@@ -1,6 +1,19 @@
 import os
+import warnings
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlencode
+
+# Suppress a known pydantic warning emitted by generated OpenAPI models.
+# Keep this narrow to avoid hiding unrelated warnings.
+warnings.filterwarnings(
+    "ignore",
+    message=(
+        r'Field name "validate" in "OrganizationsSetAgentOpenAIKeyBody" '
+        r'shadows an attribute in parent "BaseModel"'
+    ),
+    category=UserWarning,
+)
 
 from ai.models import (
     CanvasEdge,
@@ -14,12 +27,31 @@ from ai.models import (
 )
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
+from superplaneapi.api.component_api import ComponentApi
+from superplaneapi.api.organization_api import OrganizationApi
+from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
+from superplaneapi.models.components_component import ComponentsComponent
+from superplaneapi.models.components_describe_component_response import (
+    ComponentsDescribeComponentResponse,
+)
+from superplaneapi.models.components_list_components_response import ComponentsListComponentsResponse
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.components_node_type import ComponentsNodeType
+from superplaneapi.models.configuration_field import ConfigurationField
+from superplaneapi.models.organizations_integration import OrganizationsIntegration
+from superplaneapi.models.organizations_list_integration_resources_response import (
+    OrganizationsListIntegrationResourcesResponse,
+)
+from superplaneapi.models.superplane_organizations_list_integrations_response import (
+    SuperplaneOrganizationsListIntegrationsResponse,
+)
+from superplaneapi.models.triggers_describe_trigger_response import TriggersDescribeTriggerResponse
+from superplaneapi.models.triggers_list_triggers_response import TriggersListTriggersResponse
+from superplaneapi.models.triggers_trigger import TriggersTrigger
 
 
 def _debug_enabled() -> bool:
@@ -56,6 +88,9 @@ class SuperplaneClient:
         )
         self._canvas_api = CanvasApi(self._api_client)
         self._canvas_node_api = CanvasNodeApi(self._api_client)
+        self._component_api = ComponentApi(self._api_client)
+        self._trigger_api = TriggerApi(self._api_client)
+        self._organization_api = OrganizationApi(self._api_client)
 
     def _with_error_guidance(self, callback: Any, operation: str) -> Any:
         _debug_log(
@@ -157,6 +192,261 @@ class SuperplaneClient:
             nodes=nodes,
             edges=edges,
         )
+
+    @staticmethod
+    def _provider_from_name(name: str | None) -> str | None:
+        if not isinstance(name, str) or "." not in name:
+            return None
+        provider = name.split(".", 1)[0].strip()
+        return provider or None
+
+    @staticmethod
+    def _matches_filters(
+        *,
+        name: str | None,
+        label: str | None,
+        description: str | None,
+        provider: str | None,
+        query: str | None,
+    ) -> bool:
+        resolved_provider = provider.strip().lower() if isinstance(provider, str) and provider.strip() else None
+        resolved_query = query.strip().lower() if isinstance(query, str) and query.strip() else None
+        provider_from_name = SuperplaneClient._provider_from_name(name)
+        if resolved_provider and provider_from_name != resolved_provider:
+            return False
+        if not resolved_query:
+            return True
+
+        haystack_parts = [name, label, description]
+        haystack = " ".join(part for part in haystack_parts if isinstance(part, str)).lower()
+        return resolved_query in haystack
+
+    @staticmethod
+    def _serialize_configuration_fields(fields: list[ConfigurationField] | None) -> list[dict[str, Any]]:
+        if not isinstance(fields, list):
+            return []
+        serialized: list[dict[str, Any]] = []
+        for field in fields:
+            if not isinstance(field, ConfigurationField):
+                continue
+            serialized.append(
+                {
+                    "name": field.name,
+                    "label": field.label,
+                    "type": field.type,
+                    "description": field.description,
+                    "required": bool(field.required),
+                    "default_value": field.default_value,
+                    "placeholder": field.placeholder,
+                    "sensitive": bool(field.sensitive),
+                    "togglable": bool(field.togglable),
+                    "required_conditions": [
+                        condition.model_dump(mode="json", by_alias=True)
+                        for condition in (field.required_conditions or [])
+                        if condition is not None
+                    ],
+                    "visibility_conditions": [
+                        condition.model_dump(mode="json", by_alias=True)
+                        for condition in (field.visibility_conditions or [])
+                        if condition is not None
+                    ],
+                    "type_options": field.type_options.model_dump(mode="json", by_alias=True)
+                    if field.type_options is not None
+                    else None,
+                }
+            )
+        return serialized
+
+    @staticmethod
+    def _serialize_component(component: ComponentsComponent) -> dict[str, Any]:
+        output_channels = component.output_channels or []
+        configuration_fields = SuperplaneClient._serialize_configuration_fields(component.configuration)
+        required_fields = [field["name"] for field in configuration_fields if field["required"] and field["name"]]
+        return {
+            "name": component.name,
+            "provider": SuperplaneClient._provider_from_name(component.name),
+            "label": component.label,
+            "description": component.description,
+            "icon": component.icon,
+            "color": component.color,
+            "configuration_fields": configuration_fields,
+            "required_fields": required_fields,
+            "output_channels": [
+                {
+                    "name": channel.name,
+                    "label": channel.label,
+                    "description": channel.description,
+                }
+                for channel in output_channels
+                if channel is not None
+            ],
+            "example_output": component.example_output,
+        }
+
+    @staticmethod
+    def _serialize_trigger(trigger: TriggersTrigger) -> dict[str, Any]:
+        configuration_fields = SuperplaneClient._serialize_configuration_fields(trigger.configuration)
+        required_fields = [field["name"] for field in configuration_fields if field["required"] and field["name"]]
+        return {
+            "name": trigger.name,
+            "provider": SuperplaneClient._provider_from_name(trigger.name),
+            "label": trigger.label,
+            "description": trigger.description,
+            "icon": trigger.icon,
+            "color": trigger.color,
+            "configuration_fields": configuration_fields,
+            "required_fields": required_fields,
+            "example_data": trigger.example_data,
+        }
+
+    @staticmethod
+    def _serialize_org_integration(integration: OrganizationsIntegration) -> dict[str, Any]:
+        metadata = integration.metadata
+        spec = integration.spec
+        status = integration.status
+        return {
+            "id": metadata.id if metadata is not None else None,
+            "name": metadata.name if metadata is not None else None,
+            "integration_name": spec.integration_name if spec is not None else None,
+            "provider": spec.integration_name if spec is not None else None,
+            "state": status.state if status is not None else None,
+            "state_description": status.state_description if status is not None else None,
+        }
+
+    def list_components(
+        self,
+        provider: str | None = None,
+        query: str | None = None,
+    ) -> list[dict[str, Any]]:
+        response = self._with_error_guidance(
+            lambda: self._component_api.components_list_components(
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="components_list_components",
+        )
+        if not isinstance(response, ComponentsListComponentsResponse):
+            return []
+        components = response.components if isinstance(response.components, list) else []
+        matches = [
+            component
+            for component in components
+            if isinstance(component, ComponentsComponent)
+            and self._matches_filters(
+                name=component.name,
+                label=component.label,
+                description=component.description,
+                provider=provider,
+                query=query,
+            )
+        ]
+        return [self._serialize_component(component) for component in matches]
+
+    def describe_component(self, name: str) -> dict[str, Any]:
+        response = self._with_error_guidance(
+            lambda: self._component_api.components_describe_component(
+                name,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="components_describe_component",
+        )
+        if not isinstance(response, ComponentsDescribeComponentResponse) or not isinstance(
+            response.component, ComponentsComponent
+        ):
+            raise ValueError(f"Component '{name}' was not found or response shape was invalid.")
+        return self._serialize_component(response.component)
+
+    def list_triggers(
+        self,
+        provider: str | None = None,
+        query: str | None = None,
+    ) -> list[dict[str, Any]]:
+        response = self._with_error_guidance(
+            lambda: self._trigger_api.triggers_list_triggers(
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="triggers_list_triggers",
+        )
+        if not isinstance(response, TriggersListTriggersResponse):
+            return []
+        triggers = response.triggers if isinstance(response.triggers, list) else []
+        matches = [
+            trigger
+            for trigger in triggers
+            if isinstance(trigger, TriggersTrigger)
+            and self._matches_filters(
+                name=trigger.name,
+                label=trigger.label,
+                description=trigger.description,
+                provider=provider,
+                query=query,
+            )
+        ]
+        return [self._serialize_trigger(trigger) for trigger in matches]
+
+    def describe_trigger(self, name: str) -> dict[str, Any]:
+        response = self._with_error_guidance(
+            lambda: self._trigger_api.triggers_describe_trigger(
+                name,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="triggers_describe_trigger",
+        )
+        if not isinstance(response, TriggersDescribeTriggerResponse) or not isinstance(
+            response.trigger, TriggersTrigger
+        ):
+            raise ValueError(f"Trigger '{name}' was not found or response shape was invalid.")
+        return self._serialize_trigger(response.trigger)
+
+    def list_org_integrations(self) -> list[dict[str, Any]]:
+        response = self._with_error_guidance(
+            lambda: self._organization_api.organizations_list_integrations(
+                self._config.organization_id,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="organizations_list_integrations",
+        )
+        if not isinstance(response, SuperplaneOrganizationsListIntegrationsResponse):
+            return []
+        integrations = response.integrations if isinstance(response.integrations, list) else []
+        return [
+            self._serialize_org_integration(integration)
+            for integration in integrations
+            if isinstance(integration, OrganizationsIntegration)
+        ]
+
+    def list_integration_resources(
+        self,
+        integration_id: str,
+        type: str,
+        parameters: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        query_params = {"type": type}
+        if isinstance(parameters, dict):
+            query_params.update(
+                {str(key): str(value) for key, value in parameters.items() if key and value}
+            )
+        encoded_parameters = urlencode(query_params)
+        response = self._with_error_guidance(
+            lambda: self._organization_api.organizations_list_integration_resources(
+                self._config.organization_id,
+                integration_id,
+                parameters=encoded_parameters,
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="organizations_list_integration_resources",
+        )
+        if not isinstance(response, OrganizationsListIntegrationResourcesResponse):
+            return []
+        resources = response.resources if isinstance(response.resources, list) else []
+        return [
+            {
+                "id": resource.id,
+                "name": resource.name,
+                "type": resource.type,
+            }
+            for resource in resources
+            if resource is not None
+        ]
 
     def get_canvas_shape(self, canvas_id: str) -> CanvasShape:
         summary = self.describe_canvas(canvas_id)
