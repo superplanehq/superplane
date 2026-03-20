@@ -661,7 +661,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                       </div>
                       <div>
                         <Heading level={3} className="!text-sm mb-1">
-                          Blank Canvas
+                          New Canvas
                         </Heading>
                         <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
                           Start from scratch. You know what you&rsquo;re doing.
