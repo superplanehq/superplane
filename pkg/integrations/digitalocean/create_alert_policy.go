@@ -3,6 +3,7 @@ package digitalocean
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -197,7 +198,7 @@ func (c *CreateAlertPolicy) HandleAction(ctx core.ActionContext) error {
 }
 
 func (c *CreateAlertPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return rejectUnsupportedWebhook(ctx, c.Name())
+	return http.StatusOK, nil, nil
 }
 
 func (c *CreateAlertPolicy) Cleanup(ctx core.SetupContext) error {
