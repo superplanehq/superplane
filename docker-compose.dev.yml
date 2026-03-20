@@ -126,7 +126,8 @@ services:
       --host 0.0.0.0
       --port 8090
       --reload
-      --reload-dir /app/src"
+      --reload-dir /app/src
+      --reload-dir /app/evals"
     tty: true
     stdin_open: true
     ports:

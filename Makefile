@@ -69,6 +69,9 @@ test.license.check:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
+test.agent.evals:
+	$(COMPOSE) exec agent uv run python -m evals.runner
+
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
 
