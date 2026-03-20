@@ -48,7 +48,6 @@ const casesResponse = `{
 	]
 }`
 
-const caseListResponse = casesResponse
 const caseWebhookSecret = "test-signing-secret"
 
 func caseHeadersWithSecret() http.Header {
@@ -61,6 +60,14 @@ var caseWebhook = &contexts.NodeWebhookContext{Secret: caseWebhookSecret}
 var caseStatusChangedBody = []byte(`{"eventType":"case_status_changed","routeKey":"route-123"}`)
 
 func Test__OnCaseStatusChange__Setup(t *testing.T) {
+	t.Run("missing cases -> error", func(t *testing.T) {
+		err := (&OnCaseStatusChange{}).Setup(core.TriggerContext{
+			Configuration: map[string]any{},
+			Metadata:      &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "at least one case is required")
+	})
+
 	t.Run("new trigger -> initializes metadata, baseline statuses, requests webhook, and schedules provisioning", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{
 			"url":       "https://elastic.example.com",
@@ -70,13 +77,27 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		}}
 		meta := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(caseListResponse)),
-		}}}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"id": "case-1",
+					"title": "Production incident",
+					"status": "in-progress"
+				}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"id": "case-2",
+					"title": "DB issue",
+					"status": "closed"
+				}`)),
+			},
+		}}
 
 		err := (&OnCaseStatusChange{}).Setup(core.TriggerContext{
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Integration:   integration,
 			Requests:      requests,
@@ -89,6 +110,7 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		assert.NotEmpty(t, saved.LastPollTime)
 		assert.NotEmpty(t, saved.RouteKey)
 		assert.Empty(t, saved.RuleID)
+		assert.Equal(t, map[string]string{"case-1": "Production incident", "case-2": "DB issue"}, saved.CaseNames)
 		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 		require.Len(t, integration.WebhookRequests, 1)
 		cfg := integration.WebhookRequests[0].(map[string]any)
@@ -109,13 +131,27 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 			RuleID:       "existing-rule-id",
 		}}
 		requests := &contexts.RequestContext{}
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
-			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(caseListResponse)),
-		}}}
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"id": "case-1",
+					"title": "Production incident",
+					"status": "in-progress"
+				}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"id": "case-2",
+					"title": "DB issue",
+					"status": "closed"
+				}`)),
+			},
+		}}
 
 		err := (&OnCaseStatusChange{}).Setup(core.TriggerContext{
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Integration:   integration,
 			Requests:      requests,
@@ -128,6 +164,7 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		assert.Equal(t, "2024-01-01T00:00:00Z", saved.LastPollTime)
 		assert.Equal(t, "route-123", saved.RouteKey)
 		assert.Equal(t, "existing-rule-id", saved.RuleID)
+		assert.Equal(t, map[string]string{"case-1": "Production incident", "case-2": "DB issue"}, saved.CaseNames)
 		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 		require.Len(t, integration.WebhookRequests, 1)
 		assert.Empty(t, requests.Action)
@@ -347,7 +384,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,
@@ -368,7 +405,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,
@@ -448,7 +485,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{"statuses": []string{"closed"}},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}, "statuses": []string{"closed"}},
 			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,
@@ -473,7 +510,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{"severities": []string{"high"}},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}, "severities": []string{"high"}},
 			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,
@@ -499,7 +536,8 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 			Body:    caseStatusChangedBody,
 			Headers: caseHeadersWithSecret(),
 			Configuration: map[string]any{
-				"tags": []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "prod"}},
+				"cases": []string{"case-1", "case-2"},
+				"tags":  []configuration.Predicate{{Type: configuration.PredicateTypeEquals, Value: "prod"}},
 			},
 			Metadata:    meta,
 			Events:      events,
@@ -524,7 +562,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Events:        &contexts.EventContext{},
 			Webhook:       caseWebhook,
@@ -548,7 +586,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,

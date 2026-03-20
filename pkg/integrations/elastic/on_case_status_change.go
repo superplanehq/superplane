@@ -66,7 +66,7 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 
 ## Configuration
 
-- **Cases** *(optional)*: Only fire for these specific cases. Leave empty to monitor all cases.
+- **Cases**: Select one or more specific cases to monitor.
 - **Statuses** *(optional)*: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
 - **Severities** *(optional)*: Only fire for cases with one of these severities. Leave empty to accept all severities.
 - **Tags** *(optional)*: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
@@ -82,8 +82,8 @@ func (t *OnCaseStatusChange) Configuration() []configuration.Field {
 			Name:        "cases",
 			Label:       "Cases",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Only fire for these specific cases. Leave empty to monitor all cases.",
+			Required:    true,
+			Description: "Select one or more specific cases to monitor.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type:  ResourceTypeCase,
@@ -148,27 +148,17 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-
-	if len(config.Cases) > 0 {
-		names, statuses, err := t.resolveCaseMetadata(ctx, config.Cases)
-		if err != nil {
-			return err
-		}
-		meta.CaseNames = names
-		meta.CaseStatuses = statuses
-		changed = true
-	} else {
-		if meta.CaseNames != nil {
-			meta.CaseNames = nil
-			changed = true
-		}
-		statuses, err := t.loadAllCaseStatuses(ctx)
-		if err != nil {
-			return err
-		}
-		meta.CaseStatuses = statuses
-		changed = true
+	if len(config.Cases) == 0 {
+		return fmt.Errorf("at least one case is required")
 	}
+
+	names, statuses, err := t.resolveCaseMetadata(ctx, config.Cases)
+	if err != nil {
+		return err
+	}
+	meta.CaseNames = names
+	meta.CaseStatuses = statuses
+	changed = true
 
 	if changed {
 		if err := ctx.Metadata.Set(meta); err != nil {
@@ -213,25 +203,6 @@ func (t *OnCaseStatusChange) resolveCaseMetadata(ctx core.TriggerContext, caseID
 		statuses[id] = strings.ToLower(caseResp.Status)
 	}
 	return names, statuses, nil
-}
-
-func (t *OnCaseStatusChange) loadAllCaseStatuses(ctx core.TriggerContext) (map[string]string, error) {
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Elastic client: %w", err)
-	}
-
-	cases, err := client.ListCases()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list cases: %w", err)
-	}
-
-	statuses := make(map[string]string, len(cases))
-	for _, c := range cases {
-		statuses[c.ID] = strings.ToLower(c.Status)
-	}
-
-	return statuses, nil
 }
 
 func (t *OnCaseStatusChange) Actions() []core.Action {
@@ -340,6 +311,10 @@ func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int,
 	var config OnCaseStatusChangeConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+	if len(config.Cases) == 0 {
+		// Keep older misconfigured trigger nodes quiet rather than broadening scope.
+		return http.StatusOK, nil, nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

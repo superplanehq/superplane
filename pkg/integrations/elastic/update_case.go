@@ -39,7 +39,7 @@ func (c *UpdateCase) Documentation() string {
 
 ## Configuration
 
-- **Case ID**: The ID of the case to update
+- **Case**: The Kibana case to update
 - **Title**: New title for the case (optional)
 - **Description**: New description for the case (optional)
 - **Status**: New status for the case (optional)

@@ -16,9 +16,16 @@ interface OnCaseStatusChangeNodeMetadata {
   caseNames?: Record<string, string>;
 }
 
+interface OnCaseStatusChangeEventData {
+  id?: string;
+  title?: string;
+  status?: string;
+  severity?: string;
+}
+
 export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
-    const payload = context.event?.data as Record<string, any> | undefined;
+    const payload = context.event?.data as OnCaseStatusChangeEventData | undefined;
     const status = payload?.status ? ` to ${payload.status}` : "";
     const title = payload?.title ? `Case "${payload.title}" changed${status}` : "Case status changed";
     const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
@@ -26,7 +33,7 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const payload = context.event?.data as Record<string, any> | undefined;
+    const payload = context.event?.data as OnCaseStatusChangeEventData | undefined;
     const details: Record<string, string> = {};
     if (context.event?.createdAt) details["Triggered At"] = new Date(context.event.createdAt).toLocaleString();
     if (payload?.id) details["Case ID"] = String(payload.id);
@@ -62,7 +69,7 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
     }
 
     if (lastEvent) {
-      const payload = lastEvent.data as Record<string, any> | undefined;
+      const payload = lastEvent.data as OnCaseStatusChangeEventData | undefined;
       const status = payload?.status ? ` to ${payload.status}` : "";
       const title = payload?.title ? `Case "${payload.title}" changed${status}` : "Case status changed";
       return {

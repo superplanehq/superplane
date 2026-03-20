@@ -35,9 +35,9 @@ func (c *CreateCase) Documentation() string {
 ## Configuration
 
 - **Title**: The case title
-- **Description**: A description of the case
 - **Severity**: Case severity (low, medium, high, or critical)
 - **Owner**: The Kibana application that owns the case
+- **Description**: A description of the case
 - **Tags**: Optional list of tags to attach to the case
 
 ## Outputs
@@ -63,13 +63,6 @@ func (c *CreateCase) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The title of the Kibana case.",
-		},
-		{
-			Name:        "description",
-			Label:       "Description",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "A description of the case.",
 		},
 		{
 			Name:        "severity",
@@ -105,6 +98,13 @@ func (c *CreateCase) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "description",
+			Label:       "Description",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "A description of the case.",
 		},
 		{
 			Name:        "tags",
