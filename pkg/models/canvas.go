@@ -323,3 +323,21 @@ func CountCanvasesByOrganizationIDs(orgIDs []string) (map[string]int64, error) {
 
 	return counts, nil
 }
+
+func CountCanvasesByOrganization(orgID string) (int64, error) {
+	return CountCanvasesByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func CountCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&Canvas{}).
+		Where("organization_id = ?", orgID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}

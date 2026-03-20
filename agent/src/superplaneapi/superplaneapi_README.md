@@ -121,6 +121,7 @@ Class | Method | HTTP request | Description
 *OrganizationApi* | [**organizations_delete_organization**](superplaneapi/docs/OrganizationApi.md#organizations_delete_organization) | **DELETE** /api/v1/organizations/{id} | Delete an organization
 *OrganizationApi* | [**organizations_describe_integration**](superplaneapi/docs/OrganizationApi.md#organizations_describe_integration) | **GET** /api/v1/organizations/{id}/integrations/{integrationId} | Describe an integration in an organization
 *OrganizationApi* | [**organizations_describe_organization**](superplaneapi/docs/OrganizationApi.md#organizations_describe_organization) | **GET** /api/v1/organizations/{id} | Get organization details
+*OrganizationApi* | [**organizations_describe_usage**](superplaneapi/docs/OrganizationApi.md#organizations_describe_usage) | **GET** /api/v1/organizations/{id}/usage | Describe organization usage
 *OrganizationApi* | [**organizations_get_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_get_agent_settings) | **GET** /api/v1/organizations/{id}/agent-settings | Get organization Agent Mode settings
 *OrganizationApi* | [**organizations_get_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_get_invite_link) | **GET** /api/v1/organizations/{id}/invite-link | Get an organization invite link
 *OrganizationApi* | [**organizations_list_integration_resources**](superplaneapi/docs/OrganizationApi.md#organizations_list_integration_resources) | **GET** /api/v1/organizations/{id}/integrations/{integrationId}/resources | List integration resources
@@ -297,6 +298,7 @@ Class | Method | HTTP request | Description
  - [OrganizationsDeleteAgentOpenAIKeyResponse](superplaneapi/docs/OrganizationsDeleteAgentOpenAIKeyResponse.md)
  - [OrganizationsDescribeIntegrationResponse](superplaneapi/docs/OrganizationsDescribeIntegrationResponse.md)
  - [OrganizationsDescribeOrganizationResponse](superplaneapi/docs/OrganizationsDescribeOrganizationResponse.md)
+ - [OrganizationsDescribeUsageResponse](superplaneapi/docs/OrganizationsDescribeUsageResponse.md)
  - [OrganizationsGetAgentSettingsResponse](superplaneapi/docs/OrganizationsGetAgentSettingsResponse.md)
  - [OrganizationsGetInviteLinkResponse](superplaneapi/docs/OrganizationsGetInviteLinkResponse.md)
  - [OrganizationsIntegration](superplaneapi/docs/OrganizationsIntegration.md)
@@ -309,7 +311,9 @@ Class | Method | HTTP request | Description
  - [OrganizationsListIntegrationResourcesResponse](superplaneapi/docs/OrganizationsListIntegrationResourcesResponse.md)
  - [OrganizationsListInvitationsResponse](superplaneapi/docs/OrganizationsListInvitationsResponse.md)
  - [OrganizationsOrganization](superplaneapi/docs/OrganizationsOrganization.md)
+ - [OrganizationsOrganizationLimits](superplaneapi/docs/OrganizationsOrganizationLimits.md)
  - [OrganizationsOrganizationMetadata](superplaneapi/docs/OrganizationsOrganizationMetadata.md)
+ - [OrganizationsOrganizationUsage](superplaneapi/docs/OrganizationsOrganizationUsage.md)
  - [OrganizationsResetInviteLinkResponse](superplaneapi/docs/OrganizationsResetInviteLinkResponse.md)
  - [OrganizationsSetAgentOpenAIKeyBody](superplaneapi/docs/OrganizationsSetAgentOpenAIKeyBody.md)
  - [OrganizationsSetAgentOpenAIKeyResponse](superplaneapi/docs/OrganizationsSetAgentOpenAIKeyResponse.md)

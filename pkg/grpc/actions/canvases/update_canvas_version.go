@@ -14,7 +14,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
@@ -23,6 +25,32 @@ import (
 
 func UpdateCanvasVersion(
 	ctx context.Context,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	organizationID string,
+	canvasID string,
+	versionID string,
+	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
+	webhookBaseURL string,
+) (*pb.UpdateCanvasVersionResponse, error) {
+	return UpdateCanvasVersionWithUsage(
+		ctx,
+		nil,
+		encryptor,
+		registry,
+		organizationID,
+		canvasID,
+		versionID,
+		pbCanvas,
+		autoLayout,
+		webhookBaseURL,
+	)
+}
+
+func UpdateCanvasVersionWithUsage(
+	ctx context.Context,
+	usageService usage.Service,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	organizationID string,
@@ -59,6 +87,17 @@ func UpdateCanvasVersion(
 
 	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
 	if err != nil {
+		return nil, err
+	}
+
+	expandedNodes, err := expandNodes(organizationID, nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, organizationID, &usagepb.OrganizationState{}, &usagepb.CanvasState{
+		Nodes: int32(len(expandedNodes)),
+	}); err != nil {
 		return nil, err
 	}
 

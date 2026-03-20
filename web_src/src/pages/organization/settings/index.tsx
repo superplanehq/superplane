@@ -17,10 +17,13 @@ import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { ServiceAccounts } from "./ServiceAccounts";
 import { ServiceAccountDetail } from "./ServiceAccountDetail";
+import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
   ArrowRightLeft,
+  Gauge,
   Bot,
   CircleUser,
   Home,
@@ -36,15 +39,18 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip, RequirePermission } from "@/components/PermissionGate";
+import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 
 export function OrganizationSettings() {
   const location = useLocation();
   const { account: user, loading: userLoading } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const canReadOrg = permissionsLoading || canAct("org", "read");
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
+  const { data: usageStatus } = useOrganizationUsage(organizationId || "", !!organizationId && canReadOrg);
 
   if (userLoading) {
     return (
@@ -98,6 +104,7 @@ export function OrganizationSettings() {
     "integrations",
     "secrets",
     "service-accounts",
+    "billing",
   ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
@@ -114,6 +121,7 @@ export function OrganizationSettings() {
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
   const userEmail = user?.email || "";
+  const usageEnabled = usageStatus?.enabled === true || isUsagePageForced();
 
   const organizationLinks: NavLink[] = [
     {
@@ -175,6 +183,16 @@ export function OrganizationSettings() {
     { id: "change-org", label: "Change Organization", href: "/", Icon: ArrowRightLeft },
   ];
 
+  if (usageEnabled) {
+    organizationLinks.splice(6, 0, {
+      id: "billing",
+      label: "Usage",
+      href: `/${organizationId}/settings/billing`,
+      Icon: Gauge,
+      permission: { resource: "org", action: "read" },
+    });
+  }
+
   const userLinks: NavLink[] = [
     { id: "profile", label: "Profile", href: `/${organizationId}/settings/profile`, Icon: CircleUser },
     { id: "sign-out", label: "Sign Out", action: () => (window.location.href = "/logout"), Icon: LogOut },
@@ -231,6 +249,10 @@ export function OrganizationSettings() {
     integrations: {
       title: "Integrations",
       description: "Connect external tools and services to extend SuperPlane.",
+    },
+    billing: {
+      title: "Usage",
+      description: "Review organization limits and tracked usage from the configured usage service.",
     },
     secrets: {
       title: "Secrets",
@@ -491,7 +513,6 @@ export function OrganizationSettings() {
                 </RequirePermission>
               }
             />
-            <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
             <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
             <Route
               path="service-accounts"
@@ -515,10 +536,9 @@ export function OrganizationSettings() {
             <Route
               path="billing"
               element={
-                <div className="pt-6">
-                  <h1 className="text-2xl font-semibold">Billing & Plans</h1>
-                  <p>Billing management coming soon...</p>
-                </div>
+                <RequirePermission resource="org" action="read">
+                  <Usage organizationId={organizationId || ""} />
+                </RequirePermission>
               }
             />
           </Routes>

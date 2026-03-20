@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { getUsageLimitToastMessage } from "@/utils/usageLimits";
 
 interface ImportYamlDialogProps {
   open: boolean;
@@ -144,8 +145,7 @@ export function ImportYamlDialog({ open, onOpenChange, organizationId, onSuccess
         onSuccess(canvasId);
       }
     } catch (error) {
-      const errorMessage = (error as Error)?.message || "Failed to import canvas";
-      showErrorToast(errorMessage);
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to import canvas"));
     }
   }, [yamlText, createMutation, handleOpenChange, onSuccess]);
 

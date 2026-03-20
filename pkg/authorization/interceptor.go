@@ -84,6 +84,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_UpdateAgentSettings_FullMethodName:      {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_SetAgentOpenAIKey_FullMethodName:        {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DeleteAgentOpenAIKey_FullMethodName:     {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbOrganization.Organizations_DescribeUsage_FullMethodName:            {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_RemoveUser_FullMethodName:               {Resource: "members", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:       {Resource: "org", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_CreateIntegration_FullMethodName:        {Resource: "integrations", Action: "create", DomainType: models.DomainTypeOrganization},

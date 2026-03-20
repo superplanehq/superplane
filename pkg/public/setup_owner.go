@@ -9,8 +9,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/usage"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -81,6 +86,12 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
+		if err := usage.EnsureAccountWithinLimits(r.Context(), s.usageService, account.ID.String(), &usagepb.AccountState{
+			Organizations: 1,
+		}); err != nil {
+			return err
+		}
+
 		// Hash and store password
 		passwordHash, err := crypto.HashPassword(req.Password)
 		if err != nil {
@@ -139,6 +150,11 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if err != nil {
+		if status.Code(err) == codes.ResourceExhausted {
+			http.Error(w, err.Error(), http.StatusTooManyRequests)
+			return
+		}
+
 		log.Errorf("Failed to set up owner account: %v", err)
 		http.Error(w, "Failed to set up owner account", http.StatusInternalServerError)
 		return
@@ -148,6 +164,11 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	middleware.MarkOwnerSetupCompleted()
 
 	// Create account cookie so the owner is signed in
+	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
+	if err := organizationCreatedMessage.Publish(); err != nil {
+		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
+	}
+
 	token, err := s.jwt.Generate(account.ID.String(), 24*time.Hour)
 	if err != nil {
 		log.Errorf("Failed to generate account token for owner: %v", err)

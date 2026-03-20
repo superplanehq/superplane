@@ -46,14 +46,18 @@ import (
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -80,6 +84,7 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
+	usageService          usage.Service
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -98,6 +103,7 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
+	usageService usage.Service,
 	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
@@ -118,6 +124,7 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		usageService:          usageService,
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
@@ -566,6 +573,28 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if s.usageService != nil && s.usageService.Enabled() {
+		organizationCount, countErr := models.CountOrganizationsByBillingAccount(account.ID.String())
+		if countErr != nil {
+			log.Errorf("Error counting organizations for account %s: %v", account.ID, countErr)
+			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+			return
+		}
+
+		if err := usage.EnsureAccountWithinLimits(r.Context(), s.usageService, account.ID.String(), &usagepb.AccountState{
+			Organizations: int32(organizationCount + 1),
+		}); err != nil {
+			if status.Code(err) == codes.ResourceExhausted {
+				http.Error(w, err.Error(), http.StatusTooManyRequests)
+				return
+			}
+
+			log.Errorf("Error checking organization limit for account %s: %v", account.ID, err)
+			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	//
 	// Create the organization
 	//
@@ -618,6 +647,11 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
+
+	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
+	if err := organizationCreatedMessage.Publish(); err != nil {
+		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
+	}
 
 	response := map[string]any{}
 	response["id"] = organization.ID.String()

@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Text } from "../../components/Text/text";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { getUsageLimitNotice } from "@/utils/usageLimits";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -49,6 +52,8 @@ const OrganizationCreate: React.FC = () => {
     }
   };
 
+  const usageLimitNotice = error ? getUsageLimitNotice(error) : null;
+
   return (
     <div className="min-h-screen bg-slate-100">
       <div className="p-6 flex items-center">
@@ -64,11 +69,13 @@ const OrganizationCreate: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
-              </div>
-            )}
+            {usageLimitNotice ? <UsageLimitAlert notice={usageLimitNotice} /> : null}
+            {error && !usageLimitNotice ? (
+              <Alert variant="destructive">
+                <AlertTitle>Unable to create organization</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
 
             <div>
               <label

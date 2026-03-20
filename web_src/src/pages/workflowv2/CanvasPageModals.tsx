@@ -13,6 +13,7 @@ import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
 import { DraftNodeDiffSummary } from "./draftNodeDiff";
 
 interface CanvasPageModalsProps {
+  organizationId: string;
   canvas?: CanvasesCanvas | null;
   isUseTemplateOpen: boolean;
   onCloseUseTemplate: () => void;
@@ -36,6 +37,7 @@ interface CanvasPageModalsProps {
 }
 
 export function CanvasPageModals({
+  organizationId,
   canvas,
   isUseTemplateOpen,
   onCloseUseTemplate,
@@ -61,6 +63,7 @@ export function CanvasPageModals({
     <>
       {canvas ? (
         <CreateCanvasModal
+          organizationId={organizationId}
           isOpen={isUseTemplateOpen}
           onClose={onCloseUseTemplate}
           onSubmit={onUseTemplateSubmit}
