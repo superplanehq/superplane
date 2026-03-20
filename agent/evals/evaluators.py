@@ -10,7 +10,6 @@ class WorkflowShape(Evaluator):
 
   def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> bool:
     wf = process_operations(ctx.output.proposal.operations)
-    print(wf)
     return wf.nodes == self.nodes and wf.edges == self.edges
 
 # Helper functions
@@ -30,8 +29,9 @@ class CanvasShape:
     return f"CanvasShape(nodes={self.nodes}, edges={self.edges})"
 
 def process_operations(operations: list[CanvasOperation]) -> CanvasShape:
-  added_nodes = dict[str, CanvasOperation]
-  nodes = list[str]
+  added_nodes: dict[str, CanvasOperation] = {}
+  nodes: list[str] = []
+  edges: list[tuple[str, str]] = []
 
   for op in operations:
     if op.type == "add_node":
