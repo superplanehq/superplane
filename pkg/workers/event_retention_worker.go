@@ -64,7 +64,11 @@ func (w *EventRetentionWorker) tick(ctx context.Context) {
 	}
 
 	for _, rootEvent := range rootEvents {
-		if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+		if err := w.semaphore.Acquire(ctx, 1); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+
 			w.logger.Errorf("Error acquiring semaphore: %v", err)
 			continue
 		}

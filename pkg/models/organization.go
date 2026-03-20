@@ -246,6 +246,32 @@ func MarkOrganizationUsageLimitsSyncedInTransaction(
 		Error
 }
 
+func MarkOrganizationUsageLimitsSyncedIfNewer(orgID string, retentionWindowDays *int32, syncedAt time.Time) (bool, error) {
+	return MarkOrganizationUsageLimitsSyncedIfNewerInTransaction(database.Conn(), orgID, retentionWindowDays, syncedAt)
+}
+
+func MarkOrganizationUsageLimitsSyncedIfNewerInTransaction(
+	tx *gorm.DB,
+	orgID string,
+	retentionWindowDays *int32,
+	syncedAt time.Time,
+) (bool, error) {
+	result := tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at <= ?", syncedAt.UTC()).
+		Updates(map[string]any{
+			"usage_retention_window_days": retentionWindowDays,
+			"usage_limits_synced_at":      syncedAt.UTC(),
+		})
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected > 0, nil
+}
+
 func ListOrganizationsPendingUsageLimitsRefresh(staleBefore time.Time, limit int) ([]Organization, error) {
 	return ListOrganizationsPendingUsageLimitsRefreshInTransaction(database.Conn(), staleBefore, limit)
 }

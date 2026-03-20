@@ -187,14 +187,15 @@ func (w *UsageSyncWorker) ConsumeOrganizationPlanChanged(delivery tackle.Deliver
 		syncedAt = data.Timestamp.AsTime()
 	}
 
-	if err := models.MarkOrganizationUsageLimitsSynced(organizationID.String(), retentionWindowDays, syncedAt); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Warnf("Skipping usage plan change for organization %s: %v", organizationID, err)
-			return nil
-		}
-
+	applied, err := models.MarkOrganizationUsageLimitsSyncedIfNewer(organizationID.String(), retentionWindowDays, syncedAt)
+	if err != nil {
 		log.Errorf("Failed to apply usage plan change for organization %s: %v", organizationID, err)
 		return err
+	}
+
+	if !applied {
+		log.Warnf("Skipping stale or unknown usage plan change for organization %s", organizationID)
+		return nil
 	}
 
 	log.Infof("Applied usage plan change for organization %s", organizationID)

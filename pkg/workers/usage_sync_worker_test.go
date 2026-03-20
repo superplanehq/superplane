@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,4 +123,60 @@ func Test__UsageSyncWorker_ConsumeOrganizationPlanChangedUpdatesUsageLimitsCache
 	assert.Equal(t, int32(60), *organization.UsageRetentionWindowDays)
 	require.NotNil(t, organization.UsageLimitsSyncedAt)
 	assert.WithinDuration(t, eventTimestamp, *organization.UsageLimitsSyncedAt, time.Second)
+}
+
+func Test__UsageSyncWorker_ConsumeOrganizationPlanChangedSkipsStaleMessage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	worker := NewUsageSyncWorker("amqp://unused", &fakeUsageSyncWorkerService{enabled: true})
+	newerTimestamp := time.Now().UTC()
+	olderTimestamp := newerTimestamp.Add(-5 * time.Minute)
+
+	newerBody, err := proto.Marshal(&pb.OrganizationPlanChanged{
+		OrganizationId: r.Organization.ID.String(),
+		PlanName:       "growth",
+		Limits: &pb.OrganizationLimits{
+			RetentionWindowDays: 60,
+		},
+		Timestamp: timestamppb.New(newerTimestamp),
+	})
+	require.NoError(t, err)
+
+	olderBody, err := proto.Marshal(&pb.OrganizationPlanChanged{
+		OrganizationId: r.Organization.ID.String(),
+		PlanName:       "free",
+		Limits: &pb.OrganizationLimits{
+			RetentionWindowDays: 30,
+		},
+		Timestamp: timestamppb.New(olderTimestamp),
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ConsumeOrganizationPlanChanged(tackle.NewFakeDelivery(newerBody)))
+	require.NoError(t, worker.ConsumeOrganizationPlanChanged(tackle.NewFakeDelivery(olderBody)))
+
+	organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, organization.UsageRetentionWindowDays)
+	assert.Equal(t, int32(60), *organization.UsageRetentionWindowDays)
+	require.NotNil(t, organization.UsageLimitsSyncedAt)
+	assert.WithinDuration(t, newerTimestamp, *organization.UsageLimitsSyncedAt, time.Second)
+}
+
+func Test__UsageSyncWorker_ConsumeOrganizationPlanChangedSkipsMissingOrganization(t *testing.T) {
+	worker := NewUsageSyncWorker("amqp://unused", &fakeUsageSyncWorkerService{enabled: true})
+	missingOrganizationID := uuid.New()
+
+	body, err := proto.Marshal(&pb.OrganizationPlanChanged{
+		OrganizationId: missingOrganizationID.String(),
+		PlanName:       "growth",
+		Limits: &pb.OrganizationLimits{
+			RetentionWindowDays: 45,
+		},
+		Timestamp: timestamppb.New(time.Now().UTC()),
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, worker.ConsumeOrganizationPlanChanged(tackle.NewFakeDelivery(body)))
 }
