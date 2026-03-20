@@ -31,14 +31,20 @@ import {
   canvasesDescribeCanvas,
   canvasesEmitNodeEvent,
   canvasesListCanvasEvents,
+  canvasesListEventExecutions,
   canvasesUpdateCanvasVersion2,
   meRegenerateToken,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { useAccount } from "@/contexts/AccountContext";
+import { useMe } from "@/hooks/useMe";
 
 const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
+
+/** Quick start runs one tick against server1, then saves server2 before opening the canvas. */
+const QUICK_START_HTTP_URL_SERVER1 = "https://app.superplane.com/server1";
+const QUICK_START_HTTP_URL_SERVER2 = "https://app.superplane.com/server2";
 
 type Mode = "ui" | "cli" | "agent";
 
@@ -308,6 +314,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { account } = useAccount();
+  const { data: me } = useMe();
   const permissionAllowed = canCreateCanvases || permissionsLoading;
   const { data: templates = [] } = useCanvasTemplates(organizationId);
   const [mode, setMode] = useState<Mode>("ui");
@@ -325,17 +332,37 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
     setIsLaunchingQuickStart(true);
     try {
       const nodes = (template.spec?.nodes || []).map((node: any) => {
-        if (node.component?.name === "sendEmail" && account?.id) {
+        if (node.component?.name === "sendEmail" && me?.id) {
           return {
             ...node,
             configuration: {
               ...node.configuration,
-              recipients: [{ type: "user", user: account.id }],
+              recipients: [{ type: "user", user: me.id }],
+            },
+          };
+        }
+        if (node.component?.name === "http") {
+          return {
+            ...node,
+            configuration: {
+              ...node.configuration,
+              url: QUICK_START_HTTP_URL_SERVER1,
             },
           };
         }
         return node;
       });
+      const nodesWithServer2Url = nodes.map((node: any) =>
+        node.component?.name === "http"
+          ? {
+              ...node,
+              configuration: {
+                ...node.configuration,
+                url: QUICK_START_HTTP_URL_SERVER2,
+              },
+            }
+          : node,
+      );
       const edges = template.spec?.edges || [];
       const description = template.metadata?.description || "";
 
@@ -366,34 +393,73 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       );
 
       const triggerNode = nodes.find((n: any) => n.trigger?.name === "schedule");
+      const httpNode = nodes.find((n: any) => n.component?.name === "http");
+      let emittedEventId: string | undefined;
+
       if (triggerNode) {
         const now = new Date();
-        canvasesEmitNodeEvent(
-          withOrganizationHeader({
-            path: { canvasId, nodeId: triggerNode.id },
-            body: {
-              channel: "default",
-              data: {
-                type: "scheduler.tick",
-                timestamp: now.toISOString(),
+        try {
+          const emitResponse = await canvasesEmitNodeEvent(
+            withOrganizationHeader({
+              path: { canvasId, nodeId: triggerNode.id },
+              body: {
+                channel: "default",
                 data: {
-                  calendar: {
-                    year: String(now.getFullYear()),
-                    month: now.toLocaleString("en-US", { month: "long" }),
-                    day: String(now.getDate()),
-                    hour: String(now.getHours()).padStart(2, "0"),
-                    minute: String(now.getMinutes()).padStart(2, "0"),
-                    second: String(now.getSeconds()).padStart(2, "0"),
-                    week_day: now.toLocaleString("en-US", { weekday: "long" }),
+                  type: "scheduler.tick",
+                  timestamp: now.toISOString(),
+                  data: {
+                    calendar: {
+                      year: String(now.getFullYear()),
+                      month: now.toLocaleString("en-US", { month: "long" }),
+                      day: String(now.getDate()),
+                      hour: String(now.getHours()).padStart(2, "0"),
+                      minute: String(now.getMinutes()).padStart(2, "0"),
+                      second: String(now.getSeconds()).padStart(2, "0"),
+                      week_day: now.toLocaleString("en-US", { weekday: "long" }),
+                    },
                   },
                 },
               },
-            },
-          }),
-        ).catch(() => {});
+            }),
+          );
+          emittedEventId = emitResponse.data?.eventId;
+        } catch {
+          // Best-effort; the regular schedule will fire within a minute.
+        }
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (emittedEventId && httpNode?.id) {
+        for (let i = 0; i < 15; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          try {
+            const execResp = await canvasesListEventExecutions(
+              withOrganizationHeader({
+                path: { canvasId, eventId: emittedEventId },
+              }),
+            );
+            const httpDone = (execResp.data?.executions ?? []).some(
+              (e) => e.nodeId === httpNode.id && e.state === "STATE_FINISHED",
+            );
+            if (httpDone) break;
+          } catch {
+            break;
+          }
+        }
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      await canvasesUpdateCanvasVersion2(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            canvas: {
+              metadata: { name: QUICK_START_TEMPLATE_NAME, description },
+              spec: { nodes: nodesWithServer2Url, edges },
+            },
+          },
+        }),
+      );
 
       const [canvasResponse, eventsResponse] = await Promise.all([
         canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } })),
@@ -409,9 +475,6 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
 
       navigate(`/${organizationId}/canvases/${canvasId}`, { replace: true });
 
-      // Invalidate canvas list in the background so the sidebar dropdown
-      // and homepage know about the new canvas. This runs after navigation
-      // so it won't cause a flash on the onboarding page.
       queryClient.invalidateQueries({ queryKey: canvasKeys.lists() });
     } catch (error) {
       const message = (error as Error)?.message || "Failed to create canvas";
@@ -481,7 +544,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         </div>
 
         {/* Content area with crossfade */}
-        <div key={mode} className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
+        <div key={mode} className="min-h-[520px] animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
           {mode === "ui" && (
             <>
               {/* Quick Start hero card */}

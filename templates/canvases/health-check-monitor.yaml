@@ -28,7 +28,7 @@ spec:
       type: "TYPE_COMPONENT"
       configuration:
         method: "GET"
-        url: ""
+        url: "https://app.superplane.com/server2"
         successCodes: "2xx"
         timeoutSeconds: 10
       metadata: null
