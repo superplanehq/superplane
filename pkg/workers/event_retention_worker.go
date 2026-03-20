@@ -130,6 +130,18 @@ func (w *EventRetentionWorker) processRootEvent(tx *gorm.DB, rootEvent models.Ca
 	}
 
 	if len(executionIDs) > 0 {
+		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&models.CanvasEvent{}).Error; err != nil {
+			return fmt.Errorf("delete child events for root event %s: %w", rootEvent.ID, err)
+		}
+
+		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&models.CanvasNodeExecutionKV{}).Error; err != nil {
+			return fmt.Errorf("delete execution KVs for root event %s: %w", rootEvent.ID, err)
+		}
+
+		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&models.CanvasNodeRequest{}).Error; err != nil {
+			return fmt.Errorf("delete execution requests for root event %s: %w", rootEvent.ID, err)
+		}
+
 		if err := tx.Where("root_event_id = ?", rootEvent.ID).Delete(&models.CanvasNodeExecution{}).Error; err != nil {
 			return fmt.Errorf("delete executions for root event %s: %w", rootEvent.ID, err)
 		}
