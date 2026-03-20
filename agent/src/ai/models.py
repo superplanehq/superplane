@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 
 class CanvasQuestionRequest(BaseModel):
@@ -71,8 +71,6 @@ class AnswerCitation(BaseModel):
 
 
 class CanvasOperationNodeRef(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
     node_key: str | None = Field(default=None, alias="nodeKey")
     node_id: str | None = Field(default=None, alias="nodeId")
     node_name: str | None = Field(default=None, alias="nodeName")
@@ -85,8 +83,6 @@ class CanvasOperationPosition(BaseModel):
 
 
 class AddNodeOperation(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
     type: Literal["add_node"]
     block_name: str = Field(alias="blockName")
     node_key: str | None = Field(default=None, alias="nodeKey")
@@ -109,8 +105,6 @@ class DisconnectNodesOperation(BaseModel):
 
 
 class UpdateNodeConfigOperation(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
     type: Literal["update_node_config"]
     target: CanvasOperationNodeRef
     configuration: dict[str, Any] = Field(default_factory=dict)
