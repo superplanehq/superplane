@@ -582,13 +582,6 @@ message OrganizationDeleted {
   google.protobuf.Timestamp timestamp = 2;
 }
 
-message OrganizationPlanChanged {
-  string organization_id = 1;
-  string plan_name = 2;
-  OrganizationLimits limits = 3;
-  google.protobuf.Timestamp timestamp = 4;
-}
-
 message InvitationCreated {
   string invitation_id = 1;
   google.protobuf.Timestamp timestamp = 2;

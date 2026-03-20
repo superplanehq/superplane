@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -163,7 +164,7 @@ func (w *UsageSyncWorker) Consume(delivery tackle.Delivery) error {
 }
 
 func (w *UsageSyncWorker) ConsumeOrganizationPlanChanged(delivery tackle.Delivery) error {
-	data := &organizationpb.OrganizationPlanChanged{}
+	data := &usagepb.OrganizationPlanChanged{}
 	err := proto.Unmarshal(delivery.Body(), data)
 	if err != nil {
 		log.Errorf("Error unmarshaling organization plan changed message: %v", err)

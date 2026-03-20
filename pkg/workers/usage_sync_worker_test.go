@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
@@ -105,10 +104,10 @@ func Test__UsageSyncWorker_ConsumeOrganizationPlanChangedUpdatesUsageLimitsCache
 	worker := NewUsageSyncWorker("amqp://unused", &fakeUsageSyncWorkerService{enabled: true})
 	eventTimestamp := time.Now().Add(-5 * time.Minute).UTC()
 
-	body, err := proto.Marshal(&organizationpb.OrganizationPlanChanged{
+	body, err := proto.Marshal(&pb.OrganizationPlanChanged{
 		OrganizationId: r.Organization.ID.String(),
 		PlanName:       "growth",
-		Limits: &organizationpb.OrganizationLimits{
+		Limits: &pb.OrganizationLimits{
 			RetentionWindowDays: 60,
 		},
 		Timestamp: timestamppb.New(eventTimestamp),

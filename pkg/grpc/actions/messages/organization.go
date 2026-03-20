@@ -1,7 +1,8 @@
 package messages
 
 import (
-	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	organizationpb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -9,16 +10,16 @@ const OrganizationCreatedRoutingKey = "organization-created"
 const OrganizationPlanChangedRoutingKey = "organization-plan-changed"
 
 type OrganizationCreatedMessage struct {
-	message *pb.OrganizationCreated
+	message *organizationpb.OrganizationCreated
 }
 
 type OrganizationPlanChangedMessage struct {
-	message *pb.OrganizationPlanChanged
+	message *usagepb.OrganizationPlanChanged
 }
 
 func NewOrganizationCreatedMessage(organizationID string) OrganizationCreatedMessage {
 	return OrganizationCreatedMessage{
-		message: &pb.OrganizationCreated{
+		message: &organizationpb.OrganizationCreated{
 			OrganizationId: organizationID,
 			Timestamp:      timestamppb.Now(),
 		},
@@ -32,10 +33,10 @@ func (m OrganizationCreatedMessage) Publish() error {
 func NewOrganizationPlanChangedMessage(
 	organizationID string,
 	planName string,
-	limits *pb.OrganizationLimits,
+	limits *usagepb.OrganizationLimits,
 ) OrganizationPlanChangedMessage {
 	return OrganizationPlanChangedMessage{
-		message: &pb.OrganizationPlanChanged{
+		message: &usagepb.OrganizationPlanChanged{
 			OrganizationId: organizationID,
 			PlanName:       planName,
 			Limits:         limits,
