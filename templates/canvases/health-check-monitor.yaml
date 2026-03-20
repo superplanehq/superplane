@@ -1,0 +1,186 @@
+metadata:
+  name: "Health Check Monitor"
+  description: "Monitor any endpoint and get notified when it goes down. Alerts only when the endpoint transitions from healthy to failing (not on every failed check). The alert email includes approximately how long the endpoint was healthy. No integrations required."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "schedule-trigger-001"
+      name: "Check every minute"
+      type: "TYPE_TRIGGER"
+      configuration:
+        type: "minutes"
+        minutesInterval: 1
+      metadata: null
+      position:
+        x: 382
+        "y": 396
+      component: null
+      blueprint: null
+      trigger:
+        name: "schedule"
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "http-check-002"
+      name: "Health check request"
+      type: "TYPE_COMPONENT"
+      configuration:
+        method: "GET"
+        url: "https://app.superplane.com/server2"
+        successCodes: "2xx"
+        timeoutSeconds: 10
+      metadata: null
+      position:
+        x: 862
+        "y": 396
+      component:
+        name: "http"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "upsert-healthy-004"
+      name: "Remember healthy status"
+      type: "TYPE_COMPONENT"
+      configuration:
+        namespace: "healthCheckMonitor"
+        matchList:
+          - name: "monitorKey"
+            value: "default"
+        valueList:
+          - name: "monitorKey"
+            value: "default"
+          - name: "lastStatus"
+            value: "ok"
+          - name: "lastHealthyAtUnix"
+            value: "{{ int(now().Unix()) }}"
+      metadata: null
+      position:
+        x: 1438
+        "y": 396
+      component:
+        name: "upsertMemory"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "read-status-005"
+      name: "Read previous status"
+      type: "TYPE_COMPONENT"
+      configuration:
+        namespace: "healthCheckMonitor"
+        resultMode: "latest"
+        matchList:
+          - name: "monitorKey"
+            value: "default"
+        emitMode: "allAtOnce"
+      metadata: null
+      position:
+        x: 1437
+        "y": 501
+      component:
+        name: "readMemory"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: true
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "if-previously-healthy-006"
+      name: "Was previously healthy?"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: '$["Read previous status"].data.data.values[0].lastStatus == "ok"'
+      metadata: null
+      position:
+        x: 2014
+        "y": 396
+      component:
+        name: "if"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "send-email-003"
+      name: "Send alert email"
+      type: "TYPE_COMPONENT"
+      configuration:
+        recipients: []
+        subject: "Endpoint is down (status {{ $[\"Health check request\"].data.status }})"
+        body: "Your health check just started failing. SuperPlane only sends this when the endpoint transitions from healthy to failing, not on every failed check.\n\nStatus code: {{ $[\"Health check request\"].data.status }}\nChecked at: {{ $[\"Check every minute\"].data.calendar.hour }}:{{ $[\"Check every minute\"].data.calendar.minute }} on {{ $[\"Check every minute\"].data.calendar.month }} {{ $[\"Check every minute\"].data.calendar.day }}, {{ $[\"Check every minute\"].data.calendar.year }}\n\nApproximate time healthy before this failure: {{ len($[\"Read previous status\"].data.data.values) > 0 ? string(int((now().Unix() - int($[\"Read previous status\"].data.data.values[0].lastHealthyAtUnix)) / 60)) + \" minutes\" : \"unknown (no prior successful check in memory)\" }}"
+      metadata: null
+      position:
+        x: 2638
+        "y": 396
+      component:
+        name: "sendEmail"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+    - id: "upsert-down-007"
+      name: "Remember down status"
+      type: "TYPE_COMPONENT"
+      configuration:
+        namespace: "healthCheckMonitor"
+        matchList:
+          - name: "monitorKey"
+            value: "default"
+        valueList:
+          - name: "monitorKey"
+            value: "default"
+          - name: "lastStatus"
+            value: "down"
+      metadata: null
+      position:
+        x: 3118
+        "y": 396
+      component:
+        name: "upsertMemory"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+  edges:
+    - sourceId: "schedule-trigger-001"
+      targetId: "http-check-002"
+      channel: "default"
+    - sourceId: "http-check-002"
+      targetId: "upsert-healthy-004"
+      channel: "success"
+    - sourceId: "http-check-002"
+      targetId: "read-status-005"
+      channel: "failure"
+    - sourceId: "read-status-005"
+      targetId: "send-email-003"
+      channel: "notFound"
+    - sourceId: "read-status-005"
+      targetId: "if-previously-healthy-006"
+      channel: "found"
+    - sourceId: "if-previously-healthy-006"
+      targetId: "send-email-003"
+      channel: "true"
+    - sourceId: "if-previously-healthy-006"
+      targetId: "upsert-down-007"
+      channel: "false"
+    - sourceId: "send-email-003"
+      targetId: "upsert-down-007"
+      channel: "default"

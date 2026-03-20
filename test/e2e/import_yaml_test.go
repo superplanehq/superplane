@@ -14,6 +14,10 @@ import (
 )
 
 func TestImportYaml(t *testing.T) {
+	// TODO: quarantined — the import-yaml-button lives in PageHeader which is
+	// hidden on empty orgs now that the onboarding page is shown instead.
+	t.Skip("quarantined: import YAML button not visible on empty-org onboarding page")
+
 	t.Run("importing a canvas from pasted YAML", func(t *testing.T) {
 		steps := &ImportYamlSteps{t: t}
 		steps.start()

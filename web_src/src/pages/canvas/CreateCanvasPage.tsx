@@ -209,7 +209,7 @@ interface TemplateCardProps {
   organizationId: string;
 }
 
-function TemplateCard({ template, organizationId }: TemplateCardProps) {
+export function TemplateCard({ template, organizationId }: TemplateCardProps) {
   const previewNodes = (template.spec?.nodes || []) as ComponentsNode[];
   const previewEdges = (template.spec?.edges || []) as ComponentsEdge[];
   const templateId = template.metadata?.id;
