@@ -597,14 +597,25 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	magicCode, err := models.FindValidAccountMagicCode(email, codeHash)
 	if err != nil {
 		log.Warnf("Invalid magic code attempt for %s", email)
+
+		if invalidateErr := models.InvalidateActiveMagicCodes(email); invalidateErr != nil {
+			log.Errorf("Failed to invalidate magic codes for %s: %v", email, invalidateErr)
+		}
+
 		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
 		return
 	}
 
-	err = magicCode.MarkUsed()
+	marked, err := magicCode.MarkUsed()
 	if err != nil {
 		log.Errorf("Failed to mark magic code as used for %s: %v", email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if !marked {
+		log.Warnf("Magic code already used (concurrent request) for %s", email)
+		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
 		return
 	}
 

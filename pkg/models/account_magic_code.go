@@ -78,12 +78,39 @@ func CountRecentMagicCodesInTransaction(tx *gorm.DB, email string, since time.Ti
 	return count, err
 }
 
-func (c *AccountMagicCode) MarkUsed() error {
+func (c *AccountMagicCode) MarkUsed() (bool, error) {
 	return c.MarkUsedInTransaction(database.Conn())
 }
 
-func (c *AccountMagicCode) MarkUsedInTransaction(tx *gorm.DB) error {
+// MarkUsedInTransaction atomically marks the code as used only if it hasn't been used yet.
+// Returns true if the code was successfully marked, false if it was already used by a concurrent request.
+func (c *AccountMagicCode) MarkUsedInTransaction(tx *gorm.DB) (bool, error) {
 	now := time.Now()
+	result := tx.Model(c).
+		Where("used_at IS NULL").
+		Update("used_at", now)
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return false, nil
+	}
+
 	c.UsedAt = &now
-	return tx.Model(c).Update("used_at", now).Error
+	return true, nil
+}
+
+func InvalidateActiveMagicCodes(email string) error {
+	return InvalidateActiveMagicCodesInTransaction(database.Conn(), email)
+}
+
+func InvalidateActiveMagicCodesInTransaction(tx *gorm.DB, email string) error {
+	return tx.Model(&AccountMagicCode{}).
+		Where("email = ?", email).
+		Where("expires_at > ?", time.Now()).
+		Where("used_at IS NULL").
+		Update("used_at", time.Now()).
+		Error
 }
