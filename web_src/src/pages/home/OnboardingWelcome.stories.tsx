@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { BrowserRouter } from "react-router-dom";
+import { AccountProvider } from "@/contexts/AccountContext";
 import { OnboardingWelcome } from "./OnboardingWelcome";
 
 const meta: Meta<typeof OnboardingWelcome> = {
@@ -12,9 +13,11 @@ const meta: Meta<typeof OnboardingWelcome> = {
   decorators: [
     (Story) => (
       <BrowserRouter>
-        <div className="bg-slate-100 dark:bg-slate-900 min-h-screen">
-          <Story />
-        </div>
+        <AccountProvider>
+          <div className="bg-slate-100 dark:bg-slate-900 min-h-screen">
+            <Story />
+          </div>
+        </AccountProvider>
       </BrowserRouter>
     ),
   ],
