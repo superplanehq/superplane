@@ -47,6 +47,7 @@ CREATE TABLE public.account_magic_codes (
     code_hash character varying(64) NOT NULL,
     expires_at timestamp without time zone NOT NULL,
     used_at timestamp without time zone,
+    verify_attempts integer DEFAULT 0 NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -1976,7 +1977,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260319201825	f
+20260319201826	f
 \.
 
 

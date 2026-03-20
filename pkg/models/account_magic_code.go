@@ -9,12 +9,13 @@ import (
 )
 
 type AccountMagicCode struct {
-	ID        uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Email     string     `gorm:"type:varchar(255);not null"`
-	CodeHash  string     `gorm:"type:varchar(64);not null"`
-	ExpiresAt time.Time  `gorm:"not null"`
-	UsedAt    *time.Time `gorm:"default:null"`
-	CreatedAt time.Time
+	ID             uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	Email          string     `gorm:"type:varchar(255);not null"`
+	CodeHash       string     `gorm:"type:varchar(64);not null"`
+	ExpiresAt      time.Time  `gorm:"not null"`
+	UsedAt         *time.Time `gorm:"default:null"`
+	VerifyAttempts int        `gorm:"not null;default:0"`
+	CreatedAt      time.Time
 }
 
 func (AccountMagicCode) TableName() string {
@@ -113,4 +114,37 @@ func InvalidateActiveMagicCodesInTransaction(tx *gorm.DB, email string) error {
 		Where("used_at IS NULL").
 		Update("used_at", time.Now()).
 		Error
+}
+
+// IncrementVerifyAttempts atomically increments verify_attempts on all active
+// codes for the given email and returns the maximum attempt count.
+func IncrementVerifyAttempts(email string) (int, error) {
+	return IncrementVerifyAttemptsInTransaction(database.Conn(), email)
+}
+
+func IncrementVerifyAttemptsInTransaction(tx *gorm.DB, email string) (int, error) {
+	result := tx.Model(&AccountMagicCode{}).
+		Where("email = ?", email).
+		Where("expires_at > ?", time.Now()).
+		Where("used_at IS NULL").
+		Update("verify_attempts", gorm.Expr("verify_attempts + 1"))
+
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return 0, nil
+	}
+
+	var maxAttempts int
+	err := tx.Model(&AccountMagicCode{}).
+		Select("COALESCE(MAX(verify_attempts), 0)").
+		Where("email = ?", email).
+		Where("expires_at > ?", time.Now()).
+		Where("used_at IS NULL").
+		Scan(&maxAttempts).
+		Error
+
+	return maxAttempts, err
 }

@@ -33,10 +33,11 @@ import (
 const SignupDisabledError = "signup is currently disabled"
 
 const (
-	magicCodeLength     = 6
-	magicCodeTTL        = 10 * time.Minute
-	magicCodeRateLimit  = 5
-	magicCodeRateWindow = 10 * time.Minute
+	magicCodeLength            = 6
+	magicCodeTTL               = 10 * time.Minute
+	magicCodeRateLimit         = 5
+	magicCodeRateWindow        = 10 * time.Minute
+	magicCodeMaxVerifyAttempts = 3
 )
 
 type Handler struct {
@@ -528,22 +529,30 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 
 	email = utils.NormalizeEmail(email)
 
+	successResponse := func() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "If an account exists with this email, a sign-in code has been sent.",
+		})
+	}
+
 	count, err := models.CountRecentMagicCodes(email, time.Now().Add(-magicCodeRateWindow))
 	if err != nil {
 		log.Errorf("Failed to count recent magic codes for %s: %v", email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		successResponse()
 		return
 	}
 
 	if count >= magicCodeRateLimit {
-		http.Error(w, "Too many code requests. Please try again later.", http.StatusTooManyRequests)
+		log.Warnf("Magic code rate limit reached for %s", email)
+		successResponse()
 		return
 	}
 
 	code, err := generateMagicCode()
 	if err != nil {
 		log.Errorf("Failed to generate magic code: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		successResponse()
 		return
 	}
 
@@ -553,21 +562,16 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 	_, err = models.CreateAccountMagicCode(email, codeHash, expiresAt)
 	if err != nil {
 		log.Errorf("Failed to store magic code for %s: %v", email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		successResponse()
 		return
 	}
 
 	err = a.emailService.SendMagicCodeEmail(email, code)
 	if err != nil {
 		log.Errorf("Failed to send magic code email to %s: %v", email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "If an account exists with this email, a sign-in code has been sent.",
-	})
+	successResponse()
 }
 
 func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) {
@@ -598,8 +602,13 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		log.Warnf("Invalid magic code attempt for %s", email)
 
-		if invalidateErr := models.InvalidateActiveMagicCodes(email); invalidateErr != nil {
-			log.Errorf("Failed to invalidate magic codes for %s: %v", email, invalidateErr)
+		attempts, incrErr := models.IncrementVerifyAttempts(email)
+		if incrErr != nil {
+			log.Errorf("Failed to increment verify attempts for %s: %v", email, incrErr)
+		} else if attempts >= magicCodeMaxVerifyAttempts {
+			if invalidateErr := models.InvalidateActiveMagicCodes(email); invalidateErr != nil {
+				log.Errorf("Failed to invalidate magic codes for %s: %v", email, invalidateErr)
+			}
 		}
 
 		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
