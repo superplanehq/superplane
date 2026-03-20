@@ -56,13 +56,13 @@ def process_operations(operations: list[CanvasOperation]) -> CanvasShape:
   for op in operations:
     if op.type == "add_node":
       added_nodes[op.node_key] = op
-      nodes.append(op.node_name)
+      nodes.append(op.block_name)
 
   for op in operations:
     if op.type == "connect_nodes":
       n1 = added_nodes[op.source.node_key]
       n2 = added_nodes[op.target.node_key]
 
-      edges.append((n1.node_name, n2.node_name))
+      edges.append((n1.block_name, n2.block_name))
 
   return CanvasShape(nodes, edges)

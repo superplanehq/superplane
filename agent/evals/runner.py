@@ -18,8 +18,8 @@ dataset = Dataset(
             inputs="Build me a basic workflow that starts with a manual run and runs two noop actions",
             evaluators=[
                 WorkflowShape(
-                  nodes=["Manual Run", "Noop 1", "Noop 2"],
-                  edges=[("Manual Run", "Noop 1"), ("Noop 1", "Noop 2")],
+                  nodes=["start", "noop", "noop"],
+                  edges=[("start", "noop"), ("noop", "noop")],
                 )
             ],
         ),
@@ -29,8 +29,8 @@ dataset = Dataset(
             inputs="Listen to pull-request comments and send a slack message when a comment is made",
             evaluators=[
                 WorkflowShape(
-                  nodes=["GitHub On PR Comment", "Slack Send Text Message"],
-                  edges=[("GitHub On PR Comment", "Slack Send Text Message")],
+                  nodes=["github.onPRReviewComment", "slack.sendTextMessage"],
+                  edges=[("github.onPRReviewComment", "slack.sendTextMessage")],
                 )
             ],
         ),
@@ -67,7 +67,7 @@ async def runner() -> None:
         return result.output
 
     report = await dataset.evaluate(task, progress=True)
-    report.print(include_output=True, include_input=True)
+    report.print(include_output=True, include_input=True, include_reasons=True)
 
 def main() -> None:
     asyncio.run(runner())
