@@ -96,6 +96,9 @@ class StubSuperplaneClient(SuperplaneClient):
     def list_org_integrations(self) -> list[dict[str, Any]]:
         return []
 
+    def list_available_integrations(self) -> list[dict[str, Any]]:
+        return []
+
     def list_integration_resources(
         self,
         integration_id: str,

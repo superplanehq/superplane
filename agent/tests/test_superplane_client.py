@@ -3,6 +3,11 @@ from typing import Any
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
+from superplaneapi.models.components_list_components_response import ComponentsListComponentsResponse
+from superplaneapi.models.superplane_integrations_list_integrations_response import (
+    SuperplaneIntegrationsListIntegrationsResponse,
+)
+from superplaneapi.models.triggers_list_triggers_response import TriggersListTriggersResponse
 
 
 class FakeCanvasApi:
@@ -38,6 +43,48 @@ class FakeCanvasNodeApi:
         return CanvasesListNodeEventsResponse.from_dict(payload)
 
 
+class FakeComponentApi:
+    def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
+        self._payloads = payloads
+
+    def components_list_components(
+        self, _request_timeout: int | tuple[int, int] | None = None
+    ) -> ComponentsListComponentsResponse:
+        _ = _request_timeout
+        payload = self._payloads.get("/api/v1/components")
+        if payload is None:
+            raise ValueError("Missing payload for components list.")
+        return ComponentsListComponentsResponse.from_dict(payload)
+
+
+class FakeTriggerApi:
+    def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
+        self._payloads = payloads
+
+    def triggers_list_triggers(
+        self, _request_timeout: int | tuple[int, int] | None = None
+    ) -> TriggersListTriggersResponse:
+        _ = _request_timeout
+        payload = self._payloads.get("/api/v1/triggers")
+        if payload is None:
+            raise ValueError("Missing payload for triggers list.")
+        return TriggersListTriggersResponse.from_dict(payload)
+
+
+class FakeIntegrationApi:
+    def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
+        self._payloads = payloads
+
+    def integrations_list_integrations(
+        self, _request_timeout: int | tuple[int, int] | None = None
+    ) -> SuperplaneIntegrationsListIntegrationsResponse:
+        _ = _request_timeout
+        payload = self._payloads.get("/api/v1/integrations")
+        if payload is None:
+            raise ValueError("Missing payload for integration catalog list.")
+        return SuperplaneIntegrationsListIntegrationsResponse.from_dict(payload)
+
+
 class FakeSuperplaneClient(SuperplaneClient):
     def __init__(self, payloads: dict[str, dict[str, Any]]) -> None:
         super().__init__(
@@ -49,6 +96,9 @@ class FakeSuperplaneClient(SuperplaneClient):
         )
         self._canvas_api = FakeCanvasApi(payloads)
         self._canvas_node_api = FakeCanvasNodeApi(payloads)
+        self._component_api = FakeComponentApi(payloads)
+        self._trigger_api = FakeTriggerApi(payloads)
+        self._integration_api = FakeIntegrationApi(payloads)
 
 
 def test_describe_canvas_maps_nodes_and_edges() -> None:
@@ -179,3 +229,57 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
     assert shape.edges[0].s == "On Push"
     assert shape.edges[0].t == "Notify Slack"
     assert not hasattr(shape.edges[0], "channel")
+
+
+def test_list_components_includes_integration_scoped_components() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/components": {"components": [{"name": "noop", "label": "Noop"}]},
+            "/api/v1/integrations": {
+                "integrations": [
+                    {
+                        "name": "slack",
+                        "components": [
+                            {
+                                "name": "slack.sendTextMessage",
+                                "label": "Send Text Message",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+    )
+
+    components = client.list_components(provider="slack")
+
+    assert len(components) == 1
+    assert components[0]["name"] == "slack.sendTextMessage"
+    assert components[0]["provider"] == "slack"
+
+
+def test_list_triggers_includes_integration_scoped_triggers() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/triggers": {"triggers": [{"name": "start", "label": "Manual Run"}]},
+            "/api/v1/integrations": {
+                "integrations": [
+                    {
+                        "name": "github",
+                        "triggers": [
+                            {
+                                "name": "github.onPullRequestReviewComment",
+                                "label": "On Pull Request Review Comment",
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+    )
+
+    triggers = client.list_triggers(provider="github")
+
+    assert len(triggers) == 1
+    assert triggers[0]["name"] == "github.onPullRequestReviewComment"
+    assert triggers[0]["provider"] == "github"
