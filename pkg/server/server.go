@@ -184,29 +184,12 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
-	templateDir := os.Getenv("TEMPLATE_DIR")
-	if templateDir == "" {
-		log.Warn("Email Consumers not started - missing required environment variable (TEMPLATE_DIR)")
+	emailService := services.BuildEmailService(encryptor, os.Getenv("TEMPLATE_DIR"))
+	if emailService == nil {
+		log.Warn("Email Consumers not started - missing required environment variables")
 		return
 	}
 
-	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
-		log.Println("Starting SMTP Email Consumers (self-hosted)")
-		settingsProvider := &services.DatabaseEmailSettingsProvider{Encryptor: encryptor}
-		emailService := services.NewSMTPEmailService(settingsProvider, templateDir)
-		startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
-		return
-	}
-
-	resendAPIKey := os.Getenv("RESEND_API_KEY")
-	fromName := os.Getenv("EMAIL_FROM_NAME")
-	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
-	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
-		log.Warn("Email Consumers not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS)")
-		return
-	}
-
-	emailService := services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
 }
 

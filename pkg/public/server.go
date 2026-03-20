@@ -113,7 +113,7 @@ func NewServer(
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
 	var emailService services.EmailService
 	if os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes" {
-		emailService = buildEmailService(encryptor, templateDir)
+		emailService = services.BuildEmailService(encryptor, templateDir)
 	}
 	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, emailService)
 	providers := getOAuthProviders()
@@ -1136,26 +1136,6 @@ func getAvatarURL(providers []models.AccountProvider) string {
 	}
 
 	return providers[0].AvatarURL
-}
-
-func buildEmailService(encryptor crypto.Encryptor, templateDir string) services.EmailService {
-	if templateDir == "" {
-		return nil
-	}
-
-	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
-		settingsProvider := &services.DatabaseEmailSettingsProvider{Encryptor: encryptor}
-		return services.NewSMTPEmailService(settingsProvider, templateDir)
-	}
-
-	resendAPIKey := os.Getenv("RESEND_API_KEY")
-	fromName := os.Getenv("EMAIL_FROM_NAME")
-	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
-	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
-		return nil
-	}
-
-	return services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 }
 
 func getBaseURL() string {
