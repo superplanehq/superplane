@@ -19,6 +19,11 @@ type UpdateDocumentConfiguration struct {
 	Fields   map[string]any `json:"fields" mapstructure:"fields"`
 }
 
+type UpdateDocumentSetupMetadata struct {
+	Index    string `json:"index" mapstructure:"index"`
+	Document string `json:"document" mapstructure:"document"`
+}
+
 func (c *UpdateDocument) Name() string  { return "elastic.updateDocument" }
 func (c *UpdateDocument) Label() string { return "Update Document" }
 func (c *UpdateDocument) Description() string {
@@ -112,6 +117,26 @@ func (c *UpdateDocument) Setup(ctx core.SetupContext) error {
 
 	if config.Fields == nil {
 		return fmt.Errorf("fields is required and must be a JSON object")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Elastic client: %w", err)
+	}
+	if err := ensureIndexExists(client, config.Index); err != nil {
+		return err
+	}
+	if err := ensureDocumentExists(client, config.Index, config.Document); err != nil {
+		return err
+	}
+
+	if ctx.Metadata != nil {
+		if err := ctx.Metadata.Set(UpdateDocumentSetupMetadata{
+			Index:    config.Index,
+			Document: config.Document,
+		}); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
+		}
 	}
 
 	return nil

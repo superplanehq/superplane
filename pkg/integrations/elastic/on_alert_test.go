@@ -15,6 +15,24 @@ func eq(value string) configuration.Predicate {
 	return configuration.Predicate{Type: configuration.PredicateTypeEquals, Value: value}
 }
 
+func Test__OnAlertFires__Configuration(t *testing.T) {
+	fields := (&OnAlertFires{}).Configuration()
+
+	var statusesField *configuration.Field
+	for i := range fields {
+		if fields[i].Name == "statuses" {
+			statusesField = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, statusesField)
+	assert.Equal(t, configuration.FieldTypeAnyPredicateList, statusesField.Type)
+	assert.Equal(t, []map[string]any{
+		{"type": configuration.PredicateTypeEquals, "value": "active"},
+	}, statusesField.Default)
+}
+
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 	trigger := &OnAlertFires{}
 	secret := "auto-generated-secret"

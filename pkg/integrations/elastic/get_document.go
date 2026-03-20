@@ -18,6 +18,11 @@ type GetDocumentConfiguration struct {
 	Document string `json:"document" mapstructure:"document"`
 }
 
+type GetDocumentSetupMetadata struct {
+	Index    string `json:"index" mapstructure:"index"`
+	Document string `json:"document" mapstructure:"document"`
+}
+
 func (c *GetDocument) Name() string  { return "elastic.getDocument" }
 func (c *GetDocument) Label() string { return "Get Document" }
 func (c *GetDocument) Description() string {
@@ -96,6 +101,26 @@ func (c *GetDocument) Setup(ctx core.SetupContext) error {
 	config.Document = strings.TrimSpace(config.Document)
 	if config.Document == "" {
 		return fmt.Errorf("document is required")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Elastic client: %w", err)
+	}
+	if err := ensureIndexExists(client, config.Index); err != nil {
+		return err
+	}
+	if err := ensureDocumentExists(client, config.Index, config.Document); err != nil {
+		return err
+	}
+
+	if ctx.Metadata != nil {
+		if err := ctx.Metadata.Set(GetDocumentSetupMetadata{
+			Index:    config.Index,
+			Document: config.Document,
+		}); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
+		}
 	}
 
 	return nil

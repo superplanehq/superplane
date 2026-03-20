@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -131,6 +132,7 @@ func (t *OnAlertFires) Configuration() []configuration.Field {
 			Label:       "Statuses",
 			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
+			Default:     []map[string]any{{"type": configuration.PredicateTypeEquals, "value": "active"}},
 			Description: "Only fire for alerts whose status matches any of these predicates. Leave empty to accept all statuses.",
 			TypeOptions: &configuration.TypeOptions{
 				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
@@ -277,24 +279,17 @@ func extractStringSlice(payload map[string]any, key string) []string {
 
 // containsIgnoreCase reports whether value is in list (case-insensitive).
 func containsIgnoreCase(list []string, value string) bool {
-	for _, item := range list {
-		if strings.EqualFold(item, value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(list, func(item string) bool {
+		return strings.EqualFold(item, value)
+	})
 }
 
 // matchesAnyString reports whether any candidate appears in list (case-insensitive).
 func matchesAnyString(list []string, candidates ...string) bool {
-	for _, candidate := range candidates {
+	return slices.ContainsFunc(candidates, func(candidate string) bool {
 		if candidate == "" {
-			continue
+			return false
 		}
-		if containsIgnoreCase(list, candidate) {
-			return true
-		}
-	}
-
-	return false
+		return containsIgnoreCase(list, candidate)
+	})
 }

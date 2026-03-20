@@ -31,6 +31,7 @@ type OnDocumentIndexedMetadata struct {
 	LastTimestamp string `json:"lastTimestamp,omitempty" mapstructure:"lastTimestamp"`
 	RouteKey      string `json:"routeKey,omitempty" mapstructure:"routeKey"`
 	RuleID        string `json:"ruleId,omitempty" mapstructure:"ruleId"`
+	Index         string `json:"index,omitempty" mapstructure:"index"`
 }
 
 func (t *OnDocumentIndexed) Name() string  { return "elastic.onDocumentIndexed" }
@@ -98,13 +99,30 @@ func (t *OnDocumentIndexed) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.Index) == "" {
+	config.Index = strings.TrimSpace(config.Index)
+	if config.Index == "" {
 		return fmt.Errorf("index is required")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Elastic client: %w", err)
+	}
+	if err := ensureIndexExists(client, config.Index); err != nil {
+		return err
 	}
 
 	if ctx.Metadata != nil {
 		meta := loadDocumentIndexedMetadata(ctx.Metadata)
 		changed := false
+
+		// Index changes require a new rule and a fresh timestamp checkpoint.
+		if meta.Index != config.Index {
+			meta.Index = config.Index
+			meta.RuleID = ""
+			meta.LastTimestamp = time.Now().UTC().Format(time.RFC3339Nano)
+			changed = true
+		}
 		if meta.LastTimestamp == "" {
 			meta.LastTimestamp = time.Now().UTC().Format(time.RFC3339Nano)
 			changed = true

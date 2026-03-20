@@ -21,6 +21,10 @@ type IndexDocumentConfiguration struct {
 	DocumentID string         `json:"documentId" mapstructure:"documentId"`
 }
 
+type IndexDocumentSetupMetadata struct {
+	Index string `json:"index" mapstructure:"index"`
+}
+
 func (c *IndexDocument) Name() string  { return "elastic.indexDocument" }
 func (c *IndexDocument) Label() string { return "Index Document" }
 func (c *IndexDocument) Description() string {
@@ -103,6 +107,20 @@ func (c *IndexDocument) Setup(ctx core.SetupContext) error {
 
 	if config.Document == nil {
 		return fmt.Errorf("document is required and must be a JSON object")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Elastic client: %w", err)
+	}
+	if err := ensureIndexExists(client, config.Index); err != nil {
+		return err
+	}
+
+	if ctx.Metadata != nil {
+		if err := ctx.Metadata.Set(IndexDocumentSetupMetadata{Index: config.Index}); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
+		}
 	}
 
 	return nil
