@@ -116,8 +116,13 @@ func (t *OnDocumentIndexed) Setup(ctx core.TriggerContext) error {
 		meta := loadDocumentIndexedMetadata(ctx.Metadata)
 		changed := false
 
-		// Index changes require a new rule and a fresh timestamp checkpoint.
-		if meta.Index != config.Index {
+		// Backfill legacy metadata that predates the Index field without forcing
+		// reprovisioning an already-created rule.
+		if meta.Index == "" {
+			meta.Index = config.Index
+			changed = true
+		} else if meta.Index != config.Index {
+			// Index changes require a new rule and a fresh timestamp checkpoint.
 			meta.Index = config.Index
 			meta.RuleID = ""
 			meta.LastTimestamp = time.Now().UTC().Format(time.RFC3339Nano)
