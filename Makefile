@@ -69,9 +69,9 @@ test.license.check:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
-# Agent (Python): eval with real LLM; Superplane API stubbed unless ARGS='--real-superplane' (+ CANVAS_ID, SUPERPLANE_*).
+# Agent (Python): eval with real LLM + stub Superplane (no HTTP). Model/canvas via env.
 agent.eval.manual_run_two_noop:
-	$(COMPOSE) exec agent uv run python -m ai.evals.manual_run_two_noop_live $(ARGS)
+	$(COMPOSE) exec agent uv run python -m evals.manual_run_two_noop_live
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
