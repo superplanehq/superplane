@@ -1,10 +1,6 @@
-from ai.evals.basic_workflow import (
-    run_manual_run_two_noop_experiment_sync,
-    score_manual_run_two_noop_proposal,
-)
+from ai.evals.basic_workflow import score_manual_run_two_noop_proposal
 from ai.models import (
     AddNodeOperation,
-    CanvasAnswer,
     CanvasOperationNodeRef,
     CanvasProposal,
     ConnectNodesOperation,
@@ -78,12 +74,3 @@ def test_score_wrong_block_counts() -> None:
     )
     scores = score_manual_run_two_noop_proposal(bad)
     assert scores["nodes"] == 0.0
-
-
-def test_dataset_evaluate_sync_runs() -> None:
-    answer = CanvasAnswer(
-        answer="Proposed a linear workflow.",
-        proposal=_good_proposal(),
-    )
-    report = run_manual_run_two_noop_experiment_sync(answer)
-    assert report.cases[0].scores["combined"].value == 1.0

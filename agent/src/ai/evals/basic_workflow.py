@@ -3,14 +3,9 @@
 Follows the Pydantic Evals pattern (Dataset, Case, custom Evaluator); see
 https://ai.pydantic.dev/evals/
 
-Live agent example::
+Run against a **live** model and Superplane API::
 
-    async def task(prompt: str) -> CanvasAnswer:
-        agent = build_agent(model="gpt-4o-mini")
-        result = await agent.run(prompt, deps=deps)
-        return result.output
-
-    report = await build_manual_run_two_noop_dataset().evaluate(task)
+    python -m ai.evals.manual_run_two_noop_live --canvas-id … --model gpt-4o-mini
 """
 
 from __future__ import annotations
@@ -22,6 +17,7 @@ from pydantic_evals import Case, Dataset
 from pydantic_evals.evaluators import Evaluator, EvaluatorContext
 from pydantic_evals.reporting import EvaluationReport
 
+from ai.agent import AgentDeps, build_agent
 from ai.models import (
     AddNodeOperation,
     CanvasAnswer,
@@ -150,12 +146,21 @@ def build_manual_run_two_noop_dataset() -> Dataset[str, CanvasAnswer, Any]:
     )
 
 
-def run_manual_run_two_noop_experiment_sync(
-    task_answer: CanvasAnswer,
+async def evaluate_manual_run_two_noop_live(
+    *,
+    model: str,
+    deps: AgentDeps,
+    progress: bool = True,
 ) -> EvaluationReport[str, CanvasAnswer, Any]:
-    """Run the dataset against a prebuilt answer (sync helper for tests or notebooks)."""
+    """Run the dataset with ``build_agent`` and ``deps`` (use stub client to skip HTTP)."""
+    if model == "test":
+        msg = "Use a real provider model id (e.g. gpt-4o-mini), not 'test'."
+        raise ValueError(msg)
 
-    def task(_prompt: str) -> CanvasAnswer:
-        return task_answer
+    agent = build_agent(model=model)
 
-    return build_manual_run_two_noop_dataset().evaluate_sync(task)
+    async def task(prompt: str) -> CanvasAnswer:
+        result = await agent.run(prompt, deps=deps)
+        return result.output
+
+    return await build_manual_run_two_noop_dataset().evaluate(task, progress=progress)
