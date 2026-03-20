@@ -173,6 +173,12 @@ check.db.migrations:
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
+check.lint.ui:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
+
+check.lint.ui.baseline.update:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
+
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
 

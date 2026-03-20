@@ -25,13 +25,13 @@ blocks:
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
-          value: '1'
+          value: "1"
       prologue:
         commands:
           - checkout
           - mkdir -p tmp/go tmp/go-build
-          - 'cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod'
-          - 'cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build'
+          - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
+          - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
           - make test.setup
           - make test.start
       jobs:
@@ -45,28 +45,28 @@ blocks:
           parallelism: 10
           commands:
             - mkdir -p tmp/ms-playwright
-            - 'cache restore pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile),pw-browsers-$SEMAPHORE_GIT_BRANCH,pw-browsers'
+            - "cache restore pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile),pw-browsers-$SEMAPHORE_GIT_BRANCH,pw-browsers"
             - make setup.playwright
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
-        - name: 'Check: DB structure'
+        - name: "Check: DB structure"
           commands:
             - make check.db.structure
             - make check.db.migrations
-        - name: 'Check: Components Docs'
+        - name: "Check: Components Docs"
           commands:
             - make gen.components.docs
             - git diff --exit-code docs/components
-        - name: 'Check: Go Format'
+        - name: "Check: Go Format"
           commands:
             - make format.go.check
       epilogue:
         always:
           commands:
-            - '[ -f junit-report.xml ] && test-results publish junit-report.xml'
-            - 'if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi'
-            - 'cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go'
-            - 'cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build'
-            - 'cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright'
+            - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
+            - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
+            - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
+            - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
+            - "cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright"
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
@@ -77,7 +77,7 @@ blocks:
       jobs:
         - name: Build Frontend
           commands:
-            - 'cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules'
+            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
             - cd web_src
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
@@ -93,16 +93,23 @@ blocks:
       jobs:
         - name: UI Tests
           commands:
-            - 'cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules'
+            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
             - cd web_src
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
-            - 'npm run test:run'
+            - "npm run test:run"
         - name: Format Check
           commands:
-            - 'cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules'
+            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
             - cd web_src && npm ci && cd ..
             - make format.js.check
+        - name: EsLint
+          commands:
+            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
+            - cd web_src
+            - npm ci
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+            - npm run lint:budget
 after_pipeline:
   task:
     jobs:
