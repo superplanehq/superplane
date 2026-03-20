@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   Copy,
+  Database,
   ExternalLink,
   Globe,
   KeyRound,
@@ -24,8 +25,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Heading } from "@/components/Heading/heading";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { useCreateCanvas, useCanvasTemplates } from "@/hooks/useCanvasData";
-import { canvasesUpdateCanvasVersion2, meRegenerateToken } from "@/api-client/sdk.gen";
+import { canvasKeys, useCanvasTemplates } from "@/hooks/useCanvasData";
+import {
+  canvasesCreateCanvas,
+  canvasesDescribeCanvas,
+  canvasesEmitNodeEvent,
+  canvasesListCanvasEvents,
+  canvasesUpdateCanvasVersion2,
+  meRegenerateToken,
+} from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { useAccount } from "@/contexts/AccountContext";
@@ -68,6 +76,12 @@ const FLOW_STEPS = [
     label: "HTTP Check",
     bg: "bg-sky-100 dark:bg-sky-900/50",
     iconColor: "text-sky-600 dark:text-sky-400",
+  },
+  {
+    icon: Database,
+    label: "Memory Check",
+    bg: "bg-violet-100 dark:bg-violet-900/50",
+    iconColor: "text-violet-600 dark:text-violet-400",
   },
   {
     icon: Mail,
@@ -189,11 +203,7 @@ function CLIPanel({ organizationId }: { organizationId: string }) {
               disabled={generating}
               className="inline-flex items-center gap-1.5 font-sans text-[12px] font-medium text-gray-900 bg-gray-100 hover:bg-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
             >
-              {generating ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <KeyRound size={12} />
-              )}
+              {generating ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
               {generating ? "Generating..." : "Generate connect command"}
             </button>
           </div>
@@ -230,9 +240,7 @@ function CLIPanel({ organizationId }: { organizationId: string }) {
 
       <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">
-            AI Skills
-          </span>
+          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">AI Skills</span>
           <CopyButton text="npx skills add superplanehq/skills" />
         </div>
         <div className="text-[11px] font-sans text-gray-500 mb-1.5">
@@ -301,9 +309,9 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
   const queryClient = useQueryClient();
   const { account } = useAccount();
   const permissionAllowed = canCreateCanvases || permissionsLoading;
-  const createCanvasMutation = useCreateCanvas(organizationId);
   const { data: templates = [] } = useCanvasTemplates(organizationId);
   const [mode, setMode] = useState<Mode>("ui");
+  const [isLaunchingQuickStart, setIsLaunchingQuickStart] = useState(false);
 
   const firstName = account?.name?.split(" ")[0] || "";
 
@@ -314,23 +322,37 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       return;
     }
 
+    setIsLaunchingQuickStart(true);
     try {
-      const nodes = template.spec?.nodes || [];
+      const nodes = (template.spec?.nodes || []).map((node: any) => {
+        if (node.component?.name === "sendEmail" && account?.id) {
+          return {
+            ...node,
+            configuration: {
+              ...node.configuration,
+              recipients: [{ type: "user", user: account.id }],
+            },
+          };
+        }
+        return node;
+      });
       const edges = template.spec?.edges || [];
       const description = template.metadata?.description || "";
 
-      const result = await createCanvasMutation.mutateAsync({
-        name: QUICK_START_TEMPLATE_NAME,
-        description,
-        nodes,
-        edges,
-      });
+      const result = await canvasesCreateCanvas(
+        withOrganizationHeader({
+          body: {
+            canvas: {
+              metadata: { name: QUICK_START_TEMPLATE_NAME, description },
+              spec: { nodes, edges },
+            },
+          },
+        }),
+      );
 
-      const canvasId = result?.data?.canvas?.metadata?.id;
+      const canvasId = result.data?.canvas?.metadata?.id;
       if (!canvasId) return;
 
-      // Trigger a save so the backend runs Setup() validation on each node,
-      // surfacing warnings for incomplete configuration (e.g. empty HTTP URL).
       await canvasesUpdateCanvasVersion2(
         withOrganizationHeader({
           path: { canvasId },
@@ -343,11 +365,59 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         }),
       );
 
-      await queryClient.invalidateQueries({ queryKey: ["canvases"] });
-      navigate(`/${organizationId}/canvases/${canvasId}`);
+      const triggerNode = nodes.find((n: any) => n.trigger?.name === "schedule");
+      if (triggerNode) {
+        const now = new Date();
+        canvasesEmitNodeEvent(
+          withOrganizationHeader({
+            path: { canvasId, nodeId: triggerNode.id },
+            body: {
+              channel: "default",
+              data: {
+                type: "scheduler.tick",
+                timestamp: now.toISOString(),
+                data: {
+                  calendar: {
+                    year: String(now.getFullYear()),
+                    month: now.toLocaleString("en-US", { month: "long" }),
+                    day: String(now.getDate()),
+                    hour: String(now.getHours()).padStart(2, "0"),
+                    minute: String(now.getMinutes()).padStart(2, "0"),
+                    second: String(now.getSeconds()).padStart(2, "0"),
+                    week_day: now.toLocaleString("en-US", { weekday: "long" }),
+                  },
+                },
+              },
+            },
+          }),
+        ).catch(() => {});
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const [canvasResponse, eventsResponse] = await Promise.all([
+        canvasesDescribeCanvas(withOrganizationHeader({ path: { id: canvasId } })),
+        canvasesListCanvasEvents(withOrganizationHeader({ path: { canvasId }, query: { limit: 50 } })),
+      ]);
+
+      if (canvasResponse.data?.canvas) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), canvasResponse.data.canvas);
+      }
+      if (eventsResponse.data) {
+        queryClient.setQueryData(canvasKeys.eventList(canvasId, 50), eventsResponse.data);
+      }
+
+      navigate(`/${organizationId}/canvases/${canvasId}`, { replace: true });
+
+      // Invalidate canvas list in the background so the sidebar dropdown
+      // and homepage know about the new canvas. This runs after navigation
+      // so it won't cause a flash on the onboarding page.
+      queryClient.invalidateQueries({ queryKey: canvasKeys.lists() });
     } catch (error) {
       const message = (error as Error)?.message || "Failed to create canvas";
       showErrorToast(message);
+    } finally {
+      setIsLaunchingQuickStart(false);
     }
   };
 
@@ -418,7 +488,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
               <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
                 <button
                   type="button"
-                  disabled={!canCreateCanvases || createCanvasMutation.isPending}
+                  disabled={!canCreateCanvases || isLaunchingQuickStart}
                   onClick={handleQuickStart}
                   className="group w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 mb-5 hover:shadow-lg hover:outline-primary/30 transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -433,10 +503,11 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                         </Badge>
                       </div>
                       <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                        Pings your endpoint every minute. If it goes down, you get an email.
+                        Pings your endpoint every minute and alerts only on healthy-to-failing transitions, including
+                        approximately how long it stayed healthy.
                       </p>
                     </div>
-                    {createCanvasMutation.isPending ? (
+                    {isLaunchingQuickStart ? (
                       <Loader2 size={18} className="mt-0.5 text-gray-400 shrink-0 animate-spin" />
                     ) : (
                       <ArrowRight
@@ -471,8 +542,8 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                         No integrations
                       </span>
                     </div>
-                    {createCanvasMutation.isPending ? (
-                      <span className="text-[11px] text-gray-400">Creating...</span>
+                    {isLaunchingQuickStart ? (
+                      <span className="text-[11px] text-gray-400">Setting up...</span>
                     ) : (
                       <span className="text-[11px] text-primary group-hover:underline">Get started</span>
                     )}
