@@ -9,41 +9,17 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
-  <LinkCard
-    title="When Alert Fires"
-    href="#when-alert-fires"
-    description="Trigger a workflow when a Kibana alert rule fires"
-  />
-  <LinkCard
-    title="When Case Status Changes"
-    href="#when-case-status-changes"
-    description="React when an Elastic Security case status changes"
-  />
+  <LinkCard title="When Alert Fires" href="#when-alert-fires" description="Trigger a workflow when a Kibana alert rule fires" />
+  <LinkCard title="When Case Status Changes" href="#when-case-status-changes" description="React when an Elastic Security case status changes" />
 </CardGrid>
 
 ## Actions
 
 <CardGrid>
-  <LinkCard
-    title="Create Case"
-    href="#create-case"
-    description="Create a new case in Kibana Security"
-  />
-  <LinkCard
-    title="Get Case"
-    href="#get-case"
-    description="Retrieve a Kibana Security case by ID"
-  />
-  <LinkCard
-    title="Index Document"
-    href="#index-document"
-    description="Write a JSON document to an Elasticsearch index"
-  />
-  <LinkCard
-    title="Update Case"
-    href="#update-case"
-    description="Update an existing Kibana Security case"
-  />
+  <LinkCard title="Create Case" href="#create-case" description="Create a new case in Kibana Security" />
+  <LinkCard title="Get Case" href="#get-case" description="Retrieve a Kibana Security case by ID" />
+  <LinkCard title="Index Document" href="#index-document" description="Write a JSON document to an Elasticsearch index" />
+  <LinkCard title="Update Case" href="#update-case" description="Update an existing Kibana Security case" />
 </CardGrid>
 
 ## Instructions
@@ -115,7 +91,10 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
     "severity": "critical",
     "spaceId": "default",
     "status": "active",
-    "tags": ["infrastructure", "prod"]
+    "tags": [
+      "infrastructure",
+      "prod"
+    ]
   },
   "timestamp": "2026-03-12T09:00:00Z",
   "type": "elastic.alert"
@@ -147,9 +126,9 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 ### Configuration
 
 - **Cases**: Select one or more specific cases to monitor.
-- **Statuses** _(optional)_: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
-- **Severities** _(optional)_: Only fire for cases with one of these severities. Leave empty to accept all severities.
-- **Tags** _(optional)_: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
+- **Statuses** *(optional)*: Only fire when a case has one of these statuses. Leave empty to fire for any case update.
+- **Severities** *(optional)*: Only fire for cases with one of these severities. Leave empty to accept all severities.
+- **Tags** *(optional)*: Only fire for cases that include at least one tag matching any of these predicates. Leave empty to accept all cases.
 
 ### Event Data
 
@@ -165,7 +144,10 @@ The trigger emits the full case details including id, title, status, severity, v
     "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
     "severity": "high",
     "status": "in-progress",
-    "tags": ["production", "incident"],
+    "tags": [
+      "production",
+      "incident"
+    ],
     "title": "Production incident",
     "updatedAt": "2026-03-12T10:00:00.000Z",
     "version": "WzE3LDFd"
@@ -192,7 +174,6 @@ The Create Case component opens a new case in Kibana Security.
 ### Outputs
 
 The component emits an event containing:
-
 - `id`: The case ID assigned by Kibana
 - `title`: The case title
 - `status`: The initial case status
@@ -230,7 +211,6 @@ The Get Case component retrieves an existing case from Kibana Security by its ID
 ### Outputs
 
 The component emits an event containing:
-
 - `id`: The case ID
 - `title`: The case title
 - `description`: The case description
@@ -251,7 +231,10 @@ The component emits an event containing:
     "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
     "severity": "high",
     "status": "open",
-    "tags": ["production", "incident"],
+    "tags": [
+      "production",
+      "incident"
+    ],
     "title": "Production incident",
     "updatedAt": "2026-03-12T10:00:00.000Z",
     "version": "WzE2LDFd"
@@ -277,12 +260,11 @@ The Index Document component writes a JSON document to an Elasticsearch index.
 
 - **Index**: The Elasticsearch index name to write to (e.g. `workflow-audit`)
 - **Document**: The JSON object to index
-- **Document ID** _(optional)_: A stable ID for idempotent writes. If omitted, Elasticsearch generates one automatically. Providing an ID means re-runs update the existing document rather than creating a duplicate.
+- **Document ID** *(optional)*: A stable ID for idempotent writes. If omitted, Elasticsearch generates one automatically. Providing an ID means re-runs update the existing document rather than creating a duplicate.
 
 ### Outputs
 
 The component emits an event containing:
-
 - `id`: The document ID assigned by Elasticsearch
 - `index`: The index the document was written to
 - `result`: Operation result (`created` or `updated`)
@@ -321,7 +303,6 @@ The Update Case component applies a partial update to an existing Kibana Securit
 ### Outputs
 
 The component emits an event containing:
-
 - `id`: The case ID
 - `title`: The updated case title
 - `status`: The updated case status

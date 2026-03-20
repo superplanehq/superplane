@@ -435,7 +435,7 @@ func Test__OnCaseStatusChange__HandleWebhook(t *testing.T) {
 		code, _, err := (&OnCaseStatusChange{}).HandleWebhook(core.WebhookRequestContext{
 			Body:          caseStatusChangedBody,
 			Headers:       caseHeadersWithSecret(),
-			Configuration: map[string]any{},
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
 			Metadata:      meta,
 			Events:        events,
 			Webhook:       caseWebhook,
