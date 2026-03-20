@@ -65,9 +65,9 @@ def _debug_log(message: str, **fields: Any) -> None:
         return
     if fields:
         field_str = " ".join(f"{key}={_to_jsonable(value)}" for key, value in fields.items())
-        print(f"[repl_web] {message} {field_str}", flush=True)
+        print(f"[web] {message} {field_str}", flush=True)
         return
-    print(f"[repl_web] {message}", flush=True)
+    print(f"[web] {message}", flush=True)
 
 
 def _resolve_required(value: str | None, env_name: str) -> str:

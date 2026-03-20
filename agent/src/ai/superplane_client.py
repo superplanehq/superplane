@@ -60,7 +60,7 @@ def _debug_enabled() -> bool:
 
 def _debug_log(message: str) -> None:
     if _debug_enabled():
-        print(f"[repl_web][superplane_client] {message}", flush=True)
+        print(f"[web][superplane_client] {message}", flush=True)
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
 from ai.agent import build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasProposal, CanvasQuestionRequest
-from ai.repl_web import _to_jsonable
+from ai.web import _to_jsonable
 
 
 def test_build_prompt_contains_question() -> None:
