@@ -68,6 +68,10 @@ func EnsureOrganizationWithinLimits(
 	return limitViolationError(response.GetViolations())
 }
 
+func LimitViolationError(violations []*pb.LimitViolation) error {
+	return limitViolationError(violations)
+}
+
 func limitViolationError(violations []*pb.LimitViolation) error {
 	if len(violations) == 0 {
 		return nil

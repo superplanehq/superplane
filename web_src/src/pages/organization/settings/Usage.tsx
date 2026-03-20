@@ -76,11 +76,11 @@ export function Usage({ organizationId }: UsageProps) {
     <div className="pt-6 space-y-6">
       <Alert>
         <Gauge className="h-4 w-4" />
-        <AlertTitle>{isPreviewMode ? "Usage preview mode" : "Usage service connected"}</AlertTitle>
+        <AlertTitle>{isPreviewMode ? "Usage preview mode" : "Usage tracking active"}</AlertTitle>
         <AlertDescription>
           {isPreviewMode
-            ? "Showing the organization usage page in local development without a configured usage service."
-            : data.statusMessage || "Organization usage is being tracked by the configured service."}
+            ? "Showing the organization usage page in local development without configured usage tracking."
+            : data.statusMessage || "Organization usage is being tracked for this organization."}
         </AlertDescription>
       </Alert>
 

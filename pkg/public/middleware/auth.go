@@ -267,7 +267,7 @@ func isOwnerSetupAllowedPath(path string) bool {
 
 func isAccountAPIPath(path string) bool {
 	switch path {
-	case "/account", "/organizations":
+	case "/account", "/organizations", "/organizations/creation-status":
 		return true
 	default:
 		return strings.HasPrefix(path, "/api/v1/invite-links/")

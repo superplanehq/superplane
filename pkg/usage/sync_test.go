@@ -132,3 +132,18 @@ func TestSyncOrganizationTreatsExistingRemoteOrganizationAsSynced(t *testing.T) 
 	require.NoError(t, err)
 	require.NotNil(t, organization.UsageSyncedAt)
 }
+
+func TestSyncOrganizationTreatsResourceExhaustedWithExistingRemoteOrganizationAsSynced(t *testing.T) {
+	r := support.Setup(t)
+	service := &fakeSyncService{
+		enabled:                true,
+		setupOrganizationError: status.Error(codes.ResourceExhausted, "account limit exceeded"),
+	}
+
+	err := SyncOrganization(context.Background(), service, r.Organization.ID.String())
+	require.NoError(t, err)
+
+	organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, organization.UsageSyncedAt)
+}

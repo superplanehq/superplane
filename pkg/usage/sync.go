@@ -62,6 +62,10 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 			return models.MarkOrganizationUsageSynced(orgID, time.Now())
 		}
 	case codes.ResourceExhausted:
+		if _, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID); describeErr == nil {
+			return models.MarkOrganizationUsageSynced(orgID, time.Now())
+		}
+
 		return err
 	}
 

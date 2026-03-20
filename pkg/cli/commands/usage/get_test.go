@@ -24,7 +24,7 @@ func TestGetCommandExecuteText(t *testing.T) {
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{
 				"enabled": true,
-				"statusMessage": "usage service connected",
+				"statusMessage": "usage tracking active",
 				"limits": {
 					"maxCanvases": 10,
 					"maxNodesPerCanvas": 200,
@@ -51,7 +51,7 @@ func TestGetCommandExecuteText(t *testing.T) {
 	err := (&getCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "Enabled: true")
-	require.Contains(t, stdout.String(), "Status: usage service connected")
+	require.Contains(t, stdout.String(), "Status: usage tracking active")
 	require.Contains(t, stdout.String(), "Canvases")
 	require.Contains(t, stdout.String(), "3")
 	require.Contains(t, stdout.String(), "Event bucket")

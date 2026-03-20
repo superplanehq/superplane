@@ -34,7 +34,10 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
   const { data: organization } = useOrganization(organizationId || "");
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canReadOrg = permissionsLoading || canAct("org", "read");
-  const { data: usageStatus } = useOrganizationUsage(organizationId || "", !!organizationId && canReadOrg);
+  const { data: usageStatus, error: usageError } = useOrganizationUsage(
+    organizationId || "",
+    !!organizationId && canReadOrg,
+  );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,7 +79,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
   }, [isMenuOpen]);
 
   const organizationName = organization?.metadata?.name || "Organization";
-  const usageEnabled = usageStatus?.enabled === true || isUsagePageForced();
+  const usageEnabled = usageStatus?.enabled === true || !!usageError || isUsagePageForced();
 
   const sidebarUserLinks = [
     {

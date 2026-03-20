@@ -63,7 +63,7 @@ const usageLimitCopyByMessage: Record<string, UsageLimitCopy> = {
   "organization exceeds configured account usage limits": {
     title: "Account usage limit reached",
     description:
-      "This organization is blocked because its linked account is already over the configured limits in the usage service. Reduce usage on the linked account or update the account limits before trying again.",
+      "This organization is blocked because its linked account is already over its configured limits. Reduce usage on the linked account or update the account limits before trying again.",
     toastMessage:
       "This organization is blocked because its linked account is already over the configured usage limits.",
     needsUsagePage: true,
