@@ -59,7 +59,7 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
 
     details["Policy UUID"] = policy.uuid || "-";
     details["Description"] = policy.description || "-";
-    details["Metric"] = METRIC_TYPE_LABELS[policy.type] || policy.type || "-";
+    details["Metric"] = policy.type ? METRIC_TYPE_LABELS[policy.type] || policy.type : "-";
     details["Comparison"] = policy.compare || "-";
     details["Threshold"] = policy.value?.toString() ?? "-";
     details["Window"] = policy.window || "-";

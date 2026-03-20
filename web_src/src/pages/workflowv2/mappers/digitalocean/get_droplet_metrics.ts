@@ -52,7 +52,9 @@ export const getDropletMetricsMapper: ComponentBaseMapper = {
     if (!result) return details;
 
     details["Droplet ID"] = result.dropletId?.toString() || "-";
-    details["Period"] = LOOKBACK_PERIOD_LABELS[result.lookbackPeriod] || result.lookbackPeriod || "-";
+    details["Period"] = result.lookbackPeriod
+      ? LOOKBACK_PERIOD_LABELS[result.lookbackPeriod] || result.lookbackPeriod
+      : "-";
     details["From"] = result.start ? new Date(result.start).toLocaleString() : "-";
     details["To"] = result.end ? new Date(result.end).toLocaleString() : "-";
 
