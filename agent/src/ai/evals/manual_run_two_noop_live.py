@@ -1,15 +1,13 @@
-"""CLI: run the manual-run + two-noop Pydantic Eval with a live LLM and Superplane tools.
+"""CLI: manual-run + two-noop eval — real LLM, Superplane API stubbed by default.
 
-Real API: set SUPERPLANE_BASE_URL, SUPERPLANE_API_TOKEN, SUPERPLANE_ORG_ID, CANVAS_ID (or flags),
-and provider keys (e.g. OPENAI_API_KEY).
+Default uses ``StubSuperplaneClient`` (catalog: ``start``, ``noop``). Set provider keys
+(e.g. ``OPENAI_API_KEY``).
 
-Stub API: pass ``--stub-api`` or set ``EVAL_STUB_SUPERPLANE=1`` — no Superplane env required;
-catalog is fixed to trigger ``start`` and component ``noop``. Canvas id defaults to
-``eval-stub-canvas``.
+Optional ``--real-superplane`` uses HTTP + ``SUPERPLANE_*`` and ``CANVAS_ID``.
 
 Example::
 
-    uv run python -m ai.evals.manual_run_two_noop_live --stub-api --model gpt-4o-mini
+    uv run python -m ai.evals.manual_run_two_noop_live --model gpt-4o-mini
 """
 
 from __future__ import annotations
@@ -34,46 +32,28 @@ def _require_env(name: str) -> str:
     return value
 
 
-def _stub_api_enabled(flag: bool) -> bool:
-    if flag:
-        return True
-    return (os.getenv("EVAL_STUB_SUPERPLANE") or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-async def _async_main(
-    *,
-    model: str,
-    canvas_id: str,
-    stub_api: bool,
-    report_format: str,
-    rich_include_output: bool,
-) -> None:
-    if stub_api:
-        client: SuperplaneClient = StubSuperplaneClient()
-    else:
-        client = SuperplaneClient(
+async def _async_main(*, model: str, canvas_id: str, use_real_superplane: bool) -> None:
+    if use_real_superplane:
+        client: SuperplaneClient = SuperplaneClient(
             SuperplaneClientConfig(
                 base_url=_require_env("SUPERPLANE_BASE_URL"),
                 api_token=_require_env("SUPERPLANE_API_TOKEN"),
                 organization_id=_require_env("SUPERPLANE_ORG_ID"),
             )
         )
+    else:
+        client = StubSuperplaneClient()
+
     deps = AgentDeps(client=client, canvas_id=canvas_id)
     report = await evaluate_manual_run_two_noop_live(model=model, deps=deps, progress=True)
-    if report_format == "rich":
-        report.print(
-            include_input=True,
-            include_output=rich_include_output,
-            include_durations=True,
-            include_analyses=False,
-        )
-    else:
-        print_eval_report_plain(report, include_input=True, include_durations=True)
+    print_eval_report_plain(report, include_input=True, include_durations=True)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Live eval: manual run plus two noops (Pydantic Evals).",
+        description=(
+            "Eval: real LLM proposes manual run + two noops; Superplane stubbed by default."
+        ),
     )
     parser.add_argument(
         "--model",
@@ -83,42 +63,29 @@ def main() -> None:
     parser.add_argument(
         "--canvas-id",
         default=(os.getenv("CANVAS_ID") or "").strip(),
-        help="Canvas UUID (default: CANVAS_ID env; stub mode default: eval-stub-canvas).",
+        help="Canvas id for deps (default: CANVAS_ID or eval-stub-canvas when API is stubbed).",
     )
     parser.add_argument(
-        "--stub-api",
+        "--real-superplane",
         action="store_true",
-        help="In-memory Superplane API (no network). Or set EVAL_STUB_SUPERPLANE=1.",
-    )
-    parser.add_argument(
-        "--format",
-        choices=("plain", "rich"),
-        default="plain",
-        help="plain: line-oriented summary (default). rich: Pydantic Evals table.",
-    )
-    parser.add_argument(
-        "--rich-full",
-        action="store_true",
-        help="With --format rich, include the model output column (often very wide).",
+        help="Call real Superplane HTTP API (requires SUPERPLANE_* and CANVAS_ID).",
     )
     args = parser.parse_args()
-    stub_api = _stub_api_enabled(args.stub_api)
-    canvas_id = args.canvas_id if args.canvas_id else ("eval-stub-canvas" if stub_api else "")
+
+    use_real = args.real_superplane
+    canvas_id = args.canvas_id or ("eval-stub-canvas" if not use_real else "")
     if not canvas_id:
-        print("error: pass --canvas-id or set CANVAS_ID (not using --stub-api)", file=sys.stderr)
+        print(
+            "error: set CANVAS_ID or --canvas-id when using --real-superplane",
+            file=sys.stderr,
+        )
         sys.exit(1)
+
     if args.model == "test":
         print("error: pass a real --model / AI_MODEL (not the stub 'test')", file=sys.stderr)
         sys.exit(1)
-    asyncio.run(
-        _async_main(
-            model=args.model,
-            canvas_id=canvas_id,
-            stub_api=stub_api,
-            report_format=args.format,
-            rich_include_output=args.rich_full,
-        )
-    )
+
+    asyncio.run(_async_main(model=args.model, canvas_id=canvas_id, use_real_superplane=use_real))
 
 
 if __name__ == "__main__":

@@ -3,9 +3,9 @@
 Follows the Pydantic Evals pattern (Dataset, Case, custom Evaluator); see
 https://ai.pydantic.dev/evals/
 
-Run against a **live** model and Superplane API::
+Run with a **real LLM**; use ``StubSuperplaneClient`` in ``deps`` or the CLI (default)::
 
-    python -m ai.evals.manual_run_two_noop_live --canvas-id … --model gpt-4o-mini
+    python -m ai.evals.manual_run_two_noop_live --model gpt-4o-mini
 """
 
 from __future__ import annotations

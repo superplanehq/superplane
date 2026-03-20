@@ -1,4 +1,4 @@
-.PHONY: lint test test.agent.evals agent.eval.manual_run_two_noop test.license.check
+.PHONY: lint test agent.eval.manual_run_two_noop test.license.check
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -69,11 +69,7 @@ test.license.check:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
-# Agent (Python): unit tests for eval scorers only (no LLM). Requires `agent` up.
-test.agent.evals:
-	$(COMPOSE) exec agent uv run pytest tests/test_basic_workflow_eval.py tests/test_stub_superplane_client.py tests/test_report_output.py -v
-
-# Agent (Python): live Pydantic Eval. Use ARGS='--stub-api --model gpt-4o-mini' to skip Superplane; else CANVAS_ID + SUPERPLANE_* + provider keys.
+# Agent (Python): eval with real LLM; Superplane API stubbed unless ARGS='--real-superplane' (+ CANVAS_ID, SUPERPLANE_*).
 agent.eval.manual_run_two_noop:
 	$(COMPOSE) exec agent uv run python -m ai.evals.manual_run_two_noop_live $(ARGS)
 
