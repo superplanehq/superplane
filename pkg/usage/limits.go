@@ -16,8 +16,21 @@ func EnsureAccountWithinLimits(ctx context.Context, usageService Service, accoun
 	}
 
 	response, err := usageService.CheckAccountLimits(ctx, accountID, state)
-	if err != nil {
+	if err == nil {
+		return limitViolationError(response.GetViolations())
+	}
+
+	if status.Code(err) != codes.NotFound {
 		return mapLimitCheckError("check account limits", err)
+	}
+
+	if _, setupErr := usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
+		return mapLimitCheckError("set up usage account", setupErr)
+	}
+
+	response, err = usageService.CheckAccountLimits(ctx, accountID, state)
+	if err != nil {
+		return mapLimitCheckError("check account limits after setup", err)
 	}
 
 	return limitViolationError(response.GetViolations())

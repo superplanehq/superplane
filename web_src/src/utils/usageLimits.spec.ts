@@ -21,4 +21,12 @@ describe("usageLimits", () => {
     );
     expect(getUsageLimitToastMessage(undefined, "fallback")).toBe("fallback");
   });
+
+  it("maps plain string errors to usage notices", () => {
+    const notice = getUsageLimitNotice("organization user limit exceeded", "org-123");
+
+    expect(notice).not.toBeNull();
+    expect(notice?.title).toBe("Member limit reached");
+    expect(notice?.href).toBe("/org-123/settings/billing");
+  });
 });

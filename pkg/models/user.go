@@ -374,7 +374,6 @@ func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*
 	var user User
 
 	err := tx.
-		Unscoped().
 		Where("organization_id = ?", orgID).
 		Where("account_id IS NOT NULL").
 		Where("type = ?", UserTypeHuman).

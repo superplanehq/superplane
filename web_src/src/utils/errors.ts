@@ -9,6 +9,10 @@ export function getApiErrorMessage(error: unknown, fallback = "An error occurred
     return fallback;
   }
 
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
   // Check if error has the structure { error: GooglerpcStatus }
   if (typeof error === "object" && "error" in error) {
     const errorObj = error.error;

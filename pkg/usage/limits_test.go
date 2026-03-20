@@ -23,6 +23,7 @@ type fakeLimitService struct {
 	checkOrganizationResponse *usagepb.CheckOrganizationLimitsResponse
 	checkOrganizationError    error
 
+	checkAccountCalls      int
 	checkOrganizationCalls int
 }
 
@@ -62,7 +63,12 @@ func (s *fakeLimitService) CheckAccountLimits(
 	string,
 	*usagepb.AccountState,
 ) (*usagepb.CheckAccountLimitsResponse, error) {
-	return s.checkAccountResponse, s.checkAccountError
+	s.checkAccountCalls++
+	if s.checkAccountCalls == 1 && s.checkAccountError != nil {
+		return nil, s.checkAccountError
+	}
+
+	return s.checkAccountResponse, nil
 }
 
 func (s *fakeLimitService) CheckOrganizationLimits(
@@ -94,6 +100,21 @@ func TestEnsureAccountWithinLimitsReturnsResourceExhaustedForViolations(t *testi
 	require.Error(t, err)
 	assert.Equal(t, codes.ResourceExhausted, status.Code(err))
 	assert.Equal(t, "account organization limit exceeded", status.Convert(err).Message())
+}
+
+func TestEnsureAccountWithinLimitsSetsUpMissingAccount(t *testing.T) {
+	service := &fakeLimitService{
+		enabled:           true,
+		checkAccountError: status.Error(codes.NotFound, "account not configured"),
+		checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
+			Allowed: true,
+		},
+	}
+
+	err := EnsureAccountWithinLimits(context.Background(), service, "account-id", &usagepb.AccountState{Organizations: 1})
+	require.NoError(t, err)
+	assert.Equal(t, 2, service.checkAccountCalls)
+	assert.Equal(t, []string{"account-id"}, service.setupAccountCalls)
 }
 
 func TestEnsureOrganizationWithinLimitsSyncsOnNotFound(t *testing.T) {
