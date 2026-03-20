@@ -25,17 +25,15 @@ func Test__OnAlertFires__Configuration(t *testing.T) {
 	assert.Equal(t, "rule", ruleField.Name)
 	assert.Equal(t, "Rule", ruleField.Label)
 	assert.Equal(t, configuration.FieldTypeIntegrationResource, ruleField.Type)
-	assert.False(t, ruleField.Required)
+	assert.True(t, ruleField.Required)
 	require.NotNil(t, ruleField.TypeOptions)
 	require.NotNil(t, ruleField.TypeOptions.Resource)
 	assert.Equal(t, ResourceTypeKibanaRule, ruleField.TypeOptions.Resource.Type)
 	assert.False(t, ruleField.TypeOptions.Resource.Multi)
 }
 
-func Test__OnAlertFires__Setup__WithoutRule(t *testing.T) {
+func Test__OnAlertFires__Setup(t *testing.T) {
 	trigger := &OnAlertFires{}
-	httpCtx := &contexts.HTTPContext{}
-	metadataCtx := &contexts.MetadataContext{}
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
 			"url":       "https://elastic.example.com",
@@ -44,56 +42,76 @@ func Test__OnAlertFires__Setup__WithoutRule(t *testing.T) {
 		},
 	}
 
-	err := trigger.Setup(core.TriggerContext{
-		Configuration: map[string]any{},
-		HTTP:          httpCtx,
-		Metadata:      metadataCtx,
-		Integration:   integrationCtx,
+	t.Run("rules are required", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{},
+			Integration:   integrationCtx,
+			HTTP:          &contexts.HTTPContext{},
+			Metadata:      &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "rule is required")
 	})
-	require.NoError(t, err)
 
-	assert.Equal(t, OnAlertFiresMetadata{}, metadataCtx.Metadata)
-	assert.Empty(t, httpCtx.Requests)
-	require.Len(t, integrationCtx.WebhookRequests, 1)
-	assert.Equal(t, map[string]any{
-		"kibanaUrl": "https://kibana.example.com",
-		"ruleId":    "",
-	}, integrationCtx.WebhookRequests[0])
-}
-
-func Test__OnAlertFires__Setup__WithRule(t *testing.T) {
-	trigger := &OnAlertFires{}
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"id":"rule-123","name":"High error rate"}`)),
+	t.Run("valid rule and spaces are validated and stored in metadata", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"rule-123","name":"High error rate"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"id":"default","name":"Default"}]`)),
+				},
 			},
-		},
-	}
-	metadataCtx := &contexts.MetadataContext{}
-	integrationCtx := &contexts.IntegrationContext{
-		Configuration: map[string]any{
-			"url":       "https://elastic.example.com",
+		}
+		metadataCtx := &contexts.MetadataContext{}
+		testIntegration := &contexts.IntegrationContext{
+			Configuration: integrationCtx.Configuration,
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"rule":   "rule-123",
+				"spaces": []string{"default"},
+			},
+			Integration: testIntegration,
+			HTTP:        httpCtx,
+			Metadata:    metadataCtx,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, OnAlertFiresMetadata{
+			RuleID:   "rule-123",
+			RuleName: "High error rate",
+			Spaces:   []string{"Default"},
+		}, metadataCtx.Metadata)
+		require.Len(t, testIntegration.WebhookRequests, 1)
+		assert.Equal(t, map[string]any{
 			"kibanaUrl": "https://kibana.example.com",
-			"apiKey":    "api-key",
-		},
-	}
-
-	err := trigger.Setup(core.TriggerContext{
-		Configuration: map[string]any{"rule": "rule-123"},
-		HTTP:          httpCtx,
-		Metadata:      metadataCtx,
-		Integration:   integrationCtx,
+			"ruleId":    "rule-123",
+		}, testIntegration.WebhookRequests[0])
 	})
-	require.NoError(t, err)
 
-	assert.Equal(t, OnAlertFiresMetadata{RuleName: "High error rate"}, metadataCtx.Metadata)
-	require.Len(t, integrationCtx.WebhookRequests, 1)
-	assert.Equal(t, map[string]any{
-		"kibanaUrl": "https://kibana.example.com",
-		"ruleId":    "rule-123",
-	}, integrationCtx.WebhookRequests[0])
+	t.Run("unknown rule returns a validation error", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"not found"}`)),
+				},
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"rule": "missing-rule",
+			},
+			Integration: integrationCtx,
+			HTTP:        httpCtx,
+			Metadata:    &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "failed to get Kibana rule")
+	})
 }
 
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {

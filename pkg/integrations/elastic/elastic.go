@@ -76,11 +76,12 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Description: "Base URL of your Kibana instance, such as https://my-cluster.kb.us-east-1.aws.found.io:9243. In Elastic Cloud, get it from Deployments -> your deployment -> Manage.",
 		},
 		{
-			Name:      "apiKey",
-			Label:     "API Key",
-			Type:      configuration.FieldTypeString,
-			Required:  true,
-			Sensitive: true,
+			Name:        "apiKey",
+			Label:       "API Key",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Sensitive:   true,
+			Description: "API key used to authenticate Elastic API calls.",
 		},
 	}
 }

@@ -66,9 +66,9 @@ Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields om
 
 ### Filtering
 
-The **Rule** field is optional. Leave it empty to keep the original manual connector workflow. Additional filters are optional refinements. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
+Select at least one **Rule**. Additional filter fields are optional. When multiple values are provided in a list, any value matching is sufficient (OR). All active filter types must match simultaneously (AND across types).
 
-When a **Rule** is selected, it becomes the primary filter. Additional filters like space, tags, severity, and status are optional refinements.
+**Rule ID** is the most reliable selector because rule names are user-editable. Use it when you need precise per-rule routing.
 
 ### Webhook Verification
 
