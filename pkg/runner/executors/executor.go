@@ -1,4 +1,4 @@
-package worker
+package executors
 
 import (
 	"bytes"
@@ -42,7 +42,7 @@ const result = await runtime.runExecuteCodeModule(mod, job);
 await Deno.stdout.write(new TextEncoder().encode(JSON.stringify(result)));
 `
 
-type RuntimeExecutorConfig struct {
+type Config struct {
 	HubURL     string
 	CacheDir   string
 	DenoBinary string
@@ -50,11 +50,39 @@ type RuntimeExecutorConfig struct {
 	Runner     commandRunner
 }
 
+func (c *Config) Validate() error {
+	if c.HubURL == "" {
+		return fmt.Errorf("HUB_URL is required")
+	}
+
+	if c.CacheDir == "" {
+		return fmt.Errorf("CACHE_DIR is required")
+	}
+
+	if c.DenoBinary == "" {
+		return fmt.Errorf("DENO_BINARY is required")
+	}
+
+	if c.Runner == nil {
+		return fmt.Errorf("RUNNER is required")
+	}
+
+	return nil
+}
+
+func (c *Config) HTTP() *http.Client {
+	if c.HTTPClient == nil {
+		return &http.Client{Timeout: 30 * time.Second}
+	}
+
+	return c.HTTPClient
+}
+
 type commandRunner interface {
 	Run(ctx context.Context, name string, args []string, stdout io.Writer, stderr io.Writer) error
 }
 
-type RuntimeExecutor struct {
+type Executor struct {
 	hubURL     string
 	cacheDir   string
 	denoBinary string
@@ -62,37 +90,21 @@ type RuntimeExecutor struct {
 	runner     commandRunner
 }
 
-func NewRuntimeExecutor(config RuntimeExecutorConfig) *RuntimeExecutor {
-	cacheDir := config.CacheDir
-	if cacheDir == "" {
-		cacheDir = filepath.Join(os.TempDir(), "superplane-extension-worker-cache")
+func New(config Config) (*Executor, error) {
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
-	denoBinary := config.DenoBinary
-	if denoBinary == "" {
-		denoBinary = "deno"
-	}
-
-	httpClient := config.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 30 * time.Second}
-	}
-
-	runner := config.Runner
-	if runner == nil {
-		runner = execRunner{}
-	}
-
-	return &RuntimeExecutor{
+	return &Executor{
 		hubURL:     config.HubURL,
-		cacheDir:   cacheDir,
-		denoBinary: denoBinary,
-		httpClient: httpClient,
-		runner:     runner,
-	}
+		cacheDir:   config.CacheDir,
+		denoBinary: config.DenoBinary,
+		httpClient: config.HTTP(),
+		runner:     config.Runner,
+	}, nil
 }
 
-func (e *RuntimeExecutor) HandleJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
+func (e *Executor) HandleJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
 	switch message.JobType {
 	case protocol.JobTypeExecuteCode:
 		return e.handleExecuteCodeJob(ctx, message)
@@ -103,7 +115,7 @@ func (e *RuntimeExecutor) HandleJob(ctx context.Context, message protocol.JobAss
 	}
 }
 
-func (e *RuntimeExecutor) handleExecuteCodeJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
+func (e *Executor) handleExecuteCodeJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
 	log.Printf("Handling execute code job %s", message.JobID)
 
 	if message.ExecuteCode == nil {
@@ -113,7 +125,7 @@ func (e *RuntimeExecutor) handleExecuteCodeJob(ctx context.Context, message prot
 	return e.executeCode(ctx, message.ExecuteCode.Code, message.ExecuteCode.Timeout, message.ExecuteCode.Invocation)
 }
 
-func (e *RuntimeExecutor) executeCode(ctx context.Context, code string, timeout int, invocation json.RawMessage) (json.RawMessage, error) {
+func (e *Executor) executeCode(ctx context.Context, code string, timeout int, invocation json.RawMessage) (json.RawMessage, error) {
 	if strings.TrimSpace(code) == "" {
 		return nil, fmt.Errorf("execute-code job is missing code")
 	}
@@ -193,7 +205,7 @@ func (e *RuntimeExecutor) executeCode(ctx context.Context, code string, timeout 
 	return json.RawMessage(output), nil
 }
 
-func (e *RuntimeExecutor) handleInvokeExtensionJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
+func (e *Executor) handleInvokeExtensionJob(ctx context.Context, message protocol.JobAssignMessage) (json.RawMessage, error) {
 	log.Printf("Handling invoke extension job %s", message.JobID)
 
 	if message.InvokeExtension == nil {
@@ -208,7 +220,7 @@ func (e *RuntimeExecutor) handleInvokeExtensionJob(ctx context.Context, message 
 	return e.invokeBundle(ctx, bundlePath, message.InvokeExtension.Invocation)
 }
 
-func (e *RuntimeExecutor) ensureBundle(ctx context.Context, message protocol.JobAssignMessage) (string, error) {
+func (e *Executor) ensureBundle(ctx context.Context, message protocol.JobAssignMessage) (string, error) {
 	log.Printf("Ensuring bundle for job %s", message.JobID)
 
 	bundlePath := filepath.Join(
@@ -268,7 +280,7 @@ func (e *RuntimeExecutor) ensureBundle(ctx context.Context, message protocol.Job
 	return bundlePath, nil
 }
 
-func (e *RuntimeExecutor) invokeBundle(ctx context.Context, bundlePath string, invocation json.RawMessage) (json.RawMessage, error) {
+func (e *Executor) invokeBundle(ctx context.Context, bundlePath string, invocation json.RawMessage) (json.RawMessage, error) {
 	//
 	// TODO
 	// Since we have a temp dir for each execution,
@@ -342,15 +354,17 @@ func buildExecuteCodeJob(invocation json.RawMessage) ([]byte, error) {
 	return json.Marshal(job)
 }
 
-func (e *RuntimeExecutor) bundleURL(invokeExtension *protocol.InvokeExtension) (string, error) {
-	bundleURL, err := joinHTTPURL(e.hubURL, "/api/v1/extensions/bundle.js")
+func (e *Executor) bundleURL(invokeExtension *protocol.InvokeExtension) (string, error) {
+	URL, err := url.Parse(e.hubURL)
 	if err != nil {
 		return "", err
 	}
 
-	return addQuery(bundleURL, map[string]string{
-		protocol.QueryToken: invokeExtension.BundleToken,
-	})
+	URL.Path = "/api/v1/extensions/bundle.js"
+	query := URL.Query()
+	query.Set(protocol.QueryToken, invokeExtension.BundleToken)
+	URL.RawQuery = query.Encode()
+	return URL.String(), nil
 }
 
 func fileURL(path string) string {
@@ -384,26 +398,11 @@ func findPackageEntryPoint(startDir string, relativePath string) (string, error)
 	}
 }
 
-type execRunner struct{}
+type ExecRunner struct{}
 
-func (execRunner) Run(ctx context.Context, name string, args []string, stdout io.Writer, stderr io.Writer) error {
+func (ExecRunner) Run(ctx context.Context, name string, args []string, stdout io.Writer, stderr io.Writer) error {
 	command := exec.CommandContext(ctx, name, args...)
 	command.Stdout = stdout
 	command.Stderr = stderr
 	return command.Run()
-}
-
-func joinHTTPURL(base string, path string) (string, error) {
-	parsed, err := url.Parse(base)
-	if err != nil {
-		return "", err
-	}
-
-	if strings.HasPrefix(path, "/") {
-		parsed.Path = path
-	} else {
-		parsed.Path = "/" + path
-	}
-
-	return parsed.String(), nil
 }
