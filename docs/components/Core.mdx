@@ -28,6 +28,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
@@ -614,6 +615,51 @@ The Read Memory component looks up values from canvas-level memory storage.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
+}
+```
+
+<a id="send-email-notification"></a>
+
+## Send Email Notification
+
+The Send Email Notification component sends emails through the system's configured email provider (Resend or SMTP) without requiring a separate integration setup.
+
+### Use Cases
+
+- **Notifications**: Send email notifications for workflow events
+- **Alerts**: Email alerts for errors or important conditions
+- **Status updates**: Notify stakeholders about workflow progress
+- **User communications**: Send emails to users as part of automated workflows
+
+### Recipients
+
+Select recipients from your organization's users, groups, or roles. The system resolves the actual email addresses at send time.
+
+### Configuration
+
+- **Recipients**: List of users, groups, or roles
+- **Subject**: Email subject line (supports expressions)
+- **Body**: Email body content (supports expressions)
+
+### Output
+
+Emits the list of recipients and the subject to the default output channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "groups": [],
+    "roles": [],
+    "subject": "Deployment completed",
+    "to": [
+      "alice@example.com",
+      "bob@example.com"
+    ]
+  },
+  "timestamp": "2026-03-19T12:00:00.000000000Z",
+  "type": "sendEmail.sent"
 }
 ```
 

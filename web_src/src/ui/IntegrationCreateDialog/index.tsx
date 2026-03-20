@@ -11,11 +11,14 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { getApiErrorMessage } from "@/utils/errors";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import type {
   ConfigurationField,
   IntegrationsIntegrationDefinition,
@@ -75,7 +78,7 @@ export function IntegrationCreateDialog({
     config: Record<string, unknown>;
   } | null>(null);
   const [isCreatePending, setIsCreatePending] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<unknown>(null);
   const [createdIntegrationId, setCreatedIntegrationId] = useState<string | undefined>(undefined);
   const [browserActionCompleted, setBrowserActionCompleted] = useState(false);
 
@@ -175,9 +178,8 @@ export function IntegrationCreateDialog({
         onCreated?.(integration.metadata.id);
       }
     } catch (error) {
-      const message = getApiErrorMessage(error);
-      setCreateError(message);
-      showErrorToast(`Failed to create integration: ${message}`);
+      setCreateError(error);
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
     } finally {
       setIsCreatePending(false);
     }
@@ -251,6 +253,7 @@ export function IntegrationCreateDialog({
 
   const displayName =
     getIntegrationTypeDisplayName(undefined, integrationDefinition.name) || integrationDefinition.name;
+  const createErrorNotice = createError ? getUsageLimitNotice(createError, organizationId) : null;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -466,11 +469,13 @@ export function IntegrationCreateDialog({
           )}
         </DialogFooter>
 
-        {createError && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-sm text-red-800 dark:text-red-200">Failed to create integration: {createError}</p>
-          </div>
-        )}
+        {createError && createErrorNotice ? <UsageLimitAlert notice={createErrorNotice} className="mt-4" /> : null}
+        {createError && !createErrorNotice ? (
+          <Alert variant="destructive" className="mt-4">
+            <AlertTitle>Unable to create integration</AlertTitle>
+            <AlertDescription>Failed to create integration: {getApiErrorMessage(createError)}</AlertDescription>
+          </Alert>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

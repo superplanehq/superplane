@@ -16,3 +16,4 @@ vendor/bundle
 CLAUDE.local.md
 .env
 .idea/
+.agents/

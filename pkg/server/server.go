@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
@@ -32,6 +33,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
+	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
@@ -166,6 +168,19 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		w := workers.NewCanvasCleanupWorker()
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
+		usageService, err := usage.NewServiceFromEnv()
+		if err != nil {
+			log.Fatalf("failed to initialize usage sync worker: %v", err)
+		}
+
+		if usageService.Enabled() {
+			log.Println("Starting Usage Sync Worker")
+			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
+			go w.Start(context.Background())
+		}
+	}
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
@@ -216,9 +231,26 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Panicf("failed to initialize usage service for public api: %v", err)
+	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(
+		encryptor,
+		registry,
+		jwtSigner,
+		oidcProvider,
+		basePath,
+		baseURL,
+		webhooksBaseURL,
+		appEnv,
+		templateDir,
+		authService,
+		usageService,
+		blockSignup,
+	)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}

@@ -1,5 +1,6 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
@@ -995,7 +996,7 @@ export function WorkflowPageV2() {
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (error as { message?: string })?.message ||
         "Failed to create version";
-      showErrorToast(errorMessage);
+      showErrorToast(getUsageLimitToastMessage(error, errorMessage));
     }
   }, [
     organizationId,
@@ -2124,7 +2125,7 @@ export function WorkflowPageV2() {
       } catch (error: any) {
         console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
-        showErrorToast(errorMessage);
+        showErrorToast(getUsageLimitToastMessage(error, errorMessage));
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-error-${Date.now()}`,
@@ -3672,7 +3673,9 @@ export function WorkflowPageV2() {
         setTopViewMode("versioning");
         showSuccessToast("Change request created");
       } catch (error) {
-        showErrorToast(resolveApiErrorMessage(error, "Failed to create change request"));
+        showErrorToast(
+          getUsageLimitToastMessage(error, resolveApiErrorMessage(error, "Failed to create change request")),
+        );
       }
     },
     [
@@ -3716,7 +3719,7 @@ export function WorkflowPageV2() {
         onSuccess?.(actedChangeRequestId);
         showSuccessToast(successMessage);
       } catch (error) {
-        showErrorToast(resolveApiErrorMessage(error, fallbackErrorMessage));
+        showErrorToast(getUsageLimitToastMessage(error, resolveApiErrorMessage(error, fallbackErrorMessage)));
       }
     },
     [organizationId, canvasId, actOnCanvasChangeRequestMutation],
@@ -3821,7 +3824,7 @@ export function WorkflowPageV2() {
         setSelectedChangeRequestId(resolvedChangeRequestID);
         showSuccessToast("Change request conflicts resolved");
       } catch (error) {
-        showErrorToast(resolveApiErrorMessage(error, "Failed to resolve"));
+        showErrorToast(getUsageLimitToastMessage(error, resolveApiErrorMessage(error, "Failed to resolve")));
       }
     },
     [
@@ -4083,7 +4086,7 @@ export function WorkflowPageV2() {
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (error as { message?: string })?.message ||
         "Failed to reset draft";
-      showErrorToast(errorMessage);
+      showErrorToast(getUsageLimitToastMessage(error, errorMessage));
     } finally {
       setIsResetDraftPending(false);
     }
@@ -4846,6 +4849,7 @@ export function WorkflowPageV2() {
         />
       </div>
       <CanvasPageModals
+        organizationId={organizationId || ""}
         canvas={canvas}
         isUseTemplateOpen={isUseTemplateOpen}
         onCloseUseTemplate={() => setIsUseTemplateOpen(false)}

@@ -10,6 +10,10 @@ import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
 import { LoadingButton } from "../../components/ui/loading-button";
 import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
+import { getApiErrorMessage } from "@/utils/errors";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { showErrorToast } from "../../utils/toast";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 import { Rainbow } from "lucide-react";
@@ -25,12 +29,14 @@ export function CreateCanvasPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
+  const [submitError, setSubmitError] = useState<unknown>(null);
 
   const createMutation = useCreateCanvas(organizationId || "");
   const { data: workflowTemplates = [] } = useCanvasTemplates(organizationId || "");
 
   const handleSubmit = async () => {
     setNameError("");
+    setSubmitError(null);
 
     if (!name.trim()) {
       setNameError("Name is required");
@@ -57,15 +63,17 @@ export function CreateCanvasPage() {
         navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
       }
     } catch (error) {
-      const errorMessage = (error as Error)?.message || error?.toString() || "Failed to create canvas";
-
-      showErrorToast(errorMessage);
+      const errorMessage = getApiErrorMessage(error, "Failed to create canvas");
+      setSubmitError(error);
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create canvas"));
 
       if (errorMessage.toLowerCase().includes("already") || errorMessage.toLowerCase().includes("exists")) {
         setNameError("A canvas with this name already exists");
       }
     }
   };
+
+  const usageLimitNotice = submitError ? getUsageLimitNotice(submitError, organizationId) : null;
 
   const handleCancel = () => {
     navigate(`/${organizationId}`);
@@ -89,6 +97,13 @@ export function CreateCanvasPage() {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
+              {usageLimitNotice ? <UsageLimitAlert notice={usageLimitNotice} /> : null}
+              {submitError && !usageLimitNotice ? (
+                <Alert variant="destructive">
+                  <AlertTitle>Unable to create canvas</AlertTitle>
+                  <AlertDescription>{getApiErrorMessage(submitError, "Failed to create canvas")}</AlertDescription>
+                </Alert>
+              ) : null}
               <Field>
                 <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
                 <Input
@@ -102,6 +117,9 @@ export function CreateCanvasPage() {
                     }
                     if (nameError) {
                       setNameError("");
+                    }
+                    if (submitError) {
+                      setSubmitError(null);
                     }
                   }}
                   placeholder=""
@@ -128,6 +146,9 @@ export function CreateCanvasPage() {
                   onChange={(e) => {
                     if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
                       setDescription(e.target.value);
+                    }
+                    if (submitError) {
+                      setSubmitError(null);
                     }
                   }}
                   placeholder="Describe what it does (optional)"

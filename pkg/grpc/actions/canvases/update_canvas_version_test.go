@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -171,6 +172,50 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Version)
+	})
+
+	t.Run("usage limit violation blocks oversized draft", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		require.NoError(
+			t,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", true).Error,
+		)
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		service := &fakeCanvasUsageService{
+			checkOrganizationResp: &usagepb.CheckOrganizationLimitsResponse{
+				Allowed: false,
+				Violations: []*usagepb.LimitViolation{
+					{
+						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_NODES_PER_CANVAS,
+						ConfiguredLimit: 1,
+						CurrentValue:    2,
+					},
+				},
+			},
+		}
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err = UpdateCanvasVersionWithUsage(
+			ctx,
+			service,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			testPbCanvas(canvas.Name),
+			nil,
+			"",
+		)
+
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.ResourceExhausted, s.Code())
+		assert.Equal(t, "canvas node limit exceeded", s.Message())
 	})
 }
 

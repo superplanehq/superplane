@@ -174,6 +174,9 @@ import type {
   OrganizationsDescribeOrganizationData,
   OrganizationsDescribeOrganizationErrors,
   OrganizationsDescribeOrganizationResponses,
+  OrganizationsDescribeUsageData,
+  OrganizationsDescribeUsageErrors,
+  OrganizationsDescribeUsageResponses,
   OrganizationsGetAgentSettingsData,
   OrganizationsGetAgentSettingsErrors,
   OrganizationsGetAgentSettingsResponses,
@@ -1398,6 +1401,19 @@ export const organizationsResetInviteLink = <ThrowOnError extends boolean = true
     OrganizationsResetInviteLinkErrors,
     ThrowOnError
   >({ url: "/api/v1/organizations/{id}/invite-link/reset", ...options });
+
+/**
+ * Describe organization usage
+ *
+ * Returns usage tracking and limits for an organization
+ */
+export const organizationsDescribeUsage = <ThrowOnError extends boolean = true>(
+  options: Options<OrganizationsDescribeUsageData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<OrganizationsDescribeUsageResponses, OrganizationsDescribeUsageErrors, ThrowOnError>({
+    url: "/api/v1/organizations/{id}/usage",
+    ...options,
+  });
 
 /**
  * Remove a user from an organization

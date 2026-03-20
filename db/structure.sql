@@ -342,7 +342,8 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    versioning_enabled boolean DEFAULT false NOT NULL
+    versioning_enabled boolean DEFAULT false NOT NULL,
+    usage_synced_at timestamp with time zone
 );
 
 
@@ -1939,7 +1940,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260318013637	f
+20260319201824	f
 \.
 
 

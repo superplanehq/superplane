@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,14 +19,22 @@ type CanvasService struct {
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
 	webhookBaseURL string
+	usageService   usage.Service
 }
 
-func NewCanvasService(authService authorization.Authorization, registry *registry.Registry, encryptor crypto.Encryptor, webhookBaseURL string) *CanvasService {
+func NewCanvasService(
+	authService authorization.Authorization,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	webhookBaseURL string,
+	usageService usage.Service,
+) *CanvasService {
 	return &CanvasService{
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
 		webhookBaseURL: webhookBaseURL,
+		usageService:   usageService,
 	}
 }
 
@@ -58,7 +67,7 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
 	}
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CreateCanvasWithAutoLayout(ctx, s.registry, organizationID, req.Canvas, req.AutoLayout)
+	return canvases.CreateCanvasWithAutoLayoutAndUsage(ctx, s.usageService, s.registry, organizationID, req.Canvas, req.AutoLayout)
 }
 
 func (s *CanvasService) CreateCanvasVersion(ctx context.Context, req *pb.CreateCanvasVersionRequest) (*pb.CreateCanvasVersionResponse, error) {
@@ -82,8 +91,9 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasVersion(
+	return canvases.UpdateCanvasVersionWithUsage(
 		ctx,
+		s.usageService,
 		s.encryptor,
 		s.registry,
 		organizationID,

@@ -25,7 +25,7 @@ func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *model
 
 	signer := jwt.NewSigner("test-client-secret")
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "", "", "test", "/app/templates", r.AuthService, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 
 	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
@@ -152,7 +152,7 @@ func TestServer_AuthIntegration(t *testing.T) {
 
 		signer := jwt.NewSigner("test-client-secret")
 		oidcProvider := support.NewOIDCProvider()
-		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", r.AuthService, true)
+		blockedServer, err := NewServer(r.Encryptor, r.Registry, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", r.AuthService, nil, true)
 		require.NoError(t, err)
 
 		handler := blockedServer.authHandler

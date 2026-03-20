@@ -87,6 +87,24 @@ func ListIntegrations(orgID uuid.UUID) ([]Integration, error) {
 	return integrations, nil
 }
 
+func CountIntegrationsByOrganization(orgID string) (int64, error) {
+	return CountIntegrationsByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func CountIntegrationsByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&Integration{}).
+		Where("organization_id = ?", orgID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func ListIntegrationWebhooks(tx *gorm.DB, integrationID uuid.UUID) ([]Webhook, error) {
 	var webhooks []Webhook
 	err := tx.

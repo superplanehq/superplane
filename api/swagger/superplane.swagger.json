@@ -2771,6 +2771,38 @@
         ]
       }
     },
+    "/api/v1/organizations/{id}/usage": {
+      "get": {
+        "summary": "Describe organization usage",
+        "description": "Returns usage tracking and limits for an organization",
+        "operationId": "Organizations_DescribeUsage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDescribeUsageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
     "/api/v1/organizations/{id}/users/{userId}": {
       "delete": {
         "summary": "Remove a user from an organization",
@@ -5904,6 +5936,23 @@
         }
       }
     },
+    "OrganizationsDescribeUsageResponse": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "statusMessage": {
+          "type": "string"
+        },
+        "limits": {
+          "$ref": "#/definitions/OrganizationsOrganizationLimits"
+        },
+        "usage": {
+          "$ref": "#/definitions/OrganizationsOrganizationUsage"
+        }
+      }
+    },
     "OrganizationsGetAgentSettingsResponse": {
       "type": "object",
       "properties": {
@@ -6080,6 +6129,35 @@
         }
       }
     },
+    "OrganizationsOrganizationLimits": {
+      "type": "object",
+      "properties": {
+        "maxCanvases": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxNodesPerCanvas": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxUsers": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "retentionWindowDays": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "maxEventsPerMonth": {
+          "type": "string",
+          "format": "int64"
+        },
+        "maxIntegrations": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
     "OrganizationsOrganizationMetadata": {
       "type": "object",
       "properties": {
@@ -6102,6 +6180,27 @@
         },
         "versioningEnabled": {
           "type": "boolean"
+        }
+      }
+    },
+    "OrganizationsOrganizationUsage": {
+      "type": "object",
+      "properties": {
+        "canvases": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "eventBucketLevel": {
+          "type": "number",
+          "format": "double"
+        },
+        "eventBucketCapacity": {
+          "type": "number",
+          "format": "double"
+        },
+        "eventBucketLastUpdatedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

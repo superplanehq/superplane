@@ -253,7 +253,7 @@ gen.components.local.update: gen.components.docs
 	rm -rf ../docs/src/content/docs/components
 	cp -R docs/components ../docs/src/content/docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,usage
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts
 pb.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)

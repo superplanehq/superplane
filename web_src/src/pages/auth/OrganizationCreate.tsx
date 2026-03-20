@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Text } from "../../components/Text/text";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { getUsageLimitNotice } from "@/utils/usageLimits";
+import { getResponseErrorMessage } from "@/utils/errors";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");
@@ -30,17 +34,10 @@ const OrganizationCreate: React.FC = () => {
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {
-        try {
-          const errorData = await response.json();
-          setError(errorData.message || "Failed to create organization");
-        } catch {
-          // If we can't parse the error response, show a generic message based on status
-          if (response.status === 409) {
-            setError("An organization with this name already exists");
-          } else {
-            setError(`Failed to create organization (${response.status})`);
-          }
-        }
+        const fallbackMessage =
+          response.status === 409 ? "An organization with this name already exists" : "Failed to create organization";
+        const errorMessage = await getResponseErrorMessage(response, fallbackMessage);
+        setError(errorMessage);
       }
     } catch (err) {
       setError("Network error occurred");
@@ -48,6 +45,8 @@ const OrganizationCreate: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const usageLimitNotice = error ? getUsageLimitNotice(error) : null;
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -64,11 +63,13 @@ const OrganizationCreate: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
-              </div>
-            )}
+            {usageLimitNotice ? <UsageLimitAlert notice={usageLimitNotice} /> : null}
+            {error && !usageLimitNotice ? (
+              <Alert variant="destructive">
+                <AlertTitle>Unable to create organization</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
 
             <div>
               <label
