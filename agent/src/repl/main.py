@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from ai.models import CanvasQuestionRequest
-from ai.repl_web import WebServer, WebServerConfig
+from ai.web import WebServer, WebServerConfig
 
 RELOAD_EXIT_CODE = 3
 
@@ -132,7 +132,7 @@ def _parse_stream_event(raw_line: bytes) -> dict[str, Any] | None:
 
 
 def _stream_repl_answer(
-    repl_web_url: str,
+    web_url: str,
     payload: CanvasQuestionRequest,
     model: str,
     base_url: str | None = None,
@@ -147,7 +147,7 @@ def _stream_repl_answer(
     request_payload["org_id"] = org_id
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
-        url=f"{repl_web_url.rstrip('/')}/v1/agent/chat/stream",
+        url=f"{web_url.rstrip('/')}/v1/agent/chat/stream",
         data=request_body,
         method="POST",
         headers={
@@ -364,9 +364,9 @@ def main() -> None:
     if not args.question and not args.interactive:
         raise ValueError("Provide --question or --interactive.")
 
-    repl_web_url = normalize_optional_setting(args.repl_web_url)
+    web_url = normalize_optional_setting(args.repl_web_url)
     server: WebServer | None = None
-    should_start_server = args.start_repl_web or args.start_test_repl_web or repl_web_url is None
+    should_start_server = args.start_repl_web or args.start_test_repl_web or web_url is None
     if should_start_server:
         server = WebServer(
             WebServerConfig(
@@ -375,9 +375,9 @@ def main() -> None:
             )
         )
         server.start()
-        repl_web_url = server.base_url
-        print(f"REPL web app started at {repl_web_url}")
-    if repl_web_url is None:
+        web_url = server.base_url
+        print(f"REPL web app started at {web_url}")
+    if web_url is None:
         raise ValueError(
             "Missing REPL web URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
         )
@@ -412,7 +412,7 @@ def main() -> None:
                     continue
                 payload = CanvasQuestionRequest(question=question, canvas_id=canvas_id)
                 _stream_repl_answer(
-                    repl_web_url=repl_web_url,
+                    web_url=web_url,
                     payload=payload,
                     model=args.model,
                     base_url=base_url,
@@ -427,7 +427,7 @@ def main() -> None:
     payload = CanvasQuestionRequest(question=args.question, canvas_id=canvas_id)
     try:
         _stream_repl_answer(
-            repl_web_url=repl_web_url,
+            web_url=web_url,
             payload=payload,
             model=args.model,
             base_url=base_url,

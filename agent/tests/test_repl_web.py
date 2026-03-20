@@ -3,7 +3,7 @@ import socket
 import pytest
 
 from ai.models import CanvasQuestionRequest
-from ai.repl_web import WebServer, WebServerConfig
+from ai.web import WebServer, WebServerConfig
 from repl.main import _parse_stream_event, _stream_repl_answer
 
 
@@ -27,7 +27,7 @@ def test_stream_repl_answer_reads_sse_response_end_to_end(
 
     payload = CanvasQuestionRequest(question="hello from repl")
     answer = _stream_repl_answer(
-        repl_web_url=f"http://127.0.0.1:{port}",
+        web_url=f"http://127.0.0.1:{port}",
         payload=payload,
         model="test",
     )

@@ -121,7 +121,7 @@ services:
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
     command: >-
-      bash -lc "uv run uvicorn ai.repl_web:create_app
+      bash -lc "uv run uvicorn ai.web:create_app
       --factory
       --host 0.0.0.0
       --port 8090
