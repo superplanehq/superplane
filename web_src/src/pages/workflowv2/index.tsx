@@ -4509,7 +4509,7 @@ export function WorkflowPageV2() {
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
-  const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
+  const versioningDisabledTooltip = "Versioning is disabled. Enable it in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
     !canUpdateCanvas ||
@@ -4546,7 +4546,7 @@ export function WorkflowPageV2() {
           : !liveCanvasVersion?.spec
             ? "No live version available."
             : !hasEditableVersion
-              ? "Enable edit mode before resetting draft changes."
+              ? "Enable edit mode first."
               : undefined;
   const createChangeRequestDisabled =
     isVersioningDisabled ||
@@ -4559,9 +4559,9 @@ export function WorkflowPageV2() {
     : isVersioningDisabled
       ? versioningDisabledTooltip
       : !hasEditableVersion
-        ? "Enable edit mode before creating a change request."
+        ? "Enable edit mode first."
         : hasUnsavedChanges
-          ? "Save your version before creating a change request."
+          ? "Save your draft first."
           : undefined;
   const versioningItemCount = canvasChangeRequests.filter((changeRequest) => {
     const status = (changeRequest.metadata?.status || "").toLowerCase();
@@ -4601,7 +4601,7 @@ export function WorkflowPageV2() {
   const runDisabledTooltip = canvasDeletedRemotely
     ? "This canvas was deleted in another session."
     : isViewingDraftVersion
-      ? "Draft versions do not execute. Publish to run this canvas."
+      ? "Publish to run this canvas."
       : !isViewingCurrentLiveVersion
         ? "Only the current live version can execute."
         : !canUpdateCanvas
