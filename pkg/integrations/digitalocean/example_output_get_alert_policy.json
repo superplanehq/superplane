@@ -1,0 +1,22 @@
+{
+  "data": {
+    "alerts": {
+      "email": [
+        "sammy@digitalocean.com"
+      ]
+    },
+    "compare": "GreaterThan",
+    "description": "High CPU Usage",
+    "enabled": true,
+    "entities": [
+      "558899681"
+    ],
+    "tags": [],
+    "type": "v1/insights/droplet/cpu",
+    "uuid": "ffcaf816-f6a5-4b4a-b4c4-e84532755e82",
+    "value": 20,
+    "window": "5m"
+  },
+  "timestamp": "2026-03-18T09:54:58.914731251Z",
+  "type": "digitalocean.alertpolicy.fetched"
+}

@@ -57,3 +57,75 @@ export interface CreateLoadBalancerConfiguration {
   name: string;
   region: string;
 }
+
+export interface AlertPolicyNodeMetadata {
+  policyUuid?: string;
+  policyDesc?: string;
+  scopedDroplets?: { dropletId: string; dropletName: string }[];
+}
+
+export interface CreateAlertPolicyConfiguration {
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+}
+
+export interface GetAlertPolicyConfiguration {
+  alertPolicy: string;
+}
+
+export interface DeleteAlertPolicyConfiguration {
+  alertPolicy: string;
+}
+
+export interface UpdateAlertPolicyConfiguration {
+  alertPolicy: string;
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+}
+
+export interface GetDropletMetricsConfiguration {
+  droplet: string;
+  lookbackPeriod: string;
+}
+
+interface AlertPolicySlackDetails {
+  channel?: string;
+  url?: string;
+}
+
+interface AlertPolicyNotifications {
+  email?: string[];
+  slack?: AlertPolicySlackDetails[];
+}
+
+export interface AlertPolicyOutput {
+  uuid?: string;
+  description?: string;
+  type?: string;
+  compare?: string;
+  value?: number;
+  window?: string;
+  enabled?: boolean;
+  alerts?: AlertPolicyNotifications;
+}
+
+export interface DeleteAlertPolicyOutput {
+  alertPolicyUuid?: string;
+}
+
+export interface GetDropletMetricsOutput {
+  dropletId?: string;
+  lookbackPeriod?: string;
+  start?: string;
+  end?: string;
+  avgCpuUsagePercent?: number;
+  avgMemoryUsagePercent?: number;
+  avgPublicOutboundBandwidthMbps?: number;
+  avgPublicInboundBandwidthMbps?: number;
+}

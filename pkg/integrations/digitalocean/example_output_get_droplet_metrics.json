@@ -1,0 +1,14 @@
+{
+  "data": {
+    "avgCpuUsagePercent": 0.18,
+    "avgMemoryUsagePercent": 34.39,
+    "avgPublicInboundBandwidthMbps": 0.36,
+    "avgPublicOutboundBandwidthMbps": 0.15,
+    "dropletId": "559378149",
+    "end": "2026-03-19T08:36:34Z",
+    "lookbackPeriod": "1h",
+    "start": "2026-03-19T07:36:34Z"
+  },
+  "timestamp": "2026-03-19T08:36:37.115389929Z",
+  "type": "digitalocean.droplet.metrics"
+}

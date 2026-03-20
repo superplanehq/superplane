@@ -11,6 +11,11 @@ import { upsertDNSRecordMapper } from "./upsert_dns_record";
 import { assignReservedIPMapper, ASSIGN_RESERVED_IP_STATE_REGISTRY } from "./assign_reserved_ip";
 import { createLoadBalancerMapper } from "./create_load_balancer";
 import { deleteLoadBalancerMapper } from "./delete_load_balancer";
+import { createAlertPolicyMapper } from "./create_alert_policy";
+import { getAlertPolicyMapper } from "./get_alert_policy";
+import { deleteAlertPolicyMapper } from "./delete_alert_policy";
+import { updateAlertPolicyMapper } from "./update_alert_policy";
+import { getDropletMetricsMapper } from "./get_droplet_metrics";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -26,6 +31,11 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   assignReservedIP: assignReservedIPMapper,
   createLoadBalancer: createLoadBalancerMapper,
   deleteLoadBalancer: deleteLoadBalancerMapper,
+  createAlertPolicy: createAlertPolicyMapper,
+  getAlertPolicy: getAlertPolicyMapper,
+  deleteAlertPolicy: deleteAlertPolicyMapper,
+  updateAlertPolicy: updateAlertPolicyMapper,
+  getDropletMetrics: getDropletMetricsMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -43,4 +53,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   assignReservedIP: ASSIGN_RESERVED_IP_STATE_REGISTRY,
   createLoadBalancer: buildActionStateRegistry("created"),
   deleteLoadBalancer: buildActionStateRegistry("deleted"),
+  createAlertPolicy: buildActionStateRegistry("created"),
+  getAlertPolicy: buildActionStateRegistry("fetched"),
+  deleteAlertPolicy: buildActionStateRegistry("deleted"),
+  updateAlertPolicy: buildActionStateRegistry("updated"),
+  getDropletMetrics: buildActionStateRegistry("fetched"),
 };
