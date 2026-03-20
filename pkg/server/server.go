@@ -230,9 +230,26 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Panicf("failed to initialize usage service for public api: %v", err)
+	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(
+		encryptor,
+		registry,
+		jwtSigner,
+		oidcProvider,
+		basePath,
+		baseURL,
+		webhooksBaseURL,
+		appEnv,
+		templateDir,
+		authService,
+		usageService,
+		blockSignup,
+	)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}

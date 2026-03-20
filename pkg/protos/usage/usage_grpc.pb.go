@@ -24,6 +24,8 @@ const (
 	Usage_DescribeOrganizationLimits_FullMethodName = "/superplane.usage.v1.Usage/DescribeOrganizationLimits"
 	Usage_DescribeAccountLimits_FullMethodName      = "/superplane.usage.v1.Usage/DescribeAccountLimits"
 	Usage_DescribeOrganizationUsage_FullMethodName  = "/superplane.usage.v1.Usage/DescribeOrganizationUsage"
+	Usage_CheckOrganizationLimits_FullMethodName    = "/superplane.usage.v1.Usage/CheckOrganizationLimits"
+	Usage_CheckAccountLimits_FullMethodName         = "/superplane.usage.v1.Usage/CheckAccountLimits"
 )
 
 // UsageClient is the client API for Usage service.
@@ -35,6 +37,8 @@ type UsageClient interface {
 	DescribeOrganizationLimits(ctx context.Context, in *DescribeOrganizationLimitsRequest, opts ...grpc.CallOption) (*DescribeOrganizationLimitsResponse, error)
 	DescribeAccountLimits(ctx context.Context, in *DescribeAccountLimitsRequest, opts ...grpc.CallOption) (*DescribeAccountLimitsResponse, error)
 	DescribeOrganizationUsage(ctx context.Context, in *DescribeOrganizationUsageRequest, opts ...grpc.CallOption) (*DescribeOrganizationUsageResponse, error)
+	CheckOrganizationLimits(ctx context.Context, in *CheckOrganizationLimitsRequest, opts ...grpc.CallOption) (*CheckOrganizationLimitsResponse, error)
+	CheckAccountLimits(ctx context.Context, in *CheckAccountLimitsRequest, opts ...grpc.CallOption) (*CheckAccountLimitsResponse, error)
 }
 
 type usageClient struct {
@@ -95,6 +99,26 @@ func (c *usageClient) DescribeOrganizationUsage(ctx context.Context, in *Describ
 	return out, nil
 }
 
+func (c *usageClient) CheckOrganizationLimits(ctx context.Context, in *CheckOrganizationLimitsRequest, opts ...grpc.CallOption) (*CheckOrganizationLimitsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckOrganizationLimitsResponse)
+	err := c.cc.Invoke(ctx, Usage_CheckOrganizationLimits_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *usageClient) CheckAccountLimits(ctx context.Context, in *CheckAccountLimitsRequest, opts ...grpc.CallOption) (*CheckAccountLimitsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckAccountLimitsResponse)
+	err := c.cc.Invoke(ctx, Usage_CheckAccountLimits_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UsageServer is the server API for Usage service.
 // All implementations should embed UnimplementedUsageServer
 // for forward compatibility.
@@ -104,6 +128,8 @@ type UsageServer interface {
 	DescribeOrganizationLimits(context.Context, *DescribeOrganizationLimitsRequest) (*DescribeOrganizationLimitsResponse, error)
 	DescribeAccountLimits(context.Context, *DescribeAccountLimitsRequest) (*DescribeAccountLimitsResponse, error)
 	DescribeOrganizationUsage(context.Context, *DescribeOrganizationUsageRequest) (*DescribeOrganizationUsageResponse, error)
+	CheckOrganizationLimits(context.Context, *CheckOrganizationLimitsRequest) (*CheckOrganizationLimitsResponse, error)
+	CheckAccountLimits(context.Context, *CheckAccountLimitsRequest) (*CheckAccountLimitsResponse, error)
 }
 
 // UnimplementedUsageServer should be embedded to have
@@ -127,6 +153,12 @@ func (UnimplementedUsageServer) DescribeAccountLimits(context.Context, *Describe
 }
 func (UnimplementedUsageServer) DescribeOrganizationUsage(context.Context, *DescribeOrganizationUsageRequest) (*DescribeOrganizationUsageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DescribeOrganizationUsage not implemented")
+}
+func (UnimplementedUsageServer) CheckOrganizationLimits(context.Context, *CheckOrganizationLimitsRequest) (*CheckOrganizationLimitsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckOrganizationLimits not implemented")
+}
+func (UnimplementedUsageServer) CheckAccountLimits(context.Context, *CheckAccountLimitsRequest) (*CheckAccountLimitsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckAccountLimits not implemented")
 }
 func (UnimplementedUsageServer) testEmbeddedByValue() {}
 
@@ -238,6 +270,42 @@ func _Usage_DescribeOrganizationUsage_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Usage_CheckOrganizationLimits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckOrganizationLimitsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UsageServer).CheckOrganizationLimits(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Usage_CheckOrganizationLimits_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UsageServer).CheckOrganizationLimits(ctx, req.(*CheckOrganizationLimitsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Usage_CheckAccountLimits_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckAccountLimitsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UsageServer).CheckAccountLimits(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Usage_CheckAccountLimits_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UsageServer).CheckAccountLimits(ctx, req.(*CheckAccountLimitsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Usage_ServiceDesc is the grpc.ServiceDesc for Usage service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -264,6 +332,14 @@ var Usage_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribeOrganizationUsage",
 			Handler:    _Usage_DescribeOrganizationUsage_Handler,
+		},
+		{
+			MethodName: "CheckOrganizationLimits",
+			Handler:    _Usage_CheckOrganizationLimits_Handler,
+		},
+		{
+			MethodName: "CheckAccountLimits",
+			Handler:    _Usage_CheckAccountLimits_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

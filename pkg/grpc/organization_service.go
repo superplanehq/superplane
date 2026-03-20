@@ -68,7 +68,7 @@ func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.De
 
 func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateInvitation(ctx, s.authorizationService, orgID, req.Email)
+	return organizations.CreateInvitationWithUsage(ctx, s.authorizationService, s.usageService, orgID, req.Email)
 }
 
 func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
@@ -154,7 +154,7 @@ func (s *OrganizationService) AcceptInviteLink(ctx context.Context, req *pb.Invi
 		return nil, err
 	}
 
-	return organizations.AcceptInviteLink(ctx, s.authorizationService, accountID, req.Token)
+	return organizations.AcceptInviteLinkWithUsage(ctx, s.authorizationService, s.usageService, accountID, req.Token)
 }
 
 func (s *OrganizationService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
@@ -174,8 +174,9 @@ func (s *OrganizationService) ListIntegrationResources(ctx context.Context, req 
 
 func (s *OrganizationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.CreateIntegration(
+	return organizations.CreateIntegrationWithUsage(
 		ctx,
+		s.usageService,
 		s.registry,
 		s.oidcProvider,
 		s.baseURL,

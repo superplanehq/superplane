@@ -23,9 +23,22 @@ type fakeUsageService struct {
 	setupAccountError      error
 	setupOrganizationError error
 	setupOrganizationResp  *pb.SetupOrganizationResponse
+	checkAccountResponse   *pb.CheckAccountLimitsResponse
+	checkAccountError      error
+	checkOrganizationResp  *pb.CheckOrganizationLimitsResponse
+	checkOrganizationError error
 
 	setupAccountCalls      []string
 	setupOrganizationCalls [][2]string
+	checkAccountCalls      []struct {
+		accountID string
+		state     *pb.AccountState
+	}
+	checkOrganizationCalls []struct {
+		organizationID string
+		state          *pb.OrganizationState
+		canvas         *pb.CanvasState
+	}
 }
 
 func (s *fakeUsageService) Enabled() bool {
@@ -68,6 +81,13 @@ func (s *fakeUsageService) DescribeOrganizationLimits(
 	return s.describeLimitsResponse, nil
 }
 
+func (s *fakeUsageService) DescribeAccountLimits(
+	context.Context,
+	string,
+) (*pb.DescribeAccountLimitsResponse, error) {
+	return &pb.DescribeAccountLimitsResponse{}, nil
+}
+
 func (s *fakeUsageService) DescribeOrganizationUsage(
 	_ context.Context,
 	_ string,
@@ -77,6 +97,53 @@ func (s *fakeUsageService) DescribeOrganizationUsage(
 	}
 
 	return s.describeUsageResponse, nil
+}
+
+func (s *fakeUsageService) CheckAccountLimits(
+	_ context.Context,
+	accountID string,
+	state *pb.AccountState,
+) (*pb.CheckAccountLimitsResponse, error) {
+	s.checkAccountCalls = append(s.checkAccountCalls, struct {
+		accountID string
+		state     *pb.AccountState
+	}{
+		accountID: accountID,
+		state:     state,
+	})
+	if s.checkAccountError != nil {
+		return nil, s.checkAccountError
+	}
+	if s.checkAccountResponse != nil {
+		return s.checkAccountResponse, nil
+	}
+
+	return &pb.CheckAccountLimitsResponse{Allowed: true}, nil
+}
+
+func (s *fakeUsageService) CheckOrganizationLimits(
+	_ context.Context,
+	organizationID string,
+	state *pb.OrganizationState,
+	canvas *pb.CanvasState,
+) (*pb.CheckOrganizationLimitsResponse, error) {
+	s.checkOrganizationCalls = append(s.checkOrganizationCalls, struct {
+		organizationID string
+		state          *pb.OrganizationState
+		canvas         *pb.CanvasState
+	}{
+		organizationID: organizationID,
+		state:          state,
+		canvas:         canvas,
+	})
+	if s.checkOrganizationError != nil {
+		return nil, s.checkOrganizationError
+	}
+	if s.checkOrganizationResp != nil {
+		return s.checkOrganizationResp, nil
+	}
+
+	return &pb.CheckOrganizationLimitsResponse{Allowed: true}, nil
 }
 
 var _ usage.Service = (*fakeUsageService)(nil)

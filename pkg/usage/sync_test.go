@@ -62,11 +62,35 @@ func (s *fakeSyncService) DescribeOrganizationLimits(
 	}, nil
 }
 
+func (s *fakeSyncService) DescribeAccountLimits(
+	context.Context,
+	string,
+) (*usagepb.DescribeAccountLimitsResponse, error) {
+	return &usagepb.DescribeAccountLimitsResponse{}, nil
+}
+
 func (s *fakeSyncService) DescribeOrganizationUsage(
 	context.Context,
 	string,
 ) (*usagepb.DescribeOrganizationUsageResponse, error) {
 	return &usagepb.DescribeOrganizationUsageResponse{}, nil
+}
+
+func (s *fakeSyncService) CheckAccountLimits(
+	context.Context,
+	string,
+	*usagepb.AccountState,
+) (*usagepb.CheckAccountLimitsResponse, error) {
+	return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
+}
+
+func (s *fakeSyncService) CheckOrganizationLimits(
+	context.Context,
+	string,
+	*usagepb.OrganizationState,
+	*usagepb.CanvasState,
+) (*usagepb.CheckOrganizationLimitsResponse, error) {
+	return &usagepb.CheckOrganizationLimitsResponse{Allowed: true}, nil
 }
 
 func TestSyncOrganizationMarksOrganizationAsSynced(t *testing.T) {

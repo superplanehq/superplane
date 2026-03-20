@@ -17,8 +17,16 @@ type Service interface {
 	Enabled() bool
 	SetupAccount(ctx context.Context, accountID string) (*pb.SetupAccountResponse, error)
 	SetupOrganization(ctx context.Context, organizationID, accountID string) (*pb.SetupOrganizationResponse, error)
+	DescribeAccountLimits(ctx context.Context, accountID string) (*pb.DescribeAccountLimitsResponse, error)
 	DescribeOrganizationLimits(ctx context.Context, organizationID string) (*pb.DescribeOrganizationLimitsResponse, error)
 	DescribeOrganizationUsage(ctx context.Context, organizationID string) (*pb.DescribeOrganizationUsageResponse, error)
+	CheckAccountLimits(ctx context.Context, accountID string, state *pb.AccountState) (*pb.CheckAccountLimitsResponse, error)
+	CheckOrganizationLimits(
+		ctx context.Context,
+		organizationID string,
+		state *pb.OrganizationState,
+		canvas *pb.CanvasState,
+	) (*pb.CheckOrganizationLimitsResponse, error)
 }
 
 type disabledService struct{}
@@ -51,11 +59,28 @@ func (disabledService) SetupOrganization(context.Context, string, string) (*pb.S
 	return nil, ErrUsageDisabled
 }
 
+func (disabledService) DescribeAccountLimits(context.Context, string) (*pb.DescribeAccountLimitsResponse, error) {
+	return nil, ErrUsageDisabled
+}
+
 func (disabledService) DescribeOrganizationLimits(context.Context, string) (*pb.DescribeOrganizationLimitsResponse, error) {
 	return nil, ErrUsageDisabled
 }
 
 func (disabledService) DescribeOrganizationUsage(context.Context, string) (*pb.DescribeOrganizationUsageResponse, error) {
+	return nil, ErrUsageDisabled
+}
+
+func (disabledService) CheckAccountLimits(context.Context, string, *pb.AccountState) (*pb.CheckAccountLimitsResponse, error) {
+	return nil, ErrUsageDisabled
+}
+
+func (disabledService) CheckOrganizationLimits(
+	context.Context,
+	string,
+	*pb.OrganizationState,
+	*pb.CanvasState,
+) (*pb.CheckOrganizationLimitsResponse, error) {
 	return nil, ErrUsageDisabled
 }
 
@@ -99,6 +124,18 @@ func (s *grpcService) DescribeOrganizationLimits(
 	})
 }
 
+func (s *grpcService) DescribeAccountLimits(
+	ctx context.Context,
+	accountID string,
+) (*pb.DescribeAccountLimitsResponse, error) {
+	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	return s.client.DescribeAccountLimits(callCtx, &pb.DescribeAccountLimitsRequest{
+		AccountId: accountID,
+	})
+}
+
 func (s *grpcService) DescribeOrganizationUsage(
 	ctx context.Context,
 	organizationID string,
@@ -108,5 +145,35 @@ func (s *grpcService) DescribeOrganizationUsage(
 
 	return s.client.DescribeOrganizationUsage(callCtx, &pb.DescribeOrganizationUsageRequest{
 		OrganizationId: organizationID,
+	})
+}
+
+func (s *grpcService) CheckAccountLimits(
+	ctx context.Context,
+	accountID string,
+	state *pb.AccountState,
+) (*pb.CheckAccountLimitsResponse, error) {
+	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	return s.client.CheckAccountLimits(callCtx, &pb.CheckAccountLimitsRequest{
+		AccountId: accountID,
+		State:     state,
+	})
+}
+
+func (s *grpcService) CheckOrganizationLimits(
+	ctx context.Context,
+	organizationID string,
+	state *pb.OrganizationState,
+	canvas *pb.CanvasState,
+) (*pb.CheckOrganizationLimitsResponse, error) {
+	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
+
+	return s.client.CheckOrganizationLimits(callCtx, &pb.CheckOrganizationLimitsRequest{
+		OrganizationId: organizationID,
+		State:          state,
+		Canvas:         canvas,
 	})
 }

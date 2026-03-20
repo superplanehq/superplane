@@ -21,6 +21,67 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type LimitName int32
+
+const (
+	LimitName_LIMIT_NAME_UNSPECIFIED          LimitName = 0
+	LimitName_LIMIT_NAME_MAX_ORGANIZATIONS    LimitName = 1
+	LimitName_LIMIT_NAME_MAX_CANVASES         LimitName = 2
+	LimitName_LIMIT_NAME_MAX_NODES_PER_CANVAS LimitName = 3
+	LimitName_LIMIT_NAME_MAX_USERS            LimitName = 4
+	LimitName_LIMIT_NAME_MAX_EVENTS_PER_MONTH LimitName = 5
+	LimitName_LIMIT_NAME_MAX_INTEGRATIONS     LimitName = 6
+)
+
+// Enum value maps for LimitName.
+var (
+	LimitName_name = map[int32]string{
+		0: "LIMIT_NAME_UNSPECIFIED",
+		1: "LIMIT_NAME_MAX_ORGANIZATIONS",
+		2: "LIMIT_NAME_MAX_CANVASES",
+		3: "LIMIT_NAME_MAX_NODES_PER_CANVAS",
+		4: "LIMIT_NAME_MAX_USERS",
+		5: "LIMIT_NAME_MAX_EVENTS_PER_MONTH",
+		6: "LIMIT_NAME_MAX_INTEGRATIONS",
+	}
+	LimitName_value = map[string]int32{
+		"LIMIT_NAME_UNSPECIFIED":          0,
+		"LIMIT_NAME_MAX_ORGANIZATIONS":    1,
+		"LIMIT_NAME_MAX_CANVASES":         2,
+		"LIMIT_NAME_MAX_NODES_PER_CANVAS": 3,
+		"LIMIT_NAME_MAX_USERS":            4,
+		"LIMIT_NAME_MAX_EVENTS_PER_MONTH": 5,
+		"LIMIT_NAME_MAX_INTEGRATIONS":     6,
+	}
+)
+
+func (x LimitName) Enum() *LimitName {
+	p := new(LimitName)
+	*p = x
+	return p
+}
+
+func (x LimitName) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LimitName) Descriptor() protoreflect.EnumDescriptor {
+	return file_usage_proto_enumTypes[0].Descriptor()
+}
+
+func (LimitName) Type() protoreflect.EnumType {
+	return &file_usage_proto_enumTypes[0]
+}
+
+func (x LimitName) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LimitName.Descriptor instead.
+func (LimitName) EnumDescriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{0}
+}
+
 type SetupOrganizationRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
@@ -469,6 +530,238 @@ func (x *DescribeOrganizationUsageResponse) GetUsage() *OrganizationUsage {
 	return nil
 }
 
+type CheckOrganizationLimitsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	State          *OrganizationState     `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	Canvas         *CanvasState           `protobuf:"bytes,3,opt,name=canvas,proto3" json:"canvas,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CheckOrganizationLimitsRequest) Reset() {
+	*x = CheckOrganizationLimitsRequest{}
+	mi := &file_usage_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckOrganizationLimitsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckOrganizationLimitsRequest) ProtoMessage() {}
+
+func (x *CheckOrganizationLimitsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckOrganizationLimitsRequest.ProtoReflect.Descriptor instead.
+func (*CheckOrganizationLimitsRequest) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *CheckOrganizationLimitsRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
+func (x *CheckOrganizationLimitsRequest) GetState() *OrganizationState {
+	if x != nil {
+		return x.State
+	}
+	return nil
+}
+
+func (x *CheckOrganizationLimitsRequest) GetCanvas() *CanvasState {
+	if x != nil {
+		return x.Canvas
+	}
+	return nil
+}
+
+type CheckOrganizationLimitsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	Limits        *OrganizationLimits    `protobuf:"bytes,2,opt,name=limits,proto3" json:"limits,omitempty"`
+	Violations    []*LimitViolation      `protobuf:"bytes,3,rep,name=violations,proto3" json:"violations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckOrganizationLimitsResponse) Reset() {
+	*x = CheckOrganizationLimitsResponse{}
+	mi := &file_usage_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckOrganizationLimitsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckOrganizationLimitsResponse) ProtoMessage() {}
+
+func (x *CheckOrganizationLimitsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckOrganizationLimitsResponse.ProtoReflect.Descriptor instead.
+func (*CheckOrganizationLimitsResponse) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *CheckOrganizationLimitsResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *CheckOrganizationLimitsResponse) GetLimits() *OrganizationLimits {
+	if x != nil {
+		return x.Limits
+	}
+	return nil
+}
+
+func (x *CheckOrganizationLimitsResponse) GetViolations() []*LimitViolation {
+	if x != nil {
+		return x.Violations
+	}
+	return nil
+}
+
+type CheckAccountLimitsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	State         *AccountState          `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckAccountLimitsRequest) Reset() {
+	*x = CheckAccountLimitsRequest{}
+	mi := &file_usage_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckAccountLimitsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckAccountLimitsRequest) ProtoMessage() {}
+
+func (x *CheckAccountLimitsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckAccountLimitsRequest.ProtoReflect.Descriptor instead.
+func (*CheckAccountLimitsRequest) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *CheckAccountLimitsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CheckAccountLimitsRequest) GetState() *AccountState {
+	if x != nil {
+		return x.State
+	}
+	return nil
+}
+
+type CheckAccountLimitsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
+	Limits        *AccountLimits         `protobuf:"bytes,2,opt,name=limits,proto3" json:"limits,omitempty"`
+	Violations    []*LimitViolation      `protobuf:"bytes,3,rep,name=violations,proto3" json:"violations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckAccountLimitsResponse) Reset() {
+	*x = CheckAccountLimitsResponse{}
+	mi := &file_usage_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckAccountLimitsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckAccountLimitsResponse) ProtoMessage() {}
+
+func (x *CheckAccountLimitsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckAccountLimitsResponse.ProtoReflect.Descriptor instead.
+func (*CheckAccountLimitsResponse) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CheckAccountLimitsResponse) GetAllowed() bool {
+	if x != nil {
+		return x.Allowed
+	}
+	return false
+}
+
+func (x *CheckAccountLimitsResponse) GetLimits() *AccountLimits {
+	if x != nil {
+		return x.Limits
+	}
+	return nil
+}
+
+func (x *CheckAccountLimitsResponse) GetViolations() []*LimitViolation {
+	if x != nil {
+		return x.Violations
+	}
+	return nil
+}
+
 type OrganizationLimits struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	MaxCanvases         int32                  `protobuf:"varint,1,opt,name=max_canvases,json=maxCanvases,proto3" json:"max_canvases,omitempty"`
@@ -483,7 +776,7 @@ type OrganizationLimits struct {
 
 func (x *OrganizationLimits) Reset() {
 	*x = OrganizationLimits{}
-	mi := &file_usage_proto_msgTypes[10]
+	mi := &file_usage_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -495,7 +788,7 @@ func (x *OrganizationLimits) String() string {
 func (*OrganizationLimits) ProtoMessage() {}
 
 func (x *OrganizationLimits) ProtoReflect() protoreflect.Message {
-	mi := &file_usage_proto_msgTypes[10]
+	mi := &file_usage_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -508,7 +801,7 @@ func (x *OrganizationLimits) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrganizationLimits.ProtoReflect.Descriptor instead.
 func (*OrganizationLimits) Descriptor() ([]byte, []int) {
-	return file_usage_proto_rawDescGZIP(), []int{10}
+	return file_usage_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *OrganizationLimits) GetMaxCanvases() int32 {
@@ -562,7 +855,7 @@ type AccountLimits struct {
 
 func (x *AccountLimits) Reset() {
 	*x = AccountLimits{}
-	mi := &file_usage_proto_msgTypes[11]
+	mi := &file_usage_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -574,7 +867,7 @@ func (x *AccountLimits) String() string {
 func (*AccountLimits) ProtoMessage() {}
 
 func (x *AccountLimits) ProtoReflect() protoreflect.Message {
-	mi := &file_usage_proto_msgTypes[11]
+	mi := &file_usage_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -587,12 +880,56 @@ func (x *AccountLimits) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountLimits.ProtoReflect.Descriptor instead.
 func (*AccountLimits) Descriptor() ([]byte, []int) {
-	return file_usage_proto_rawDescGZIP(), []int{11}
+	return file_usage_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AccountLimits) GetMaxOrganizations() int32 {
 	if x != nil {
 		return x.MaxOrganizations
+	}
+	return 0
+}
+
+type AccountState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Organizations int32                  `protobuf:"varint,1,opt,name=organizations,proto3" json:"organizations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountState) Reset() {
+	*x = AccountState{}
+	mi := &file_usage_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountState) ProtoMessage() {}
+
+func (x *AccountState) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountState.ProtoReflect.Descriptor instead.
+func (*AccountState) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *AccountState) GetOrganizations() int32 {
+	if x != nil {
+		return x.Organizations
 	}
 	return 0
 }
@@ -609,7 +946,7 @@ type OrganizationUsage struct {
 
 func (x *OrganizationUsage) Reset() {
 	*x = OrganizationUsage{}
-	mi := &file_usage_proto_msgTypes[12]
+	mi := &file_usage_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -621,7 +958,7 @@ func (x *OrganizationUsage) String() string {
 func (*OrganizationUsage) ProtoMessage() {}
 
 func (x *OrganizationUsage) ProtoReflect() protoreflect.Message {
-	mi := &file_usage_proto_msgTypes[12]
+	mi := &file_usage_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -634,7 +971,7 @@ func (x *OrganizationUsage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OrganizationUsage.ProtoReflect.Descriptor instead.
 func (*OrganizationUsage) Descriptor() ([]byte, []int) {
-	return file_usage_proto_rawDescGZIP(), []int{12}
+	return file_usage_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *OrganizationUsage) GetCanvases() int32 {
@@ -661,6 +998,170 @@ func (x *OrganizationUsage) GetEventBucketCapacity() float64 {
 func (x *OrganizationUsage) GetEventBucketLastUpdatedAtUnixSeconds() int64 {
 	if x != nil {
 		return x.EventBucketLastUpdatedAtUnixSeconds
+	}
+	return 0
+}
+
+type OrganizationState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Canvases      int32                  `protobuf:"varint,1,opt,name=canvases,proto3" json:"canvases,omitempty"`
+	Users         int32                  `protobuf:"varint,2,opt,name=users,proto3" json:"users,omitempty"`
+	Integrations  int32                  `protobuf:"varint,3,opt,name=integrations,proto3" json:"integrations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OrganizationState) Reset() {
+	*x = OrganizationState{}
+	mi := &file_usage_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OrganizationState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OrganizationState) ProtoMessage() {}
+
+func (x *OrganizationState) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OrganizationState.ProtoReflect.Descriptor instead.
+func (*OrganizationState) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *OrganizationState) GetCanvases() int32 {
+	if x != nil {
+		return x.Canvases
+	}
+	return 0
+}
+
+func (x *OrganizationState) GetUsers() int32 {
+	if x != nil {
+		return x.Users
+	}
+	return 0
+}
+
+func (x *OrganizationState) GetIntegrations() int32 {
+	if x != nil {
+		return x.Integrations
+	}
+	return 0
+}
+
+type CanvasState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Nodes         int32                  `protobuf:"varint,1,opt,name=nodes,proto3" json:"nodes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CanvasState) Reset() {
+	*x = CanvasState{}
+	mi := &file_usage_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CanvasState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CanvasState) ProtoMessage() {}
+
+func (x *CanvasState) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CanvasState.ProtoReflect.Descriptor instead.
+func (*CanvasState) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *CanvasState) GetNodes() int32 {
+	if x != nil {
+		return x.Nodes
+	}
+	return 0
+}
+
+type LimitViolation struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Limit           LimitName              `protobuf:"varint,1,opt,name=limit,proto3,enum=superplane.usage.v1.LimitName" json:"limit,omitempty"`
+	ConfiguredLimit int64                  `protobuf:"varint,2,opt,name=configured_limit,json=configuredLimit,proto3" json:"configured_limit,omitempty"`
+	CurrentValue    int64                  `protobuf:"varint,3,opt,name=current_value,json=currentValue,proto3" json:"current_value,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LimitViolation) Reset() {
+	*x = LimitViolation{}
+	mi := &file_usage_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LimitViolation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LimitViolation) ProtoMessage() {}
+
+func (x *LimitViolation) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LimitViolation.ProtoReflect.Descriptor instead.
+func (*LimitViolation) Descriptor() ([]byte, []int) {
+	return file_usage_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *LimitViolation) GetLimit() LimitName {
+	if x != nil {
+		return x.Limit
+	}
+	return LimitName_LIMIT_NAME_UNSPECIFIED
+}
+
+func (x *LimitViolation) GetConfiguredLimit() int64 {
+	if x != nil {
+		return x.ConfiguredLimit
+	}
+	return 0
+}
+
+func (x *LimitViolation) GetCurrentValue() int64 {
+	if x != nil {
+		return x.CurrentValue
 	}
 	return 0
 }
@@ -693,7 +1194,27 @@ const file_usage_proto_rawDesc = "" +
 	" DescribeOrganizationUsageRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"a\n" +
 	"!DescribeOrganizationUsageResponse\x12<\n" +
-	"\x05usage\x18\x01 \x01(\v2&.superplane.usage.v1.OrganizationUsageR\x05usage\"\x95\x02\n" +
+	"\x05usage\x18\x01 \x01(\v2&.superplane.usage.v1.OrganizationUsageR\x05usage\"\xc1\x01\n" +
+	"\x1eCheckOrganizationLimitsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12<\n" +
+	"\x05state\x18\x02 \x01(\v2&.superplane.usage.v1.OrganizationStateR\x05state\x128\n" +
+	"\x06canvas\x18\x03 \x01(\v2 .superplane.usage.v1.CanvasStateR\x06canvas\"\xc1\x01\n" +
+	"\x1fCheckOrganizationLimitsResponse\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12?\n" +
+	"\x06limits\x18\x02 \x01(\v2'.superplane.usage.v1.OrganizationLimitsR\x06limits\x12C\n" +
+	"\n" +
+	"violations\x18\x03 \x03(\v2#.superplane.usage.v1.LimitViolationR\n" +
+	"violations\"s\n" +
+	"\x19CheckAccountLimitsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x127\n" +
+	"\x05state\x18\x02 \x01(\v2!.superplane.usage.v1.AccountStateR\x05state\"\xb7\x01\n" +
+	"\x1aCheckAccountLimitsResponse\x12\x18\n" +
+	"\aallowed\x18\x01 \x01(\bR\aallowed\x12:\n" +
+	"\x06limits\x18\x02 \x01(\v2\".superplane.usage.v1.AccountLimitsR\x06limits\x12C\n" +
+	"\n" +
+	"violations\x18\x03 \x03(\v2#.superplane.usage.v1.LimitViolationR\n" +
+	"violations\"\x95\x02\n" +
 	"\x12OrganizationLimits\x12!\n" +
 	"\fmax_canvases\x18\x01 \x01(\x05R\vmaxCanvases\x12/\n" +
 	"\x14max_nodes_per_canvas\x18\x02 \x01(\x05R\x11maxNodesPerCanvas\x12\x1b\n" +
@@ -702,18 +1223,40 @@ const file_usage_proto_rawDesc = "" +
 	"\x14max_events_per_month\x18\x05 \x01(\x03R\x11maxEventsPerMonth\x12)\n" +
 	"\x10max_integrations\x18\x06 \x01(\x05R\x0fmaxIntegrations\"<\n" +
 	"\rAccountLimits\x12+\n" +
-	"\x11max_organizations\x18\x01 \x01(\x05R\x10maxOrganizations\"\xe9\x01\n" +
+	"\x11max_organizations\x18\x01 \x01(\x05R\x10maxOrganizations\"4\n" +
+	"\fAccountState\x12$\n" +
+	"\rorganizations\x18\x01 \x01(\x05R\rorganizations\"\xe9\x01\n" +
 	"\x11OrganizationUsage\x12\x1a\n" +
 	"\bcanvases\x18\x01 \x01(\x05R\bcanvases\x12,\n" +
 	"\x12event_bucket_level\x18\x02 \x01(\x01R\x10eventBucketLevel\x122\n" +
 	"\x15event_bucket_capacity\x18\x03 \x01(\x01R\x13eventBucketCapacity\x12V\n" +
-	")event_bucket_last_updated_at_unix_seconds\x18\x04 \x01(\x03R#eventBucketLastUpdatedAtUnixSeconds2\xfd\x04\n" +
+	")event_bucket_last_updated_at_unix_seconds\x18\x04 \x01(\x03R#eventBucketLastUpdatedAtUnixSeconds\"i\n" +
+	"\x11OrganizationState\x12\x1a\n" +
+	"\bcanvases\x18\x01 \x01(\x05R\bcanvases\x12\x14\n" +
+	"\x05users\x18\x02 \x01(\x05R\x05users\x12\"\n" +
+	"\fintegrations\x18\x03 \x01(\x05R\fintegrations\"#\n" +
+	"\vCanvasState\x12\x14\n" +
+	"\x05nodes\x18\x01 \x01(\x05R\x05nodes\"\x96\x01\n" +
+	"\x0eLimitViolation\x124\n" +
+	"\x05limit\x18\x01 \x01(\x0e2\x1e.superplane.usage.v1.LimitNameR\x05limit\x12)\n" +
+	"\x10configured_limit\x18\x02 \x01(\x03R\x0fconfiguredLimit\x12#\n" +
+	"\rcurrent_value\x18\x03 \x01(\x03R\fcurrentValue*\xeb\x01\n" +
+	"\tLimitName\x12\x1a\n" +
+	"\x16LIMIT_NAME_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cLIMIT_NAME_MAX_ORGANIZATIONS\x10\x01\x12\x1b\n" +
+	"\x17LIMIT_NAME_MAX_CANVASES\x10\x02\x12#\n" +
+	"\x1fLIMIT_NAME_MAX_NODES_PER_CANVAS\x10\x03\x12\x18\n" +
+	"\x14LIMIT_NAME_MAX_USERS\x10\x04\x12#\n" +
+	"\x1fLIMIT_NAME_MAX_EVENTS_PER_MONTH\x10\x05\x12\x1f\n" +
+	"\x1bLIMIT_NAME_MAX_INTEGRATIONS\x10\x062\xfb\x06\n" +
 	"\x05Usage\x12r\n" +
 	"\x11SetupOrganization\x12-.superplane.usage.v1.SetupOrganizationRequest\x1a..superplane.usage.v1.SetupOrganizationResponse\x12c\n" +
 	"\fSetupAccount\x12(.superplane.usage.v1.SetupAccountRequest\x1a).superplane.usage.v1.SetupAccountResponse\x12\x8d\x01\n" +
 	"\x1aDescribeOrganizationLimits\x126.superplane.usage.v1.DescribeOrganizationLimitsRequest\x1a7.superplane.usage.v1.DescribeOrganizationLimitsResponse\x12~\n" +
 	"\x15DescribeAccountLimits\x121.superplane.usage.v1.DescribeAccountLimitsRequest\x1a2.superplane.usage.v1.DescribeAccountLimitsResponse\x12\x8a\x01\n" +
-	"\x19DescribeOrganizationUsage\x125.superplane.usage.v1.DescribeOrganizationUsageRequest\x1a6.superplane.usage.v1.DescribeOrganizationUsageResponseB5Z3github.com/superplanehq/superplane/pkg/protos/usageb\x06proto3"
+	"\x19DescribeOrganizationUsage\x125.superplane.usage.v1.DescribeOrganizationUsageRequest\x1a6.superplane.usage.v1.DescribeOrganizationUsageResponse\x12\x84\x01\n" +
+	"\x17CheckOrganizationLimits\x123.superplane.usage.v1.CheckOrganizationLimitsRequest\x1a4.superplane.usage.v1.CheckOrganizationLimitsResponse\x12u\n" +
+	"\x12CheckAccountLimits\x12..superplane.usage.v1.CheckAccountLimitsRequest\x1a/.superplane.usage.v1.CheckAccountLimitsResponseB5Z3github.com/superplanehq/superplane/pkg/protos/usageb\x06proto3"
 
 var (
 	file_usage_proto_rawDescOnce sync.Once
@@ -727,43 +1270,65 @@ func file_usage_proto_rawDescGZIP() []byte {
 	return file_usage_proto_rawDescData
 }
 
-var file_usage_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_usage_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_usage_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_usage_proto_goTypes = []any{
-	(*SetupOrganizationRequest)(nil),           // 0: superplane.usage.v1.SetupOrganizationRequest
-	(*SetupOrganizationResponse)(nil),          // 1: superplane.usage.v1.SetupOrganizationResponse
-	(*SetupAccountRequest)(nil),                // 2: superplane.usage.v1.SetupAccountRequest
-	(*SetupAccountResponse)(nil),               // 3: superplane.usage.v1.SetupAccountResponse
-	(*DescribeOrganizationLimitsRequest)(nil),  // 4: superplane.usage.v1.DescribeOrganizationLimitsRequest
-	(*DescribeOrganizationLimitsResponse)(nil), // 5: superplane.usage.v1.DescribeOrganizationLimitsResponse
-	(*DescribeAccountLimitsRequest)(nil),       // 6: superplane.usage.v1.DescribeAccountLimitsRequest
-	(*DescribeAccountLimitsResponse)(nil),      // 7: superplane.usage.v1.DescribeAccountLimitsResponse
-	(*DescribeOrganizationUsageRequest)(nil),   // 8: superplane.usage.v1.DescribeOrganizationUsageRequest
-	(*DescribeOrganizationUsageResponse)(nil),  // 9: superplane.usage.v1.DescribeOrganizationUsageResponse
-	(*OrganizationLimits)(nil),                 // 10: superplane.usage.v1.OrganizationLimits
-	(*AccountLimits)(nil),                      // 11: superplane.usage.v1.AccountLimits
-	(*OrganizationUsage)(nil),                  // 12: superplane.usage.v1.OrganizationUsage
+	(LimitName)(0),                             // 0: superplane.usage.v1.LimitName
+	(*SetupOrganizationRequest)(nil),           // 1: superplane.usage.v1.SetupOrganizationRequest
+	(*SetupOrganizationResponse)(nil),          // 2: superplane.usage.v1.SetupOrganizationResponse
+	(*SetupAccountRequest)(nil),                // 3: superplane.usage.v1.SetupAccountRequest
+	(*SetupAccountResponse)(nil),               // 4: superplane.usage.v1.SetupAccountResponse
+	(*DescribeOrganizationLimitsRequest)(nil),  // 5: superplane.usage.v1.DescribeOrganizationLimitsRequest
+	(*DescribeOrganizationLimitsResponse)(nil), // 6: superplane.usage.v1.DescribeOrganizationLimitsResponse
+	(*DescribeAccountLimitsRequest)(nil),       // 7: superplane.usage.v1.DescribeAccountLimitsRequest
+	(*DescribeAccountLimitsResponse)(nil),      // 8: superplane.usage.v1.DescribeAccountLimitsResponse
+	(*DescribeOrganizationUsageRequest)(nil),   // 9: superplane.usage.v1.DescribeOrganizationUsageRequest
+	(*DescribeOrganizationUsageResponse)(nil),  // 10: superplane.usage.v1.DescribeOrganizationUsageResponse
+	(*CheckOrganizationLimitsRequest)(nil),     // 11: superplane.usage.v1.CheckOrganizationLimitsRequest
+	(*CheckOrganizationLimitsResponse)(nil),    // 12: superplane.usage.v1.CheckOrganizationLimitsResponse
+	(*CheckAccountLimitsRequest)(nil),          // 13: superplane.usage.v1.CheckAccountLimitsRequest
+	(*CheckAccountLimitsResponse)(nil),         // 14: superplane.usage.v1.CheckAccountLimitsResponse
+	(*OrganizationLimits)(nil),                 // 15: superplane.usage.v1.OrganizationLimits
+	(*AccountLimits)(nil),                      // 16: superplane.usage.v1.AccountLimits
+	(*AccountState)(nil),                       // 17: superplane.usage.v1.AccountState
+	(*OrganizationUsage)(nil),                  // 18: superplane.usage.v1.OrganizationUsage
+	(*OrganizationState)(nil),                  // 19: superplane.usage.v1.OrganizationState
+	(*CanvasState)(nil),                        // 20: superplane.usage.v1.CanvasState
+	(*LimitViolation)(nil),                     // 21: superplane.usage.v1.LimitViolation
 }
 var file_usage_proto_depIdxs = []int32{
-	10, // 0: superplane.usage.v1.SetupOrganizationResponse.limits:type_name -> superplane.usage.v1.OrganizationLimits
-	11, // 1: superplane.usage.v1.SetupAccountResponse.limits:type_name -> superplane.usage.v1.AccountLimits
-	10, // 2: superplane.usage.v1.DescribeOrganizationLimitsResponse.limits:type_name -> superplane.usage.v1.OrganizationLimits
-	11, // 3: superplane.usage.v1.DescribeAccountLimitsResponse.limits:type_name -> superplane.usage.v1.AccountLimits
-	12, // 4: superplane.usage.v1.DescribeOrganizationUsageResponse.usage:type_name -> superplane.usage.v1.OrganizationUsage
-	0,  // 5: superplane.usage.v1.Usage.SetupOrganization:input_type -> superplane.usage.v1.SetupOrganizationRequest
-	2,  // 6: superplane.usage.v1.Usage.SetupAccount:input_type -> superplane.usage.v1.SetupAccountRequest
-	4,  // 7: superplane.usage.v1.Usage.DescribeOrganizationLimits:input_type -> superplane.usage.v1.DescribeOrganizationLimitsRequest
-	6,  // 8: superplane.usage.v1.Usage.DescribeAccountLimits:input_type -> superplane.usage.v1.DescribeAccountLimitsRequest
-	8,  // 9: superplane.usage.v1.Usage.DescribeOrganizationUsage:input_type -> superplane.usage.v1.DescribeOrganizationUsageRequest
-	1,  // 10: superplane.usage.v1.Usage.SetupOrganization:output_type -> superplane.usage.v1.SetupOrganizationResponse
-	3,  // 11: superplane.usage.v1.Usage.SetupAccount:output_type -> superplane.usage.v1.SetupAccountResponse
-	5,  // 12: superplane.usage.v1.Usage.DescribeOrganizationLimits:output_type -> superplane.usage.v1.DescribeOrganizationLimitsResponse
-	7,  // 13: superplane.usage.v1.Usage.DescribeAccountLimits:output_type -> superplane.usage.v1.DescribeAccountLimitsResponse
-	9,  // 14: superplane.usage.v1.Usage.DescribeOrganizationUsage:output_type -> superplane.usage.v1.DescribeOrganizationUsageResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	15, // 0: superplane.usage.v1.SetupOrganizationResponse.limits:type_name -> superplane.usage.v1.OrganizationLimits
+	16, // 1: superplane.usage.v1.SetupAccountResponse.limits:type_name -> superplane.usage.v1.AccountLimits
+	15, // 2: superplane.usage.v1.DescribeOrganizationLimitsResponse.limits:type_name -> superplane.usage.v1.OrganizationLimits
+	16, // 3: superplane.usage.v1.DescribeAccountLimitsResponse.limits:type_name -> superplane.usage.v1.AccountLimits
+	18, // 4: superplane.usage.v1.DescribeOrganizationUsageResponse.usage:type_name -> superplane.usage.v1.OrganizationUsage
+	19, // 5: superplane.usage.v1.CheckOrganizationLimitsRequest.state:type_name -> superplane.usage.v1.OrganizationState
+	20, // 6: superplane.usage.v1.CheckOrganizationLimitsRequest.canvas:type_name -> superplane.usage.v1.CanvasState
+	15, // 7: superplane.usage.v1.CheckOrganizationLimitsResponse.limits:type_name -> superplane.usage.v1.OrganizationLimits
+	21, // 8: superplane.usage.v1.CheckOrganizationLimitsResponse.violations:type_name -> superplane.usage.v1.LimitViolation
+	17, // 9: superplane.usage.v1.CheckAccountLimitsRequest.state:type_name -> superplane.usage.v1.AccountState
+	16, // 10: superplane.usage.v1.CheckAccountLimitsResponse.limits:type_name -> superplane.usage.v1.AccountLimits
+	21, // 11: superplane.usage.v1.CheckAccountLimitsResponse.violations:type_name -> superplane.usage.v1.LimitViolation
+	0,  // 12: superplane.usage.v1.LimitViolation.limit:type_name -> superplane.usage.v1.LimitName
+	1,  // 13: superplane.usage.v1.Usage.SetupOrganization:input_type -> superplane.usage.v1.SetupOrganizationRequest
+	3,  // 14: superplane.usage.v1.Usage.SetupAccount:input_type -> superplane.usage.v1.SetupAccountRequest
+	5,  // 15: superplane.usage.v1.Usage.DescribeOrganizationLimits:input_type -> superplane.usage.v1.DescribeOrganizationLimitsRequest
+	7,  // 16: superplane.usage.v1.Usage.DescribeAccountLimits:input_type -> superplane.usage.v1.DescribeAccountLimitsRequest
+	9,  // 17: superplane.usage.v1.Usage.DescribeOrganizationUsage:input_type -> superplane.usage.v1.DescribeOrganizationUsageRequest
+	11, // 18: superplane.usage.v1.Usage.CheckOrganizationLimits:input_type -> superplane.usage.v1.CheckOrganizationLimitsRequest
+	13, // 19: superplane.usage.v1.Usage.CheckAccountLimits:input_type -> superplane.usage.v1.CheckAccountLimitsRequest
+	2,  // 20: superplane.usage.v1.Usage.SetupOrganization:output_type -> superplane.usage.v1.SetupOrganizationResponse
+	4,  // 21: superplane.usage.v1.Usage.SetupAccount:output_type -> superplane.usage.v1.SetupAccountResponse
+	6,  // 22: superplane.usage.v1.Usage.DescribeOrganizationLimits:output_type -> superplane.usage.v1.DescribeOrganizationLimitsResponse
+	8,  // 23: superplane.usage.v1.Usage.DescribeAccountLimits:output_type -> superplane.usage.v1.DescribeAccountLimitsResponse
+	10, // 24: superplane.usage.v1.Usage.DescribeOrganizationUsage:output_type -> superplane.usage.v1.DescribeOrganizationUsageResponse
+	12, // 25: superplane.usage.v1.Usage.CheckOrganizationLimits:output_type -> superplane.usage.v1.CheckOrganizationLimitsResponse
+	14, // 26: superplane.usage.v1.Usage.CheckAccountLimits:output_type -> superplane.usage.v1.CheckAccountLimitsResponse
+	20, // [20:27] is the sub-list for method output_type
+	13, // [13:20] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_usage_proto_init() }
@@ -776,13 +1341,14 @@ func file_usage_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_usage_proto_rawDesc), len(file_usage_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   13,
+			NumEnums:      1,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_usage_proto_goTypes,
 		DependencyIndexes: file_usage_proto_depIdxs,
+		EnumInfos:         file_usage_proto_enumTypes,
 		MessageInfos:      file_usage_proto_msgTypes,
 	}.Build()
 	File_usage_proto = out.File

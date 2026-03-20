@@ -83,6 +83,6 @@ func Bind(cmd *cobra.Command, command Command, options BindOptions) {
 			return err
 		}
 
-		return command.Execute(ctx)
+		return FormatCommandError(command.Execute(ctx))
 	}
 }
