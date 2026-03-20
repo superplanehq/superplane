@@ -170,36 +170,6 @@ func CountRootCanvasEvents(canvasID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
-func ListRoutedRootCanvasEventsForOrganization(orgID uuid.UUID, before time.Time, limit int) ([]CanvasEvent, error) {
-	return ListRoutedRootCanvasEventsForOrganizationInTransaction(database.Conn(), orgID, before, limit)
-}
-
-func ListRoutedRootCanvasEventsForOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID, before time.Time, limit int) ([]CanvasEvent, error) {
-	var events []CanvasEvent
-
-	query := tx.
-		Table("workflow_events").
-		Select("workflow_events.*").
-		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Where("workflows.organization_id = ?", orgID).
-		Where("workflows.deleted_at IS NULL").
-		Where("workflow_events.execution_id IS NULL").
-		Where("workflow_events.state = ?", CanvasEventStateRouted).
-		Where("workflow_events.created_at < ?", before).
-		Order("workflow_events.created_at ASC")
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	err := query.Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
 func ListExpiredRoutedRootCanvasEvents(referenceTime time.Time, limit int) ([]CanvasEvent, error) {
 	return ListExpiredRoutedRootCanvasEventsInTransaction(database.Conn(), referenceTime, limit)
 }
@@ -259,28 +229,6 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 		First(&event).
 		Error
 
-	if err != nil {
-		return nil, err
-	}
-
-	return &event, nil
-}
-
-func LockRoutedRootCanvasEventForRetention(tx *gorm.DB, id uuid.UUID, before time.Time) (*CanvasEvent, error) {
-	var event CanvasEvent
-
-	err := tx.
-		Table("workflow_events").
-		Select("workflow_events.*").
-		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("workflow_events.id = ?", id).
-		Where("workflows.deleted_at IS NULL").
-		Where("workflow_events.execution_id IS NULL").
-		Where("workflow_events.state = ?", CanvasEventStateRouted).
-		Where("workflow_events.created_at < ?", before).
-		First(&event).
-		Error
 	if err != nil {
 		return nil, err
 	}
