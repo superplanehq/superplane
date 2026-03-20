@@ -437,6 +437,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 
@@ -548,6 +549,95 @@ type OrganizationCreationRequest struct {
 	Name string `json:"name"`
 }
 
+type organizationCreationStatusResponse struct {
+	Allowed              bool   `json:"allowed"`
+	UsageEnabled         bool   `json:"usageEnabled"`
+	CurrentOrganizations int32  `json:"currentOrganizations"`
+	MaxOrganizations     int32  `json:"maxOrganizations"`
+	Message              string `json:"message,omitempty"`
+}
+
+func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		log.Errorf("Error loading organization creation status for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) describeOrganizationCreationStatus(
+	ctx context.Context,
+	accountID string,
+) (*organizationCreationStatusResponse, error) {
+	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
+	}
+
+	response := &organizationCreationStatusResponse{
+		Allowed:              true,
+		UsageEnabled:         s.usageService != nil && s.usageService.Enabled(),
+		CurrentOrganizations: int32(organizationCount),
+	}
+
+	if !response.UsageEnabled {
+		return response, nil
+	}
+
+	checkResponse, err := s.checkAccountOrganizationCreationLimits(
+		ctx,
+		accountID,
+		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
+	}
+
+	response.MaxOrganizations = checkResponse.GetLimits().GetMaxOrganizations()
+
+	if violationErr := usage.LimitViolationError(checkResponse.GetViolations()); violationErr != nil {
+		response.Allowed = false
+		response.Message = status.Convert(violationErr).Message()
+	}
+
+	return response, nil
+}
+
+func (s *Server) checkAccountOrganizationCreationLimits(
+	ctx context.Context,
+	accountID string,
+	state *usagepb.AccountState,
+) (*usagepb.CheckAccountLimitsResponse, error) {
+	if s.usageService == nil || !s.usageService.Enabled() {
+		return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
+	}
+
+	response, err := s.usageService.CheckAccountLimits(ctx, accountID, state)
+	if err == nil {
+		return response, nil
+	}
+
+	if status.Code(err) != codes.NotFound {
+		return nil, err
+	}
+
+	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
+		return nil, setupErr
+	}
+
+	return s.usageService.CheckAccountLimits(ctx, accountID, state)
+}
+
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
@@ -573,26 +663,16 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.usageService != nil && s.usageService.Enabled() {
-		organizationCount, countErr := models.CountOrganizationsByBillingAccount(account.ID.String())
-		if countErr != nil {
-			log.Errorf("Error counting organizations for account %s: %v", account.ID, countErr)
-			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-			return
-		}
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		log.Errorf("Error checking organization creation status for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
 
-		if err := usage.EnsureAccountWithinLimits(r.Context(), s.usageService, account.ID.String(), &usagepb.AccountState{
-			Organizations: int32(organizationCount + 1),
-		}); err != nil {
-			if status.Code(err) == codes.ResourceExhausted {
-				http.Error(w, err.Error(), http.StatusTooManyRequests)
-				return
-			}
-
-			log.Errorf("Error checking organization limit for account %s: %v", account.ID, err)
-			http.Error(w, "Failed to create organization", http.StatusInternalServerError)
-			return
-		}
+	if !creationStatus.Allowed {
+		http.Error(w, creationStatus.Message, http.StatusTooManyRequests)
+		return
 	}
 
 	//

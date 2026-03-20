@@ -502,3 +502,127 @@ func Test__CreateOrganization(t *testing.T) {
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 	})
 }
+
+func Test__GetOrganizationCreationStatus(t *testing.T) {
+	t.Run("returns allowed when the account can create another organization", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		account, err := models.CreateAccount("status-ok@example.com", "Status Ok")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test")
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		authService, err := authorization.NewAuthService()
+		require.NoError(t, err)
+
+		encryptor := &crypto.NoOpEncryptor{}
+		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		require.NoError(t, err)
+		oidcProvider := support.NewOIDCProvider()
+		usageService := &fakePublicUsageService{
+			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
+				Allowed: true,
+				Limits: &usagepb.AccountLimits{
+					MaxOrganizations: 3,
+				},
+			},
+		}
+		server, err := NewServer(
+			encryptor,
+			r,
+			signer,
+			oidcProvider,
+			"",
+			"localhost",
+			"",
+			"test",
+			"/app/templates",
+			authService,
+			usageService,
+			false,
+		)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account/limits",
+			authCookie: token,
+		})
+
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var data organizationCreationStatusResponse
+		err = json.Unmarshal(response.Body.Bytes(), &data)
+		require.NoError(t, err)
+		assert.True(t, data.Allowed)
+		assert.True(t, data.UsageEnabled)
+		assert.Equal(t, int32(0), data.CurrentOrganizations)
+		assert.Equal(t, int32(3), data.MaxOrganizations)
+		assert.Empty(t, data.Message)
+	})
+
+	t.Run("returns blocked when the account has reached the max organizations limit", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		account, err := models.CreateAccount("status-blocked@example.com", "Status Blocked")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test")
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		authService, err := authorization.NewAuthService()
+		require.NoError(t, err)
+
+		encryptor := &crypto.NoOpEncryptor{}
+		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		require.NoError(t, err)
+		oidcProvider := support.NewOIDCProvider()
+		usageService := &fakePublicUsageService{
+			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
+				Allowed: false,
+				Limits: &usagepb.AccountLimits{
+					MaxOrganizations: 1,
+				},
+				Violations: []*usagepb.LimitViolation{
+					{
+						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_ORGANIZATIONS,
+						ConfiguredLimit: 1,
+						CurrentValue:    2,
+					},
+				},
+			},
+		}
+		server, err := NewServer(
+			encryptor,
+			r,
+			signer,
+			oidcProvider,
+			"",
+			"localhost",
+			"",
+			"test",
+			"/app/templates",
+			authService,
+			usageService,
+			false,
+		)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account/limits",
+			authCookie: token,
+		})
+
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var data organizationCreationStatusResponse
+		err = json.Unmarshal(response.Body.Bytes(), &data)
+		require.NoError(t, err)
+		assert.False(t, data.Allowed)
+		assert.True(t, data.UsageEnabled)
+		assert.Equal(t, int32(1), data.MaxOrganizations)
+		assert.Equal(t, "account organization limit exceeded", data.Message)
+	})
+}

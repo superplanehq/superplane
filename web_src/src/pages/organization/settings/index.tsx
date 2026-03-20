@@ -50,7 +50,10 @@ export function OrganizationSettings() {
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(organizationId || "");
-  const { data: usageStatus } = useOrganizationUsage(organizationId || "", !!organizationId && canReadOrg);
+  const { data: usageStatus, error: usageError } = useOrganizationUsage(
+    organizationId || "",
+    !!organizationId && canReadOrg,
+  );
 
   if (userLoading) {
     return (
@@ -121,7 +124,8 @@ export function OrganizationSettings() {
   const organizationName = organization?.metadata?.name || "Organization";
   const userName = user?.name || "My Account";
   const userEmail = user?.email || "";
-  const usageEnabled = usageStatus?.enabled === true || isUsagePageForced();
+  const usageEnabled =
+    usageStatus?.enabled === true || !!usageError || currentSection === "billing" || isUsagePageForced();
 
   const organizationLinks: NavLink[] = [
     {
@@ -252,7 +256,7 @@ export function OrganizationSettings() {
     },
     billing: {
       title: "Usage",
-      description: "Review organization limits and tracked usage from the configured usage service.",
+      description: "Review organization limits and tracked usage for this organization.",
     },
     secrets: {
       title: "Secrets",
