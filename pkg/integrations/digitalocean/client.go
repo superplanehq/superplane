@@ -211,13 +211,17 @@ func (c *Client) ListImages(imageType string) ([]Image, error) {
 
 // CreateDropletRequest is the payload for creating a droplet
 type CreateDropletRequest struct {
-	Name     string   `json:"name"`
-	Region   string   `json:"region"`
-	Size     string   `json:"size"`
-	Image    string   `json:"image"`
-	SSHKeys  []string `json:"ssh_keys,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
-	UserData string   `json:"user_data,omitempty"`
+	Name       string   `json:"name"`
+	Region     string   `json:"region"`
+	Size       string   `json:"size"`
+	Image      string   `json:"image"`
+	SSHKeys    []string `json:"ssh_keys,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
+	UserData   string   `json:"user_data,omitempty"`
+	Backups    bool     `json:"backups,omitempty"`
+	IPv6       bool     `json:"ipv6,omitempty"`
+	Monitoring bool     `json:"monitoring,omitempty"`
+	VpcUUID    string   `json:"vpc_uuid,omitempty"`
 }
 
 // Droplet represents a DigitalOcean droplet
@@ -233,6 +237,7 @@ type Droplet struct {
 	SizeSlug string          `json:"size_slug"`
 	Networks DropletNetworks `json:"networks"`
 	Tags     []string        `json:"tags"`
+	Features []string        `json:"features"`
 }
 
 type DropletRegion struct {
@@ -972,4 +977,354 @@ func (c *Client) ListSnapshots() ([]Snapshot, error) {
 	}
 
 	return response.Snapshots, nil
+}
+
+// AlertPolicySlackDetails represents a Slack notification channel for an alert policy
+type AlertPolicySlackDetails struct {
+	URL     string `json:"url"`
+	Channel string `json:"channel"`
+}
+
+// AlertPolicyAlerts represents the notification channels configured on an alert policy
+type AlertPolicyAlerts struct {
+	Slack []AlertPolicySlackDetails `json:"slack,omitempty"`
+	Email []string                  `json:"email,omitempty"`
+}
+
+// AlertPolicy represents a DigitalOcean monitoring alert policy
+type AlertPolicy struct {
+	UUID        string            `json:"uuid"`
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Compare     string            `json:"compare"`
+	Value       float64           `json:"value"`
+	Window      string            `json:"window"`
+	Entities    []string          `json:"entities"`
+	Tags        []string          `json:"tags"`
+	Alerts      AlertPolicyAlerts `json:"alerts"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// CreateAlertPolicyRequest is the payload for creating a monitoring alert policy
+type CreateAlertPolicyRequest struct {
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Compare     string            `json:"compare"`
+	Value       float64           `json:"value"`
+	Window      string            `json:"window"`
+	Entities    []string          `json:"entities,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Alerts      AlertPolicyAlerts `json:"alerts"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// UpdateAlertPolicyRequest is the payload for updating a monitoring alert policy
+type UpdateAlertPolicyRequest struct {
+	Type        string            `json:"type"`
+	Description string            `json:"description"`
+	Compare     string            `json:"compare"`
+	Value       float64           `json:"value"`
+	Window      string            `json:"window"`
+	Entities    []string          `json:"entities,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Alerts      AlertPolicyAlerts `json:"alerts"`
+	Enabled     bool              `json:"enabled"`
+}
+
+// CreateAlertPolicy creates a new monitoring alert policy
+func (c *Client) CreateAlertPolicy(req CreateAlertPolicyRequest) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policy AlertPolicy `json:"policy"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Policy, nil
+}
+
+// UpdateAlertPolicy updates an existing monitoring alert policy
+func (c *Client) UpdateAlertPolicy(policyID string, req UpdateAlertPolicyRequest) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policy AlertPolicy `json:"policy"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Policy, nil
+}
+
+// GetAlertPolicy retrieves a monitoring alert policy by its UUID
+func (c *Client) GetAlertPolicy(policyID string) (*AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policy AlertPolicy `json:"policy"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Policy, nil
+}
+
+// DeleteAlertPolicy deletes a monitoring alert policy by its UUID
+func (c *Client) DeleteAlertPolicy(policyID string) error {
+	url := fmt.Sprintf("%s/monitoring/alerts/%s", c.BaseURL, policyID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// ListAlertPolicies retrieves all monitoring alert policies in the account
+func (c *Client) ListAlertPolicies() ([]AlertPolicy, error) {
+	url := fmt.Sprintf("%s/monitoring/alerts?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Policies []AlertPolicy `json:"policies"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Policies, nil
+}
+
+// AlertPolicyNodeMetadata stores metadata about an alert policy for display in the UI
+type AlertPolicyNodeMetadata struct {
+	PolicyID       string                             `json:"policyUuid" mapstructure:"policyUuid"`
+	PolicyDesc     string                             `json:"policyDesc" mapstructure:"policyDesc"`
+	ScopedDroplets []AlertPolicyScopedDropletMetadata `json:"scopedDroplets,omitempty" mapstructure:"scopedDroplets"`
+}
+
+// resolveAlertPolicyMetadata fetches the alert policy description from the API and stores it in metadata
+func resolveAlertPolicyMetadata(ctx core.SetupContext, policyID string) error {
+	var existing AlertPolicyNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if strings.Contains(policyID, "{{") {
+		existing.PolicyID = ""
+		existing.PolicyDesc = policyID
+		return ctx.Metadata.Set(existing)
+	}
+	if err == nil && existing.PolicyID == policyID && existing.PolicyDesc != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+	}
+
+	policy, err := client.GetAlertPolicy(policyID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch alert policy %s for metadata: %w", policyID, err)
+	}
+
+	existing.PolicyID = policyID
+	existing.PolicyDesc = policy.Description
+	return ctx.Metadata.Set(existing)
+}
+
+// AlertPolicyScopedDropletMetadata stores the selected scope droplets for alert policy components.
+type AlertPolicyScopedDropletMetadata struct {
+	DropletID   string `json:"dropletId" mapstructure:"dropletId"`
+	DropletName string `json:"dropletName" mapstructure:"dropletName"`
+}
+
+// resolveAlertPolicyEntitiesMetadata validates configured droplets and stores their labels in metadata.
+func resolveAlertPolicyEntitiesMetadata(ctx core.SetupContext, dropletIDs []string) error {
+	var existing AlertPolicyNodeMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+
+	scopedDroplets := make([]AlertPolicyScopedDropletMetadata, 0, len(dropletIDs))
+
+	var client *Client
+	for _, dropletID := range dropletIDs {
+		if strings.Contains(dropletID, "{{") {
+			scopedDroplets = append(scopedDroplets, AlertPolicyScopedDropletMetadata{
+				DropletID:   dropletID,
+				DropletName: dropletID,
+			})
+			continue
+		}
+
+		id, err := strconv.Atoi(dropletID)
+		if err != nil {
+			return fmt.Errorf("invalid droplet ID %q: must be a number", dropletID)
+		}
+
+		if client == nil {
+			client, err = NewClient(ctx.HTTP, ctx.Integration)
+			if err != nil {
+				return fmt.Errorf("failed to create client for metadata resolution: %w", err)
+			}
+		}
+
+		droplet, err := client.GetDroplet(id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch droplet %s for metadata: %w", dropletID, err)
+		}
+
+		scopedDroplets = append(scopedDroplets, AlertPolicyScopedDropletMetadata{
+			DropletID:   dropletID,
+			DropletName: droplet.Name,
+		})
+	}
+
+	existing.ScopedDroplets = scopedDroplets
+	return ctx.Metadata.Set(existing)
+}
+
+// MetricsValue represents a single data point in a metric series: [unix_timestamp, string_value]
+type MetricsValue []any
+
+// MetricsResult represents a single labeled metric time series
+type MetricsResult struct {
+	Metric map[string]string `json:"metric"`
+	Values []MetricsValue    `json:"values"`
+}
+
+// MetricsData is the data envelope returned by the monitoring metrics API
+type MetricsData struct {
+	ResultType string          `json:"resultType"`
+	Result     []MetricsResult `json:"result"`
+}
+
+// MetricsResponse is the top-level response from the monitoring metrics API
+type MetricsResponse struct {
+	Status string      `json:"status"`
+	Data   MetricsData `json:"data"`
+}
+
+// GetDropletCPUMetrics fetches CPU usage percentage metrics for a droplet
+func (c *Client) GetDropletCPUMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/cpu?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetDropletMemoryAvailableMetrics fetches available memory metrics for a droplet.
+// Available memory includes free memory and reclaimable cache, matching what
+// DigitalOcean's dashboard reports as memory utilization.
+func (c *Client) GetDropletMemoryAvailableMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/memory_available?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetDropletMemoryTotalMetrics fetches total memory metrics for a droplet
+func (c *Client) GetDropletMemoryTotalMetrics(dropletID string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/memory_total?host_id=%s&start=%d&end=%d", c.BaseURL, dropletID, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// GetDropletBandwidthMetrics fetches network bandwidth metrics for a droplet.
+func (c *Client) GetDropletBandwidthMetrics(dropletID, iface, direction string, start, end int64) (*MetricsResponse, error) {
+	url := fmt.Sprintf("%s/monitoring/metrics/droplet/bandwidth?host_id=%s&interface=%s&direction=%s&start=%d&end=%d", c.BaseURL, dropletID, iface, direction, start, end)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response MetricsResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
+// VPC represents a DigitalOcean VPC
+type VPC struct {
+	ID          string `json:"id"`
+	URN         string `json:"urn"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	RegionSlug  string `json:"region"`
+	IPRange     string `json:"ip_range"`
+	CreatedAt   string `json:"created_at"`
+	Default     bool   `json:"default"`
+}
+
+// ListVPCs retrieves all VPCs in the account
+func (c *Client) ListVPCs() ([]VPC, error) {
+	url := fmt.Sprintf("%s/vpcs?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		VPCs []VPC `json:"vpcs"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.VPCs, nil
 }

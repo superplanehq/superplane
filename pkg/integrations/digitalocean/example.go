@@ -126,3 +126,53 @@ var exampleOutputAssignReservedIP map[string]any
 func (a *AssignReservedIP) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAssignReservedIPOnce, exampleOutputAssignReservedIPBytes, &exampleOutputAssignReservedIP)
 }
+
+//go:embed example_output_create_alert_policy.json
+var exampleOutputCreateAlertPolicyBytes []byte
+
+var exampleOutputCreateAlertPolicyOnce sync.Once
+var exampleOutputCreateAlertPolicy map[string]any
+
+func (c *CreateAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAlertPolicyOnce, exampleOutputCreateAlertPolicyBytes, &exampleOutputCreateAlertPolicy)
+}
+
+//go:embed example_output_get_alert_policy.json
+var exampleOutputGetAlertPolicyBytes []byte
+
+var exampleOutputGetAlertPolicyOnce sync.Once
+var exampleOutputGetAlertPolicy map[string]any
+
+func (g *GetAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertPolicyOnce, exampleOutputGetAlertPolicyBytes, &exampleOutputGetAlertPolicy)
+}
+
+//go:embed example_output_delete_alert_policy.json
+var exampleOutputDeleteAlertPolicyBytes []byte
+
+var exampleOutputDeleteAlertPolicyOnce sync.Once
+var exampleOutputDeleteAlertPolicy map[string]any
+
+func (d *DeleteAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlertPolicyOnce, exampleOutputDeleteAlertPolicyBytes, &exampleOutputDeleteAlertPolicy)
+}
+
+//go:embed example_output_update_alert_policy.json
+var exampleOutputUpdateAlertPolicyBytes []byte
+
+var exampleOutputUpdateAlertPolicyOnce sync.Once
+var exampleOutputUpdateAlertPolicy map[string]any
+
+func (u *UpdateAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlertPolicyOnce, exampleOutputUpdateAlertPolicyBytes, &exampleOutputUpdateAlertPolicy)
+}
+
+//go:embed example_output_get_droplet_metrics.json
+var exampleOutputGetDropletMetricsBytes []byte
+
+var exampleOutputGetDropletMetricsOnce sync.Once
+var exampleOutputGetDropletMetrics map[string]any
+
+func (g *GetDropletMetrics) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDropletMetricsOnce, exampleOutputGetDropletMetricsBytes, &exampleOutputGetDropletMetrics)
+}
