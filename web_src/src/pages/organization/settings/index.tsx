@@ -513,7 +513,6 @@ export function OrganizationSettings() {
                 </RequirePermission>
               }
             />
-            <Route path="secrets" element={<Secrets organizationId={organizationId || ""} />} />
             <Route path="secrets/:secretId" element={<SecretDetail organizationId={organizationId || ""} />} />
             <Route
               path="service-accounts"
