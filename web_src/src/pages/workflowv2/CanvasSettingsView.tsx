@@ -156,7 +156,7 @@ export function CanvasSettingsView({
   const isVersioningEnforcedByOrganization = orgVersioningEnabled === true;
   const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : versioningEnabled;
   const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningEnforcedByOrganization;
-  const versioningEnforcedTooltip = "Versioning is enabled by your organization settings for all canvases.";
+  const versioningEnforcedTooltip = "Enforced by organization settings.";
 
   useEffect(() => {
     setName(initialValues.name);
@@ -282,10 +282,9 @@ export function CanvasSettingsView({
         <div>
           <Label className="mb-1 block text-sm font-medium text-gray-700">Canvas Versioning</Label>
           <p className="text-sm text-gray-500">
-            Manage canvas edits with drafts and publish flow. When disabled, users edit the live canvas directly.
             {isVersioningEnforcedByOrganization
-              ? " Versioning is enabled by your organization settings for all canvases."
-              : " This toggle controls versioning for this canvas."}
+              ? "Enforced by organization settings."
+              : "Use drafts and change requests to manage edits."}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -344,7 +343,7 @@ export function CanvasSettingsView({
         <Fieldset className="space-y-4 rounded-lg border border-gray-300 bg-white p-6">
           <div>
             <Label className="mb-1 block text-sm font-medium text-gray-700">Change Request Approvers</Label>
-            <p className="text-sm text-gray-500">Define who can approve or reject change requests for this canvas.</p>
+            <p className="text-sm text-gray-500">Configure change request approvers.</p>
           </div>
 
           {approverValidation.formErrors.map((error) => (
