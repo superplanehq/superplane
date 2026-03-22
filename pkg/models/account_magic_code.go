@@ -104,10 +104,6 @@ func (c *AccountMagicCode) MarkUsedInTransaction(tx *gorm.DB) (bool, error) {
 	return true, nil
 }
 
-func InvalidateActiveMagicCodes(email string) error {
-	return InvalidateActiveMagicCodesInTransaction(database.Conn(), email)
-}
-
 func InvalidateActiveMagicCodesInTransaction(tx *gorm.DB, email string) error {
 	return tx.Model(&AccountMagicCode{}).
 		Where("email = ?", email).

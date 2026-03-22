@@ -638,12 +638,12 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		if a.blockSignup && inviteToken == "" {
-			http.Error(w, SignupDisabledError, http.StatusForbidden)
-			return
-		}
+		if a.blockSignup {
+			if inviteToken == "" {
+				http.Error(w, SignupDisabledError, http.StatusForbidden)
+				return
+			}
 
-		if inviteToken != "" {
 			inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
 			if findErr != nil || !inviteLink.Enabled {
 				http.Error(w, "invite link not found or disabled", http.StatusForbidden)
