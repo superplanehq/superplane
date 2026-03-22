@@ -460,8 +460,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="one-time-code"
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
+                  maxLength={7}
                   value={magicCode}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCode(e.target.value)}
                 />

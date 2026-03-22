@@ -5,14 +5,16 @@ import "encoding/json"
 const MagicCodeRequestedRoutingKey = "magic-code-requested"
 
 type MagicCodeRequestedMessage struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	Email          string `json:"email"`
+	Code           string `json:"code"`
+	MagicLinkToken string `json:"magic_link_token"`
 }
 
-func NewMagicCodeRequestedMessage(email, code string) MagicCodeRequestedMessage {
+func NewMagicCodeRequestedMessage(email, code, magicLinkToken string) MagicCodeRequestedMessage {
 	return MagicCodeRequestedMessage{
-		Email: email,
-		Code:  code,
+		Email:          email,
+		Code:           code,
+		MagicLinkToken: magicLinkToken,
 	}
 }
 

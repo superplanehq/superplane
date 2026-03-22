@@ -80,11 +80,13 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	magicLink := fmt.Sprintf("%s/auth/magic-code/verify?email=%s&code=%s",
-		c.BaseURL,
-		url.QueryEscape(data.Email),
-		url.QueryEscape(data.Code),
-	)
+	var magicLink string
+	if data.MagicLinkToken != "" {
+		magicLink = fmt.Sprintf("%s/auth/magic-code/verify?token=%s",
+			c.BaseURL,
+			url.QueryEscape(data.MagicLinkToken),
+		)
+	}
 
 	readableCode := formatReadableCode(data.Code)
 

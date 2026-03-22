@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	jwtLib "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
@@ -564,7 +565,12 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	msg := messages.NewMagicCodeRequestedMessage(email, code)
+	magicLinkToken, err := a.generateMagicLinkToken(email, code)
+	if err != nil {
+		log.Errorf("Failed to generate magic link token for %s: %v", email, err)
+	}
+
+	msg := messages.NewMagicCodeRequestedMessage(email, code, magicLinkToken)
 	if err := msg.Publish(); err != nil {
 		log.Errorf("Failed to publish magic code email request for %s: %v", email, err)
 	}
@@ -583,8 +589,21 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	email := strings.TrimSpace(r.FormValue("email"))
-	code := strings.TrimSpace(r.FormValue("code"))
+	var email, code string
+
+	if magicLinkToken := strings.TrimSpace(r.FormValue("token")); magicLinkToken != "" {
+		var parseErr error
+		email, code, parseErr = a.parseMagicLinkToken(magicLinkToken)
+		if parseErr != nil {
+			log.Warnf("Invalid magic link token: %v", parseErr)
+			http.Error(w, "Invalid or expired link", http.StatusUnauthorized)
+			return
+		}
+	} else {
+		email = strings.TrimSpace(r.FormValue("email"))
+		code = strings.TrimSpace(r.FormValue("code"))
+	}
+
 	name := strings.TrimSpace(r.FormValue("name"))
 	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
 
@@ -594,6 +613,7 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	}
 
 	email = utils.NormalizeEmail(email)
+	code = stripNonDigits(code)
 	codeHash := crypto.HashToken(code)
 
 	magicCode, err := models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
@@ -702,6 +722,49 @@ func generateMagicCode() (string, error) {
 	}
 
 	return fmt.Sprintf("%0*d", magicCodeLength, n), nil
+}
+
+func stripNonDigits(s string) string {
+	var result strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+func (a *Handler) generateMagicLinkToken(email, code string) (string, error) {
+	now := time.Now()
+	token := jwtLib.NewWithClaims(jwtLib.SigningMethodHS256, jwtLib.MapClaims{
+		"email": email,
+		"code":  code,
+		"iat":   now.Unix(),
+		"exp":   now.Add(magicCodeTTL).Unix(),
+		"type":  "magic_link",
+	})
+
+	return token.SignedString([]byte(a.jwtSigner.Secret))
+}
+
+func (a *Handler) parseMagicLinkToken(tokenString string) (email string, code string, err error) {
+	claims, err := a.jwtSigner.ValidateAndGetClaims(tokenString)
+	if err != nil {
+		return "", "", err
+	}
+
+	tokenType, _ := claims["type"].(string)
+	if tokenType != "magic_link" {
+		return "", "", fmt.Errorf("invalid token type")
+	}
+
+	email, _ = claims["email"].(string)
+	code, _ = claims["code"].(string)
+	if email == "" || code == "" {
+		return "", "", fmt.Errorf("missing claims")
+	}
+
+	return email, code, nil
 }
 
 func (a *Handler) FindOrCreateAccountForProvider(gothUser goth.User) (*models.Account, error) {
