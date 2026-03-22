@@ -23,7 +23,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { Incident, ListIncidentsConfiguration, ListIncidentsResponse } from "./types";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_CLEAR = "clear";
@@ -115,7 +115,7 @@ export const listIncidentsMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
+    const date = new Date(context.execution.createdAt!);
     const incidents = getIncidents(context.execution);
 
     if (incidents.length > 0) {
@@ -131,13 +131,13 @@ export const listIncidentsMapper: ComponentBaseMapper = {
       }
 
       if (countParts.length > 0) {
-        return `${countParts.join(", ")} · ${timeAgo}`;
+        return renderWithTimeAgo(countParts.join(", "), date);
       }
 
-      return `${incidents.length} incidents · ${timeAgo}`;
+      return renderWithTimeAgo(`${incidents.length} incidents`, date);
     }
 
-    return `no incidents · ${timeAgo}`;
+    return renderWithTimeAgo("no incidents", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -289,9 +289,9 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const incidents = getIncidents(execution);
-  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (incidents.length > 0) {
     const highCount = incidents.filter((i) => i.urgency === "high").length;
     const lowCount = incidents.filter((i) => i.urgency === "low").length;
@@ -305,12 +305,12 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     }
 
     if (countParts.length > 0) {
-      eventSubtitle = `${countParts.join(", ")} · ${timeAgo}`;
+      eventSubtitle = renderWithTimeAgo(countParts.join(", "), date);
     } else {
-      eventSubtitle = `${incidents.length} incidents · ${timeAgo}`;
+      eventSubtitle = renderWithTimeAgo(`${incidents.length} incidents`, date);
     }
   } else {
-    eventSubtitle = `no incidents · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no incidents", date);
   }
 
   return [

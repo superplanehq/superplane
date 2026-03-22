@@ -21,7 +21,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { GetHttpSyntheticCheckConfiguration, GetHttpSyntheticCheckNodeMetadata } from "./types";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_HEALTHY = "healthy";
@@ -170,10 +170,10 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const timeAgo = renderTimeAgo(new Date(execution.createdAt));
+  const date = new Date(execution.createdAt);
   const activeChannel = getActiveChannel(execution);
   const statusLabel = activeChannel ? channelLabel(activeChannel) : null;
-  const eventSubtitle = statusLabel ? `${statusLabel} · ${timeAgo}` : timeAgo;
+  const eventSubtitle = statusLabel ? renderWithTimeAgo(statusLabel, date) : renderTimeAgo(date);
 
   return [
     {

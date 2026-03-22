@@ -3,7 +3,7 @@ import React from "react";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
@@ -65,14 +65,14 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
+    const date = new Date(context.execution.createdAt!);
     const logEntries = getLogEntries(context.execution);
 
     if (logEntries.length > 0) {
-      return `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
+      return renderWithTimeAgo(`${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"}`, date);
     }
 
-    return `no log entries · ${timeAgo}`;
+    return renderWithTimeAgo("no log entries", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -112,13 +112,13 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const logEntries = getLogEntries(execution);
-  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (logEntries.length > 0) {
-    eventSubtitle = `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo(`${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"}`, date);
   } else {
-    eventSubtitle = `no log entries · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no log entries", date);
   }
 
   return [

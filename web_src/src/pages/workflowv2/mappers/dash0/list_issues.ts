@@ -21,7 +21,7 @@ import {
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { ListIssuesConfiguration, PrometheusResponse } from "./types";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_CLEAR = "clear";
@@ -102,23 +102,19 @@ export const listIssuesMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    // Check if this is being called from ChainItem (which passes additionalData as undefined or a different structure)
-    // For ChainItem, just return the time without counts
-    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
+    const date = new Date(context.execution.createdAt!);
 
     // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
-    // Otherwise, include counts for SidebarEventItem
     if (
       context.additionalData &&
       typeof context.additionalData === "object" &&
       "skipIssueCounts" in context.additionalData
     ) {
-      return timeAgo;
+      return renderTimeAgo(date);
     }
 
     const { critical, degraded } = getIssueCounts(context.execution);
 
-    // Build subtitle with counts and time
     const countParts: string[] = [];
     if (critical > 0) {
       countParts.push(`${critical} critical`);
@@ -128,11 +124,10 @@ export const listIssuesMapper: ComponentBaseMapper = {
     }
 
     if (countParts.length > 0) {
-      return `${countParts.join(", ")} · ${timeAgo}`;
+      return renderWithTimeAgo(countParts.join(", "), date);
     }
 
-    // No issues found - show "no issues" with time
-    return `no issues · ${timeAgo}`;
+    return renderWithTimeAgo("no issues", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -369,9 +364,8 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const { critical, degraded } = getIssueCounts(execution);
-  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  // Build subtitle with counts and time
   const countParts: string[] = [];
   if (critical > 0) {
     countParts.push(`${critical} critical`);
@@ -380,12 +374,11 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     countParts.push(`${degraded} degraded`);
   }
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (countParts.length > 0) {
-    eventSubtitle = `${countParts.join(", ")} · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo(countParts.join(", "), date);
   } else {
-    // No issues found - show "no issues" with time
-    eventSubtitle = `no issues · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no issues", date);
   }
 
   return [

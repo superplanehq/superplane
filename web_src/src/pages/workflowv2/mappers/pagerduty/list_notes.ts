@@ -3,7 +3,7 @@ import React from "react";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
@@ -65,14 +65,14 @@ export const listNotesMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
+    const date = new Date(context.execution.createdAt!);
     const notes = getNotes(context.execution);
 
     if (notes.length > 0) {
-      return `${notes.length} note${notes.length === 1 ? "" : "s"} · ${timeAgo}`;
+      return renderWithTimeAgo(`${notes.length} note${notes.length === 1 ? "" : "s"}`, date);
     }
 
-    return `no notes · ${timeAgo}`;
+    return renderWithTimeAgo("no notes", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -108,13 +108,13 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const notes = getNotes(execution);
-  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (notes.length > 0) {
-    eventSubtitle = `${notes.length} note${notes.length === 1 ? "" : "s"} · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo(`${notes.length} note${notes.length === 1 ? "" : "s"}`, date);
   } else {
-    eventSubtitle = `no notes · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no notes", date);
   }
 
   return [

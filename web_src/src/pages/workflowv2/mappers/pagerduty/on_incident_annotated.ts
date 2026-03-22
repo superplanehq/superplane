@@ -1,6 +1,6 @@
 import { getBackgroundColorClass } from "@/utils/colors";
 import React from "react";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -108,12 +108,15 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
 };
 
 function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
-  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
+  if (content && createdAt) {
+    return renderWithTimeAgo(content, new Date(createdAt));
   }
 
-  return content || timeAgo;
+  if (createdAt) {
+    return renderTimeAgo(new Date(createdAt));
+  }
+
+  return content;
 }
 
 /**
