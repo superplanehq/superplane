@@ -598,17 +598,13 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	email = utils.NormalizeEmail(email)
 	codeHash := crypto.HashToken(code)
 
-	magicCode, err := models.FindValidAccountMagicCode(email, codeHash)
+	magicCode, err := models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
 	if err != nil {
 		log.Warnf("Invalid magic code attempt for %s", email)
 
-		attempts, incrErr := models.IncrementVerifyAttempts(email)
+		_, incrErr := models.IncrementAndMaybeInvalidateCodes(email, magicCodeMaxVerifyAttempts)
 		if incrErr != nil {
-			log.Errorf("Failed to increment verify attempts for %s: %v", email, incrErr)
-		} else if attempts >= magicCodeMaxVerifyAttempts {
-			if invalidateErr := models.InvalidateActiveMagicCodes(email); invalidateErr != nil {
-				log.Errorf("Failed to invalidate magic codes for %s: %v", email, invalidateErr)
-			}
+			log.Errorf("Failed to process verify attempt for %s: %v", email, incrErr)
 		}
 
 		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
@@ -655,9 +651,12 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 
 		account, err = models.CreateAccount(name, email)
 		if err != nil {
-			log.Errorf("Failed to create account for %s: %v", email, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
+			account, err = models.FindAccountByEmail(email)
+			if err != nil {
+				log.Errorf("Failed to create or find account for %s: %v", email, err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 

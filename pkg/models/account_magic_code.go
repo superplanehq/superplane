@@ -41,11 +41,11 @@ func CreateAccountMagicCodeInTransaction(tx *gorm.DB, email, codeHash string, ex
 	return code, nil
 }
 
-func FindValidAccountMagicCode(email, codeHash string) (*AccountMagicCode, error) {
-	return FindValidAccountMagicCodeInTransaction(database.Conn(), email, codeHash)
+func FindValidAccountMagicCode(email, codeHash string, maxVerifyAttempts int) (*AccountMagicCode, error) {
+	return FindValidAccountMagicCodeInTransaction(database.Conn(), email, codeHash, maxVerifyAttempts)
 }
 
-func FindValidAccountMagicCodeInTransaction(tx *gorm.DB, email, codeHash string) (*AccountMagicCode, error) {
+func FindValidAccountMagicCodeInTransaction(tx *gorm.DB, email, codeHash string, maxVerifyAttempts int) (*AccountMagicCode, error) {
 	var code AccountMagicCode
 
 	err := tx.
@@ -53,6 +53,7 @@ func FindValidAccountMagicCodeInTransaction(tx *gorm.DB, email, codeHash string)
 		Where("code_hash = ?", codeHash).
 		Where("expires_at > ?", time.Now()).
 		Where("used_at IS NULL").
+		Where("verify_attempts < ?", maxVerifyAttempts).
 		First(&code).
 		Error
 
@@ -116,35 +117,51 @@ func InvalidateActiveMagicCodesInTransaction(tx *gorm.DB, email string) error {
 		Error
 }
 
-// IncrementVerifyAttempts atomically increments verify_attempts on all active
-// codes for the given email and returns the maximum attempt count.
-func IncrementVerifyAttempts(email string) (int, error) {
-	return IncrementVerifyAttemptsInTransaction(database.Conn(), email)
+// IncrementAndMaybeInvalidateCodes atomically increments verify_attempts on all
+// active codes for the given email. If the threshold is reached, it invalidates
+// all active codes in the same transaction. Returns true if codes were invalidated.
+func IncrementAndMaybeInvalidateCodes(email string, maxVerifyAttempts int) (bool, error) {
+	return IncrementAndMaybeInvalidateCodesInTransaction(database.Conn(), email, maxVerifyAttempts)
 }
 
-func IncrementVerifyAttemptsInTransaction(tx *gorm.DB, email string) (int, error) {
-	result := tx.Model(&AccountMagicCode{}).
-		Where("email = ?", email).
-		Where("expires_at > ?", time.Now()).
-		Where("used_at IS NULL").
-		Update("verify_attempts", gorm.Expr("verify_attempts + 1"))
+func IncrementAndMaybeInvalidateCodesInTransaction(conn *gorm.DB, email string, maxVerifyAttempts int) (bool, error) {
+	var invalidated bool
 
-	if result.Error != nil {
-		return 0, result.Error
-	}
+	err := conn.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&AccountMagicCode{}).
+			Where("email = ?", email).
+			Where("expires_at > ?", time.Now()).
+			Where("used_at IS NULL").
+			Update("verify_attempts", gorm.Expr("verify_attempts + 1"))
 
-	if result.RowsAffected == 0 {
-		return 0, nil
-	}
+		if result.Error != nil {
+			return result.Error
+		}
 
-	var maxAttempts int
-	err := tx.Model(&AccountMagicCode{}).
-		Select("COALESCE(MAX(verify_attempts), 0)").
-		Where("email = ?", email).
-		Where("expires_at > ?", time.Now()).
-		Where("used_at IS NULL").
-		Scan(&maxAttempts).
-		Error
+		if result.RowsAffected == 0 {
+			return nil
+		}
 
-	return maxAttempts, err
+		var maxAttempts int
+		err := tx.Model(&AccountMagicCode{}).
+			Select("COALESCE(MAX(verify_attempts), 0)").
+			Where("email = ?", email).
+			Where("expires_at > ?", time.Now()).
+			Where("used_at IS NULL").
+			Scan(&maxAttempts).
+			Error
+
+		if err != nil {
+			return err
+		}
+
+		if maxAttempts >= maxVerifyAttempts {
+			invalidated = true
+			return InvalidateActiveMagicCodesInTransaction(tx, email)
+		}
+
+		return nil
+	})
+
+	return invalidated, err
 }
