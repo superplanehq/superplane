@@ -6,7 +6,8 @@ CREATE TABLE account_magic_codes (
   code_hash VARCHAR(64) NOT NULL,
   expires_at TIMESTAMP NOT NULL,
   used_at TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  verify_attempts INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_account_magic_codes_email ON account_magic_codes(email);
