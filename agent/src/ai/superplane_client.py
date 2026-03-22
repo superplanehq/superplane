@@ -28,6 +28,7 @@ from ai.models import (
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
 from superplaneapi.api.component_api import ComponentApi
+from superplaneapi.api.integration_api import IntegrationApi
 from superplaneapi.api.organization_api import OrganizationApi
 from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
@@ -45,6 +46,9 @@ from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
+)
+from superplaneapi.models.superplane_integrations_list_integrations_response import (
+    SuperplaneIntegrationsListIntegrationsResponse,
 )
 from superplaneapi.models.superplane_organizations_list_integrations_response import (
     SuperplaneOrganizationsListIntegrationsResponse,
@@ -90,6 +94,7 @@ class SuperplaneClient:
         self._canvas_node_api = CanvasNodeApi(self._api_client)
         self._component_api = ComponentApi(self._api_client)
         self._trigger_api = TriggerApi(self._api_client)
+        self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
 
     def _with_error_guidance(self, callback: Any, operation: str) -> Any:
@@ -313,6 +318,31 @@ class SuperplaneClient:
             "state_description": status.state_description if status is not None else None,
         }
 
+    @staticmethod
+    def _serialize_available_integration(integration: Any) -> dict[str, Any]:
+        components = integration.components if isinstance(integration.components, list) else []
+        triggers = integration.triggers if isinstance(integration.triggers, list) else []
+        return {
+            "name": integration.name,
+            "provider": integration.name,
+            "label": integration.label,
+            "description": integration.description,
+            "icon": integration.icon,
+            "component_count": len(components),
+            "trigger_count": len(triggers),
+        }
+
+    def _list_available_integrations_raw(self) -> list[Any]:
+        response = self._with_error_guidance(
+            lambda: self._integration_api.integrations_list_integrations(
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="integrations_list_integrations",
+        )
+        if not isinstance(response, SuperplaneIntegrationsListIntegrationsResponse):
+            return []
+        return response.integrations if isinstance(response.integrations, list) else []
+
     def list_components(
         self,
         provider: str | None = None,
@@ -326,12 +356,33 @@ class SuperplaneClient:
         )
         if not isinstance(response, ComponentsListComponentsResponse):
             return []
-        components = response.components if isinstance(response.components, list) else []
+        root_components = response.components if isinstance(response.components, list) else []
+        components_by_name: dict[str, ComponentsComponent] = {}
+        for component in root_components:
+            if not isinstance(component, ComponentsComponent):
+                continue
+            if isinstance(component.name, str) and component.name:
+                components_by_name[component.name] = component
+
+        # Integration-scoped components are exposed under /api/v1/integrations.
+        try:
+            integration_definitions = self._list_available_integrations_raw()
+        except Exception as error:
+            _debug_log(f"integration_components_unavailable reason={error}")
+            integration_definitions = []
+
+        for integration in integration_definitions:
+            scoped_components = integration.components if isinstance(integration.components, list) else []
+            for component in scoped_components:
+                if not isinstance(component, ComponentsComponent):
+                    continue
+                if isinstance(component.name, str) and component.name:
+                    components_by_name[component.name] = component
+
         matches = [
             component
-            for component in components
-            if isinstance(component, ComponentsComponent)
-            and self._matches_filters(
+            for component in components_by_name.values()
+            if self._matches_filters(
                 name=component.name,
                 label=component.label,
                 description=component.description,
@@ -339,7 +390,7 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_component(component) for component in matches]
+        return [self._serialize_component(component) for component in sorted(matches, key=lambda item: item.name or "")]
 
     def describe_component(self, name: str) -> dict[str, Any]:
         response = self._with_error_guidance(
@@ -368,12 +419,32 @@ class SuperplaneClient:
         )
         if not isinstance(response, TriggersListTriggersResponse):
             return []
-        triggers = response.triggers if isinstance(response.triggers, list) else []
+        root_triggers = response.triggers if isinstance(response.triggers, list) else []
+        triggers_by_name: dict[str, TriggersTrigger] = {}
+        for trigger in root_triggers:
+            if not isinstance(trigger, TriggersTrigger):
+                continue
+            if isinstance(trigger.name, str) and trigger.name:
+                triggers_by_name[trigger.name] = trigger
+
+        try:
+            integration_definitions = self._list_available_integrations_raw()
+        except Exception as error:
+            _debug_log(f"integration_triggers_unavailable reason={error}")
+            integration_definitions = []
+
+        for integration in integration_definitions:
+            scoped_triggers = integration.triggers if isinstance(integration.triggers, list) else []
+            for trigger in scoped_triggers:
+                if not isinstance(trigger, TriggersTrigger):
+                    continue
+                if isinstance(trigger.name, str) and trigger.name:
+                    triggers_by_name[trigger.name] = trigger
+
         matches = [
             trigger
-            for trigger in triggers
-            if isinstance(trigger, TriggersTrigger)
-            and self._matches_filters(
+            for trigger in triggers_by_name.values()
+            if self._matches_filters(
                 name=trigger.name,
                 label=trigger.label,
                 description=trigger.description,
@@ -381,7 +452,15 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_trigger(trigger) for trigger in matches]
+        return [self._serialize_trigger(trigger) for trigger in sorted(matches, key=lambda item: item.name or "")]
+
+    def list_available_integrations(self) -> list[dict[str, Any]]:
+        integrations = self._list_available_integrations_raw()
+        return [
+            self._serialize_available_integration(integration)
+            for integration in integrations
+            if integration is not None
+        ]
 
     def describe_trigger(self, name: str) -> dict[str, Any]:
         response = self._with_error_guidance(

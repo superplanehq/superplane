@@ -365,6 +365,21 @@ func CountNodeQueueItems(workflowID uuid.UUID, nodeID string) (int64, error) {
 	return totalCount, nil
 }
 
+func CountNodeQueueItemsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (int64, error) {
+	var count int64
+
+	err := tx.
+		Model(&CanvasNodeQueueItem{}).
+		Where("root_event_id = ?", rootEventID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // FindNextQueueItemPerNode finds the next (oldest) queue item for each node in a workflow
 // using DISTINCT ON to get one queue item per node_id, ordered by created_at ASC
 // Only returns queue items for nodes that have not been deleted

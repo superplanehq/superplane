@@ -600,6 +600,12 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 
 	magicCode, err := models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
 	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Errorf("Database error during magic code lookup for %s: %v", email, err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		log.Warnf("Invalid magic code attempt for %s", email)
 
 		_, incrErr := models.IncrementAndMaybeInvalidateCodes(email, magicCodeMaxVerifyAttempts)

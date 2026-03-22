@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package superplane.usage.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/superplanehq/superplane/pkg/protos/usage";
 
 service Usage {
@@ -87,6 +89,13 @@ message OrganizationLimits {
   int32 retention_window_days = 4;
   int64 max_events_per_month = 5;
   int32 max_integrations = 6;
+}
+
+message OrganizationPlanChanged {
+  string organization_id = 1;
+  string plan_name = 2;
+  OrganizationLimits limits = 3;
+  google.protobuf.Timestamp timestamp = 4;
 }
 
 message AccountLimits {

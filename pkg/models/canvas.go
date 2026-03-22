@@ -275,6 +275,21 @@ func ListDeletedCanvases() ([]Canvas, error) {
 	return canvases, nil
 }
 
+func ListMaybeDeletedCanvasesByOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID) ([]Canvas, error) {
+	var canvases []Canvas
+
+	err := tx.
+		Unscoped().
+		Where("organization_id = ?", orgID).
+		Find(&canvases).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
+}
+
 func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	var canvas Canvas
 
