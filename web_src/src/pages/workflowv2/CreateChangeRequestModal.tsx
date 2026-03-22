@@ -48,9 +48,7 @@ export function CreateChangeRequestModal({
 }: CreateChangeRequestModalProps) {
   const handlePublish = () => {
     if (isDraftOutdated) {
-      const confirmed = window.confirm(
-        "This draft is outdated because the live version was updated after this draft was created. Create anyway?",
-      );
+      const confirmed = window.confirm("This draft is outdated — the live version has changed. Create anyway?");
       if (!confirmed) {
         return;
       }
@@ -64,14 +62,12 @@ export function CreateChangeRequestModal({
       <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Change Request</DialogTitle>
-          <DialogDescription>
-            Add a title and summary. This will create a change request snapshot from your current draft.
-          </DialogDescription>
+          <DialogDescription>Create a change request snapshot from your current draft.</DialogDescription>
         </DialogHeader>
 
         {!version ? (
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            Enable edit mode and save your draft before creating a change request.
+            Save your draft first to create a change request.
           </div>
         ) : (
           <div className="space-y-4">
@@ -178,7 +174,7 @@ export function CreateChangeRequestModal({
           {isDraftOutdated ? (
             <div
               className="inline-flex items-center gap-1.5 rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs text-amber-900"
-              title="Current draft is outdated because the live version is newer."
+              title="Draft is outdated — live version is newer."
             >
               <TriangleAlert className="h-3.5 w-3.5" />
               Outdated draft

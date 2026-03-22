@@ -457,7 +457,7 @@ export function Header({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">Create a change request from your current draft.</TooltipContent>
+                    <TooltipContent side="left">Propose a change request.</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -482,9 +482,7 @@ export function Header({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">
-                      Discard draft changes and reset it to match the current live version.
-                    </TooltipContent>
+                    <TooltipContent side="left">Discard draft and reset to live.</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -509,7 +507,7 @@ export function Header({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">Exit edit mode and return to the live version.</TooltipContent>
+                    <TooltipContent side="left">Exit edit mode.</TooltipContent>
                   </Tooltip>
                 </DropdownMenuContent>
               </DropdownMenu>
