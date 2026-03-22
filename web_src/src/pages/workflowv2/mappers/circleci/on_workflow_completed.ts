@@ -3,7 +3,7 @@ import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 interface OnWorkflowCompletedMetadata {
   project?: {
@@ -37,8 +37,10 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnWorkflowCompletedEventData;
     const workflowName = eventData?.workflow?.name || "Workflow";
     const status = eventData?.workflow?.status || "";
-    const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt)) : "";
-    const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
+    const subtitle =
+      status && context.event?.createdAt
+        ? renderWithTimeAgo(status, new Date(context.event.createdAt))
+        : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return {
       title: workflowName,
@@ -86,8 +88,10 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnWorkflowCompletedEventData;
       const workflowName = eventData?.workflow?.name || "Workflow";
       const status = eventData?.workflow?.status || "";
-      const timeAgo = lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "";
-      const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
+      const subtitle =
+        status && lastEvent.createdAt
+          ? renderWithTimeAgo(status, new Date(lastEvent.createdAt))
+          : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
         title: workflowName,

@@ -3,7 +3,7 @@ import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { AmiStateChangeEvent } from "./types";
@@ -33,7 +33,10 @@ export const onImageTriggerRenderer: TriggerRenderer = {
     const imageId = eventData?.detail?.ImageId;
     const state = eventData?.detail?.State || "";
     const title = imageId || "EC2 AMI state change";
-    const subtitle = `${state} · ${renderTimeAgo(new Date(context.event?.createdAt || ""))}`;
+    const subtitle =
+      state && context.event?.createdAt
+        ? renderWithTimeAgo(state, new Date(context.event.createdAt))
+        : state || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
     return { title, subtitle };
   },
 

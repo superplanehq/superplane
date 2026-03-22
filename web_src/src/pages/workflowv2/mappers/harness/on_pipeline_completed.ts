@@ -3,7 +3,7 @@ import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 interface OnPipelineCompletedMetadata {
   pipelineIdentifier?: string;
@@ -21,8 +21,10 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnPipelineCompletedEventData;
     const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
     const status = eventData?.status || "";
-    const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
-    const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
+    const subtitle =
+      status && context.event?.createdAt
+        ? renderWithTimeAgo(status, new Date(context.event.createdAt))
+        : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return { title, subtitle };
   },
@@ -61,8 +63,10 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnPipelineCompletedEventData;
       const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
       const status = eventData?.status || "";
-      const timeAgo = lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "";
-      const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
+      const subtitle =
+        status && lastEvent.createdAt
+          ? renderWithTimeAgo(status, new Date(lastEvent.createdAt))
+          : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
         title,

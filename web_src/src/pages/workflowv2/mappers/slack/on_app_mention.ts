@@ -1,7 +1,7 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { TriggerProps } from "@/ui/trigger";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 
@@ -106,12 +106,10 @@ function stringOrDash(value?: unknown): string {
 }
 
 function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
-  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
+  if (content && createdAt) {
+    return renderWithTimeAgo(content, new Date(createdAt));
   }
-
-  return content || timeAgo;
+  return content || (createdAt ? renderTimeAgo(new Date(createdAt)) : "");
 }
 
 function formatSlackTimestamp(value?: unknown): string | undefined {

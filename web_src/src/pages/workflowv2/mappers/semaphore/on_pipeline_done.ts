@@ -3,7 +3,7 @@ import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { MetadataItem } from "@/ui/metadataList";
 import { formatPredicate, Predicate } from "../utils";
 
@@ -49,10 +49,12 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnPipelineDoneEventData;
     const result = eventData?.pipeline?.result || "";
-    const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt)) : "";
     const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
     const title = `${pipelineFile} (${eventData?.pipeline?.name || ""})`;
-    const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
+    const subtitle =
+      result && context.event?.createdAt
+        ? renderWithTimeAgo(result, new Date(context.event.createdAt))
+        : result || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return {
       title: title,
@@ -126,8 +128,10 @@ export const onPipelineDoneTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnPipelineDoneEventData;
       const result = eventData?.pipeline?.result || "";
       const pipelineFile = `${eventData?.pipeline?.working_directory || ""}/${eventData?.pipeline?.yaml_file_name}`;
-      const timeAgo = lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "";
-      const subtitle = result && timeAgo ? `${result} · ${timeAgo}` : result || timeAgo;
+      const subtitle =
+        result && lastEvent.createdAt
+          ? renderWithTimeAgo(result, new Date(lastEvent.createdAt))
+          : result || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
         title: `${pipelineFile} (${eventData?.pipeline?.name || ""})`,

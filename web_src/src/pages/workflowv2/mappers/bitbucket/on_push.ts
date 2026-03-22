@@ -5,7 +5,7 @@ import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import { TriggerProps } from "@/ui/trigger";
 import { NodeMetadata } from "./types";
 import { Predicate, formatPredicate } from "../utils";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 export interface OnPushConfiguration {
   repository?: string;
@@ -81,12 +81,10 @@ export interface BitbucketCommit {
 
 function buildBitbucketSubtitle(shortSha: string, createdAt?: string): string | React.ReactNode {
   const trimmedSha = shortSha.trim();
-  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
-
-  if (trimmedSha && timeAgo) {
-    return `${trimmedSha} · ${timeAgo}`;
+  if (trimmedSha && createdAt) {
+    return renderWithTimeAgo(trimmedSha, new Date(createdAt));
   }
-  return trimmedSha || timeAgo;
+  return trimmedSha || (createdAt ? renderTimeAgo(new Date(createdAt)) : "");
 }
 
 /**

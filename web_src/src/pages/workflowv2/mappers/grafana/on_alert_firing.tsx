@@ -1,7 +1,7 @@
 import { useState, type FC } from "react";
 import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
@@ -171,10 +171,11 @@ function getAlertName(eventData?: OnAlertFiringEventData): string | undefined {
 }
 
 function buildSubtitle(status: string, createdAt?: string): string | React.ReactNode {
-  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
-  if (status) {
-    return `${status} - ${timeAgo}`;
+  if (status && createdAt) {
+    return renderWithTimeAgo(status, new Date(createdAt), " - ");
   }
-
-  return timeAgo;
+  if (status) {
+    return status;
+  }
+  return createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
 }

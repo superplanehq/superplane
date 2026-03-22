@@ -1,6 +1,6 @@
 import { getBackgroundColorClass } from "@/utils/colors";
 import React from "react";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
@@ -64,8 +64,10 @@ export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
     const issue = eventData?.issue;
     const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 synthetic check notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
-    const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
-    const subtitle = subtitleParts && timeAgo ? `${subtitleParts} · ${timeAgo}` : subtitleParts || timeAgo;
+    const subtitle =
+      subtitleParts && context.event?.createdAt
+        ? renderWithTimeAgo(subtitleParts, new Date(context.event.createdAt))
+        : subtitleParts || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return {
       title,
