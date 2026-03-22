@@ -1,4 +1,5 @@
 import { ComponentBaseProps, EventSection, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getTriggerRenderer } from "..";
 import {
@@ -13,7 +14,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { AssignReservedIPConfiguration } from "./types";
 import { defaultStateFunction } from "../stateRegistry";
 
@@ -90,9 +91,9 @@ export const assignReservedIPMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -136,7 +137,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: eventState,
       eventId: execution.rootEvent!.id!,
     },

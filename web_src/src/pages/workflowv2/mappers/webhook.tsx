@@ -1,7 +1,8 @@
 import { useState } from "react";
+import React from "react";
 import { canvasesInvokeNodeTriggerAction } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
 import { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
@@ -75,10 +76,10 @@ function getWebhookEventTitle(context: TriggerEventContext): string {
  * Renderer for the "webhook" trigger type
  */
 export const webhookTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     return {
       title: getWebhookEventTitle(context),
-      subtitle: formatTimeAgo(new Date(context.event?.createdAt || "")),
+      subtitle: renderTimeAgo(new Date(context.event?.createdAt || "")),
     };
   },
 
@@ -143,7 +144,7 @@ export const webhookTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: getWebhookEventTitle({ event: lastEvent }),
-        subtitle: formatTimeAgo(eventDate),
+        subtitle: renderTimeAgo(eventDate),
         receivedAt: eventDate,
         state: "triggered",
         eventId: lastEvent.id,

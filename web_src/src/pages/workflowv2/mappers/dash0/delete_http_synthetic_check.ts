@@ -1,4 +1,5 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseMapper,
@@ -12,7 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { DeleteHttpSyntheticCheckConfiguration } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const deleteHttpSyntheticCheckMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -58,9 +59,9 @@ export const deleteHttpSyntheticCheckMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -90,7 +91,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

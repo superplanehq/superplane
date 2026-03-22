@@ -1,3 +1,4 @@
+import React from "react";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import {
   ComponentBaseContext,
@@ -28,7 +29,7 @@ export const createReleaseMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

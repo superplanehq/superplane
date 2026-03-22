@@ -1,4 +1,5 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
@@ -12,7 +13,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { QueryDataSourceConfiguration } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "./utils";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
@@ -64,9 +65,9 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "-";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -101,7 +102,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     {
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
       eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)) : "-",
+      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
     },

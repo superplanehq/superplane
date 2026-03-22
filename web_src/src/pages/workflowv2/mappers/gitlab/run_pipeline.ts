@@ -1,3 +1,4 @@
+import React from "react";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 import {
   ComponentBaseProps,
@@ -123,7 +124,7 @@ export const runPipelineMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const metadata = context.execution.metadata as ExecutionMetadata | undefined;
     const status = metadata?.pipeline?.status ? metadata.pipeline.status : "Pipeline Run";
     return buildGitlabExecutionSubtitle(context.execution, status);

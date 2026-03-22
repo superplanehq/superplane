@@ -1,3 +1,4 @@
+import React from "react";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -39,7 +40,7 @@ export const publishMessageMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildSubtitle(context);
   },
 };

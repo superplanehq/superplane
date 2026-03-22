@@ -1,5 +1,6 @@
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { formatTimeAgo } from "@/utils/date";
+import React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { EventStateRegistry } from "./types";
 import { defaultStateFunction } from "./stateRegistry";
 
@@ -97,9 +98,9 @@ export function formatPredicate(predicate: Predicate): string {
   }
 }
 
-export function buildSubtitle(content: string | undefined, createdAt?: string): string {
+export function buildSubtitle(content: string | undefined, createdAt?: string): string | React.ReactNode {
   const trimmed = (content || "").trim();
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
 
   if (trimmed && timeAgo) {
     return `${trimmed} · ${timeAgo}`;
@@ -112,7 +113,7 @@ export interface ExecutionLike {
   updatedAt?: string;
 }
 
-export function buildExecutionSubtitle(execution: ExecutionLike, content?: string): string {
+export function buildExecutionSubtitle(execution: ExecutionLike, content?: string): string | React.ReactNode {
   const timestamp = execution.updatedAt || execution.createdAt;
   return buildSubtitle(content || "", timestamp);
 }

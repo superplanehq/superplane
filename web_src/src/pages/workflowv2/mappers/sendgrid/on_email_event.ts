@@ -1,8 +1,9 @@
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import React from "react";
 import { formatPredicate, Predicate } from "../utils";
 import { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 
 const eventLabels: Record<string, string> = {
@@ -34,7 +35,7 @@ interface OnEmailEventData {
 }
 
 export const onEmailEventTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnEmailEventData;
     const eventType = eventData?.event ? formatEventLabel(eventData.event) : "Email Event";
     const title = buildTitle(eventData?.email, eventType);
@@ -121,8 +122,8 @@ function buildTitle(email: string | undefined, eventType: string): string {
   return `Email Event · ${eventType}`;
 }
 
-function buildSubtitle(createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+function buildSubtitle(createdAt?: string): string | React.ReactNode {
+  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
   return timeAgo;
 }
 

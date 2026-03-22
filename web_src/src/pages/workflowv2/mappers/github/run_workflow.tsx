@@ -127,7 +127,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

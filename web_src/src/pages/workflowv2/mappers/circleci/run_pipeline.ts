@@ -1,4 +1,5 @@
 import { CanvasesCanvasNodeExecution } from "@/api-client";
+import React from "react";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
 import {
   ComponentBaseProps,
@@ -10,7 +11,7 @@ import {
 } from "@/ui/componentBase";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
@@ -105,9 +106,9 @@ export const runPipelineMapper: ComponentBaseMapper = {
       eventStateMap: RUN_PIPELINE_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
@@ -230,7 +231,7 @@ function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   const executionState = runPipelineStateFunction(execution);
   const subtitleTimestamp =
     executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : undefined;
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : undefined;
 
   sections.push({
     receivedAt: new Date(execution.createdAt!),

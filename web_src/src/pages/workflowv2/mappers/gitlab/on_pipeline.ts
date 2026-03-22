@@ -42,7 +42,7 @@ function getPipelineTitle(eventData: OnPipelineEventData): string {
 }
 
 export const onPipelineTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPipelineEventData;
     const attrs = eventData?.object_attributes;
 

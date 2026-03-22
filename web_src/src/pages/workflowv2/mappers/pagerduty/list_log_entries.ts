@@ -1,8 +1,9 @@
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
+import React from "react";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
@@ -63,8 +64,8 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
     const logEntries = getLogEntries(context.execution);
 
     if (logEntries.length > 0) {
@@ -111,7 +112,7 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const logEntries = getLogEntries(execution);
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
 
   let eventSubtitle: string;
   if (logEntries.length > 0) {

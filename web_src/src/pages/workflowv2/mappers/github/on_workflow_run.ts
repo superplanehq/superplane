@@ -52,7 +52,7 @@ interface OnWorkflowRunEventData {
  * Renderer for the "github.onWorkflowRun" trigger
  */
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnWorkflowRunEventData;
     const workflowName =
       eventData?.workflow_run?.display_title ||

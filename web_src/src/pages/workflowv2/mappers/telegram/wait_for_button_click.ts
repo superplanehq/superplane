@@ -10,11 +10,12 @@ import {
   SubtitleContext,
 } from "../types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 
 interface WaitForButtonClickConfiguration {
@@ -140,9 +141,9 @@ export const waitForButtonClickMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -189,7 +190,7 @@ function waitForButtonClickEventSections(nodes: NodeInfo[], execution: Execution
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: waitForButtonClickStateFunction(execution as any),
       eventId: execution.rootEvent!.id!,
     },

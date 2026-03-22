@@ -1,4 +1,5 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
 import {
@@ -10,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import snIcon from "@/assets/icons/integrations/servicenow.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { BaseNodeMetadata } from "./types";
 import { baseEventSections, buildIncidentExecutionDetails, getIncidentFromExecution, instanceUrlToLabel } from "./base";
 
@@ -31,9 +32,9 @@ export const getIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt));
+    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt));
     const incident = getIncidentFromExecution(context.execution);
     if (incident?.number) {
       return `${incident.number} · ${timeAgo}`;

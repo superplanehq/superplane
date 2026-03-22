@@ -1,3 +1,4 @@
+import React from "react";
 import {
   OutputPayload,
   ComponentBaseMapper,
@@ -15,7 +16,7 @@ export const labelsMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

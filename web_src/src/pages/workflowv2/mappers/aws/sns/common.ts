@@ -1,9 +1,10 @@
 import { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import React from "react";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { MetadataItem } from "@/ui/metadataList";
 
 export function buildSnsProps(context: ComponentBaseContext, metadata: MetadataItem[]): ComponentBaseProps {
@@ -23,12 +24,12 @@ export function buildSnsProps(context: ComponentBaseContext, metadata: MetadataI
   };
 }
 
-export function buildSubtitle(context: SubtitleContext): string {
+export function buildSubtitle(context: SubtitleContext): string | React.ReactNode {
   if (!context.execution.createdAt) {
     return "";
   }
 
-  return formatTimeAgo(new Date(context.execution.createdAt));
+  return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
 export function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
@@ -44,7 +45,7 @@ export function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, 
     {
       receivedAt: new Date(execution.createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent.id,
     },

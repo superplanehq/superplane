@@ -1,6 +1,7 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
+import React from "react";
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -53,9 +54,9 @@ export const cloudDNSMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 

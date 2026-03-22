@@ -21,7 +21,7 @@ import {
 import { getColorClass } from "@/utils/colors";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const timeGateMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -244,9 +244,9 @@ function getTimeGateEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
 function getTimeGateEventSubtitle(execution: ExecutionInfo, componentName: string): React.ReactNode | undefined {
   const executionState = getState(componentName)(execution);
   const timeAgo = execution.updatedAt
-    ? formatTimeAgo(new Date(execution.updatedAt))
+    ? renderTimeAgo(new Date(execution.updatedAt))
     : execution.createdAt
-      ? formatTimeAgo(new Date(execution.createdAt))
+      ? renderTimeAgo(new Date(execution.createdAt))
       : "";
 
   if (executionState === "waiting") {
@@ -259,7 +259,10 @@ function getTimeGateEventSubtitle(execution: ExecutionInfo, componentName: strin
   return timeAgo || undefined;
 }
 
-const TimeGateCountdown: React.FC<{ nextValidTime: string; timeAgo?: string }> = ({ nextValidTime, timeAgo }) => {
+const TimeGateCountdown: React.FC<{ nextValidTime: string; timeAgo?: string | React.ReactNode }> = ({
+  nextValidTime,
+  timeAgo,
+}) => {
   const nextRunTime = React.useMemo(() => new Date(nextValidTime), [nextValidTime]);
   const [timeLeft, setTimeLeft] = React.useState<number>(() => nextRunTime.getTime() - Date.now());
 

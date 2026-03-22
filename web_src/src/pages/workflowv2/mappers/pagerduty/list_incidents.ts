@@ -7,6 +7,7 @@ import {
   DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
+import React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseMapper,
@@ -22,7 +23,7 @@ import {
 import { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { Incident, ListIncidentsConfiguration, ListIncidentsResponse } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_CLEAR = "clear";
@@ -113,8 +114,8 @@ export const listIncidentsMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
     const incidents = getIncidents(context.execution);
 
     if (incidents.length > 0) {
@@ -288,7 +289,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const incidents = getIncidents(execution);
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
 
   let eventSubtitle: string;
   if (incidents.length > 0) {

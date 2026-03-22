@@ -1,3 +1,4 @@
+import React from "react";
 import { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
@@ -62,7 +63,7 @@ export const updateServiceMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return ecsSubtitle(context);
   },
 };

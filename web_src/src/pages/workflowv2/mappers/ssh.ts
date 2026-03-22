@@ -15,8 +15,9 @@ import {
   DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
+import React from "react";
 import { getTriggerRenderer } from ".";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 const SSH_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -132,7 +133,7 @@ export const sshMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const state = sshStateFunction(context.execution);
 
     if (state === "running" && context.execution.createdAt) {
@@ -149,7 +150,7 @@ export const sshMapper: ComponentBaseMapper = {
       const metadata = context.execution.metadata as Record<string, unknown> | undefined;
       const result = metadata?.result as { exitCode?: number } | undefined;
       const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
-      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
+      const timeAgo = context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "";
       if (exitStr && timeAgo) {
         return `${exitStr} · ${timeAgo}`;
       }
@@ -157,7 +158,7 @@ export const sshMapper: ComponentBaseMapper = {
     }
 
     if (context.execution.updatedAt) {
-      return formatTimeAgo(new Date(context.execution.updatedAt));
+      return renderTimeAgo(new Date(context.execution.updatedAt));
     }
     return "";
   },
@@ -194,7 +195,7 @@ function getSSHEventSections(
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const generateEventSubtitle = (): string => {
+  const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
     if (state === "running" && execution.createdAt) {
       const startTime = new Date(execution.createdAt);
@@ -208,12 +209,12 @@ function getSSHEventSections(
       const metadata = execution.metadata as Record<string, unknown> | undefined;
       const result = metadata?.result as { exitCode?: number } | undefined;
       const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
-      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
+      const timeAgo = execution.updatedAt ? renderTimeAgo(new Date(execution.updatedAt)) : "";
       if (exitStr && timeAgo) return `${exitStr} · ${timeAgo}`;
       if (timeAgo) return timeAgo;
     }
     if (execution.updatedAt) {
-      return formatTimeAgo(new Date(execution.updatedAt));
+      return renderTimeAgo(new Date(execution.updatedAt));
     }
     return "";
   };

@@ -37,7 +37,7 @@ interface OnMergeRequestEventData {
 }
 
 export const onMergeRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnMergeRequestEventData;
     const mr = eventData?.object_attributes;
 

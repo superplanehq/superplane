@@ -1,3 +1,4 @@
+import React from "react";
 import { ComponentBaseProps } from "@/ui/componentBase";
 import {
   OutputPayload,
@@ -16,7 +17,7 @@ export const createIssueMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default?.[0]?.data) {
       const issue = outputs.default[0].data as Issue;

@@ -1,6 +1,7 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { TriggerProps } from "@/ui/trigger";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 
@@ -28,7 +29,7 @@ interface AppMentionEventData {
  * Renderer for the "slack.onAppMention" trigger
  */
 export const onAppMentionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as AppMentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "App mention";
     const subtitle = buildSubtitle(
@@ -104,8 +105,8 @@ function stringOrDash(value?: unknown): string {
   return String(value);
 }
 
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
+  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
   if (content && timeAgo) {
     return `${content} · ${timeAgo}`;
   }

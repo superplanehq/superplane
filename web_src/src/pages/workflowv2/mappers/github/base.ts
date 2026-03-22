@@ -1,3 +1,4 @@
+import React from "react";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
@@ -21,7 +22,7 @@ export const baseIssueMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

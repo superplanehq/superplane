@@ -15,7 +15,8 @@ import {
   EventStateMap,
 } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
-import { formatTimeAgo } from "@/utils/date";
+import React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
 
 type DeleteMemoryMetadata = {
@@ -79,9 +80,9 @@ export const deleteMemoryMapper: ComponentBaseMapper = {
       eventStateMap: DELETE_MEMORY_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
@@ -105,7 +106,7 @@ function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSec
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title: fallbackTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {

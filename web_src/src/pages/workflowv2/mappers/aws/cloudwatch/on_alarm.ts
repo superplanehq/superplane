@@ -1,7 +1,8 @@
 import { TriggerProps } from "@/ui/trigger";
+import React from "react";
 import { MetadataItem } from "@/ui/metadataList";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { Predicate, formatPredicate, stringOrDash } from "../../utils";
@@ -44,7 +45,7 @@ function buildMetadataItems(configuration?: Configuration): MetadataItem[] {
  * Renderer for the "aws.cloudwatch.onAlarm" trigger
  */
 export const onAlarmTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as CloudWatchAlarmEvent;
     const detail = eventData?.detail;
     const alarmName = detail?.alarmName;
@@ -58,7 +59,7 @@ export const onAlarmTriggerRenderer: TriggerRenderer = {
       title = alarmName;
     }
 
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
     return { title, subtitle };
   },
 

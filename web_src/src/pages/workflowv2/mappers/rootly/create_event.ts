@@ -1,4 +1,5 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
 import {
@@ -13,7 +14,7 @@ import { MetadataItem } from "@/ui/metadataList";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
 import { IncidentEvent } from "./types";
 import { baseEventSections, getDetailsForIncidentEvent } from "./base";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const createEventMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -45,9 +46,9 @@ export const createEventMapper: ComponentBaseMapper = {
     return getDetailsForIncidentEvent(incidentEvent);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 

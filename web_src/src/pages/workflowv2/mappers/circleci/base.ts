@@ -1,6 +1,6 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import circleCIIcon from "@/assets/icons/integrations/circleci.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
@@ -33,7 +33,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const eventTitle = rootEvent ? rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent }).title : "Event";
 
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   const eventId = rootEvent?.id || execution.id;
 
   return [

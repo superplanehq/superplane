@@ -25,7 +25,7 @@ interface OnPRReviewCommentEventData {
  * Renderer for the "github.onPRReviewComment" trigger
  */
 export const onPRReviewCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPRReviewCommentEventData;
     const prNumber = eventData?.pull_request?.number || "";
     const fileName = eventData?.comment?.path || "";

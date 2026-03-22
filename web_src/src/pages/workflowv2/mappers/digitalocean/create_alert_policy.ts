@@ -1,4 +1,5 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
@@ -12,7 +13,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { AlertPolicyOutput, CreateAlertPolicyConfiguration } from "./types";
 
 const METRIC_TYPE_LABELS: Record<string, string> = {
@@ -78,9 +79,9 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -118,7 +119,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     {
       receivedAt: new Date(execution.createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent.id ?? "",
     },

@@ -1,5 +1,6 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
@@ -58,12 +59,12 @@ function formatSyntheticCheckLabels(labels?: SyntheticCheckLabelTuple[]): string
 }
 
 export const onSyntheticCheckNotificationTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as SyntheticCheckNotificationEventData | undefined;
     const issue = eventData?.issue;
     const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 synthetic check notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
-    const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
     const subtitle = subtitleParts && timeAgo ? `${subtitleParts} · ${timeAgo}` : subtitleParts || timeAgo;
 
     return {

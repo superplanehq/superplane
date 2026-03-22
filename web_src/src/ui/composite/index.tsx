@@ -29,7 +29,7 @@ export interface WaitingInfo {
 
 export interface QueueItem {
   title: string;
-  subtitle: string;
+  subtitle: string | React.ReactNode;
   receivedAt: Date;
 }
 

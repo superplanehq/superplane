@@ -19,7 +19,7 @@ interface OnIssueCommentEventData {
  * Renderer for the "github.onIssueComment" trigger
  */
 export const onIssueCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueCommentEventData;
 
     return {

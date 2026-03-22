@@ -1,8 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
+import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { AmiStateChangeEvent } from "./types";
@@ -27,12 +28,12 @@ function buildMetadata(configuration?: Configuration): MetadataItem[] {
 }
 
 export const onImageTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as AmiStateChangeEvent;
     const imageId = eventData?.detail?.ImageId;
     const state = eventData?.detail?.State || "";
     const title = imageId || "EC2 AMI state change";
-    const subtitle = `${state} · ${formatTimeAgo(new Date(context.event?.createdAt || ""))}`;
+    const subtitle = `${state} · ${renderTimeAgo(new Date(context.event?.createdAt || ""))}`;
     return { title, subtitle };
   },
 

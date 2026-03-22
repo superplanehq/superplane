@@ -26,7 +26,7 @@ interface OnTagEventData {
 }
 
 export const onTagTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnTagEventData;
 
     return {

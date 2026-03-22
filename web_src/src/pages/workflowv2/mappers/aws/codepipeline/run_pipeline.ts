@@ -17,9 +17,10 @@ import {
   EventStateMap,
 } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import React from "react";
 import { getTriggerRenderer } from "../..";
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
 import { defaultStateFunction } from "../../stateRegistry";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
@@ -111,11 +112,11 @@ export const runPipelineMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -146,7 +147,7 @@ function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSec
     {
       receivedAt: new Date(execution.createdAt ?? 0),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: runPipelineStateFunction(execution),
       eventId: execution.rootEvent?.id ?? "",
     },

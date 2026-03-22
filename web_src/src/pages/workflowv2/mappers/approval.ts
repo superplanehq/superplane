@@ -36,7 +36,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { showErrorToast } from "@/utils/toast";
 
 type ApprovalConfiguration = {
@@ -278,7 +278,7 @@ function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown
     const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
     const subtitle = `${approvalsApprovedCount}/${approvalsCount} approved`;
     if (execution.createdAt) {
-      return `${subtitle} · ${formatTimeAgo(new Date(execution.createdAt))}`;
+      return `${subtitle} · ${renderTimeAgo(new Date(execution.createdAt))}`;
     }
     return subtitle;
   }
@@ -291,7 +291,7 @@ function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown
     const date = new Date(timestamp);
     const metadata = execution.metadata as Record<string, unknown> | undefined;
     const result = metadata?.result;
-    const timeAgo = formatTimeAgo(date);
+    const timeAgo = renderTimeAgo(date);
 
     if (result === "approved") {
       return `Approved · ${timeAgo}`;
@@ -349,13 +349,14 @@ function buildApprovalTimeline(records: ApprovalRecord[]) {
       if (!a.timestamp && !b.timestamp) return 0;
       if (!a.timestamp) return 1;
       if (!b.timestamp) return -1;
+      if (typeof a.timestamp !== "string" || typeof b.timestamp !== "string") return 0;
       return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     });
 }
 
 function getApprovalDecisionMeta(record: ApprovalRecord): {
   status: string;
-  timestamp?: string;
+  timestamp?: string | React.ReactNode;
   comment?: string;
 } {
   const approvalComment = record.approval?.comment?.trim();
@@ -384,13 +385,13 @@ function getApprovalDecisionMeta(record: ApprovalRecord): {
   };
 }
 
-function formatDecisionTimestamp(timestamp?: string): string | undefined {
+function formatDecisionTimestamp(timestamp?: string): string | React.ReactNode | undefined {
   if (!timestamp) return undefined;
 
   const parsed = new Date(timestamp);
   if (Number.isNaN(parsed.getTime())) return undefined;
 
-  return formatTimeAgo(parsed);
+  return renderTimeAgo(parsed);
 }
 
 // ----------------------- Data Builder -----------------------

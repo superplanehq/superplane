@@ -24,7 +24,7 @@ import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
 import { MetadataItem } from "@/ui/metadataList";
 import Tippy from "@tippyjs/react/headless";
 import "tippy.js/dist/tippy.css";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 // Helper function to detect if a value contains expressions
 function hasExpressions(value: string): boolean {
@@ -296,9 +296,9 @@ function getWaitEventSubtitle(
 ): string | React.ReactNode | undefined {
   const executionState = getState(componentName)(execution);
   const timeAgo = execution.updatedAt
-    ? formatTimeAgo(new Date(execution.updatedAt))
+    ? renderTimeAgo(new Date(execution.updatedAt))
     : execution.createdAt
-      ? formatTimeAgo(new Date(execution.createdAt))
+      ? renderTimeAgo(new Date(execution.createdAt))
       : "";
 
   // Get expected duration from execution metadata (calculated interval)

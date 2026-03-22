@@ -1,3 +1,4 @@
+import React from "react";
 import {
   ComponentBaseMapper,
   ComponentBaseContext,
@@ -9,7 +10,7 @@ import {
 import { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
 import { MetadataItem } from "@/ui/metadataList";
 
@@ -21,9 +22,9 @@ function pubsubProps(context: ComponentBaseContext): ComponentBaseProps {
   };
 }
 
-function pubsubSubtitle(context: SubtitleContext): string {
+function pubsubSubtitle(context: SubtitleContext): string | React.ReactNode {
   const timestamp = context.execution.updatedAt || context.execution.createdAt;
-  return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+  return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
 type PubSubOutputs<T> = { default?: Array<{ data?: T }> };

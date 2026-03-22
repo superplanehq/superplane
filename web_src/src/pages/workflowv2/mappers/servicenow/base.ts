@@ -2,7 +2,7 @@ import { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
 import { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { IncidentRecord, STATE_LABELS, URGENCY_LABELS, IMPACT_LABELS } from "./types";
 
 export function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution): IncidentRecord | null {
@@ -21,7 +21,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

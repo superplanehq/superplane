@@ -9,9 +9,10 @@ import {
   SubtitleContext,
 } from "./types";
 import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
+import React from "react";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
 
@@ -168,7 +169,7 @@ export const httpMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const state = httpStateFunction(context.execution);
 
     // For running state, show duration
@@ -200,7 +201,7 @@ export const httpMapper: ComponentBaseMapper = {
         responseCode = response.status.toString();
       }
 
-      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
+      const timeAgo = context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "";
 
       if (responseCode && timeAgo) {
         return `Response: ${responseCode} · ${timeAgo}`;
@@ -213,7 +214,7 @@ export const httpMapper: ComponentBaseMapper = {
 
     // Fallback: just show time ago
     if (context.execution.updatedAt) {
-      return formatTimeAgo(new Date(context.execution.updatedAt));
+      return renderTimeAgo(new Date(context.execution.updatedAt));
     }
 
     return "";
@@ -435,7 +436,7 @@ function getHTTPEventSections(
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const generateEventSubtitle = (): string => {
+  const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
 
     if (state === "running") {
@@ -471,7 +472,7 @@ function getHTTPEventSections(
         }
       }
 
-      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
+      const timeAgo = execution.updatedAt ? renderTimeAgo(new Date(execution.updatedAt)) : "";
 
       if (responseCode && timeAgo) {
         return `Response: ${responseCode} · ${timeAgo}`;
@@ -484,7 +485,7 @@ function getHTTPEventSections(
 
     // Fallback: just show time ago
     if (execution.updatedAt) {
-      return formatTimeAgo(new Date(execution.updatedAt));
+      return renderTimeAgo(new Date(execution.updatedAt));
     }
 
     return "";

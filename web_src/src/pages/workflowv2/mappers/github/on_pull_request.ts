@@ -19,7 +19,7 @@ interface OnPullRequestEventData {
  * Renderer for the "github.onPullRequest" trigger
  */
 export const onPullRequestTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPullRequestEventData;
 
     return {

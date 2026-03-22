@@ -9,9 +9,10 @@ import {
   SubtitleContext,
 } from "./types";
 import { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import React from "react";
 import { MetadataItem } from "@/ui/metadataList";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 
 const SEND_EMAIL_EVENT_STATE_MAP: EventStateMap = {
@@ -122,7 +123,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const state = sendEmailStateFunction(context.execution);
 
     if (state === "running") {
@@ -133,7 +134,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
       const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
       const payload = outputs?.default?.[0]?.data as { subject?: string; to?: string[] } | undefined;
       const recipientCount = payload?.to?.length ?? 0;
-      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
+      const timeAgo = context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "";
 
       if (recipientCount > 0 && timeAgo) {
         return `Sent to ${recipientCount} recipient${recipientCount > 1 ? "s" : ""} · ${timeAgo}`;
@@ -143,7 +144,7 @@ export const sendEmailMapper: ComponentBaseMapper = {
     }
 
     if (context.execution.updatedAt) {
-      return formatTimeAgo(new Date(context.execution.updatedAt));
+      return renderTimeAgo(new Date(context.execution.updatedAt));
     }
 
     return "";
@@ -229,7 +230,7 @@ function getSendEmailEventSections(nodes: NodeInfo[], execution: ExecutionInfo):
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {

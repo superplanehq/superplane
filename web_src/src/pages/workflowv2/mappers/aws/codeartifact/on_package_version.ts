@@ -1,10 +1,11 @@
 import { getBackgroundColorClass } from "@/utils/colors";
+import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
 import { formatPackageLabel, formatPackageName } from "./utils";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatPredicate, numberOrZero, Predicate, stringOrDash } from "../../utils";
 import { MetadataItem } from "@/ui/metadataList";
 
@@ -25,12 +26,12 @@ export interface Metadata {
  * Renderer for the "aws.codeArtifact.onPackageVersion" trigger
  */
 export const onPackageVersionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as PackageVersionEvent;
     const detail = eventData?.detail;
     const packageLabel = formatPackageLabel(detail);
     const title = packageLabel || "CodeArtifact package version";
-    const subtitle = formatTimeAgo(new Date(context.event?.createdAt || ""));
+    const subtitle = renderTimeAgo(new Date(context.event?.createdAt || ""));
 
     return { title, subtitle };
   },

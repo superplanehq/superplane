@@ -14,7 +14,7 @@ interface GithubConfiguration {
  * Renderer for the "github.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as Push;
     const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 

@@ -34,7 +34,7 @@ interface OnMilestoneEventData {
 }
 
 export const onMilestoneTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnMilestoneEventData;
     const milestone = eventData?.object_attributes;
 

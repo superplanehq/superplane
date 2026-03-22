@@ -38,7 +38,7 @@ export interface TriggerRenderer {
    * @param context The context for the trigger event
    * @returns The title and subtitle to display
    */
-  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string };
+  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string | React.ReactNode };
 
   /**
    * Optional event-state mapper for triggers that have meaningful terminal/running states.

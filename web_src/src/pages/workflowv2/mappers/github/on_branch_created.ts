@@ -15,7 +15,7 @@ interface GithubConfiguration {
  * Renderer for the "github.onBranchCreated" trigger
  */
 export const onBranchCreatedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as GitRef;
 
     return {

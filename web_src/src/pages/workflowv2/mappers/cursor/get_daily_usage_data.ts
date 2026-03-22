@@ -1,4 +1,5 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   ComponentBaseContext,
@@ -10,7 +11,7 @@ import {
   SubtitleContext,
 } from "../types";
 import cursorIcon from "@/assets/icons/integrations/cursor.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 type GetDailyUsageDataPayload = {
   data?: unknown[];
@@ -74,9 +75,9 @@ export const getDailyUsageDataMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 
@@ -89,7 +90,7 @@ function getDailyUsageDataEventSections(
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {

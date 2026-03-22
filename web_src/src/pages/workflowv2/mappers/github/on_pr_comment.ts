@@ -19,7 +19,7 @@ interface OnPRCommentEventData {
  * Renderer for the "github.onPRComment" trigger
  */
 export const onPRCommentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnPRCommentEventData;
     const prNumber = eventData?.issue?.number || "";
     const title = eventData?.issue?.title || "PR Comment";

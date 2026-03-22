@@ -7,6 +7,7 @@ import {
   DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
+import React from "react";
 import {
   ComponentBaseMapper,
   OutputPayload,
@@ -20,7 +21,7 @@ import {
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { ListIssuesConfiguration, PrometheusResponse } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_CLEAR = "clear";
@@ -100,10 +101,10 @@ export const listIssuesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     // Check if this is being called from ChainItem (which passes additionalData as undefined or a different structure)
     // For ChainItem, just return the time without counts
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt!));
 
     // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
     // Otherwise, include counts for SidebarEventItem
@@ -368,7 +369,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const { critical, degraded } = getIssueCounts(execution);
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const timeAgo = renderTimeAgo(new Date(execution.createdAt!));
 
   // Build subtitle with counts and time
   const countParts: string[] = [];

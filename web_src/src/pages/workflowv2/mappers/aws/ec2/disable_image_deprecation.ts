@@ -8,10 +8,11 @@ import {
   SubtitleContext,
 } from "../../types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import React from "react";
 import { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 
@@ -62,12 +63,12 @@ export const disableImageDeprecationMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) {
       return "";
     }
 
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -98,7 +99,7 @@ function disableImageDeprecationEventSections(
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id!,
     },

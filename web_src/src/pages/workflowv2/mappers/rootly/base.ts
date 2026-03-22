@@ -1,7 +1,7 @@
 import { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
 import { ExecutionInfo, NodeInfo } from "../types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { Incident, IncidentEvent } from "./types";
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
@@ -13,7 +13,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

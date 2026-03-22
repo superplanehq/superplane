@@ -1,5 +1,6 @@
 import { ComponentBaseProps } from "@/ui/componentBase";
-import { formatTimeAgo } from "@/utils/date";
+import React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -43,8 +44,8 @@ export const invokeFunctionMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };

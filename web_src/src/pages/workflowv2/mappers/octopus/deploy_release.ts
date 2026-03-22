@@ -10,10 +10,11 @@ import {
   SubtitleContext,
 } from "../types";
 import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventSection, EventStateMap } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getTriggerRenderer } from "..";
 import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import { formatTimestamp, stringOrDash } from "./common";
 import { defaultStateFunction } from "../stateRegistry";
@@ -123,9 +124,9 @@ export const deployReleaseMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -165,7 +166,7 @@ function deployReleaseEventSections(
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

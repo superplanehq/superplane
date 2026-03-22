@@ -8,10 +8,11 @@ import {
   SubtitleContext,
 } from "../../types";
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { MetadataItem } from "@/ui/metadataList";
 import { EcrImageDetail, EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
@@ -60,11 +61,11 @@ export const getImageMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -90,7 +91,7 @@ function getImageEventSections(nodes: NodeInfo[], execution: ExecutionInfo, comp
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

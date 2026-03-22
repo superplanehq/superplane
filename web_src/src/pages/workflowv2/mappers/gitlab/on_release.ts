@@ -34,7 +34,7 @@ function getReleaseTitle(eventData: OnReleaseEventData): string {
 }
 
 export const onReleaseTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnReleaseEventData;
 
     return {

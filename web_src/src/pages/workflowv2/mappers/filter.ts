@@ -17,9 +17,10 @@ import {
   DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { parseExpression, substituteExpressionValues, evaluateIndividualComparisons } from "@/lib/expressionParser";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 type FilterOutputs = Record<string, OutputPayload[]>;
 
@@ -117,7 +118,7 @@ export const filterMapper: ComponentBaseMapper = {
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -226,7 +227,7 @@ function getfilterEventSections(nodes: NodeInfo[], execution: ExecutionInfo, com
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
     eventTitle: title,
-    eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+    eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
     eventState: getState(componentName)(execution),
     eventId: execution.rootEvent!.id!,
   };

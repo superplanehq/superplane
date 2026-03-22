@@ -1,8 +1,9 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface OnPipelineCompletedMetadata {
   pipelineIdentifier?: string;
@@ -16,11 +17,11 @@ interface OnPipelineCompletedEventData {
 }
 
 export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnPipelineCompletedEventData;
     const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
     const status = eventData?.status || "";
-    const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const timeAgo = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
     const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
 
     return { title, subtitle };
@@ -60,7 +61,7 @@ export const onPipelineCompletedTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnPipelineCompletedEventData;
       const title = "Pipeline Completed · " + (eventData?.pipelineIdentifier || "unknown");
       const status = eventData?.status || "";
-      const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
+      const timeAgo = lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "";
       const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
 
       props.lastEventData = {

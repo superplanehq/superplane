@@ -18,7 +18,7 @@ interface OnReleaseEventData {
  * Renderer for the "github.onRelease" trigger
  */
 export const onReleaseTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnReleaseEventData;
     const assetCount = eventData?.release?.assets?.length || 0;
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";

@@ -1,3 +1,4 @@
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
@@ -46,7 +47,7 @@ interface OnFeatureFlagChangeEventData {
 function getEventTitleAndSubtitle(
   eventData: OnFeatureFlagChangeEventData | undefined,
   createdAt?: string,
-): { title: string; subtitle: string } {
+): { title: string; subtitle: string | React.ReactNode } {
   const title = eventData?.name || eventData?.flagKey || "Feature Flag";
   const verb = eventData?.titleVerb;
   const kind = eventData?.kind ? formatEventLabel(eventData.kind) : "";
@@ -56,7 +57,7 @@ function getEventTitleAndSubtitle(
 }
 
 export const onFeatureFlagChangeTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnFeatureFlagChangeEventData;
     return getEventTitleAndSubtitle(eventData, context.event?.createdAt);
   },

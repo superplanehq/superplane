@@ -19,7 +19,7 @@ interface OnIssueEventData {
  * Renderer for the "github.onIssue" trigger
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
 
     return {

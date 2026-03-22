@@ -1,6 +1,7 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import React from "react";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { TriggerProps } from "@/ui/trigger";
 import teamsIcon from "@/assets/icons/integrations/teams.svg";
 
@@ -33,7 +34,7 @@ interface MentionEventData {
  * Renderer for the "teams.onMention" trigger
  */
 export const onMentionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as MentionEventData | undefined;
     const title = eventData?.text?.trim() ? eventData.text : "Bot mention";
     const subtitle = buildSubtitle(
@@ -117,8 +118,8 @@ function stringOrDash(value?: unknown): string {
   return String(value);
 }
 
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
+  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
   if (content && timeAgo) {
     return `${content} · ${timeAgo}`;
   }

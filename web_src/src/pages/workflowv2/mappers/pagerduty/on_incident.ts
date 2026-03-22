@@ -1,5 +1,6 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
@@ -23,7 +24,7 @@ interface OnIncidentEventData {
  * Renderer for the "pagerduty.onIncident" trigger type
  */
 export const onIncidentTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data?.data as OnIncidentEventData;
     const incident = eventData?.incident;
     const contentParts = [incident?.urgency, incident?.status].filter(Boolean).join(" · ");
@@ -93,8 +94,8 @@ export const onIncidentTriggerRenderer: TriggerRenderer = {
   },
 };
 
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
+  const timeAgo = createdAt ? renderTimeAgo(new Date(createdAt)) : "";
   if (content && timeAgo) {
     return `${content} · ${timeAgo}`;
   }

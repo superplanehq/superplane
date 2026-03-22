@@ -1,8 +1,9 @@
 import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import React from "react";
 import { TriggerProps } from "@/ui/trigger";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import { AzureBlobEvent } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../utils";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
@@ -33,13 +34,13 @@ function extractBlobName(subject?: string): string | undefined {
 }
 
 export const onBlobDeletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const envelope = context.event?.data as AzureBlobEvent | undefined;
     const container = extractBlobContainer(envelope?.subject);
     const blobName = extractBlobName(envelope?.subject);
 
     const title = container ? `${container}/${blobName ?? ""}` : "Blob deleted";
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },
