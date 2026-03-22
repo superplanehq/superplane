@@ -11,14 +11,24 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func CacheOrganizationLimits(orgID string, limits *pb.OrganizationLimits, syncedAt time.Time) error {
+func CacheOrganizationLimits(orgID string, limits *pb.OrganizationLimits, readStartedAt time.Time, syncedAt time.Time) error {
 	var retentionWindowDays *int32
 	if limits != nil {
 		retentionWindowDays = &limits.RetentionWindowDays
 	}
 
-	if err := models.MarkOrganizationUsageLimitsSynced(orgID, retentionWindowDays, syncedAt); err != nil {
+	applied, err := models.MarkOrganizationUsageLimitsSyncedIfNoNewerThan(
+		orgID,
+		retentionWindowDays,
+		readStartedAt,
+		syncedAt,
+	)
+	if err != nil {
 		return fmt.Errorf("persist usage limits cache for organization %s: %w", orgID, err)
+	}
+
+	if !applied {
+		return nil
 	}
 
 	return nil
@@ -29,6 +39,7 @@ func RefreshOrganizationLimitsCache(ctx context.Context, usageService Service, o
 		return nil, ErrUsageDisabled
 	}
 
+	readStartedAt := time.Now()
 	response, err := usageService.DescribeOrganizationLimits(ctx, orgID)
 	if err != nil {
 		if status.Code(err) != codes.NotFound {
@@ -50,7 +61,7 @@ func RefreshOrganizationLimitsCache(ctx context.Context, usageService Service, o
 		limits = response.Limits
 	}
 
-	if err := CacheOrganizationLimits(orgID, limits, time.Now()); err != nil {
+	if err := CacheOrganizationLimits(orgID, limits, readStartedAt, time.Now()); err != nil {
 		return nil, err
 	}
 

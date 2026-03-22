@@ -135,6 +135,42 @@ func HardDeleteOrganization(id string) error {
 		Error
 }
 
+func ListDeletedOrganizations() ([]Organization, error) {
+	return ListDeletedOrganizationsInTransaction(database.Conn())
+}
+
+func ListDeletedOrganizationsInTransaction(tx *gorm.DB) ([]Organization, error) {
+	var organizations []Organization
+
+	err := tx.
+		Unscoped().
+		Where("deleted_at IS NOT NULL").
+		Find(&organizations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return organizations, nil
+}
+
+func LockDeletedOrganization(tx *gorm.DB, id uuid.UUID) (*Organization, error) {
+	var organization Organization
+
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		Where("deleted_at IS NOT NULL").
+		First(&organization).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &organization, nil
+}
+
 func GetActiveOrganizationIDs() ([]string, error) {
 	var orgIDs []string
 	err := database.Conn().Model(&Organization{}).
@@ -260,6 +296,44 @@ func MarkOrganizationUsageLimitsSyncedIfNewerInTransaction(
 		Model(&Organization{}).
 		Where("id = ?", orgID).
 		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at <= ?", syncedAt.UTC()).
+		Updates(map[string]any{
+			"usage_retention_window_days": retentionWindowDays,
+			"usage_limits_synced_at":      syncedAt.UTC(),
+		})
+
+	if result.Error != nil {
+		return false, result.Error
+	}
+
+	return result.RowsAffected > 0, nil
+}
+
+func MarkOrganizationUsageLimitsSyncedIfNoNewerThan(
+	orgID string,
+	retentionWindowDays *int32,
+	maxExistingSyncedAt time.Time,
+	syncedAt time.Time,
+) (bool, error) {
+	return MarkOrganizationUsageLimitsSyncedIfNoNewerThanInTransaction(
+		database.Conn(),
+		orgID,
+		retentionWindowDays,
+		maxExistingSyncedAt,
+		syncedAt,
+	)
+}
+
+func MarkOrganizationUsageLimitsSyncedIfNoNewerThanInTransaction(
+	tx *gorm.DB,
+	orgID string,
+	retentionWindowDays *int32,
+	maxExistingSyncedAt time.Time,
+	syncedAt time.Time,
+) (bool, error) {
+	result := tx.
+		Model(&Organization{}).
+		Where("id = ?", orgID).
+		Where("usage_limits_synced_at IS NULL OR usage_limits_synced_at <= ?", maxExistingSyncedAt.UTC()).
 		Updates(map[string]any{
 			"usage_retention_window_days": retentionWindowDays,
 			"usage_limits_synced_at":      syncedAt.UTC(),
