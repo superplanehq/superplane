@@ -1,10 +1,11 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { Predicate, formatPredicate, stringOrDash } from "../utils";
+import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { Predicate } from "../utils";
+import { formatPredicate, stringOrDash } from "../utils";
 import { buildGitlabSubtitle } from "./utils";
-import { GitLabNodeMetadata } from "./types";
+import type { GitLabNodeMetadata } from "./types";
 
 interface OnTagConfiguration {
   tags: Predicate[];

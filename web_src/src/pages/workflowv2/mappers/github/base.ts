@@ -1,10 +1,10 @@
-import React from "react";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { MetadataItem } from "@/ui/metadataList";
-import {
+import type { MetadataItem } from "@/ui/metadataList";
+import type {
   OutputPayload,
   ComponentBaseMapper,
   ComponentBaseContext,
@@ -14,7 +14,7 @@ import {
   ComponentDefinition,
   ExecutionInfo,
 } from "../types";
-import { Issue } from "./types";
+import type { Issue } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
 
 export const baseIssueMapper: ComponentBaseMapper = {

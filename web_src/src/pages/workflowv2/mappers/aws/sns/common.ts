@@ -1,11 +1,11 @@
-import { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
-import React from "react";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export function buildSnsProps(context: ComponentBaseContext, metadata: MetadataItem[]): ComponentBaseProps {
   const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;

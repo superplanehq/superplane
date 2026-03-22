@@ -1,13 +1,13 @@
-import React from "react";
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   OutputPayload,
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
   ExecutionDetailsContext,
 } from "../types";
-import { Issue } from "./types";
+import type { Issue } from "./types";
 import { baseProps } from "./base";
 import { buildGitlabExecutionSubtitle } from "./utils";
 import { getDetailsForApiIssue } from "./issue_utils";

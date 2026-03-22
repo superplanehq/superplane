@@ -1,7 +1,7 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 

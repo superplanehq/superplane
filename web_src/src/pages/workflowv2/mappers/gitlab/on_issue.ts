@@ -1,11 +1,13 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { GitLabNodeMetadata } from "./types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { GitLabNodeMetadata } from "./types";
 import { buildGitlabSubtitle } from "./utils";
-import { getDetailsForWebhookIssue, WebhookIssue } from "./issue_utils";
-import { formatPredicate, Predicate } from "../utils";
+import type { WebhookIssue } from "./issue_utils";
+import { getDetailsForWebhookIssue } from "./issue_utils";
+import type { Predicate } from "../utils";
+import { formatPredicate } from "../utils";
 
 interface OnIssueConfiguration {
   actions: string[];

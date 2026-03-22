@@ -1,9 +1,10 @@
-import { EventSection } from "@/ui/componentBase";
+import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
-import { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { IncidentRecord, STATE_LABELS, URGENCY_LABELS, IMPACT_LABELS } from "./types";
+import type { IncidentRecord } from "./types";
+import { STATE_LABELS, URGENCY_LABELS, IMPACT_LABELS } from "./types";
 
 export function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution): IncidentRecord | null {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;

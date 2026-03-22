@@ -1,12 +1,12 @@
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import React from "react";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerProps } from "@/ui/trigger";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
-import { AzureBlobEvent } from "./types";
+import type { AzureBlobEvent } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../utils";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnBlobDeletedConfiguration {
   resourceGroup?: string;

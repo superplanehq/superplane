@@ -1,6 +1,6 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import React from "react";
-import {
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type {
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
@@ -9,7 +9,7 @@ import {
   OutputPayload,
   NodeInfo,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";

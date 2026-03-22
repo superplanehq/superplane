@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -6,8 +6,8 @@ import {
   NodeInfo,
   SubtitleContext,
 } from "./types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getStateMap, getTriggerRenderer } from ".";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";

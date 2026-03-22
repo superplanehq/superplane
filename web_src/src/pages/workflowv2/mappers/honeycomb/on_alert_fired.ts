@@ -1,8 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/ui/trigger";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface OnAlertFiredConfiguration {

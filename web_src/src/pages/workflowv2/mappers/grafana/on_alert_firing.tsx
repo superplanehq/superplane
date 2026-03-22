@@ -2,10 +2,16 @@ import { useState, type FC } from "react";
 import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { OnAlertFiringEventData } from "./types";
+import type { OnAlertFiringEventData } from "./types";
 import { stringOrDash } from "../utils";
 import { formatTimestamp } from "./utils";
 import { Icon } from "@/components/Icon";

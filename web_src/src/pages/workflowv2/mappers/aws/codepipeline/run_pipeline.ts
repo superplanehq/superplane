@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,17 +9,12 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../../types";
-import {
-  ComponentBaseProps,
-  DEFAULT_EVENT_STATE_MAP,
-  EventSection,
-  EventState,
-  EventStateMap,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import React from "react";
+import type React from "react";
 import { getTriggerRenderer } from "../..";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
 import { defaultStateFunction } from "../../stateRegistry";

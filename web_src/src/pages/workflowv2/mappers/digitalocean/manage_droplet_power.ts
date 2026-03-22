@@ -1,8 +1,9 @@
-import { ComponentBaseProps, EventSection, EventStateMap, DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -12,10 +13,10 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { DropletNodeMetadata, ManageDropletPowerConfiguration } from "./types";
+import type { DropletNodeMetadata, ManageDropletPowerConfiguration } from "./types";
 import { defaultStateFunction } from "../stateRegistry";
 
 export const powerStateMap: EventStateMap = {

@@ -1,13 +1,8 @@
-import {
-  ComponentBaseProps,
-  EventSection,
-  EventState,
-  EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import React from "react";
-import {
+import type React from "react";
+import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ComponentBaseContext,
@@ -18,9 +13,9 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { GetHttpSyntheticCheckConfiguration, GetHttpSyntheticCheckNodeMetadata } from "./types";
+import type { GetHttpSyntheticCheckConfiguration, GetHttpSyntheticCheckNodeMetadata } from "./types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants

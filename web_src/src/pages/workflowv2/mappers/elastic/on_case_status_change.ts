@@ -1,9 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
+import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { MetadataItem } from "@/ui/metadataList";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
 interface OnCaseStatusChangeConfiguration {

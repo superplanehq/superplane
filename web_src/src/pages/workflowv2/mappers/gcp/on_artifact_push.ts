@@ -1,11 +1,11 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
-import { ArtifactPushData } from "./artifact_registry";
+import type { ArtifactPushData } from "./artifact_registry";
 
 type OnArtifactPushConfiguration = {
   location?: string;

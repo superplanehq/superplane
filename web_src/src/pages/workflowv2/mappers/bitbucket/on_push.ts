@@ -1,10 +1,11 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { NodeMetadata } from "./types";
-import { Predicate, formatPredicate } from "../utils";
+import type { TriggerProps } from "@/ui/trigger";
+import type { NodeMetadata } from "./types";
+import type { Predicate } from "../utils";
+import { formatPredicate } from "../utils";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 export interface OnPushConfiguration {

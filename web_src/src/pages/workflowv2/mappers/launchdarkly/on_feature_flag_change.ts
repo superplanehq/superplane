@@ -1,8 +1,9 @@
-import React from "react";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { Predicate, formatPredicate, buildSubtitle } from "../utils";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { Predicate } from "../utils";
+import { formatPredicate, buildSubtitle } from "../utils";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 
 const eventLabels: Record<string, string> = {

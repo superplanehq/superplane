@@ -1,11 +1,11 @@
-import { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
-import React from "react";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export const MAX_METADATA_ITEMS = 3;
 

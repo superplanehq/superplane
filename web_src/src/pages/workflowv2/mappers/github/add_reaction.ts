@@ -1,6 +1,6 @@
-import React from "react";
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -8,7 +8,7 @@ import {
   SubtitleContext,
 } from "../types";
 import { baseProps } from "./base";
-import { BaseNodeMetadata } from "./types";
+import type { BaseNodeMetadata } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
 
 interface AddReactionConfiguration {

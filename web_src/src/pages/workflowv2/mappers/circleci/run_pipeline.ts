@@ -1,19 +1,19 @@
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import React from "react";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type React from "react";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
   EventSection,
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,

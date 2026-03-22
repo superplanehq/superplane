@@ -1,5 +1,5 @@
 import React from "react";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
@@ -11,17 +11,12 @@ import {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import {
-  ComponentBaseProps,
-  EventSection,
-  EventState,
-  EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
 import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import Tippy from "@tippyjs/react/headless";
 import "tippy.js/dist/tippy.css";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";

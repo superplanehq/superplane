@@ -1,11 +1,11 @@
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import React from "react";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { renderWithTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -13,7 +13,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ListLogEntriesResponse, LogEntry } from "./types";
+import type { ListLogEntriesResponse, LogEntry } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.

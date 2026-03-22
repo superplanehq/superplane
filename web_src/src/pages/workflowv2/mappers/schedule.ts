@@ -1,8 +1,14 @@
 import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  TriggerRenderer,
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerRendererContext,
+  TriggerEventContext,
+} from "./types";
+import type { TriggerProps } from "@/ui/trigger";
 import React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 

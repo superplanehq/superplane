@@ -1,5 +1,5 @@
-import { ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
-import React from "react";
+import type { ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import type React from "react";
 import { noopMapper } from "../noop";
 import { renderTimeAgo } from "@/components/TimeAgo";
 

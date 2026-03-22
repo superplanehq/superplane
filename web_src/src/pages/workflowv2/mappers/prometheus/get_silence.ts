@@ -1,11 +1,11 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import React from "react";
-import { MetadataItem } from "@/ui/metadataList";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -14,7 +14,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { GetSilenceConfiguration, GetSilenceNodeMetadata, PrometheusSilencePayload } from "./types";
+import type { GetSilenceConfiguration, GetSilenceNodeMetadata, PrometheusSilencePayload } from "./types";
 
 export const getSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {

@@ -1,10 +1,16 @@
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
 import React from "react";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
-import { NewRelicIssuePayload, OnIssueConfiguration } from "./types";
+import type { NewRelicIssuePayload, OnIssueConfiguration } from "./types";
 
 const stateLabels: Record<string, string> = {
   CREATED: "Created",

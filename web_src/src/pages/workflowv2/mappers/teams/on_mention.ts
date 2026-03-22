@@ -1,8 +1,8 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/ui/trigger";
 import teamsIcon from "@/assets/icons/integrations/teams.svg";
 
 interface OnMentionConfiguration {

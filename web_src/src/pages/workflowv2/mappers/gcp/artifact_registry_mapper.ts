@@ -1,7 +1,7 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import React from "react";
-import { MetadataItem } from "@/ui/metadataList";
-import {
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,

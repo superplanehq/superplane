@@ -1,7 +1,7 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ComponentBaseContext,
@@ -10,9 +10,9 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { UpdateHttpSyntheticCheckConfiguration } from "./types";
+import type { UpdateHttpSyntheticCheckConfiguration } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 const LOCATION_LABELS: Record<string, string> = {

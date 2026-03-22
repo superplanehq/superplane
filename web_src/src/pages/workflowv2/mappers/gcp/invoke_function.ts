@@ -1,7 +1,7 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,

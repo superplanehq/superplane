@@ -3,8 +3,14 @@ import React from "react";
 import { canvasesInvokeNodeTriggerAction } from "@/api-client";
 import { getColorClass } from "@/utils/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  TriggerRenderer,
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerRendererContext,
+  TriggerEventContext,
+} from "./types";
+import type { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";

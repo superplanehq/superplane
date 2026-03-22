@@ -1,13 +1,20 @@
 import { getBackgroundColorClass } from "@/utils/colors";
 import React from "react";
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
-import { Repository, RepositoryMetadata } from "./types";
+import type { Repository, RepositoryMetadata } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { formatPredicate, Predicate, stringOrDash } from "../utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../utils";
+import { formatPredicate, stringOrDash } from "../utils";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnImagePushMetadata {
   repository?: RepositoryMetadata;

@@ -1,9 +1,9 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import circleCIIcon from "@/assets/icons/integrations/circleci.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
+import type { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
 
 export function baseProps(
   nodes: NodeInfo[],

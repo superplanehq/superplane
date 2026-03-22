@@ -1,18 +1,19 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import snIcon from "@/assets/icons/integrations/servicenow.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { BaseNodeMetadata, CreateIncidentConfiguration, URGENCY_LABELS } from "./types";
+import type { BaseNodeMetadata, CreateIncidentConfiguration } from "./types";
+import { URGENCY_LABELS } from "./types";
 import { baseEventSections, buildIncidentExecutionDetails, instanceUrlToLabel } from "./base";
 
 export const createIncidentMapper: ComponentBaseMapper = {

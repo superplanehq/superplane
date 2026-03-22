@@ -1,12 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
-import { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
+import type { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
 import { buildRepositoryMetadataItems, formatTagLabel, formatTags, getRepositoryLabel } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { EcrImageScanDetail } from "./types";
+import type { EcrImageScanDetail } from "./types";
 import { numberOrZero, stringOrDash } from "../../utils";
 
 /**
@@ -29,7 +29,7 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail as EcrImageScanDetail;
 
-    let values: Record<string, string> = {
+    const values: Record<string, string> = {
       Repository: stringOrDash(getRepositoryLabel(undefined, undefined, detail?.["repository-name"])),
       "Image Tags": formatTags(detail?.["image-tags"]),
       "Image Digest": stringOrDash(detail?.["image-digest"]),

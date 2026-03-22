@@ -1,11 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatPredicate, Predicate, stringOrDash } from "../../utils";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../../utils";
+import { formatPredicate, stringOrDash } from "../../utils";
 
 interface OnPipelineConfiguration {
   region?: string;

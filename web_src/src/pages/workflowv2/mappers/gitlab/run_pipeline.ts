@@ -1,13 +1,8 @@
-import React from "react";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import {
-  ComponentBaseProps,
-  ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
-  EventState,
-  EventStateMap,
-} from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { ComponentBaseProps, ComponentBaseSpec, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -18,7 +13,7 @@ import {
 } from "../types";
 import { baseProps } from "./base";
 import { buildGitlabExecutionSubtitle } from "./utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 interface PipelineMetadata {
   id?: number;

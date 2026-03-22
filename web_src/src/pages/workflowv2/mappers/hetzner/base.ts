@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,9 +7,9 @@ import {
   SubtitleContext,
 } from "../types";
 import { noopMapper } from "../noop";
-import React from "react";
+import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 type HetznerConfiguration = {
   serverType?: unknown;

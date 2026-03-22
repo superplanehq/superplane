@@ -1,15 +1,15 @@
-import {
+import type {
   ComponentBaseProps,
   EventSection,
   ComponentBaseSpec,
   EventState,
   EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
+import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseMapper,
   OutputPayload,
   EventStateRegistry,
@@ -20,9 +20,9 @@ import {
   NodeInfo,
   ExecutionInfo,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { Incident, ListIncidentsConfiguration, ListIncidentsResponse } from "./types";
+import type { Incident, ListIncidentsConfiguration, ListIncidentsResponse } from "./types";
 import { renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants

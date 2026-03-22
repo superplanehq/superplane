@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,15 +7,15 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { MetadataItem } from "@/ui/metadataList";
-import { PackageVersionDescription, PackageLicense, PackageVersionPayload } from "./types";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { PackageVersionDescription, PackageLicense, PackageVersionPayload } from "./types";
 import { formatPackageName } from "./utils";
 import { stringOrDash } from "../../utils";
 

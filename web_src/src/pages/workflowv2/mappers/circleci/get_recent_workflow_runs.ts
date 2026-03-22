@@ -1,6 +1,6 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import React from "react";
-import {
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -8,7 +8,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../utils";
 import { baseProps } from "./base";

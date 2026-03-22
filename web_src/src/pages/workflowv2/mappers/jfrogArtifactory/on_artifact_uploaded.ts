@@ -1,8 +1,8 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
-import React from "react";
+import type React from "react";
 import jfrogIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass } from "@/utils/colors";
 
 interface OnArtifactUploadedConfiguration {

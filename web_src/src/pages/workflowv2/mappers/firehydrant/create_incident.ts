@@ -1,15 +1,15 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import firehydrantIcon from "@/assets/icons/integrations/firehydrant.svg";
 import { baseEventSections, buildFireHydrantExecutionDetails } from "./base";
 import { renderTimeAgo } from "@/components/TimeAgo";

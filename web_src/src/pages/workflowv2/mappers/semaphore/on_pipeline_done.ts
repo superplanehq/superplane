@@ -1,11 +1,12 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatPredicate, Predicate } from "../utils";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../utils";
+import { formatPredicate } from "../utils";
 
 interface OnPipelineDoneMetadata {
   project?: {

@@ -1,5 +1,5 @@
-import React from "react";
-import {
+import type React from "react";
+import type {
   ComponentBaseMapper,
   ComponentBaseContext,
   EventStateRegistry,
@@ -7,12 +7,12 @@ import {
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpPubSubIcon from "@/assets/icons/integrations/gcp.pubsub.svg";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 function pubsubProps(context: ComponentBaseContext): ComponentBaseProps {
   return {

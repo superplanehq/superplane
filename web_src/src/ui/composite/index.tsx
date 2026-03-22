@@ -1,6 +1,6 @@
 import React from "react";
 import { ComponentBase, type EventSection, type EventState } from "../componentBase";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 import { type MetadataItem } from "../metadataList";
 import { type ChildEventsInfo } from "../childEvents";
 

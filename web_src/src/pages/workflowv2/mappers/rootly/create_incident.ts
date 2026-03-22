@@ -1,8 +1,8 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -10,9 +10,9 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import { Incident } from "./types";
+import type { Incident } from "./types";
 import { baseEventSections, getDetailsForIncident } from "./base";
 import { renderTimeAgo } from "@/components/TimeAgo";
 

@@ -1,6 +1,12 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  TriggerRenderer,
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerRendererContext,
+  TriggerEventContext,
+} from "./types";
+import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";

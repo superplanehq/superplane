@@ -1,7 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import { buildCloudBuildSummaryDetails, cloudBuildStatusToTriggerState, type CloudBuildData } from "./cloudbuild";

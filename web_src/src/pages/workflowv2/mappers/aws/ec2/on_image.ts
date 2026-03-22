@@ -1,12 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
-import { AmiStateChangeEvent } from "./types";
+import type { AmiStateChangeEvent } from "./types";
 
 interface Configuration {
   region?: string;
@@ -43,7 +43,7 @@ export const onImageTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as AmiStateChangeEvent;
 
-    let details: Record<string, string> = {
+    const details: Record<string, string> = {
       "Image ID": stringOrDash(eventData?.detail?.ImageId),
       State: stringOrDash(eventData?.detail?.State),
       Region: stringOrDash(eventData?.region),

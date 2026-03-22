@@ -1,6 +1,6 @@
 import React from "react";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import {
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -10,14 +10,14 @@ import {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
   EventSection,
   EventState,
   EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/utils/colors";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";

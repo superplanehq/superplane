@@ -1,10 +1,10 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
+import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import { Incident } from "./types";
+import type { Incident } from "./types";
 import { getDetailsForIncident } from "./base";
 
 // Map event values to display labels (matching backend configuration)

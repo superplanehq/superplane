@@ -1,10 +1,10 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
+import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { Agent, ResourceRef } from "./types";
+import type { Agent, ResourceRef } from "./types";
 
 interface OnIncidentAnnotatedMetadata {
   service?: {

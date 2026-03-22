@@ -1,6 +1,6 @@
-import React from "react";
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -9,7 +9,7 @@ import {
 } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
-import { Comment } from "./types";
+import type { Comment } from "./types";
 
 export const createIssueCommentMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {

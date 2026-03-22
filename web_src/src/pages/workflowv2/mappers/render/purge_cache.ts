@@ -1,6 +1,7 @@
-import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventStateMap } from "@/ui/componentBase";
-import React from "react";
-import {
+import type { ComponentBaseProps, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type React from "react";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -10,7 +11,7 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "./common";
 import { baseProps } from "./base";

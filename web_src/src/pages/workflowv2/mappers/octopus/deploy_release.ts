@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,11 +9,12 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventSection, EventStateMap } from "@/ui/componentBase";
-import React from "react";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getTriggerRenderer } from "..";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
 import { formatTimestamp, stringOrDash } from "./common";

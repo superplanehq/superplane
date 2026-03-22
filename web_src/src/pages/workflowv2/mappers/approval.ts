@@ -1,13 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import {
-  GroupsGroup,
-  RolesRole,
-  SuperplaneUsersUser,
-  groupsListGroupUsers,
-  canvasesInvokeNodeExecutionAction,
-  CanvasesCanvasNodeExecution,
-} from "@/api-client";
-import {
+import type { GroupsGroup, RolesRole, SuperplaneUsersUser, CanvasesCanvasNodeExecution } from "@/api-client";
+import { groupsListGroupUsers, canvasesInvokeNodeExecutionAction } from "@/api-client";
+import type {
   AdditionalDataBuilderContext,
   ComponentAdditionalDataBuilder,
   ComponentBaseContext,
@@ -19,20 +13,20 @@ import {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
   EventSection,
   EventState,
   EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
-import { ApprovalItemProps } from "@/ui/approvalItem";
-import { QueryClient } from "@tanstack/react-query";
+import type { ApprovalItemProps } from "@/ui/approvalItem";
+import type { QueryClient } from "@tanstack/react-query";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -92,6 +86,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 /**
  * Approval-specific state logic function
  */
+// eslint-disable-next-line complexity
 export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (
     execution.resultMessage &&
@@ -210,40 +205,43 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
     {
       title: "approvals required",
       tooltipTitle: "approvals required",
-      values: items.map((item) => {
-        const type = (item.type || "").toString();
-        let value =
-          type === "anyone"
-            ? "Anyone"
-            : type === "user"
-              ? item.user || ""
-              : type === "role"
-                ? item.role || ""
-                : type === "group"
-                  ? item.group || ""
-                  : "";
-        const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+      values: items.map(
+        // eslint-disable-next-line complexity
+        (item) => {
+          const type = (item.type || "").toString();
+          let value =
+            type === "anyone"
+              ? "Anyone"
+              : type === "user"
+                ? item.user || ""
+                : type === "role"
+                  ? item.role || ""
+                  : type === "group"
+                    ? item.group || ""
+                    : "";
+          const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
-        // Pretty-print values
-        if (type === "user" && value && usersById[value]) {
-          value = usersById[value].email || usersById[value].name || value;
-        }
-        if (type === "role" && value) {
-          value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-          // Fallback to simple suffix mapping when not found
-          const suffix = (item.role || "").split("_").pop();
-          if (!rolesByName[item.role || ""] && suffix) {
-            const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-            value = map[suffix] || value;
+          // Pretty-print values
+          if (type === "user" && value && usersById[value]) {
+            value = usersById[value].email || usersById[value].name || value;
           }
-        }
-        return {
-          badges: [
-            { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-            { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-          ],
-        };
-      }),
+          if (type === "role" && value) {
+            value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
+            // Fallback to simple suffix mapping when not found
+            const suffix = (item.role || "").split("_").pop();
+            if (!rolesByName[item.role || ""] && suffix) {
+              const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
+              value = map[suffix] || value;
+            }
+          }
+          return {
+            badges: [
+              { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+              { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+            ],
+          };
+        },
+      ),
     },
   ];
 }
@@ -306,6 +304,7 @@ function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown
   return "";
 }
 
+// eslint-disable-next-line complexity
 function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLabelMaps): string {
   const rolesByName = labelMaps?.rolesByName;
   const groupsByName = labelMaps?.groupsByName;
@@ -334,7 +333,17 @@ function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLa
 }
 
 function buildApprovalTimeline(records: ApprovalRecord[]) {
-  return records
+  return [...records]
+    .sort((a, b) => {
+      const aTimestamp = getApprovalDecisionTimestampValue(a);
+      const bTimestamp = getApprovalDecisionTimestampValue(b);
+
+      if (aTimestamp === null && bTimestamp === null) return 0;
+      if (aTimestamp === null) return 1;
+      if (bTimestamp === null) return -1;
+
+      return aTimestamp - bTimestamp;
+    })
     .map((record) => {
       const meta = getApprovalDecisionMeta(record);
       return {
@@ -343,13 +352,6 @@ function buildApprovalTimeline(records: ApprovalRecord[]) {
         timestamp: meta.timestamp,
         comment: meta.comment,
       };
-    })
-    .sort((a, b) => {
-      if (!a.timestamp && !b.timestamp) return 0;
-      if (!a.timestamp) return 1;
-      if (!b.timestamp) return -1;
-      if (typeof a.timestamp !== "string" || typeof b.timestamp !== "string") return 0;
-      return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
     });
 }
 
@@ -391,6 +393,26 @@ function formatDecisionTimestamp(timestamp?: string): string | React.ReactNode |
   if (Number.isNaN(parsed.getTime())) return undefined;
 
   return renderTimeAgo(parsed);
+}
+
+function getApprovalDecisionTimestampValue(record: ApprovalRecord): number | null {
+  const timestamp =
+    record.state === "approved"
+      ? record.approval?.approvedAt
+      : record.state === "rejected"
+        ? record.rejection?.rejectedAt
+        : undefined;
+
+  if (!timestamp) {
+    return null;
+  }
+
+  const parsed = new Date(timestamp).getTime();
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return parsed;
 }
 
 // ----------------------- Data Builder -----------------------

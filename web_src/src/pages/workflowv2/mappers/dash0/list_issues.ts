@@ -1,14 +1,14 @@
-import {
+import type {
   ComponentBaseProps,
   EventSection,
   ComponentBaseSpec,
   EventState,
   EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import React from "react";
-import {
+import type React from "react";
+import type {
   ComponentBaseMapper,
   OutputPayload,
   EventStateRegistry,
@@ -20,7 +20,7 @@ import {
   ExecutionInfo,
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { ListIssuesConfiguration, PrometheusResponse } from "./types";
+import type { ListIssuesConfiguration, PrometheusResponse } from "./types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants

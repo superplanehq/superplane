@@ -1,6 +1,6 @@
-import { EventSection } from "@/ui/componentBase";
+import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
-import { ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionInfo, NodeInfo } from "../types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {

@@ -1,8 +1,8 @@
-import React from "react";
-import { EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
-import { ExecutionInfo, NodeInfo } from "../types";
-import { StatuspageIncident, StatuspageIncidentUpdate } from "./types";
+import type { ExecutionInfo, NodeInfo } from "../types";
+import type { StatuspageIncident, StatuspageIncidentUpdate } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export function stringOrDash(value?: string | null): string {

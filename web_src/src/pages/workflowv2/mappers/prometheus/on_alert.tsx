@@ -1,11 +1,17 @@
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
 import React from "react";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import { getDetailsForAlert } from "./base";
-import { OnAlertConfiguration, OnAlertMetadata, PrometheusAlertPayload } from "./types";
+import type { OnAlertConfiguration, OnAlertMetadata, PrometheusAlertPayload } from "./types";
 
 const statusLabels: Record<string, string> = {
   firing: "Firing",

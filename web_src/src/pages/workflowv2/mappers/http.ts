@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -8,10 +8,16 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
-import React from "react";
+import type {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventStateMap,
+  EventState,
+} from "@/ui/componentBase";
+import type React from "react";
 import { getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";

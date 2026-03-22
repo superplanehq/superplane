@@ -1,8 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, Release } from "./types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { BaseNodeMetadata, Release } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
 interface OnReleaseConfiguration {

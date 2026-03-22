@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,21 +9,21 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
   EventSection,
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import React from "react";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "..";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,

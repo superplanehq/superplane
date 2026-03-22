@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,14 +9,20 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import React from "react";
+import type {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventState,
+  EventStateMap,
+} from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getTriggerRenderer } from "..";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 interface WaitForButtonClickConfiguration {
   chatId?: string;

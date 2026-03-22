@@ -1,12 +1,13 @@
-import { TriggerProps } from "@/ui/trigger";
-import React from "react";
-import { MetadataItem } from "@/ui/metadataList";
+import type { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { Predicate, formatPredicate, stringOrDash } from "../../utils";
-import { CloudWatchAlarmEvent } from "./types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { Predicate } from "../../utils";
+import { formatPredicate, stringOrDash } from "../../utils";
+import type { CloudWatchAlarmEvent } from "./types";
 
 interface Configuration {
   region?: string;

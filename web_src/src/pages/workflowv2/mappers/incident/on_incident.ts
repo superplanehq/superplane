@@ -1,10 +1,10 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
+import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import incidentIcon from "@/assets/icons/integrations/incident.svg";
-import { Incident } from "./types";
+import type { Incident } from "./types";
 import { getDetailsForIncident } from "./base";
 
 const eventLabels: Record<string, string> = {

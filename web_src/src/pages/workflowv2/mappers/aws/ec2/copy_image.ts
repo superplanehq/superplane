@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,15 +7,15 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import React from "react";
-import { MetadataItem } from "@/ui/metadataList";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { Ec2Image } from "./types";
+import type { Ec2Image } from "./types";
 
 interface Configuration {
   region?: string;

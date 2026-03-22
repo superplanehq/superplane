@@ -1,13 +1,14 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import React from "react";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
+import type { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
 import { formatPackageLabel, formatPackageName } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatPredicate, numberOrZero, Predicate, stringOrDash } from "../../utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../../utils";
+import { formatPredicate, numberOrZero, stringOrDash } from "../../utils";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export interface Configuration {
   region?: string;

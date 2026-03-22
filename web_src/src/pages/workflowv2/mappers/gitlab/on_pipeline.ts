@@ -1,9 +1,9 @@
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import { buildGitlabSubtitle } from "./utils";
-import { GitLabNodeMetadata } from "./types";
+import type { GitLabNodeMetadata } from "./types";
 import { stringOrDash } from "../utils";
 
 interface OnPipelineConfiguration {
