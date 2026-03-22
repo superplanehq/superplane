@@ -6,6 +6,7 @@ import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
+import { CopyPayloadButton } from "../CopyPayloadButton";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
 
@@ -83,7 +84,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [copiedExecutions, setCopiedExecutions] = useState<Set<string>>(new Set());
-  const [payloadCopied, setPayloadCopied] = useState(false);
   const [executionChainData, setExecutionChainData] = useState<ExecutionChainItem[] | null>(null);
   const [executionChainLoading, setExecutionChainLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -233,16 +233,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
   }, []);
-
-  const copyPayloadToClipboard = useCallback(
-    (payload: any) => {
-      const payloadString = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
-      copyToClipboard(payloadString);
-      setPayloadCopied(true);
-      setTimeout(() => setPayloadCopied(false), 2000);
-    },
-    [copyToClipboard],
-  );
 
   const copyExecutionLink = useCallback(
     (execution: ExecutionChainItem) => {
@@ -548,14 +538,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="w-full px-2 py-2">
               <div className="flex items-center justify-between mb-2 relative">
                 <div className="flex items-center gap-1 absolute right-2 top-4">
-                  <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
-                    <button
-                      onClick={() => copyPayloadToClipboard(tabData.payload)}
-                      className="p-1 text-gray-500 hover:text-gray-800"
-                    >
-                      {React.createElement(resolveIcon("copy"), { size: 16 })}
-                    </button>
-                  </SimpleTooltip>
+                  <CopyPayloadButton
+                    payload={tabData.payload}
+                    iconSize={16}
+                    className="p-1 text-gray-500 hover:text-gray-800"
+                  />
                   <SimpleTooltip content="Payload">
                     <button
                       onClick={() => {
@@ -736,15 +723,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold text-gray-800">Payload</h3>
               <div className="flex items-center gap-2">
-                <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy Link"} hideOnClick={false}>
-                  <button
-                    onClick={() => copyPayloadToClipboard(modalPayload)}
-                    className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
-                  >
-                    {React.createElement(resolveIcon("copy"), { size: 14 })}
-                    Copy
-                  </button>
-                </SimpleTooltip>
+                <CopyPayloadButton payload={modalPayload} variant="labeled" />
                 <button
                   onClick={() => {
                     setIsPayloadModalOpen(false);
