@@ -71,7 +71,7 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 		return err
 	}
 
-	if data.Email == "" || data.Code == "" || data.MagicCodeID == "" {
+	if data.Email == "" || data.Code == "" {
 		log.Errorf("Invalid magic code requested message: missing fields")
 		return nil
 	}

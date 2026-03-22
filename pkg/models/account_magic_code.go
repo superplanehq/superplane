@@ -41,19 +41,6 @@ func CreateAccountMagicCodeInTransaction(tx *gorm.DB, email, codeHash string, ex
 	return code, nil
 }
 
-func FindAccountMagicCodeByID(id string) (*AccountMagicCode, error) {
-	return FindAccountMagicCodeByIDInTransaction(database.Conn(), id)
-}
-
-func FindAccountMagicCodeByIDInTransaction(tx *gorm.DB, id string) (*AccountMagicCode, error) {
-	var code AccountMagicCode
-	err := tx.Where("id = ?", id).First(&code).Error
-	if err != nil {
-		return nil, err
-	}
-	return &code, nil
-}
-
 func FindValidAccountMagicCode(email, codeHash string, maxVerifyAttempts int) (*AccountMagicCode, error) {
 	return FindValidAccountMagicCodeInTransaction(database.Conn(), email, codeHash, maxVerifyAttempts)
 }
@@ -115,14 +102,6 @@ func (c *AccountMagicCode) MarkUsedInTransaction(tx *gorm.DB) (bool, error) {
 
 	c.UsedAt = &now
 	return true, nil
-}
-
-func (c *AccountMagicCode) Delete() error {
-	return c.DeleteInTransaction(database.Conn())
-}
-
-func (c *AccountMagicCode) DeleteInTransaction(tx *gorm.DB) error {
-	return tx.Delete(c).Error
 }
 
 func InvalidateActiveMagicCodesInTransaction(tx *gorm.DB, email string) error {

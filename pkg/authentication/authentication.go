@@ -557,14 +557,14 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 	codeHash := crypto.HashToken(code)
 	expiresAt := time.Now().Add(magicCodeTTL)
 
-	magicCodeRecord, err := models.CreateAccountMagicCode(email, codeHash, expiresAt)
+	_, err = models.CreateAccountMagicCode(email, codeHash, expiresAt)
 	if err != nil {
 		log.Errorf("Failed to store magic code for %s: %v", email, err)
 		successResponse()
 		return
 	}
 
-	msg := messages.NewMagicCodeRequestedMessage(email, code, magicCodeRecord.ID.String())
+	msg := messages.NewMagicCodeRequestedMessage(email, code)
 	if err := msg.Publish(); err != nil {
 		log.Errorf("Failed to publish magic code email request for %s: %v", email, err)
 	}
