@@ -13,7 +13,7 @@ import (
 type EmailService interface {
 	SendInvitationEmail(toEmail, organizationName, invitationLink, inviterEmail string) error
 	SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error
-	SendMagicCodeEmail(toEmail, code string) error
+	SendMagicCodeEmail(toEmail, code, magicLink string) error
 }
 
 type InvitationTemplateData struct {
@@ -31,7 +31,8 @@ type NotificationTemplateData struct {
 }
 
 type MagicCodeTemplateData struct {
-	Code string
+	Code      string
+	MagicLink string
 }
 
 type ResendEmailService struct {
@@ -90,8 +91,8 @@ func (s *ResendEmailService) SendInvitationEmail(toEmail, organizationName, invi
 	return nil
 }
 
-func (s *ResendEmailService) SendMagicCodeEmail(toEmail, code string) error {
-	templateData := MagicCodeTemplateData{Code: code}
+func (s *ResendEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
+	templateData := MagicCodeTemplateData{Code: code, MagicLink: magicLink}
 
 	plainTextContent, err := s.renderTemplate("magic_code.txt", templateData)
 	if err != nil {

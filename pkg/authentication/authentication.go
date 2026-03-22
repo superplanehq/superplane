@@ -107,7 +107,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	}
 	if a.magicCodeEnabled {
 		router.HandleFunc("/auth/magic-code/request", a.handleMagicCodeRequest).Methods("POST")
-		router.HandleFunc("/auth/magic-code/verify", a.handleMagicCodeVerify).Methods("POST")
+		router.HandleFunc("/auth/magic-code/verify", a.handleMagicCodeVerify).Methods("POST", "GET")
 	}
 
 	//

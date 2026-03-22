@@ -223,7 +223,7 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go notificationEmailConsumer.Start()
 
 	log.Println("Starting Magic Code Email Consumer")
-	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService)
+	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
 	go magicCodeEmailConsumer.Start()
 }
 

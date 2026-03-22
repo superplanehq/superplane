@@ -2,6 +2,8 @@ package workers
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/renderedtext/go-tackle"
@@ -18,9 +20,10 @@ type MagicCodeEmailConsumer struct {
 	Consumer     *tackle.Consumer
 	RabbitMQURL  string
 	EmailService services.EmailService
+	BaseURL      string
 }
 
-func NewMagicCodeEmailConsumer(rabbitMQURL string, emailService services.EmailService) *MagicCodeEmailConsumer {
+func NewMagicCodeEmailConsumer(rabbitMQURL string, emailService services.EmailService, baseURL string) *MagicCodeEmailConsumer {
 	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
 		"consumer": "magic_code_email",
 	}))
@@ -32,6 +35,7 @@ func NewMagicCodeEmailConsumer(rabbitMQURL string, emailService services.EmailSe
 		RabbitMQURL:  rabbitMQURL,
 		Consumer:     consumer,
 		EmailService: emailService,
+		BaseURL:      baseURL,
 	}
 }
 
@@ -76,7 +80,15 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	err = c.EmailService.SendMagicCodeEmail(data.Email, data.Code)
+	magicLink := fmt.Sprintf("%s/auth/magic-code/verify?email=%s&code=%s",
+		c.BaseURL,
+		url.QueryEscape(data.Email),
+		url.QueryEscape(data.Code),
+	)
+
+	readableCode := formatReadableCode(data.Code)
+
+	err = c.EmailService.SendMagicCodeEmail(data.Email, readableCode, magicLink)
 	if err != nil {
 		log.Errorf("Failed to send magic code email to %s: %v", data.Email, err)
 		return err
@@ -84,4 +96,11 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 
 	log.Infof("Successfully sent magic code email to %s", data.Email)
 	return nil
+}
+
+func formatReadableCode(code string) string {
+	if len(code) == 6 {
+		return code[:3] + " " + code[3:]
+	}
+	return code
 }

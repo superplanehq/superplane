@@ -166,13 +166,13 @@ func (s *SMTPEmailService) SendInvitationEmail(toEmail, organizationName, invita
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
-func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code string) error {
+func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
 	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
 	if err != nil {
 		return err
 	}
 
-	templateData := MagicCodeTemplateData{Code: code}
+	templateData := MagicCodeTemplateData{Code: code, MagicLink: magicLink}
 
 	plainTextContent, err := s.renderTemplate("magic_code.txt", templateData)
 	if err != nil {

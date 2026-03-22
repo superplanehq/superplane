@@ -18,8 +18,9 @@ type SentNotificationEmail struct {
 }
 
 type SentMagicCodeEmail struct {
-	ToEmail string
-	Code    string
+	ToEmail   string
+	Code      string
+	MagicLink string
 }
 
 type NoopEmailService struct {
@@ -50,13 +51,14 @@ func (s *NoopEmailService) SendInvitationEmail(toEmail, organizationName, invita
 	return nil
 }
 
-func (s *NoopEmailService) SendMagicCodeEmail(toEmail, code string) error {
+func (s *NoopEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.magicCodeEmails = append(s.magicCodeEmails, SentMagicCodeEmail{
-		ToEmail: toEmail,
-		Code:    code,
+		ToEmail:   toEmail,
+		Code:      code,
+		MagicLink: magicLink,
 	})
 	return nil
 }
