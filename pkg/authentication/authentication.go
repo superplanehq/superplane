@@ -556,19 +556,19 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	err = a.emailService.SendMagicCodeEmail(email, code)
+	if err != nil {
+		log.Errorf("Failed to send magic code email to %s: %v", email, err)
+		successResponse()
+		return
+	}
+
 	codeHash := crypto.HashToken(code)
 	expiresAt := time.Now().Add(magicCodeTTL)
 
 	_, err = models.CreateAccountMagicCode(email, codeHash, expiresAt)
 	if err != nil {
 		log.Errorf("Failed to store magic code for %s: %v", email, err)
-		successResponse()
-		return
-	}
-
-	err = a.emailService.SendMagicCodeEmail(email, code)
-	if err != nil {
-		log.Errorf("Failed to send magic code email to %s: %v", email, err)
 	}
 
 	successResponse()
@@ -617,6 +617,28 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	account, err := models.FindAccountByEmail(email)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("Error finding account for %s: %v", email, err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	isNewAccount := errors.Is(err, gorm.ErrRecordNotFound)
+
+	if isNewAccount && a.blockSignup {
+		if inviteToken == "" {
+			http.Error(w, SignupDisabledError, http.StatusForbidden)
+			return
+		}
+
+		inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
+		if findErr != nil || !inviteLink.Enabled {
+			http.Error(w, "invite link not found or disabled", http.StatusForbidden)
+			return
+		}
+	}
+
 	marked, err := magicCode.MarkUsed()
 	if err != nil {
 		log.Errorf("Failed to mark magic code as used for %s: %v", email, err)
@@ -630,27 +652,7 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	account, err := models.FindAccountByEmail(email)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Errorf("Error finding account for %s: %v", email, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		if a.blockSignup {
-			if inviteToken == "" {
-				http.Error(w, SignupDisabledError, http.StatusForbidden)
-				return
-			}
-
-			inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
-			if findErr != nil || !inviteLink.Enabled {
-				http.Error(w, "invite link not found or disabled", http.StatusForbidden)
-				return
-			}
-		}
-
+	if isNewAccount {
 		if name == "" {
 			name = strings.Split(email, "@")[0]
 		}
