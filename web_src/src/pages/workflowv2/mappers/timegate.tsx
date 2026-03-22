@@ -288,7 +288,14 @@ const TimeGateCountdown: React.FC<{ nextValidTime: string; timeAgo?: string | Re
   return (
     <span>
       Runs in {timeLeftText}
-      {timeAgo ? ` · ${timeAgo}` : ""}
+      {timeAgo ? (
+        <>
+          {" · "}
+          {timeAgo}
+        </>
+      ) : (
+        ""
+      )}
     </span>
   );
 };

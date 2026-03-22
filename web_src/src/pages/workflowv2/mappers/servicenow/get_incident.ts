@@ -11,7 +11,7 @@ import {
 } from "../types";
 import { MetadataItem } from "@/ui/metadataList";
 import snIcon from "@/assets/icons/integrations/servicenow.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { BaseNodeMetadata } from "./types";
 import { baseEventSections, buildIncidentExecutionDetails, getIncidentFromExecution, instanceUrlToLabel } from "./base";
 
@@ -34,12 +34,11 @@ export const getIncidentMapper: ComponentBaseMapper = {
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    const timeAgo = renderTimeAgo(new Date(context.execution.createdAt));
     const incident = getIncidentFromExecution(context.execution);
     if (incident?.number) {
-      return `${incident.number} · ${timeAgo}`;
+      return renderWithTimeAgo(incident.number, new Date(context.execution.createdAt));
     }
-    return timeAgo;
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {

@@ -17,7 +17,7 @@ import {
 import { getColorClass } from "@/utils/colors";
 import React from "react";
 import { getTriggerRenderer } from ".";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 const SSH_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -150,11 +150,10 @@ export const sshMapper: ComponentBaseMapper = {
       const metadata = context.execution.metadata as Record<string, unknown> | undefined;
       const result = metadata?.result as { exitCode?: number } | undefined;
       const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
-      const timeAgo = context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "";
-      if (exitStr && timeAgo) {
-        return `${exitStr} · ${timeAgo}`;
+      if (exitStr && context.execution.updatedAt) {
+        return renderWithTimeAgo(exitStr, new Date(context.execution.updatedAt));
       }
-      if (timeAgo) return timeAgo;
+      if (context.execution.updatedAt) return renderTimeAgo(new Date(context.execution.updatedAt));
     }
 
     if (context.execution.updatedAt) {
@@ -209,9 +208,8 @@ function getSSHEventSections(
       const metadata = execution.metadata as Record<string, unknown> | undefined;
       const result = metadata?.result as { exitCode?: number } | undefined;
       const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
-      const timeAgo = execution.updatedAt ? renderTimeAgo(new Date(execution.updatedAt)) : "";
-      if (exitStr && timeAgo) return `${exitStr} · ${timeAgo}`;
-      if (timeAgo) return timeAgo;
+      if (exitStr && execution.updatedAt) return renderWithTimeAgo(exitStr, new Date(execution.updatedAt));
+      if (execution.updatedAt) return renderTimeAgo(new Date(execution.updatedAt));
     }
     if (execution.updatedAt) {
       return renderTimeAgo(new Date(execution.updatedAt));

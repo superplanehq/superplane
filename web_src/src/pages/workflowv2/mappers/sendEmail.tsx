@@ -12,7 +12,7 @@ import { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/u
 import React from "react";
 import { MetadataItem } from "@/ui/metadataList";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 
 const SEND_EMAIL_EVENT_STATE_MAP: EventStateMap = {
@@ -134,13 +134,13 @@ export const sendEmailMapper: ComponentBaseMapper = {
       const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
       const payload = outputs?.default?.[0]?.data as { subject?: string; to?: string[] } | undefined;
       const recipientCount = payload?.to?.length ?? 0;
-      const timeAgo = context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "";
 
-      if (recipientCount > 0 && timeAgo) {
-        return `Sent to ${recipientCount} recipient${recipientCount > 1 ? "s" : ""} · ${timeAgo}`;
+      if (recipientCount > 0 && context.execution.updatedAt) {
+        const prefix = `Sent to ${recipientCount} recipient${recipientCount > 1 ? "s" : ""}`;
+        return renderWithTimeAgo(prefix, new Date(context.execution.updatedAt));
       }
 
-      return timeAgo || "Sent";
+      return context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "Sent";
     }
 
     if (context.execution.updatedAt) {

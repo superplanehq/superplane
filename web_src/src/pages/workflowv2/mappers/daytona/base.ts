@@ -11,7 +11,7 @@ import {
   SubtitleContext,
 } from "../types";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 interface ExecuteCommandOutput {
   exitCode?: number | null;
@@ -133,18 +133,18 @@ function buildExecuteCommandSubtitle(
   const timestamp = execution.updatedAt || execution.createdAt;
   if (!timestamp) return "";
 
-  const timeAgo = renderTimeAgo(new Date(timestamp));
+  const date = new Date(timestamp);
 
   const payload = getFirstOutputPayload(execution.outputs);
   const data = payload?.data as ExecuteCommandOutput | undefined;
 
   if (data?.timeout === true) {
-    return `timed out · ${timeAgo}`;
+    return renderWithTimeAgo("timed out", date);
   }
 
   if (typeof data?.exitCode === "number") {
-    return `exit code ${data.exitCode} · ${timeAgo}`;
+    return renderWithTimeAgo(`exit code ${data.exitCode}`, date);
   }
 
-  return timeAgo;
+  return renderTimeAgo(date);
 }

@@ -18,7 +18,7 @@ import {
 import { getTriggerRenderer } from ".";
 import React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching backend
 const CHANNEL_SUCCESS = "success";
@@ -233,26 +233,25 @@ function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): s
   const timestamp =
     execution.state === "STATE_FINISHED" && execution.updatedAt ? execution.updatedAt : execution.createdAt;
 
-  const timeAgo = timestamp ? renderTimeAgo(new Date(timestamp)) : "";
-
   // For waiting state, show progress
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    if (sourcesNeeded !== undefined && sourcesNeeded > 0) {
-      return `${sourcesReceived}/${sourcesNeeded} received · ${timeAgo}`;
-    }
-    // If we don't know the needed count, just show received
-    return `${sourcesReceived} received · ${timeAgo}`;
+    const prefix =
+      sourcesNeeded !== undefined && sourcesNeeded > 0
+        ? `${sourcesReceived}/${sourcesNeeded} received`
+        : `${sourcesReceived} received`;
+    return timestamp ? renderWithTimeAgo(prefix, new Date(timestamp)) : prefix;
   }
 
   // For completed states, show the final count and time
   if (execution.state === "STATE_FINISHED") {
     if (sourcesNeeded !== undefined && sourcesNeeded > 0) {
-      return `${sourcesReceived}/${sourcesNeeded} received · ${timeAgo}`;
+      const prefix = `${sourcesReceived}/${sourcesNeeded} received`;
+      return timestamp ? renderWithTimeAgo(prefix, new Date(timestamp)) : prefix;
     }
-    return timeAgo;
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   }
 
-  return timeAgo;
+  return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
 /**

@@ -12,7 +12,7 @@ import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, Eve
 import React from "react";
 import { getColorClass } from "@/utils/colors";
 import { MetadataItem } from "@/ui/metadataList";
-import { renderTimeAgo } from "@/components/TimeAgo";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
 
@@ -201,14 +201,12 @@ export const httpMapper: ComponentBaseMapper = {
         responseCode = response.status.toString();
       }
 
-      const timeAgo = context.execution.updatedAt ? renderTimeAgo(new Date(context.execution.updatedAt)) : "";
-
-      if (responseCode && timeAgo) {
-        return `Response: ${responseCode} · ${timeAgo}`;
+      if (responseCode && context.execution.updatedAt) {
+        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(context.execution.updatedAt));
       } else if (responseCode) {
         return `Response: ${responseCode}`;
-      } else if (timeAgo) {
-        return timeAgo;
+      } else if (context.execution.updatedAt) {
+        return renderTimeAgo(new Date(context.execution.updatedAt));
       }
     }
 
@@ -472,14 +470,12 @@ function getHTTPEventSections(
         }
       }
 
-      const timeAgo = execution.updatedAt ? renderTimeAgo(new Date(execution.updatedAt)) : "";
-
-      if (responseCode && timeAgo) {
-        return `Response: ${responseCode} · ${timeAgo}`;
+      if (responseCode && execution.updatedAt) {
+        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(execution.updatedAt));
       } else if (responseCode) {
         return `Response: ${responseCode}`;
-      } else if (timeAgo) {
-        return timeAgo;
+      } else if (execution.updatedAt) {
+        return renderTimeAgo(new Date(execution.updatedAt));
       }
     }
 

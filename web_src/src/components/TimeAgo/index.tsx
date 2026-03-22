@@ -59,9 +59,9 @@ export function renderTimeAgo(date: Date | string): React.ReactNode {
 }
 
 /**
- * Creates a React element with a text prefix followed by " · " and a self-updating TimeAgo.
+ * Creates a React element with a text prefix followed by a separator and a self-updating TimeAgo.
  * Use in .ts files where JSX is not available.
  */
-export function renderWithTimeAgo(prefix: string, date: Date | string): React.ReactNode {
-  return React.createElement(React.Fragment, null, prefix, " · ", React.createElement(TimeAgo, { date }));
+export function renderWithTimeAgo(prefix: string, date: Date | string, separator = " · "): React.ReactNode {
+  return React.createElement(React.Fragment, null, prefix, separator, React.createElement(TimeAgo, { date }));
 }
