@@ -556,19 +556,22 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = a.emailService.SendMagicCodeEmail(email, code)
+	codeHash := crypto.HashToken(code)
+	expiresAt := time.Now().Add(magicCodeTTL)
+
+	magicCodeRecord, err := models.CreateAccountMagicCode(email, codeHash, expiresAt)
 	if err != nil {
-		log.Errorf("Failed to send magic code email to %s: %v", email, err)
+		log.Errorf("Failed to store magic code for %s: %v", email, err)
 		successResponse()
 		return
 	}
 
-	codeHash := crypto.HashToken(code)
-	expiresAt := time.Now().Add(magicCodeTTL)
-
-	_, err = models.CreateAccountMagicCode(email, codeHash, expiresAt)
+	err = a.emailService.SendMagicCodeEmail(email, code)
 	if err != nil {
-		log.Errorf("Failed to store magic code for %s: %v", email, err)
+		log.Errorf("Failed to send magic code email to %s: %v", email, err)
+		if deleteErr := magicCodeRecord.Delete(); deleteErr != nil {
+			log.Errorf("Failed to clean up unsent magic code for %s: %v", email, deleteErr)
+		}
 	}
 
 	successResponse()
