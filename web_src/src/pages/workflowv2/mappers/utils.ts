@@ -1,7 +1,7 @@
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import React from "react";
+import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { EventStateRegistry } from "./types";
+import type { EventStateRegistry } from "./types";
 import { defaultStateFunction } from "./stateRegistry";
 
 /*

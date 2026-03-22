@@ -2,17 +2,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { resolveIcon, flattenObject, calcRelativeTimeFromDiff } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
-import { SidebarEvent } from "../types";
+import type { SidebarEvent } from "../types";
 import { TimeAgo } from "@/components/TimeAgo";
-import {
+import type {
   CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
 } from "@/api-client";
-import { EventState, EventStateMap } from "../../componentBase";
-import { ChildExecution } from "@/ui/chainItem/ChainItem";
+import type { EventState, EventStateMap } from "../../componentBase";
+import type { ChildExecution } from "@/ui/chainItem/ChainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 
 function buildExecutionTabData(

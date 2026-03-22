@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  DEFAULT_EVENT_STATE_MAP,
+import type {
   EventState,
   EventStateMap,
   EventStateStyle,
-  ComponentBaseSpecValue,
+  ComponentBaseSpecValue} from "@/ui/componentBase";
+import {
+  DEFAULT_EVENT_STATE_MAP
 } from "@/ui/componentBase";
-import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { TimeAgo } from "@/components/TimeAgo";

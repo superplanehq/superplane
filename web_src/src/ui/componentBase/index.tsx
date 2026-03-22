@@ -5,9 +5,10 @@ import React from "react";
 import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
-import { MetadataItem, MetadataList } from "../metadataList";
+import type { MetadataItem } from "../metadataList";
+import { MetadataList } from "../metadataList";
 import { SelectionWrapper } from "../selectionWrapper";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
 import { TimeAgo } from "@/components/TimeAgo";
@@ -74,7 +75,7 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
         </div>
         {section.eventSubtitle ? (
           <span
-            title={String(section.eventSubtitle)}
+            title={typeof section.eventSubtitle === "string" ? section.eventSubtitle : undefined}
             className="text-[13px] font-medium truncate flex-shrink-0 max-w-[65%] text-gray-950/50"
           >
             {section.showAutomaticTime && durationText ? durationText : section.eventSubtitle}

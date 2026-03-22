@@ -1,4 +1,4 @@
-import {
+import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
   CanvasesCanvasEventWithExecutions,
@@ -9,14 +9,14 @@ import {
   ComponentsNode,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
-import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
+import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/utils/date";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
+import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
