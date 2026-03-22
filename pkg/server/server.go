@@ -169,18 +169,32 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		go w.Start(context.Background())
 	}
 
-	if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
+	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Organization Cleanup Worker")
+
+		w := workers.NewOrganizationCleanupWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
 		usageService, err := usage.NewServiceFromEnv()
 		if err != nil {
-			log.Fatalf("failed to initialize usage sync worker: %v", err)
+			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
 		}
 
-		if usageService.Enabled() {
+		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
+			log.Println("Starting Event Retention Worker")
+			w := workers.NewEventRetentionWorker(usageService)
+			go w.Start(context.Background())
+		}
+
+		if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" && usageService.Enabled() {
 			log.Println("Starting Usage Sync Worker")
 			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
 			go w.Start(context.Background())
 		}
 	}
+
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {

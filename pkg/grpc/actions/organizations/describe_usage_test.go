@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
@@ -195,6 +196,12 @@ func Test__DescribeUsage(t *testing.T) {
 		assert.Equal(t, 42.0, response.Usage.EventBucketLevel)
 		assert.Empty(t, service.setupAccountCalls)
 		assert.Empty(t, service.setupOrganizationCalls)
+
+		organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, organization.UsageRetentionWindowDays)
+		assert.Equal(t, int32(30), *organization.UsageRetentionWindowDays)
+		require.NotNil(t, organization.UsageLimitsSyncedAt)
 	})
 
 	t.Run("sets up remote organization when not configured", func(t *testing.T) {

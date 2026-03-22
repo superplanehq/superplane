@@ -170,6 +170,39 @@ func CountRootCanvasEvents(canvasID uuid.UUID) (int64, error) {
 	return count, nil
 }
 
+func ListExpiredRoutedRootCanvasEvents(referenceTime time.Time, limit int) ([]CanvasEvent, error) {
+	return ListExpiredRoutedRootCanvasEventsInTransaction(database.Conn(), referenceTime, limit)
+}
+
+func ListExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime time.Time, limit int) ([]CanvasEvent, error) {
+	var events []CanvasEvent
+
+	query := tx.
+		Table("workflow_events").
+		Select("workflow_events.*").
+		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Where("organizations.deleted_at IS NULL").
+		Where("organizations.usage_retention_window_days IS NOT NULL").
+		Where("organizations.usage_retention_window_days > 0").
+		Where("workflows.deleted_at IS NULL").
+		Where("workflow_events.execution_id IS NULL").
+		Where("workflow_events.state = ?", CanvasEventStateRouted).
+		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC()).
+		Order("workflow_events.created_at ASC")
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
 func ListPendingCanvasEvents() ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	err := database.Conn().
@@ -196,6 +229,36 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 		First(&event).
 		Error
 
+	if err != nil {
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+func LockExpiredRoutedRootCanvasEvent(tx *gorm.DB, id uuid.UUID, referenceTime time.Time) (*CanvasEvent, error) {
+	var event CanvasEvent
+
+	err := tx.
+		Table("workflow_events").
+		Select("workflow_events.*").
+		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_events"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_events.id = ?", id).
+		Where("organizations.deleted_at IS NULL").
+		Where("organizations.usage_retention_window_days IS NOT NULL").
+		Where("organizations.usage_retention_window_days > 0").
+		Where("workflows.deleted_at IS NULL").
+		Where("workflow_events.execution_id IS NULL").
+		Where("workflow_events.state = ?", CanvasEventStateRouted).
+		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC()).
+		First(&event).
+		Error
 	if err != nil {
 		return nil, err
 	}

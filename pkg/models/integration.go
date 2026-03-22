@@ -231,6 +231,21 @@ func ListDeletedIntegrations() ([]Integration, error) {
 	return integrations, nil
 }
 
+func ListMaybeDeletedIntegrationsByOrganizationInTransaction(tx *gorm.DB, orgID uuid.UUID) ([]Integration, error) {
+	var integrations []Integration
+
+	err := tx.
+		Unscoped().
+		Where("organization_id = ?", orgID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations, nil
+}
+
 func LockIntegration(tx *gorm.DB, ID uuid.UUID) (*Integration, error) {
 	var integration Integration
 
