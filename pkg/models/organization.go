@@ -221,34 +221,6 @@ func MarkOrganizationUsageSyncedInTransaction(tx *gorm.DB, orgID string, syncedA
 		Error
 }
 
-func MarkOrganizationUsageSyncedWithLimits(orgID string, usageSyncedAt time.Time, retentionWindowDays *int32, limitsSyncedAt time.Time) error {
-	return MarkOrganizationUsageSyncedWithLimitsInTransaction(
-		database.Conn(),
-		orgID,
-		usageSyncedAt,
-		retentionWindowDays,
-		limitsSyncedAt,
-	)
-}
-
-func MarkOrganizationUsageSyncedWithLimitsInTransaction(
-	tx *gorm.DB,
-	orgID string,
-	usageSyncedAt time.Time,
-	retentionWindowDays *int32,
-	limitsSyncedAt time.Time,
-) error {
-	return tx.
-		Model(&Organization{}).
-		Where("id = ?", orgID).
-		Updates(map[string]any{
-			"usage_synced_at":             usageSyncedAt.UTC(),
-			"usage_retention_window_days": retentionWindowDays,
-			"usage_limits_synced_at":      limitsSyncedAt.UTC(),
-		}).
-		Error
-}
-
 func MarkOrganizationUsageSyncedWithLimitsIfNoNewerThan(
 	orgID string,
 	usageSyncedAt time.Time,

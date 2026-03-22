@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,8 +88,12 @@ func (w *EventRetentionWorker) LockAndProcessRootEvent(rootEvent models.CanvasEv
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedEvent, err := models.LockExpiredRoutedRootCanvasEvent(tx, rootEvent.ID, referenceTime)
 		if err != nil {
-			w.logger.Infof("Root event %s already processed or no longer eligible - skipping", rootEvent.ID)
-			return nil
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				w.logger.Infof("Root event %s already processed or no longer eligible - skipping", rootEvent.ID)
+				return nil
+			}
+
+			return fmt.Errorf("lock expired routed root event %s: %w", rootEvent.ID, err)
 		}
 
 		return w.processRootEvent(tx, *lockedEvent)

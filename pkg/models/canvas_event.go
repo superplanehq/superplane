@@ -244,7 +244,11 @@ func LockExpiredRoutedRootCanvasEvent(tx *gorm.DB, id uuid.UUID, referenceTime t
 		Select("workflow_events.*").
 		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
 		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_events"},
+			Options:  "SKIP LOCKED",
+		}).
 		Where("workflow_events.id = ?", id).
 		Where("organizations.deleted_at IS NULL").
 		Where("organizations.usage_retention_window_days IS NOT NULL").
