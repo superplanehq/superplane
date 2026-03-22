@@ -1,10 +1,17 @@
 import { useState, type FC } from "react";
+import React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import { OnAlertFiringEventData } from "./types";
+import type { OnAlertFiringEventData } from "./types";
 import { stringOrDash } from "../utils";
 import { formatTimestamp } from "./utils";
 import { Icon } from "@/components/Icon";
@@ -14,7 +21,7 @@ import { showErrorToast } from "@/utils/toast";
  * Renderer for the "grafana.onAlertFiring" trigger
  */
 export const onAlertFiringTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
     const alertName = getAlertName(eventData);
     const status = eventData?.status || "firing";
@@ -169,11 +176,12 @@ function getAlertName(eventData?: OnAlertFiringEventData): string | undefined {
   return undefined;
 }
 
-function buildSubtitle(status: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "-";
-  if (status) {
-    return `${status} - ${timeAgo}`;
+function buildSubtitle(status: string, createdAt?: string): string | React.ReactNode {
+  if (status && createdAt) {
+    return renderWithTimeAgo(status, new Date(createdAt), " - ");
   }
-
-  return timeAgo;
+  if (status) {
+    return status;
+  }
+  return createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
 }

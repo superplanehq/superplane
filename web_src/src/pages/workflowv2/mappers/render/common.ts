@@ -1,7 +1,8 @@
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 
 interface RenderEventData {
@@ -51,7 +52,7 @@ function formatEventLabel(event?: string): string {
 }
 
 export const renderTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const event = context.event?.data as RenderEventData | undefined;
     const title = buildTitle(event, context.event?.type as string);
 
@@ -141,8 +142,8 @@ function buildTitle(event: RenderEventData | undefined, type?: string): string {
   return `${serviceLabel} · ${eventLabel}`;
 }
 
-function buildSubtitle(createdAt?: string): string {
-  return createdAt ? formatTimeAgo(new Date(createdAt)) : "";
+function buildSubtitle(createdAt?: string): string | React.ReactNode {
+  return createdAt ? renderTimeAgo(new Date(createdAt)) : "";
 }
 
 /** Shared: value or "-" for display. */

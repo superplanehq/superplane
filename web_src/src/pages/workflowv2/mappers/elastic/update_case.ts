@@ -1,7 +1,8 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -10,9 +11,9 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface UpdateCaseConfiguration {
   case?: string;
@@ -67,9 +68,9 @@ export const updateCaseMapper: ComponentBaseMapper = {
     return { ...details, ...getDetailsForUpdateCase(doc) };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 

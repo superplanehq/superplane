@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,12 +7,13 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsSqsIcon from "@/assets/icons/integrations/aws.sqs.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { getQueueNameFromUrl } from "./utils";
 
@@ -62,11 +63,11 @@ export const deleteQueueMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -91,7 +92,7 @@ function deleteQueueEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
     },

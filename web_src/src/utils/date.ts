@@ -1,5 +1,5 @@
 export const formatTimeAgo = (date: Date): string => {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  const seconds = Math.max(0, Math.floor((new Date().getTime() - date.getTime()) / 1000));
 
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);

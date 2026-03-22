@@ -1,10 +1,11 @@
-import { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export const MAX_METADATA_ITEMS = 3;
 
@@ -58,18 +59,18 @@ export function buildEcsEventSections(
     {
       receivedAt: new Date(execution.createdAt ?? 0),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",
     },
   ];
 }
 
-export function ecsSubtitle(context: SubtitleContext): string {
+export function ecsSubtitle(context: SubtitleContext): string | React.ReactNode {
   if (!context.execution.createdAt) {
     return "";
   }
-  return formatTimeAgo(new Date(context.execution.createdAt));
+  return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
 export function truncateForDisplay(value: string, maxLen = 40): string {

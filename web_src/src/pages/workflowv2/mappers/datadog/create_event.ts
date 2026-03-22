@@ -1,7 +1,8 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -10,10 +11,10 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
-import { DatadogEvent } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { DatadogEvent } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const createEventMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -45,9 +46,9 @@ export const createEventMapper: ComponentBaseMapper = {
     return getDetailsForEvent(event);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 

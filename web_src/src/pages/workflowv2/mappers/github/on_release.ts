@@ -1,8 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, Release } from "./types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { BaseNodeMetadata, Release } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
 interface OnReleaseConfiguration {
@@ -18,7 +18,7 @@ interface OnReleaseEventData {
  * Renderer for the "github.onRelease" trigger
  */
 export const onReleaseTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnReleaseEventData;
     const assetCount = eventData?.release?.assets?.length || 0;
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";

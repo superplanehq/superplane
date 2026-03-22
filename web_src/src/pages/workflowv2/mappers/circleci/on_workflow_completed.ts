@@ -1,8 +1,9 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 interface OnWorkflowCompletedMetadata {
   project?: {
@@ -32,12 +33,14 @@ interface OnWorkflowCompletedEventData {
 }
 
 export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnWorkflowCompletedEventData;
     const workflowName = eventData?.workflow?.name || "Workflow";
     const status = eventData?.workflow?.status || "";
-    const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt)) : "";
-    const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
+    const subtitle =
+      status && context.event?.createdAt
+        ? renderWithTimeAgo(status, new Date(context.event.createdAt))
+        : status || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return {
       title: workflowName,
@@ -85,8 +88,10 @@ export const onWorkflowCompletedTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnWorkflowCompletedEventData;
       const workflowName = eventData?.workflow?.name || "Workflow";
       const status = eventData?.workflow?.status || "";
-      const timeAgo = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
-      const subtitle = status && timeAgo ? `${status} · ${timeAgo}` : status || timeAgo;
+      const subtitle =
+        status && lastEvent.createdAt
+          ? renderWithTimeAgo(status, new Date(lastEvent.createdAt))
+          : status || (lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "");
 
       props.lastEventData = {
         title: workflowName,

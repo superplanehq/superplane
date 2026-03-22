@@ -1,8 +1,9 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { formatTimeAgo } from "@/utils/date";
+import type { TriggerProps } from "@/ui/trigger";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface OnAlertFiredConfiguration {
   datasetSlug?: string;
@@ -21,12 +22,12 @@ interface OnAlertFiredEventData {
 }
 
 export const onAlertFiredTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnAlertFiredEventData;
 
     return {
       title: buildEventTitle(eventData),
-      subtitle: context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "",
+      subtitle: context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "",
     };
   },
 
@@ -77,7 +78,7 @@ export const onAlertFiredTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: buildEventTitle(eventData),
-        subtitle: lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "",
+        subtitle: lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "",
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,

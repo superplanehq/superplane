@@ -1,8 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
 type UnknownRecord = Record<string, unknown>;
@@ -33,11 +34,11 @@ interface OnAlertMetadata {
 }
 
 export const onAlertFiresTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const payload = toAlertPayload(context.event?.data);
 
     const title = alertTitle(payload);
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },
@@ -76,7 +77,7 @@ export const onAlertFiresTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       const payload = toAlertPayload(lastEvent.data);
       const title = alertTitle(payload);
-      const subtitle = formatTimeAgo(new Date(lastEvent.createdAt));
+      const subtitle = renderTimeAgo(new Date(lastEvent.createdAt));
 
       return {
         title: node.name || definition.label || "Unnamed trigger",

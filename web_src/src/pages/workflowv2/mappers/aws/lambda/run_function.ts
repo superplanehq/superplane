@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,11 +7,12 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import type { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import awsLambdaIcon from "@/assets/icons/integrations/aws.lambda.svg";
 
 interface RunFunctionConfiguration {
@@ -63,7 +64,7 @@ export const runFunctionMapper: ComponentBaseMapper = {
       return {};
     }
 
-    let details: Record<string, string> = {
+    const details: Record<string, string> = {
       "Request ID": stringOrDash(result.requestId),
       Duration: stringOrDash(result.report?.duration),
       "Billed Duration": stringOrDash(result.report?.billedDuration),
@@ -79,11 +80,11 @@ export const runFunctionMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -135,7 +136,7 @@ function runFunctionEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id!,
     },

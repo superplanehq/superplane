@@ -1,6 +1,7 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
-import {
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -8,7 +9,7 @@ import {
   SubtitleContext,
 } from "../types";
 import { baseMapper } from "./base";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getArtifactOutputPayload, getArtifactData, artifactShortName } from "./artifact_registry";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
 
@@ -58,9 +59,9 @@ export const getArtifactMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 
@@ -107,9 +108,9 @@ export const getArtifactAnalysisMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 

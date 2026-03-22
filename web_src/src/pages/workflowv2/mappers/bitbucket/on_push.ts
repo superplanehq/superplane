@@ -1,10 +1,12 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { NodeMetadata } from "./types";
-import { Predicate, formatPredicate } from "../utils";
-import { formatTimeAgo } from "@/utils/date";
+import type { TriggerProps } from "@/ui/trigger";
+import type { NodeMetadata } from "./types";
+import type { Predicate } from "../utils";
+import { formatPredicate } from "../utils";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 export interface OnPushConfiguration {
   repository?: string;
@@ -78,21 +80,19 @@ export interface BitbucketCommit {
   };
 }
 
-function buildBitbucketSubtitle(shortSha: string, createdAt?: string): string {
+function buildBitbucketSubtitle(shortSha: string, createdAt?: string): string | React.ReactNode {
   const trimmedSha = shortSha.trim();
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-
-  if (trimmedSha && timeAgo) {
-    return `${trimmedSha} · ${timeAgo}`;
+  if (trimmedSha && createdAt) {
+    return renderWithTimeAgo(trimmedSha, new Date(createdAt));
   }
-  return trimmedSha || timeAgo;
+  return trimmedSha || (createdAt ? renderTimeAgo(new Date(createdAt)) : "");
 }
 
 /**
  * Renderer for the "bitbucket.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as BitbucketPush;
     const firstChange = eventData?.push?.changes?.[0];
     const commitMessage = firstChange?.new?.target?.message?.trim() || "";

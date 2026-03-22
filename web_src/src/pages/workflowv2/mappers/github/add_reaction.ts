@@ -1,5 +1,6 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,7 +8,7 @@ import {
   SubtitleContext,
 } from "../types";
 import { baseProps } from "./base";
-import { BaseNodeMetadata } from "./types";
+import type { BaseNodeMetadata } from "./types";
 import { buildGithubExecutionSubtitle } from "./utils";
 
 interface AddReactionConfiguration {
@@ -76,7 +77,7 @@ export const addReactionMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

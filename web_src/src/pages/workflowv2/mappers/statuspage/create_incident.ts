@@ -1,7 +1,8 @@
-import { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -9,10 +10,10 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import statuspageIcon from "@/assets/icons/integrations/statuspage.svg";
-import { StatuspageIncident, StatuspageNodeMetadata } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { StatuspageIncident, StatuspageNodeMetadata } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections, getDetailsForIncident, truncateForDisplay } from "./utils";
 
 export const createIncidentMapper: ComponentBaseMapper = {
@@ -52,9 +53,9 @@ export const createIncidentMapper: ComponentBaseMapper = {
     });
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 

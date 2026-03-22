@@ -6,7 +6,7 @@ type LastEventState = string;
 
 interface TriggerLastEventData {
   title: string;
-  subtitle?: string;
+  subtitle?: string | React.ReactNode;
   receivedAt: Date;
   state: LastEventState;
   eventId: string;

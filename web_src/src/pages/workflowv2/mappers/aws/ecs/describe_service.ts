@@ -1,5 +1,12 @@
-import { ComponentBaseMapper, ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "../../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type {
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "../../types";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { buildEcsComponentProps, ecsConsoleUrl, ecsSubtitle, MAX_METADATA_ITEMS } from "./common";
 
@@ -65,7 +72,7 @@ export const describeServiceMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return ecsSubtitle(context);
   },
 };

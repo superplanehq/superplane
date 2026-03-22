@@ -1,8 +1,9 @@
-import { EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
-import { ExecutionInfo, NodeInfo } from "../types";
-import { StatuspageIncident, StatuspageIncidentUpdate } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { ExecutionInfo, NodeInfo } from "../types";
+import type { StatuspageIncident, StatuspageIncidentUpdate } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 export function stringOrDash(value?: string | null): string {
   if (value === undefined || value === null || value === "") {
@@ -21,7 +22,7 @@ export function truncateForDisplay(value: string, maxLen = 40): string {
 export type IncidentTimelineEntry = {
   label: string;
   status: string;
-  timestamp?: string;
+  timestamp?: string | React.ReactNode;
   comment?: string;
 };
 
@@ -70,7 +71,7 @@ export function buildIncidentTimeline(updates: StatuspageIncidentUpdate[]): Inci
     const rawStatus = update.status ?? "";
     const label = humanizeStatus(rawStatus);
     const statusForColor = STATUS_TO_COLOR[rawStatus] ?? label;
-    const timestamp = update.created_at ? formatTimeAgo(new Date(update.created_at)) : undefined;
+    const timestamp = update.created_at ? renderTimeAgo(new Date(update.created_at)) : undefined;
     const comment = update.body?.trim() || undefined;
 
     timeline.push({
@@ -144,7 +145,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
       {
         receivedAt: new Date(execution.createdAt!),
         eventTitle: "Execution",
-        eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+        eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
         eventState: getState(componentName)(execution),
         eventId: execution.id ?? "",
       },
@@ -156,7 +157,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
       {
         receivedAt: new Date(execution.createdAt!),
         eventTitle: "Execution",
-        eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+        eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
         eventState: getState(componentName)(execution),
         eventId: execution.rootEvent.id,
       },
@@ -168,7 +169,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent.id,
     },

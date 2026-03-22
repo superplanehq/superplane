@@ -1,21 +1,22 @@
-import {
+import type React from "react";
+import type {
   OutputPayload,
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
   ExecutionDetailsContext,
 } from "../types";
-import { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
-import { Label } from "./types";
+import type { Label } from "./types";
 
 export const labelsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

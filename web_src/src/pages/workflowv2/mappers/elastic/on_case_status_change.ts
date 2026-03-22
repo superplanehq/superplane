@@ -1,8 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { MetadataItem } from "@/ui/metadataList";
 import elasticIcon from "@/assets/icons/integrations/elastic.svg";
 
 interface OnCaseStatusChangeConfiguration {
@@ -24,11 +25,11 @@ interface OnCaseStatusChangeEventData {
 }
 
 export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const payload = context.event?.data as OnCaseStatusChangeEventData | undefined;
     const status = payload?.status ? ` to ${payload.status}` : "";
     const title = payload?.title ? `Case "${payload.title}" changed${status}` : "Case status changed";
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
     return { title, subtitle };
   },
 
@@ -79,7 +80,7 @@ export const onCaseStatusChangeTriggerRenderer: TriggerRenderer = {
         metadata,
         lastEventData: {
           title,
-          subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
+          subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,

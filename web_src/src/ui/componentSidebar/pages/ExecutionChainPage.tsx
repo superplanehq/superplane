@@ -2,17 +2,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { resolveIcon, flattenObject, calcRelativeTimeFromDiff } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
-import { SidebarEvent } from "../types";
-import { formatTimeAgo } from "@/utils/date";
-import {
+import type { SidebarEvent } from "../types";
+import { TimeAgo } from "@/components/TimeAgo";
+import type {
   CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
   BlueprintsBlueprint,
 } from "@/api-client";
-import { EventState, EventStateMap } from "../../componentBase";
-import { ChildExecution } from "@/ui/chainItem/ChainItem";
+import type { EventState, EventStateMap } from "../../componentBase";
+import type { ChildExecution } from "@/ui/chainItem/ChainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
 
 function buildExecutionTabData(
@@ -193,7 +193,6 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     const endTime = lastExecution?.originalExecution?.updatedAt;
 
     const startDate = new Date(triggerStartTime);
-    const timeAgo = formatTimeAgo(startDate);
 
     let duration = "";
     if (endTime) {
@@ -205,7 +204,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
     const stepCount = chainItems.length;
 
     return {
-      timeAgo,
+      startDate,
       duration,
       stepCount,
     };
@@ -453,7 +452,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
                 </h2>
                 {summaryInfo && (
                   <div className="text-[13px] text-gray-500">
-                    {summaryInfo.timeAgo}
+                    <TimeAgo date={summaryInfo.startDate} />
                     {summaryInfo.duration && (
                       <>
                         <span className="mx-1">·</span>

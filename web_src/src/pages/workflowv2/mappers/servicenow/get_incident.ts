@@ -1,17 +1,18 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import snIcon from "@/assets/icons/integrations/servicenow.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { BaseNodeMetadata } from "./types";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import type { BaseNodeMetadata } from "./types";
 import { baseEventSections, buildIncidentExecutionDetails, getIncidentFromExecution, instanceUrlToLabel } from "./base";
 
 export const getIncidentMapper: ComponentBaseMapper = {
@@ -31,14 +32,13 @@ export const getIncidentMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt));
     const incident = getIncidentFromExecution(context.execution);
     if (incident?.number) {
-      return `${incident.number} · ${timeAgo}`;
+      return renderWithTimeAgo(incident.number, new Date(context.execution.createdAt));
     }
-    return timeAgo;
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {

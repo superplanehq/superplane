@@ -1,5 +1,7 @@
-import { ComponentBaseProps, DEFAULT_EVENT_STATE_MAP, EventStateMap } from "@/ui/componentBase";
-import {
+import type { ComponentBaseProps, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type React from "react";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,8 +11,8 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import type { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "./common";
 import { baseProps } from "./base";
 import { defaultStateFunction } from "../stateRegistry";
@@ -70,9 +72,9 @@ export const purgeCacheMapper: ComponentBaseMapper = {
     return { ...base, metadata: metadataList(context.node) };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {

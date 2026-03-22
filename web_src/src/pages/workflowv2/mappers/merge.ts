@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -8,16 +8,12 @@ import {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import {
-  ComponentBaseProps,
-  EventSection,
-  EventState,
-  EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching backend
 const CHANNEL_SUCCESS = "success";
@@ -175,7 +171,7 @@ export const mergeMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return getMergeSubtitle(context.execution, context.additionalData);
   },
 
@@ -221,7 +217,7 @@ function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo, addi
   return sections;
 }
 
-function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): string {
+function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): string | React.ReactNode {
   const metadata = execution.metadata as MergeExecutionMetadata | undefined;
   const mergeData = additionalData as MergeAdditionalData | undefined;
 
@@ -232,26 +228,25 @@ function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): s
   const timestamp =
     execution.state === "STATE_FINISHED" && execution.updatedAt ? execution.updatedAt : execution.createdAt;
 
-  const timeAgo = timestamp ? formatTimeAgo(new Date(timestamp)) : "";
-
   // For waiting state, show progress
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    if (sourcesNeeded !== undefined && sourcesNeeded > 0) {
-      return `${sourcesReceived}/${sourcesNeeded} received · ${timeAgo}`;
-    }
-    // If we don't know the needed count, just show received
-    return `${sourcesReceived} received · ${timeAgo}`;
+    const prefix =
+      sourcesNeeded !== undefined && sourcesNeeded > 0
+        ? `${sourcesReceived}/${sourcesNeeded} received`
+        : `${sourcesReceived} received`;
+    return timestamp ? renderWithTimeAgo(prefix, new Date(timestamp)) : prefix;
   }
 
   // For completed states, show the final count and time
   if (execution.state === "STATE_FINISHED") {
     if (sourcesNeeded !== undefined && sourcesNeeded > 0) {
-      return `${sourcesReceived}/${sourcesNeeded} received · ${timeAgo}`;
+      const prefix = `${sourcesReceived}/${sourcesNeeded} received`;
+      return timestamp ? renderWithTimeAgo(prefix, new Date(timestamp)) : prefix;
     }
-    return timeAgo;
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   }
 
-  return timeAgo;
+  return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
 }
 
 /**
@@ -260,7 +255,7 @@ function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): s
 interface MergeTimelineEntry {
   label: string;
   status: string;
-  timestamp?: string;
+  timestamp?: string | React.ReactNode;
   comment?: string;
 }
 
@@ -282,7 +277,7 @@ function buildMergeTimeline(
       const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${sourceId.substring(0, 8)}...`;
 
       // Format timestamp in "ago" style
-      const timestampFormatted = execution.createdAt ? formatTimeAgo(new Date(execution.createdAt)) : undefined;
+      const timestampFormatted = execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : undefined;
 
       timeline.push({
         label: sourceLabel,
@@ -294,7 +289,7 @@ function buildMergeTimeline(
 
   // If merge stopped early, add that to the timeline
   if (metadata.stopEarly) {
-    const stoppedAtFormatted = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : undefined;
+    const stoppedAtFormatted = execution.updatedAt ? renderTimeAgo(new Date(execution.updatedAt)) : undefined;
     timeline.push({
       label: "Condition met",
       status: "Stopped",

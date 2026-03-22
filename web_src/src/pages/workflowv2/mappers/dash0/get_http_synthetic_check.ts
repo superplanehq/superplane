@@ -1,12 +1,8 @@
-import {
-  ComponentBaseProps,
-  EventSection,
-  EventState,
-  EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type React from "react";
+import type {
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ComponentBaseContext,
@@ -17,10 +13,10 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { GetHttpSyntheticCheckConfiguration, GetHttpSyntheticCheckNodeMetadata } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { GetHttpSyntheticCheckConfiguration, GetHttpSyntheticCheckNodeMetadata } from "./types";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_HEALTHY = "healthy";
@@ -133,9 +129,9 @@ export const getHttpSyntheticCheckMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -169,10 +165,10 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt));
+  const date = new Date(execution.createdAt);
   const activeChannel = getActiveChannel(execution);
   const statusLabel = activeChannel ? channelLabel(activeChannel) : null;
-  const eventSubtitle = statusLabel ? `${statusLabel} · ${timeAgo}` : timeAgo;
+  const eventSubtitle = statusLabel ? renderWithTimeAgo(statusLabel, date) : renderTimeAgo(date);
 
   return [
     {

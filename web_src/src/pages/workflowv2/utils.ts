@@ -1,4 +1,4 @@
-import {
+import type {
   CanvasesCanvas,
   CanvasesCanvasEvent,
   CanvasesCanvasEventWithExecutions,
@@ -9,13 +9,14 @@ import {
   ComponentsNode,
 } from "@/api-client";
 import { flattenObject } from "@/lib/utils";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
-import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
+import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/utils/date";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
+import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
@@ -83,7 +84,7 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
   return {
     id: event.id!,
     title,
-    subtitle: subtitle || formatTimeAgo(new Date(event.createdAt!)),
+    subtitle: subtitle || renderTimeAgo(new Date(event.createdAt!)),
     state,
     isOpen: false,
     receivedAt: event.createdAt ? new Date(event.createdAt) : undefined,
@@ -132,7 +133,7 @@ export function mapExecutionsToSidebarEvents(
     return {
       id: execution.id!,
       title,
-      subtitle: componentSubtitle || subtitle || formatTimeAgo(new Date(execution.createdAt!)),
+      subtitle: componentSubtitle || subtitle || renderTimeAgo(new Date(execution.createdAt!)),
       state,
       isOpen: false,
       receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
@@ -150,7 +151,7 @@ export function getNextInQueueInfo(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> | undefined,
   nodeId: string,
   nodes: ComponentsNode[],
-): { title: string; subtitle: string; receivedAt: Date } | undefined {
+): { title: string; subtitle: string | ReactNode; receivedAt: Date } | undefined {
   if (!nodeQueueItemsMap || !nodeQueueItemsMap[nodeId] || nodeQueueItemsMap[nodeId].length === 0) {
     return undefined;
   }
@@ -174,7 +175,7 @@ export function getNextInQueueInfo(
 
   return {
     title,
-    subtitle: subtitle || (queueItem.createdAt ? formatTimeAgo(new Date(queueItem.createdAt)) : ""),
+    subtitle: subtitle || (queueItem.createdAt ? renderTimeAgo(new Date(queueItem.createdAt)) : ""),
     receivedAt: queueItem.createdAt ? new Date(queueItem.createdAt) : new Date(),
   };
 }
@@ -205,7 +206,7 @@ export function mapQueueItemsToSidebarEvents(
     return {
       id: item.id!,
       title,
-      subtitle: subtitle || formatTimeAgo(new Date(item.createdAt!)),
+      subtitle: subtitle || renderTimeAgo(new Date(item.createdAt!)),
       state: "queued" as const,
       isOpen: false,
       receivedAt: item.createdAt ? new Date(item.createdAt) : undefined,
