@@ -221,6 +221,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Notification Email Consumer")
 	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
 	go notificationEmailConsumer.Start()
+
+	log.Println("Starting Magic Code Email Consumer")
+	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService)
+	go magicCodeEmailConsumer.Start()
 }
 
 func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {

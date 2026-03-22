@@ -51,7 +51,6 @@ import (
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
-	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
@@ -111,17 +110,8 @@ func NewServer(
 
 	// Initialize OAuth providers from environment variables
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
-	var emailService services.EmailService
-	if os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes" {
-		emailService = services.BuildEmailService(encryptor, services.EmailServiceConfig{
-			TemplateDir:       templateDir,
-			OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
-			ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
-			FromName:          os.Getenv("EMAIL_FROM_NAME"),
-			FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
-		})
-	}
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, emailService)
+	magicCodeEnabled := os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes"
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, magicCodeEnabled)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 

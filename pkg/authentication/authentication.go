@@ -23,9 +23,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/utils"
 	"gorm.io/gorm"
 )
@@ -44,7 +44,6 @@ type Handler struct {
 	jwtSigner            *jwt.Signer
 	authService          authorization.Authorization
 	encryptor            crypto.Encryptor
-	emailService         services.EmailService
 	isDev                bool
 	templateDir          string
 	blockSignup          bool
@@ -58,7 +57,7 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool, emailService services.EmailService) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool, magicCodeEnabled bool) *Handler {
 	return &Handler{
 		jwtSigner:            jwtSigner,
 		encryptor:            encryptor,
@@ -67,8 +66,7 @@ func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService a
 		templateDir:          templateDir,
 		blockSignup:          blockSignup,
 		passwordLoginEnabled: passwordLoginEnabled,
-		emailService:         emailService,
-		magicCodeEnabled:     emailService != nil,
+		magicCodeEnabled:     magicCodeEnabled,
 	}
 }
 
@@ -566,11 +564,11 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = a.emailService.SendMagicCodeEmail(email, code)
-	if err != nil {
-		log.Errorf("Failed to send magic code email to %s: %v", email, err)
+	msg := messages.NewMagicCodeRequestedMessage(email, code, magicCodeRecord.ID.String())
+	if err := msg.Publish(); err != nil {
+		log.Errorf("Failed to publish magic code email request for %s: %v", email, err)
 		if deleteErr := magicCodeRecord.Delete(); deleteErr != nil {
-			log.Errorf("Failed to clean up unsent magic code for %s: %v", email, deleteErr)
+			log.Errorf("Failed to clean up magic code for %s: %v", email, deleteErr)
 		}
 	}
 
