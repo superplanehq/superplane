@@ -207,11 +207,7 @@ export const Login: React.FC = () => {
       });
 
       if (!response.ok) {
-        if (response.status === 429) {
-          setFormError("Too many code requests. Please try again later.");
-        } else {
-          setFormError("Failed to send code. Please try again.");
-        }
+        setFormError("Failed to send code. Please try again.");
         setSubmitLoading(false);
         return;
       }
