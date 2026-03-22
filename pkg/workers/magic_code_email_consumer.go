@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
-	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/services"
 )
 
@@ -80,14 +79,6 @@ func (c *MagicCodeEmailConsumer) Consume(delivery tackle.Delivery) error {
 	err = c.EmailService.SendMagicCodeEmail(data.Email, data.Code)
 	if err != nil {
 		log.Errorf("Failed to send magic code email to %s: %v", data.Email, err)
-
-		magicCode, findErr := models.FindAccountMagicCodeByID(data.MagicCodeID)
-		if findErr != nil {
-			log.Errorf("Failed to find magic code %s for cleanup: %v", data.MagicCodeID, findErr)
-		} else if deleteErr := magicCode.Delete(); deleteErr != nil {
-			log.Errorf("Failed to clean up unsent magic code %s: %v", data.MagicCodeID, deleteErr)
-		}
-
 		return err
 	}
 

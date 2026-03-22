@@ -567,9 +567,6 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 	msg := messages.NewMagicCodeRequestedMessage(email, code, magicCodeRecord.ID.String())
 	if err := msg.Publish(); err != nil {
 		log.Errorf("Failed to publish magic code email request for %s: %v", email, err)
-		if deleteErr := magicCodeRecord.Delete(); deleteErr != nil {
-			log.Errorf("Failed to clean up magic code for %s: %v", email, deleteErr)
-		}
 	}
 
 	successResponse()
