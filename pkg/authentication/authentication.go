@@ -108,7 +108,8 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	}
 	if a.magicCodeEnabled {
 		router.HandleFunc("/auth/magic-code/request", a.handleMagicCodeRequest).Methods("POST")
-		router.HandleFunc("/auth/magic-code/verify", a.handleMagicCodeVerify).Methods("POST", "GET")
+		router.HandleFunc("/auth/magic-code/verify", a.handleMagicCodeVerify).Methods("POST")
+		router.HandleFunc("/auth/magic-code/verify", a.handleMagicLinkRedirect).Methods("GET")
 	}
 
 	//
@@ -722,6 +723,17 @@ func generateMagicCode() (string, error) {
 	}
 
 	return fmt.Sprintf("%0*d", magicCodeLength, n), nil
+}
+
+func (a *Handler) handleMagicLinkRedirect(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
+		return
+	}
+
+	redirectURL := fmt.Sprintf("/login?magic_link_token=%s", url.QueryEscape(token))
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func stripNonDigits(s string) string {

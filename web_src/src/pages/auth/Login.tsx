@@ -92,11 +92,45 @@ export const Login: React.FC = () => {
     return parts.length >= 3 ? parts[2] : "";
   }, [safeRedirect]);
 
+  const magicLinkToken = searchParams.get("magic_link_token");
+
   useEffect(() => {
     if (!accountLoading && account) {
       window.location.href = safeRedirect || "/";
     }
   }, [account, accountLoading, safeRedirect]);
+
+  useEffect(() => {
+    if (!magicLinkToken) return;
+
+    const verifyMagicLink = async () => {
+      setSubmitLoading(true);
+      try {
+        const formData = new URLSearchParams();
+        formData.append("token", magicLinkToken);
+
+        const response = await fetch("/auth/magic-code/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          credentials: "include",
+          body: formData.toString(),
+        });
+
+        if (!response.ok) {
+          setFormError("Invalid or expired link. Please request a new code.");
+          setSubmitLoading(false);
+          return;
+        }
+
+        await handleRedirectAfterAuth(response);
+      } catch {
+        setFormError("Network error occurred");
+        setSubmitLoading(false);
+      }
+    };
+
+    verifyMagicLink();
+  }, [magicLinkToken]);
 
   useEffect(() => {
     let canceled = false;
