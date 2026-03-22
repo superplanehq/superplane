@@ -590,6 +590,31 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	email, code, err := a.parseMagicCodeInput(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := a.validateAndConsumeCode(email, code); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, err.Error(), errorStatusForCodeError(err))
+		return
+	}
+
+	account, err := a.resolveAccountForMagicCode(email, r)
+	if err != nil {
+		http.Error(w, err.Error(), errorStatusForAccountError(err))
+		return
+	}
+
+	a.issueSessionAndRedirect(w, r, account)
+}
+
+func (a *Handler) parseMagicCodeInput(r *http.Request) (string, string, error) {
 	var email, code string
 
 	if magicLinkToken := strings.TrimSpace(r.FormValue("token")); magicLinkToken != "" {
@@ -597,99 +622,118 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		email, code, parseErr = a.parseMagicLinkToken(magicLinkToken)
 		if parseErr != nil {
 			log.Warnf("Invalid magic link token: %v", parseErr)
-			http.Error(w, "Invalid or expired link", http.StatusUnauthorized)
-			return
+			return "", "", fmt.Errorf("Invalid or expired link")
 		}
 	} else {
 		email = strings.TrimSpace(r.FormValue("email"))
 		code = strings.TrimSpace(r.FormValue("code"))
 	}
 
-	name := strings.TrimSpace(r.FormValue("name"))
-	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
-
 	email = utils.NormalizeEmail(email)
 	code = stripNonDigits(code)
 
 	if email == "" || code == "" {
-		http.Error(w, "Email and code are required", http.StatusBadRequest)
-		return
+		return "", "", fmt.Errorf("Email and code are required")
 	}
 
+	return email, code, nil
+}
+
+var errCodeUsed = fmt.Errorf("Invalid or expired code")
+var errDBError = fmt.Errorf("Internal server error")
+
+func (a *Handler) validateAndConsumeCode(email, code string) error {
 	codeHash := crypto.HashToken(code)
 
 	magicCode, err := models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Errorf("Database error during magic code lookup for %s: %v", email, err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
+			return errDBError
 		}
 
 		log.Warnf("Invalid magic code attempt for %s", email)
-
 		_, incrErr := models.IncrementAndMaybeInvalidateCodes(email, magicCodeMaxVerifyAttempts)
 		if incrErr != nil {
 			log.Errorf("Failed to process verify attempt for %s: %v", email, incrErr)
 		}
 
-		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
-		return
-	}
-
-	account, err := models.FindAccountByEmail(email)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Errorf("Error finding account for %s: %v", email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	isNewAccount := errors.Is(err, gorm.ErrRecordNotFound)
-
-	if isNewAccount && a.blockSignup {
-		if inviteToken == "" {
-			http.Error(w, SignupDisabledError, http.StatusForbidden)
-			return
-		}
-
-		inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
-		if findErr != nil || !inviteLink.Enabled {
-			http.Error(w, "invite link not found or disabled", http.StatusForbidden)
-			return
-		}
+		return gorm.ErrRecordNotFound
 	}
 
 	marked, err := magicCode.MarkUsed()
 	if err != nil {
 		log.Errorf("Failed to mark magic code as used for %s: %v", email, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return errDBError
 	}
-
 	if !marked {
 		log.Warnf("Magic code already used (concurrent request) for %s", email)
-		http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
-		return
+		return errCodeUsed
 	}
 
-	if isNewAccount {
-		if name == "" {
-			name = strings.Split(email, "@")[0]
-		}
+	return nil
+}
 
-		account, err = models.CreateAccount(name, email)
-		if err != nil {
-			account, err = models.FindAccountByEmail(email)
-			if err != nil {
-				log.Errorf("Failed to create or find account for %s: %v", email, err)
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
+func errorStatusForCodeError(err error) int {
+	if err == errDBError {
+		return http.StatusInternalServerError
+	}
+	return http.StatusUnauthorized
+}
+
+var errSignupDisabled = fmt.Errorf(SignupDisabledError)
+var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
+var errAccountError = fmt.Errorf("Internal server error")
+
+func (a *Handler) resolveAccountForMagicCode(email string, r *http.Request) (*models.Account, error) {
+	account, err := models.FindAccountByEmail(email)
+	if err == nil {
+		return account, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("Error finding account for %s: %v", email, err)
+		return nil, errAccountError
+	}
+
+	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
+	if a.blockSignup {
+		if inviteToken == "" {
+			return nil, errSignupDisabled
+		}
+		inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
+		if findErr != nil || !inviteLink.Enabled {
+			return nil, errInviteLinkInvalid
 		}
 	}
 
-	err = a.acceptPendingInvitations(account)
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		name = strings.Split(email, "@")[0]
+	}
+
+	account, err = models.CreateAccount(name, email)
 	if err != nil {
+		account, err = models.FindAccountByEmail(email)
+		if err != nil {
+			log.Errorf("Failed to create or find account for %s: %v", email, err)
+			return nil, errAccountError
+		}
+	}
+
+	return account, nil
+}
+
+func errorStatusForAccountError(err error) int {
+	switch err {
+	case errSignupDisabled, errInviteLinkInvalid:
+		return http.StatusForbidden
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+func (a *Handler) issueSessionAndRedirect(w http.ResponseWriter, r *http.Request, account *models.Account) {
+	if err := a.acceptPendingInvitations(account); err != nil {
 		log.Errorf("Error accepting pending invitations for %s: %v", account.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
