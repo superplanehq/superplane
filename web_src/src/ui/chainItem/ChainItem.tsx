@@ -11,7 +11,7 @@ import {
 import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
-import { formatTimeAgo } from "@/utils/date";
+import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
@@ -170,7 +170,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       additionalData: { skipIssueCounts: true },
     });
 
-    const parts = subtitle ? subtitle.toString().split(" · ") : [];
+    if (typeof subtitle !== "string") {
+      return "";
+    }
+
+    const parts = subtitle.split(" · ");
     if (parts.length > 1) {
       return parts[0];
     }
@@ -315,7 +319,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-6 gap-2">
           <span className="text-[13px] text-gray-950/60">
-            {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
+            <TimeAgo date={new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || "")} />
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
               item.originalExecution?.updatedAt && (
@@ -587,7 +591,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                       <>
                                         {" · "}
                                         <span className="text-[12px] font-normal text-gray-500">
-                                          {formatTimeAgo(new Date(incident.created_at))}
+                                          <TimeAgo date={new Date(incident.created_at)} />
                                         </span>
                                       </>
                                     )}
