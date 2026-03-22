@@ -14,7 +14,7 @@ export function usePageTitle(parts: Array<string | undefined | null>) {
 
     const segments = [...cleaned, "SuperPlane"];
     document.title = segments.join(" · ");
-  }, [JSON.stringify(parts)]);
+  }, [parts]);
 }
 
 export default usePageTitle;

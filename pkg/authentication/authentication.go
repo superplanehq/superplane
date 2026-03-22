@@ -608,13 +608,14 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 	name := strings.TrimSpace(r.FormValue("name"))
 	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
 
+	email = utils.NormalizeEmail(email)
+	code = stripNonDigits(code)
+
 	if email == "" || code == "" {
 		http.Error(w, "Email and code are required", http.StatusBadRequest)
 		return
 	}
 
-	email = utils.NormalizeEmail(email)
-	code = stripNonDigits(code)
 	codeHash := crypto.HashToken(code)
 
 	magicCode, err := models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)

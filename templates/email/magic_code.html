@@ -82,12 +82,14 @@
         <span class="code">{{.Code}}</span>
     </div>
 
+    {{if .MagicLink}}
     <div class="text">
         Or sign in directly by clicking this link: <a href="{{.MagicLink}}" class="login-link">Sign in to SuperPlane</a>
     </div>
+    {{end}}
 
     <div class="instruction-text">
-        This code and link expire in 10 minutes. If you didn't request this, you can safely ignore this email.
+        {{if .MagicLink}}This code and link expire in 10 minutes.{{else}}This code expires in 10 minutes.{{end}} If you didn't request this, you can safely ignore this email.
     </div>
 
     <div class="footer">
