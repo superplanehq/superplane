@@ -154,3 +154,40 @@ func TestSyncOrganizationTreatsResourceExhaustedWithExistingRemoteOrganizationAs
 	require.NotNil(t, organization.UsageRetentionWindowDays)
 	require.NotNil(t, organization.UsageLimitsSyncedAt)
 }
+
+func TestMarkOrganizationUsageSyncedPreservesNewerLimitsCache(t *testing.T) {
+	r := support.Setup(t)
+
+	newerRetentionWindowDays := int32(60)
+	newerLimitsSyncedAt := time.Now().UTC()
+	require.NoError(
+		t,
+		models.MarkOrganizationUsageLimitsSynced(
+			r.Organization.ID.String(),
+			&newerRetentionWindowDays,
+			newerLimitsSyncedAt,
+		),
+	)
+
+	readStartedAt := newerLimitsSyncedAt.Add(-1 * time.Minute)
+	usageSyncedAt := newerLimitsSyncedAt.Add(1 * time.Minute)
+
+	require.NoError(
+		t,
+		markOrganizationUsageSynced(
+			r.Organization.ID.String(),
+			readStartedAt,
+			usageSyncedAt,
+			&usagepb.OrganizationLimits{RetentionWindowDays: 30},
+		),
+	)
+
+	organization, err := models.FindOrganizationByID(r.Organization.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, organization.UsageSyncedAt)
+	assert.WithinDuration(t, usageSyncedAt, *organization.UsageSyncedAt, time.Second)
+	require.NotNil(t, organization.UsageRetentionWindowDays)
+	assert.Equal(t, int32(60), *organization.UsageRetentionWindowDays)
+	require.NotNil(t, organization.UsageLimitsSyncedAt)
+	assert.WithinDuration(t, newerLimitsSyncedAt, *organization.UsageLimitsSyncedAt, time.Second)
+}

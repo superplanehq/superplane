@@ -27,13 +27,19 @@ func MarkOrganizationSyncedIfUnset(orgID string) error {
 	return models.MarkOrganizationUsageSyncedIfUnset(orgID, time.Now())
 }
 
-func markOrganizationUsageSynced(orgID string, syncedAt time.Time, limits *pb.OrganizationLimits) error {
+func markOrganizationUsageSynced(orgID string, readStartedAt, syncedAt time.Time, limits *pb.OrganizationLimits) error {
 	if limits == nil {
 		return models.MarkOrganizationUsageSynced(orgID, syncedAt)
 	}
 
 	retentionWindowDays := limits.RetentionWindowDays
-	return models.MarkOrganizationUsageSyncedWithLimits(orgID, syncedAt, &retentionWindowDays, syncedAt)
+	return models.MarkOrganizationUsageSyncedWithLimitsIfNoNewerThan(
+		orgID,
+		syncedAt,
+		&retentionWindowDays,
+		readStartedAt,
+		syncedAt,
+	)
 }
 
 func syncOrganization(ctx context.Context, usageService Service, orgID string, force bool) error {
@@ -59,16 +65,18 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 		return fmt.Errorf("set up usage account %s: %w", accountID, err)
 	}
 
+	setupStartedAt := time.Now()
 	response, err := usageService.SetupOrganization(ctx, orgID, accountID)
 	if err == nil {
 		syncedAt := time.Now()
 		if response.GetLimits() != nil {
-			return markOrganizationUsageSynced(orgID, syncedAt, response.GetLimits())
+			return markOrganizationUsageSynced(orgID, setupStartedAt, syncedAt, response.GetLimits())
 		}
 
+		describeStartedAt := time.Now()
 		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
 		if describeErr == nil {
-			return markOrganizationUsageSynced(orgID, syncedAt, describeResponse.GetLimits())
+			return markOrganizationUsageSynced(orgID, describeStartedAt, syncedAt, describeResponse.GetLimits())
 		}
 
 		return models.MarkOrganizationUsageSynced(orgID, syncedAt)
@@ -76,21 +84,24 @@ func syncOrganization(ctx context.Context, usageService Service, orgID string, f
 
 	switch status.Code(err) {
 	case codes.AlreadyExists:
+		describeStartedAt := time.Now()
 		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
 		if describeErr == nil {
-			return markOrganizationUsageSynced(orgID, time.Now(), describeResponse.GetLimits())
+			return markOrganizationUsageSynced(orgID, describeStartedAt, time.Now(), describeResponse.GetLimits())
 		}
 
 		return models.MarkOrganizationUsageSynced(orgID, time.Now())
 	case codes.FailedPrecondition:
+		describeStartedAt := time.Now()
 		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
 		if describeErr == nil {
-			return markOrganizationUsageSynced(orgID, time.Now(), describeResponse.GetLimits())
+			return markOrganizationUsageSynced(orgID, describeStartedAt, time.Now(), describeResponse.GetLimits())
 		}
 	case codes.ResourceExhausted:
+		describeStartedAt := time.Now()
 		describeResponse, describeErr := usageService.DescribeOrganizationLimits(ctx, orgID)
 		if describeErr == nil {
-			return markOrganizationUsageSynced(orgID, time.Now(), describeResponse.GetLimits())
+			return markOrganizationUsageSynced(orgID, describeStartedAt, time.Now(), describeResponse.GetLimits())
 		}
 
 		return err

@@ -249,6 +249,52 @@ func MarkOrganizationUsageSyncedWithLimitsInTransaction(
 		Error
 }
 
+func MarkOrganizationUsageSyncedWithLimitsIfNoNewerThan(
+	orgID string,
+	usageSyncedAt time.Time,
+	retentionWindowDays *int32,
+	maxExistingLimitsSyncedAt time.Time,
+	limitsSyncedAt time.Time,
+) error {
+	return MarkOrganizationUsageSyncedWithLimitsIfNoNewerThanInTransaction(
+		database.Conn(),
+		orgID,
+		usageSyncedAt,
+		retentionWindowDays,
+		maxExistingLimitsSyncedAt,
+		limitsSyncedAt,
+	)
+}
+
+func MarkOrganizationUsageSyncedWithLimitsIfNoNewerThanInTransaction(
+	tx *gorm.DB,
+	orgID string,
+	usageSyncedAt time.Time,
+	retentionWindowDays *int32,
+	maxExistingLimitsSyncedAt time.Time,
+	limitsSyncedAt time.Time,
+) error {
+	return tx.Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Model(&Organization{}).
+			Where("id = ?", orgID).
+			Update("usage_synced_at", usageSyncedAt.UTC()).
+			Error; err != nil {
+			return err
+		}
+
+		_, err := MarkOrganizationUsageLimitsSyncedIfNoNewerThanInTransaction(
+			tx,
+			orgID,
+			retentionWindowDays,
+			maxExistingLimitsSyncedAt,
+			limitsSyncedAt,
+		)
+
+		return err
+	})
+}
+
 func MarkOrganizationUsageSyncedIfUnset(orgID string, syncedAt time.Time) error {
 	return MarkOrganizationUsageSyncedIfUnsetInTransaction(database.Conn(), orgID, syncedAt)
 }
