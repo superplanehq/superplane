@@ -719,9 +719,7 @@ export function CanvasChangeRequestConflictResolver({
                 Back to Versioning
               </Button>
               <p className="text-sm font-semibold text-slate-900">Resolve Change Request Conflicts</p>
-              <p className="text-xs text-slate-600">
-                Review Current vs Incoming, then edit Final Result and save the resolved version.
-              </p>
+              <p className="text-xs text-slate-600">Edit the final result and save the resolved version.</p>
               {!allConflictsMarkedResolved ? (
                 <p className="text-xs text-amber-700">
                   {unresolvedNodeCount} conflicting node{unresolvedNodeCount === 1 ? "" : "s"} still need to be marked
@@ -848,8 +846,7 @@ export function CanvasChangeRequestConflictResolver({
                   </div>
 
                   <p className="mb-2 text-[11px] text-slate-600">
-                    Resolve markers directly in this editor using the inline conflict actions for each block (or edit
-                    manually), then mark this node as resolved.
+                    Use inline actions or edit manually, then mark as resolved.
                   </p>
                   <div className="h-[520px] overflow-hidden rounded border border-slate-200 bg-white">
                     <Editor

@@ -414,7 +414,7 @@ export function CanvasChangeRequestsView({
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-base font-semibold text-slate-900">Change Requests</p>
-                  <p className="text-xs text-slate-600">Select a request to open it in a dedicated PR view.</p>
+                  <p className="text-xs text-slate-600">Select a request to review.</p>
                 </div>
                 <Badge variant="outline">{changeRequests.length}</Badge>
               </div>
@@ -465,9 +465,7 @@ export function CanvasChangeRequestsView({
                                     Conflicted
                                   </Badge>
                                 </TooltipTrigger>
-                                <TooltipContent>
-                                  This change request is conflicted. It cannot be approved until conflicts are resolved.
-                                </TooltipContent>
+                                <TooltipContent>Conflicted. Resolve before approving.</TooltipContent>
                               </Tooltip>
                             ) : null}
                             <Badge variant={statusBadgeVariant(itemStatus)}>{formatStatusLabel(itemStatus)}</Badge>
@@ -526,9 +524,7 @@ export function CanvasChangeRequestsView({
                           Conflicted
                         </Badge>
                       </TooltipTrigger>
-                      <TooltipContent>
-                        This change request is conflicted. It cannot be approved until conflicts are resolved.
-                      </TooltipContent>
+                      <TooltipContent>Conflicted. Resolve before approving.</TooltipContent>
                     </Tooltip>
                   ) : null}
                   <Badge variant={statusBadgeVariant(selectedStatus)}>{formatStatusLabel(selectedStatus)}</Badge>
@@ -670,9 +666,7 @@ export function CanvasChangeRequestsView({
                   {showConflictResolutionCard ? (
                     <div className="rounded-xl border border-slate-200 bg-white p-4">
                       <p className="text-sm font-semibold text-slate-900">Conflict Resolution</p>
-                      <p className="mt-1 text-xs text-slate-600">
-                        Conflicts found in this request. Open resolver to merge node changes.
-                      </p>
+                      <p className="mt-1 text-xs text-slate-600">Open resolver to merge conflicting nodes.</p>
                       <Button
                         className="mt-3 w-full justify-center"
                         variant="secondary"
