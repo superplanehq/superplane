@@ -1,29 +1,32 @@
 package services
 
 import (
-	"os"
-
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
-// BuildEmailService creates an EmailService based on environment configuration.
+type EmailServiceConfig struct {
+	TemplateDir       string
+	OwnerSetupEnabled bool
+	ResendAPIKey      string
+	FromName          string
+	FromEmail         string
+}
+
+// BuildEmailService creates an EmailService based on the provided configuration.
 // Returns nil if required configuration is missing.
-func BuildEmailService(encryptor crypto.Encryptor, templateDir string) EmailService {
-	if templateDir == "" {
+func BuildEmailService(encryptor crypto.Encryptor, cfg EmailServiceConfig) EmailService {
+	if cfg.TemplateDir == "" {
 		return nil
 	}
 
-	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
+	if cfg.OwnerSetupEnabled {
 		settingsProvider := &DatabaseEmailSettingsProvider{Encryptor: encryptor}
-		return NewSMTPEmailService(settingsProvider, templateDir)
+		return NewSMTPEmailService(settingsProvider, cfg.TemplateDir)
 	}
 
-	resendAPIKey := os.Getenv("RESEND_API_KEY")
-	fromName := os.Getenv("EMAIL_FROM_NAME")
-	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
-	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
+	if cfg.ResendAPIKey == "" || cfg.FromName == "" || cfg.FromEmail == "" {
 		return nil
 	}
 
-	return NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
+	return NewResendEmailService(cfg.ResendAPIKey, cfg.FromName, cfg.FromEmail, cfg.TemplateDir)
 }

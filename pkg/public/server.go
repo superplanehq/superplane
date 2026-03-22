@@ -113,7 +113,13 @@ func NewServer(
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
 	var emailService services.EmailService
 	if os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes" {
-		emailService = services.BuildEmailService(encryptor, templateDir)
+		emailService = services.BuildEmailService(encryptor, services.EmailServiceConfig{
+			TemplateDir:       templateDir,
+			OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+			ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+			FromName:          os.Getenv("EMAIL_FROM_NAME"),
+			FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+		})
 	}
 	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, emailService)
 	providers := getOAuthProviders()

@@ -198,7 +198,13 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
-	emailService := services.BuildEmailService(encryptor, os.Getenv("TEMPLATE_DIR"))
+	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
 	if emailService == nil {
 		log.Warn("Email Consumers not started - missing required environment variables")
 		return
