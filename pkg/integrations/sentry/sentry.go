@@ -719,7 +719,6 @@ func displayName(name, slug string) string {
 	}
 }
 
-
 func displayIntegrationName(name string) string {
 	if strings.TrimSpace(name) == "" {
 		return "SuperPlane"
