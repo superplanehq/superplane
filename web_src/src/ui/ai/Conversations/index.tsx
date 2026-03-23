@@ -3,7 +3,6 @@ import { BotIcon, CheckIcon, CopyIcon, FileIcon, ListIcon, PaperclipIcon, PlusIc
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Textarea } from "@/components/ui/textarea";
 import { showErrorToast } from "@/utils/toast";
 
 export namespace Conversations {
@@ -168,7 +167,6 @@ export function Conversations({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const maxInputHeight = 160;
 
   // Get the active conversation
   const activeConversation = conversations.find((c) => c.id === activeConversationId);
@@ -184,12 +182,6 @@ export function Conversations({
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [activeConversation?.messages]);
-
-  useEffect(() => {
-    if (!inputRef.current) return;
-    inputRef.current.style.height = "auto";
-    inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, maxInputHeight)}px`;
-  }, [inputMessage, maxInputHeight]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -263,9 +255,7 @@ export function Conversations({
     onCreateConversation(action);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.nativeEvent.isComposing) return;
-
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -580,16 +570,17 @@ export function Conversations({
       {activeConversation && (
         <div className="border-t border-surface-outline p-4">
           <div className="flex gap-2">
-            <Textarea
+            <textarea
               ref={inputRef}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
+              onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               rows={1}
-              className="flex-1 min-h-[38px] resize-none border-surface-outline bg-surface-base text-content-base placeholder-content-dimmed focus-visible:ring-2 focus-visible:ring-accent-base"
+              className="flex-1 resize-none border border-surface-outline rounded px-3 py-2 text-sm bg-surface-base text-content-base placeholder-content-dimmed focus:outline-none focus:ring-2 focus:ring-accent-base focus:border-transparent"
               style={{
-                maxHeight: `${maxInputHeight}px`,
+                minHeight: "38px",
+                maxHeight: "120px",
               }}
             />
             <LoadingButton
