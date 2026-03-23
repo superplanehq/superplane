@@ -77,6 +77,24 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	s.session.AssertVisible(q.TestID("building-blocks-sidebar"))
 }
 
+// ClickOnEmptyCanvasArea clicks on an empty area of the canvas to dismiss
+// any open sidebars and deselect all nodes.
+func (s *CanvasSteps) ClickOnEmptyCanvasArea() {
+	target := q.TestID("rf__wrapper")
+	el := target.Run(s.session)
+	box, _ := el.BoundingBox()
+	if box != nil {
+		_ = s.session.Page().Mouse().Click(box.X+600, box.Y+50)
+	}
+}
+
+// SelectAllNodes performs a rubber-band drag selection across the entire visible
+// canvas area to select all nodes. The sidebar must be closed before calling this.
+func (s *CanvasSteps) SelectAllNodes() {
+	target := q.TestID("rf__wrapper")
+	s.session.DragSelectOnCanvas(target, 10, 10, 1100, 700)
+}
+
 func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.OpenBuildingBlocksSidebar()
 

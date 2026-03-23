@@ -77,6 +77,7 @@ import {
 import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
+import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode/constants";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
@@ -98,7 +99,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
+import { applyHorizontalAutoLayout, buildChannelsByNodeId, estimateNodeSize } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -121,6 +122,8 @@ import {
   buildComponentDefinition,
   buildExecutionInfo,
   buildQueueItemInfo,
+  collectGroupChildIds,
+  buildChildToGroupMap,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -192,6 +195,115 @@ function resolveApiErrorMessage(error: unknown, fallback: string): string {
   const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
   const runtimeMessage = (error as { message?: string })?.message;
   return responseMessage || runtimeMessage || fallback;
+}
+
+/** Deleting a group widget must also remove its child nodes from the spec. */
+function expandWorkflowNodeDeletionIds(nodes: ComponentsNode[], seedIds: string[]): Set<string> {
+  const byId = new Map<string, ComponentsNode>();
+  for (const node of nodes) {
+    if (node.id) byId.set(node.id, node);
+  }
+
+  const toRemove = new Set<string>(seedIds.filter(Boolean));
+  let added = true;
+  while (added) {
+    added = false;
+    for (const id of [...toRemove]) {
+      const node = byId.get(id);
+      if (!node) continue;
+      for (const childId of collectGroupChildIds(node)) {
+        if (toRemove.has(childId)) continue;
+        toRemove.add(childId);
+        added = true;
+      }
+    }
+  }
+
+  return toRemove;
+}
+
+/**
+ * Strips deleted node IDs from surviving group nodes' childNodeIds so the
+ * backend validation in serialization.go doesn't reject stale references.
+ */
+function pruneGroupChildReferences(nodes: ComponentsNode[], removedIds: Set<string>): ComponentsNode[] {
+  return nodes.map((node) => {
+    if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return node;
+    const childIds = collectGroupChildIds(node);
+    const prunedChildIds = childIds.filter((id) => !removedIds.has(id));
+    if (prunedChildIds.length === childIds.length) return node;
+    return { ...node, configuration: { ...node.configuration, childNodeIds: prunedChildIds } };
+  });
+}
+
+function buildUngroupWorkflow(workflow: CanvasesCanvas, groupNodeId: string): CanvasesCanvas | null {
+  const specNodes = workflow?.spec?.nodes || [];
+  const groupNode = specNodes.find((n) => n.id === groupNodeId);
+  if (!groupNode) return null;
+
+  const childNodeIds = (groupNode.configuration?.childNodeIds as string[]) || [];
+  const groupX = groupNode.position?.x || 0;
+  const groupY = groupNode.position?.y || 0;
+
+  const updatedNodes = specNodes
+    .filter((node) => node.id !== groupNodeId)
+    .map((node) => {
+      if (!node.id || !childNodeIds.includes(node.id)) return node;
+      return {
+        ...node,
+        position: {
+          x: Math.round((node.position?.x || 0) + groupX),
+          y: Math.round((node.position?.y || 0) + groupY),
+        },
+      };
+    });
+
+  return { ...workflow, spec: { ...workflow.spec, nodes: updatedNodes } };
+}
+
+function buildGroupWorkflow(
+  workflow: CanvasesCanvas,
+  bounds: { x: number; y: number; width: number; height: number },
+  nodePositions: Array<{ id: string; x: number; y: number }>,
+): CanvasesCanvas {
+  const specNodes = workflow?.spec?.nodes || [];
+  const nodeIds = nodePositions.map((n) => n.id);
+
+  const GROUP_PADDING = 40;
+  const GROUP_LABEL_HEIGHT = 72;
+  const groupX = Math.round(bounds.x - GROUP_PADDING);
+  const groupY = Math.round(bounds.y - GROUP_PADDING - GROUP_LABEL_HEIGHT);
+
+  const existingNodeNames = specNodes.map((n) => n.name || "");
+  const uniqueNodeName = generateUniqueNodeName("group", existingNodeNames);
+  const newGroupId = generateNodeId("group", uniqueNodeName);
+
+  const groupNode: ComponentsNode = {
+    id: newGroupId,
+    name: uniqueNodeName,
+    type: "TYPE_WIDGET",
+    widget: { name: "group" },
+    configuration: {
+      label: "Group",
+      description: "",
+      color: "purple",
+      childNodeIds: nodeIds,
+    },
+    position: { x: groupX, y: groupY },
+  };
+
+  const absolutePositionMap = new Map(nodePositions.map((n) => [n.id, { x: n.x, y: n.y }]));
+  const updatedNodes = specNodes.map((node) => {
+    if (!node.id || !nodeIds.includes(node.id)) return node;
+    const absPos = absolutePositionMap.get(node.id);
+    if (!absPos) return node;
+    return {
+      ...node,
+      position: { x: Math.round(absPos.x - groupX), y: Math.round(absPos.y - groupY) },
+    };
+  });
+
+  return { ...workflow, spec: { ...workflow.spec, nodes: [groupNode, ...updatedNodes] } };
 }
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
@@ -1066,7 +1178,12 @@ export function WorkflowPageV2() {
    * Maps node ID to its updated position.
    */
   const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-  const pendingAnnotationUpdatesRef = useRef<Map<string, { text?: string; color?: string }>>(new Map());
+  const pendingAnnotationUpdatesRef = useRef<
+    Map<
+      string,
+      { text?: string; color?: string; width?: number; height?: number; label?: string; description?: string }
+    >
+  >(new Map());
   const logNodeSelectRef = useRef<(nodeId: string) => void>(() => {});
 
   /**
@@ -2467,6 +2584,60 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleGroupUpdate = useCallback(
+    (nodeId: string, updates: { label?: string; description?: string; color?: string }) => {
+      if (!canvas || !organizationId || !canvasId) return;
+      if (Object.keys(updates).length === 0) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      saveWorkflowSnapshot(latestWorkflow);
+
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
+          return node;
+        }
+
+        return {
+          ...node,
+          configuration: {
+            ...node.configuration,
+            ...updates,
+          },
+        };
+      });
+
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
+        debouncedAnnotationAutoSave();
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      debouncedAnnotationAutoSave,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
   const handleNodeAdd = useCallback(
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
@@ -2874,11 +3045,16 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(canvas);
 
-      // Remove the node from the workflow
-      const updatedNodes = canvas.spec?.nodes?.filter((node) => node.id !== nodeId);
+      const specNodes = canvas.spec?.nodes || [];
+      const idsToRemove = expandWorkflowNodeDeletionIds(specNodes, [nodeId]);
 
-      // Remove any edges connected to this node
-      const updatedEdges = canvas.spec?.edges?.filter((edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId);
+      const survivingNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+      const updatedNodes = pruneGroupChildReferences(survivingNodes, idsToRemove);
+
+      const updatedEdges = canvas.spec?.edges?.filter(
+        (edge) =>
+          (!edge.sourceId || !idsToRemove.has(edge.sourceId)) && (!edge.targetId || !idsToRemove.has(edge.targetId)),
+      );
 
       const updatedWorkflow = {
         ...canvas,
@@ -2916,10 +3092,14 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(canvas);
 
-      const nodeIdSet = new Set(nodeIds);
-      const updatedNodes = canvas.spec?.nodes?.filter((node) => !nodeIdSet.has(node.id!));
+      const specNodes = canvas.spec?.nodes || [];
+      const idsToRemove = expandWorkflowNodeDeletionIds(specNodes, nodeIds);
+
+      const survivingNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+      const updatedNodes = pruneGroupChildReferences(survivingNodes, idsToRemove);
       const updatedEdges = canvas.spec?.edges?.filter(
-        (edge) => !nodeIdSet.has(edge.sourceId!) && !nodeIdSet.has(edge.targetId!),
+        (edge) =>
+          (!edge.sourceId || !idsToRemove.has(edge.sourceId)) && (!edge.targetId || !idsToRemove.has(edge.targetId)),
       );
 
       const updatedWorkflow = {
@@ -2985,18 +3165,91 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleGroupNodes = useCallback(
+    async (
+      bounds: { x: number; y: number; width: number; height: number },
+      nodePositions: Array<{ id: string; x: number; y: number }>,
+    ) => {
+      if (!canvas || !organizationId || !canvasId || nodePositions.length < 2) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      saveWorkflowSnapshot(latestWorkflow);
+
+      const updatedWorkflow = buildGroupWorkflow(latestWorkflow, bounds, nodePositions);
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleUngroupNodes = useCallback(
+    async (groupNodeId: string) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      saveWorkflowSnapshot(latestWorkflow);
+
+      const updatedWorkflow = buildUngroupWorkflow(latestWorkflow, groupNodeId);
+      if (!updatedWorkflow) return;
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
   const handleNodesDuplicate = useCallback(
     async (nodeIds: string[]) => {
       if (!canvas || !organizationId || !canvasId) return;
 
       saveWorkflowSnapshot(canvas);
 
-      const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+      const specNodes = canvas.spec?.nodes || [];
+      const childToGroup = buildChildToGroupMap(specNodes);
+
+      const filteredNodeIds = nodeIds.filter((id) => {
+        const node = specNodes.find((n) => n.id === id);
+        return node && !(node.type === "TYPE_WIDGET" && node.widget?.name === "group");
+      });
+
+      const existingNodeNames = specNodes.map((n) => n.name || "").filter(Boolean);
       const newNodes: ComponentsNode[] = [];
       const nodeIdMap: Record<string, string> = {};
 
-      for (const nodeId of nodeIds) {
-        const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
+      for (const nodeId of filteredNodeIds) {
+        const nodeToDuplicate = specNodes.find((node) => node.id === nodeId);
         if (!nodeToDuplicate) continue;
 
         let baseName = nodeToDuplicate.name?.trim() || "";
@@ -3019,13 +3272,18 @@ export function WorkflowPageV2() {
 
         nodeIdMap[nodeId] = newNodeId;
 
+        const groupId = childToGroup.get(nodeId);
+        const groupNode = groupId ? specNodes.find((n) => n.id === groupId) : undefined;
+        const absoluteX = (nodeToDuplicate.position?.x || 0) + (groupNode?.position?.x || 0);
+        const absoluteY = (nodeToDuplicate.position?.y || 0) + (groupNode?.position?.y || 0);
+
         newNodes.push({
           ...nodeToDuplicate,
           id: newNodeId,
           name: uniqueNodeName,
           position: {
-            x: (nodeToDuplicate.position?.x || 0) + 50,
-            y: (nodeToDuplicate.position?.y || 0) + 50,
+            x: absoluteX + 50,
+            y: absoluteY + 50,
           },
           isCollapsed: false,
         });
@@ -3033,7 +3291,7 @@ export function WorkflowPageV2() {
 
       if (newNodes.length === 0) return;
 
-      const duplicatedNodeIds = new Set(nodeIds);
+      const duplicatedNodeIds = new Set(filteredNodeIds);
       const newEdges = (canvas.spec?.edges || [])
         .filter(
           (edge) =>
@@ -4730,6 +4988,9 @@ export function WorkflowPageV2() {
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
+          onGroupUpdate={!isReadOnly ? handleGroupUpdate : undefined}
+          onGroupNodes={!isReadOnly ? handleGroupNodes : undefined}
+          onUngroupNodes={!isReadOnly ? handleUngroupNodes : undefined}
           onSave={isTemplate ? undefined : handleSave}
           onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
           onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
@@ -4994,6 +5255,22 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
   return nodesBefore;
 }
 
+function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
+  const groupChildMap = buildChildToGroupMap(workflow?.spec?.nodes || []);
+
+  const wiredNodes = nodes.map((node) => {
+    const parentId = groupChildMap.get(node.id);
+    if (!parentId) return node;
+
+    const x = Math.max(node.position?.x ?? 0, GROUP_CHILD_EDGE_PADDING);
+    const y = Math.max(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET);
+    return { ...node, parentId, position: { x, y } };
+  });
+
+  const groupNodeIds = new Set(wiredNodes.filter((n) => n.data?.type === "group").map((n) => n.id));
+  return [...wiredNodes.filter((n) => groupNodeIds.has(n.id)), ...wiredNodes.filter((n) => !groupNodeIds.has(n.id))];
+}
+
 function prepareData(
   workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
@@ -5036,7 +5313,8 @@ function prepareData(
         dragHandle: ".canvas-node-drag-handle",
       })) || [];
 
-  return { nodes, edges };
+  const sortedNodes = wireGroupParentChildRelationships(workflow, nodes);
+  return { nodes: sortedNodes, edges };
 }
 
 function prepareTriggerNode(
@@ -5211,7 +5489,9 @@ function prepareNode(
 
       return compositeNode;
     case "TYPE_WIDGET":
-      // support other widgets if necessary
+      if (node.widget?.name === "group") {
+        return prepareGroupNode(node, nodes);
+      }
       return prepareAnnotationNode(node);
 
     default:
@@ -5242,7 +5522,7 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
       type: "annotation",
       label: node.name || "Annotation",
       state: "pending" as const,
-      outputChannels: [], // Annotation nodes don't have output channels
+      outputChannels: [],
       annotation: {
         title: node.name || "Annotation",
         annotationText: node.configuration?.text || "",
@@ -5251,6 +5531,66 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
         height,
       },
     },
+  };
+}
+
+function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
+  const label = node.name || "Group";
+  return {
+    type: "group",
+    label,
+    state: "pending" as const,
+    outputChannels: [],
+    group: {
+      groupLabel: (node.configuration?.label as string) || label,
+      groupDescription: (node.configuration?.description as string) || "",
+      groupColor: normalizeGroupColor(node.configuration?.color as string),
+    },
+  };
+}
+
+const DEFAULT_GROUP_WIDTH = 480;
+const DEFAULT_GROUP_HEIGHT = 320;
+const GROUP_SIZE_PADDING = 10;
+
+function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[]): { width: number; height: number } {
+  const childIds = collectGroupChildIds(groupNode);
+  if (childIds.length === 0) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
+
+  let maxX = 0;
+  let maxY = 0;
+  let found = false;
+
+  for (const childId of childIds) {
+    const child = allNodes.find((n) => n.id === childId);
+    if (!child?.position) continue;
+    found = true;
+    const cx = child.position.x ?? 0;
+    const cy = child.position.y ?? 0;
+    const { width: cw, height: ch } = estimateNodeSize(child);
+    if (cx + cw > maxX) maxX = cx + cw;
+    if (cy + ch > maxY) maxY = cy + ch;
+  }
+
+  if (!found) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
+
+  return {
+    width: Math.max(DEFAULT_GROUP_WIDTH, Math.round(maxX + GROUP_SIZE_PADDING)),
+    height: Math.max(DEFAULT_GROUP_HEIGHT, Math.round(maxY + GROUP_SIZE_PADDING)),
+  };
+}
+
+function prepareGroupNode(node: ComponentsNode, allNodes: ComponentsNode[]): CanvasNode {
+  const { width, height } = computeGroupSize(node, allNodes);
+  return {
+    id: node.id!,
+    type: "group",
+    position: { x: node.position?.x ?? 0, y: node.position?.y ?? 0 },
+    selectable: true,
+    width,
+    height,
+    style: { width, height, zIndex: -1 },
+    data: buildGroupNodeData(node),
   };
 }
 
