@@ -202,6 +202,10 @@ func (s *ownerSetupSteps) fillInEmailAndPassword(email, password string) {
 }
 
 func (s *ownerSetupSteps) submitLoginForm() {
+	// With magic code enabled, password form is hidden by default.
+	// Toggle to password login first.
+	s.session.Click(q.Text("Sign in with password instead"))
+	s.session.Sleep(300)
 	s.session.Click(q.Text("Login"))
 	s.session.Sleep(1000) // wait for redirect
 }

@@ -108,6 +108,9 @@ export const Login: React.FC = () => {
       try {
         const formData = new URLSearchParams();
         formData.append("token", magicLinkToken);
+        if (inviteToken) {
+          formData.append("invite_token", inviteToken);
+        }
 
         const response = await fetch("/auth/magic-code/verify", {
           method: "POST",
@@ -130,7 +133,7 @@ export const Login: React.FC = () => {
     };
 
     verifyMagicLink();
-  }, [magicLinkToken]);
+  }, [magicLinkToken, inviteToken]);
 
   useEffect(() => {
     let canceled = false;

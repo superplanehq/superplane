@@ -596,6 +596,14 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Check signup policy before consuming the code. This avoids permanently
+	// spending a single-use code when the signup check would reject the
+	// request with 403, forcing the user to request a new one.
+	if err := a.checkSignupPolicy(email, r); err != nil {
+		http.Error(w, err.Error(), errorStatusForAccountError(err))
+		return
+	}
+
 	if err := a.validateAndConsumeCode(email, code); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
@@ -684,6 +692,37 @@ func errorStatusForCodeError(err error) int {
 var errSignupDisabled = fmt.Errorf(SignupDisabledError)
 var errInviteLinkInvalid = fmt.Errorf("invite link not found or disabled")
 var errAccountError = fmt.Errorf("Internal server error")
+
+// checkSignupPolicy verifies that a new-user signup would be allowed for
+// the given email without creating any records. For existing accounts this
+// is always a no-op. Called before consuming the one-time code so that a
+// policy rejection does not waste the code.
+func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
+	_, err := models.FindAccountByEmail(email)
+	if err == nil {
+		return nil // existing user — no signup gate
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Errorf("Error finding account for %s: %v", email, err)
+		return errAccountError
+	}
+
+	if !a.blockSignup {
+		return nil
+	}
+
+	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
+	if inviteToken == "" {
+		return errSignupDisabled
+	}
+
+	inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
+	if findErr != nil || !inviteLink.Enabled {
+		return errInviteLinkInvalid
+	}
+
+	return nil
+}
 
 func (a *Handler) resolveAccountForMagicCode(email string, r *http.Request) (*models.Account, error) {
 	account, err := models.FindAccountByEmail(email)

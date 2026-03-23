@@ -90,6 +90,15 @@ func (s *NoopEmailService) SentInvitationEmails() []SentInvitationEmail {
 	return emails
 }
 
+func (s *NoopEmailService) SentMagicCodeEmails() []SentMagicCodeEmail {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	emails := make([]SentMagicCodeEmail, len(s.magicCodeEmails))
+	copy(emails, s.magicCodeEmails)
+	return emails
+}
+
 func (s *NoopEmailService) SentNotificationEmails() []SentNotificationEmail {
 	s.mu.Lock()
 	defer s.mu.Unlock()
