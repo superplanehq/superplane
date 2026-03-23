@@ -77,7 +77,7 @@ import {
 import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
-import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode";
+import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode/constants";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
@@ -195,33 +195,109 @@ function resolveApiErrorMessage(error: unknown, fallback: string): string {
   return responseMessage || runtimeMessage || fallback;
 }
 
+/** Collect child IDs from a single group node. */
+function collectGroupChildIds(node: ComponentsNode): string[] {
+  if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
+  return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
+}
+
 /** Deleting a group widget must also remove its child nodes from the spec. */
 function expandWorkflowNodeDeletionIds(nodes: ComponentsNode[], seedIds: string[]): Set<string> {
   const byId = new Map<string, ComponentsNode>();
   for (const node of nodes) {
-    if (node.id) {
-      byId.set(node.id, node);
-    }
+    if (node.id) byId.set(node.id, node);
   }
 
-  const toRemove = new Set<string>(seedIds.filter((id) => id.length > 0));
+  const toRemove = new Set<string>(seedIds.filter(Boolean));
   let added = true;
   while (added) {
     added = false;
     for (const id of [...toRemove]) {
       const node = byId.get(id);
-      if (node?.type === "TYPE_WIDGET" && node.widget?.name === "group") {
-        for (const childId of (node.configuration?.childNodeIds as string[]) || []) {
-          if (!toRemove.has(childId)) {
-            toRemove.add(childId);
-            added = true;
-          }
-        }
+      if (!node) continue;
+      for (const childId of collectGroupChildIds(node)) {
+        if (toRemove.has(childId)) continue;
+        toRemove.add(childId);
+        added = true;
       }
     }
   }
 
   return toRemove;
+}
+
+function buildUngroupWorkflow(workflow: CanvasesCanvas, groupNodeId: string): CanvasesCanvas | null {
+  const specNodes = workflow?.spec?.nodes || [];
+  const groupNode = specNodes.find((n) => n.id === groupNodeId);
+  if (!groupNode) return null;
+
+  const childNodeIds = (groupNode.configuration?.childNodeIds as string[]) || [];
+  const groupX = groupNode.position?.x || 0;
+  const groupY = groupNode.position?.y || 0;
+
+  const updatedNodes = specNodes
+    .filter((node) => node.id !== groupNodeId)
+    .map((node) => {
+      if (!node.id || !childNodeIds.includes(node.id)) return node;
+      return {
+        ...node,
+        position: {
+          x: Math.round((node.position?.x || 0) + groupX),
+          y: Math.round((node.position?.y || 0) + groupY),
+        },
+      };
+    });
+
+  return { ...workflow, spec: { ...workflow.spec, nodes: updatedNodes } };
+}
+
+function buildGroupWorkflow(
+  workflow: CanvasesCanvas,
+  bounds: { x: number; y: number; width: number; height: number },
+  nodePositions: Array<{ id: string; x: number; y: number }>,
+): CanvasesCanvas {
+  const specNodes = workflow?.spec?.nodes || [];
+  const nodeIds = nodePositions.map((n) => n.id);
+
+  const GROUP_PADDING = 40;
+  const GROUP_LABEL_HEIGHT = 72;
+  const groupX = Math.round(bounds.x - GROUP_PADDING);
+  const groupY = Math.round(bounds.y - GROUP_PADDING - GROUP_LABEL_HEIGHT);
+  const groupWidth = Math.round(bounds.width + GROUP_PADDING * 2);
+  const groupHeight = Math.round(bounds.height + GROUP_PADDING * 2 + GROUP_LABEL_HEIGHT);
+
+  const existingNodeNames = specNodes.map((n) => n.name || "");
+  const uniqueNodeName = generateUniqueNodeName("group", existingNodeNames);
+  const newGroupId = generateNodeId("group", uniqueNodeName);
+
+  const groupNode: ComponentsNode = {
+    id: newGroupId,
+    name: uniqueNodeName,
+    type: "TYPE_WIDGET",
+    widget: { name: "group" },
+    configuration: {
+      label: "Group",
+      description: "",
+      color: "purple",
+      width: groupWidth,
+      height: groupHeight,
+      childNodeIds: nodeIds,
+    },
+    position: { x: groupX, y: groupY },
+  };
+
+  const absolutePositionMap = new Map(nodePositions.map((n) => [n.id, { x: n.x, y: n.y }]));
+  const updatedNodes = specNodes.map((node) => {
+    if (!node.id || !nodeIds.includes(node.id)) return node;
+    const absPos = absolutePositionMap.get(node.id);
+    if (!absPos) return node;
+    return {
+      ...node,
+      position: { x: Math.round(absPos.x - groupX), y: Math.round(absPos.y - groupY) },
+    };
+  });
+
+  return { ...workflow, spec: { ...workflow.spec, nodes: [groupNode, ...updatedNodes] } };
 }
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
@@ -3081,69 +3157,14 @@ export function WorkflowPageV2() {
       bounds: { x: number; y: number; width: number; height: number },
       nodePositions: Array<{ id: string; x: number; y: number }>,
     ) => {
-      if (!canvas || !organizationId || !canvasId) return;
-      if (nodePositions.length < 2) return;
+      if (!canvas || !organizationId || !canvasId || nodePositions.length < 2) return;
 
       saveWorkflowSnapshot(canvas);
 
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
 
-      const specNodes = latestWorkflow?.spec?.nodes || [];
-      const nodeIds = nodePositions.map((n) => n.id);
-
-      const GROUP_PADDING = 40;
-      const GROUP_LABEL_HEIGHT = 72;
-
-      const groupX = Math.round(bounds.x - GROUP_PADDING);
-      const groupY = Math.round(bounds.y - GROUP_PADDING - GROUP_LABEL_HEIGHT);
-      const groupWidth = Math.round(bounds.width + GROUP_PADDING * 2);
-      const groupHeight = Math.round(bounds.height + GROUP_PADDING * 2 + GROUP_LABEL_HEIGHT);
-
-      const existingNodeNames = specNodes.map((n) => n.name || "");
-      const uniqueNodeName = generateUniqueNodeName("group", existingNodeNames);
-      const newGroupId = generateNodeId("group", uniqueNodeName);
-
-      const groupNode: ComponentsNode = {
-        id: newGroupId,
-        name: uniqueNodeName,
-        type: "TYPE_WIDGET",
-        widget: { name: "group" },
-        configuration: {
-          label: "Group",
-          description: "",
-          color: "purple",
-          width: groupWidth,
-          height: groupHeight,
-          childNodeIds: nodeIds,
-        },
-        position: { x: groupX, y: groupY },
-      };
-
-      const absolutePositionMap = new Map(nodePositions.map((n) => [n.id, { x: n.x, y: n.y }]));
-
-      const updatedNodes = specNodes.map((node) => {
-        if (node.id && nodeIds.includes(node.id)) {
-          const absPos = absolutePositionMap.get(node.id)!;
-          return {
-            ...node,
-            position: {
-              x: Math.round(absPos.x - groupX),
-              y: Math.round(absPos.y - groupY),
-            },
-          };
-        }
-        return node;
-      });
-
-      const updatedWorkflow = {
-        ...latestWorkflow,
-        spec: {
-          ...latestWorkflow.spec,
-          nodes: [groupNode, ...updatedNodes],
-        },
-      };
-
+      const updatedWorkflow = buildGroupWorkflow(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (canAutoSave) {
@@ -3173,37 +3194,8 @@ export function WorkflowPageV2() {
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
 
-      const specNodes = latestWorkflow?.spec?.nodes || [];
-      const groupNode = specNodes.find((n) => n.id === groupNodeId);
-      if (!groupNode) return;
-
-      const childNodeIds = (groupNode.configuration?.childNodeIds as string[]) || [];
-      const groupX = groupNode.position?.x || 0;
-      const groupY = groupNode.position?.y || 0;
-
-      // Convert child positions back to absolute and remove the group node
-      const updatedNodes = specNodes
-        .filter((node) => node.id !== groupNodeId)
-        .map((node) => {
-          if (node.id && childNodeIds.includes(node.id)) {
-            return {
-              ...node,
-              position: {
-                x: Math.round((node.position?.x || 0) + groupX),
-                y: Math.round((node.position?.y || 0) + groupY),
-              },
-            };
-          }
-          return node;
-        });
-
-      const updatedWorkflow = {
-        ...latestWorkflow,
-        spec: {
-          ...latestWorkflow.spec,
-          nodes: updatedNodes,
-        },
-      };
+      const updatedWorkflow = buildUngroupWorkflow(latestWorkflow, groupNodeId);
+      if (!updatedWorkflow) return;
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
@@ -5237,6 +5229,50 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
   return nodesBefore;
 }
 
+function clampToRange(value: number, min: number, max: number): number {
+  return max >= min ? Math.min(Math.max(value, min), max) : min;
+}
+
+function buildGroupChildMap(specNodes: ComponentsNode[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const specNode of specNodes) {
+    if (specNode.type !== "TYPE_WIDGET" || specNode.widget?.name !== "group" || !specNode.id) continue;
+    for (const childId of collectGroupChildIds(specNode)) {
+      map.set(childId, specNode.id);
+    }
+  }
+  return map;
+}
+
+function buildGroupSizeMap(nodes: CanvasNode[]): Map<string, { w: number; h: number }> {
+  const map = new Map<string, { w: number; h: number }>();
+  for (const n of nodes) {
+    if (n.data?.type === "group" && n.id) {
+      map.set(n.id, { w: n.width ?? 480, h: n.height ?? 320 });
+    }
+  }
+  return map;
+}
+
+function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
+  const groupChildMap = buildGroupChildMap(workflow?.spec?.nodes || []);
+  const groupSizeById = buildGroupSizeMap(nodes);
+  const pad = GROUP_CHILD_EDGE_PADDING;
+
+  const wiredNodes = nodes.map((node) => {
+    const parentId = groupChildMap.get(node.id);
+    if (!parentId) return node;
+
+    const { w: pw, h: ph } = groupSizeById.get(parentId) ?? { w: 480, h: 320 };
+    const x = clampToRange(node.position?.x ?? 0, pad, pw - (node.width ?? 280) - pad);
+    const y = clampToRange(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET, ph - (node.height ?? 100) - pad);
+    return { ...node, parentId, extent: "parent" as const, position: { x, y } };
+  });
+
+  const groupNodeIds = new Set(wiredNodes.filter((n) => n.data?.type === "group").map((n) => n.id));
+  return [...wiredNodes.filter((n) => groupNodeIds.has(n.id)), ...wiredNodes.filter((n) => !groupNodeIds.has(n.id))];
+}
+
 function prepareData(
   workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
@@ -5279,60 +5315,7 @@ function prepareData(
         dragHandle: ".canvas-node-drag-handle",
       })) || [];
 
-  // Wire parent-child relationships for group nodes
-  const groupChildMap = new Map<string, string>();
-  for (const specNode of workflow?.spec?.nodes || []) {
-    if (specNode.type === "TYPE_WIDGET" && specNode.widget?.name === "group" && specNode.id) {
-      const childIds = (specNode.configuration?.childNodeIds as string[]) || [];
-      for (const childId of childIds) {
-        groupChildMap.set(childId, specNode.id);
-      }
-    }
-  }
-
-  const groupSizeById = new Map<string, { w: number; h: number }>();
-  for (const n of nodes) {
-    if (n.data?.type === "group" && n.id) {
-      groupSizeById.set(n.id, {
-        w: n.width ?? 480,
-        h: n.height ?? 320,
-      });
-    }
-  }
-
-  const pad = GROUP_CHILD_EDGE_PADDING;
-
-  const wiredNodes = nodes.map((node) => {
-    const parentId = groupChildMap.get(node.id);
-    if (parentId) {
-      const { w: pw, h: ph } = groupSizeById.get(parentId) ?? { w: 480, h: 320 };
-      const cw = node.width ?? 280;
-      const ch = node.height ?? 100;
-      const minX = pad;
-      const minY = GROUP_CHILD_MIN_Y_OFFSET;
-      const maxX = pw - cw - pad;
-      const maxY = ph - ch - pad;
-      let x = node.position?.x ?? 0;
-      let y = node.position?.y ?? 0;
-      x = maxX >= minX ? Math.min(Math.max(x, minX), maxX) : minX;
-      y = maxY >= minY ? Math.min(Math.max(y, minY), maxY) : minY;
-      return {
-        ...node,
-        parentId,
-        extent: "parent" as const,
-        position: { x, y },
-      };
-    }
-    return node;
-  });
-
-  // React Flow requires parent nodes to appear before their children
-  const groupNodeIds = new Set(wiredNodes.filter((n) => n.data?.type === "group").map((n) => n.id));
-  const sortedNodes = [
-    ...wiredNodes.filter((n) => groupNodeIds.has(n.id)),
-    ...wiredNodes.filter((n) => !groupNodeIds.has(n.id)),
-  ];
-
+  const sortedNodes = wireGroupParentChildRelationships(workflow, nodes);
   return { nodes: sortedNodes, edges };
 }
 
@@ -5553,28 +5536,33 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
   };
 }
 
+function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
+  const label = node.name || "Group";
+  return {
+    type: "group",
+    label,
+    state: "pending" as const,
+    outputChannels: [],
+    group: {
+      groupLabel: (node.configuration?.label as string) || label,
+      groupDescription: (node.configuration?.description as string) || "",
+      groupColor: normalizeGroupColor(node.configuration?.color as string),
+    },
+  };
+}
+
 function prepareGroupNode(node: ComponentsNode): CanvasNode {
   const width = (node.configuration?.width as number) || 480;
   const height = (node.configuration?.height as number) || 320;
   return {
     id: node.id!,
     type: "group",
-    position: { x: node.position?.x!, y: node.position?.y! },
+    position: { x: node.position?.x ?? 0, y: node.position?.y ?? 0 },
     selectable: true,
     width,
     height,
     style: { width, height, zIndex: -1 },
-    data: {
-      type: "group",
-      label: node.name || "Group",
-      state: "pending" as const,
-      outputChannels: [],
-      group: {
-        groupLabel: (node.configuration?.label as string) || node.name || "Group",
-        groupDescription: (node.configuration?.description as string) || "",
-        groupColor: normalizeGroupColor(node.configuration?.color as string),
-      },
-    },
+    data: buildGroupNodeData(node),
   };
 }
 

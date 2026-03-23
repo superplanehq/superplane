@@ -9,7 +9,7 @@ import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
-import { type GroupNodeProps } from "../groupNode";
+import type { GroupNodeProps } from "../groupNode";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation" | "group";

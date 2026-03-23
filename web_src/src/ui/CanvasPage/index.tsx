@@ -59,7 +59,8 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
-import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, GroupNode } from "../groupNode";
+import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET } from "../groupNode/constants";
+import { GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -1638,6 +1639,40 @@ function CanvasContentHeader({
   );
 }
 
+type AbsoluteNodeRect = { x: number; y: number; w: number; h: number };
+type NodeLike = {
+  id: string;
+  position: { x: number; y: number };
+  measured?: { width?: number; height?: number };
+  width?: number;
+  height?: number;
+};
+type InternalNodeFull = {
+  internals: { positionAbsolute: { x: number; y: number } };
+  measured?: { width?: number; height?: number };
+};
+
+function resolveNodeWidth(internal: InternalNodeFull | undefined, node: NodeLike): number {
+  return internal?.measured?.width ?? node.measured?.width ?? node.width ?? 240;
+}
+
+function resolveNodeHeight(internal: InternalNodeFull | undefined, node: NodeLike): number {
+  return internal?.measured?.height ?? node.measured?.height ?? node.height ?? 80;
+}
+
+function resolveAbsoluteNodeRect(
+  node: NodeLike,
+  getInternalNode: (nodeId: string) => InternalNodeFull | undefined,
+): AbsoluteNodeRect {
+  const internal = getInternalNode(node.id);
+  return {
+    x: internal?.internals.positionAbsolute.x ?? node.position.x,
+    y: internal?.internals.positionAbsolute.y ?? node.position.y,
+    w: resolveNodeWidth(internal, node),
+    h: resolveNodeHeight(internal, node),
+  };
+}
+
 function CanvasContent({
   state,
   onSave,
@@ -1831,16 +1866,12 @@ function CanvasContent({
         maxX = -Infinity,
         maxY = -Infinity;
       const nodePositions = nodes.map((n) => {
-        const internal = getInternalNode(n.id);
-        const x = internal?.internals.positionAbsolute.x ?? n.position.x;
-        const y = internal?.internals.positionAbsolute.y ?? n.position.y;
-        const w = internal?.measured?.width ?? n.measured?.width ?? n.width ?? 240;
-        const h = internal?.measured?.height ?? n.measured?.height ?? n.height ?? 80;
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x + w > maxX) maxX = x + w;
-        if (y + h > maxY) maxY = y + h;
-        return { id: n.id, x, y };
+        const rect = resolveAbsoluteNodeRect(n, getInternalNode);
+        if (rect.x < minX) minX = rect.x;
+        if (rect.y < minY) minY = rect.y;
+        if (rect.x + rect.w > maxX) maxX = rect.x + rect.w;
+        if (rect.y + rect.h > maxY) maxY = rect.y + rect.h;
+        return { id: n.id, x: rect.x, y: rect.y };
       });
       return {
         bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
@@ -1922,12 +1953,9 @@ function CanvasContent({
 
     for (const node of state.nodes) {
       if (!multiSelectedNodeIds.has(node.id)) continue;
-      const internal = getInternalNode(node.id);
-      const x = internal?.internals.positionAbsolute.x ?? node.position.x;
-      const y = internal?.internals.positionAbsolute.y ?? node.position.y;
-      const w = internal?.measured?.width ?? node.measured?.width ?? node.width ?? 240;
-      if (y < minY) minY = y;
-      if (x + w > maxX) maxX = x + w;
+      const rect = resolveAbsoluteNodeRect(node, getInternalNode);
+      if (rect.y < minY) minY = rect.y;
+      if (rect.x + rect.w > maxX) maxX = rect.x + rect.w;
     }
 
     return { x: maxX, y: minY };

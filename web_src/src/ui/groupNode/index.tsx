@@ -2,17 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
 import { Trash2, Ungroup } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-export type GroupColor = "purple" | "blue" | "green" | "cyan" | "orange" | "rose" | "amber";
+import { normalizeGroupColor } from "./constants";
+import type { GroupColor } from "./constants";
 
 type GroupColorStyles = {
   label: string;
-  /** Fills the group area with the hue at low opacity */
   bgTint: string;
   border: string;
-  /** Outer glow + subtle inner edge */
   glow: string;
-  /** Opaque label strip */
   labelBg: string;
   labelText: string;
   dot: string;
@@ -86,27 +83,8 @@ const GROUP_COLORS: Record<GroupColor, GroupColorStyles> = {
 
 const GROUP_COLOR_KEYS = Object.keys(GROUP_COLORS) as GroupColor[];
 
-/**
- * Minimum Y (relative to the group parent) for child nodes so they cannot overlap the
- * title/description header strip. Keep in sync with header layout in this file.
- */
-export const GROUP_CHILD_MIN_Y_OFFSET = 104;
-
-/** Inset from the group border on left, right, and bottom (flow px). Top inset is {@link GROUP_CHILD_MIN_Y_OFFSET}. */
-export const GROUP_CHILD_EDGE_PADDING = 12;
-
-/** Maps saved configuration values (including legacy `gray`) to a valid palette key. */
-export function normalizeGroupColor(raw?: string): GroupColor {
-  if (raw && GROUP_COLORS[raw as GroupColor]) {
-    return raw as GroupColor;
-  }
-  return "purple";
-}
-
 export interface GroupNodeProps {
-  /** Primary title shown on the group */
   groupLabel?: string;
-  /** Optional secondary line below the title */
   groupDescription?: string;
   groupColor?: GroupColor;
   selected?: boolean;
@@ -116,16 +94,86 @@ export interface GroupNodeProps {
   onDelete?: () => void;
 }
 
-const GroupNodeBase: React.FC<GroupNodeProps> = ({
-  groupLabel = "Group",
-  groupDescription = "",
-  groupColor,
-  selected = false,
-  hideActionsButton,
+function stopEvent(event: React.MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function GroupActionsToolbar({
+  activeColor,
+  colorOptions,
   onGroupUpdate,
   onUngroup,
   onDelete,
-}) => {
+}: {
+  activeColor: GroupColor;
+  colorOptions: { value: GroupColor; dot: string }[];
+  onGroupUpdate?: GroupNodeProps["onGroupUpdate"];
+  onUngroup?: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <>
+      <div className="absolute -top-12 right-0 z-20 h-12 w-44 opacity-0" aria-hidden />
+      <div className="nodrag absolute -top-8 right-0 z-30 hidden flex-nowrap items-center justify-start gap-2 rounded-md border border-slate-200/80 bg-white/95 px-1.5 py-1 shadow-md group-hover:flex">
+        <div className="group/swatch flex shrink-0 items-center gap-2 px-0.5 py-0.5">
+          <div className="hidden shrink-0 flex-nowrap items-center gap-2 group-hover/swatch:flex">
+            {colorOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={(event: React.MouseEvent) => {
+                  stopEvent(event);
+                  onGroupUpdate?.({ color: option.value });
+                }}
+                className={cn("h-4 w-4 shrink-0 rounded-full border-2 transition", option.dot)}
+                aria-label={`Set group color to ${GROUP_COLORS[option.value].label}`}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={stopEvent}
+            className={cn("h-4 w-4 shrink-0 rounded-full border-2 transition", GROUP_COLORS[activeColor].dot)}
+            aria-label={`Current group color: ${GROUP_COLORS[activeColor].label}`}
+          />
+        </div>
+        {onUngroup && (
+          <button
+            type="button"
+            onClick={(event: React.MouseEvent) => {
+              stopEvent(event);
+              onUngroup();
+            }}
+            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            aria-label="Ungroup nodes"
+          >
+            <Ungroup size={16} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            onClick={(event: React.MouseEvent) => {
+              stopEvent(event);
+              onDelete();
+            }}
+            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+            aria-label="Delete group and contained nodes"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+function useGroupTextEditing(
+  groupLabel: string,
+  groupDescription: string,
+  onGroupUpdate: GroupNodeProps["onGroupUpdate"],
+) {
   const inputRef = React.useRef<HTMLInputElement | null>(null);
   const descriptionRef = React.useRef<HTMLTextAreaElement | null>(null);
 
@@ -139,21 +187,12 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
   }, [groupLabel]);
 
   useEffect(() => {
-    if (!isEditingDescription) {
-      setLocalDescription(groupDescription);
-    }
+    if (!isEditingDescription) setLocalDescription(groupDescription);
   }, [groupDescription, isEditingDescription]);
 
   useEffect(() => {
-    if (isEditingDescription) {
-      requestAnimationFrame(() => {
-        descriptionRef.current?.focus();
-      });
-    }
+    if (isEditingDescription) requestAnimationFrame(() => descriptionRef.current?.focus());
   }, [isEditingDescription]);
-
-  const activeColor = normalizeGroupColor(groupColor);
-  const colorStyles = GROUP_COLORS[activeColor];
 
   const onGroupUpdateRef = React.useRef(onGroupUpdate);
   useEffect(() => {
@@ -161,18 +200,11 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
   }, [onGroupUpdate]);
 
   const debouncedLabelUpdate = useMemo(
-    () =>
-      debounce((nextLabel: string) => {
-        onGroupUpdateRef.current?.({ label: nextLabel });
-      }, 500),
+    () => debounce((v: string) => onGroupUpdateRef.current?.({ label: v }), 500),
     [],
   );
-
   const debouncedDescriptionUpdate = useMemo(
-    () =>
-      debounce((nextDescription: string) => {
-        onGroupUpdateRef.current?.({ description: nextDescription });
-      }, 500),
+    () => debounce((v: string) => onGroupUpdateRef.current?.({ description: v }), 500),
     [],
   );
 
@@ -182,15 +214,6 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
       debouncedDescriptionUpdate.cancel();
     };
   }, [debouncedLabelUpdate, debouncedDescriptionUpdate]);
-
-  const colorOptions = useMemo(
-    () =>
-      GROUP_COLOR_KEYS.map((value) => ({
-        value,
-        dot: GROUP_COLORS[value].dot,
-      })),
-    [],
-  );
 
   const handleDoubleClickLabel = useCallback(() => {
     setIsEditingLabel(true);
@@ -211,9 +234,7 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
         e.preventDefault();
         commitLabel();
         inputRef.current?.blur();
-        if (onGroupUpdate) {
-          setIsEditingDescription(true);
-        }
+        if (onGroupUpdate) setIsEditingDescription(true);
         return;
       }
       if (e.key === "Escape") {
@@ -233,8 +254,6 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
     debouncedDescriptionUpdate.flush();
   }, [localDescription, debouncedDescriptionUpdate]);
 
-  const hasDescriptionText = Boolean(localDescription.trim());
-
   const handleDescriptionKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Escape") {
@@ -252,6 +271,42 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
     [commitDescription, groupDescription],
   );
 
+  return {
+    inputRef,
+    descriptionRef,
+    isEditingLabel,
+    localLabel,
+    setLocalLabel,
+    isEditingDescription,
+    setIsEditingDescription,
+    localDescription,
+    setLocalDescription,
+    hasDescriptionText: Boolean(localDescription.trim()),
+    handleDoubleClickLabel,
+    commitLabel,
+    handleLabelKeyDown,
+    commitDescription,
+    handleDescriptionKeyDown,
+  };
+}
+
+const GroupNodeBase: React.FC<GroupNodeProps> = ({
+  groupLabel = "Group",
+  groupDescription = "",
+  groupColor,
+  selected = false,
+  hideActionsButton,
+  onGroupUpdate,
+  onUngroup,
+  onDelete,
+}) => {
+  const activeColor = normalizeGroupColor(groupColor);
+  const colorStyles = GROUP_COLORS[activeColor];
+
+  const colorOptions = useMemo(() => GROUP_COLOR_KEYS.map((value) => ({ value, dot: GROUP_COLORS[value].dot })), []);
+
+  const text = useGroupTextEditing(groupLabel, groupDescription, onGroupUpdate);
+
   return (
     <div className="h-full w-full">
       <div
@@ -267,17 +322,17 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
           <div
             className={cn(
               "canvas-node-drag-handle flex min-h-10 cursor-grab items-start justify-start px-3 pt-2.5 text-left",
-              isEditingDescription || hasDescriptionText ? "pb-1" : "pb-2.5",
+              text.isEditingDescription || text.hasDescriptionText ? "pb-1" : "pb-2.5",
             )}
           >
             <div className="min-w-0 flex-1 text-left">
-              {isEditingLabel ? (
+              {text.isEditingLabel ? (
                 <input
-                  ref={inputRef}
-                  value={localLabel}
-                  onChange={(e) => setLocalLabel(e.target.value)}
-                  onBlur={commitLabel}
-                  onKeyDown={handleLabelKeyDown}
+                  ref={text.inputRef}
+                  value={text.localLabel}
+                  onChange={(e) => text.setLocalLabel(e.target.value)}
+                  onBlur={text.commitLabel}
+                  onKeyDown={text.handleLabelKeyDown}
                   title="Press Enter to add a description"
                   className={cn(
                     "nodrag w-full bg-transparent text-left text-base font-semibold leading-snug outline-none",
@@ -290,105 +345,47 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
                     "inline-block w-fit max-w-full cursor-text select-none text-left text-base font-semibold leading-snug tracking-tight",
                     colorStyles.labelText,
                   )}
-                  onDoubleClick={handleDoubleClickLabel}
+                  onDoubleClick={text.handleDoubleClickLabel}
                 >
-                  {localLabel}
+                  {text.localLabel}
                 </span>
               )}
             </div>
           </div>
 
-          {isEditingDescription ? (
+          {text.isEditingDescription ? (
             <div className="nodrag w-full px-3 pb-2.5 pt-0 text-left">
               <textarea
-                ref={descriptionRef}
-                value={localDescription}
-                onChange={(e) => setLocalDescription(e.target.value)}
-                onBlur={commitDescription}
-                onKeyDown={handleDescriptionKeyDown}
+                ref={text.descriptionRef}
+                value={text.localDescription}
+                onChange={(e) => text.setLocalDescription(e.target.value)}
+                onBlur={text.commitDescription}
+                onKeyDown={text.handleDescriptionKeyDown}
                 rows={3}
                 placeholder="Description (optional)"
-                className={cn(
-                  "w-full min-h-[4.5rem] resize-none border-0 bg-transparent text-left text-sm leading-snug text-slate-600 outline-none ring-0 placeholder:text-slate-400/70",
-                )}
+                className="w-full min-h-[4.5rem] resize-none border-0 bg-transparent text-left text-sm leading-snug text-slate-600 outline-none ring-0 placeholder:text-slate-400/70"
               />
             </div>
-          ) : hasDescriptionText ? (
+          ) : text.hasDescriptionText ? (
             <div className="nodrag w-full px-3 pb-2.5 pt-0 text-left">
               <p
                 className="cursor-text select-none whitespace-pre-wrap text-left text-sm leading-snug text-slate-600 line-clamp-6"
-                onDoubleClick={() => {
-                  if (onGroupUpdate) {
-                    setIsEditingDescription(true);
-                  }
-                }}
+                onDoubleClick={() => onGroupUpdate && text.setIsEditingDescription(true)}
               >
-                {localDescription}
+                {text.localDescription}
               </p>
             </div>
           ) : null}
         </div>
 
         {!hideActionsButton && (
-          <>
-            <div className="absolute -top-12 right-0 z-20 h-12 w-44 opacity-0" aria-hidden />
-            <div className="nodrag absolute -top-8 right-0 z-30 hidden flex-nowrap items-center justify-start gap-2 rounded-md border border-slate-200/80 bg-white/95 px-1.5 py-1 shadow-md group-hover:flex">
-              <div className="group/swatch flex shrink-0 items-center gap-2 px-0.5 py-0.5">
-                <div className="hidden shrink-0 flex-nowrap items-center gap-2 group-hover/swatch:flex">
-                  {colorOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={(event: React.MouseEvent) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        onGroupUpdate?.({ color: option.value });
-                      }}
-                      className={cn("h-4 w-4 shrink-0 rounded-full border-2 transition", option.dot)}
-                      aria-label={`Set group color to ${GROUP_COLORS[option.value].label}`}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={(event: React.MouseEvent) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                  }}
-                  className={cn("h-4 w-4 shrink-0 rounded-full border-2 transition", GROUP_COLORS[activeColor].dot)}
-                  aria-label={`Current group color: ${GROUP_COLORS[activeColor].label}`}
-                />
-              </div>
-              {onUngroup && (
-                <button
-                  type="button"
-                  onClick={(event: React.MouseEvent) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onUngroup();
-                  }}
-                  className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                  aria-label="Ungroup nodes"
-                >
-                  <Ungroup size={16} />
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  type="button"
-                  onClick={(event: React.MouseEvent) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onDelete();
-                  }}
-                  className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                  aria-label="Delete group and contained nodes"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          </>
+          <GroupActionsToolbar
+            activeColor={activeColor}
+            colorOptions={colorOptions}
+            onGroupUpdate={onGroupUpdate}
+            onUngroup={onUngroup}
+            onDelete={onDelete}
+          />
         )}
       </div>
     </div>

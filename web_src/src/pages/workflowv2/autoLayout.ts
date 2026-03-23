@@ -228,13 +228,36 @@ function buildLayoutAdjacency(
   return adjacencyByNodeID;
 }
 
+function bfsCollectComponent(
+  seedNodeID: string,
+  adjacencyByNodeID: Map<string, string[]>,
+  nodesByID: Map<string, ComponentsNode>,
+  visitedNodeIDs: Set<string>,
+): ComponentsNode[] {
+  const componentNodes: ComponentsNode[] = [];
+  const queue = [seedNodeID];
+
+  while (queue.length > 0) {
+    const currentNodeID = queue.shift();
+    if (!currentNodeID || visitedNodeIDs.has(currentNodeID)) continue;
+
+    visitedNodeIDs.add(currentNodeID);
+    const currentNode = nodesByID.get(currentNodeID);
+    if (currentNode) componentNodes.push(currentNode);
+
+    for (const neighborNodeID of adjacencyByNodeID.get(currentNodeID) || []) {
+      if (!visitedNodeIDs.has(neighborNodeID)) queue.push(neighborNodeID);
+    }
+  }
+
+  return componentNodes;
+}
+
 function resolveDisconnectedLayoutComponents(
   layoutNodes: ComponentsNode[],
   layoutEdges: Array<{ sourceId?: string; targetId?: string }>,
 ): ComponentsNode[][] {
-  if (layoutNodes.length === 0) {
-    return [];
-  }
+  if (layoutNodes.length === 0) return [];
 
   const adjacencyByNodeID = buildLayoutAdjacency(layoutNodes, layoutEdges);
   const nodesByID = new Map(layoutNodes.map((node) => [node.id as string, node]));
@@ -243,36 +266,9 @@ function resolveDisconnectedLayoutComponents(
 
   for (const node of layoutNodes) {
     const seedNodeID = node.id as string;
-    if (visitedNodeIDs.has(seedNodeID)) {
-      continue;
-    }
-
-    const componentNodes: ComponentsNode[] = [];
-    const queue = [seedNodeID];
-
-    while (queue.length > 0) {
-      const currentNodeID = queue.shift();
-      if (!currentNodeID || visitedNodeIDs.has(currentNodeID)) {
-        continue;
-      }
-
-      visitedNodeIDs.add(currentNodeID);
-      const currentNode = nodesByID.get(currentNodeID);
-      if (currentNode) {
-        componentNodes.push(currentNode);
-      }
-
-      const neighbors = adjacencyByNodeID.get(currentNodeID) || [];
-      for (const neighborNodeID of neighbors) {
-        if (!visitedNodeIDs.has(neighborNodeID)) {
-          queue.push(neighborNodeID);
-        }
-      }
-    }
-
-    if (componentNodes.length > 0) {
-      components.push(componentNodes);
-    }
+    if (visitedNodeIDs.has(seedNodeID)) continue;
+    const collected = bfsCollectComponent(seedNodeID, adjacencyByNodeID, nodesByID, visitedNodeIDs);
+    if (collected.length > 0) components.push(collected);
   }
 
   return components;
@@ -530,33 +526,41 @@ function applyLayoutedPositions(
   });
 }
 
+function resolveNodeOutputChannels(
+  node: ComponentsNode,
+  components: ComponentsComponent[],
+  blueprints: BlueprintsBlueprint[],
+): string[] {
+  const defaultChannels = ["default"];
+
+  if (node.type === "TYPE_BLUEPRINT") {
+    const componentMeta = components.find((c) => c.name === node.component?.name);
+    const bp = blueprints.find((b) => b.id === node.blueprint?.id);
+    return (
+      componentMeta?.outputChannels?.map((c) => c.name!).filter(Boolean) ||
+      bp?.outputChannels?.map((c) => c.name!).filter(Boolean) ||
+      defaultChannels
+    );
+  }
+
+  if (node.type === "TYPE_COMPONENT" && node.component?.name) {
+    const meta = components.find((c) => c.name === node.component?.name);
+    return meta?.outputChannels?.map((c) => c.name!).filter(Boolean) || defaultChannels;
+  }
+
+  return defaultChannels;
+}
+
 export function buildChannelsByNodeId(
   workflow: CanvasesCanvas,
   components: ComponentsComponent[],
   blueprints: BlueprintsBlueprint[],
 ): Map<string, string[]> {
   const map = new Map<string, string[]>();
-
   for (const node of workflow.spec?.nodes || []) {
     if (!node.id) continue;
-
-    let channels: string[] = ["default"];
-
-    if (node.type === "TYPE_TRIGGER") {
-      channels = ["default"];
-    } else if (node.type === "TYPE_BLUEPRINT") {
-      const componentMeta = components.find((c) => c.name === node.component?.name);
-      const bp = blueprints.find((b) => b.id === node.blueprint?.id);
-      channels = componentMeta?.outputChannels?.map((c) => c.name!).filter(Boolean) ||
-        bp?.outputChannels?.map((c) => c.name!).filter(Boolean) || ["default"];
-    } else if (node.type === "TYPE_COMPONENT" && node.component?.name) {
-      const meta = components.find((c) => c.name === node.component?.name);
-      channels = meta?.outputChannels?.map((c) => c.name!).filter(Boolean) || ["default"];
-    }
-
-    map.set(node.id, channels);
+    map.set(node.id, resolveNodeOutputChannels(node, components, blueprints));
   }
-
   return map;
 }
 
