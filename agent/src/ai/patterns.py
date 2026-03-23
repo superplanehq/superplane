@@ -143,3 +143,23 @@ def search_decision_patterns(
             }
         )
     return results
+
+
+def get_decision_pattern(
+    pattern_id: str,
+    pattern_dir: Path | None = None,
+) -> dict[str, str] | None:
+    normalized_pattern_id = pattern_id.strip().lower()
+    if not normalized_pattern_id:
+        return None
+
+    for pattern in load_decision_patterns(pattern_dir):
+        if pattern.id.lower() != normalized_pattern_id:
+            continue
+        return {
+            "id": pattern.id,
+            "title": pattern.title,
+            "path": str(pattern.path),
+            "content": pattern.content,
+        }
+    return None

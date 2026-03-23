@@ -7,6 +7,7 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
 
 from ai.models import CanvasAnswer, CanvasQuestionRequest, CanvasSummary
+from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
 from ai.patterns import search_decision_patterns as search_markdown_patterns
 from ai.superplane_client import SuperplaneClient
@@ -41,7 +42,9 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "Do not block proposing provider nodes just because org integrations are missing; "
             "it is valid to add nodes first and configure integration bindings later. "
             "When integration is missing, still provide the node proposal and mention setup as a follow-up. "
-            "When a request sounds like a known workflow archetype, call list_decision_patterns or search_decision_patterns first."
+            "When a request sounds like a known workflow archetype, call list_decision_patterns or search_decision_patterns first. "
+            "After selecting a pattern, always call get_decision_pattern and follow the retrieved pattern content as closely as possible. "
+            "If a relevant pattern is found, follow it as closely as possible and only deviate when required by the user's explicit request or current canvas constraints. "
             "Do not claim a provider is unavailable unless a catalog tool succeeds and clearly shows no matches. "
             "If catalog tools fail, state that availability could not be verified and proceed with a best-effort proposal. "
             "When the user asks for canvas edits, include a structured proposal with "
@@ -101,6 +104,20 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         except Exception as error:
             _tool_debug(f"search_decision_patterns failed: {error}")
             return [_tool_error_entry("search_decision_patterns", error)]
+
+    @agent.tool
+    def get_decision_pattern(
+        _ctx: RunContext[AgentDeps], pattern_id: str
+    ) -> dict[str, Any]:
+        """Fetch full markdown content for one decision pattern by id."""
+        try:
+            pattern = get_markdown_pattern(pattern_id=pattern_id)
+            if pattern is None:
+                return {"id": pattern_id, "error": "pattern_not_found"}
+            return pattern
+        except Exception as error:
+            _tool_debug(f"get_decision_pattern failed for {pattern_id}: {error}")
+            return {"id": pattern_id, "error": str(error)}
 
     @agent.tool
     def list_components(
