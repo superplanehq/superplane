@@ -2470,6 +2470,8 @@ function CanvasContent({
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
       const prev = previouslySelectedRef.current;
+      const nodes = stateRef.current.nodes ?? [];
+
       if (prev.size > 0) {
         changes = changes.map((c) => {
           if (c.type === "select" && !c.selected && prev.has(c.id)) {
@@ -2480,7 +2482,6 @@ function CanvasContent({
       }
 
       if (!isReadOnly) {
-        const nodes = stateRef.current.nodes ?? [];
         state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes));
         resizeGroupsAfterChildChanges(changes, nodes, state.setNodes);
         return;

@@ -3215,12 +3215,20 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(canvas);
 
-      const existingNodeNames = (canvas.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
+      const specNodes = canvas.spec?.nodes || [];
+      const childToGroup = buildChildToGroupMap(specNodes);
+
+      const filteredNodeIds = nodeIds.filter((id) => {
+        const node = specNodes.find((n) => n.id === id);
+        return node && !(node.type === "TYPE_WIDGET" && node.widget?.name === "group");
+      });
+
+      const existingNodeNames = specNodes.map((n) => n.name || "").filter(Boolean);
       const newNodes: ComponentsNode[] = [];
       const nodeIdMap: Record<string, string> = {};
 
-      for (const nodeId of nodeIds) {
-        const nodeToDuplicate = canvas.spec?.nodes?.find((node) => node.id === nodeId);
+      for (const nodeId of filteredNodeIds) {
+        const nodeToDuplicate = specNodes.find((node) => node.id === nodeId);
         if (!nodeToDuplicate) continue;
 
         let baseName = nodeToDuplicate.name?.trim() || "";
@@ -3243,13 +3251,18 @@ export function WorkflowPageV2() {
 
         nodeIdMap[nodeId] = newNodeId;
 
+        const groupId = childToGroup.get(nodeId);
+        const groupNode = groupId ? specNodes.find((n) => n.id === groupId) : undefined;
+        const absoluteX = (nodeToDuplicate.position?.x || 0) + (groupNode?.position?.x || 0);
+        const absoluteY = (nodeToDuplicate.position?.y || 0) + (groupNode?.position?.y || 0);
+
         newNodes.push({
           ...nodeToDuplicate,
           id: newNodeId,
           name: uniqueNodeName,
           position: {
-            x: (nodeToDuplicate.position?.x || 0) + 50,
-            y: (nodeToDuplicate.position?.y || 0) + 50,
+            x: absoluteX + 50,
+            y: absoluteY + 50,
           },
           isCollapsed: false,
         });
@@ -3257,7 +3270,7 @@ export function WorkflowPageV2() {
 
       if (newNodes.length === 0) return;
 
-      const duplicatedNodeIds = new Set(nodeIds);
+      const duplicatedNodeIds = new Set(filteredNodeIds);
       const newEdges = (canvas.spec?.edges || [])
         .filter(
           (edge) =>
