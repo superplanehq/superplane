@@ -15,6 +15,50 @@ class ReportBuilder:
         self.report = report
         self.console = Console()
 
+    def render(self) -> None:
+        output_dir = Path("tmp/eval_outputs")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        total_duration = 0.0
+        case_count_with_duration = 0
+        total_assertions = 0
+        passed_assertions = 0
+
+        self.console.print()
+        self.console.print()
+
+        for i, case_result in enumerate(self.report.cases):
+            case_name = getattr(case_result, "name", None) or f"case_{i}"
+            safe_case_name = re.sub(r"[^A-Za-z0-9_.-]", "_", case_name)
+            filename = output_dir / f"{safe_case_name}.json"
+            serialized_output = self._serialize_output(case_result.output)
+            case_input = getattr(case_result, "inputs", getattr(case_result, "input", "-"))
+            assertion_values = self._get_assertion_values(case_result)
+            duration_seconds = self._duration_seconds(case_result)
+
+            with filename.open("w", encoding="utf-8") as file:
+                json.dump(serialized_output, file, indent=2, default=str)
+
+            self.console.print(f"{case_name} {self._format_duration(case_result)}")
+            self.console.print(f"  input: {case_input}")
+            self.console.print(f"  output: {filename}")
+            self.console.print(f"  assertions: {self._format_assertions_inline(case_result)}")
+
+            total_assertions += len(assertion_values)
+            passed_assertions += sum(1 for assertion in assertion_values if bool(getattr(assertion, "value", False)))
+            if duration_seconds is not None:
+                total_duration += duration_seconds
+                case_count_with_duration += 1
+
+            if i < len(self.report.cases) - 1:
+                self.console.print()
+                self.console.print()
+
+        self.console.print()
+        self.console.print()
+
+        self.console.print(f"duration: {total_duration:.1f}s")
+        self.console.print(f"results: {passed_assertions}/{total_assertions}")
+
     def _serialize_output(self, output: Any) -> Any:
         if hasattr(output, "model_dump"):
             return output.model_dump()
@@ -69,62 +113,5 @@ class ReportBuilder:
         if duration_seconds is None:
             return "-"
         return f"{duration_seconds:.1f}s"
-
-    def render(self) -> None:
-        in_docker = os.getenv("IN_DOCKER") == "1"
-        output_dir = Path("/app/tmp/eval_outputs") if in_docker else Path("tmp/eval_outputs")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        total_duration = 0.0
-        case_count_with_duration = 0
-        total_assertions = 0
-        passed_assertions = 0
-
-        self.console.print()
-        self.console.print()
-
-        for i, case_result in enumerate(self.report.cases):
-            case_name = getattr(case_result, "name", None) or f"case_{i}"
-            safe_case_name = re.sub(r"[^A-Za-z0-9_.-]", "_", case_name)
-            filename = output_dir / f"{safe_case_name}.json"
-            display_path = Path("agent/tmp/eval_outputs") / filename.name if in_docker else filename
-            serialized_output = self._serialize_output(case_result.output)
-            case_input = getattr(case_result, "inputs", getattr(case_result, "input", "-"))
-            assertion_values = self._get_assertion_values(case_result)
-            duration_seconds = self._duration_seconds(case_result)
-
-            with filename.open("w", encoding="utf-8") as file:
-                json.dump(serialized_output, file, indent=2, default=str)
-
-            self.console.print(f"{case_name} {self._format_duration(case_result)}")
-            self.console.print(f"  input: {case_input}")
-            self.console.print(f"  output: {display_path}")
-            self.console.print(f"  assertions: {self._format_assertions_inline(case_result)}")
-
-            total_assertions += len(assertion_values)
-            passed_assertions += sum(1 for assertion in assertion_values if bool(getattr(assertion, "value", False)))
-            if duration_seconds is not None:
-                total_duration += duration_seconds
-                case_count_with_duration += 1
-
-            if i < len(self.report.cases) - 1:
-                self.console.print()
-                self.console.print()
-
-        self.console.print()
-        self.console.print()
-
-        avg_duration = total_duration / case_count_with_duration if case_count_with_duration else None
-        avg_assertion_rate = (passed_assertions / total_assertions) if total_assertions else None
-
-        self.console.print()
-        self.console.print("averages and total duration")
-        self.console.print(f"average duration: {avg_duration:.1f}s" if avg_duration is not None else "average duration: -")
-        if avg_assertion_rate is not None:
-            self.console.print(
-                f"average assertions: {passed_assertions}/{total_assertions} ({avg_assertion_rate:.1%})"
-            )
-        else:
-            self.console.print("average assertions: -")
-        self.console.print(f"total duration: {total_duration:.1f}s")
 
   
