@@ -66,6 +66,11 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 
 			for _, execution := range executions {
 				if err := w.semaphore.Acquire(ctx, 1); err != nil {
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						w.logger.Infof("Worker context canceled while acquiring semaphore, stopping tick processing")
+						break
+					}
+
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}

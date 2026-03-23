@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -49,6 +50,11 @@ func (w *EventRouter) Start(ctx context.Context) {
 			for _, event := range events {
 				logger := logging.ForEvent(w.logger, event)
 				if err := w.semaphore.Acquire(ctx, 1); err != nil {
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						w.logger.Infof("Worker context canceled while acquiring semaphore, stopping tick processing")
+						break
+					}
+
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}

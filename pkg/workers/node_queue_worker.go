@@ -56,6 +56,11 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 			for _, node := range nodes {
 				logger := logging.WithNode(w.logger, node)
 				if err := w.semaphore.Acquire(ctx, 1); err != nil {
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						logger.Infof("Worker context canceled while acquiring semaphore, stopping tick processing")
+						break
+					}
+
 					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
