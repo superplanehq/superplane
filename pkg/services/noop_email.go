@@ -63,15 +63,6 @@ func (s *NoopEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) e
 	return nil
 }
 
-func (s *NoopEmailService) SentMagicCodeEmails() []SentMagicCodeEmail {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	emails := make([]SentMagicCodeEmail, len(s.magicCodeEmails))
-	copy(emails, s.magicCodeEmails)
-	return emails
-}
-
 func (s *NoopEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
