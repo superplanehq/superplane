@@ -154,3 +154,11 @@ export function isUrl(value: string): boolean {
     return false;
   }
 }
+
+/**
+ * Clamps a value to a range [min, max]. If max < min, returns min.
+ */
+export function clampInRange(value: number, min: number, max: number): number {
+  if (max < min) return min;
+  return Math.min(Math.max(value, min), max);
+}

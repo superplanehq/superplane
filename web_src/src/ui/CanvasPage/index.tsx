@@ -46,6 +46,7 @@ import {
   OrganizationsIntegration,
 } from "@/api-client";
 import { parseDefaultValues } from "@/utils/components";
+import { clampInRange } from "@/lib/utils";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
 import {
@@ -101,11 +102,6 @@ function sizeFromNodeOrInternal(
   const w = internal?.measured?.width ?? node.width ?? node.measured?.width ?? fallback.w;
   const h = internal?.measured?.height ?? node.height ?? node.measured?.height ?? fallback.h;
   return { w, h };
-}
-
-function clampInRange(value: number, min: number, max: number) {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
 }
 
 function clampGroupChildNodePositionChanges(

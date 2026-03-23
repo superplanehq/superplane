@@ -39,7 +39,7 @@ function estimateNodeSize(node: ComponentsNode): { width: number; height: number
   };
 }
 
-function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
+export function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
   const childToGroup = new Map<string, string>();
   for (const node of nodes) {
     if (node.type === "TYPE_WIDGET" && node.widget?.name === "group" && node.id) {

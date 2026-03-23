@@ -239,11 +239,12 @@ function useGroupTextEditing(
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        commitLabel();
+        setLocalLabel(groupLabel);
+        setIsEditingLabel(false);
         inputRef.current?.blur();
       }
     },
-    [commitLabel, onGroupUpdate],
+    [commitLabel, onGroupUpdate, groupLabel],
   );
 
   const commitDescription = useCallback(() => {
@@ -399,5 +400,8 @@ export const GroupNode = React.memo(
     prev.groupDescription === next.groupDescription &&
     prev.groupColor === next.groupColor &&
     prev.selected === next.selected &&
-    prev.hideActionsButton === next.hideActionsButton,
+    prev.hideActionsButton === next.hideActionsButton &&
+    !!prev.onGroupUpdate === !!next.onGroupUpdate &&
+    !!prev.onUngroup === !!next.onUngroup &&
+    !!prev.onDelete === !!next.onDelete,
 );

@@ -2,6 +2,7 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
+import { clampInRange } from "@/lib/utils";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { GitBranch, Loader2, Puzzle } from "lucide-react";
@@ -99,7 +100,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
+import { applyHorizontalAutoLayout, buildChannelsByNodeId, buildChildToGroupMap } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -5229,21 +5230,6 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
   return nodesBefore;
 }
 
-function clampToRange(value: number, min: number, max: number): number {
-  return max >= min ? Math.min(Math.max(value, min), max) : min;
-}
-
-function buildGroupChildMap(specNodes: ComponentsNode[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const specNode of specNodes) {
-    if (specNode.type !== "TYPE_WIDGET" || specNode.widget?.name !== "group" || !specNode.id) continue;
-    for (const childId of collectGroupChildIds(specNode)) {
-      map.set(childId, specNode.id);
-    }
-  }
-  return map;
-}
-
 function buildGroupSizeMap(nodes: CanvasNode[]): Map<string, { w: number; h: number }> {
   const map = new Map<string, { w: number; h: number }>();
   for (const n of nodes) {
@@ -5255,7 +5241,7 @@ function buildGroupSizeMap(nodes: CanvasNode[]): Map<string, { w: number; h: num
 }
 
 function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
-  const groupChildMap = buildGroupChildMap(workflow?.spec?.nodes || []);
+  const groupChildMap = buildChildToGroupMap(workflow?.spec?.nodes || []);
   const groupSizeById = buildGroupSizeMap(nodes);
   const pad = GROUP_CHILD_EDGE_PADDING;
 
@@ -5264,8 +5250,8 @@ function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: Canv
     if (!parentId) return node;
 
     const { w: pw, h: ph } = groupSizeById.get(parentId) ?? { w: 480, h: 320 };
-    const x = clampToRange(node.position?.x ?? 0, pad, pw - (node.width ?? 280) - pad);
-    const y = clampToRange(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET, ph - (node.height ?? 100) - pad);
+    const x = clampInRange(node.position?.x ?? 0, pad, pw - (node.width ?? 280) - pad);
+    const y = clampInRange(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET, ph - (node.height ?? 100) - pad);
     return { ...node, parentId, extent: "parent" as const, position: { x, y } };
   });
 
