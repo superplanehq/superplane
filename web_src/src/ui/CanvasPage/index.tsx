@@ -472,7 +472,7 @@ function GroupNodeRenderer(nodeProps: {
     : undefined;
 
   return (
-    <div style={{ width: nodeProps.width, height: nodeProps.height }}>
+    <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
       <GroupNode
         {...groupData}
         selected={nodeProps.selected}

@@ -211,6 +211,19 @@ func (s *TestSession) Click(q queries.Query) {
 	}
 }
 
+// ClickWithControlOrMeta clicks with the multi-selection modifier (Control on Windows/Linux, Meta on macOS).
+func (s *TestSession) ClickWithControlOrMeta(q queries.Query) {
+	s.t.Logf("Clicking with ControlOrMeta modifier %q", q.Describe())
+
+	opts := pw.LocatorClickOptions{
+		Timeout:   pw.Float(s.timeoutMs),
+		Modifiers: []pw.KeyboardModifier{*pw.KeyboardModifierControlOrMeta},
+	}
+	if err := q.Run(s).Click(opts); err != nil {
+		s.t.Fatalf("click with ControlOrMeta %q: %v", q.Describe(), err)
+	}
+}
+
 func (s *TestSession) FillIn(q queries.Query, value string) {
 	s.t.Logf("Filling in %q with %q", q.Describe(), value)
 
