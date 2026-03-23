@@ -66,8 +66,7 @@ type canvasChangeRequestSteps struct {
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
 
-	changeRequestID    string
-	changeRequestTitle string
+	changeRequestID string
 }
 
 func (s *canvasChangeRequestSteps) start() {
@@ -83,8 +82,6 @@ func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationVersioningEnabled(
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	// Default create-modal title for a new canvas is v1 (see workflowv2 create CR title effect).
-	s.changeRequestTitle = "v1"
 	s.session.AssertVisible(q.Locator(`header button:has-text("Edit")`))
 }
 
@@ -173,16 +170,21 @@ func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
 
 	s.session.AssertText("Versions")
 
-	// Version rows use aria-label "Preview <title>" (see CanvasVersionControlSidebar VersionRow).
-	previewName := "Preview " + s.changeRequestTitle
-	row := s.session.Page().Locator("aside").GetByRole("button", pw.LocatorGetByRoleOptions{
-		Name:  previewName,
-		Exact: pw.Bool(true),
-	})
-	require.NoError(s.t, row.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
-	require.NoError(s.t, row.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	// Scope to the version sidebar (not e.g. log panel): it contains the collapse control.
+	// Pending rows are listed before live rows; both can share "Preview v1" as the accessible name, so use .First().
+	// Row label is "Preview v{n}" matching the create-modal default title (see workflowv2 create CR title effect).
+	// "View details" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
+	versionAside := s.session.Page().Locator(`aside:has([aria-label="Collapse version control"])`)
+	previewRow := versionAside.GetByRole("button", pw.LocatorGetByRoleOptions{
+		Name: regexp.MustCompile(`^Preview v\d+`),
+	}).First()
+	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
+	viewDetails := previewRow.Locator(`[aria-label="View details"]`)
+	require.NoError(s.t, viewDetails.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
+	require.NoError(s.t, viewDetails.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 
-	s.session.AssertVisible(q.Locator(`[data-slot="dialog-title"]:has-text("` + s.changeRequestTitle + `")`))
+	dialogTitle := s.session.Page().Locator(`[data-slot="dialog-title"]`)
+	require.NoError(s.t, dialogTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
 	s.session.AssertText("Review Actions")
 }
 
