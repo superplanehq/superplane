@@ -236,6 +236,9 @@ export const Login: React.FC = () => {
     try {
       const formData = new URLSearchParams();
       formData.append("email", magicCodeEmail.trim());
+      if (redirectTarget) {
+        formData.append("redirect", redirectTarget);
+      }
 
       const response = await fetch("/auth/magic-code/request", {
         method: "POST",

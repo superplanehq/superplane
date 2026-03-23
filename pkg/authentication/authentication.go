@@ -571,7 +571,8 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 		log.Errorf("Failed to generate magic link token for %s: %v", email, err)
 	}
 
-	msg := messages.NewMagicCodeRequestedMessage(email, code, magicLinkToken)
+	redirectURL := strings.TrimSpace(r.FormValue("redirect"))
+	msg := messages.NewMagicCodeRequestedMessage(email, code, magicLinkToken, redirectURL)
 	if err := msg.Publish(); err != nil {
 		log.Errorf("Failed to publish magic code email request for %s: %v", email, err)
 	}
@@ -596,19 +597,28 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Check signup policy before consuming the code. This avoids permanently
-	// spending a single-use code when the signup check would reject the
-	// request with 403, forcing the user to request a new one.
+	// 1. Validate the code exists without consuming it. This ensures that
+	//    invalid-code requests always return 401 regardless of account
+	//    existence, preventing email enumeration via differing status codes.
+	magicCode, err := a.findValidCode(email, code)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Check signup policy. Only reachable with a valid code, so a 403
+	//    here does not leak account existence to unauthenticated attackers.
 	if err := a.checkSignupPolicy(email, r); err != nil {
 		http.Error(w, err.Error(), errorStatusForAccountError(err))
 		return
 	}
 
-	if err := a.validateAndConsumeCode(email, code); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			http.Error(w, "Invalid or expired code", http.StatusUnauthorized)
-			return
-		}
+	// 3. Atomically consume the code.
+	if err := a.consumeCode(magicCode, email); err != nil {
 		http.Error(w, err.Error(), errorStatusForCodeError(err))
 		return
 	}
@@ -650,14 +660,16 @@ func (a *Handler) parseMagicCodeInput(r *http.Request) (string, string, error) {
 var errCodeUsed = fmt.Errorf("Invalid or expired code")
 var errDBError = fmt.Errorf("Internal server error")
 
-func (a *Handler) validateAndConsumeCode(email, code string) error {
+// findValidCode looks up a valid, unconsumed magic code without marking it
+// as used. On failure it increments the per-code attempt counter.
+func (a *Handler) findValidCode(email, code string) (*models.AccountMagicCode, error) {
 	codeHash := crypto.HashToken(code)
 
 	magicCode, err := models.FindValidAccountMagicCode(email, codeHash, magicCodeMaxVerifyAttempts)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Errorf("Database error during magic code lookup for %s: %v", email, err)
-			return errDBError
+			return nil, errDBError
 		}
 
 		log.Warnf("Invalid magic code attempt for %s", email)
@@ -666,9 +678,14 @@ func (a *Handler) validateAndConsumeCode(email, code string) error {
 			log.Errorf("Failed to process verify attempt for %s: %v", email, incrErr)
 		}
 
-		return gorm.ErrRecordNotFound
+		return nil, gorm.ErrRecordNotFound
 	}
 
+	return magicCode, nil
+}
+
+// consumeCode atomically marks a previously-found code as used.
+func (a *Handler) consumeCode(magicCode *models.AccountMagicCode, email string) error {
 	marked, err := magicCode.MarkUsed()
 	if err != nil {
 		log.Errorf("Failed to mark magic code as used for %s: %v", email, err)
@@ -817,6 +834,13 @@ func (a *Handler) handleMagicLinkRedirect(w http.ResponseWriter, r *http.Request
 	}
 
 	redirectURL := fmt.Sprintf("/login?magic_link_token=%s", url.QueryEscape(token))
+
+	// Preserve the redirect parameter so invite context survives the
+	// magic-link round-trip through email.
+	if redirect := r.URL.Query().Get("redirect"); redirect != "" {
+		redirectURL += "&redirect=" + url.QueryEscape(redirect)
+	}
+
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
