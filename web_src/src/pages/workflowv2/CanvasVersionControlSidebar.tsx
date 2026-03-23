@@ -41,7 +41,6 @@ interface CanvasVersionControlSidebarProps {
   }>;
   liveVersions: CanvasesCanvasVersion[];
   liveVersionChangeRequestsByVersionId?: Map<string, CanvasesCanvasChangeRequest>;
-  liveVersionsTotalCount?: number;
   canUpdateCanvas: boolean;
   isTemplate: boolean;
   canvasDeletedRemotely: boolean;

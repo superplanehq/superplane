@@ -190,6 +190,56 @@ function versionSortValue(raw?: string): number {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+type ChangeRequestVersionRow = {
+  version: CanvasesCanvasVersion;
+  changeRequest: CanvasesCanvasChangeRequest;
+};
+
+function buildChangeRequestVersionRows(
+  canvasChangeRequests: CanvasesCanvasChangeRequest[],
+  visibleCanvasVersions: CanvasesCanvasVersion[],
+  statusFilter: string,
+): ChangeRequestVersionRow[] {
+  const matchingChangeRequests = canvasChangeRequests
+    .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes(statusFilter))
+    .sort(
+      (left, right) =>
+        versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
+        versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
+    );
+
+  const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
+  visibleCanvasVersions.forEach((version) => {
+    const id = version.metadata?.id;
+    if (!id) {
+      return;
+    }
+    indexedVisibleVersions.set(id, version);
+  });
+
+  const seenVersionIds = new Set<string>();
+  const rows: ChangeRequestVersionRow[] = [];
+
+  matchingChangeRequests.forEach((changeRequest) => {
+    const versionFromRequest = changeRequest.version;
+    const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
+    const resolvedVersion =
+      versionFromRequest?.metadata?.id || versionFromRequest?.spec
+        ? versionFromRequest
+        : indexedVisibleVersions.get(versionId);
+
+    const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
+    if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
+      return;
+    }
+
+    seenVersionIds.add(resolvedVersionId);
+    rows.push({ version: resolvedVersion, changeRequest });
+  });
+
+  return rows;
+}
+
 function resolveApiErrorMessage(error: unknown, fallback: string): string {
   const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
   const runtimeMessage = (error as { message?: string })?.message;
@@ -217,6 +267,7 @@ export function WorkflowPageV2() {
   const [isCreateChangeRequestMode, setIsCreateChangeRequestMode] = useState(false);
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
+  const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
@@ -373,84 +424,14 @@ export function WorkflowPageV2() {
     });
     return profilesByID;
   }, [organizationUsers]);
-  const pendingApprovalVersions = useMemo(() => {
-    const openChangeRequests = canvasChangeRequests
-      .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes("open"))
-      .sort(
-        (left, right) =>
-          versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
-          versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
-      );
-
-    const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
-    visibleCanvasVersions.forEach((version) => {
-      const id = version.metadata?.id;
-      if (!id) return;
-      indexedVisibleVersions.set(id, version);
-    });
-
-    const seenVersionIds = new Set<string>();
-    const rows: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }> = [];
-
-    openChangeRequests.forEach((changeRequest) => {
-      const versionFromRequest = changeRequest.version;
-      const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
-      const resolvedVersion =
-        versionFromRequest?.metadata?.id || versionFromRequest?.spec
-          ? versionFromRequest
-          : indexedVisibleVersions.get(versionId);
-
-      const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
-      if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
-        return;
-      }
-
-      seenVersionIds.add(resolvedVersionId);
-      rows.push({ version: resolvedVersion, changeRequest });
-    });
-
-    return rows;
-  }, [canvasChangeRequests, visibleCanvasVersions]);
-  const rejectedVersions = useMemo(() => {
-    const rejectedChangeRequests = canvasChangeRequests
-      .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes("reject"))
-      .sort(
-        (left, right) =>
-          versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
-          versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
-      );
-
-    const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
-    visibleCanvasVersions.forEach((version) => {
-      const id = version.metadata?.id;
-      if (!id) {
-        return;
-      }
-      indexedVisibleVersions.set(id, version);
-    });
-
-    const seenVersionIds = new Set<string>();
-    const rows: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }> = [];
-
-    rejectedChangeRequests.forEach((changeRequest) => {
-      const versionFromRequest = changeRequest.version;
-      const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
-      const resolvedVersion =
-        versionFromRequest?.metadata?.id || versionFromRequest?.spec
-          ? versionFromRequest
-          : indexedVisibleVersions.get(versionId);
-
-      const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
-      if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
-        return;
-      }
-
-      seenVersionIds.add(resolvedVersionId);
-      rows.push({ version: resolvedVersion, changeRequest });
-    });
-
-    return rows;
-  }, [canvasChangeRequests, visibleCanvasVersions]);
+  const pendingApprovalVersions = useMemo(
+    () => buildChangeRequestVersionRows(canvasChangeRequests, visibleCanvasVersions, "open"),
+    [canvasChangeRequests, visibleCanvasVersions],
+  );
+  const rejectedVersions = useMemo(
+    () => buildChangeRequestVersionRows(canvasChangeRequests, visibleCanvasVersions, "reject"),
+    [canvasChangeRequests, visibleCanvasVersions],
+  );
   const pendingApprovalVersionIds = useMemo(() => {
     const ids = new Set<string>();
     pendingApprovalVersions.forEach((item) => {
@@ -491,7 +472,6 @@ export function WorkflowPageV2() {
         ),
     [visibleCanvasVersions],
   );
-  const liveVersionsTotalCount = paginatedVersionPages[0]?.totalCount || liveVersions.length;
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
@@ -710,9 +690,15 @@ export function WorkflowPageV2() {
 
   useEffect(() => {
     if (!isCreateChangeRequestMode) {
+      hasInitializedCreateChangeRequestFormRef.current = false;
       return;
     }
 
+    if (hasInitializedCreateChangeRequestFormRef.current) {
+      return;
+    }
+
+    hasInitializedCreateChangeRequestFormRef.current = true;
     const nextVersionNumber = canvasChangeRequests.length + 1;
     setCreateChangeRequestTitle(`v${nextVersionNumber}`);
     setCreateChangeRequestDescription("");
@@ -5056,7 +5042,6 @@ export function WorkflowPageV2() {
                 pendingApprovalVersions={pendingApprovalVersions}
                 liveVersions={liveVersions}
                 liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-                liveVersionsTotalCount={liveVersionsTotalCount}
                 canUpdateCanvas={canUpdateCanvas}
                 isTemplate={isTemplate}
                 canvasDeletedRemotely={canvasDeletedRemotely}
