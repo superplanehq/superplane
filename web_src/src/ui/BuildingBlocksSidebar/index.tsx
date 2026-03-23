@@ -8,35 +8,23 @@ import type {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { resolveIcon } from "@/lib/utils";
 import { getAgentUrl, isCustomComponentsEnabled } from "@/lib/env";
+import { resolveIcon } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { getComponentSubtype } from "../buildingBlocks";
-import {
-  ChevronRight,
-  GripVerticalIcon,
-  Plug,
-  Plus,
-  Search,
-  SendHorizontal,
-  Settings2,
-  StickyNote,
-  X,
-} from "lucide-react";
+import { ChevronRight, GripVerticalIcon, Plug, Plus, Search, Settings2, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
 import { toTestId } from "../../utils/testID";
+import { getComponentSubtype } from "../buildingBlocks";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
 import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
+import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 
 export interface BuildingBlock {
   name: string;
@@ -204,7 +192,7 @@ export function BuildingBlocksSidebar({
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const aiInputRef = useRef<HTMLInputElement>(null);
+  const aiInputRef = useRef<HTMLTextAreaElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
@@ -224,7 +212,6 @@ export function BuildingBlocksSidebar({
   const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
     persistedAiState?.pendingProposal || null,
   );
-  const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
   const applyShortcutHint = useMemo(() => {
     if (typeof navigator === "undefined") {
       return "Ctrl+Enter";
@@ -296,6 +283,15 @@ export function BuildingBlocksSidebar({
         return "Update canvas";
     }
   }, []);
+  const pendingProposalSummaries = useMemo(() => {
+    if (!pendingProposal) {
+      return [];
+    }
+
+    return pendingProposal.operations
+      .filter((operation) => operation.type !== "connect_nodes")
+      .map((operation) => formatOperation(operation, pendingProposal));
+  }, [formatOperation, pendingProposal]);
 
   const handleApplyProposal = useCallback(async () => {
     if (!pendingProposal) return;
@@ -379,19 +375,6 @@ export function BuildingBlocksSidebar({
       pendingProposal,
     });
   }, [activeTab, aiMessages, canvasId, pendingProposal]);
-
-  useEffect(() => {
-    if (activeTab !== "ai") {
-      return;
-    }
-
-    const container = aiMessagesContainerRef.current;
-    if (!container) {
-      return;
-    }
-
-    container.scrollTop = container.scrollHeight;
-  }, [activeTab, aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -659,132 +642,23 @@ export function BuildingBlocksSidebar({
         {(!showAiBuilderTab || activeTab === "components") && componentsTabContent}
 
         {showAiBuilderTab && (
-          <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
-            <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-                {aiMessages.length === 0 ? (
-                  <div className="text-sm text-gray-600">
-                    <div className="flex items-start gap-2">
-                      <p>Describe your flow and I will propose changes.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {aiMessages.map((message) => {
-                      const isEmptyAssistantPlaceholder =
-                        message.role === "assistant" && message.content.trim().length === 0;
-                      if (isEmptyAssistantPlaceholder) {
-                        return null;
-                      }
-
-                      const isToolMessage = message.role === "tool";
-                      const isRunningToolMessage = isToolMessage && message.toolStatus === "running";
-                      return (
-                        <div
-                          key={message.id}
-                          className={message.role === "user" ? "w-full" : isToolMessage ? "mr-6 pl-1" : "mr-6"}
-                        >
-                          <div
-                            className={
-                              message.role === "user"
-                                ? "w-full rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
-                                : isToolMessage
-                                  ? `px-0.5 py-0.5 text-[11px] leading-relaxed text-gray-500 ${
-                                      isRunningToolMessage ? "sp-ai-thinking" : ""
-                                    }`
-                                  : "px-0.5 py-0.5 text-sm text-gray-800"
-                            }
-                          >
-                            {message.role === "assistant" ? (
-                              <div className="max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold">
-                                <ReactMarkdown
-                                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                                  components={{
-                                    a: ({ children, href }) => (
-                                      <a href={href} target="_blank" rel="noopener noreferrer" className="underline">
-                                        {children}
-                                      </a>
-                                    ),
-                                  }}
-                                >
-                                  {message.content}
-                                </ReactMarkdown>
-                              </div>
-                            ) : (
-                              message.content
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {isGeneratingResponse ? (
-                      <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">
-                        Planning next steps...
-                      </div>
-                    ) : null}
-                  </>
-                )}
-
-                {pendingProposal && (
-                  <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
-                    <span className="absolute right-2 top-2 text-[10px] text-blue-800">
-                      {`${applyShortcutHint} to accept`}
-                    </span>
-                    <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
-                      {pendingProposal.operations
-                        .filter((operation) => operation.type !== "connect_nodes")
-                        .map((operation) => (
-                          <li key={`${pendingProposal.id}-${JSON.stringify(operation)}`}>
-                            {formatOperation(operation, pendingProposal)}
-                          </li>
-                        ))}
-                    </ul>
-                    <div className="flex items-center gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        onClick={handleApplyProposal}
-                        disabled={disabled || isApplyingProposal || pendingProposal.operations.length === 0}
-                      >
-                        Apply changes
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={handleDiscardProposal} disabled={isApplyingProposal}>
-                        Discard
-                      </Button>
-                    </div>
-                    {aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
-                  </div>
-                )}
-
-                {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
-              </div>
-
-              <div className="border-t border-border px-3 py-2">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendPrompt();
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Input
-                    ref={aiInputRef}
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    placeholder="Describe your canvas changes..."
-                    disabled={disabled || !canvasId}
-                  />
-                  <Button
-                    type="submit"
-                    size="icon-sm"
-                    disabled={disabled || isGeneratingResponse || !canvasId || !aiInput.trim()}
-                    aria-label="Send prompt"
-                  >
-                    <SendHorizontal size={14} />
-                  </Button>
-                </form>
-              </div>
-            </div>
-          </TabsContent>
+          <AiBuilderChatPanel
+            aiMessages={aiMessages}
+            isGeneratingResponse={isGeneratingResponse}
+            pendingProposal={pendingProposal}
+            pendingProposalSummaries={pendingProposalSummaries}
+            applyShortcutHint={applyShortcutHint}
+            onApplyProposal={() => void handleApplyProposal()}
+            onDiscardProposal={handleDiscardProposal}
+            isApplyingProposal={isApplyingProposal}
+            aiError={aiError}
+            disabled={disabled}
+            canvasId={canvasId}
+            aiInput={aiInput}
+            onAiInputChange={setAiInput}
+            onSendPrompt={() => void handleSendPrompt()}
+            aiInputRef={aiInputRef}
+          />
         )}
       </Tabs>
 
