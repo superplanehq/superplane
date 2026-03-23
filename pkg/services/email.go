@@ -3,8 +3,10 @@ package services
 import (
 	"bytes"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
 	"path/filepath"
+	"strings"
+	texttemplate "text/template"
 
 	"github.com/resend/resend-go/v3"
 	log "github.com/sirupsen/logrus"
@@ -174,15 +176,26 @@ func (s *ResendEmailService) SendNotificationEmail(bccEmails []string, title, bo
 func (s *ResendEmailService) renderTemplate(templateName string, data any) (string, error) {
 	templatePath := filepath.Join(s.templateDir, "email", templateName)
 
-	tmpl, err := template.ParseFiles(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
-	}
-
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
+
+	// Use text/template for .txt files to avoid HTML-escaping URLs
+	// (html/template converts & to &amp; which breaks plain-text links).
+	if strings.HasSuffix(templateName, ".txt") {
+		tmpl, err := texttemplate.ParseFiles(templatePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
+		}
+		if err = tmpl.Execute(&buf, data); err != nil {
+			return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
+		}
+	} else {
+		tmpl, err := htmltemplate.ParseFiles(templatePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
+		}
+		if err = tmpl.Execute(&buf, data); err != nil {
+			return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
+		}
 	}
 
 	return buf.String(), nil

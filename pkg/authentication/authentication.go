@@ -610,8 +610,8 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 2. Check signup policy. Only reachable with a valid code, so a 403
-	//    here does not leak account existence to unauthenticated attackers.
+	// 2. Check signup policy without creating any records. Only reachable
+	//    with a valid code, so a 403 does not leak account existence.
 	if err := a.checkSignupPolicy(email, r); err != nil {
 		http.Error(w, err.Error(), errorStatusForAccountError(err))
 		return
@@ -623,7 +623,8 @@ func (a *Handler) handleMagicCodeVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	account, err := a.resolveAccountForMagicCode(email, r)
+	// 4. Find or create the account (policy already verified above).
+	account, err := a.findOrCreateAccountForMagicCode(email, r)
 	if err != nil {
 		http.Error(w, err.Error(), errorStatusForAccountError(err))
 		return
@@ -712,8 +713,7 @@ var errAccountError = fmt.Errorf("Internal server error")
 
 // checkSignupPolicy verifies that a new-user signup would be allowed for
 // the given email without creating any records. For existing accounts this
-// is always a no-op. Called before consuming the one-time code so that a
-// policy rejection does not waste the code.
+// is always a no-op.
 func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 	_, err := models.FindAccountByEmail(email)
 	if err == nil {
@@ -741,7 +741,9 @@ func (a *Handler) checkSignupPolicy(email string, r *http.Request) error {
 	return nil
 }
 
-func (a *Handler) resolveAccountForMagicCode(email string, r *http.Request) (*models.Account, error) {
+// findOrCreateAccountForMagicCode returns the existing account or creates a
+// new one. Signup policy must already be verified by checkSignupPolicy.
+func (a *Handler) findOrCreateAccountForMagicCode(email string, r *http.Request) (*models.Account, error) {
 	account, err := models.FindAccountByEmail(email)
 	if err == nil {
 		return account, nil
@@ -749,17 +751,6 @@ func (a *Handler) resolveAccountForMagicCode(email string, r *http.Request) (*mo
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Errorf("Error finding account for %s: %v", email, err)
 		return nil, errAccountError
-	}
-
-	inviteToken := strings.TrimSpace(r.FormValue("invite_token"))
-	if a.blockSignup {
-		if inviteToken == "" {
-			return nil, errSignupDisabled
-		}
-		inviteLink, findErr := models.FindInviteLinkByToken(inviteToken)
-		if findErr != nil || !inviteLink.Enabled {
-			return nil, errInviteLinkInvalid
-		}
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))

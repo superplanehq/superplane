@@ -7,7 +7,8 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"html/template"
+	htmltemplate "html/template"
+	texttemplate "text/template"
 	"io"
 	"net/smtp"
 	"path/filepath"
@@ -224,15 +225,25 @@ func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body
 
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
 	templatePath := filepath.Join(s.templateDir, "email", templateName)
-	tmpl, err := template.ParseFiles(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
-	}
 
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
+
+	if strings.HasSuffix(templateName, ".txt") {
+		tmpl, err := texttemplate.ParseFiles(templatePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
+		}
+		if err = tmpl.Execute(&buf, data); err != nil {
+			return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
+		}
+	} else {
+		tmpl, err := htmltemplate.ParseFiles(templatePath)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
+		}
+		if err = tmpl.Execute(&buf, data); err != nil {
+			return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
+		}
 	}
 
 	return buf.String(), nil
