@@ -2575,10 +2575,10 @@ export function WorkflowPageV2() {
       if (!canvas || !organizationId || !canvasId) return;
       if (Object.keys(updates).length === 0) return;
 
-      saveWorkflowSnapshot(canvas);
-
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      saveWorkflowSnapshot(latestWorkflow);
 
       const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
         if (node.id !== nodeId || node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
@@ -3156,10 +3156,10 @@ export function WorkflowPageV2() {
     ) => {
       if (!canvas || !organizationId || !canvasId || nodePositions.length < 2) return;
 
-      saveWorkflowSnapshot(canvas);
-
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      saveWorkflowSnapshot(latestWorkflow);
 
       const updatedWorkflow = buildGroupWorkflow(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -3186,10 +3186,10 @@ export function WorkflowPageV2() {
     async (groupNodeId: string) => {
       if (!canvas || !organizationId || !canvasId) return;
 
-      saveWorkflowSnapshot(canvas);
-
       const latestWorkflow =
         queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      saveWorkflowSnapshot(latestWorkflow);
 
       const updatedWorkflow = buildUngroupWorkflow(latestWorkflow, groupNodeId);
       if (!updatedWorkflow) return;

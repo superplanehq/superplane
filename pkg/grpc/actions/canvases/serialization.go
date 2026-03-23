@@ -262,6 +262,14 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
+	groupNodeIDs := make(map[string]bool)
+	for _, node := range canvas.Spec.Nodes {
+		if node.Type == compb.Node_TYPE_WIDGET && node.Widget != nil && node.Widget.Name == "group" {
+			groupNodeIDs[node.Id] = true
+		}
+	}
+
+	claimedChildren := make(map[string]string)
 	for _, node := range canvas.Spec.Nodes {
 		if node.Type != compb.Node_TYPE_WIDGET || node.Widget == nil || node.Widget.Name != "group" {
 			continue
@@ -278,6 +286,20 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 			if !nodeIDs[childID] {
 				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s not found", node.Id, childID)
 			}
+
+			if childID == node.Id {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: cannot reference itself as a child", node.Id)
+			}
+
+			if groupNodeIDs[childID] {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is a group (nested groups are not supported)", node.Id, childID)
+			}
+
+			if ownerID, taken := claimedChildren[childID]; taken {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is already claimed by group %s", node.Id, childID, ownerID)
+			}
+
+			claimedChildren[childID] = node.Id
 		}
 	}
 
