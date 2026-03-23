@@ -472,7 +472,6 @@ export function WorkflowPageV2() {
         ),
     [visibleCanvasVersions],
   );
-  const liveVersionsTotalCount = paginatedVersionPages[0]?.totalCount || liveVersions.length;
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
@@ -5043,7 +5042,6 @@ export function WorkflowPageV2() {
                 pendingApprovalVersions={pendingApprovalVersions}
                 liveVersions={liveVersions}
                 liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-                liveVersionsTotalCount={liveVersionsTotalCount}
                 canUpdateCanvas={canUpdateCanvas}
                 isTemplate={isTemplate}
                 canvasDeletedRemotely={canvasDeletedRemotely}
