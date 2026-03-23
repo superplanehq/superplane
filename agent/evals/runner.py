@@ -30,8 +30,36 @@ dataset = Dataset(
             inputs="Listen to pull-request comments and send a slack message when a comment is made",
             evaluators=[
                 WorkflowShape(
-                  nodes=["github.onPRReviewComment", "slack.sendTextMessage"],
-                  edges=[("github.onPRReviewComment", "slack.sendTextMessage")],
+                  nodes=["github.onPRComment", "slack.sendTextMessage"],
+                  edges=[("github.onPRComment", "slack.sendTextMessage")],
+                )
+            ],
+        ),
+        Case(
+            name="ephemeral_pr_preview_machines",
+            inputs="Build a workflow that creates ephemeral preview machines for pull requests. On PR open, create infra and post the preview URL to the PR. On PR close or after 48 hours, tear it down.",
+            evaluators=[
+                WorkflowShape(
+                  nodes=[
+                      "github.onPullRequest",
+                      "daytona.createRepositorySandbox",
+                      "upsertMemory",
+                      "github.createIssueComment",
+                      "wait",
+                      "daytona.deleteSandbox",
+                      "github.onPullRequest",
+                      "readMemory",
+                      "daytona.deleteSandbox",
+                  ],
+                  edges=[
+                      ("github.onPullRequest", "daytona.createRepositorySandbox"),
+                      ("daytona.createRepositorySandbox", "upsertMemory"),
+                      ("upsertMemory", "github.createIssueComment"),
+                      ("github.createIssueComment", "wait"),
+                      ("wait", "daytona.deleteSandbox"),
+                      ("github.onPullRequest", "readMemory"),
+                      ("readMemory", "daytona.deleteSandbox"),
+                  ],
                 )
             ],
         ),

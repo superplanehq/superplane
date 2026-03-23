@@ -16,7 +16,8 @@ class ReportBuilder:
         self.console = Console()
 
     def render(self) -> None:
-        output_dir = Path("tmp/eval_outputs")
+        display_output_dir = Path("agent/tmp/eval_outputs")
+        output_dir = Path("/app/tmp/eval_outputs")
         output_dir.mkdir(parents=True, exist_ok=True)
         total_duration = 0.0
         case_count_with_duration = 0
@@ -29,18 +30,21 @@ class ReportBuilder:
         for i, case_result in enumerate(self.report.cases):
             case_name = getattr(case_result, "name", None) or f"case_{i}"
             safe_case_name = re.sub(r"[^A-Za-z0-9_.-]", "_", case_name)
-            filename = output_dir / f"{safe_case_name}.json"
+
             serialized_output = self._serialize_output(case_result.output)
             case_input = getattr(case_result, "inputs", getattr(case_result, "input", "-"))
             assertion_values = self._get_assertion_values(case_result)
             duration_seconds = self._duration_seconds(case_result)
+
+            filename = output_dir / f"{safe_case_name}.json"                  # this is /app/tmp/eval_outputs/... so the system knows where to store it from docker
+            display_filename = display_output_dir / f"{safe_case_name}.json"  # this is tmp/eval_outputs/... so you can open it from the host
 
             with filename.open("w", encoding="utf-8") as file:
                 json.dump(serialized_output, file, indent=2, default=str)
 
             self.console.print(f"{case_name} {self._format_duration(case_result)}")
             self.console.print(f"  input: {case_input}")
-            self.console.print(f"  output: {filename}")
+            self.console.print(f"  output: {display_filename}")
             self.console.print(f"  assertions: {self._format_assertions_inline(case_result)}")
 
             total_assertions += len(assertion_values)
