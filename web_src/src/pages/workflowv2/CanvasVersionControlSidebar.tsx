@@ -234,11 +234,9 @@ export function CanvasVersionControlSidebar({
 
         <div className="flex-1 overflow-auto p-3">
           {!canUpdateCanvas && !canvasDeletedRemotely ? (
-            <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+            <p className="text-xs text-slate-600">No edit permission.</p>
           ) : null}
-          {canvasDeletedRemotely ? (
-            <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
-          ) : null}
+          {canvasDeletedRemotely ? <p className="text-xs text-red-700">Canvas was deleted.</p> : null}
           {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
 
           <section className="mt-3 rounded-md">
@@ -298,9 +296,7 @@ export function CanvasVersionControlSidebar({
         <DialogContent className="min-w-[60vw] max-w-5xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{diffContext?.changeRequest?.metadata?.title?.trim() || "Version Node Diff"}</DialogTitle>
-            <DialogDescription>
-              Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against the previous published version.
-            </DialogDescription>
+            <DialogDescription>Diff against previous published version.</DialogDescription>
           </DialogHeader>
 
           {!diffSummary ? null : (
@@ -406,9 +402,7 @@ function VersionRow({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top">
-              {previousVersion ? "View node diff with previous version" : "No previous version to compare"}
-            </TooltipContent>
+            <TooltipContent side="top">{previousVersion ? "View diff" : "No previous version"}</TooltipContent>
           </Tooltip>
         </div>
       </div>
