@@ -9,12 +9,8 @@ from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
-<<<<<<< HEAD
 from evals.evaluators import WorkflowShape
 from evals.report import ReportBuilder
-=======
-from evals.evaluators import EphemeralMachineWorkflow, WorkflowShape
->>>>>>> 5264aba85 (Bootstrap ephemerals)
 
 dataset = Dataset(
     cases=[
