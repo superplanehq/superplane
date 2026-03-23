@@ -252,6 +252,7 @@ export function CanvasVersionControlSidebar({
                     return (
                       <VersionRow
                         key={`pending-${versionID || item.changeRequest.metadata?.id || "unknown"}`}
+                        rowTestId="canvas-pending-change-request-version-row"
                         version={item.version}
                         changeRequest={item.changeRequest}
                         changeRequestApprovalConfig={changeRequestApprovalConfig}
@@ -376,6 +377,7 @@ function VersionRow({
   isActive = false,
   isCurrentLive = false,
   isFirstCanvasVersion = false,
+  rowTestId,
   onUseVersion,
   onViewDiff,
 }: {
@@ -387,6 +389,8 @@ function VersionRow({
   isActive?: boolean;
   isCurrentLive?: boolean;
   isFirstCanvasVersion?: boolean;
+  /** Stable hook for E2E: pending approval rows only. */
+  rowTestId?: string;
   onUseVersion: (versionID: string) => void;
   onViewDiff: (
     version: CanvasesCanvasVersion,
@@ -420,6 +424,7 @@ function VersionRow({
 
   return (
     <div
+      data-testid={rowTestId}
       className={cn(
         "w-full rounded-md px-2.5 py-2 text-left transition cursor-pointer",
         isActive

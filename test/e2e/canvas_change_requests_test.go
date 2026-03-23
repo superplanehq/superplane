@@ -170,14 +170,10 @@ func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
 
 	s.session.AssertText("Versions")
 
-	// Scope to the version sidebar (not e.g. log panel): it contains the collapse control.
-	// Pending rows are listed before live rows; both can share "Preview v1" as the accessible name, so use .First().
-	// Row label is "Preview v{n}" matching the create-modal default title (see workflowv2 create CR title effect).
+	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
+	// accessible-name collisions between pending and live "Preview v1" rows or on :has() CSS support.
 	// "View details" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
-	versionAside := s.session.Page().Locator(`aside:has([aria-label="Collapse version control"])`)
-	previewRow := versionAside.GetByRole("button", pw.LocatorGetByRoleOptions{
-		Name: regexp.MustCompile(`^Preview v\d+`),
-	}).First()
+	previewRow := s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
 	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
 	viewDetails := previewRow.Locator(`[aria-label="View details"]`)
 	require.NoError(s.t, viewDetails.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
