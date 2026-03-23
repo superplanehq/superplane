@@ -2,6 +2,9 @@ import {
   AuthorizationDomainType,
   ComponentsIntegrationRef,
   ConfigurationField,
+  IntegrationsIntegrationDefinition,
+  OrganizationsBrowserAction,
+  OrganizationsCreateIntegrationResponse,
   OrganizationsIntegration,
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode, useRef } from "react";
@@ -21,6 +24,14 @@ import {
 } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
+import type { IntegrationCreatePayload } from "@/ui/IntegrationCreateDialog";
+import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
+import { showErrorToast } from "@/utils/toast";
+import { getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { integrationKeys } from "@/hooks/useIntegrations";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -42,9 +53,18 @@ interface SettingsTabProps {
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
   integrationDefinition?: { name?: string; label?: string; icon?: string };
+  integrationDefinitionFull?: IntegrationsIntegrationDefinition;
   autocompleteExampleObj?: Record<string, unknown> | null;
-  onOpenCreateIntegrationDialog?: () => void;
+  onOpenCreateIntegrationDialog?: (opts?: {
+    defaultName?: string;
+    browserAction?: OrganizationsBrowserAction;
+    createdIntegrationId?: string;
+    webhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
+  }) => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
+  onCreateIntegration?: (payload: IntegrationCreatePayload) => Promise<OrganizationsCreateIntegrationResponse>;
+  onIntegrationCreated?: (integrationId: string) => void;
+  organizationId?: string;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -66,9 +86,13 @@ export function SettingsTab({
   integrationRef,
   integrations = [],
   integrationDefinition,
+  integrationDefinitionFull,
   autocompleteExampleObj,
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
+  onCreateIntegration,
+  onIntegrationCreated,
+  organizationId,
   readOnly = false,
   canReadIntegrations,
   canCreateIntegrations,
@@ -89,6 +113,150 @@ export function SettingsTab({
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
+  const queryClient = useQueryClient();
+
+  // Inline integration creation state
+  const [inlineIntegrationName, setInlineIntegrationName] = useState(integrationDefinitionFull?.name ?? "");
+  const [inlineIntegrationConfig, setInlineIntegrationConfig] = useState<Record<string, unknown>>({});
+  const [isInlineCreating, setIsInlineCreating] = useState(false);
+  const [inlineBrowserAction, setInlineBrowserAction] = useState<OrganizationsBrowserAction | undefined>(undefined);
+  const [inlineCreatedIntegrationId, setInlineCreatedIntegrationId] = useState<string | undefined>(undefined);
+  const [inlineBrowserActionCompleted, setInlineBrowserActionCompleted] = useState(false);
+  const [inlineWebhookSetup, setInlineWebhookSetup] = useState<
+    { id: string; webhookUrl: string; config: Record<string, unknown> } | undefined
+  >(undefined);
+  const [isInlineWebhookCompleting, setIsInlineWebhookCompleting] = useState(false);
+
+  const inlineConfigFields = useMemo(() => {
+    return integrationDefinitionFull?.configuration ?? [];
+  }, [integrationDefinitionFull?.configuration]);
+
+  useEffect(() => {
+    setInlineIntegrationName(integrationDefinitionFull?.name ?? "");
+    setInlineIntegrationConfig({});
+    setInlineBrowserAction(undefined);
+    setInlineCreatedIntegrationId(undefined);
+    setInlineBrowserActionCompleted(false);
+    setInlineWebhookSetup(undefined);
+  }, [integrationDefinitionFull?.name]);
+
+  const handleInlineCreate = useCallback(async () => {
+    if (!onCreateIntegration || !integrationDefinitionFull?.name) return;
+    const trimmedName = inlineIntegrationName.trim();
+    if (!trimmedName) {
+      showErrorToast("Integration name is required");
+      return;
+    }
+
+    setIsInlineCreating(true);
+    try {
+      const result = await onCreateIntegration({
+        integrationName: integrationDefinitionFull.name,
+        name: trimmedName,
+        configuration: inlineIntegrationConfig,
+      });
+
+      const integration = result.integration;
+      const browserAction = integration?.status?.browserAction;
+      const webhookUrl =
+        integration?.status?.metadata &&
+        typeof integration.status.metadata === "object" &&
+        "webhookUrl" in integration.status.metadata
+          ? (integration.status.metadata as { webhookUrl?: string }).webhookUrl
+          : undefined;
+
+      if (browserAction && integration?.metadata?.id) {
+        setInlineBrowserAction(browserAction);
+        setInlineCreatedIntegrationId(integration.metadata.id);
+        return;
+      }
+
+      if (integration?.metadata?.id && webhookUrl) {
+        setInlineWebhookSetup({ id: integration.metadata.id, webhookUrl, config: { ...inlineIntegrationConfig } });
+        setInlineCreatedIntegrationId(integration.metadata.id);
+        return;
+      }
+
+      if (integration?.metadata?.id) {
+        onIntegrationCreated?.(integration.metadata.id);
+      }
+    } catch (error) {
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create integration"));
+    } finally {
+      setIsInlineCreating(false);
+    }
+  }, [
+    onCreateIntegration,
+    integrationDefinitionFull?.name,
+    inlineIntegrationName,
+    inlineIntegrationConfig,
+    onIntegrationCreated,
+  ]);
+
+  const handleInlineBrowserActionContinue = useCallback(async () => {
+    if (!inlineBrowserAction) return;
+    const { url, method, formFields } = inlineBrowserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+    } else if (url) {
+      window.open(url, "_blank");
+    }
+
+    if (inlineCreatedIntegrationId) {
+      const orgId = organizationId ?? domainId ?? "";
+      try {
+        await organizationsUpdateIntegration(
+          withOrganizationHeader({
+            path: { id: orgId, integrationId: inlineCreatedIntegrationId },
+            body: { configuration: { ...inlineIntegrationConfig, installed: "true" } },
+          }),
+        );
+        await queryClient.invalidateQueries({
+          queryKey: integrationKeys.connected(orgId),
+        });
+      } catch {
+        // Resync is best-effort
+      }
+      setInlineBrowserActionCompleted(true);
+    }
+  }, [inlineBrowserAction, inlineCreatedIntegrationId, inlineIntegrationConfig, organizationId, domainId, queryClient]);
+
+  const handleInlineWebhookComplete = useCallback(async () => {
+    if (!inlineWebhookSetup) return;
+    const orgId = organizationId ?? domainId ?? "";
+    setIsInlineWebhookCompleting(true);
+    try {
+      await organizationsUpdateIntegration(
+        withOrganizationHeader({
+          path: { id: orgId, integrationId: inlineWebhookSetup.id },
+          body: { configuration: { ...inlineWebhookSetup.config, ...inlineIntegrationConfig } },
+        }),
+      );
+      await queryClient.invalidateQueries({
+        queryKey: integrationKeys.connected(orgId),
+      });
+      onIntegrationCreated?.(inlineWebhookSetup.id);
+    } catch {
+      showErrorToast("Failed to complete setup");
+    } finally {
+      setIsInlineWebhookCompleting(false);
+    }
+  }, [inlineWebhookSetup, inlineIntegrationConfig, organizationId, domainId, queryClient, onIntegrationCreated]);
+
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
@@ -108,6 +276,50 @@ export function SettingsTab({
     if (!integrationName) return [];
     return integrations.filter((i) => i.spec?.integrationName === integrationName);
   }, [integrations, integrationName]);
+  const readyIntegrationsOfType = useMemo(() => {
+    return integrationsOfType.filter((i) => i.status?.state === "ready");
+  }, [integrationsOfType]);
+  const pendingIntegration = useMemo(() => {
+    if (readyIntegrationsOfType.length > 0) return undefined;
+    return integrationsOfType.find((i) => i.status?.state === "pending" || i.status?.state === "error");
+  }, [integrationsOfType, readyIntegrationsOfType]);
+
+  // Seed inline state from an existing pending/errored integration so the user
+  // sees the configure form (browser action, webhook, etc.) instead of a blank creation form.
+  useEffect(() => {
+    if (!pendingIntegration) return;
+    const id = pendingIntegration.metadata?.id;
+    if (!id) return;
+    // Only seed once per integration id to avoid overwriting user edits
+    if (inlineCreatedIntegrationId === id) return;
+
+    setInlineCreatedIntegrationId(id);
+    setInlineIntegrationName(pendingIntegration.metadata?.name ?? integrationDefinitionFull?.name ?? "");
+    if (pendingIntegration.spec?.configuration) {
+      setInlineIntegrationConfig({ ...pendingIntegration.spec.configuration });
+    }
+
+    const browserAction = pendingIntegration.status?.browserAction;
+    if (browserAction) {
+      setInlineBrowserAction(browserAction);
+      setInlineBrowserActionCompleted(false);
+      return;
+    }
+
+    const meta = pendingIntegration.status?.metadata;
+    const webhookUrl =
+      meta && typeof meta === "object" && "webhookUrl" in meta
+        ? (meta as { webhookUrl?: string }).webhookUrl
+        : undefined;
+    if (webhookUrl) {
+      setInlineWebhookSetup({
+        id,
+        webhookUrl,
+        config: { ...(pendingIntegration.spec?.configuration ?? {}) },
+      });
+    }
+  }, [pendingIntegration, inlineCreatedIntegrationId, integrationDefinitionFull?.name]);
+
   const selectedIntegrationFull = useMemo(() => {
     const id = selectedIntegration?.id ?? integrationRef?.id;
     if (!id) return undefined;
@@ -226,9 +438,9 @@ export function SettingsTab({
     setShowValidation(false);
   }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
 
-  // Auto-select the first installation if none is selected or selection is invalid
+  // Auto-select the first ready installation if none is selected or selection is invalid
   useEffect(() => {
-    if (integrationsOfType.length === 0) {
+    if (readyIntegrationsOfType.length === 0) {
       if (selectedIntegration) {
         setSelectedIntegration(undefined);
       }
@@ -237,18 +449,18 @@ export function SettingsTab({
 
     const selectedId = selectedIntegration?.id;
     const hasSelected = selectedId
-      ? integrationsOfType.some((integration) => integration.metadata?.id === selectedId)
+      ? readyIntegrationsOfType.some((integration) => integration.metadata?.id === selectedId)
       : false;
     if (hasSelected) {
       return;
     }
 
-    const firstIntegration = integrationsOfType[0];
+    const firstIntegration = readyIntegrationsOfType[0];
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration]);
+  }, [readyIntegrationsOfType, selectedIntegration]);
 
   const isIntegrationReady =
     !integrationName || !allowIntegrations || selectedIntegrationFull?.status?.state === "ready";
@@ -301,28 +513,187 @@ export function SettingsTab({
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
                 You don't have permission to view integrations.
               </div>
-            ) : integrationsOfType.length === 0 ? (
-              /* No integration: Connect XYZ — always use helper so "github" shows as "GitHub" */
-              <div className="bg-orange-100 dark:bg-orange-950/30 border border-orange-950/15 rounded-md bg-stripe-diagonal p-3 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2 min-w-0">
+            ) : readyIntegrationsOfType.length === 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
                   <IntegrationIcon
                     integrationName={integrationName}
                     iconSlug={integrationDefinition?.icon}
-                    className="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400"
+                    className="h-5 w-5 flex-shrink-0 text-gray-500 dark:text-gray-400"
                   />
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {getIntegrationTypeDisplayName(undefined, integrationName) || integrationName} Integration
                   </span>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onOpenCreateIntegrationDialog}
-                  className="flex-shrink-0"
-                  disabled={isReadOnly || !allowCreateIntegrations}
-                >
-                  Connect
-                </Button>
+
+                {inlineWebhookSetup ? (
+                  <>
+                    <p className="text-sm text-gray-800 dark:text-gray-200">
+                      Copy the webhook URL below and complete the required steps in your integration provider. Then
+                      enter any required secrets below.
+                    </p>
+                    <div>
+                      <Label className="text-gray-800 dark:text-gray-100 mb-2">Webhook URL</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          readOnly
+                          value={inlineWebhookSetup.webhookUrl}
+                          className="font-mono text-sm shadow-none"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(inlineWebhookSetup.webhookUrl);
+                            } catch {
+                              showErrorToast("Failed to copy to clipboard");
+                            }
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      </div>
+                    </div>
+                    {(integrationDefinitionFull?.configuration ?? [])
+                      .filter((f: ConfigurationField) => {
+                        if (!f.name) return false;
+                        return f.name === "signingSecret" || f.name === "webhookSigningSecret";
+                      })
+                      .map((field) => (
+                        <ConfigurationFieldRenderer
+                          key={field.name}
+                          field={field}
+                          value={inlineIntegrationConfig[field.name!]}
+                          onChange={(value) =>
+                            setInlineIntegrationConfig((prev) => ({
+                              ...prev,
+                              [field.name || ""]: value,
+                            }))
+                          }
+                          allValues={inlineIntegrationConfig}
+                          domainId={organizationId ?? domainId ?? ""}
+                          domainType="DOMAIN_TYPE_ORGANIZATION"
+                          organizationId={organizationId ?? domainId ?? ""}
+                        />
+                      ))}
+                    <LoadingButton
+                      color="blue"
+                      onClick={() => void handleInlineWebhookComplete()}
+                      loading={isInlineWebhookCompleting}
+                      loadingText="Completing..."
+                      disabled={isReadOnly}
+                    >
+                      Complete Setup
+                    </LoadingButton>
+                  </>
+                ) : inlineBrowserAction ? (
+                  <>
+                    <IntegrationInstructions
+                      description={
+                        inlineBrowserActionCompleted
+                          ? [integrationDefinitionFull?.instructions?.trim(), inlineBrowserAction.description]
+                              .filter(Boolean)
+                              .join("\n\n") || "Integration is being configured. It may take a moment to become ready."
+                          : inlineBrowserAction.description ||
+                            integrationDefinitionFull?.instructions?.trim() ||
+                            "Click Continue to authorize this integration."
+                      }
+                      onContinue={
+                        !inlineBrowserActionCompleted && inlineBrowserAction.url
+                          ? () => void handleInlineBrowserActionContinue()
+                          : undefined
+                      }
+                    />
+                    {!inlineBrowserActionCompleted && inlineConfigFields.length > 0 && (
+                      <div className="space-y-4">
+                        {inlineConfigFields.map((field: ConfigurationField) => {
+                          if (!field.name) return null;
+                          return (
+                            <ConfigurationFieldRenderer
+                              key={field.name}
+                              field={field}
+                              value={inlineIntegrationConfig[field.name]}
+                              onChange={(value) =>
+                                setInlineIntegrationConfig((prev) => ({
+                                  ...prev,
+                                  [field.name || ""]: value,
+                                }))
+                              }
+                              allValues={inlineIntegrationConfig}
+                              domainId={organizationId ?? domainId ?? ""}
+                              domainType="DOMAIN_TYPE_ORGANIZATION"
+                              organizationId={organizationId ?? domainId ?? ""}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                    {inlineBrowserActionCompleted && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Waiting for the integration to become ready. This page will update automatically.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                        Integration Name
+                        <span className="text-gray-800 ml-1">*</span>
+                      </Label>
+                      <Input
+                        type="text"
+                        value={inlineIntegrationName}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInlineIntegrationName(e.target.value)}
+                        placeholder="e.g., my-app-integration"
+                        disabled={isReadOnly || !allowCreateIntegrations}
+                        className="shadow-none"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        A unique name for this integration
+                      </p>
+                    </div>
+
+                    {inlineConfigFields.length > 0 && (
+                      <div className="space-y-4">
+                        {inlineConfigFields.map((field: ConfigurationField) => {
+                          if (!field.name) return null;
+                          return (
+                            <ConfigurationFieldRenderer
+                              key={field.name}
+                              field={field}
+                              value={inlineIntegrationConfig[field.name]}
+                              onChange={(value) =>
+                                setInlineIntegrationConfig((prev) => ({
+                                  ...prev,
+                                  [field.name || ""]: value,
+                                }))
+                              }
+                              allValues={inlineIntegrationConfig}
+                              domainId={organizationId ?? domainId ?? ""}
+                              domainType="DOMAIN_TYPE_ORGANIZATION"
+                              organizationId={organizationId ?? domainId ?? ""}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <LoadingButton
+                      color="blue"
+                      onClick={() => void handleInlineCreate()}
+                      disabled={!inlineIntegrationName?.trim() || isReadOnly || !allowCreateIntegrations}
+                      loading={isInlineCreating}
+                      loadingText="Connecting..."
+                      className="flex items-center gap-2"
+                    >
+                      Connect
+                    </LoadingButton>
+                  </>
+                )}
               </div>
             ) : (
               <>
@@ -344,7 +715,7 @@ export function SettingsTab({
                         }
                         return;
                       }
-                      const integration = integrationsOfType.find((i) => i.metadata?.id === value);
+                      const integration = readyIntegrationsOfType.find((i) => i.metadata?.id === value);
                       if (integration) {
                         setSelectedIntegration({
                           id: integration.metadata?.id,
@@ -358,7 +729,7 @@ export function SettingsTab({
                       <SelectValue placeholder="Select an installation" />
                     </SelectTrigger>
                     <SelectContent>
-                      {integrationsOfType.map((integration) => {
+                      {readyIntegrationsOfType.map((integration) => {
                         const instanceName = integration.metadata?.name;
                         const typeName = integration.spec?.integrationName;
                         const displayName =

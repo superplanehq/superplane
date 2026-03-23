@@ -36,6 +36,7 @@ import {
   TriggersTrigger,
   BlueprintsBlueprint,
   OrganizationsIntegration,
+  OrganizationsBrowserAction,
   ComponentsIntegrationRef,
 } from "@/api-client";
 import { EventState, EventStateMap } from "../componentBase";
@@ -263,6 +264,16 @@ export const ComponentSidebar = ({
   const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
+  const [createIntegrationDialogDefaultName, setCreateIntegrationDialogDefaultName] = useState<string | undefined>(
+    undefined,
+  );
+  const [createDialogBrowserAction, setCreateDialogBrowserAction] = useState<OrganizationsBrowserAction | undefined>(
+    undefined,
+  );
+  const [createDialogIntegrationId, setCreateDialogIntegrationId] = useState<string | undefined>(undefined);
+  const [createDialogWebhookSetup, setCreateDialogWebhookSetup] = useState<
+    { id: string; webhookUrl: string; config: Record<string, unknown> } | undefined
+  >(undefined);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
   const [configureIntegrationName, setConfigureIntegrationName] = useState("");
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
@@ -308,12 +319,28 @@ export const ComponentSidebar = ({
     }
   }, [nodeId]);
 
-  const handleOpenCreateIntegrationDialog = useCallback(() => {
-    setIsCreateIntegrationDialogOpen(true);
-  }, []);
+  const handleOpenCreateIntegrationDialog = useCallback(
+    (opts?: {
+      defaultName?: string;
+      browserAction?: OrganizationsBrowserAction;
+      createdIntegrationId?: string;
+      webhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
+    }) => {
+      setCreateIntegrationDialogDefaultName(opts?.defaultName);
+      setCreateDialogBrowserAction(opts?.browserAction);
+      setCreateDialogIntegrationId(opts?.createdIntegrationId);
+      setCreateDialogWebhookSetup(opts?.webhookSetup);
+      setIsCreateIntegrationDialogOpen(true);
+    },
+    [],
+  );
 
   const handleCloseCreateIntegrationDialog = useCallback(() => {
     setIsCreateIntegrationDialogOpen(false);
+    setCreateIntegrationDialogDefaultName(undefined);
+    setCreateDialogBrowserAction(undefined);
+    setCreateDialogIntegrationId(undefined);
+    setCreateDialogWebhookSetup(undefined);
   }, []);
 
   const handleOpenConfigureIntegrationDialog = useCallback((integrationId: string) => {
@@ -777,9 +804,16 @@ export const ComponentSidebar = ({
                   canCreateIntegrations={canCreateIntegrations}
                   canUpdateIntegrations={canUpdateIntegrations}
                   integrationDefinition={createIntegrationDefinition}
+                  integrationDefinitionFull={createIntegrationDefinition}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
+                  onCreateIntegration={async (payload) => {
+                    const res = await createIntegrationMutation.mutateAsync(payload);
+                    return res.data;
+                  }}
+                  onIntegrationCreated={() => handleCloseCreateIntegrationDialog()}
+                  organizationId={domainId}
                 />
               </TabsContent>
             )}
@@ -891,9 +925,12 @@ export const ComponentSidebar = ({
           return res.data;
         }}
         onReset={() => createIntegrationMutation.reset()}
-        defaultName={createIntegrationDefinition?.name ?? ""}
+        defaultName={createIntegrationDialogDefaultName ?? createIntegrationDefinition?.name ?? ""}
         integrationHomeHref={integrationHomeHref}
         onCreated={() => handleCloseCreateIntegrationDialog()}
+        initialBrowserAction={createDialogBrowserAction}
+        initialCreatedIntegrationId={createDialogIntegrationId}
+        initialWebhookSetup={createDialogWebhookSetup}
         instructionsEndBeforeHeading={
           CREATE_INTEGRATION_DIALOG_OPTIONS[createIntegrationDefinition?.name ?? ""]?.instructionsEndBeforeHeading
         }

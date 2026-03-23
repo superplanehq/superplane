@@ -50,6 +50,10 @@ export interface IntegrationCreateDialogProps {
   initialStepFieldNames?: string[];
   /** Optional custom description for the webhook completion step. */
   webhookStepDescription?: ReactNode;
+  /** Pre-created integration state for resuming a flow started inline (e.g. browser action after inline creation). */
+  initialCreatedIntegrationId?: string;
+  initialBrowserAction?: OrganizationsBrowserAction;
+  initialWebhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
 }
 
 export function IntegrationCreateDialog({
@@ -65,6 +69,9 @@ export function IntegrationCreateDialog({
   instructionsEndBeforeHeading,
   initialStepFieldNames,
   webhookStepDescription,
+  initialCreatedIntegrationId,
+  initialBrowserAction,
+  initialWebhookSetup,
 }: IntegrationCreateDialogProps) {
   const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
@@ -104,12 +111,12 @@ export function IntegrationCreateDialog({
     if (open) {
       setIntegrationName(defaultName);
       setConfiguration({});
-      setCreateIntegrationBrowserAction(undefined);
-      setPendingWebhookSetup(null);
-      setCreatedIntegrationId(undefined);
+      setCreateIntegrationBrowserAction(initialBrowserAction ?? undefined);
+      setPendingWebhookSetup(initialWebhookSetup ?? null);
+      setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
       setBrowserActionCompleted(false);
     }
-  }, [open, defaultName]);
+  }, [open, defaultName, initialBrowserAction, initialWebhookSetup, initialCreatedIntegrationId]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
