@@ -2444,8 +2444,6 @@ export function WorkflowPageV2() {
       } else {
         markUnsavedChange("structural");
       }
-
-      setIntegrationDialogName(null);
     },
     [
       canvas,
