@@ -44,11 +44,11 @@ func (w *EventRouter) Start(ctx context.Context) {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
 
-			telemetry.RecordEventWorkerEventsCount(context.Background(), len(events))
+			telemetry.RecordEventWorkerEventsCount(ctx, len(events))
 
 			for _, event := range events {
 				logger := logging.ForEvent(w.logger, event)
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -62,7 +62,7 @@ func (w *EventRouter) Start(ctx context.Context) {
 				}(event)
 			}
 
-			telemetry.RecordEventWorkerTickDuration(context.Background(), time.Since(tickStart))
+			telemetry.RecordEventWorkerTickDuration(ctx, time.Since(tickStart))
 		}
 	}
 }

@@ -51,11 +51,11 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 				w.logger.Errorf("Error finding canvas nodes ready to be processed: %v", err)
 			}
 
-			telemetry.RecordQueueWorkerNodesCount(context.Background(), len(nodes))
+			telemetry.RecordQueueWorkerNodesCount(ctx, len(nodes))
 
 			for _, node := range nodes {
 				logger := logging.WithNode(w.logger, node)
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -69,7 +69,7 @@ func (w *NodeQueueWorker) Start(ctx context.Context) {
 				}(node)
 			}
 
-			telemetry.RecordQueueWorkerTickDuration(context.Background(), time.Since(tickStart))
+			telemetry.RecordQueueWorkerTickDuration(ctx, time.Since(tickStart))
 		}
 	}
 }

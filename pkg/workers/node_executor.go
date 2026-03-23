@@ -62,10 +62,10 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 				w.logger.Errorf("Error finding workflow nodes ready to be processed: %v", err)
 			}
 
-			telemetry.RecordExecutorWorkerNodesCount(context.Background(), len(executions))
+			telemetry.RecordExecutorWorkerNodesCount(ctx, len(executions))
 
 			for _, execution := range executions {
-				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
+				if err := w.semaphore.Acquire(ctx, 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
 				}
@@ -89,7 +89,7 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 				}(execution)
 			}
 
-			telemetry.RecordExecutorWorkerTickDuration(context.Background(), time.Since(tickStart))
+			telemetry.RecordExecutorWorkerTickDuration(ctx, time.Since(tickStart))
 		}
 	}
 }
