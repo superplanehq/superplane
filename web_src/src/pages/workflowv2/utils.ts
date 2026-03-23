@@ -18,11 +18,6 @@ import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
 
-export function clampInRange(value: number, min: number, max: number): number {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
-}
-
 export function collectGroupChildIds(node: ComponentsNode): string[] {
   if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
   return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);

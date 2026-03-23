@@ -215,12 +215,19 @@ function useGroupTextEditing(
     };
   }, [debouncedLabelUpdate, debouncedDescriptionUpdate]);
 
+  const skipBlurCommitRef = React.useRef(false);
+
   const handleDoubleClickLabel = useCallback(() => {
     setIsEditingLabel(true);
+    skipBlurCommitRef.current = false;
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
   const commitLabel = useCallback(() => {
+    if (skipBlurCommitRef.current) {
+      skipBlurCommitRef.current = false;
+      return;
+    }
     setIsEditingLabel(false);
     const trimmed = localLabel.trim() || "Group";
     setLocalLabel(trimmed);
@@ -232,20 +239,20 @@ function useGroupTextEditing(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        commitLabel();
         inputRef.current?.blur();
         if (onGroupUpdate) setIsEditingDescription(true);
         return;
       }
       if (e.key === "Escape") {
         e.preventDefault();
+        skipBlurCommitRef.current = true;
         debouncedLabelUpdate.cancel();
         setLocalLabel(groupLabel);
         setIsEditingLabel(false);
         inputRef.current?.blur();
       }
     },
-    [commitLabel, onGroupUpdate, debouncedLabelUpdate, groupLabel],
+    [onGroupUpdate, debouncedLabelUpdate, groupLabel],
   );
 
   const commitDescription = useCallback(() => {

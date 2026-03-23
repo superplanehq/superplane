@@ -1164,7 +1164,12 @@ export function WorkflowPageV2() {
    * Maps node ID to its updated position.
    */
   const pendingPositionUpdatesRef = useRef<Map<string, { x: number; y: number }>>(new Map());
-  const pendingAnnotationUpdatesRef = useRef<Map<string, { text?: string; color?: string }>>(new Map());
+  const pendingAnnotationUpdatesRef = useRef<
+    Map<
+      string,
+      { text?: string; color?: string; width?: number; height?: number; label?: string; description?: string }
+    >
+  >(new Map());
   const logNodeSelectRef = useRef<(nodeId: string) => void>(() => {});
 
   /**
