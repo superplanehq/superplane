@@ -23,6 +23,8 @@ const DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 460;
 const LEGACY_DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 340;
 const MIN_CANVAS_VERSION_CONTROL_WIDTH = 280;
 const MAX_CANVAS_VERSION_CONTROL_WIDTH = 640;
+const INITIAL_VISIBLE_LIVE_VERSIONS = 5;
+const LOAD_OLDER_LIVE_VERSIONS_STEP = 5;
 
 interface CanvasVersionControlSidebarProps {
   isOpen: boolean;
@@ -115,7 +117,28 @@ export function CanvasVersionControlSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [isResizeHandleHovered, setIsResizeHandleHovered] = useState(false);
   const [rejectedVersionsExpanded, setRejectedVersionsExpanded] = useState(false);
+  const [visibleLiveVersionCount, setVisibleLiveVersionCount] = useState(INITIAL_VISIBLE_LIVE_VERSIONS);
   const sidebarRef = useRef<HTMLElement>(null);
+
+  const headLiveVersionId = liveVersions[0]?.metadata?.id ?? "";
+  useEffect(() => {
+    setVisibleLiveVersionCount(INITIAL_VISIBLE_LIVE_VERSIONS);
+  }, [headLiveVersionId]);
+
+  const displayedLiveVersions = liveVersions.slice(0, visibleLiveVersionCount);
+  const canExpandLocal = visibleLiveVersionCount < liveVersions.length;
+  const showLoadOlderVersions = canExpandLocal || !!onLoadMoreLiveVersions;
+
+  const handleLoadOlderVersions = useCallback(() => {
+    if (canExpandLocal) {
+      setVisibleLiveVersionCount((prev) => Math.min(prev + LOAD_OLDER_LIVE_VERSIONS_STEP, liveVersions.length));
+      return;
+    }
+    onLoadMoreLiveVersions?.();
+  }, [canExpandLocal, liveVersions.length, onLoadMoreLiveVersions]);
+
+  const loadOlderVersionsDisabled = !canExpandLocal && (loadMoreLiveVersionsDisabled ?? !onLoadMoreLiveVersions);
+  const loadOlderVersionsPending = !canExpandLocal && !!loadMoreLiveVersionsPending;
 
   const handleMouseDown = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -178,7 +201,7 @@ export function CanvasVersionControlSidebar({
       ref={sidebarRef}
       className={cn(
         "z-20 h-full border-r bg-white relative",
-        isResizeHandleHovered || isResizing ? "border-sky-600" : "border-slate-950/15",
+        isResizeHandleHovered || isResizing ? "border-slate-800" : "border-slate-950/15",
       )}
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
     >
@@ -247,7 +270,7 @@ export function CanvasVersionControlSidebar({
                       />
                     );
                   })}
-                  {liveVersions.map((version, index) => {
+                  {displayedLiveVersions.map((version, index) => {
                     const versionID = version.metadata?.id || "";
                     const isActive = versionID === selectedVersionId;
                     const isCurrentLive = liveCanvasVersionId === versionID;
@@ -279,15 +302,15 @@ export function CanvasVersionControlSidebar({
                     );
                   })}
                 </div>
-                {onLoadMoreLiveVersions ? (
+                {showLoadOlderVersions ? (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-2 w-full"
-                    onClick={onLoadMoreLiveVersions}
-                    disabled={loadMoreLiveVersionsDisabled}
+                    className="mt-2 w-fit self-start"
+                    onClick={handleLoadOlderVersions}
+                    disabled={loadOlderVersionsDisabled}
                   >
-                    {loadMoreLiveVersionsPending ? "Loading..." : "Load older versions"}
+                    {loadOlderVersionsPending ? "Loading..." : "Load older versions"}
                   </Button>
                 ) : null}
               </>

@@ -4819,11 +4819,10 @@ export function WorkflowPageV2() {
       ? "version-edit"
       : "version-live";
   const headerSaveState = updateCanvasVersionMutation.isPending ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
-  const showPendingDraftBadge =
-    !suppressUnpublishedChangesBadge &&
-    !isVersioningDisabled &&
-    !!latestDraftVersion &&
-    pendingDraftDiffSummary.items.length > 0;
+  const unpublishedDraftChangeCount =
+    !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
+      ? pendingDraftDiffSummary.items.length
+      : 0;
   const canvasStateMode = !showVersioningUI
     ? "default"
     : hasEditableVersion
@@ -5010,7 +5009,7 @@ export function WorkflowPageV2() {
           onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          showPendingDraftBadge={showPendingDraftBadge}
+          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}

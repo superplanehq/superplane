@@ -177,7 +177,7 @@ export interface CanvasPageProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  showPendingDraftBadge?: boolean;
+  unpublishedDraftChangeCount?: number;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -949,7 +949,7 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          showPendingDraftBadge={props.showPendingDraftBadge}
+          unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
           memoryItemCount={props.memoryItemCount}
@@ -1100,7 +1100,7 @@ function CanvasPage(props: CanvasPageProps) {
                 onExitEditMode={props.onExitEditMode}
                 exitEditModeDisabled={props.exitEditModeDisabled}
                 exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-                showPendingDraftBadge={props.showPendingDraftBadge}
+                unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
                 versionControlButtonTooltip={props.versionControlButtonTooltip}
@@ -1501,7 +1501,7 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  showPendingDraftBadge,
+  unpublishedDraftChangeCount,
   topViewMode,
   onTopViewModeChange,
   memoryItemCount,
@@ -1540,7 +1540,7 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  showPendingDraftBadge?: boolean;
+  unpublishedDraftChangeCount?: number;
   topViewMode?: "canvas" | "yaml" | "memory" | "settings";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
   memoryItemCount?: number;
@@ -1609,7 +1609,7 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      showPendingDraftBadge={showPendingDraftBadge}
+      unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
       memoryItemCount={memoryItemCount}
@@ -1682,7 +1682,7 @@ function CanvasContent({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  showPendingDraftBadge,
+  unpublishedDraftChangeCount,
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
@@ -1768,7 +1768,7 @@ function CanvasContent({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  showPendingDraftBadge?: boolean;
+  unpublishedDraftChangeCount?: number;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
@@ -2516,7 +2516,7 @@ function CanvasContent({
           onExitEditMode={onExitEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          showPendingDraftBadge={showPendingDraftBadge}
+          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
         />
       )}
 
