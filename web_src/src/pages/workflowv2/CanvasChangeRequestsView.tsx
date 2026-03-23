@@ -344,7 +344,7 @@ export function CanvasChangeRequestsView({
       items.push({
         id: "published",
         title: "Published",
-        detail: "This change request was published to live.",
+        detail: "Published to live.",
         timestamp: publishedAt || "unknown time",
         tone: "emerald",
       });
@@ -414,7 +414,7 @@ export function CanvasChangeRequestsView({
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="text-base font-semibold text-slate-900">Change Requests</p>
-                  <p className="text-xs text-slate-600">Select a request to open it in a dedicated PR view.</p>
+                  <p className="text-xs text-slate-600">Select a request to review.</p>
                 </div>
                 <Badge variant="outline">{changeRequests.length}</Badge>
               </div>
@@ -499,7 +499,7 @@ export function CanvasChangeRequestsView({
           <section className="rounded-xl border border-slate-200 bg-white p-4">
             <Button variant="ghost" size="sm" className="px-1" onClick={() => setShowDetailView(false)}>
               <ArrowLeft className="h-4 w-4" />
-              Back to Change Requests
+              Back
             </Button>
             <p className="mt-2 text-sm text-slate-600">This change request is no longer available.</p>
           </section>
@@ -508,7 +508,7 @@ export function CanvasChangeRequestsView({
             <section className="rounded-xl border border-slate-200 bg-white p-4">
               <Button variant="ghost" size="sm" className="mb-3 px-1" onClick={() => setShowDetailView(false)}>
                 <ArrowLeft className="h-4 w-4" />
-                Back to Change Requests
+                Back
               </Button>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
@@ -554,7 +554,7 @@ export function CanvasChangeRequestsView({
                     <VersionNodeDiffAccordion
                       summary={selectedDiffSummary}
                       conflictingNodeIDs={selectedConflictingNodeIDSet}
-                      emptyMessage="No node-level differences found."
+                      emptyMessage="No differences found."
                     />
                   </div>
                 </div>

@@ -716,16 +716,13 @@ export function CanvasChangeRequestConflictResolver({
             <div className="space-y-1">
               <Button variant="ghost" size="sm" className="px-1" onClick={onBack}>
                 <ArrowLeft className="h-4 w-4" />
-                Back to Versioning
+                Back
               </Button>
               <p className="text-sm font-semibold text-slate-900">Resolve Change Request Conflicts</p>
-              <p className="text-xs text-slate-600">
-                Review Current vs Incoming, then edit Final Result and save the resolved version.
-              </p>
+              <p className="text-xs text-slate-600">Review changes, edit the final result, and save.</p>
               {!allConflictsMarkedResolved ? (
                 <p className="text-xs text-amber-700">
-                  {unresolvedNodeCount} conflicting node{unresolvedNodeCount === 1 ? "" : "s"} still need to be marked
-                  as resolved.
+                  {unresolvedNodeCount} unresolved conflict{unresolvedNodeCount === 1 ? "" : "s"}.
                 </p>
               ) : null}
             </div>

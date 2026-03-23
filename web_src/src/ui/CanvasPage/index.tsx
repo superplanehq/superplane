@@ -880,7 +880,7 @@ function CanvasPage(props: CanvasPageProps) {
     canvasStateMode === "editing"
       ? "Edit Mode"
       : canvasStateMode === "previewing-previous-version"
-        ? "Previewing Previous Version"
+        ? "Previous Version"
         : "";
 
   return (
@@ -951,7 +951,7 @@ function CanvasPage(props: CanvasPageProps) {
             integrations={props.integrations}
             canvasZoom={canvasZoom}
             disabled={readOnly}
-            disabledMessage="You don't have permission to edit this canvas."
+            disabledMessage="No edit permission."
             onBlockClick={handleBuildingBlockClick}
             onAddNote={handleAddNote}
           />
@@ -2581,7 +2581,7 @@ function CanvasContent({
                         <GitBranch className="h-3 w-3" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
+                    <TooltipContent>{versionControlButtonTooltip || "Open versions"}</TooltipContent>
                   </Tooltip>
                 </div>
               ) : null}

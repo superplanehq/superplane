@@ -255,7 +255,7 @@ export function VersionNodeDiffAccordion({
   summary,
   className,
   conflictingNodeIDs,
-  emptyMessage = "No node changes found between these versions.",
+  emptyMessage = "No changes found.",
 }: {
   summary: VersionNodeDiffSummary;
   className?: string;

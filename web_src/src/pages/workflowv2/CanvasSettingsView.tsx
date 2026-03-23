@@ -156,7 +156,7 @@ export function CanvasSettingsView({
   const isVersioningEnforcedByOrganization = orgVersioningEnabled === true;
   const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : versioningEnabled;
   const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningEnforcedByOrganization;
-  const versioningEnforcedTooltip = "Versioning is enabled by your organization settings for all canvases.";
+  const versioningEnforcedTooltip = "Enforced by organization settings.";
 
   useEffect(() => {
     setName(initialValues.name);
@@ -282,10 +282,8 @@ export function CanvasSettingsView({
         <div>
           <Label className="mb-1 block text-sm font-medium text-gray-700">Canvas Versioning</Label>
           <p className="text-sm text-gray-500">
-            Manage canvas edits with drafts and publish flow. When disabled, users edit the live canvas directly.
-            {isVersioningEnforcedByOrganization
-              ? " Versioning is enabled by your organization settings for all canvases."
-              : " This toggle controls versioning for this canvas."}
+            Use drafts and publish flow to manage edits.
+            {isVersioningEnforcedByOrganization ? " Enforced by organization settings." : ""}
           </p>
         </div>
         <div className="flex items-center gap-3">
