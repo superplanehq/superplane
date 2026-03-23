@@ -1,0 +1,153 @@
+---
+title: "Sentry"
+---
+
+React to issue events and update issues in Sentry
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Issue Event" href="#on-issue-event" description="Listen to issue webhooks from Sentry" />
+</CardGrid>
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status" />
+</CardGrid>
+
+## Instructions
+
+SuperPlane connects to Sentry via a **Custom Internal Integration** that you create in your Sentry account.
+
+**What you need:**
+- **User Token** – your Sentry personal auth token from **Settings → Developer Settings → Auth Tokens**
+- **Client Secret** – from the internal integration page in Sentry, used to verify incoming webhooks
+- **Sentry URL** – use your org-specific URL, e.g. `https://your-org.sentry.io`
+- **Integration Name** – the name you gave the integration in Sentry (default: `SuperPlane`)
+
+**Setup steps:**
+1. In Sentry go to **Settings → Developer Settings → Auth Tokens** and create a personal auth token. Copy it — this is your **User Token**.
+2. Go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
+3. Set the name (e.g. `SuperPlane`) and leave **Webhook URL** empty — SuperPlane sets this automatically.
+4. Save — Sentry shows the **Client Secret** on the integration page. Copy it.
+5. In SuperPlane fill in **Sentry URL** (org URL), **Integration Name**, **User Token**, and **Client Secret**, then save.
+6. SuperPlane finds the integration by name, sets the webhook URL on it, and subscribes it to issue events automatically.
+
+After that the integration is **ready** — any issue event Sentry sends will be routed to your `OnIssue` triggers.
+
+<a id="on-issue-event"></a>
+
+## On Issue Event
+
+The On Issue Event trigger starts a workflow execution when Sentry sends issue webhooks for the connected organization.
+
+### Use Cases
+
+- **Escalation workflows**: react when a new issue is created in Sentry
+- **Triage automation**: assign follow-up actions when issues are assigned or resolved
+- **Cross-tool sync**: mirror Sentry issue state changes into incident or ticketing systems
+
+### Configuration
+
+- **Project**: Optionally limit the trigger to a single Sentry project
+- **Actions**: Select which issue actions should trigger the workflow
+
+### Event Data
+
+The trigger emits the full Sentry webhook payload, including:
+- **action**: the issue event action
+- **data.issue**: the Sentry issue object
+- **actor**: the user or team that triggered the event when available
+
+### Setup
+
+This trigger uses the webhook URL configured on your Sentry internal integration. SuperPlane verifies each webhook signature using your Sentry client secret before routing the event to matching triggers.
+
+### Example Data
+
+```json
+{
+  "action": "created",
+  "actor": {
+    "id": "789",
+    "name": "Person",
+    "type": "user"
+  },
+  "data": {
+    "issue": {
+      "assignedTo": {
+        "id": "789",
+        "name": "Person",
+        "type": "user"
+      },
+      "culprit": "SentryCustomError(frontend/src/util)",
+      "firstSeen": "2022-04-04T18:17:18.320000Z",
+      "id": "123",
+      "lastSeen": "2022-04-04T18:17:18.320000Z",
+      "level": "error",
+      "project": {
+        "id": "456",
+        "name": "ipe",
+        "slug": "ipe"
+      },
+      "shortId": "IPE-1",
+      "status": "unresolved",
+      "title": "Error #1: This is a test error!"
+    }
+  },
+  "installation": {
+    "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
+  },
+  "resource": "issue",
+  "timestamp": "2022-04-04T18:17:18.320000Z"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+The Update Issue component updates an existing issue in Sentry.
+
+### Use Cases
+
+- **Resolve issues automatically** after a remediation workflow succeeds
+- **Reopen issues** when a related deployment regresses
+
+### Configuration
+
+- **Issue**: Select the Sentry issue to update
+- **Status**: New issue status
+
+### Output
+
+Returns the updated Sentry issue object.
+
+### Example Output
+
+```json
+{
+  "assignedTo": {
+    "id": "789",
+    "name": "Person",
+    "type": "user"
+  },
+  "culprit": "SentryCustomError(frontend/src/util)",
+  "firstSeen": "2022-04-04T18:17:18.320000Z",
+  "id": "123",
+  "lastSeen": "2022-04-04T18:17:18.320000Z",
+  "level": "error",
+  "project": {
+    "id": "456",
+    "name": "ipe",
+    "slug": "ipe"
+  },
+  "shortId": "IPE-1",
+  "status": "unresolved",
+  "title": "Error #1: This is a test error!"
+}
+```
+

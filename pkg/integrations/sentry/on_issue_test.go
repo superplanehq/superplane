@@ -1,0 +1,108 @@
+package sentry
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
+)
+
+func Test__OnIssue__Setup(t *testing.T) {
+	trigger := &OnIssue{}
+	integrationCtx := &contexts.IntegrationContext{
+		Metadata: Metadata{
+			Projects: []ProjectSummary{
+				{ID: "1", Slug: "backend", Name: "Backend"},
+			},
+		},
+	}
+	metadataCtx := &contexts.MetadataContext{}
+
+	err := trigger.Setup(core.TriggerContext{
+		Configuration: map[string]any{
+			"project": "backend",
+			"actions": []string{"created"},
+		},
+		Integration: integrationCtx,
+		Metadata:    metadataCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, integrationCtx.Subscriptions, 1)
+
+	metadata, ok := metadataCtx.Metadata.(OnIssueMetadata)
+	require.True(t, ok)
+	require.NotNil(t, metadata.AppSubscriptionID)
+	require.NotNil(t, metadata.Project)
+	assert.Equal(t, "backend", metadata.Project.Slug)
+}
+
+func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
+	trigger := &OnIssue{}
+	eventCtx := &contexts.EventContext{}
+
+	message := WebhookMessage{
+		Resource: "issue",
+		Action:   "resolved",
+		Data: map[string]any{
+			"issue": map[string]any{
+				"id":    "123",
+				"title": "Broken deploy",
+				"project": map[string]any{
+					"slug": "backend",
+				},
+			},
+		},
+	}
+
+	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		Message: message,
+		Configuration: map[string]any{
+			"project": "backend",
+			"actions": []string{"resolved"},
+		},
+		Events: eventCtx,
+		Logger: logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, eventCtx.Payloads, 1)
+	assert.Equal(t, "sentry.issue", eventCtx.Payloads[0].Type)
+}
+
+func Test__OnIssue__OnIntegrationMessage__ArchivedAction(t *testing.T) {
+	trigger := &OnIssue{}
+	eventCtx := &contexts.EventContext{}
+
+	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		Message: WebhookMessage{
+			Resource: "issue",
+			Action:   "archived",
+			Data: map[string]any{
+				"issue": map[string]any{
+					"id": "123",
+				},
+			},
+		},
+		Configuration: map[string]any{
+			"actions": []string{"archived"},
+		},
+		Events: eventCtx,
+		Logger: logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, eventCtx.Payloads, 1)
+	assert.Equal(t, "sentry.issue", eventCtx.Payloads[0].Type)
+}
+
+func Test__OnIssue__HandleWebhook(t *testing.T) {
+	trigger := &OnIssue{}
+	code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, code)
+}
