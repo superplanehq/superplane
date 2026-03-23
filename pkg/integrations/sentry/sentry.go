@@ -24,12 +24,14 @@ const (
 
 	ResourceTypeProject = "project"
 	ResourceTypeTeam    = "team"
+	ResourceTypeIssue   = "issue"
 )
 
 const (
 	appSetupDescription = `
 - If you already created a Sentry internal integration named ` + "`%s`" + `, close this prompt and paste the **User Token** and **Client Secret** into SuperPlane.
-- Click **Continue** to open the **New Internal Integration** form in Sentry.
+- Click **Continue** to open Sentry's internal integration flow.
+- In Sentry go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
 - Fill in:
   - **Integration Name**: ` + "`%s`" + `
   - Leave **Webhook URL** empty — SuperPlane sets this automatically.
@@ -44,7 +46,26 @@ const (
 - Open the ` + "`%s`" + ` integration and set:
   - **Webhook URL**: ` + "`%s`" + `
   - **Webhook Subscriptions**: ` + "`issue`" + `
-- Reason: %s
+`
+
+	missingIntegrationDescription = `
+- SuperPlane connected to Sentry, but it could not find an internal integration named ` + "`%s`" + `.
+- Click **Continue** to open the **Custom Integrations** page in Sentry.
+- Create an internal integration with that exact name, or update **Integration Name** in SuperPlane to match the name already in Sentry.
+- Save the integration in SuperPlane again after fixing the name so SuperPlane can configure the webhook automatically.
+`
+
+	multipleIntegrationsDescription = `
+- SuperPlane connected to Sentry, but multiple internal integrations matched the name ` + "`%s`" + `.
+- Click **Continue** to open the **Custom Integrations** page in Sentry.
+- Rename one of the matching integrations in Sentry or choose a unique **Integration Name** in SuperPlane.
+- Save the integration in SuperPlane again after fixing the name so SuperPlane can configure the webhook automatically.
+`
+
+	noIntegrationsDescription = `
+- SuperPlane connected to Sentry, but there are no custom integrations in this Sentry organization yet.
+- Click **Continue** to open the **Custom Integrations** page in Sentry.
+- Create the internal integration first, then save the integration in SuperPlane again so SuperPlane can configure the webhook automatically.
 `
 )
 
@@ -130,7 +151,7 @@ SuperPlane connects to Sentry via a **Custom Internal Integration** that you cre
 
 **Setup steps:**
 1. In Sentry go to **Settings → Developer Settings → Auth Tokens** and create a personal auth token. Copy it — this is your **User Token**.
-2. Go to **Settings → Developer Settings → Custom Integrations** and click **New Internal Integration**.
+2. Go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
 3. Set the name (e.g. ` + "`SuperPlane`" + `) and leave **Webhook URL** empty — SuperPlane sets this automatically.
 4. Save — Sentry shows the **Client Secret** on the integration page. Copy it.
 5. In SuperPlane fill in **Sentry URL** (org URL), **Integration Name**, **User Token**, and **Client Secret**, then save.
@@ -203,6 +224,13 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
+	subscriptions, err := ctx.Integration.ListSubscriptions()
+	if err == nil && len(subscriptions) == 0 {
+		ctx.Integration.RemoveBrowserAction()
+		ctx.Integration.Ready()
+		return nil
+	}
+
 	warning, err := s.reconcileWebhook(ctx, config)
 	if err != nil {
 		ctx.Integration.Error(err.Error())
@@ -219,7 +247,7 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 			orgSlug = metadata.Organization.Slug
 		}
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: fmt.Sprintf(manualWebhookDescription, displayIntegrationName(config.IntegrationName), eventsURL(ctx), warning),
+			Description: webhookBrowserActionDescription(config.IntegrationName, warning, eventsURL(ctx)),
 			URL:         developerSettingsURL(config.BaseURL, orgSlug),
 			Method:      http.MethodGet,
 		})
@@ -342,6 +370,21 @@ func findTargetApp(apps []SentryApp, integrationName string) (*SentryApp, string
 	return nil, "multiple custom integrations exist for this organization; set Integration Name in SuperPlane or configure the webhook URL manually"
 }
 
+func webhookBrowserActionDescription(integrationName, warning, webhookURL string) string {
+	name := displayIntegrationName(integrationName)
+
+	switch {
+	case strings.HasPrefix(warning, "could not find an internal integration named"):
+		return fmt.Sprintf(missingIntegrationDescription, name)
+	case strings.HasPrefix(warning, "multiple internal integrations named"):
+		return fmt.Sprintf(multipleIntegrationsDescription, name)
+	case warning == "no custom integrations were found for this organization":
+		return noIntegrationsDescription
+	default:
+		return fmt.Sprintf(manualWebhookDescription, name, webhookURL)
+	}
+}
+
 func ensureContains(values []string, needle string) []string {
 	if slices.Contains(values, needle) {
 		return values
@@ -357,8 +400,21 @@ func sameStringSet(a, b []string) bool {
 		return false
 	}
 
+	counts := make(map[string]int, len(a))
 	for _, value := range a {
-		if !slices.Contains(b, value) {
+		counts[value]++
+	}
+
+	for _, value := range b {
+		count, exists := counts[value]
+		if !exists || count == 0 {
+			return false
+		}
+		counts[value]--
+	}
+
+	for _, count := range counts {
+		if count != 0 {
 			return false
 		}
 	}
@@ -487,7 +543,7 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypeProject,
 				ID:   project.Slug,
-				Name: displayName(project.Name, project.Slug),
+				Name: project.Name,
 			})
 		}
 		return resources, nil
@@ -498,9 +554,31 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypeTeam,
 				ID:   team.Slug,
-				Name: displayName(team.Name, team.Slug),
+				Name: team.Name,
 			})
 		}
+		return resources, nil
+
+	case ResourceTypeIssue:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		issues, err := client.ListIssues()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list issues: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(issues))
+		for _, issue := range issues {
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeIssue,
+				ID:   issue.ID,
+				Name: normalizedIssueTitle(issue.Title),
+			})
+		}
+
 		return resources, nil
 	}
 
@@ -707,24 +785,30 @@ func verifyWebhookSignature(signature string, body, secret []byte) error {
 	return nil
 }
 
-func displayName(name, slug string) string {
-	name = strings.TrimSpace(name)
-	slug = strings.TrimSpace(slug)
-
-	switch {
-	case name == "":
-		return slug
-	case slug == "" || name == slug:
-		return name
-	default:
-		return fmt.Sprintf("%s (%s)", name, slug)
-	}
-}
-
 func displayIntegrationName(name string) string {
 	if strings.TrimSpace(name) == "" {
 		return "SuperPlane"
 	}
 
 	return strings.TrimSpace(name)
+}
+
+func normalizedIssueTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return ""
+	}
+
+	separatorIndex := strings.Index(title, ":")
+	if separatorIndex <= 0 || separatorIndex >= len(title)-1 {
+		return title
+	}
+
+	prefix := strings.TrimSpace(title[:separatorIndex])
+	suffix := strings.TrimSpace(title[separatorIndex+1:])
+	if prefix == "" || suffix == "" {
+		return title
+	}
+
+	return prefix
 }

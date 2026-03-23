@@ -15,6 +15,7 @@ func (t *OnIssue) ExampleData() map[string]any {
 		"data": map[string]any{
 			"issue": sentryIssueExample(),
 		},
+		"timestamp": "2022-04-04T18:17:18.320000Z",
 	}
 }
 

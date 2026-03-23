@@ -16,7 +16,10 @@ import type {
 interface UpdateIssueConfiguration {
   issueId?: string;
   status?: string;
-  assignedTo?: string;
+}
+
+interface UpdateIssueNodeMetadata {
+  issueTitle?: string;
 }
 
 interface SentryIssue {
@@ -106,18 +109,16 @@ function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, compone
 
 function buildMetadata(node: NodeInfo) {
   const configuration = node.configuration as UpdateIssueConfiguration | undefined;
+  const nodeMetadata = node.metadata as UpdateIssueNodeMetadata | undefined;
   const metadata = [];
 
-  if (configuration?.issueId) {
-    metadata.push({ icon: "hash", label: configuration.issueId });
+  const issueLabel = nodeMetadata?.issueTitle || configuration?.issueId;
+  if (issueLabel) {
+    metadata.push({ icon: "bug", label: issueLabel });
   }
 
   if (configuration?.status) {
     metadata.push({ icon: "check-circle-2", label: configuration.status });
-  }
-
-  if (configuration?.assignedTo) {
-    metadata.push({ icon: "user", label: configuration.assignedTo });
   }
 
   return metadata;

@@ -15,7 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status" />
 </CardGrid>
 
 ## Instructions
@@ -30,7 +30,7 @@ SuperPlane connects to Sentry via a **Custom Internal Integration** that you cre
 
 **Setup steps:**
 1. In Sentry go to **Settings → Developer Settings → Auth Tokens** and create a personal auth token. Copy it — this is your **User Token**.
-2. Go to **Settings → Developer Settings → Custom Integrations** and click **New Internal Integration**.
+2. Go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
 3. Set the name (e.g. `SuperPlane`) and leave **Webhook URL** empty — SuperPlane sets this automatically.
 4. Save — Sentry shows the **Client Secret** on the integration page. Copy it.
 5. In SuperPlane fill in **Sentry URL** (org URL), **Integration Name**, **User Token**, and **Client Secret**, then save.
@@ -101,7 +101,8 @@ This trigger uses the webhook URL configured on your Sentry internal integration
   "installation": {
     "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
   },
-  "resource": "issue"
+  "resource": "issue",
+  "timestamp": "2022-04-04T18:17:18.320000Z"
 }
 ```
 
@@ -115,13 +116,11 @@ The Update Issue component updates an existing issue in Sentry.
 
 - **Resolve issues automatically** after a remediation workflow succeeds
 - **Reopen issues** when a related deployment regresses
-- **Assign issues** to a user or team for triage
 
 ### Configuration
 
-- **Issue ID**: The Sentry issue ID to update
-- **Status**: Optional new issue status
-- **Assigned To**: Optional user or team identifier to assign the issue to
+- **Issue**: Select the Sentry issue to update
+- **Status**: New issue status
 
 ### Output
 

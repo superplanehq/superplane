@@ -13,10 +13,13 @@ import (
 
 type UpdateIssue struct{}
 
+type UpdateIssueNodeMetadata struct {
+	IssueTitle string `json:"issueTitle,omitempty" mapstructure:"issueTitle"`
+}
+
 type UpdateIssueConfiguration struct {
-	IssueID    string `json:"issueId" mapstructure:"issueId"`
-	Status     string `json:"status" mapstructure:"status"`
-	AssignedTo string `json:"assignedTo" mapstructure:"assignedTo"`
+	IssueID string `json:"issueId" mapstructure:"issueId"`
+	Status  string `json:"status" mapstructure:"status"`
 }
 
 func (c *UpdateIssue) Name() string {
@@ -28,7 +31,7 @@ func (c *UpdateIssue) Label() string {
 }
 
 func (c *UpdateIssue) Description() string {
-	return "Update a Sentry issue"
+	return "Update a Sentry issue status"
 }
 
 func (c *UpdateIssue) Documentation() string {
@@ -38,13 +41,11 @@ func (c *UpdateIssue) Documentation() string {
 
 - **Resolve issues automatically** after a remediation workflow succeeds
 - **Reopen issues** when a related deployment regresses
-- **Assign issues** to a user or team for triage
 
 ## Configuration
 
-- **Issue ID**: The Sentry issue ID to update
-- **Status**: Optional new issue status
-- **Assigned To**: Optional user or team identifier to assign the issue to
+- **Issue**: Select the Sentry issue to update
+- **Status**: New issue status
 
 ## Output
 
@@ -71,16 +72,21 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "issueId",
-			Label:       "Issue ID",
-			Type:        configuration.FieldTypeExpression,
+			Label:       "Issue",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Sentry issue ID to update, usually from an upstream trigger payload",
+			Description: "Select the Sentry issue to update",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeIssue,
+				},
+			},
 		},
 		{
 			Name:        "status",
 			Label:       "Status",
 			Type:        configuration.FieldTypeSelect,
-			Required:    false,
+			Required:    true,
 			Description: "The new issue status",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
@@ -92,13 +98,6 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 					},
 				},
 			},
-		},
-		{
-			Name:        "assignedTo",
-			Label:       "Assigned To",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "The Sentry user or team identifier to assign the issue to",
 		},
 	}
 }
@@ -113,11 +112,23 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 		return errors.New("issueId is required")
 	}
 
-	if config.Status == "" && config.AssignedTo == "" {
-		return errors.New("at least one field to update must be provided")
+	if config.Status == "" {
+		return errors.New("status is required")
 	}
 
-	return nil
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create sentry client: %w", err)
+	}
+
+	issue, err := client.GetIssue(config.IssueID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve sentry issue: %w", err)
+	}
+
+	return ctx.Metadata.Set(UpdateIssueNodeMetadata{
+		IssueTitle: normalizedIssueTitle(issue.Title),
+	})
 }
 
 func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -136,8 +147,7 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	issue, err := client.UpdateIssue(config.IssueID, UpdateIssueRequest{
-		Status:     config.Status,
-		AssignedTo: config.AssignedTo,
+		Status: config.Status,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update sentry issue: %w", err)

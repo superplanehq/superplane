@@ -86,6 +86,12 @@ type Team struct {
 	Name string `json:"name" mapstructure:"name"`
 }
 
+type Issue struct {
+	ID      string `json:"id" mapstructure:"id"`
+	ShortID string `json:"shortId" mapstructure:"shortId"`
+	Title   string `json:"title" mapstructure:"title"`
+}
+
 type AuthIdentity struct {
 	ID       string `json:"id" mapstructure:"id"`
 	Name     string `json:"name" mapstructure:"name"`
@@ -126,8 +132,7 @@ type UpdateSentryAppRequest struct {
 }
 
 type UpdateIssueRequest struct {
-	Status     string `json:"status,omitempty"`
-	AssignedTo string `json:"assignedTo,omitempty"`
+	Status string `json:"status,omitempty"`
 }
 
 func (c *Client) ListOrganizations() ([]Organization, error) {
@@ -216,6 +221,42 @@ func (c *Client) ListTeams() ([]TeamSummary, error) {
 	}
 
 	return result, nil
+}
+
+func (c *Client) ListIssues() ([]Issue, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/issues/?query=&limit=100", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	issues := []Issue{}
+	if err := json.Unmarshal(responseBody, &issues); err != nil {
+		return nil, err
+	}
+
+	return issues, nil
+}
+
+func (c *Client) GetIssue(issueID string) (*Issue, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/issues/%s/", c.orgSlug, issueID),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	issue := Issue{}
+	if err := json.Unmarshal(responseBody, &issue); err != nil {
+		return nil, err
+	}
+
+	return &issue, nil
 }
 
 func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {

@@ -3,6 +3,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
+import { splitSentryIssueTitle } from "./utils";
 
 interface OnIssueConfiguration {
   project?: string;
@@ -34,7 +35,8 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as SentryIssueEventData;
     const issue = eventData?.data?.issue;
-    const title = issue?.shortId ? `${issue.shortId} · ${issue.title || "Issue"}` : issue?.title || "Issue";
+    const parsedTitle = splitSentryIssueTitle(issue?.title);
+    const title = parsedTitle.title || "Issue";
 
     const subtitleParts = [
       eventData?.action,
@@ -55,8 +57,8 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const issue = eventData?.data?.issue;
     const details: Record<string, string> = {};
 
+    addFormattedTimestamp(details, "Triggered At", context.event?.createdAt);
     addDetail(details, "Issue ID", issue?.id);
-    addDetail(details, "Short ID", issue?.shortId);
     addDetail(details, "Title", issue?.title);
     addDetail(details, "Action", eventData?.action);
     addDetail(details, "Status", issue?.status);
@@ -108,6 +110,14 @@ function addDetail(details: Record<string, string>, label: string, value?: strin
   }
 
   details[label] = value;
+}
+
+function addFormattedTimestamp(details: Record<string, string>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  details[label] = new Date(value).toLocaleString();
 }
 
 function getProjectLabel(issue?: SentryIssue) {
