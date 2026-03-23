@@ -198,29 +198,18 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
-	templateDir := os.Getenv("TEMPLATE_DIR")
-	if templateDir == "" {
-		log.Warn("Email Consumers not started - missing required environment variable (TEMPLATE_DIR)")
+	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
+	if emailService == nil {
+		log.Warn("Email Consumers not started - missing required environment variables")
 		return
 	}
 
-	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
-		log.Println("Starting SMTP Email Consumers (self-hosted)")
-		settingsProvider := &services.DatabaseEmailSettingsProvider{Encryptor: encryptor}
-		emailService := services.NewSMTPEmailService(settingsProvider, templateDir)
-		startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
-		return
-	}
-
-	resendAPIKey := os.Getenv("RESEND_API_KEY")
-	fromName := os.Getenv("EMAIL_FROM_NAME")
-	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
-	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
-		log.Warn("Email Consumers not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS)")
-		return
-	}
-
-	emailService := services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
 }
 
@@ -232,6 +221,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Notification Email Consumer")
 	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
 	go notificationEmailConsumer.Start()
+
+	log.Println("Starting Magic Code Email Consumer")
+	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
+	go magicCodeEmailConsumer.Start()
 }
 
 func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {

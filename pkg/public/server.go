@@ -110,7 +110,8 @@ func NewServer(
 
 	// Initialize OAuth providers from environment variables
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled)
+	magicCodeEnabled := os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes"
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, blockSignup, passwordLoginEnabled, magicCodeEnabled)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
