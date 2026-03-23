@@ -47,6 +47,8 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "Use exact block names from catalog tools, include node references by nodeId "
             "for existing nodes, and keep operation order executable. "
             "Do not invent unknown fields or operation types. "
+            "For complex automation requests, check list_canvas_memories for reusable "
+            "patterns before proposing a new architecture. "
             "Use get_canvas at most once per answer unless the user asks to refresh "
             "or use a different canvas. "
             "Keep responses short by default (about 6-10 lines) unless the user asks "
@@ -139,6 +141,25 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         except Exception as error:
             _tool_debug(f"list_available_integrations failed: {error}")
             return [_tool_error_entry("list_available_integrations", error)]
+
+    @agent.tool
+    def list_canvas_memories(
+        ctx: RunContext[AgentDeps],
+        namespace: str | None = None,
+        query: str | None = None,
+        limit: int | None = 20,
+    ) -> list[dict[str, Any]]:
+        """List canvas memory entries; optionally filter by namespace/query."""
+        try:
+            return ctx.deps.client.list_canvas_memories(
+                canvas_id=ctx.deps.canvas_id,
+                namespace=namespace,
+                query=query,
+                limit=limit,
+            )
+        except Exception as error:
+            _tool_debug(f"list_canvas_memories failed: {error}")
+            return [_tool_error_entry("list_canvas_memories", error)]
 
     @agent.tool
     def list_integration_resources(

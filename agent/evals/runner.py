@@ -9,8 +9,12 @@ from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
+<<<<<<< HEAD
 from evals.evaluators import WorkflowShape
 from evals.report import ReportBuilder
+=======
+from evals.evaluators import EphemeralMachineWorkflow, WorkflowShape
+>>>>>>> 5264aba85 (Bootstrap ephemerals)
 
 dataset = Dataset(
     cases=[
@@ -34,6 +38,15 @@ dataset = Dataset(
                   edges=[("github.onPRReviewComment", "slack.sendTextMessage")],
                 )
             ],
+        ),
+        Case(
+            name="ephemeral_pr_preview_machines",
+            inputs=(
+                "Build a workflow that creates ephemeral preview machines for backend pull requests. "
+                "On PR open, create infra and post the preview URL to the PR; on PR close or after 48 hours, "
+                "tear it down and avoid zombie environments."
+            ),
+            evaluators=[EphemeralMachineWorkflow()],
         ),
     ],
 )
