@@ -28,6 +28,7 @@ import type { IntegrationCreatePayload } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { showErrorToast } from "@/utils/toast";
 import { getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { integrationKeys } from "@/hooks/useIntegrations";
@@ -55,12 +56,7 @@ interface SettingsTabProps {
   integrationDefinition?: { name?: string; label?: string; icon?: string };
   integrationDefinitionFull?: IntegrationsIntegrationDefinition;
   autocompleteExampleObj?: Record<string, unknown> | null;
-  onOpenCreateIntegrationDialog?: (opts?: {
-    defaultName?: string;
-    browserAction?: OrganizationsBrowserAction;
-    createdIntegrationId?: string;
-    webhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
-  }) => void;
+  onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
   onCreateIntegration?: (payload: IntegrationCreatePayload) => Promise<OrganizationsCreateIntegrationResponse>;
   onIntegrationCreated?: (integrationId: string) => void;
@@ -114,6 +110,7 @@ export function SettingsTab({
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
   const queryClient = useQueryClient();
+  const resolvedOrgId = organizationId ?? domainId ?? "";
 
   // Inline integration creation state
   const [inlineIntegrationName, setInlineIntegrationName] = useState(integrationDefinitionFull?.name ?? "");
@@ -131,7 +128,10 @@ export function SettingsTab({
     return integrationDefinitionFull?.configuration ?? [];
   }, [integrationDefinitionFull?.configuration]);
 
+  const lastSeededIntegrationIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
+    lastSeededIntegrationIdRef.current = undefined;
     setInlineIntegrationName(integrationDefinitionFull?.name ?? "");
     setInlineIntegrationConfig({});
     setInlineBrowserAction(undefined);
@@ -158,12 +158,7 @@ export function SettingsTab({
 
       const integration = result.integration;
       const browserAction = integration?.status?.browserAction;
-      const webhookUrl =
-        integration?.status?.metadata &&
-        typeof integration.status.metadata === "object" &&
-        "webhookUrl" in integration.status.metadata
-          ? (integration.status.metadata as { webhookUrl?: string }).webhookUrl
-          : undefined;
+      const webhookUrl = getIntegrationWebhookUrl(integration?.status?.metadata);
 
       if (browserAction && integration?.metadata?.id) {
         setInlineBrowserAction(browserAction);
@@ -217,37 +212,35 @@ export function SettingsTab({
     }
 
     if (inlineCreatedIntegrationId) {
-      const orgId = organizationId ?? domainId ?? "";
       try {
         await organizationsUpdateIntegration(
           withOrganizationHeader({
-            path: { id: orgId, integrationId: inlineCreatedIntegrationId },
+            path: { id: resolvedOrgId, integrationId: inlineCreatedIntegrationId },
             body: { configuration: { ...inlineIntegrationConfig, installed: "true" } },
           }),
         );
         await queryClient.invalidateQueries({
-          queryKey: integrationKeys.connected(orgId),
+          queryKey: integrationKeys.connected(resolvedOrgId),
         });
       } catch {
         // Resync is best-effort
       }
       setInlineBrowserActionCompleted(true);
     }
-  }, [inlineBrowserAction, inlineCreatedIntegrationId, inlineIntegrationConfig, organizationId, domainId, queryClient]);
+  }, [inlineBrowserAction, inlineCreatedIntegrationId, inlineIntegrationConfig, resolvedOrgId, queryClient]);
 
   const handleInlineWebhookComplete = useCallback(async () => {
     if (!inlineWebhookSetup) return;
-    const orgId = organizationId ?? domainId ?? "";
     setIsInlineWebhookCompleting(true);
     try {
       await organizationsUpdateIntegration(
         withOrganizationHeader({
-          path: { id: orgId, integrationId: inlineWebhookSetup.id },
+          path: { id: resolvedOrgId, integrationId: inlineWebhookSetup.id },
           body: { configuration: { ...inlineWebhookSetup.config, ...inlineIntegrationConfig } },
         }),
       );
       await queryClient.invalidateQueries({
-        queryKey: integrationKeys.connected(orgId),
+        queryKey: integrationKeys.connected(resolvedOrgId),
       });
       onIntegrationCreated?.(inlineWebhookSetup.id);
     } catch {
@@ -255,7 +248,38 @@ export function SettingsTab({
     } finally {
       setIsInlineWebhookCompleting(false);
     }
-  }, [inlineWebhookSetup, inlineIntegrationConfig, organizationId, domainId, queryClient, onIntegrationCreated]);
+  }, [inlineWebhookSetup, inlineIntegrationConfig, resolvedOrgId, queryClient, onIntegrationCreated]);
+
+  const renderInlineConfigFields = useCallback(
+    (fields: ConfigurationField[]) => {
+      if (fields.length === 0) return null;
+      return (
+        <div className="space-y-4">
+          {fields.map((field: ConfigurationField) => {
+            if (!field.name) return null;
+            return (
+              <ConfigurationFieldRenderer
+                key={field.name}
+                field={field}
+                value={inlineIntegrationConfig[field.name]}
+                onChange={(value) =>
+                  setInlineIntegrationConfig((prev) => ({
+                    ...prev,
+                    [field.name || ""]: value,
+                  }))
+                }
+                allValues={inlineIntegrationConfig}
+                domainId={resolvedOrgId}
+                domainType="DOMAIN_TYPE_ORGANIZATION"
+                organizationId={resolvedOrgId}
+              />
+            );
+          })}
+        </div>
+      );
+    },
+    [inlineIntegrationConfig, resolvedOrgId],
+  );
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -284,15 +308,12 @@ export function SettingsTab({
     return integrationsOfType.find((i) => i.status?.state === "pending" || i.status?.state === "error");
   }, [integrationsOfType, readyIntegrationsOfType]);
 
-  // Seed inline state from an existing pending/errored integration so the user
-  // sees the configure form (browser action, webhook, etc.) instead of a blank creation form.
   useEffect(() => {
     if (!pendingIntegration) return;
     const id = pendingIntegration.metadata?.id;
-    if (!id) return;
-    // Only seed once per integration id to avoid overwriting user edits
-    if (inlineCreatedIntegrationId === id) return;
+    if (!id || lastSeededIntegrationIdRef.current === id) return;
 
+    lastSeededIntegrationIdRef.current = id;
     setInlineCreatedIntegrationId(id);
     setInlineIntegrationName(pendingIntegration.metadata?.name ?? integrationDefinitionFull?.name ?? "");
     if (pendingIntegration.spec?.configuration) {
@@ -306,11 +327,7 @@ export function SettingsTab({
       return;
     }
 
-    const meta = pendingIntegration.status?.metadata;
-    const webhookUrl =
-      meta && typeof meta === "object" && "webhookUrl" in meta
-        ? (meta as { webhookUrl?: string }).webhookUrl
-        : undefined;
+    const webhookUrl = getIntegrationWebhookUrl(pendingIntegration.status?.metadata);
     if (webhookUrl) {
       setInlineWebhookSetup({
         id,
@@ -318,7 +335,7 @@ export function SettingsTab({
         config: { ...(pendingIntegration.spec?.configuration ?? {}) },
       });
     }
-  }, [pendingIntegration, inlineCreatedIntegrationId, integrationDefinitionFull?.name]);
+  }, [pendingIntegration, integrationDefinitionFull?.name]);
 
   const selectedIntegrationFull = useMemo(() => {
     const id = selectedIntegration?.id ?? integrationRef?.id;
@@ -590,28 +607,7 @@ export function SettingsTab({
                         </Button>
                       </div>
                     </div>
-                    {(integrationDefinitionFull?.configuration ?? [])
-                      .filter((f: ConfigurationField) => {
-                        if (!f.name) return false;
-                        return f.name === "signingSecret" || f.name === "webhookSigningSecret";
-                      })
-                      .map((field) => (
-                        <ConfigurationFieldRenderer
-                          key={field.name}
-                          field={field}
-                          value={inlineIntegrationConfig[field.name!]}
-                          onChange={(value) =>
-                            setInlineIntegrationConfig((prev) => ({
-                              ...prev,
-                              [field.name || ""]: value,
-                            }))
-                          }
-                          allValues={inlineIntegrationConfig}
-                          domainId={organizationId ?? domainId ?? ""}
-                          domainType="DOMAIN_TYPE_ORGANIZATION"
-                          organizationId={organizationId ?? domainId ?? ""}
-                        />
-                      ))}
+                    {renderInlineConfigFields(inlineConfigFields.filter((f) => f.sensitive))}
                     <LoadingButton
                       color="blue"
                       onClick={() => void handleInlineWebhookComplete()}
@@ -640,30 +636,7 @@ export function SettingsTab({
                           : undefined
                       }
                     />
-                    {!inlineBrowserActionCompleted && inlineConfigFields.length > 0 && (
-                      <div className="space-y-4">
-                        {inlineConfigFields.map((field: ConfigurationField) => {
-                          if (!field.name) return null;
-                          return (
-                            <ConfigurationFieldRenderer
-                              key={field.name}
-                              field={field}
-                              value={inlineIntegrationConfig[field.name]}
-                              onChange={(value) =>
-                                setInlineIntegrationConfig((prev) => ({
-                                  ...prev,
-                                  [field.name || ""]: value,
-                                }))
-                              }
-                              allValues={inlineIntegrationConfig}
-                              domainId={organizationId ?? domainId ?? ""}
-                              domainType="DOMAIN_TYPE_ORGANIZATION"
-                              organizationId={organizationId ?? domainId ?? ""}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
+                    {!inlineBrowserActionCompleted && renderInlineConfigFields(inlineConfigFields)}
                     {inlineBrowserActionCompleted && (
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         Waiting for the integration to become ready. This page will update automatically.
@@ -690,30 +663,7 @@ export function SettingsTab({
                       </p>
                     </div>
 
-                    {inlineConfigFields.length > 0 && (
-                      <div className="space-y-4">
-                        {inlineConfigFields.map((field: ConfigurationField) => {
-                          if (!field.name) return null;
-                          return (
-                            <ConfigurationFieldRenderer
-                              key={field.name}
-                              field={field}
-                              value={inlineIntegrationConfig[field.name]}
-                              onChange={(value) =>
-                                setInlineIntegrationConfig((prev) => ({
-                                  ...prev,
-                                  [field.name || ""]: value,
-                                }))
-                              }
-                              allValues={inlineIntegrationConfig}
-                              domainId={organizationId ?? domainId ?? ""}
-                              domainType="DOMAIN_TYPE_ORGANIZATION"
-                              organizationId={organizationId ?? domainId ?? ""}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
+                    {renderInlineConfigFields(inlineConfigFields)}
 
                     <LoadingButton
                       color="blue"

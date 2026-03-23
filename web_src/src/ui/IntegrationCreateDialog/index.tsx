@@ -12,6 +12,7 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { getApiErrorMessage } from "@/utils/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
@@ -158,12 +159,7 @@ export function IntegrationCreateDialog({
 
       const integration = result.integration;
       const browserAction = integration?.status?.browserAction;
-      const webhookUrl =
-        integration?.status?.metadata &&
-        typeof integration.status.metadata === "object" &&
-        "webhookUrl" in integration.status.metadata
-          ? (integration.status.metadata as { webhookUrl?: string }).webhookUrl
-          : undefined;
+      const webhookUrl = getIntegrationWebhookUrl(integration?.status?.metadata);
 
       if (browserAction) {
         setCreateIntegrationBrowserAction(browserAction);
