@@ -73,7 +73,7 @@ func (steps *TestLoginPageSteps) VisitProtectedRandomURL() {
 }
 
 func (steps *TestLoginPageSteps) AssertLoginPageVisible() {
-	steps.session.AssertVisible(q.Text("Login"))
+	steps.session.AssertVisible(q.Text("Welcome to SuperPlane"))
 }
 
 func (steps *TestLoginPageSteps) AssertRedirectedToLoginWithRedirectParam() {
