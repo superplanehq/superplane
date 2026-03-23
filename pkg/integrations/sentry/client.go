@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -14,7 +15,7 @@ import (
 type Client struct {
 	httpContext core.HTTPContext
 	baseURL     string
-	accessToken string
+	userToken   string
 	orgSlug     string
 }
 
@@ -33,13 +34,13 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 		return nil, fmt.Errorf("failed to get sentry base URL: %w", err)
 	}
 
-	accessToken, err := findSecret(integration, OAuthAccessTokenSecret)
+	userToken, err := integration.GetConfig("userToken")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sentry access token: %w", err)
+		return nil, fmt.Errorf("failed to get sentry user token: %w", err)
 	}
 
-	if accessToken == "" {
-		return nil, fmt.Errorf("Sentry access token is missing")
+	if strings.TrimSpace(string(userToken)) == "" {
+		return nil, fmt.Errorf("Sentry user token is missing")
 	}
 
 	metadata := Metadata{}
@@ -54,16 +55,16 @@ func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext
 	return &Client{
 		httpContext: httpContext,
 		baseURL:     normalizeBaseURL(string(baseURL)),
-		accessToken: accessToken,
+		userToken:   strings.TrimSpace(string(userToken)),
 		orgSlug:     metadata.Organization.Slug,
 	}, nil
 }
 
-func NewAPIClient(httpContext core.HTTPContext, baseURL, accessToken string) *Client {
+func NewAPIClient(httpContext core.HTTPContext, baseURL, userToken string) *Client {
 	return &Client{
 		httpContext: httpContext,
 		baseURL:     normalizeBaseURL(baseURL),
-		accessToken: accessToken,
+		userToken:   strings.TrimSpace(userToken),
 	}
 }
 
@@ -85,6 +86,45 @@ type Team struct {
 	Name string `json:"name" mapstructure:"name"`
 }
 
+type AuthIdentity struct {
+	ID       string `json:"id" mapstructure:"id"`
+	Name     string `json:"name" mapstructure:"name"`
+	Username string `json:"username" mapstructure:"username"`
+	Email    string `json:"email" mapstructure:"email"`
+}
+
+type SentryApp struct {
+	Name           string   `json:"name" mapstructure:"name"`
+	Slug           string   `json:"slug" mapstructure:"slug"`
+	Scopes         []string `json:"scopes" mapstructure:"scopes"`
+	Events         []string `json:"events" mapstructure:"events"`
+	WebhookURL     string   `json:"webhookUrl" mapstructure:"webhookUrl"`
+	RedirectURL    *string  `json:"redirectUrl" mapstructure:"redirectUrl"`
+	IsInternal     bool     `json:"isInternal" mapstructure:"isInternal"`
+	IsAlertable    bool     `json:"isAlertable" mapstructure:"isAlertable"`
+	Overview       *string  `json:"overview" mapstructure:"overview"`
+	VerifyInstall  bool     `json:"verifyInstall" mapstructure:"verifyInstall"`
+	AllowedOrigins []string `json:"allowedOrigins" mapstructure:"allowedOrigins"`
+	Author         string   `json:"author" mapstructure:"author"`
+	Schema         any      `json:"schema" mapstructure:"schema"`
+	ClientSecret   string   `json:"clientSecret" mapstructure:"clientSecret"`
+}
+
+type UpdateSentryAppRequest struct {
+	Name           string   `json:"name"`
+	Scopes         []string `json:"scopes"`
+	Events         []string `json:"events,omitempty"`
+	WebhookURL     string   `json:"webhookUrl,omitempty"`
+	RedirectURL    *string  `json:"redirectUrl,omitempty"`
+	IsInternal     bool     `json:"isInternal"`
+	IsAlertable    bool     `json:"isAlertable"`
+	Overview       *string  `json:"overview,omitempty"`
+	VerifyInstall  bool     `json:"verifyInstall"`
+	AllowedOrigins []string `json:"allowedOrigins,omitempty"`
+	Author         string   `json:"author,omitempty"`
+	Schema         any      `json:"schema,omitempty"`
+}
+
 type UpdateIssueRequest struct {
 	Status     string `json:"status,omitempty"`
 	AssignedTo string `json:"assignedTo,omitempty"`
@@ -102,6 +142,20 @@ func (c *Client) ListOrganizations() ([]Organization, error) {
 	}
 
 	return organizations, nil
+}
+
+func (c *Client) GetAuthIdentity() (*AuthIdentity, error) {
+	responseBody, err := c.doJSON(http.MethodGet, "/api/0/auth/", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	identity := AuthIdentity{}
+	if err := json.Unmarshal(responseBody, &identity); err != nil {
+		return nil, err
+	}
+
+	return &identity, nil
 }
 
 func (c *Client) GetOrganization() (*Organization, error) {
@@ -164,6 +218,48 @@ func (c *Client) ListTeams() ([]TeamSummary, error) {
 	return result, nil
 }
 
+func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {
+	responseBody, err := c.doJSON(http.MethodGet, fmt.Sprintf("/api/0/organizations/%s/sentry-apps/", orgSlug), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	apps := []SentryApp{}
+	if err := json.Unmarshal(responseBody, &apps); err != nil {
+		return nil, err
+	}
+
+	return apps, nil
+}
+
+func (c *Client) GetSentryApp(appSlug string) (*SentryApp, error) {
+	responseBody, err := c.doJSON(http.MethodGet, fmt.Sprintf("/api/0/sentry-apps/%s/", appSlug), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	app := SentryApp{}
+	if err := json.Unmarshal(responseBody, &app); err != nil {
+		return nil, err
+	}
+
+	return &app, nil
+}
+
+func (c *Client) UpdateSentryApp(appSlug string, request UpdateSentryAppRequest) (*SentryApp, error) {
+	responseBody, err := c.doJSON(http.MethodPut, fmt.Sprintf("/api/0/sentry-apps/%s/", appSlug), request)
+	if err != nil {
+		return nil, err
+	}
+
+	app := SentryApp{}
+	if err := json.Unmarshal(responseBody, &app); err != nil {
+		return nil, err
+	}
+
+	return &app, nil
+}
+
 func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (map[string]any, error) {
 	responseBody, err := c.doJSON(
 		http.MethodPut,
@@ -197,7 +293,7 @@ func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	req.Header.Set("Authorization", "Bearer "+c.userToken)
 	req.Header.Set("Accept", "application/json")
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")

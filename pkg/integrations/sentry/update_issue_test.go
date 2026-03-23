@@ -39,15 +39,13 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 	component := &UpdateIssue{}
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"baseUrl": "https://sentry.io",
+			"baseUrl":   "https://sentry.io",
+			"userToken": "user-token",
 		},
 		Metadata: Metadata{
 			Organization: &OrganizationSummary{
 				Slug: "example",
 			},
-		},
-		Secrets: map[string]core.IntegrationSecret{
-			OAuthAccessTokenSecret: {Name: OAuthAccessTokenSecret, Value: []byte("access-token")},
 		},
 	}
 	httpCtx := &contexts.HTTPContext{

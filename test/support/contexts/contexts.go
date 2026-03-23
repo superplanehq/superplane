@@ -166,6 +166,9 @@ func (c *IntegrationContext) RemoveBrowserAction() {
 }
 
 func (c *IntegrationContext) SetSecret(name string, value []byte) error {
+	if c.Secrets == nil {
+		c.Secrets = make(map[string]core.IntegrationSecret)
+	}
 	c.Secrets[name] = core.IntegrationSecret{Name: name, Value: value}
 	return nil
 }

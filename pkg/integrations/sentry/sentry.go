@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,15 +22,13 @@ import (
 const (
 	DefaultBaseURL = "https://sentry.io"
 
-	OAuthAccessTokenSecret  = "accessToken"
-	OAuthRefreshTokenSecret = "refreshToken"
-
 	ResourceTypeProject = "project"
 	ResourceTypeTeam    = "team"
 )
 
 var scopeList = []string{
 	"org:read",
+	"org:write",
 	"project:read",
 	"team:read",
 	"event:read",
@@ -38,19 +37,26 @@ var scopeList = []string{
 
 const (
 	appSetupDescription = `
-- Click **Continue** to open Sentry Developer Settings.
-- Create a **Public Integration** / **Sentry App**.
-- Configure:
-  - **Integration Name**: SuperPlane
-  - **Slug**: any unique slug (for example ` + "`superplane`" + `)
-  - **Redirect URL**: ` + "`%s`" + `
-  - **Webhook URL**: ` + "`%s`" + `
-  - **Webhook Subscriptions**: ` + "`issue`" + ` and ` + "`installation`" + `
+- If you already created a Sentry internal integration named ` + "`%s`" + `, close this prompt and paste the **User Token** and **Client Secret** into SuperPlane.
+- Click **Continue** to open Sentry Settings.
+- Go to **Settings > Developer Settings > Custom Integrations**.
+- Create a new **Internal Integration** and configure:
+  - **Integration Name**: ` + "`%s`" + `
+  - Leave **Webhook URL** empty — SuperPlane sets this automatically.
   - **Scopes**: %s
-- Copy the **Slug**, **Client ID**, and **Client Secret** into SuperPlane and save.
+- Save, then copy the **User Token** and **Client Secret** into SuperPlane.
+- Set **Sentry URL** to your org URL (e.g. ` + "`https://your-org.sentry.io`" + `).
+- Set **Integration Name** to match the name you chose above.
 `
 
-	appConnectDescription = `Click **Continue** to install the Sentry integration in your organization and authorize SuperPlane.`
+	manualWebhookDescription = `
+- SuperPlane connected to Sentry, but it could not automatically configure the internal integration webhook.
+- In **Settings > Developer Settings > Custom Integrations**, open the internal integration and set:
+  - **Webhook URL**: ` + "`%s`" + `
+  - **Webhook Subscriptions**: ` + "`issue`" + `
+- Make sure the integration name in Sentry exactly matches the **Integration Name** configured in SuperPlane.
+- Reason: %s
+`
 )
 
 func init() {
@@ -60,18 +66,17 @@ func init() {
 type Sentry struct{}
 
 type Configuration struct {
-	BaseURL      string `json:"baseUrl" mapstructure:"baseUrl"`
-	AppSlug      string `json:"appSlug" mapstructure:"appSlug"`
-	ClientID     string `json:"clientId" mapstructure:"clientId"`
-	ClientSecret string `json:"clientSecret" mapstructure:"clientSecret"`
+	BaseURL         string `json:"baseUrl" mapstructure:"baseUrl"`
+	IntegrationName string `json:"integrationName" mapstructure:"integrationName"`
+	UserToken       string `json:"userToken" mapstructure:"userToken"`
+	ClientSecret    string `json:"clientSecret" mapstructure:"clientSecret"`
 }
 
 type Metadata struct {
-	InstallationID string               `json:"installationId" mapstructure:"installationId"`
-	AppSlug        string               `json:"appSlug" mapstructure:"appSlug"`
-	Organization   *OrganizationSummary `json:"organization,omitempty" mapstructure:"organization,omitempty"`
-	Projects       []ProjectSummary     `json:"projects" mapstructure:"projects"`
-	Teams          []TeamSummary        `json:"teams" mapstructure:"teams"`
+	AppSlug      string               `json:"appSlug" mapstructure:"appSlug"`
+	Organization *OrganizationSummary `json:"organization,omitempty" mapstructure:"organization,omitempty"`
+	Projects     []ProjectSummary     `json:"projects" mapstructure:"projects"`
+	Teams        []TeamSummary        `json:"teams" mapstructure:"teams"`
 }
 
 type OrganizationSummary struct {
@@ -126,14 +131,23 @@ func (s *Sentry) Description() string {
 
 func (s *Sentry) Instructions() string {
 	return `
-Leave **App Slug**, **Client ID**, and **Client Secret** empty to start the Sentry app setup wizard.
+SuperPlane connects to Sentry via a **Custom Internal Integration** that you create in your Sentry account.
 
-SuperPlane uses a Sentry **Public Integration** OAuth flow:
-- create a Sentry app
-- set the callback and webhook URLs shown in the setup prompt
-- install the app into the target Sentry organization
+**What you need:**
+- **User Token** – your Sentry personal auth token from **Settings → Developer Settings → Auth Tokens**
+- **Client Secret** – from the internal integration page in Sentry, used to verify incoming webhooks
+- **Sentry URL** – use your org-specific URL, e.g. ` + "`https://your-org.sentry.io`" + `
+- **Integration Name** – the name you gave the integration in Sentry (default: ` + "`SuperPlane`" + `)
 
-Required scopes: ` + "`org:read`, `project:read`, `team:read`, `event:read`, `event:write`" + `.
+**Setup steps:**
+1. In Sentry go to **Settings → Developer Settings → Auth Tokens** and create a personal auth token. Copy it — this is your **User Token**.
+2. Go to **Settings → Developer Settings → Custom Integrations** and click **New Internal Integration**.
+3. Set the name (e.g. ` + "`SuperPlane`" + `), leave **Webhook URL** empty, and enable these scopes: ` + "`org:read`, `org:write`, `project:read`, `team:read`, `event:read`, `event:write`" + `.
+4. Save — Sentry shows the **Client Secret** on the integration page. Copy it.
+5. In SuperPlane fill in **Sentry URL** (org URL), **Integration Name**, **User Token**, and **Client Secret**, then save.
+6. SuperPlane finds the integration by name, sets the webhook URL on it, and subscribes it to issue events automatically.
+
+After that the integration is **ready** — any issue event Sentry sends will be routed to your ` + "`OnIssue`" + ` triggers.
 `
 }
 
@@ -143,30 +157,32 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Name:        "baseUrl",
 			Label:       "Sentry URL",
 			Type:        configuration.FieldTypeString,
-			Description: "Sentry instance URL (or leave empty for https://sentry.io)",
+			Description: "Sentry instance URL. Use your org-specific URL (e.g., https://your-org.sentry.io) so SuperPlane can identify your organization automatically.",
 			Default:     DefaultBaseURL,
 		},
 		{
-			Name:        "appSlug",
-			Label:       "App Slug",
+			Name:        "integrationName",
+			Label:       "Integration Name",
 			Type:        configuration.FieldTypeString,
-			Description: "Slug of your Sentry public integration",
+			Description: "Name of the Sentry internal integration that SuperPlane should manage",
+			Default:     "SuperPlane",
 			Required:    false,
 		},
 		{
-			Name:        "clientId",
-			Label:       "Client ID",
+			Name:        "userToken",
+			Label:       "User Token",
 			Type:        configuration.FieldTypeString,
-			Description: "OAuth Client ID from your Sentry app",
-			Required:    false,
+			Sensitive:   true,
+			Description: "Your Sentry personal auth token. Found in Sentry under Settings > Developer Settings > Auth Tokens.",
+			Required:    true,
 		},
 		{
 			Name:        "clientSecret",
 			Label:       "Client Secret",
 			Type:        configuration.FieldTypeString,
-			Description: "OAuth Client Secret from your Sentry app",
 			Sensitive:   true,
-			Required:    false,
+			Description: "Client secret from your Sentry internal integration, used to verify incoming webhooks.",
+			Required:    true,
 		},
 	}
 }
@@ -184,27 +200,13 @@ func (s *Sentry) Triggers() []core.Trigger {
 }
 
 func (s *Sentry) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode config: %w", err)
+	config, err := s.loadConfiguration(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	config.BaseURL = normalizeBaseURL(config.BaseURL)
-
-	if config.AppSlug == "" || config.ClientID == "" || config.ClientSecret == "" {
+	if strings.TrimSpace(config.UserToken) == "" || strings.TrimSpace(config.ClientSecret) == "" {
 		return s.createSetupPrompt(ctx, config)
-	}
-
-	accessToken, _ := findSecret(ctx.Integration, OAuthAccessTokenSecret)
-	if accessToken == "" {
-		return s.createInstallPrompt(ctx, config)
-	}
-
-	refreshToken, _ := findSecret(ctx.Integration, OAuthRefreshTokenSecret)
-	if refreshToken != "" {
-		if err := s.refreshToken(ctx, config, refreshToken); err != nil {
-			return err
-		}
 	}
 
 	if err := s.updateMetadata(ctx, config); err != nil {
@@ -212,7 +214,22 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
-	ctx.Integration.RemoveBrowserAction()
+	warning, err := s.reconcileWebhook(ctx, config)
+	if err != nil {
+		ctx.Integration.Error(err.Error())
+		return nil
+	}
+
+	if warning == "" {
+		ctx.Integration.RemoveBrowserAction()
+	} else {
+		ctx.Integration.NewBrowserAction(core.BrowserAction{
+			Description: fmt.Sprintf(manualWebhookDescription, eventsURL(ctx), warning),
+			URL:         settingsURL(config.BaseURL),
+			Method:      http.MethodGet,
+		})
+	}
+
 	ctx.Integration.Ready()
 	return nil
 }
@@ -221,40 +238,136 @@ func (s *Sentry) createSetupPrompt(ctx core.SyncContext, config Configuration) e
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(
 			appSetupDescription,
-			callbackURL(ctx),
-			eventsURL(ctx),
+			displayIntegrationName(config.IntegrationName),
+			displayIntegrationName(config.IntegrationName),
 			strings.Join(scopeList, ", "),
 		),
-		URL:    fmt.Sprintf("%s/settings/account/developer-settings/", config.BaseURL),
+		URL:    settingsURL(config.BaseURL),
 		Method: http.MethodGet,
 	})
 	return nil
 }
 
-func (s *Sentry) createInstallPrompt(ctx core.SyncContext, config Configuration) error {
-	installURL := fmt.Sprintf("%s/sentry-apps/%s/external-install/", config.BaseURL, url.PathEscape(config.AppSlug))
-	ctx.Integration.NewBrowserAction(core.BrowserAction{
-		Description: appConnectDescription,
-		URL:         installURL,
-		Method:      http.MethodGet,
+func (s *Sentry) reconcileWebhook(ctx core.SyncContext, config Configuration) (string, error) {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return "", fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.Organization == nil || metadata.Organization.Slug == "" {
+		return "", nil
+	}
+
+	client := NewAPIClient(ctx.HTTP, config.BaseURL, config.UserToken)
+
+	apps, err := client.ListSentryApps(metadata.Organization.Slug)
+	if err != nil {
+		return "failed to list internal integrations for automatic webhook configuration", nil
+	}
+
+	app, warning := findTargetApp(apps, config.IntegrationName)
+	if app == nil {
+		return warning, nil
+	}
+
+	desiredWebhookURL := eventsURL(ctx)
+	desiredEvents := ensureContains(app.Events, "issue")
+	// issue webhooks require event:read — ensure it's in the scopes.
+	desiredScopes := ensureContains(app.Scopes, "event:read")
+
+	if strings.TrimSpace(app.WebhookURL) == desiredWebhookURL && sameStringSet(app.Events, desiredEvents) {
+		metadata.AppSlug = app.Slug
+		ctx.Integration.SetMetadata(metadata)
+		return "", nil
+	}
+
+	updatedApp, err := client.UpdateSentryApp(app.Slug, UpdateSentryAppRequest{
+		Name:           app.Name,
+		Scopes:         desiredScopes,
+		Events:         desiredEvents,
+		WebhookURL:     desiredWebhookURL,
+		RedirectURL:    app.RedirectURL,
+		IsInternal:     app.IsInternal,
+		IsAlertable:    app.IsAlertable,
+		Overview:       app.Overview,
+		VerifyInstall:  app.VerifyInstall,
+		AllowedOrigins: app.AllowedOrigins,
+		Author:         app.Author,
+		Schema:         app.Schema,
 	})
-	return nil
+	if err != nil {
+		return fmt.Sprintf("failed to update internal integration webhook automatically: %v", err), nil
+	}
+
+	// Sentry rotates the client secret when the app is updated via PUT.
+	// Store the new secret so webhook signature verification keeps working
+	// without requiring the user to manually update the integration.
+	if updatedApp.ClientSecret != "" {
+		if err := ctx.Integration.SetSecret("clientSecret", []byte(updatedApp.ClientSecret)); err != nil {
+			ctx.Logger.Warnf("failed to store rotated sentry client secret: %v", err)
+		}
+	}
+
+	metadata.AppSlug = app.Slug
+	ctx.Integration.SetMetadata(metadata)
+	return "", nil
 }
 
-func (s *Sentry) refreshToken(ctx core.SyncContext, config Configuration, refreshToken string) error {
-	auth := NewAuth(ctx.HTTP)
-	tokenResponse, err := auth.RefreshToken(config.BaseURL, config.ClientID, config.ClientSecret, currentInstallationID(ctx.Integration), refreshToken)
-	if err != nil {
-		_ = ctx.Integration.SetSecret(OAuthAccessTokenSecret, []byte(""))
-		_ = ctx.Integration.SetSecret(OAuthRefreshTokenSecret, []byte(""))
-		return fmt.Errorf("failed to refresh Sentry token: %w", err)
+func findTargetApp(apps []SentryApp, integrationName string) (*SentryApp, string) {
+	name := strings.TrimSpace(integrationName)
+	if name != "" {
+		matches := make([]SentryApp, 0, 1)
+		for _, app := range apps {
+			if strings.EqualFold(strings.TrimSpace(app.Name), name) {
+				matches = append(matches, app)
+			}
+		}
+
+		switch len(matches) {
+		case 0:
+			return nil, fmt.Sprintf("could not find an internal integration named %q", name)
+		case 1:
+			copy := matches[0]
+			return &copy, ""
+		default:
+			return nil, fmt.Sprintf("multiple internal integrations named %q were found; rename one of them or choose a unique Integration Name in SuperPlane", name)
+		}
 	}
 
-	if err := storeTokenSecrets(ctx.Integration, tokenResponse); err != nil {
-		return err
+	if len(apps) == 0 {
+		return nil, "no custom integrations were found for this organization"
 	}
 
-	return ctx.Integration.ScheduleResync(tokenResponse.GetExpiration())
+	if len(apps) == 1 {
+		copy := apps[0]
+		return &copy, ""
+	}
+
+	return nil, "multiple custom integrations exist for this organization; set Integration Name in SuperPlane or configure the webhook URL manually"
+}
+
+func ensureContains(values []string, needle string) []string {
+	if slices.Contains(values, needle) {
+		return values
+	}
+
+	result := append([]string{}, values...)
+	result = append(result, needle)
+	return result
+}
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for _, value := range a {
+		if !slices.Contains(b, value) {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (s *Sentry) Cleanup(ctx core.IntegrationCleanupContext) error {
@@ -270,112 +383,12 @@ func (s *Sentry) HandleAction(ctx core.IntegrationActionContext) error {
 }
 
 func (s *Sentry) HandleRequest(ctx core.HTTPRequestContext) {
-	switch {
-	case strings.HasSuffix(ctx.Request.URL.Path, "/callback"):
-		s.handleCallback(ctx)
-	case strings.HasSuffix(ctx.Request.URL.Path, "/events"):
-		s.handleWebhook(ctx)
-	default:
+	if !strings.HasSuffix(ctx.Request.URL.Path, "/events") {
 		ctx.Response.WriteHeader(http.StatusNotFound)
-	}
-}
-
-func (s *Sentry) handleCallback(ctx core.HTTPRequestContext) {
-	config, err := s.loadConfiguration(ctx.Integration)
-	if err != nil {
-		ctx.Logger.Errorf("failed to load sentry config: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	auth := NewAuth(ctx.HTTP)
-	tokenResponse, installationID, err := auth.HandleCallback(ctx.Request, config.BaseURL, config.ClientID, config.ClientSecret)
-	if err != nil {
-		ctx.Logger.Errorf("sentry callback failed: %v", err)
-		http.Redirect(ctx.Response, ctx.Request, integrationSettingsURL(ctx), http.StatusSeeOther)
-		return
-	}
-
-	if err := storeTokenSecrets(ctx.Integration, tokenResponse); err != nil {
-		ctx.Logger.Errorf("failed to save sentry token secrets: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	metadata := Metadata{
-		InstallationID: installationID,
-		AppSlug:        config.AppSlug,
-	}
-
-	verifyResponse, err := auth.VerifyInstallation(config.BaseURL, installationID, tokenResponse.AccessToken)
-	if err == nil {
-		metadata.AppSlug = firstNonEmpty(verifyResponse.App.Slug, metadata.AppSlug)
-		if verifyResponse.Organization.Slug != "" {
-			metadata.Organization = &OrganizationSummary{
-				Slug: verifyResponse.Organization.Slug,
-			}
-		}
-	} else {
-		ctx.Logger.Warnf("sentry installation verification skipped: %v", err)
-	}
-
-	ctx.Integration.SetMetadata(metadata)
-
-	if err := s.resolveOrganization(ctx, config, tokenResponse.AccessToken); err != nil {
-		ctx.Logger.Errorf("failed to resolve sentry organization: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if err := ctx.Integration.ScheduleResync(tokenResponse.GetExpiration()); err != nil {
-		ctx.Logger.Errorf("failed to schedule sentry token refresh: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if err := s.updateMetadata(core.SyncContext{
-		Logger:      ctx.Logger,
-		HTTP:        ctx.HTTP,
-		Integration: ctx.Integration,
-	}); err != nil {
-		ctx.Logger.Errorf("failed to sync sentry metadata after callback: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.Ready()
-
-	http.Redirect(ctx.Response, ctx.Request, integrationSettingsURL(ctx), http.StatusSeeOther)
-}
-
-func (s *Sentry) resolveOrganization(ctx core.HTTPRequestContext, config Configuration, accessToken string) error {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	if metadata.Organization != nil && metadata.Organization.Slug != "" {
-		return nil
-	}
-
-	client := NewAPIClient(ctx.HTTP, config.BaseURL, accessToken)
-	organizations, err := client.ListOrganizations()
-	if err != nil {
-		return fmt.Errorf("failed to list organizations: %w", err)
-	}
-
-	if len(organizations) == 0 {
-		return fmt.Errorf("no organizations available for the Sentry installation")
-	}
-
-	metadata.Organization = &OrganizationSummary{
-		ID:   organizations[0].ID,
-		Slug: organizations[0].Slug,
-		Name: organizations[0].Name,
-	}
-	ctx.Integration.SetMetadata(metadata)
-	return nil
+	s.handleWebhook(ctx)
 }
 
 func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
@@ -417,30 +430,12 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil {
-		if metadata.InstallationID != "" && payload.Installation.UUID != "" && metadata.InstallationID != payload.Installation.UUID {
-			ctx.Response.WriteHeader(http.StatusOK)
-			return
-		}
-	}
-
 	message := WebhookMessage{
 		Resource:     resource,
 		Action:       payload.Action,
 		Installation: payload.Installation,
 		Data:         payload.Data,
 		Actor:        payload.Actor,
-	}
-
-	if resource == "installation" && payload.Action == "deleted" {
-		if err := s.handleInstallationDeleted(ctx, config, message); err != nil {
-			ctx.Logger.Errorf("failed to handle sentry uninstall webhook: %v", err)
-			ctx.Response.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
 	}
 
 	if err := s.dispatchWebhookMessage(ctx, message); err != nil {
@@ -450,38 +445,6 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 	}
 
 	ctx.Response.WriteHeader(http.StatusOK)
-}
-
-func (s *Sentry) handleInstallationDeleted(ctx core.HTTPRequestContext, config Configuration, message WebhookMessage) error {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
-	}
-
-	metadata.InstallationID = ""
-	metadata.Organization = nil
-	metadata.Projects = nil
-	metadata.Teams = nil
-	ctx.Integration.SetMetadata(metadata)
-
-	if err := ctx.Integration.SetSecret(OAuthAccessTokenSecret, []byte("")); err != nil {
-		return fmt.Errorf("failed to clear sentry access token: %w", err)
-	}
-
-	if err := ctx.Integration.SetSecret(OAuthRefreshTokenSecret, []byte("")); err != nil {
-		return fmt.Errorf("failed to clear sentry refresh token: %w", err)
-	}
-
-	if config.AppSlug != "" && config.ClientID != "" && config.ClientSecret != "" {
-		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appConnectDescription,
-			URL:         fmt.Sprintf("%s/sentry-apps/%s/external-install/", config.BaseURL, url.PathEscape(config.AppSlug)),
-			Method:      http.MethodGet,
-		})
-	}
-
-	ctx.Integration.Error("Sentry app installation was removed. Reconnect the integration.")
-	return nil
 }
 
 func (s *Sentry) dispatchWebhookMessage(ctx core.HTTPRequestContext, message WebhookMessage) error {
@@ -546,26 +509,43 @@ func (s *Sentry) updateMetadata(ctx core.SyncContext, config ...Configuration) e
 	var cfg Configuration
 	if len(config) > 0 {
 		cfg = config[0]
-	} else if decoded, err := s.loadConfiguration(ctx.Integration); err == nil {
-		cfg = decoded
 	} else {
-		return err
+		decoded, err := s.loadConfiguration(ctx.Integration)
+		if err != nil {
+			return err
+		}
+		cfg = decoded
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode metadata: %w", err)
+	client := NewAPIClient(ctx.HTTP, cfg.BaseURL, cfg.UserToken)
+	if inferredSlug := orgSlugFromBaseURL(cfg.BaseURL); inferredSlug != "" {
+		client.orgSlug = inferredSlug
+		return s.populateMetadataFromOrg(ctx, client)
 	}
 
-	if metadata.Organization == nil || metadata.Organization.Slug == "" {
-		return fmt.Errorf("Sentry organization is not connected yet")
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	organizations, err := client.ListOrganizations()
 	if err != nil {
-		return fmt.Errorf("failed to create sentry client: %w", err)
+		var sentryAPIError *apiError
+		if errors.As(err, &sentryAPIError) && sentryAPIError.StatusCode == http.StatusUnauthorized {
+			if _, authErr := client.GetAuthIdentity(); authErr == nil {
+				return fmt.Errorf(
+					"token is accepted by /auth but is not authorized for organization listing; use your org-specific URL as Sentry URL (e.g., https://your-org.sentry.io)",
+				)
+			}
+		}
+
+		return fmt.Errorf("failed to list organizations: %w", err)
 	}
 
+	if len(organizations) != 1 {
+		return fmt.Errorf("expected exactly one organization, got %d", len(organizations))
+	}
+
+	client.orgSlug = organizations[0].Slug
+	return s.populateMetadataFromOrg(ctx, client)
+}
+
+func (s *Sentry) populateMetadataFromOrg(ctx core.SyncContext, client *Client) error {
 	organization, err := client.GetOrganization()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve organization: %w", err)
@@ -581,7 +561,12 @@ func (s *Sentry) updateMetadata(ctx core.SyncContext, config ...Configuration) e
 		return fmt.Errorf("failed to list teams: %w", err)
 	}
 
-	metadata.AppSlug = firstNonEmpty(metadata.AppSlug, cfg.AppSlug)
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	metadata.AppSlug = strings.TrimSpace(metadata.AppSlug)
 	metadata.Organization = &OrganizationSummary{
 		ID:   organization.ID,
 		Slug: organization.Slug,
@@ -595,32 +580,34 @@ func (s *Sentry) updateMetadata(ctx core.SyncContext, config ...Configuration) e
 }
 
 func (s *Sentry) loadConfiguration(integration core.IntegrationContext) (Configuration, error) {
-	baseURL, err := integration.GetConfig("baseUrl")
-	if err != nil {
-		return Configuration{}, err
-	}
+	clientSecret := optionalConfig(integration, "clientSecret")
 
-	appSlug, err := integration.GetConfig("appSlug")
-	if err != nil {
-		return Configuration{}, err
-	}
-
-	clientID, err := integration.GetConfig("clientId")
-	if err != nil {
-		return Configuration{}, err
-	}
-
-	clientSecret, err := integration.GetConfig("clientSecret")
-	if err != nil {
-		return Configuration{}, err
+	// Sentry rotates the client secret when the app is updated via PUT.
+	// If a newer secret was captured automatically, prefer it over the stored config.
+	if secrets, err := integration.GetSecrets(); err == nil {
+		for _, secret := range secrets {
+			if secret.Name == "clientSecret" && len(secret.Value) > 0 {
+				clientSecret = string(secret.Value)
+				break
+			}
+		}
 	}
 
 	return Configuration{
-		BaseURL:      normalizeBaseURL(string(baseURL)),
-		AppSlug:      string(appSlug),
-		ClientID:     string(clientID),
-		ClientSecret: string(clientSecret),
+		BaseURL:         normalizeBaseURL(optionalConfig(integration, "baseUrl")),
+		IntegrationName: optionalConfig(integration, "integrationName"),
+		UserToken:       optionalConfig(integration, "userToken"),
+		ClientSecret:    clientSecret,
 	}, nil
+}
+
+func optionalConfig(integration core.IntegrationContext, name string) string {
+	value, err := integration.GetConfig(name)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(value))
 }
 
 func normalizeBaseURL(raw string) string {
@@ -635,63 +622,37 @@ func normalizeBaseURL(raw string) string {
 	return strings.TrimSuffix(raw, "/")
 }
 
-func callbackURL(ctx core.SyncContext) string {
-	return fmt.Sprintf("%s/api/v1/integrations/%s/callback", publicBaseURL(ctx.BaseURL, ctx.WebhooksBaseURL), ctx.Integration.ID().String())
+func orgSlugFromBaseURL(baseURL string) string {
+	parsed, err := url.Parse(normalizeBaseURL(baseURL))
+	if err != nil {
+		return ""
+	}
+
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" || host == "sentry.io" || host == "www.sentry.io" {
+		return ""
+	}
+
+	if strings.HasSuffix(host, ".sentry.io") {
+		slug := strings.TrimSuffix(host, ".sentry.io")
+		if slug != "" && !strings.Contains(slug, ".") {
+			return slug
+		}
+	}
+
+	return ""
+}
+
+func settingsURL(baseURL string) string {
+	return fmt.Sprintf("%s/settings/", normalizeBaseURL(baseURL))
 }
 
 func eventsURL(ctx core.SyncContext) string {
-	return fmt.Sprintf("%s/api/v1/integrations/%s/events", publicBaseURL(ctx.BaseURL, ctx.WebhooksBaseURL), ctx.Integration.ID().String())
-}
-
-func publicBaseURL(baseURL, webhooksBaseURL string) string {
-	if webhooksBaseURL != "" {
-		return strings.TrimSuffix(webhooksBaseURL, "/")
+	baseURL := strings.TrimSuffix(ctx.BaseURL, "/")
+	if ctx.WebhooksBaseURL != "" {
+		baseURL = strings.TrimSuffix(ctx.WebhooksBaseURL, "/")
 	}
-
-	return strings.TrimSuffix(baseURL, "/")
-}
-
-func integrationSettingsURL(ctx core.HTTPRequestContext) string {
-	return fmt.Sprintf("%s/%s/settings/integrations/%s", strings.TrimSuffix(ctx.BaseURL, "/"), ctx.OrganizationID, ctx.Integration.ID().String())
-}
-
-func currentInstallationID(integration core.IntegrationContext) string {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
-		return ""
-	}
-	return metadata.InstallationID
-}
-
-func findSecret(integration core.IntegrationContext, name string) (string, error) {
-	secrets, err := integration.GetSecrets()
-	if err != nil {
-		return "", err
-	}
-
-	for _, secret := range secrets {
-		if secret.Name == name {
-			return string(secret.Value), nil
-		}
-	}
-
-	return "", nil
-}
-
-func storeTokenSecrets(integration core.IntegrationContext, tokenResponse *TokenResponse) error {
-	if tokenResponse.AccessToken != "" {
-		if err := integration.SetSecret(OAuthAccessTokenSecret, []byte(tokenResponse.AccessToken)); err != nil {
-			return fmt.Errorf("failed to save sentry access token: %w", err)
-		}
-	}
-
-	if tokenResponse.RefreshToken != "" {
-		if err := integration.SetSecret(OAuthRefreshTokenSecret, []byte(tokenResponse.RefreshToken)); err != nil {
-			return fmt.Errorf("failed to save sentry refresh token: %w", err)
-		}
-	}
-
-	return nil
+	return fmt.Sprintf("%s/api/v1/integrations/%s/events", baseURL, ctx.Integration.ID().String())
 }
 
 func verifyWebhookSignature(signature string, body, secret []byte) error {
@@ -726,11 +687,11 @@ func displayName(name, slug string) string {
 	}
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
+
+func displayIntegrationName(name string) string {
+	if strings.TrimSpace(name) == "" {
+		return "SuperPlane"
 	}
-	return ""
+
+	return strings.TrimSpace(name)
 }

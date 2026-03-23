@@ -57,7 +57,7 @@ The trigger emits the full Sentry webhook payload, including:
 
 ## Setup
 
-This trigger uses the Sentry app webhook URL configured during the integration OAuth setup. SuperPlane verifies each webhook signature using your Sentry app client secret before routing the event to matching triggers.`
+This trigger uses the webhook URL configured on your Sentry internal integration. SuperPlane verifies each webhook signature using your Sentry client secret before routing the event to matching triggers.`
 }
 
 func (t *OnIssue) Icon() string {
