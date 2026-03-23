@@ -1,18 +1,14 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	htmltemplate "html/template"
 	"io"
 	"net/smtp"
-	"path/filepath"
 	"strings"
-	texttemplate "text/template"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -224,29 +220,7 @@ func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body
 }
 
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
-	templatePath := filepath.Join(s.templateDir, "email", templateName)
-
-	var buf bytes.Buffer
-
-	if strings.HasSuffix(templateName, ".txt") {
-		tmpl, err := texttemplate.ParseFiles(templatePath)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
-		}
-		if err = tmpl.Execute(&buf, data); err != nil {
-			return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
-		}
-	} else {
-		tmpl, err := htmltemplate.ParseFiles(templatePath)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
-		}
-		if err = tmpl.Execute(&buf, data); err != nil {
-			return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
-		}
-	}
-
-	return buf.String(), nil
+	return renderEmailTemplate(s.templateDir, templateName, data)
 }
 
 func (s *SMTPEmailService) sendEmail(settings *SMTPSettings, to []string, bcc []string, subject, textBody, htmlBody string) error {

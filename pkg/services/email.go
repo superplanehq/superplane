@@ -174,12 +174,18 @@ func (s *ResendEmailService) SendNotificationEmail(bccEmails []string, title, bo
 }
 
 func (s *ResendEmailService) renderTemplate(templateName string, data any) (string, error) {
-	templatePath := filepath.Join(s.templateDir, "email", templateName)
+	return renderEmailTemplate(s.templateDir, templateName, data)
+}
+
+// renderEmailTemplate renders an email template from templateDir. It uses
+// text/template for .txt files to avoid HTML-escaping URLs (html/template
+// converts & to &amp; which breaks plain-text links), and html/template
+// for everything else.
+func renderEmailTemplate(templateDir, templateName string, data any) (string, error) {
+	templatePath := filepath.Join(templateDir, "email", templateName)
 
 	var buf bytes.Buffer
 
-	// Use text/template for .txt files to avoid HTML-escaping URLs
-	// (html/template converts & to &amp; which breaks plain-text links).
 	if strings.HasSuffix(templateName, ".txt") {
 		tmpl, err := texttemplate.ParseFiles(templatePath)
 		if err != nil {

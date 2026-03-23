@@ -569,6 +569,8 @@ func (a *Handler) handleMagicCodeRequest(w http.ResponseWriter, r *http.Request)
 	magicLinkToken, err := a.generateMagicLinkToken(email, code)
 	if err != nil {
 		log.Errorf("Failed to generate magic link token for %s: %v", email, err)
+		successResponse()
+		return
 	}
 
 	redirectURL := strings.TrimSpace(r.FormValue("redirect"))
