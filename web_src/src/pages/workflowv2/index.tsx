@@ -26,6 +26,7 @@ import {
   canvasesEmitNodeEvent,
   canvasesUpdateNodePause,
   OrganizationsIntegration,
+  IntegrationsIntegrationDefinition,
 } from "@/api-client";
 import {
   useOrganization,
@@ -309,6 +310,29 @@ function buildGroupWorkflow(
 }
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
+
+/**
+ * Resolves the integration type name for a canvas node by matching its
+ * component or trigger against the catalog of available integrations.
+ */
+function getNodeIntegrationName(
+  node: ComponentsNode,
+  availableIntegrations: IntegrationsIntegrationDefinition[],
+): string | undefined {
+  if (node.type === "TYPE_COMPONENT") {
+    const match = availableIntegrations.find((integration) =>
+      integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
+    );
+    return match?.name;
+  }
+  if (node.type === "TYPE_TRIGGER") {
+    const match = availableIntegrations.find((integration) =>
+      integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
+    );
+    return match?.name;
+  }
+  return undefined;
+}
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
@@ -2293,27 +2317,13 @@ export function WorkflowPageV2() {
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
         blockName = node.component?.name;
-
-        // Check if this component is from an integration
-        const componentIntegration = availableIntegrations.find((integration) =>
-          integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
-        );
-        if (componentIntegration) {
-          integrationName = componentIntegration.name;
-        }
+        integrationName = getNodeIntegrationName(node, availableIntegrations);
       } else if (node.type === "TYPE_TRIGGER") {
         const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
         blockName = node.trigger?.name;
-
-        // Check if this trigger is from an application
-        const triggerIntegration = availableIntegrations.find((integration) =>
-          integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
-        );
-        if (triggerIntegration) {
-          integrationName = triggerIntegration.name;
-        }
+        integrationName = getNodeIntegrationName(node, availableIntegrations);
       } else if (node.type === "TYPE_WIDGET") {
         const widget = widgets.find((w) => w.name === node.widget?.name);
         if (widget) {
@@ -2365,20 +2375,7 @@ export function WorkflowPageV2() {
     const missingMap = new Map<string, { count: number; definition?: (typeof availableIntegrations)[0] }>();
 
     for (const node of canvas.spec.nodes) {
-      let integrationName: string | undefined;
-
-      if (node.type === "TYPE_COMPONENT") {
-        const match = availableIntegrations.find((integration) =>
-          integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
-        );
-        if (match) integrationName = match.name;
-      } else if (node.type === "TYPE_TRIGGER") {
-        const match = availableIntegrations.find((integration) =>
-          integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
-        );
-        if (match) integrationName = match.name;
-      }
-
+      const integrationName = getNodeIntegrationName(node, availableIntegrations);
       if (!integrationName) continue;
 
       const hasConnectedInstance = integrations.some((i) => i.spec?.integrationName === integrationName);
@@ -2428,20 +2425,7 @@ export function WorkflowPageV2() {
       };
 
       const updatedNodes = canvas.spec?.nodes?.map((node) => {
-        let nodeIntegrationName: string | undefined;
-
-        if (node.type === "TYPE_COMPONENT") {
-          const match = availableIntegrations.find((integration) =>
-            integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
-          );
-          if (match) nodeIntegrationName = match.name;
-        } else if (node.type === "TYPE_TRIGGER") {
-          const match = availableIntegrations.find((integration) =>
-            integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
-          );
-          if (match) nodeIntegrationName = match.name;
-        }
-
+        const nodeIntegrationName = getNodeIntegrationName(node, availableIntegrations);
         if (nodeIntegrationName === integrationDialogName && !node.integration?.id) {
           return { ...node, integration: integrationRef };
         }

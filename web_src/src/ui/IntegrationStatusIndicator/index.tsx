@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { AlertTriangle, Check, ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { IntegrationsIntegrationDefinition } from "@/api-client";
 
 export interface MissingIntegration {
@@ -32,12 +32,6 @@ export function IntegrationStatusIndicator({
 }: IntegrationStatusIndicatorProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  useEffect(() => {
-    if (missingIntegrations.length === 0) {
-      setIsCollapsed(false);
-    }
-  }, [missingIntegrations.length]);
-
   const handleToggle = useCallback(() => {
     setIsCollapsed((prev) => !prev);
   }, []);
@@ -49,11 +43,11 @@ export function IntegrationStatusIndicator({
     [onConnect],
   );
 
-  if (missingIntegrations.length === 0) {
+  const activeCount = missingIntegrations.filter((m) => !m.justConnected).length;
+
+  if (activeCount === 0) {
     return null;
   }
-
-  const activeCount = missingIntegrations.filter((m) => !m.justConnected).length;
 
   if (isCollapsed) {
     return (
