@@ -85,6 +85,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
+	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {

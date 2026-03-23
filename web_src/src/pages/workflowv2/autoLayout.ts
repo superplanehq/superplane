@@ -1,5 +1,6 @@
 import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
+import { buildChildToGroupMap } from "./utils";
 
 const elk = new ELK();
 
@@ -37,18 +38,6 @@ function estimateNodeSize(node: ComponentsNode): { width: number; height: number
     width: DEFAULT_NODE_WIDTH,
     height: DEFAULT_NODE_HEIGHT,
   };
-}
-
-function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
-  const childToGroup = new Map<string, string>();
-  for (const node of nodes) {
-    if (node.type === "TYPE_WIDGET" && node.widget?.name === "group" && node.id) {
-      for (const childId of (node.configuration?.childNodeIds as string[]) || []) {
-        childToGroup.set(childId, node.id);
-      }
-    }
-  }
-  return childToGroup;
 }
 
 function isAnnotationWidget(node: ComponentsNode): boolean {

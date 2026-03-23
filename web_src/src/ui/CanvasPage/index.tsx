@@ -70,6 +70,7 @@ import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
+import { clampInRange } from "@/pages/workflowv2/utils";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -101,11 +102,6 @@ function sizeFromNodeOrInternal(
   const w = internal?.measured?.width ?? node.width ?? node.measured?.width ?? fallback.w;
   const h = internal?.measured?.height ?? node.height ?? node.measured?.height ?? fallback.h;
   return { w, h };
-}
-
-function clampInRange(value: number, min: number, max: number) {
-  if (max < min) return min;
-  return Math.min(Math.max(value, min), max);
 }
 
 function clampGroupChildNodePositionChanges(

@@ -122,6 +122,9 @@ import {
   buildComponentDefinition,
   buildExecutionInfo,
   buildQueueItemInfo,
+  clampInRange,
+  collectGroupChildIds,
+  buildChildToGroupMap,
 } from "./utils";
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -193,12 +196,6 @@ function resolveApiErrorMessage(error: unknown, fallback: string): string {
   const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
   const runtimeMessage = (error as { message?: string })?.message;
   return responseMessage || runtimeMessage || fallback;
-}
-
-/** Collect child IDs from a single group node. */
-function collectGroupChildIds(node: ComponentsNode): string[] {
-  if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
-  return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
 }
 
 /** Deleting a group widget must also remove its child nodes from the spec. */
@@ -5229,21 +5226,6 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
   return nodesBefore;
 }
 
-function clampToRange(value: number, min: number, max: number): number {
-  return max >= min ? Math.min(Math.max(value, min), max) : min;
-}
-
-function buildGroupChildMap(specNodes: ComponentsNode[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const specNode of specNodes) {
-    if (specNode.type !== "TYPE_WIDGET" || specNode.widget?.name !== "group" || !specNode.id) continue;
-    for (const childId of collectGroupChildIds(specNode)) {
-      map.set(childId, specNode.id);
-    }
-  }
-  return map;
-}
-
 function buildGroupSizeMap(nodes: CanvasNode[]): Map<string, { w: number; h: number }> {
   const map = new Map<string, { w: number; h: number }>();
   for (const n of nodes) {
@@ -5255,7 +5237,7 @@ function buildGroupSizeMap(nodes: CanvasNode[]): Map<string, { w: number; h: num
 }
 
 function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
-  const groupChildMap = buildGroupChildMap(workflow?.spec?.nodes || []);
+  const groupChildMap = buildChildToGroupMap(workflow?.spec?.nodes || []);
   const groupSizeById = buildGroupSizeMap(nodes);
   const pad = GROUP_CHILD_EDGE_PADDING;
 
@@ -5264,8 +5246,8 @@ function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: Canv
     if (!parentId) return node;
 
     const { w: pw, h: ph } = groupSizeById.get(parentId) ?? { w: 480, h: 320 };
-    const x = clampToRange(node.position?.x ?? 0, pad, pw - (node.width ?? 280) - pad);
-    const y = clampToRange(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET, ph - (node.height ?? 100) - pad);
+    const x = clampInRange(node.position?.x ?? 0, pad, pw - (node.width ?? 280) - pad);
+    const y = clampInRange(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET, ph - (node.height ?? 100) - pad);
     return { ...node, parentId, extent: "parent" as const, position: { x, y } };
   });
 
