@@ -68,7 +68,7 @@ def _debug_enabled() -> bool:
 
 def _debug_log(message: str) -> None:
     if _debug_enabled():
-        print(f"[web][superplane_client] {message}", flush=True)
+        print(message, flush=True)
 
 
 @dataclass(frozen=True)
@@ -102,37 +102,20 @@ class SuperplaneClient:
         self._organization_api = OrganizationApi(self._api_client)
 
     def _api_request(self, callback: Any, operation: str) -> Any:
-        _debug_log(
-            f"request operation={operation} base_url={self._config.base_url.rstrip('/')} "
-            f"org_id={self._config.organization_id} timeout={self._config.timeout_seconds}s"
-        )
+        org_id = self._config.organization_id
         try:
             response = callback()
-            _debug_log(f"response operation={operation} status=ok")
+            _debug_log(f"[api] org={org_id} operation={operation} status=200 OK")
             return response
         except ApiException as error:
-            status = error.status if isinstance(error.status, int) else None
-            response_text = error.body if isinstance(error.body, str) else ""
-            _debug_log(
-                f"http_error operation={operation} status={status} body={response_text[:400]}"
-            )
+            status = error.status if isinstance(error.status, int) else "unknown"
+            _debug_log(f"[api] org={org_id} operation={operation} status={status} reason={error}")
 
-            guidance = (
-                "Check SUPERPLANE_API_TOKEN, SUPERPLANE_ORG_ID, and canvas access permissions."
-                if status in {401, 403}
-                else "Check SUPERPLANE_BASE_URL and request parameters."
-            )
-            if response_text:
-                details = f" HTTP {status}: {response_text}"
-            else:
-                details = f" HTTP {status or 'unknown'}."
-            raise RuntimeError(f"Superplane API request failed.{details} {guidance}") from error
+            raise RuntimeError("Superplane API request failed.") from error
         except Exception as error:
-            _debug_log(f"url_error operation={operation} reason={error}")
-            raise RuntimeError(
-                "Failed to reach Superplane API. "
-                "Check SUPERPLANE_BASE_URL and network connectivity."
-            ) from error
+            _debug_log(f"[api] org={org_id} operation={operation} status=unknown_error reason={error}")
+
+            raise RuntimeError("Failed to reach Superplane API.") from error
 
     def describe_canvas(self, canvas_id: str) -> CanvasSummary:
         response = self._api_request(
