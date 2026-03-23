@@ -2586,6 +2586,7 @@ function CanvasContent({
                           size="sm"
                           className="h-8 items-center text-xs font-medium gap-1.5"
                           onClick={onOpenVersionControl}
+                          aria-label="Open version control"
                         >
                           <GitBranch className="h-3 w-3" />
                         </Button>
