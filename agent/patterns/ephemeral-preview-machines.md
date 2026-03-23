@@ -24,7 +24,7 @@ Use this pattern when a user wants temporary environments for pull requests.
 3. If the canvas is empty, but the organization has some connected integration, e.g. daytona integration
    => use that one for provisioning the infrastructure
 
-4. Otherwise, choose one of the following:
+4. Otherwise, choose one of the following in the following order:
    => Daytona sandboxed via `daytona.createSandbox` component
    => Digital Ocean droplets
    => AWS ec2 machines, or GCP cloud instances
