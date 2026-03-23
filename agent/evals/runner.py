@@ -30,8 +30,8 @@ dataset = Dataset(
             inputs="Listen to pull-request comments and send a slack message when a comment is made",
             evaluators=[
                 WorkflowShape(
-                  nodes=["github.onPRReviewComment", "slack.sendTextMessage"],
-                  edges=[("github.onPRReviewComment", "slack.sendTextMessage")],
+                  nodes=["github.onPRComment", "slack.sendTextMessage"],
+                  edges=[("github.onPRComment", "slack.sendTextMessage")],
                 )
             ],
         ),
@@ -42,23 +42,23 @@ dataset = Dataset(
                 WorkflowShape(
                   nodes=[
                       "github.onPullRequest",
-                      "daytona.createSandbox",
-                      "memory.upsert",
+                      "daytona.createRepositorySandbox",
+                      "upsertMemory",
                       "github.createIssueComment",
                       "wait",
                       "daytona.deleteSandbox",
                       "github.onPullRequest",
-                      "memory.read",
+                      "readMemory",
                       "daytona.deleteSandbox",
                   ],
                   edges=[
-                      ("github.onPullRequest", "daytona.createSandbox"),
-                      ("daytona.createSandbox", "memory.upsert"),
-                      ("memory.upsert", "github.createIssueComment"),
+                      ("github.onPullRequest", "daytona.createRepositorySandbox"),
+                      ("daytona.createRepositorySandbox", "upsertMemory"),
+                      ("upsertMemory", "github.createIssueComment"),
                       ("github.createIssueComment", "wait"),
                       ("wait", "daytona.deleteSandbox"),
-                      ("github.onPullRequest", "memory.read"),
-                      ("memory.read", "daytona.deleteSandbox"),
+                      ("github.onPullRequest", "readMemory"),
+                      ("readMemory", "daytona.deleteSandbox"),
                   ],
                 )
             ],

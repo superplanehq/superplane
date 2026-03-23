@@ -24,17 +24,13 @@ Use this pattern when a user wants temporary environments for pull requests.
 3. If the canvas is empty, but the organization has some connected integration, e.g. daytona integration
    => use that one for provisioning the infrastructure
 
-4. Otherwise, choose one of the following in the following order:
-   => Daytona sandboxed via `daytona.createSandbox` component
-   => Digital Ocean droplets
-   => AWS ec2 machines, or GCP cloud instances
-   => Hetzner Machines
+4. Otherwise, choose daytona `daytone.createRepositorySandbox` component
 
 ## Cannonical workflow
 
 trigger1: `github.onPullRequest` action: opened
 -> provision machine based on the above
--> store into canvas memory via `upsert_memory` component
+-> store into canvas memory via `upsertMemory` component
 -> comment back to the PR with `github.createIssueComment`
 -> wait for 48 hours via `wait` component
 -> teardown the machine
