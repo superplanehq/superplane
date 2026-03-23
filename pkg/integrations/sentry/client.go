@@ -232,20 +232,6 @@ func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {
 	return apps, nil
 }
 
-func (c *Client) GetSentryApp(appSlug string) (*SentryApp, error) {
-	responseBody, err := c.doJSON(http.MethodGet, fmt.Sprintf("/api/0/sentry-apps/%s/", appSlug), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	app := SentryApp{}
-	if err := json.Unmarshal(responseBody, &app); err != nil {
-		return nil, err
-	}
-
-	return &app, nil
-}
-
 func (c *Client) UpdateSentryApp(appSlug string, request UpdateSentryAppRequest) (*SentryApp, error) {
 	responseBody, err := c.doJSON(http.MethodPut, fmt.Sprintf("/api/0/sentry-apps/%s/", appSlug), request)
 	if err != nil {

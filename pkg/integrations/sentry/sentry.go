@@ -26,15 +26,6 @@ const (
 	ResourceTypeTeam    = "team"
 )
 
-var scopeList = []string{
-	"org:read",
-	"org:write",
-	"project:read",
-	"team:read",
-	"event:read",
-	"event:write",
-}
-
 const (
 	appSetupDescription = `
 - If you already created a Sentry internal integration named ` + "`%s`" + `, close this prompt and paste the **User Token** and **Client Secret** into SuperPlane.
@@ -278,7 +269,9 @@ func (s *Sentry) reconcileWebhook(ctx core.SyncContext, config Configuration) (s
 	// issue webhooks require event:read — ensure it's in the scopes.
 	desiredScopes := ensureContains(app.Scopes, "event:read")
 
-	if strings.TrimSpace(app.WebhookURL) == desiredWebhookURL && sameStringSet(app.Events, desiredEvents) {
+	if strings.TrimSpace(app.WebhookURL) == desiredWebhookURL &&
+		sameStringSet(app.Events, desiredEvents) &&
+		sameStringSet(app.Scopes, desiredScopes) {
 		metadata.AppSlug = app.Slug
 		ctx.Integration.SetMetadata(metadata)
 		return "", nil
@@ -406,6 +399,12 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 	if err != nil {
 		ctx.Logger.Errorf("failed to read sentry webhook body: %v", err)
 		ctx.Response.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if strings.TrimSpace(config.ClientSecret) == "" {
+		ctx.Logger.Warn("missing sentry client secret for webhook signature verification")
+		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
 
@@ -692,6 +691,9 @@ func verifyWebhookSignature(signature string, body, secret []byte) error {
 	signature = strings.TrimPrefix(signature, "sha256=")
 	if signature == "" {
 		return fmt.Errorf("missing signature")
+	}
+	if len(secret) == 0 {
+		return fmt.Errorf("missing webhook secret")
 	}
 
 	mac := hmac.New(sha256.New, secret)

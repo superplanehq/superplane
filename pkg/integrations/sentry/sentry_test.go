@@ -249,6 +249,43 @@ func Test__Sentry__Sync(t *testing.T) {
 		require.Len(t, httpContext.Requests, 4)
 		assert.Equal(t, "https://washington-x2.sentry.io/api/0/organizations/washington-x2/", httpContext.Requests[0].URL.String())
 	})
+
+	t.Run("matching webhook and events but missing event read scope -> updates integration", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			Configuration: map[string]any{
+				"baseUrl":         "https://sentry.io",
+				"integrationName": "SuperPlane",
+				"userToken":       "auth-token",
+				"clientSecret":    "client-secret",
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"1","slug":"example","name":"Example Org"}]`),
+				sentryMockResponse(http.StatusOK, `{"id":"1","slug":"example","name":"Example Org"}`),
+				sentryMockResponse(http.StatusOK, `[{"id":"2","slug":"backend","name":"Backend"}]`),
+				sentryMockResponse(http.StatusOK, `[{"id":"3","slug":"platform","name":"Platform"}]`),
+				sentryMockResponse(http.StatusOK, `[{"name":"SuperPlane","slug":"superplane","scopes":["org:read","org:write","project:read","team:read","event:write"],"events":["issue"],"webhookUrl":"https://hooks.example.com/api/v1/integrations/8f5fbc57-2738-409a-a6f8-af65c2de733c/events","isInternal":true,"isAlertable":false,"verifyInstall":false,"allowedOrigins":[]}]`),
+				sentryMockResponse(http.StatusOK, `{"name":"SuperPlane","slug":"superplane","scopes":["org:read","org:write","project:read","team:read","event:read","event:write"],"events":["issue"],"webhookUrl":"https://hooks.example.com/api/v1/integrations/8f5fbc57-2738-409a-a6f8-af65c2de733c/events","isInternal":true,"isAlertable":false,"verifyInstall":false,"allowedOrigins":[]}`),
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			HTTP:            httpContext,
+			Logger:          logrus.NewEntry(logrus.New()),
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpContext.Requests, 6)
+		assert.Equal(t, "https://sentry.io/api/0/sentry-apps/superplane/", httpContext.Requests[5].URL.String())
+	})
 }
 
 func Test__Sentry__HandleWebhook(t *testing.T) {
@@ -280,6 +317,32 @@ func Test__Sentry__HandleWebhook(t *testing.T) {
 	})
 
 	require.Equal(t, http.StatusOK, response.Code)
+}
+
+func Test__Sentry__HandleWebhook__MissingClientSecret(t *testing.T) {
+	impl := &Sentry{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"baseUrl":   "https://sentry.io",
+			"userToken": "auth-token",
+		},
+	}
+
+	body := []byte(`{"action":"created","installation":{"uuid":"install-123"},"data":{"issue":{"id":"123"}}}`)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/events", bytes.NewReader(body))
+	request.Header.Set("Sentry-Hook-Resource", "issue")
+	request.Header.Set("Sentry-Hook-Signature", computeWebhookSignature("", body))
+	response := httptest.NewRecorder()
+
+	impl.HandleRequest(core.HTTPRequestContext{
+		Logger:      logrus.NewEntry(logrus.New()),
+		Request:     request,
+		Response:    response,
+		HTTP:        &contexts.HTTPContext{},
+		Integration: integrationCtx,
+	})
+
+	require.Equal(t, http.StatusForbidden, response.Code)
 }
 
 func computeWebhookSignature(secret string, body []byte) string {
