@@ -262,6 +262,25 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 		}
 	}
 
+	for _, node := range canvas.Spec.Nodes {
+		if node.Type != compb.Node_TYPE_WIDGET || node.Widget == nil || node.Widget.Name != "group" {
+			continue
+		}
+
+		config := node.Configuration.AsMap()
+		childIDs, _ := config["childNodeIds"].([]any)
+		for _, raw := range childIDs {
+			childID, ok := raw.(string)
+			if !ok || childID == "" {
+				continue
+			}
+
+			if !nodeIDs[childID] {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s not found", node.Id, childID)
+			}
+		}
+	}
+
 	if err := actions.CheckForCycles(canvas.Spec.Nodes, canvas.Spec.Edges); err != nil {
 		return nil, nil, err
 	}
