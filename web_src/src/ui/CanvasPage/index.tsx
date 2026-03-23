@@ -32,6 +32,7 @@ import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 
 import {
@@ -181,18 +182,19 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
-  canvasStateMode?: "default" | "editing" | "previewing-previous-version";
-  showVersioningTab?: boolean;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
-  versioningItemCount?: number;
+  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
+  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
   dataViewContent?: React.ReactNode;
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   versionControlButtonLabel?: string;
   versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
@@ -321,6 +323,29 @@ export interface CanvasPageProps {
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
+
+  /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
+  onPreviewPreviousVersionViewDetails?: () => void;
+  /** Change request being previewed while awaiting approval (floating bar + versioning sidebar). */
+  awaitingApprovalBanner?: {
+    title: string;
+    description?: string;
+    onApprove: () => void | Promise<void>;
+    onReject: () => void | Promise<void>;
+    onPublish: () => void | Promise<void>;
+    onOpenVersioningTab?: () => void;
+    /** Opens the same version node diff dialog as the version sidebar compare control. */
+    onViewNodeDiff?: () => void;
+    canAct: boolean;
+    actionPending: boolean;
+    /** Label + colors for open vs ready-to-publish (matches version sidebar + diff dialog). */
+    reviewUi: {
+      label: string;
+      floatingBarBgClassName: string;
+      dotClassName: string;
+      titleClassName: string;
+    };
+  };
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
@@ -864,6 +889,10 @@ function CanvasPage(props: CanvasPageProps) {
   }, [state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
+  const showPreviewFloatingBar =
+    canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
+  const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
+
   const canvasStateBorderClass =
     canvasStateMode === "editing"
       ? "border-3 border-amber-500"
@@ -923,14 +952,14 @@ function CanvasPage(props: CanvasPageProps) {
           showPendingDraftBadge={props.showPendingDraftBadge}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
-          showVersioningTab={props.showVersioningTab}
           memoryItemCount={props.memoryItemCount}
-          versioningItemCount={props.versioningItemCount}
+          onExportYamlCopy={props.onExportYamlCopy}
+          onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-      {/* Main content area with sidebar and canvas/memory/versioning */}
+      {/* Main content area with sidebar and canvas/memory/settings views */}
       {props.topViewMode && props.topViewMode !== "canvas" ? (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
@@ -957,6 +986,51 @@ function CanvasPage(props: CanvasPageProps) {
           />
 
           <div className={`flex-1 relative ${canvasStateBorderClass}`}>
+            {showPreviewFloatingBar || showAwaitingFloatingBar ? (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
+                <div
+                  className={cn(
+                    "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
+                    showAwaitingFloatingBar
+                      ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName
+                      : "bg-sky-50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex min-w-0 max-w-full items-center gap-1 text-sm",
+                      showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
+                    )}
+                  >
+                    {showAwaitingFloatingBar ? (
+                      <>
+                        <span className={props.awaitingApprovalBanner?.reviewUi.dotClassName}>{"\u25cf"}</span>
+                        <span className={props.awaitingApprovalBanner?.reviewUi.titleClassName}>
+                          {props.awaitingApprovalBanner?.reviewUi.label}
+                        </span>
+                      </>
+                    ) : (
+                      "Previewing previous version"
+                    )}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => {
+                      if (showAwaitingFloatingBar) {
+                        props.awaitingApprovalBanner?.onViewNodeDiff?.();
+                      } else {
+                        props.onPreviewPreviousVersionViewDetails?.();
+                      }
+                    }}
+                  >
+                    View details
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {canvasStateLabel ? (
               <div
                 className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
@@ -1029,8 +1103,8 @@ function CanvasPage(props: CanvasPageProps) {
                 showPendingDraftBadge={props.showPendingDraftBadge}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
-                versionControlButtonLabel={props.versionControlButtonLabel}
                 versionControlButtonTooltip={props.versionControlButtonTooltip}
+                versionControlNotificationCount={props.versionControlNotificationCount}
                 showBottomStatusControls={props.showBottomStatusControls}
                 isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                 onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
@@ -1430,9 +1504,9 @@ function CanvasContentHeader({
   showPendingDraftBadge,
   topViewMode,
   onTopViewModeChange,
-  showVersioningTab,
   memoryItemCount,
-  versioningItemCount,
+  onExportYamlCopy,
+  onExportYamlDownload,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1467,11 +1541,11 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   showPendingDraftBadge?: boolean;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
-  showVersioningTab?: boolean;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
   memoryItemCount?: number;
-  versioningItemCount?: number;
+  onExportYamlCopy?: (nodes: CanvasNode[]) => void;
+  onExportYamlDownload?: (nodes: CanvasNode[]) => void;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1481,6 +1555,18 @@ function CanvasContentHeader({
       onSave(stateRef.current.nodes);
     }
   }, [onSave]);
+
+  const handleExportYamlCopy = useCallback(() => {
+    if (onExportYamlCopy) {
+      onExportYamlCopy(stateRef.current.nodes);
+    }
+  }, [onExportYamlCopy]);
+
+  const handleExportYamlDownload = useCallback(() => {
+    if (onExportYamlDownload) {
+      onExportYamlDownload(stateRef.current.nodes);
+    }
+  }, [onExportYamlDownload]);
 
   const handleLogoClick = useCallback(() => {
     if (organizationId) {
@@ -1526,9 +1612,9 @@ function CanvasContentHeader({
       showPendingDraftBadge={showPendingDraftBadge}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
-      showVersioningTab={showVersioningTab}
       memoryItemCount={memoryItemCount}
-      versioningItemCount={versioningItemCount}
+      onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
+      onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
     />
   );
 }
@@ -1600,6 +1686,7 @@ function CanvasContent({
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
+  versionControlNotificationCount = 0,
   showBottomStatusControls = true,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
@@ -1684,8 +1771,8 @@ function CanvasContent({
   showPendingDraftBadge?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
-  versionControlButtonLabel?: string;
   versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
@@ -2489,6 +2576,30 @@ function CanvasContent({
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex items-center gap-2"
             >
+              {showVersionControlTrigger ? (
+                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="relative inline-flex">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 items-center text-xs font-medium gap-1.5"
+                          onClick={onOpenVersionControl}
+                        >
+                          <GitBranch className="h-3 w-3" />
+                        </Button>
+                        {versionControlNotificationCount > 0 ? (
+                          <span className="absolute left-6 -top-2 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                            {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
+                          </span>
+                        ) : null}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : null}
               <ZoomSlider
                 orientation="horizontal"
                 className="!static !m-0"
@@ -2568,23 +2679,6 @@ function CanvasContent({
                   }}
                 />
               </ZoomSlider>
-              {showVersionControlTrigger ? (
-                <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 items-center text-xs font-medium gap-1.5"
-                        onClick={onOpenVersionControl}
-                      >
-                        <GitBranch className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
-                  </Tooltip>
-                </div>
-              ) : null}
               {showBottomStatusControls ? (
                 <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
                   <Tooltip>
