@@ -163,10 +163,10 @@ function formatVersionTimestamp(version?: CanvasesCanvasVersion | null): string 
 
 function formatVersionLabel(version?: CanvasesCanvasVersion | null): string {
   if (version?.metadata?.isPublished) {
-    return "Published version";
+    return "Published";
   }
 
-  return "Draft version";
+  return "Draft";
 }
 
 function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion | null): string {
@@ -935,24 +935,22 @@ export function WorkflowPageV2() {
     }
 
     if (!canUpdateCanvas) {
-      showErrorToast("You don't have permission to edit this canvas");
+      showErrorToast("No edit permission.");
       return;
     }
 
     if (isTemplate) {
-      showErrorToast("Template canvases are read-only");
+      showErrorToast("Templates are read-only.");
       return;
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+      showErrorToast("Enable versioning in canvas settings.");
       return;
     }
 
     if (hasEditableVersion && hasUnsavedChanges) {
-      const shouldCreate = window.confirm(
-        "You have unsaved changes in the current draft. Create a new draft from live anyway?",
-      );
+      const shouldCreate = window.confirm("Unsaved changes in current draft. Create new draft from live?");
       if (!shouldCreate) {
         return;
       }
@@ -1271,7 +1269,7 @@ export function WorkflowPageV2() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();
-        e.returnValue = "Your work isn't saved, unsaved changes will be lost. Are you sure you want to leave?";
+        e.returnValue = "You have unsaved changes. Leave anyway?";
       }
     };
 
@@ -2064,7 +2062,7 @@ export function WorkflowPageV2() {
       }
       if (isTemplate) {
         if (options?.showToast !== false) {
-          showErrorToast("Template canvases are read-only");
+          showErrorToast("Templates are read-only.");
         }
         return;
       }
@@ -2124,7 +2122,7 @@ export function WorkflowPageV2() {
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
       } catch (error: any) {
         console.error("Failed to save canvas", error);
-        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
+        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save canvas.";
         showErrorToast(getUsageLimitToastMessage(error, errorMessage));
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
@@ -3494,7 +3492,7 @@ export function WorkflowPageV2() {
     async (canvasNodes: CanvasNode[]) => {
       if (!canvas || !organizationId || !canvasId) return;
       if (isTemplate) {
-        showErrorToast("Template canvases are read-only");
+        showErrorToast("Templates are read-only.");
         return;
       }
       if (!activeCanvasVersionId && !isVersioningDisabled) {
@@ -3576,7 +3574,7 @@ export function WorkflowPageV2() {
         const errorMessage =
           (error as { response?: { data?: { message: string } } })?.response?.data?.message ||
           (error as { message: string })?.message ||
-          "Failed to save changes to the canvas";
+          "Failed to save canvas.";
         showErrorToast(errorMessage);
       }
     },
@@ -3597,19 +3595,19 @@ export function WorkflowPageV2() {
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+      showErrorToast("Enable versioning in canvas settings.");
       return;
     }
 
     const editVersionID = createChangeRequestVersion?.metadata?.id || "";
 
     if (!editVersionID) {
-      showErrorToast("Enable edit mode before opening a change request");
+      showErrorToast("Enter edit mode first.");
       return;
     }
 
     if (hasUnsavedChanges && editVersionID === activeCanvasVersionId) {
-      showErrorToast("Save your version before creating a change request");
+      showErrorToast("Save changes first.");
       return;
     }
 
@@ -3641,19 +3639,19 @@ export function WorkflowPageV2() {
       }
 
       if (isVersioningDisabled) {
-        showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+        showErrorToast("Enable versioning in canvas settings.");
         return;
       }
 
       const editVersionID = createChangeRequestVersion?.metadata?.id || "";
 
       if (!editVersionID) {
-        showErrorToast("Enable edit mode before creating a change request");
+        showErrorToast("Enter edit mode first.");
         return;
       }
 
       if (hasUnsavedChanges && editVersionID === activeCanvasVersionId) {
-        showErrorToast("Save your version before creating a change request");
+        showErrorToast("Save changes first.");
         return;
       }
 
@@ -3855,7 +3853,7 @@ export function WorkflowPageV2() {
       const isOwnedDraft = !isPublishedVersion && isSameUserID(version.metadata?.owner?.id, currentUserId);
       const isCurrentLive = version.metadata?.id === liveCanvasVersionId;
       if (!isOwnedDraft && !isPublishedVersion) {
-        showErrorToast("You can only use your edit version or published live history");
+        showErrorToast("Select your draft or a published version.");
         return;
       }
 
@@ -3963,17 +3961,17 @@ export function WorkflowPageV2() {
     }
 
     if (!canUpdateCanvas) {
-      showErrorToast("You don't have permission to edit this canvas");
+      showErrorToast("No edit permission.");
       return;
     }
 
     if (isTemplate) {
-      showErrorToast("Template canvases are read-only");
+      showErrorToast("Templates are read-only.");
       return;
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+      showErrorToast("Enable versioning in canvas settings.");
       return;
     }
 
@@ -4012,29 +4010,29 @@ export function WorkflowPageV2() {
     }
 
     if (!canUpdateCanvas) {
-      showErrorToast("You don't have permission to edit this canvas");
+      showErrorToast("No edit permission.");
       return;
     }
 
     if (isTemplate) {
-      showErrorToast("Template canvases are read-only");
+      showErrorToast("Templates are read-only.");
       return;
     }
 
     if (isVersioningDisabled) {
-      showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+      showErrorToast("Enable versioning in canvas settings.");
       return;
     }
 
     if (!hasEditableVersion) {
-      showErrorToast("Enable edit mode before resetting draft changes");
+      showErrorToast("Enter edit mode to reset draft.");
       return;
     }
 
     const shouldReset = window.confirm(
       hasUnsavedChanges
-        ? "Discard local unsaved changes and reset your draft to current live?"
-        : "Reset your draft to current live and discard draft changes?",
+        ? "Discard unsaved changes and reset draft to live?"
+        : "Reset draft to live and discard changes?",
     );
     if (!shouldReset) {
       return;
@@ -4080,7 +4078,7 @@ export function WorkflowPageV2() {
         };
       });
 
-      showSuccessToast("Draft reset to current live");
+      showSuccessToast("Draft reset to live");
     } catch (error) {
       const errorMessage =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -4496,20 +4494,20 @@ export function WorkflowPageV2() {
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const saveDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
+    ? "No edit permission."
     : !hasEditableVersion
-      ? "Enable edit mode to save changes."
+      ? "Enter edit mode first."
       : undefined;
   const autoSaveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const autoSaveDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
+    ? "No edit permission."
     : !hasEditableVersion
-      ? "Enable edit mode to use auto-save."
+      ? "Enter edit mode first."
       : undefined;
   const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
-  const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
+  const versioningDisabledTooltip = "Enable versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
     !canUpdateCanvas ||
@@ -4517,11 +4515,11 @@ export function WorkflowPageV2() {
     createCanvasVersionMutation.isPending ||
     (hasEditableVersion && !liveCanvasVersionId);
   const toggleEditModeDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
+    ? "No edit permission."
     : isVersioningDisabled
       ? versioningDisabledTooltip
       : canvasDeletedRemotely
-        ? "This canvas was deleted in another session."
+        ? "Canvas deleted remotely."
         : hasEditableVersion && !liveCanvasVersionId
           ? "No live version available."
           : undefined;
@@ -4538,15 +4536,15 @@ export function WorkflowPageV2() {
   const resetDraftDisabledTooltip = isVersioningDisabled
     ? versioningDisabledTooltip
     : !canUpdateCanvas
-      ? "You don't have permission to edit this canvas."
+      ? "No edit permission."
       : canvasDeletedRemotely
-        ? "This canvas was deleted in another session."
+        ? "Canvas deleted remotely."
         : !activeCanvasVersionId
-          ? "Draft version not found."
+          ? "Draft not found."
           : !liveCanvasVersion?.spec
             ? "No live version available."
             : !hasEditableVersion
-              ? "Enable edit mode before resetting draft changes."
+              ? "Enter edit mode first."
               : undefined;
   const createChangeRequestDisabled =
     isVersioningDisabled ||
@@ -4555,13 +4553,13 @@ export function WorkflowPageV2() {
     createCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely;
   const createChangeRequestDisabledTooltip = canvasDeletedRemotely
-    ? "This canvas was deleted in another session."
+    ? "Canvas deleted remotely."
     : isVersioningDisabled
       ? versioningDisabledTooltip
       : !hasEditableVersion
-        ? "Enable edit mode before creating a change request."
+        ? "Enter edit mode first."
         : hasUnsavedChanges
-          ? "Save your version before creating a change request."
+          ? "Save changes first."
           : undefined;
   const versioningItemCount = canvasChangeRequests.filter((changeRequest) => {
     const status = (changeRequest.metadata?.status || "").toLowerCase();
@@ -4585,11 +4583,11 @@ export function WorkflowPageV2() {
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
+    ? "No edit permission."
     : canvasDeletedRemotely
-      ? "This canvas was deleted in another session."
+      ? "Canvas deleted remotely."
       : !hasEditableVersion
-        ? "Edit mode is not enabled."
+        ? "Not in edit mode."
         : undefined;
   const runDisabled =
     hasRunBlockingChanges ||
@@ -4599,17 +4597,17 @@ export function WorkflowPageV2() {
     isViewingDraftVersion ||
     !isViewingCurrentLiveVersion;
   const runDisabledTooltip = canvasDeletedRemotely
-    ? "This canvas was deleted in another session."
+    ? "Canvas deleted remotely."
     : isViewingDraftVersion
-      ? "Draft versions do not execute. Publish to run this canvas."
+      ? "Publish draft to run canvas."
       : !isViewingCurrentLiveVersion
-        ? "Only the current live version can execute."
+        ? "Only the live version can run."
         : !canUpdateCanvas
-          ? "You don't have permission to emit events on this canvas."
+          ? "No run permission."
           : isTemplate
-            ? "Templates are read-only"
+            ? "Templates are read-only."
             : hasRunBlockingChanges
-              ? "Save canvas changes before running"
+              ? "Save changes first."
               : undefined;
 
   const dataViewContent =
@@ -4790,7 +4788,7 @@ export function WorkflowPageV2() {
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           showPendingDraftBadge={showPendingDraftBadge}
           autoLayoutOnUpdateDisabled={isReadOnly}
-          autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
+          autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "No edit permission." : undefined}
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}

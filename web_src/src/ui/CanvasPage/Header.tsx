@@ -196,7 +196,7 @@ export function Header({
   const pendingDraftBadge = showPendingDraftBadge ? (
     <div className="flex items-center relative">
       <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
-        Unpublished Changes
+        Unpublished
       </span>
       <span
         aria-hidden="true"
@@ -457,7 +457,7 @@ export function Header({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">Create a change request from your current draft.</TooltipContent>
+                    <TooltipContent side="left">Propose a change from your draft.</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -482,9 +482,7 @@ export function Header({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">
-                      Discard draft changes and reset it to match the current live version.
-                    </TooltipContent>
+                    <TooltipContent side="left">Reset draft to live.</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -509,7 +507,7 @@ export function Header({
                         )}
                       </div>
                     </TooltipTrigger>
-                    <TooltipContent side="left">Exit edit mode and return to the live version.</TooltipContent>
+                    <TooltipContent side="left">Return to live.</TooltipContent>
                   </Tooltip>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -544,7 +542,7 @@ export function Header({
                   </div>
 
                   {isAutoSaveEnabled ? (
-                    <p className="px-2 pb-2 text-xs text-slate-600 text-center">Changes are saved automatically.</p>
+                    <p className="px-2 pb-2 text-xs text-slate-600 text-center">Auto-saving enabled.</p>
                   ) : null}
 
                   {showSaveUndoActions ? (

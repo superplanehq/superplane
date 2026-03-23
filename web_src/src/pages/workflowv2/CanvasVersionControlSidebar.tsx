@@ -52,10 +52,10 @@ function formatVersionTimestamp(version?: CanvasesCanvasVersion): string | undef
 
 function formatVersionLabel(version?: CanvasesCanvasVersion): string {
   if (version?.metadata?.isPublished) {
-    return "Published version";
+    return "Published";
   }
 
-  return "Draft version";
+  return "Draft";
 }
 
 function formatVersionLabelWithTimestamp(version?: CanvasesCanvasVersion): string {
@@ -219,14 +219,14 @@ export function CanvasVersionControlSidebar({
         <div className="flex h-12 items-center justify-between border-b border-slate-200 px-3">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
             <GitBranch className="h-4 w-4" />
-            Version Control
+            Versions
           </div>
           <Button
             variant="ghost"
             size="icon-sm"
             className="h-7 w-7"
             onClick={() => onToggle(false)}
-            aria-label="Collapse version control"
+            aria-label="Collapse versions"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -234,19 +234,17 @@ export function CanvasVersionControlSidebar({
 
         <div className="flex-1 overflow-auto p-3">
           {!canUpdateCanvas && !canvasDeletedRemotely ? (
-            <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+            <p className="text-xs text-slate-600">No edit permission.</p>
           ) : null}
-          {canvasDeletedRemotely ? (
-            <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
-          ) : null}
-          {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
+          {canvasDeletedRemotely ? <p className="text-xs text-red-700">Canvas deleted remotely.</p> : null}
+          {isTemplate ? <p className="text-xs text-slate-600">Templates are read-only.</p> : null}
 
           <section className="mt-3 rounded-md">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Live History ({liveVersionsTotalCount ?? liveVersions.length})
             </p>
             {liveVersions.length === 0 ? (
-              <p className="mt-2 text-xs text-slate-600">No published history yet.</p>
+              <p className="mt-2 text-xs text-slate-600">No history yet.</p>
             ) : (
               <>
                 <div className="mt-2 space-y-2">
@@ -299,7 +297,7 @@ export function CanvasVersionControlSidebar({
           <DialogHeader>
             <DialogTitle>{diffContext?.changeRequest?.metadata?.title?.trim() || "Version Node Diff"}</DialogTitle>
             <DialogDescription>
-              Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against the previous published version.
+              Comparing {formatVersionLabelWithTimestamp(diffContext?.version)} against previous version.
             </DialogDescription>
           </DialogHeader>
 
@@ -383,7 +381,7 @@ function VersionRow({
                 <Eye className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Preview this version</TooltipContent>
+            <TooltipContent side="top">Preview</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -406,9 +404,7 @@ function VersionRow({
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top">
-              {previousVersion ? "View node diff with previous version" : "No previous version to compare"}
-            </TooltipContent>
+            <TooltipContent side="top">{previousVersion ? "View diff" : "No previous version"}</TooltipContent>
           </Tooltip>
         </div>
       </div>
