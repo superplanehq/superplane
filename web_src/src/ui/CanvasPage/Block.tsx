@@ -66,7 +66,7 @@ interface BlockProps extends ComponentActionsProps {
   ) => void;
   onAnnotationBlur?: () => void;
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
 
   ai?: BlockAi;
 }
@@ -91,7 +91,7 @@ export function Block(props: BlockProps) {
     <>
       <AiPopup {...ai} />
 
-      <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={props.onClick}>
+      <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={(e) => props.onClick?.(e)}>
         <LeftHandle data={data} nodeId={props.nodeId} />
         <BlockContent {...props} />
         <RightHandle data={data} nodeId={props.nodeId} />

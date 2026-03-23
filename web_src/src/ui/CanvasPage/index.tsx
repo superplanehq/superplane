@@ -415,7 +415,7 @@ function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: an
       runDisabledTooltip={callbacks?.runDisabledTooltip}
       showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
       onExpand={callbacks.handleNodeExpand}
-      onClick={() => callbacks.handleNodeClick(nodeProps.id)}
+      onClick={(e) => callbacks.handleNodeClick(nodeProps.id, e)}
       onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
       onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
       onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
@@ -1973,27 +1973,24 @@ function CanvasContent({
   }, []);
 
   const handleNodeClick = useCallback(
-    (nodeId: string) => {
-      // Check if this is a pending connection node
+    (nodeId: string, e?: React.MouseEvent) => {
+      const isMultiSelectClick = e && (e.ctrlKey || e.metaKey);
+      if (isMultiSelectClick) return;
+
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
       const isGroupNode = clickedNode?.data?.type === "group";
 
-      // Check if this is a placeholder node (persisted, not local-only)
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
       const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
-      // Check if this is a template node
       const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
 
-      // Check if the current template is a configured template (not just pending connection)
       const currentTemplateNode = templateNodeId ? stateRef.current.nodes?.find((n) => n.id === templateNodeId) : null;
       const isCurrentTemplateConfigured =
         currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
 
-      // Allow switching to pending connection nodes or other template nodes even if there's a configured template
-      // But block switching to other regular/real nodes
       if (
         isCurrentTemplateConfigured &&
         nodeId !== templateNodeId &&
@@ -2009,17 +2006,13 @@ function CanvasContent({
       }
 
       if (isPendingConnection && onPendingConnectionNodeClick) {
-        // Notify parent that a pending connection node was clicked
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
-        // Handle placeholder clicks the same as pending connections
         onPendingConnectionNodeClick(nodeId);
       } else {
         if (isTemplateNode && onTemplateNodeClick) {
-          // Notify parent to restore template state
           onTemplateNodeClick(nodeId);
         } else {
-          // Regular node click
           stateRef.current.componentSidebar.open(nodeId);
 
           const nodeData = clickedNode?.data as {
@@ -2031,12 +2024,10 @@ function CanvasContent({
             nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
           );
 
-          // Reset to Runs tab when clicking on a regular node
           if (setCurrentTab) {
             setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
           }
 
-          // Close building blocks sidebar when clicking on a regular node
           if (onBuildingBlocksSidebarToggle) {
             onBuildingBlocksSidebarToggle(false);
           }

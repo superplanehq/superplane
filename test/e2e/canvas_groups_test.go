@@ -50,16 +50,14 @@ func (s *CanvasGroupSteps) givenACanvasWithTwoNoopNodes(first, second string) {
 	s.canvas.Create()
 	s.canvas.AddNoop(first, models.Position{X: 200, Y: 220})
 	s.canvas.AddNoop(second, models.Position{X: 200, Y: 420})
-	s.dismissSidebar()
-}
-
-func (s *CanvasGroupSteps) dismissSidebar() {
 	s.canvas.ClickOnEmptyCanvasArea()
 	s.session.Sleep(500)
 }
 
-func (s *CanvasGroupSteps) selectNodesForGrouping(_, _ string) {
-	s.canvas.SelectAllNodes()
+func (s *CanvasGroupSteps) selectNodesForGrouping(first, second string) {
+	s.session.Click(q.TestID("node", first, "header"))
+	s.session.Sleep(300)
+	s.session.ClickWithControlOrMeta(q.TestID("node", second, "header"))
 	s.session.Sleep(500)
 	s.session.AssertVisible(q.TestID("multi-select-group"))
 }
