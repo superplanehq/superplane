@@ -41,10 +41,13 @@ dataset = Dataset(
         ),
         Case(
             name="ephemeral_pr_preview_machines",
-            inputs=(
-                "Build a workflow that creates ephemeral preview machines for backend pull requests. On PR open, create infra and post the preview URL to the PR; on PR close or after 48 hours, tear it down and avoid zombie environments."
-            ),
-            evaluators=[EphemeralMachineWorkflow()],
+            inputs="Build a workflow that creates ephemeral preview machines for pull requests. On PR open, create infra and post the preview URL to the PR. On PR close or after 48 hours, tear it down.",
+            evaluators=[
+                WorkflowShape(
+                  nodes=["github.onPullRequest", "http.request", "memory.upsert", "schedule.delay", "memory.read", "http.request"],
+                  edges=[("github.onPullRequest", "http.request"), ("http.request", "memory.upsert"), ("memory.upsert", "schedule.delay"), ("schedule.delay", "memory.read"), ("memory.read", "http.request")],
+                )
+            ],
         ),
     ],
 )
