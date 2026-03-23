@@ -179,7 +179,7 @@ func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
 	require.NoError(s.t, viewDetails.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
 	require.NoError(s.t, viewDetails.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 
-	dialogTitle := s.session.Page().Locator(`[data-slot="dialog-title"]`)
+	dialogTitle := s.session.Page().Locator(`[role=dialog] [data-slot="dialog-title"]`)
 	require.NoError(s.t, dialogTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
 	s.session.AssertText("Review Actions")
 }
