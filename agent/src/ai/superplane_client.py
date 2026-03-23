@@ -38,8 +38,12 @@ from superplaneapi.models.components_component import ComponentsComponent
 from superplaneapi.models.components_describe_component_response import (
     ComponentsDescribeComponentResponse,
 )
+from superplaneapi.models.canvases_canvas_memory import CanvasesCanvasMemory
 from superplaneapi.models.components_list_components_response import ComponentsListComponentsResponse
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_list_canvas_memories_response import (
+    CanvasesListCanvasMemoriesResponse,
+)
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
@@ -97,7 +101,7 @@ class SuperplaneClient:
         self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
 
-    def _with_error_guidance(self, callback: Any, operation: str) -> Any:
+    def _api_request(self, callback: Any, operation: str) -> Any:
         _debug_log(
             f"request operation={operation} base_url={self._config.base_url.rstrip('/')} "
             f"org_id={self._config.organization_id} timeout={self._config.timeout_seconds}s"
@@ -131,7 +135,7 @@ class SuperplaneClient:
             ) from error
 
     def describe_canvas(self, canvas_id: str) -> CanvasSummary:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._canvas_api.canvases_describe_canvas(
                 canvas_id,
                 _request_timeout=self._config.timeout_seconds,
@@ -333,7 +337,7 @@ class SuperplaneClient:
         }
 
     def _list_available_integrations_raw(self) -> list[Any]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._integration_api.integrations_list_integrations(
                 _request_timeout=self._config.timeout_seconds,
             ),
@@ -348,7 +352,7 @@ class SuperplaneClient:
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._component_api.components_list_components(
                 _request_timeout=self._config.timeout_seconds,
             ),
@@ -393,7 +397,7 @@ class SuperplaneClient:
         return [self._serialize_component(component) for component in sorted(matches, key=lambda item: item.name or "")]
 
     def describe_component(self, name: str) -> dict[str, Any]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._component_api.components_describe_component(
                 name,
                 _request_timeout=self._config.timeout_seconds,
@@ -411,7 +415,7 @@ class SuperplaneClient:
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._trigger_api.triggers_list_triggers(
                 _request_timeout=self._config.timeout_seconds,
             ),
@@ -463,7 +467,7 @@ class SuperplaneClient:
         ]
 
     def describe_trigger(self, name: str) -> dict[str, Any]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._trigger_api.triggers_describe_trigger(
                 name,
                 _request_timeout=self._config.timeout_seconds,
@@ -477,7 +481,7 @@ class SuperplaneClient:
         return self._serialize_trigger(response.trigger)
 
     def list_org_integrations(self) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._organization_api.organizations_list_integrations(
                 self._config.organization_id,
                 _request_timeout=self._config.timeout_seconds,
@@ -505,7 +509,7 @@ class SuperplaneClient:
                 {str(key): str(value) for key, value in parameters.items() if key and value}
             )
         encoded_parameters = urlencode(query_params)
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._organization_api.organizations_list_integration_resources(
                 self._config.organization_id,
                 integration_id,
@@ -567,7 +571,7 @@ class SuperplaneClient:
         )
 
     def list_node_events(self, canvas_id: str, node_id: str, limit: int = 5) -> list[NodeEvent]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._canvas_node_api.canvases_list_node_events(
                 canvas_id,
                 node_id,
@@ -576,6 +580,7 @@ class SuperplaneClient:
             ),
             operation="canvases_list_node_events",
         )
+
         if not isinstance(response, CanvasesListNodeEventsResponse) or not isinstance(
             response.events, list
         ):
