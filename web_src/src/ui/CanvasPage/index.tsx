@@ -112,6 +112,73 @@ function clampGroupChildNodePositionChanges(changes: NodeChange[], nodes: Canvas
   });
 }
 
+const DEFAULT_GROUP_MIN_WIDTH = 480;
+const DEFAULT_GROUP_MIN_HEIGHT = 320;
+const GROUP_RESIZE_PADDING = 30;
+
+function computeGroupSizeFromChildren(groupId: string, nodes: CanvasNode[]): { width: number; height: number } | null {
+  const children = nodes.filter((n) => n.parentId === groupId);
+  if (children.length === 0) return null;
+
+  let maxRight = 0;
+  let maxBottom = 0;
+
+  for (const child of children) {
+    const cx = child.position?.x ?? 0;
+    const cy = child.position?.y ?? 0;
+    const cw = child.measured?.width ?? child.width ?? 240;
+    const ch = child.measured?.height ?? child.height ?? 80;
+    maxRight = Math.max(maxRight, cx + cw);
+    maxBottom = Math.max(maxBottom, cy + ch);
+  }
+
+  return {
+    width: Math.max(DEFAULT_GROUP_MIN_WIDTH, Math.round(maxRight + GROUP_RESIZE_PADDING)),
+    height: Math.max(DEFAULT_GROUP_MIN_HEIGHT, Math.round(maxBottom + GROUP_RESIZE_PADDING)),
+  };
+}
+
+function resizeGroupsAfterChildChanges(
+  changes: NodeChange[],
+  nodes: CanvasNode[],
+  setNodes: (updater: (nodes: CanvasNode[]) => CanvasNode[]) => void,
+) {
+  const childChangedIds = new Set(
+    changes.filter((c) => c.type === "dimensions" || c.type === "position").map((c) => c.id),
+  );
+  if (childChangedIds.size === 0) return;
+
+  const affectedGroupIds = new Set<string>();
+  for (const node of nodes) {
+    if (node.parentId && childChangedIds.has(node.id)) {
+      affectedGroupIds.add(node.parentId);
+    }
+  }
+  if (affectedGroupIds.size === 0) return;
+
+  setNodes((currentNodes) => {
+    let changed = false;
+    const updated = currentNodes.map((node) => {
+      if (!affectedGroupIds.has(node.id)) return node;
+      const size = computeGroupSizeFromChildren(node.id, currentNodes);
+      if (!size) return node;
+
+      const currentW = node.width ?? 0;
+      const currentH = node.height ?? 0;
+      if (Math.abs(currentW - size.width) < 1 && Math.abs(currentH - size.height) < 1) return node;
+
+      changed = true;
+      return {
+        ...node,
+        width: size.width,
+        height: size.height,
+        style: { ...node.style, width: size.width, height: size.height, zIndex: -1 },
+      };
+    });
+    return changed ? updated : currentNodes;
+  });
+}
+
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
   targetHandle?: string | null;
@@ -2415,6 +2482,7 @@ function CanvasContent({
       if (!isReadOnly) {
         const nodes = stateRef.current.nodes ?? [];
         state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes));
+        resizeGroupsAfterChildChanges(changes, nodes, state.setNodes);
         return;
       }
 
@@ -2422,6 +2490,8 @@ function CanvasContent({
       if (filteredChanges.length > 0) {
         state.onNodesChange(filteredChanges);
       }
+
+      resizeGroupsAfterChildChanges(changes, stateRef.current.nodes ?? [], state.setNodes);
     },
     [isReadOnly, state],
   );

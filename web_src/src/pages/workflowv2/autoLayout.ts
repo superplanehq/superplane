@@ -29,7 +29,7 @@ function normalizeChannel(channel?: string): string {
 const GROUP_NODE_WIDTH = 480;
 const GROUP_NODE_HEIGHT = 320;
 
-function estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
+export function estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
   if (node.type === "TYPE_WIDGET") {
     if (node.widget?.name === "group") {
       return { width: GROUP_NODE_WIDTH, height: GROUP_NODE_HEIGHT };

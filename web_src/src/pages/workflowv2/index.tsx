@@ -99,7 +99,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
+import { applyHorizontalAutoLayout, buildChannelsByNodeId, estimateNodeSize } from "./autoLayout";
 import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
@@ -5517,9 +5517,7 @@ function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
 
 const DEFAULT_GROUP_WIDTH = 480;
 const DEFAULT_GROUP_HEIGHT = 320;
-const DEFAULT_CHILD_WIDTH = 370;
-const DEFAULT_CHILD_HEIGHT = 220;
-const GROUP_SIZE_PADDING = 30;
+const GROUP_SIZE_PADDING = 10;
 
 function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[]): { width: number; height: number } {
   const childIds = collectGroupChildIds(groupNode);
@@ -5535,8 +5533,7 @@ function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[])
     found = true;
     const cx = child.position.x ?? 0;
     const cy = child.position.y ?? 0;
-    const cw = DEFAULT_CHILD_WIDTH;
-    const ch = DEFAULT_CHILD_HEIGHT;
+    const { width: cw, height: ch } = estimateNodeSize(child);
     if (cx + cw > maxX) maxX = cx + cw;
     if (cy + ch > maxY) maxY = cy + ch;
   }
