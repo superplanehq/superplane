@@ -267,6 +267,7 @@ export function WorkflowPageV2() {
   const [isCreateChangeRequestMode, setIsCreateChangeRequestMode] = useState(false);
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
+  const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
@@ -690,9 +691,15 @@ export function WorkflowPageV2() {
 
   useEffect(() => {
     if (!isCreateChangeRequestMode) {
+      hasInitializedCreateChangeRequestFormRef.current = false;
       return;
     }
 
+    if (hasInitializedCreateChangeRequestFormRef.current) {
+      return;
+    }
+
+    hasInitializedCreateChangeRequestFormRef.current = true;
     const nextVersionNumber = canvasChangeRequests.length + 1;
     setCreateChangeRequestTitle(`v${nextVersionNumber}`);
     setCreateChangeRequestDescription("");
