@@ -1867,13 +1867,16 @@ function CanvasContent({
 
     for (const node of state.nodes) {
       if (!multiSelectedNodeIds.has(node.id)) continue;
-      const w = node.measured?.width ?? node.width ?? 240;
-      if (node.position.y < minY) minY = node.position.y;
-      if (node.position.x + w > maxX) maxX = node.position.x + w;
+      const internal = getInternalNode(node.id);
+      const x = internal?.internals.positionAbsolute.x ?? node.position.x;
+      const y = internal?.internals.positionAbsolute.y ?? node.position.y;
+      const w = internal?.measured?.width ?? node.measured?.width ?? node.width ?? 240;
+      if (y < minY) minY = y;
+      if (x + w > maxX) maxX = x + w;
     }
 
     return { x: maxX, y: minY };
-  }, [multiSelectedNodeIds, state.nodes]);
+  }, [multiSelectedNodeIds, state.nodes, getInternalNode]);
 
   useEffect(() => {
     const activeNoteId = getActiveNoteId();
@@ -2759,24 +2762,28 @@ function CanvasContent({
                         pointerEvents: "all",
                       }}
                     >
-                      {onGroupNodes && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-group"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const { bounds, nodePositions } = computeSelectionBounds(multiSelectedNodes);
-                            onGroupNodes(bounds, nodePositions);
-                            setMultiSelectedNodes([]);
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <Group className="h-4 w-4" />
-                        </button>
-                      )}
+                      {onGroupNodes &&
+                        multiSelectedNodes.filter((n) => n.data?.type !== "group" && !n.parentId).length >= 2 && (
+                          <button
+                            type="button"
+                            data-testid="multi-select-group"
+                            onPointerDown={stopCanvasPointerEvent}
+                            onMouseDown={stopCanvasPointerEvent}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const groupable = multiSelectedNodes.filter(
+                                (n) => n.data?.type !== "group" && !n.parentId,
+                              );
+                              const { bounds, nodePositions } = computeSelectionBounds(groupable);
+                              onGroupNodes(bounds, nodePositions);
+                              setMultiSelectedNodes([]);
+                            }}
+                            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                          >
+                            <Group className="h-4 w-4" />
+                          </button>
+                        )}
                       {onAutoLayoutNodes && (
                         <button
                           type="button"
