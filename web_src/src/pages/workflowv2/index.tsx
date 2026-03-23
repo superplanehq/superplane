@@ -122,7 +122,6 @@ import {
   buildComponentDefinition,
   buildExecutionInfo,
   buildQueueItemInfo,
-  clampInRange,
   collectGroupChildIds,
   buildChildToGroupMap,
 } from "./utils";
@@ -260,8 +259,6 @@ function buildGroupWorkflow(
   const GROUP_LABEL_HEIGHT = 72;
   const groupX = Math.round(bounds.x - GROUP_PADDING);
   const groupY = Math.round(bounds.y - GROUP_PADDING - GROUP_LABEL_HEIGHT);
-  const groupWidth = Math.round(bounds.width + GROUP_PADDING * 2);
-  const groupHeight = Math.round(bounds.height + GROUP_PADDING * 2 + GROUP_LABEL_HEIGHT);
 
   const existingNodeNames = specNodes.map((n) => n.name || "");
   const uniqueNodeName = generateUniqueNodeName("group", existingNodeNames);
@@ -276,8 +273,6 @@ function buildGroupWorkflow(
       label: "Group",
       description: "",
       color: "purple",
-      width: groupWidth,
-      height: groupHeight,
       childNodeIds: nodeIds,
     },
     position: { x: groupX, y: groupY },
@@ -5226,29 +5221,16 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
   return nodesBefore;
 }
 
-function buildGroupSizeMap(nodes: CanvasNode[]): Map<string, { w: number; h: number }> {
-  const map = new Map<string, { w: number; h: number }>();
-  for (const n of nodes) {
-    if (n.data?.type === "group" && n.id) {
-      map.set(n.id, { w: n.width ?? 480, h: n.height ?? 320 });
-    }
-  }
-  return map;
-}
-
 function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
   const groupChildMap = buildChildToGroupMap(workflow?.spec?.nodes || []);
-  const groupSizeById = buildGroupSizeMap(nodes);
-  const pad = GROUP_CHILD_EDGE_PADDING;
 
   const wiredNodes = nodes.map((node) => {
     const parentId = groupChildMap.get(node.id);
     if (!parentId) return node;
 
-    const { w: pw, h: ph } = groupSizeById.get(parentId) ?? { w: 480, h: 320 };
-    const x = clampInRange(node.position?.x ?? 0, pad, pw - (node.width ?? 280) - pad);
-    const y = clampInRange(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET, ph - (node.height ?? 100) - pad);
-    return { ...node, parentId, extent: "parent" as const, position: { x, y } };
+    const x = Math.max(node.position?.x ?? 0, GROUP_CHILD_EDGE_PADDING);
+    const y = Math.max(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET);
+    return { ...node, parentId, position: { x, y } };
   });
 
   const groupNodeIds = new Set(wiredNodes.filter((n) => n.data?.type === "group").map((n) => n.id));
@@ -5474,7 +5456,7 @@ function prepareNode(
       return compositeNode;
     case "TYPE_WIDGET":
       if (node.widget?.name === "group") {
-        return prepareGroupNode(node);
+        return prepareGroupNode(node, nodes);
       }
       return prepareAnnotationNode(node);
 
@@ -5533,9 +5515,42 @@ function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
   };
 }
 
-function prepareGroupNode(node: ComponentsNode): CanvasNode {
-  const width = (node.configuration?.width as number) || 480;
-  const height = (node.configuration?.height as number) || 320;
+const DEFAULT_GROUP_WIDTH = 480;
+const DEFAULT_GROUP_HEIGHT = 320;
+const DEFAULT_CHILD_WIDTH = 370;
+const DEFAULT_CHILD_HEIGHT = 220;
+const GROUP_SIZE_PADDING = 30;
+
+function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[]): { width: number; height: number } {
+  const childIds = collectGroupChildIds(groupNode);
+  if (childIds.length === 0) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
+
+  let maxX = 0;
+  let maxY = 0;
+  let found = false;
+
+  for (const childId of childIds) {
+    const child = allNodes.find((n) => n.id === childId);
+    if (!child?.position) continue;
+    found = true;
+    const cx = child.position.x ?? 0;
+    const cy = child.position.y ?? 0;
+    const cw = DEFAULT_CHILD_WIDTH;
+    const ch = DEFAULT_CHILD_HEIGHT;
+    if (cx + cw > maxX) maxX = cx + cw;
+    if (cy + ch > maxY) maxY = cy + ch;
+  }
+
+  if (!found) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
+
+  return {
+    width: Math.max(DEFAULT_GROUP_WIDTH, Math.round(maxX + GROUP_SIZE_PADDING)),
+    height: Math.max(DEFAULT_GROUP_HEIGHT, Math.round(maxY + GROUP_SIZE_PADDING)),
+  };
+}
+
+function prepareGroupNode(node: ComponentsNode, allNodes: ComponentsNode[]): CanvasNode {
+  const { width, height } = computeGroupSize(node, allNodes);
   return {
     id: node.id!,
     type: "group",

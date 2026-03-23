@@ -26,8 +26,14 @@ function normalizeChannel(channel?: string): string {
   return normalizedChannel.length > 0 ? normalizedChannel : "default";
 }
 
+const GROUP_NODE_WIDTH = 480;
+const GROUP_NODE_HEIGHT = 320;
+
 function estimateNodeSize(node: ComponentsNode): { width: number; height: number } {
   if (node.type === "TYPE_WIDGET") {
+    if (node.widget?.name === "group") {
+      return { width: GROUP_NODE_WIDTH, height: GROUP_NODE_HEIGHT };
+    }
     return {
       width: Number(node.configuration?.width) || ANNOTATION_NODE_WIDTH,
       height: Number(node.configuration?.height) || ANNOTATION_NODE_HEIGHT,

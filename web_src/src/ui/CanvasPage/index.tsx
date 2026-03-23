@@ -70,7 +70,6 @@ import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
-import { clampInRange } from "@/pages/workflowv2/utils";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -90,27 +89,8 @@ export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-type InternalNodeLike = { measured?: { width?: number; height?: number } };
-
-function sizeFromNodeOrInternal(
-  id: string,
-  node: CanvasNode,
-  fallback: { w: number; h: number },
-  getInternalNode?: (nodeId: string) => InternalNodeLike | undefined,
-) {
-  const internal = getInternalNode?.(id);
-  const w = internal?.measured?.width ?? node.width ?? node.measured?.width ?? fallback.w;
-  const h = internal?.measured?.height ?? node.height ?? node.measured?.height ?? fallback.h;
-  return { w, h };
-}
-
-function clampGroupChildNodePositionChanges(
-  changes: NodeChange[],
-  nodes: CanvasNode[],
-  getInternalNode?: (nodeId: string) => InternalNodeLike | undefined,
-): NodeChange[] {
+function clampGroupChildNodePositionChanges(changes: NodeChange[], nodes: CanvasNode[]): NodeChange[] {
   const nodesById = new Map(nodes.map((n) => [n.id, n]));
-  const pad = GROUP_CHILD_EDGE_PADDING;
 
   return changes.map((change) => {
     if (change.type !== "position") return change;
@@ -121,16 +101,8 @@ function clampGroupChildNodePositionChanges(
     const parent = nodesById.get(node.parentId);
     if (!parent || (parent.data as { type?: string })?.type !== "group") return change;
 
-    const { w: cw, h: ch } = sizeFromNodeOrInternal(posChange.id, node, { w: 280, h: 80 }, getInternalNode);
-    const { w: pw, h: ph } = sizeFromNodeOrInternal(node.parentId, parent, { w: 480, h: 320 }, getInternalNode);
-
-    const minX = pad;
-    const minY = GROUP_CHILD_MIN_Y_OFFSET;
-    const maxX = pw - cw - pad;
-    const maxY = ph - ch - pad;
-
-    const x = clampInRange(posChange.position.x, minX, maxX);
-    const y = clampInRange(posChange.position.y, minY, maxY);
+    const x = Math.max(posChange.position.x, GROUP_CHILD_EDGE_PADDING);
+    const y = Math.max(posChange.position.y, GROUP_CHILD_MIN_Y_OFFSET);
 
     if (x === posChange.position.x && y === posChange.position.y) return change;
     return {
@@ -2442,7 +2414,7 @@ function CanvasContent({
 
       if (!isReadOnly) {
         const nodes = stateRef.current.nodes ?? [];
-        state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes, getInternalNode));
+        state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes));
         return;
       }
 
@@ -2451,7 +2423,7 @@ function CanvasContent({
         state.onNodesChange(filteredChanges);
       }
     },
-    [isReadOnly, state, getInternalNode],
+    [isReadOnly, state],
   );
 
   const handleEdgesChange = useCallback(

@@ -65,5 +65,18 @@ func (g *Group) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "childNodeIds",
+			Label:       "Child Nodes",
+			Type:        configuration.FieldTypeList,
+			Description: "IDs of nodes contained within this group",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
 	}
 }
