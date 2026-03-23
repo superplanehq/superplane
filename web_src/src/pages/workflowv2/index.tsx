@@ -222,6 +222,20 @@ function expandWorkflowNodeDeletionIds(nodes: ComponentsNode[], seedIds: string[
   return toRemove;
 }
 
+/**
+ * Strips deleted node IDs from surviving group nodes' childNodeIds so the
+ * backend validation in serialization.go doesn't reject stale references.
+ */
+function pruneGroupChildReferences(nodes: ComponentsNode[], removedIds: Set<string>): ComponentsNode[] {
+  return nodes.map((node) => {
+    if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return node;
+    const childIds = collectGroupChildIds(node);
+    const prunedChildIds = childIds.filter((id) => !removedIds.has(id));
+    if (prunedChildIds.length === childIds.length) return node;
+    return { ...node, configuration: { ...node.configuration, childNodeIds: prunedChildIds } };
+  });
+}
+
 function buildUngroupWorkflow(workflow: CanvasesCanvas, groupNodeId: string): CanvasesCanvas | null {
   const specNodes = workflow?.spec?.nodes || [];
   const groupNode = specNodes.find((n) => n.id === groupNodeId);
@@ -3034,7 +3048,8 @@ export function WorkflowPageV2() {
       const specNodes = canvas.spec?.nodes || [];
       const idsToRemove = expandWorkflowNodeDeletionIds(specNodes, [nodeId]);
 
-      const updatedNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+      const survivingNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+      const updatedNodes = pruneGroupChildReferences(survivingNodes, idsToRemove);
 
       const updatedEdges = canvas.spec?.edges?.filter(
         (edge) =>
@@ -3080,7 +3095,8 @@ export function WorkflowPageV2() {
       const specNodes = canvas.spec?.nodes || [];
       const idsToRemove = expandWorkflowNodeDeletionIds(specNodes, nodeIds);
 
-      const updatedNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+      const survivingNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+      const updatedNodes = pruneGroupChildReferences(survivingNodes, idsToRemove);
       const updatedEdges = canvas.spec?.edges?.filter(
         (edge) =>
           (!edge.sourceId || !idsToRemove.has(edge.sourceId)) && (!edge.targetId || !idsToRemove.has(edge.targetId)),
