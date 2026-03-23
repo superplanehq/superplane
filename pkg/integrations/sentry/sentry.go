@@ -38,23 +38,21 @@ var scopeList = []string{
 const (
 	appSetupDescription = `
 - If you already created a Sentry internal integration named ` + "`%s`" + `, close this prompt and paste the **User Token** and **Client Secret** into SuperPlane.
-- Click **Continue** to open Sentry Settings.
-- Go to **Settings > Developer Settings > Custom Integrations**.
-- Create a new **Internal Integration** and configure:
+- Click **Continue** to open the **New Internal Integration** form in Sentry.
+- Fill in:
   - **Integration Name**: ` + "`%s`" + `
   - Leave **Webhook URL** empty — SuperPlane sets this automatically.
-  - **Scopes**: %s
-- Save, then copy the **User Token** and **Client Secret** into SuperPlane.
-- Set **Sentry URL** to your org URL (e.g. ` + "`https://your-org.sentry.io`" + `).
-- Set **Integration Name** to match the name you chose above.
+- Save — Sentry shows the **Client Secret** on the integration page. Copy it.
+- Get your **User Token** from **Settings → Developer Settings → Auth Tokens**.
+- Paste both into SuperPlane along with your org URL (e.g. ` + "`https://your-org.sentry.io`" + `), then click **Save**.
 `
 
 	manualWebhookDescription = `
 - SuperPlane connected to Sentry, but it could not automatically configure the internal integration webhook.
-- In **Settings > Developer Settings > Custom Integrations**, open the internal integration and set:
+- Click **Continue** to open the **Custom Integrations** page in Sentry.
+- Open the ` + "`%s`" + ` integration and set:
   - **Webhook URL**: ` + "`%s`" + `
   - **Webhook Subscriptions**: ` + "`issue`" + `
-- Make sure the integration name in Sentry exactly matches the **Integration Name** configured in SuperPlane.
 - Reason: %s
 `
 )
@@ -142,7 +140,7 @@ SuperPlane connects to Sentry via a **Custom Internal Integration** that you cre
 **Setup steps:**
 1. In Sentry go to **Settings → Developer Settings → Auth Tokens** and create a personal auth token. Copy it — this is your **User Token**.
 2. Go to **Settings → Developer Settings → Custom Integrations** and click **New Internal Integration**.
-3. Set the name (e.g. ` + "`SuperPlane`" + `), leave **Webhook URL** empty, and enable these scopes: ` + "`org:read`, `org:write`, `project:read`, `team:read`, `event:read`, `event:write`" + `.
+3. Set the name (e.g. ` + "`SuperPlane`" + `) and leave **Webhook URL** empty — SuperPlane sets this automatically.
 4. Save — Sentry shows the **Client Secret** on the integration page. Copy it.
 5. In SuperPlane fill in **Sentry URL** (org URL), **Integration Name**, **User Token**, and **Client Secret**, then save.
 6. SuperPlane finds the integration by name, sets the webhook URL on it, and subscribes it to issue events automatically.
@@ -223,9 +221,15 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 	if warning == "" {
 		ctx.Integration.RemoveBrowserAction()
 	} else {
+		metadata := Metadata{}
+		_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+		orgSlug := ""
+		if metadata.Organization != nil {
+			orgSlug = metadata.Organization.Slug
+		}
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: fmt.Sprintf(manualWebhookDescription, eventsURL(ctx), warning),
-			URL:         settingsURL(config.BaseURL),
+			Description: fmt.Sprintf(manualWebhookDescription, displayIntegrationName(config.IntegrationName), eventsURL(ctx), warning),
+			URL:         developerSettingsURL(config.BaseURL, orgSlug),
 			Method:      http.MethodGet,
 		})
 	}
@@ -240,9 +244,8 @@ func (s *Sentry) createSetupPrompt(ctx core.SyncContext, config Configuration) e
 			appSetupDescription,
 			displayIntegrationName(config.IntegrationName),
 			displayIntegrationName(config.IntegrationName),
-			strings.Join(scopeList, ", "),
 		),
-		URL:    settingsURL(config.BaseURL),
+		URL:    newInternalIntegrationURL(config.BaseURL),
 		Method: http.MethodGet,
 	})
 	return nil
@@ -643,8 +646,37 @@ func orgSlugFromBaseURL(baseURL string) string {
 	return ""
 }
 
-func settingsURL(baseURL string) string {
-	return fmt.Sprintf("%s/settings/", normalizeBaseURL(baseURL))
+// sentryUIBaseURL returns the base URL for Sentry's web UI.
+// Org-specific subdomains (e.g. https://your-org.sentry.io) are for data ingest only;
+// settings and developer pages always live on https://sentry.io.
+func sentryUIBaseURL(baseURL string) string {
+	parsed, err := url.Parse(normalizeBaseURL(baseURL))
+	if err != nil {
+		return "https://sentry.io"
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "sentry.io" || strings.HasSuffix(host, ".sentry.io") {
+		return "https://sentry.io"
+	}
+	// Self-hosted Sentry instance — use the provided base URL as-is.
+	return normalizeBaseURL(baseURL)
+}
+
+func developerSettingsURL(baseURL, orgSlug string) string {
+	base := sentryUIBaseURL(baseURL)
+	if orgSlug != "" {
+		return fmt.Sprintf("%s/settings/%s/developer-settings/", base, orgSlug)
+	}
+	return fmt.Sprintf("%s/settings/", base)
+}
+
+func newInternalIntegrationURL(baseURL string) string {
+	orgSlug := orgSlugFromBaseURL(baseURL)
+	base := sentryUIBaseURL(baseURL)
+	if orgSlug != "" {
+		return fmt.Sprintf("%s/settings/%s/developer-settings/new-internal/", base, orgSlug)
+	}
+	return fmt.Sprintf("%s/settings/", base)
 }
 
 func eventsURL(ctx core.SyncContext) string {

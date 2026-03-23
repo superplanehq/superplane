@@ -48,7 +48,7 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "already created a Sentry internal integration")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Integration Name")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "SuperPlane")
-		assert.Contains(t, integrationCtx.BrowserAction.Description, "Custom Integrations")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "New Internal Integration")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "User Token")
 	})
 
@@ -137,7 +137,7 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Equal(t, "ready", integrationCtx.State)
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "multiple custom integrations exist")
-		assert.Equal(t, "https://sentry.io/settings/", integrationCtx.BrowserAction.URL)
+		assert.Equal(t, "https://sentry.io/settings/example/developer-settings/", integrationCtx.BrowserAction.URL)
 	})
 
 	t.Run("valid token and client secret without app visibility -> ready with manual webhook prompt", func(t *testing.T) {
