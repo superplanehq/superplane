@@ -17,6 +17,7 @@ import {
 import {
   CircleX,
   GitBranch,
+  Group,
   Loader2,
   Map as MapIcon,
   ScanLine,
@@ -58,6 +59,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
+import { GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -222,6 +224,12 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
+  onGroupUpdate?: (nodeId: string, updates: { label?: string; color?: string }) => void;
+  onGroupNodes?: (
+    bounds: { x: number; y: number; width: number; height: number },
+    nodePositions: Array<{ id: string; x: number; y: number }>,
+  ) => void;
+  onUngroupNodes?: (groupNodeId: string) => void;
   getCustomField?: (
     nodeId: string,
     onRun?: (initialData?: string) => void,
@@ -338,53 +346,92 @@ const MIN_CANVAS_ZOOM = 0.1;
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
  */
-const nodeTypes = {
-  default: (nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) => {
-    const { _callbacksRef, ...blockData } = nodeProps.data;
-    const callbacks = _callbacksRef?.current;
+function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) {
+  const { _callbacksRef, ...blockData } = nodeProps.data;
+  const callbacks = _callbacksRef?.current;
 
-    if (!callbacks) {
-      return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
-    }
+  if (!callbacks) {
+    return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
+  }
 
-    return (
-      <Block
-        data={blockData}
-        nodeId={nodeProps.id}
+  return (
+    <Block
+      data={blockData}
+      nodeId={nodeProps.id}
+      selected={nodeProps.selected}
+      runDisabled={callbacks?.runDisabled}
+      runDisabledTooltip={callbacks?.runDisabledTooltip}
+      showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
+      onExpand={callbacks.handleNodeExpand}
+      onClick={() => callbacks.handleNodeClick(nodeProps.id)}
+      onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
+      onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
+      onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
+      onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
+      onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
+      onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
+      onTogglePause={
+        callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
+      }
+      onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
+      onToggleCollapse={
+        callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
+      }
+      onAnnotationUpdate={
+        callbacks.onAnnotationUpdate.current
+          ? (nodeId: string, updates: any) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
+          : undefined
+      }
+      onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
+      ai={{
+        show: callbacks.aiState.sidebarOpen,
+        suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
+        onApply: () => callbacks.aiState.onApply(nodeProps.id),
+        onDismiss: () => callbacks.aiState.onDismiss(nodeProps.id),
+      }}
+    />
+  );
+}
+
+function GroupNodeRenderer(nodeProps: {
+  data: BlockData & { _callbacksRef?: any };
+  id: string;
+  selected?: boolean;
+  width?: number;
+  height?: number;
+}) {
+  const { _callbacksRef, ...blockData } = nodeProps.data;
+  const callbacks = _callbacksRef?.current;
+  const groupData = blockData.group || {};
+
+  const handleGroupUpdate = callbacks?.onGroupUpdate?.current
+    ? (updates: any) => callbacks.onGroupUpdate.current?.(nodeProps.id, updates)
+    : undefined;
+
+  const handleUngroup = callbacks?.onUngroupNodes?.current
+    ? () => callbacks.onUngroupNodes.current?.(nodeProps.id)
+    : undefined;
+
+  const handleDelete = callbacks?.onNodeDelete?.current
+    ? () => callbacks.onNodeDelete.current?.(nodeProps.id)
+    : undefined;
+
+  return (
+    <div style={{ width: nodeProps.width, height: nodeProps.height }}>
+      <GroupNode
+        {...groupData}
         selected={nodeProps.selected}
-        runDisabled={callbacks?.runDisabled}
-        runDisabledTooltip={callbacks?.runDisabledTooltip}
-        showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
-        onExpand={callbacks.handleNodeExpand}
-        onClick={() => callbacks.handleNodeClick(nodeProps.id)}
-        onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
-        onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-        onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
-        onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
-        onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
-        onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
-        onTogglePause={
-          callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
-        }
-        onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
-        onToggleCollapse={
-          callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
-        }
-        onAnnotationUpdate={
-          callbacks.onAnnotationUpdate.current
-            ? (nodeId, updates) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
-            : undefined
-        }
-        onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
-        ai={{
-          show: callbacks.aiState.sidebarOpen,
-          suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
-          onApply: () => callbacks.aiState.onApply(nodeProps.id),
-          onDismiss: () => callbacks.aiState.onDismiss(nodeProps.id),
-        }}
+        onGroupUpdate={handleGroupUpdate}
+        onUngroup={handleUngroup}
+        onDelete={handleDelete}
       />
-    );
-  },
+    </div>
+  );
+}
+
+const nodeTypes = {
+  default: DefaultNodeRenderer,
+  group: GroupNodeRenderer,
 };
 
 function CanvasPage(props: CanvasPageProps) {
@@ -983,6 +1030,9 @@ function CanvasPage(props: CanvasPageProps) {
                 onDeactivate={props.onDeactivate}
                 onAnnotationUpdate={props.onAnnotationUpdate}
                 onAnnotationBlur={props.onAnnotationBlur}
+                onGroupUpdate={props.onGroupUpdate}
+                onGroupNodes={props.onGroupNodes}
+                onUngroupNodes={props.onUngroupNodes}
                 onTogglePause={props.onTogglePause}
                 runDisabled={props.runDisabled}
                 runDisabledTooltip={props.runDisabledTooltip}
@@ -1552,6 +1602,9 @@ function CanvasContent({
   onToggleCollapse,
   onAnnotationUpdate,
   onAnnotationBlur,
+  onGroupUpdate,
+  onGroupNodes,
+  onUngroupNodes,
   onBuildingBlockDrop,
   onBuildingBlocksSidebarToggle,
   onConnectionDropInEmptySpace,
@@ -1634,6 +1687,12 @@ function CanvasContent({
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
+  onGroupUpdate?: (nodeId: string, updates: { label?: string; color?: string }) => void;
+  onGroupNodes?: (
+    bounds: { x: number; y: number; width: number; height: number },
+    nodePositions: Array<{ id: string; x: number; y: number }>,
+  ) => void;
+  onUngroupNodes?: (groupNodeId: string) => void;
   onBuildingBlockDrop?: (block: BuildingBlock, position?: { x: number; y: number }) => void;
   onBuildingBlocksSidebarToggle?: (open: boolean) => void;
   onConnectionDropInEmptySpace?: (
@@ -1699,17 +1758,42 @@ function CanvasContent({
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   title?: string;
 }) {
-  const { fitView, screenToFlowPosition, getViewport } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
   const selectionKey = useMemo(() => {
-    // Check if running on Mac to use Meta (Cmd) key, otherwise use Control (Ctrl) key
     const isMac = navigator.platform.toLowerCase().includes("mac");
     return isMac ? "Meta" : "Control";
   }, []);
+
+  const computeSelectionBounds = useCallback(
+    (nodes: CanvasNode[]) => {
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
+      const nodePositions = nodes.map((n) => {
+        const internal = getInternalNode(n.id);
+        const x = internal?.internals.positionAbsolute.x ?? n.position.x;
+        const y = internal?.internals.positionAbsolute.y ?? n.position.y;
+        const w = internal?.measured?.width ?? n.measured?.width ?? n.width ?? 240;
+        const h = internal?.measured?.height ?? n.measured?.height ?? n.height ?? 80;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+        return { id: n.id, x, y };
+      });
+      return {
+        bounds: { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+        nodePositions,
+      };
+    },
+    [getInternalNode],
+  );
 
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
@@ -1812,6 +1896,7 @@ function CanvasContent({
       const clickedNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       const isPendingConnection = clickedNode?.data?.isPendingConnection;
       const isAnnotationNode = clickedNode?.data?.type === "annotation";
+      const isGroupNode = clickedNode?.data?.type === "group";
 
       // Check if this is a placeholder node (persisted, not local-only)
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
@@ -1837,7 +1922,7 @@ function CanvasContent({
         return;
       }
 
-      if (isAnnotationNode) {
+      if (isAnnotationNode || isGroupNode) {
         return;
       }
 
@@ -1921,6 +2006,10 @@ function CanvasContent({
   onAnnotationUpdateRef.current = onAnnotationUpdate;
   const onAnnotationBlurRef = useRef(onAnnotationBlur);
   onAnnotationBlurRef.current = onAnnotationBlur;
+  const onGroupUpdateRef = useRef(onGroupUpdate);
+  onGroupUpdateRef.current = onGroupUpdate;
+  const onUngroupNodesRef = useRef(onUngroupNodes);
+  onUngroupNodesRef.current = onUngroupNodes;
 
   const handleSave = useCallback(() => {
     if (onSave) {
@@ -2126,6 +2215,8 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
+    onGroupUpdate: onGroupUpdateRef,
+    onUngroupNodes: onUngroupNodesRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -2145,6 +2236,8 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
+    onGroupUpdate: onGroupUpdateRef,
+    onUngroupNodes: onUngroupNodesRef,
     aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
@@ -2646,7 +2739,7 @@ function CanvasContent({
             {selectionToolbarFlowPos &&
               !isSelecting &&
               !isReadOnly &&
-              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes) && (
+              (onNodesDelete || onNodeDelete || onAutoLayoutNodes || onDuplicateNodes || onGroupNodes) && (
                 <ViewportPortal>
                   <div
                     style={{
@@ -2666,6 +2759,24 @@ function CanvasContent({
                         pointerEvents: "all",
                       }}
                     >
+                      {onGroupNodes && (
+                        <button
+                          type="button"
+                          data-testid="multi-select-group"
+                          onPointerDown={stopCanvasPointerEvent}
+                          onMouseDown={stopCanvasPointerEvent}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const { bounds, nodePositions } = computeSelectionBounds(multiSelectedNodes);
+                            onGroupNodes(bounds, nodePositions);
+                            setMultiSelectedNodes([]);
+                          }}
+                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        >
+                          <Group className="h-4 w-4" />
+                        </button>
+                      )}
                       {onAutoLayoutNodes && (
                         <button
                           type="button"

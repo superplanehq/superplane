@@ -2467,6 +2467,60 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleGroupUpdate = useCallback(
+    (nodeId: string, updates: { label?: string; color?: string }) => {
+      if (!canvas || !organizationId || !canvasId) return;
+      if (Object.keys(updates).length === 0) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
+          return node;
+        }
+
+        return {
+          ...node,
+          configuration: {
+            ...node.configuration,
+            ...updates,
+          },
+        };
+      });
+
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
+        pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
+        debouncedAnnotationAutoSave();
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      debouncedAnnotationAutoSave,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
   const handleNodeAdd = useCallback(
     async (newNodeData: NewNodeData): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
@@ -2975,6 +3029,154 @@ export function WorkflowPageV2() {
       canvas,
       components,
       blueprints,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleGroupNodes = useCallback(
+    async (
+      bounds: { x: number; y: number; width: number; height: number },
+      nodePositions: Array<{ id: string; x: number; y: number }>,
+    ) => {
+      if (!canvas || !organizationId || !canvasId) return;
+      if (nodePositions.length < 2) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      const specNodes = latestWorkflow?.spec?.nodes || [];
+      const nodeIds = nodePositions.map((n) => n.id);
+
+      const GROUP_PADDING = 40;
+      const GROUP_LABEL_HEIGHT = 28;
+
+      const groupX = Math.round(bounds.x - GROUP_PADDING);
+      const groupY = Math.round(bounds.y - GROUP_PADDING - GROUP_LABEL_HEIGHT);
+      const groupWidth = Math.round(bounds.width + GROUP_PADDING * 2);
+      const groupHeight = Math.round(bounds.height + GROUP_PADDING * 2 + GROUP_LABEL_HEIGHT);
+
+      const existingNodeNames = specNodes.map((n) => n.name || "");
+      const uniqueNodeName = generateUniqueNodeName("group", existingNodeNames);
+      const newGroupId = generateNodeId("group", uniqueNodeName);
+
+      const groupNode: ComponentsNode = {
+        id: newGroupId,
+        name: uniqueNodeName,
+        type: "TYPE_WIDGET",
+        widget: { name: "group" },
+        configuration: {
+          label: "Group",
+          color: "gray",
+          width: groupWidth,
+          height: groupHeight,
+          childNodeIds: nodeIds,
+        },
+        position: { x: groupX, y: groupY },
+      };
+
+      const absolutePositionMap = new Map(nodePositions.map((n) => [n.id, { x: n.x, y: n.y }]));
+
+      const updatedNodes = specNodes.map((node) => {
+        if (node.id && nodeIds.includes(node.id)) {
+          const absPos = absolutePositionMap.get(node.id)!;
+          return {
+            ...node,
+            position: {
+              x: Math.round(absPos.x - groupX),
+              y: Math.round(absPos.y - groupY),
+            },
+          };
+        }
+        return node;
+      });
+
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: [groupNode, ...updatedNodes],
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
+  );
+
+  const handleUngroupNodes = useCallback(
+    async (groupNodeId: string) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      saveWorkflowSnapshot(canvas);
+
+      const latestWorkflow =
+        queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) || canvas;
+
+      const specNodes = latestWorkflow?.spec?.nodes || [];
+      const groupNode = specNodes.find((n) => n.id === groupNodeId);
+      if (!groupNode) return;
+
+      const childNodeIds = (groupNode.configuration?.childNodeIds as string[]) || [];
+      const groupX = groupNode.position?.x || 0;
+      const groupY = groupNode.position?.y || 0;
+
+      // Convert child positions back to absolute and remove the group node
+      const updatedNodes = specNodes
+        .filter((node) => node.id !== groupNodeId)
+        .map((node) => {
+          if (node.id && childNodeIds.includes(node.id)) {
+            return {
+              ...node,
+              position: {
+                x: Math.round((node.position?.x || 0) + groupX),
+                y: Math.round((node.position?.y || 0) + groupY),
+              },
+            };
+          }
+          return node;
+        });
+
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
       organizationId,
       canvasId,
       queryClient,
@@ -4730,6 +4932,9 @@ export function WorkflowPageV2() {
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
+          onGroupUpdate={!isReadOnly ? handleGroupUpdate : undefined}
+          onGroupNodes={!isReadOnly ? handleGroupNodes : undefined}
+          onUngroupNodes={!isReadOnly ? handleUngroupNodes : undefined}
           onSave={isTemplate ? undefined : handleSave}
           onEdgeCreate={!isReadOnly ? handleEdgeCreate : undefined}
           onNodeDelete={!isReadOnly ? handleNodeDelete : undefined}
@@ -5036,7 +5241,33 @@ function prepareData(
         dragHandle: ".canvas-node-drag-handle",
       })) || [];
 
-  return { nodes, edges };
+  // Wire parent-child relationships for group nodes
+  const groupChildMap = new Map<string, string>();
+  for (const specNode of workflow?.spec?.nodes || []) {
+    if (specNode.type === "TYPE_WIDGET" && specNode.widget?.name === "group" && specNode.id) {
+      const childIds = (specNode.configuration?.childNodeIds as string[]) || [];
+      for (const childId of childIds) {
+        groupChildMap.set(childId, specNode.id);
+      }
+    }
+  }
+
+  const wiredNodes = nodes.map((node) => {
+    const parentId = groupChildMap.get(node.id);
+    if (parentId) {
+      return { ...node, parentId, extent: "parent" as const };
+    }
+    return node;
+  });
+
+  // React Flow requires parent nodes to appear before their children
+  const groupNodeIds = new Set(wiredNodes.filter((n) => n.data?.type === "group").map((n) => n.id));
+  const sortedNodes = [
+    ...wiredNodes.filter((n) => groupNodeIds.has(n.id)),
+    ...wiredNodes.filter((n) => !groupNodeIds.has(n.id)),
+  ];
+
+  return { nodes: sortedNodes, edges };
 }
 
 function prepareTriggerNode(
@@ -5211,7 +5442,9 @@ function prepareNode(
 
       return compositeNode;
     case "TYPE_WIDGET":
-      // support other widgets if necessary
+      if (node.widget?.name === "group") {
+        return prepareGroupNode(node);
+      }
       return prepareAnnotationNode(node);
 
     default:
@@ -5242,13 +5475,37 @@ function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
       type: "annotation",
       label: node.name || "Annotation",
       state: "pending" as const,
-      outputChannels: [], // Annotation nodes don't have output channels
+      outputChannels: [],
       annotation: {
         title: node.name || "Annotation",
         annotationText: node.configuration?.text || "",
         annotationColor: node.configuration?.color || "yellow",
         width,
         height,
+      },
+    },
+  };
+}
+
+function prepareGroupNode(node: ComponentsNode): CanvasNode {
+  const width = (node.configuration?.width as number) || 480;
+  const height = (node.configuration?.height as number) || 320;
+  return {
+    id: node.id!,
+    type: "group",
+    position: { x: node.position?.x!, y: node.position?.y! },
+    selectable: true,
+    width,
+    height,
+    style: { width, height, zIndex: -1 },
+    data: {
+      type: "group",
+      label: node.name || "Group",
+      state: "pending" as const,
+      outputChannels: [],
+      group: {
+        groupLabel: (node.configuration?.label as string) || node.name || "Group",
+        groupColor: (node.configuration?.color as string) || "gray",
       },
     },
   };
