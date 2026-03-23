@@ -26,6 +26,7 @@ import {
   canvasesEmitNodeEvent,
   canvasesUpdateNodePause,
   OrganizationsIntegration,
+  IntegrationsIntegrationDefinition,
 } from "@/api-client";
 import {
   useOrganization,
@@ -39,7 +40,7 @@ import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { useMe } from "@/hooks/useMe";
-import { useAvailableIntegrations, useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import {
   eventExecutionsQueryOptions,
   useCreateCanvas,
@@ -73,6 +74,7 @@ import {
   NewNodeData,
   NodeEditData,
   SidebarData,
+  type MissingIntegration,
 } from "@/ui/CanvasPage";
 import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -95,6 +97,7 @@ import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
@@ -307,6 +310,29 @@ function buildGroupWorkflow(
 }
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
+
+/**
+ * Resolves the integration type name for a canvas node by matching its
+ * component or trigger against the catalog of available integrations.
+ */
+function getNodeIntegrationName(
+  node: ComponentsNode,
+  availableIntegrations: IntegrationsIntegrationDefinition[],
+): string | undefined {
+  if (node.type === "TYPE_COMPONENT") {
+    const match = availableIntegrations.find((integration) =>
+      integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
+    );
+    return match?.name;
+  }
+  if (node.type === "TYPE_TRIGGER") {
+    const match = availableIntegrations.find((integration) =>
+      integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
+    );
+    return match?.name;
+  }
+  return undefined;
+}
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
@@ -2291,27 +2317,13 @@ export function WorkflowPageV2() {
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
         blockName = node.component?.name;
-
-        // Check if this component is from an integration
-        const componentIntegration = availableIntegrations.find((integration) =>
-          integration.components?.some((c: ComponentsComponent) => c.name === node.component?.name),
-        );
-        if (componentIntegration) {
-          integrationName = componentIntegration.name;
-        }
+        integrationName = getNodeIntegrationName(node, availableIntegrations);
       } else if (node.type === "TYPE_TRIGGER") {
         const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
         blockName = node.trigger?.name;
-
-        // Check if this trigger is from an application
-        const triggerIntegration = availableIntegrations.find((integration) =>
-          integration.triggers?.some((t: TriggersTrigger) => t.name === node.trigger?.name),
-        );
-        if (triggerIntegration) {
-          integrationName = triggerIntegration.name;
-        }
+        integrationName = getNodeIntegrationName(node, availableIntegrations);
       } else if (node.type === "TYPE_WIDGET") {
         const widget = widgets.find((w) => w.name === node.widget?.name);
         if (widget) {
@@ -2346,6 +2358,105 @@ export function WorkflowPageV2() {
       };
     },
     [canvas, blueprints, allComponents, allTriggers, availableIntegrations, widgets],
+  );
+
+  const createIntegrationMutation = useCreateIntegration(organizationId ?? "");
+  const [integrationDialogName, setIntegrationDialogName] = useState<string | null>(null);
+  const [justConnectedIntegrations, setJustConnectedIntegrations] = useState<Set<string>>(new Set());
+
+  const integrationDialogDefinition = useMemo(
+    () => (integrationDialogName ? availableIntegrations.find((d) => d.name === integrationDialogName) : undefined),
+    [availableIntegrations, integrationDialogName],
+  );
+
+  const missingIntegrations: MissingIntegration[] = useMemo(() => {
+    if (!canvas?.spec?.nodes || !canReadIntegrations) return [];
+
+    const missingMap = new Map<string, { count: number; definition?: (typeof availableIntegrations)[0] }>();
+
+    for (const node of canvas.spec.nodes) {
+      const integrationName = getNodeIntegrationName(node, availableIntegrations);
+      if (!integrationName) continue;
+
+      const hasConnectedInstance = integrations.some((i) => i.spec?.integrationName === integrationName);
+      if (hasConnectedInstance) continue;
+
+      const existing = missingMap.get(integrationName);
+      if (existing) {
+        existing.count++;
+      } else {
+        missingMap.set(integrationName, {
+          count: 1,
+          definition: availableIntegrations.find((d) => d.name === integrationName),
+        });
+      }
+    }
+
+    return Array.from(missingMap.entries()).map(([name, { count, definition }]) => ({
+      integrationName: name,
+      affectedNodeCount: count,
+      definition,
+      justConnected: justConnectedIntegrations.has(name),
+    }));
+  }, [canvas?.spec?.nodes, availableIntegrations, integrations, canReadIntegrations, justConnectedIntegrations]);
+
+  const handleConnectIntegration = useCallback((integrationName: string) => {
+    setIntegrationDialogName(integrationName);
+  }, []);
+
+  const handleIntegrationCreated = useCallback(
+    async (integrationId: string) => {
+      if (!canvas || !organizationId || !canvasId || !integrationDialogName) return;
+
+      setJustConnectedIntegrations((prev) => new Set(prev).add(integrationDialogName));
+      setTimeout(() => {
+        setJustConnectedIntegrations((prev) => {
+          const next = new Set(prev);
+          next.delete(integrationDialogName);
+          return next;
+        });
+      }, 2000);
+
+      saveWorkflowSnapshot(canvas);
+
+      const integrationRef: ComponentsIntegrationRef = {
+        id: integrationId,
+        name: integrationDialogName,
+      };
+
+      const updatedNodes = canvas.spec?.nodes?.map((node) => {
+        const nodeIntegrationName = getNodeIntegrationName(node, availableIntegrations);
+        if (nodeIntegrationName === integrationDialogName && !node.integration?.id) {
+          return { ...node, integration: integrationRef };
+        }
+        return node;
+      });
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: { ...canvas.spec, nodes: updatedNodes },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+
+      if (canAutoSave) {
+        await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+      } else {
+        markUnsavedChange("structural");
+      }
+    },
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      integrationDialogName,
+      availableIntegrations,
+      queryClient,
+      saveWorkflowSnapshot,
+      handleSaveWorkflow,
+      canAutoSave,
+      markUnsavedChange,
+    ],
   );
 
   const handleNodeConfigurationSave = useCallback(
@@ -5018,6 +5129,8 @@ export function WorkflowPageV2() {
           canReadIntegrations={canReadIntegrations}
           canCreateIntegrations={canCreateIntegrations}
           canUpdateIntegrations={canUpdateIntegrations}
+          missingIntegrations={missingIntegrations}
+          onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly}
           hasFitToViewRef={hasFitToViewRef}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
@@ -5144,6 +5257,19 @@ export function WorkflowPageV2() {
             navigate(`/${organizationId}`, { replace: true });
           }
         }}
+      />
+      <IntegrationCreateDialog
+        open={!!integrationDialogName}
+        onOpenChange={(open) => !open && setIntegrationDialogName(null)}
+        integrationDefinition={integrationDialogDefinition ?? null}
+        organizationId={organizationId ?? ""}
+        onCreateIntegration={async (payload) => {
+          const res = await createIntegrationMutation.mutateAsync(payload);
+          return res.data;
+        }}
+        onReset={() => createIntegrationMutation.reset()}
+        defaultName={integrationDialogDefinition?.name ?? ""}
+        onCreated={(integrationId) => void handleIntegrationCreated(integrationId)}
       />
     </>
   );
