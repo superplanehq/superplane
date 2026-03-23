@@ -59,7 +59,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
-import { GroupNode } from "../groupNode";
+import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -86,6 +86,61 @@ export interface SidebarData {
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
+}
+
+type InternalNodeLike = { measured?: { width?: number; height?: number } };
+
+function sizeFromNodeOrInternal(
+  id: string,
+  node: CanvasNode,
+  fallback: { w: number; h: number },
+  getInternalNode?: (nodeId: string) => InternalNodeLike | undefined,
+) {
+  const internal = getInternalNode?.(id);
+  const w = internal?.measured?.width ?? node.width ?? node.measured?.width ?? fallback.w;
+  const h = internal?.measured?.height ?? node.height ?? node.measured?.height ?? fallback.h;
+  return { w, h };
+}
+
+function clampInRange(value: number, min: number, max: number) {
+  if (max < min) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function clampGroupChildNodePositionChanges(
+  changes: NodeChange[],
+  nodes: CanvasNode[],
+  getInternalNode?: (nodeId: string) => InternalNodeLike | undefined,
+): NodeChange[] {
+  const nodesById = new Map(nodes.map((n) => [n.id, n]));
+  const pad = GROUP_CHILD_EDGE_PADDING;
+
+  return changes.map((change) => {
+    if (change.type !== "position") return change;
+    const posChange = change as { id: string; type: "position"; position?: { x: number; y: number } };
+    if (!posChange.position) return change;
+    const node = nodesById.get(posChange.id);
+    if (!node?.parentId) return change;
+    const parent = nodesById.get(node.parentId);
+    if (!parent || (parent.data as { type?: string })?.type !== "group") return change;
+
+    const { w: cw, h: ch } = sizeFromNodeOrInternal(posChange.id, node, { w: 280, h: 80 }, getInternalNode);
+    const { w: pw, h: ph } = sizeFromNodeOrInternal(node.parentId, parent, { w: 480, h: 320 }, getInternalNode);
+
+    const minX = pad;
+    const minY = GROUP_CHILD_MIN_Y_OFFSET;
+    const maxX = pw - cw - pad;
+    const maxY = ph - ch - pad;
+
+    const x = clampInRange(posChange.position.x, minX, maxX);
+    const y = clampInRange(posChange.position.y, minY, maxY);
+
+    if (x === posChange.position.x && y === posChange.position.y) return change;
+    return {
+      ...posChange,
+      position: { ...posChange.position, x, y },
+    };
+  });
 }
 
 export interface CanvasEdge extends ReactFlowEdge {
@@ -224,7 +279,7 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onGroupUpdate?: (nodeId: string, updates: { label?: string; color?: string }) => void;
+  onGroupUpdate?: (nodeId: string, updates: { label?: string; description?: string; color?: string }) => void;
   onGroupNodes?: (
     bounds: { x: number; y: number; width: number; height: number },
     nodePositions: Array<{ id: string; x: number; y: number }>,
@@ -1687,7 +1742,7 @@ function CanvasContent({
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onGroupUpdate?: (nodeId: string, updates: { label?: string; color?: string }) => void;
+  onGroupUpdate?: (nodeId: string, updates: { label?: string; description?: string; color?: string }) => void;
   onGroupNodes?: (
     bounds: { x: number; y: number; width: number; height: number },
     nodePositions: Array<{ id: string; x: number; y: number }>,
@@ -2371,7 +2426,8 @@ function CanvasContent({
       }
 
       if (!isReadOnly) {
-        state.onNodesChange(changes);
+        const nodes = stateRef.current.nodes ?? [];
+        state.onNodesChange(clampGroupChildNodePositionChanges(changes, nodes, getInternalNode));
         return;
       }
 
@@ -2380,7 +2436,7 @@ function CanvasContent({
         state.onNodesChange(filteredChanges);
       }
     },
-    [isReadOnly, state],
+    [isReadOnly, state, getInternalNode],
   );
 
   const handleEdgesChange = useCallback(

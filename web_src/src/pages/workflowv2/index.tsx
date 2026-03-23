@@ -77,6 +77,7 @@ import {
 import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
+import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
@@ -192,6 +193,35 @@ function resolveApiErrorMessage(error: unknown, fallback: string): string {
   const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
   const runtimeMessage = (error as { message?: string })?.message;
   return responseMessage || runtimeMessage || fallback;
+}
+
+/** Deleting a group widget must also remove its child nodes from the spec. */
+function expandWorkflowNodeDeletionIds(nodes: ComponentsNode[], seedIds: string[]): Set<string> {
+  const byId = new Map<string, ComponentsNode>();
+  for (const node of nodes) {
+    if (node.id) {
+      byId.set(node.id, node);
+    }
+  }
+
+  const toRemove = new Set<string>(seedIds.filter((id) => id.length > 0));
+  let added = true;
+  while (added) {
+    added = false;
+    for (const id of [...toRemove]) {
+      const node = byId.get(id);
+      if (node?.type === "TYPE_WIDGET" && node.widget?.name === "group") {
+        for (const childId of (node.configuration?.childNodeIds as string[]) || []) {
+          if (!toRemove.has(childId)) {
+            toRemove.add(childId);
+            added = true;
+          }
+        }
+      }
+    }
+  }
+
+  return toRemove;
 }
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
@@ -2468,7 +2498,7 @@ export function WorkflowPageV2() {
   );
 
   const handleGroupUpdate = useCallback(
-    (nodeId: string, updates: { label?: string; color?: string }) => {
+    (nodeId: string, updates: { label?: string; description?: string; color?: string }) => {
       if (!canvas || !organizationId || !canvasId) return;
       if (Object.keys(updates).length === 0) return;
 
@@ -2928,11 +2958,15 @@ export function WorkflowPageV2() {
       // Save snapshot before making changes
       saveWorkflowSnapshot(canvas);
 
-      // Remove the node from the workflow
-      const updatedNodes = canvas.spec?.nodes?.filter((node) => node.id !== nodeId);
+      const specNodes = canvas.spec?.nodes || [];
+      const idsToRemove = expandWorkflowNodeDeletionIds(specNodes, [nodeId]);
 
-      // Remove any edges connected to this node
-      const updatedEdges = canvas.spec?.edges?.filter((edge) => edge.sourceId !== nodeId && edge.targetId !== nodeId);
+      const updatedNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
+
+      const updatedEdges = canvas.spec?.edges?.filter(
+        (edge) =>
+          (!edge.sourceId || !idsToRemove.has(edge.sourceId)) && (!edge.targetId || !idsToRemove.has(edge.targetId)),
+      );
 
       const updatedWorkflow = {
         ...canvas,
@@ -2970,10 +3004,13 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(canvas);
 
-      const nodeIdSet = new Set(nodeIds);
-      const updatedNodes = canvas.spec?.nodes?.filter((node) => !nodeIdSet.has(node.id!));
+      const specNodes = canvas.spec?.nodes || [];
+      const idsToRemove = expandWorkflowNodeDeletionIds(specNodes, nodeIds);
+
+      const updatedNodes = specNodes.filter((node) => !node.id || !idsToRemove.has(node.id));
       const updatedEdges = canvas.spec?.edges?.filter(
-        (edge) => !nodeIdSet.has(edge.sourceId!) && !nodeIdSet.has(edge.targetId!),
+        (edge) =>
+          (!edge.sourceId || !idsToRemove.has(edge.sourceId)) && (!edge.targetId || !idsToRemove.has(edge.targetId)),
       );
 
       const updatedWorkflow = {
@@ -3056,7 +3093,7 @@ export function WorkflowPageV2() {
       const nodeIds = nodePositions.map((n) => n.id);
 
       const GROUP_PADDING = 40;
-      const GROUP_LABEL_HEIGHT = 28;
+      const GROUP_LABEL_HEIGHT = 72;
 
       const groupX = Math.round(bounds.x - GROUP_PADDING);
       const groupY = Math.round(bounds.y - GROUP_PADDING - GROUP_LABEL_HEIGHT);
@@ -3074,7 +3111,8 @@ export function WorkflowPageV2() {
         widget: { name: "group" },
         configuration: {
           label: "Group",
-          color: "gray",
+          description: "",
+          color: "purple",
           width: groupWidth,
           height: groupHeight,
           childNodeIds: nodeIds,
@@ -5252,10 +5290,38 @@ function prepareData(
     }
   }
 
+  const groupSizeById = new Map<string, { w: number; h: number }>();
+  for (const n of nodes) {
+    if (n.data?.type === "group" && n.id) {
+      groupSizeById.set(n.id, {
+        w: n.width ?? 480,
+        h: n.height ?? 320,
+      });
+    }
+  }
+
+  const pad = GROUP_CHILD_EDGE_PADDING;
+
   const wiredNodes = nodes.map((node) => {
     const parentId = groupChildMap.get(node.id);
     if (parentId) {
-      return { ...node, parentId, extent: "parent" as const };
+      const { w: pw, h: ph } = groupSizeById.get(parentId) ?? { w: 480, h: 320 };
+      const cw = node.width ?? 280;
+      const ch = node.height ?? 100;
+      const minX = pad;
+      const minY = GROUP_CHILD_MIN_Y_OFFSET;
+      const maxX = pw - cw - pad;
+      const maxY = ph - ch - pad;
+      let x = node.position?.x ?? 0;
+      let y = node.position?.y ?? 0;
+      x = maxX >= minX ? Math.min(Math.max(x, minX), maxX) : minX;
+      y = maxY >= minY ? Math.min(Math.max(y, minY), maxY) : minY;
+      return {
+        ...node,
+        parentId,
+        extent: "parent" as const,
+        position: { x, y },
+      };
     }
     return node;
   });
@@ -5505,7 +5571,8 @@ function prepareGroupNode(node: ComponentsNode): CanvasNode {
       outputChannels: [],
       group: {
         groupLabel: (node.configuration?.label as string) || node.name || "Group",
-        groupColor: (node.configuration?.color as string) || "gray",
+        groupDescription: (node.configuration?.description as string) || "",
+        groupColor: normalizeGroupColor(node.configuration?.color as string),
       },
     },
   };
