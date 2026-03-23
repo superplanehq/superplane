@@ -10,6 +10,7 @@ from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 
 from evals.evaluators import WorkflowShape
+from evals.report import ReportBuilder
 
 dataset = Dataset(
     cases=[
@@ -67,7 +68,7 @@ async def runner() -> None:
         return result.output
 
     report = await dataset.evaluate(task, progress=True)
-    report.print(include_output=True, include_input=True, include_reasons=True)
+    ReportBuilder(report).render()
 
 def main() -> None:
     asyncio.run(runner())
