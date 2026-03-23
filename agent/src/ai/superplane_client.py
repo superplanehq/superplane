@@ -319,15 +319,6 @@ class SuperplaneClient:
             "trigger_count": len(triggers),
         }
 
-    @staticmethod
-    def _serialize_canvas_memory(memory: CanvasesCanvasMemory) -> dict[str, Any]:
-        values = memory.values if isinstance(memory.values, dict) else {}
-        return {
-            "id": memory.id,
-            "namespace": memory.namespace,
-            "values": values,
-        }
-
     def _list_available_integrations_raw(self) -> list[Any]:
         response = self._api_request(
             lambda: self._integration_api.integrations_list_integrations(
@@ -457,52 +448,6 @@ class SuperplaneClient:
             for integration in integrations
             if integration is not None
         ]
-
-    def list_canvas_memories(
-        self,
-        canvas_id: str,
-        namespace: str | None = None,
-        query: str | None = None,
-        limit: int | None = 20,
-    ) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
-            lambda: self._canvas_api.canvases_list_canvas_memories(
-                canvas_id,
-                _request_timeout=self._config.timeout_seconds,
-            ),
-            operation="canvases_list_canvas_memories",
-        )
-        if not isinstance(response, CanvasesListCanvasMemoriesResponse):
-            return []
-
-        namespace_filter = namespace.strip().lower() if isinstance(namespace, str) and namespace.strip() else None
-        query_filter = query.strip().lower() if isinstance(query, str) and query.strip() else None
-        records = response.items if isinstance(response.items, list) else []
-        output: list[dict[str, Any]] = []
-
-        for record in records:
-            if not isinstance(record, CanvasesCanvasMemory):
-                continue
-
-            record_namespace = (
-                record.namespace.strip().lower()
-                if isinstance(record.namespace, str) and record.namespace.strip()
-                else None
-            )
-            if namespace_filter and record_namespace != namespace_filter:
-                continue
-
-            serialized = self._serialize_canvas_memory(record)
-            if query_filter:
-                haystack = f"{serialized.get('namespace', '')} {serialized.get('values', '')}".lower()
-                if query_filter not in haystack:
-                    continue
-
-            output.append(serialized)
-            if isinstance(limit, int) and limit > 0 and len(output) >= limit:
-                break
-
-        return output
 
     def describe_trigger(self, name: str) -> dict[str, Any]:
         response = self._api_request(

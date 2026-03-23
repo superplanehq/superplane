@@ -42,9 +42,7 @@ dataset = Dataset(
         Case(
             name="ephemeral_pr_preview_machines",
             inputs=(
-                "Build a workflow that creates ephemeral preview machines for backend pull requests. "
-                "On PR open, create infra and post the preview URL to the PR; on PR close or after 48 hours, "
-                "tear it down and avoid zombie environments."
+                "Build a workflow that creates ephemeral preview machines for backend pull requests. On PR open, create infra and post the preview URL to the PR; on PR close or after 48 hours, tear it down and avoid zombie environments."
             ),
             evaluators=[EphemeralMachineWorkflow()],
         ),
