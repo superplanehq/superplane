@@ -40,8 +40,26 @@ dataset = Dataset(
             inputs="Build a workflow that creates ephemeral preview machines for pull requests. On PR open, create infra and post the preview URL to the PR. On PR close or after 48 hours, tear it down.",
             evaluators=[
                 WorkflowShape(
-                  nodes=["github.onPullRequest", "http.request", "memory.upsert", "schedule.delay", "memory.read", "http.request"],
-                  edges=[("github.onPullRequest", "http.request"), ("http.request", "memory.upsert"), ("memory.upsert", "schedule.delay"), ("schedule.delay", "memory.read"), ("memory.read", "http.request")],
+                  nodes=[
+                      "github.onPullRequest",
+                      "daytona.createSandbox",
+                      "memory.upsert",
+                      "github.createIssueComment",
+                      "wait",
+                      "daytona.deleteSandbox",
+                      "github.onPullRequest",
+                      "memory.read",
+                      "daytona.deleteSandbox",
+                  ],
+                  edges=[
+                      ("github.onPullRequest", "daytona.createSandbox"),
+                      ("daytona.createSandbox", "memory.upsert"),
+                      ("memory.upsert", "github.createIssueComment"),
+                      ("github.createIssueComment", "wait"),
+                      ("wait", "daytona.deleteSandbox"),
+                      ("github.onPullRequest", "memory.read"),
+                      ("memory.read", "daytona.deleteSandbox"),
+                  ],
                 )
             ],
         ),
