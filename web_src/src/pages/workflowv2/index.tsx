@@ -335,6 +335,51 @@ function getNodeIntegrationName(
   return undefined;
 }
 
+function overlayIntegrationWarnings(
+  nodes: CanvasNode[],
+  integrations: OrganizationsIntegration[],
+  canvasNodes: ComponentsNode[] | undefined,
+): CanvasNode[] {
+  if (!integrations.length || !canvasNodes) return nodes;
+
+  const nonReadyIntegrations = new Map<string, { state?: string; description?: string }>();
+  for (const integration of integrations) {
+    if (integration.metadata?.id && integration.status?.state !== "ready") {
+      nonReadyIntegrations.set(integration.metadata.id, {
+        state: integration.status?.state,
+        description: integration.status?.stateDescription,
+      });
+    }
+  }
+  if (nonReadyIntegrations.size === 0) return nodes;
+
+  const canvasNodeMap = new Map(canvasNodes.map((n) => [n.id, n]));
+  return nodes.map((canvasNode) => {
+    const sourceNode = canvasNodeMap.get(canvasNode.id);
+    const integrationId = sourceNode?.integration?.id;
+    if (!integrationId) return canvasNode;
+    const status = nonReadyIntegrations.get(integrationId);
+    if (!status) return canvasNode;
+
+    const data = canvasNode.data as Record<string, unknown>;
+    const warningMsg =
+      status.state === "error"
+        ? `Integration error${status.description ? `: ${status.description}` : ""}`
+        : `Integration is ${status.state ?? "not ready"}`;
+
+    const component = data.component as Record<string, unknown> | undefined;
+    const trigger = data.trigger as Record<string, unknown> | undefined;
+
+    if (component && !component.error) {
+      return { ...canvasNode, data: { ...data, component: { ...component, error: warningMsg } } };
+    }
+    if (trigger && !trigger.error) {
+      return { ...canvasNode, data: { ...data, trigger: { ...trigger, error: warningMsg } } };
+    }
+    return canvasNode;
+  });
+}
+
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
@@ -1487,46 +1532,10 @@ export function WorkflowPageV2() {
     account,
   ]);
 
-  const nodesWithIntegrationStatus = useMemo(() => {
-    if (!integrations.length || !canvas?.spec?.nodes) return preparedNodes;
-
-    const nonReadyIntegrations = new Map<string, { state?: string; description?: string }>();
-    for (const integration of integrations) {
-      if (integration.metadata?.id && integration.status?.state !== "ready") {
-        nonReadyIntegrations.set(integration.metadata.id, {
-          state: integration.status?.state,
-          description: integration.status?.stateDescription,
-        });
-      }
-    }
-    if (nonReadyIntegrations.size === 0) return preparedNodes;
-
-    const canvasNodeMap = new Map(canvas.spec.nodes.map((n) => [n.id, n]));
-    return preparedNodes.map((canvasNode) => {
-      const sourceNode = canvasNodeMap.get(canvasNode.id);
-      const integrationId = sourceNode?.integration?.id;
-      if (!integrationId) return canvasNode;
-      const status = nonReadyIntegrations.get(integrationId);
-      if (!status) return canvasNode;
-
-      const data = canvasNode.data as Record<string, unknown>;
-      const warningMsg =
-        status.state === "error"
-          ? `Integration error${status.description ? `: ${status.description}` : ""}`
-          : `Integration is ${status.state ?? "not ready"}`;
-
-      const component = data.component as Record<string, unknown> | undefined;
-      const trigger = data.trigger as Record<string, unknown> | undefined;
-
-      if (component && !component.error) {
-        return { ...canvasNode, data: { ...data, component: { ...component, error: warningMsg } } };
-      }
-      if (trigger && !trigger.error) {
-        return { ...canvasNode, data: { ...data, trigger: { ...trigger, error: warningMsg } } };
-      }
-      return canvasNode;
-    });
-  }, [preparedNodes, integrations, canvas?.spec?.nodes]);
+  const nodesWithIntegrationStatus = useMemo(
+    () => overlayIntegrationWarnings(preparedNodes, integrations, canvas?.spec?.nodes),
+    [preparedNodes, integrations, canvas?.spec?.nodes],
+  );
 
   const nodes = nodesWithIntegrationStatus;
 
