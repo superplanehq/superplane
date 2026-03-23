@@ -373,84 +373,59 @@ export function WorkflowPageV2() {
     });
     return profilesByID;
   }, [organizationUsers]);
+
+  const buildApprovalVersionRows = useCallback(
+    (
+      statusSubstring: string,
+    ): Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }> => {
+      const filteredChangeRequests = canvasChangeRequests
+        .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes(statusSubstring))
+        .sort(
+          (left, right) =>
+            versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
+            versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
+        );
+
+      const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
+      visibleCanvasVersions.forEach((version) => {
+        const id = version.metadata?.id;
+        if (!id) {
+          return;
+        }
+        indexedVisibleVersions.set(id, version);
+      });
+
+      const seenVersionIds = new Set<string>();
+      const rows: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }> = [];
+
+      filteredChangeRequests.forEach((changeRequest) => {
+        const versionFromRequest = changeRequest.version;
+        const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
+        const resolvedVersion =
+          versionFromRequest?.metadata?.id || versionFromRequest?.spec
+            ? versionFromRequest
+            : indexedVisibleVersions.get(versionId);
+
+        const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
+        if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
+          return;
+        }
+
+        seenVersionIds.add(resolvedVersionId);
+        rows.push({ version: resolvedVersion, changeRequest });
+      });
+
+      return rows;
+    },
+    [canvasChangeRequests, visibleCanvasVersions],
+  );
+
   const pendingApprovalVersions = useMemo(() => {
-    const openChangeRequests = canvasChangeRequests
-      .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes("open"))
-      .sort(
-        (left, right) =>
-          versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
-          versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
-      );
-
-    const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
-    visibleCanvasVersions.forEach((version) => {
-      const id = version.metadata?.id;
-      if (!id) return;
-      indexedVisibleVersions.set(id, version);
-    });
-
-    const seenVersionIds = new Set<string>();
-    const rows: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }> = [];
-
-    openChangeRequests.forEach((changeRequest) => {
-      const versionFromRequest = changeRequest.version;
-      const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
-      const resolvedVersion =
-        versionFromRequest?.metadata?.id || versionFromRequest?.spec
-          ? versionFromRequest
-          : indexedVisibleVersions.get(versionId);
-
-      const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
-      if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
-        return;
-      }
-
-      seenVersionIds.add(resolvedVersionId);
-      rows.push({ version: resolvedVersion, changeRequest });
-    });
-
-    return rows;
-  }, [canvasChangeRequests, visibleCanvasVersions]);
+    return buildApprovalVersionRows("open");
+  }, [buildApprovalVersionRows]);
   const rejectedVersions = useMemo(() => {
-    const rejectedChangeRequests = canvasChangeRequests
-      .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes("reject"))
-      .sort(
-        (left, right) =>
-          versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
-          versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
-      );
-
-    const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
-    visibleCanvasVersions.forEach((version) => {
-      const id = version.metadata?.id;
-      if (!id) {
-        return;
-      }
-      indexedVisibleVersions.set(id, version);
-    });
-
-    const seenVersionIds = new Set<string>();
-    const rows: Array<{ version: CanvasesCanvasVersion; changeRequest: CanvasesCanvasChangeRequest }> = [];
-
-    rejectedChangeRequests.forEach((changeRequest) => {
-      const versionFromRequest = changeRequest.version;
-      const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
-      const resolvedVersion =
-        versionFromRequest?.metadata?.id || versionFromRequest?.spec
-          ? versionFromRequest
-          : indexedVisibleVersions.get(versionId);
-
-      const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
-      if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
-        return;
-      }
-
-      seenVersionIds.add(resolvedVersionId);
-      rows.push({ version: resolvedVersion, changeRequest });
-    });
-
-    return rows;
-  }, [canvasChangeRequests, visibleCanvasVersions]);
+    return buildApprovalVersionRows("reject");
+  }, [buildApprovalVersionRows]);
   const pendingApprovalVersionIds = useMemo(() => {
     const ids = new Set<string>();
     pendingApprovalVersions.forEach((item) => {

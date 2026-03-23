@@ -208,7 +208,7 @@ export function CanvasVersionNodeDiffDialog({
                     ) : null}
                     {diffOwner?.name || "Unknown user"} on {formatTimestamp(effectiveChangeRequest.metadata?.createdAt)}
                   </span>
-                  <span>Changed Notes: {diffChangedCount}</span>
+                  <span>Changed Nodes: {diffChangedCount}</span>
                   <span className={cn(diffHasConflicts ? "font-semibold text-red-700" : "text-emerald-700")}>
                     Conflicts: {diffConflictCount}
                   </span>
