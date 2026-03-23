@@ -526,6 +526,39 @@ export function SettingsTab({
                   </span>
                 </div>
 
+                {pendingIntegration && (
+                  <div
+                    className={`border rounded-md p-3 text-sm ${
+                      pendingIntegration.status?.state === "error"
+                        ? "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30"
+                        : "border-orange-300 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-700 dark:text-gray-200 font-medium">
+                        {pendingIntegration.metadata?.name}
+                      </span>
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          pendingIntegration.status?.state === "error"
+                            ? "border border-red-950/15 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                            : "border border-orange-950/15 bg-orange-100 text-yellow-800 dark:bg-orange-950/30 dark:text-yellow-400"
+                        }`}
+                      >
+                        {pendingIntegration.status?.state
+                          ? pendingIntegration.status.state.charAt(0).toUpperCase() +
+                            pendingIntegration.status.state.slice(1)
+                          : "Unknown"}
+                      </span>
+                    </div>
+                    {pendingIntegration.status?.stateDescription && (
+                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        {pendingIntegration.status.stateDescription}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {inlineWebhookSetup ? (
                   <>
                     <p className="text-sm text-gray-800 dark:text-gray-200">
