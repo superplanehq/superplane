@@ -8,11 +8,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	htmltemplate "html/template"
-	texttemplate "text/template"
 	"io"
 	"net/smtp"
 	"path/filepath"
 	"strings"
+	texttemplate "text/template"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
