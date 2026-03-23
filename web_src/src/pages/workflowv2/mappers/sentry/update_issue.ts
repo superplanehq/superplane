@@ -1,9 +1,9 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -66,40 +66,40 @@ export const updateIssueMapper: ComponentBaseMapper = {
     const issue = outputs?.default?.[0]?.data as SentryIssue | undefined;
     const details: Record<string, string> = {};
 
-    if (context.execution.createdAt) {
-      details["Started At"] = new Date(context.execution.createdAt).toLocaleString();
-    }
+    addFormattedTimestamp(details, "Started At", context.execution.createdAt);
+    addFormattedTimestamp(details, "Last Updated At", context.execution.updatedAt);
 
-    if (context.execution.updatedAt) {
-      details["Last Updated At"] = new Date(context.execution.updatedAt).toLocaleString();
-    }
-
-    if (issue) {
-      if (issue.id) details["Issue ID"] = issue.id;
-      if (issue.shortId) details["Short ID"] = issue.shortId;
-      if (issue.title) details["Title"] = issue.title;
-      if (issue.status) details["Status"] = issue.status;
-      if (issue.project?.name || issue.project?.slug)
-        details["Project"] = issue.project?.name || issue.project?.slug || "";
-      if (issue.assignedTo?.name) details["Assigned To"] = issue.assignedTo.name;
-    }
+    addDetail(details, "Issue ID", issue?.id);
+    addDetail(details, "Short ID", issue?.shortId);
+    addDetail(details, "Title", issue?.title);
+    addDetail(details, "Status", issue?.status);
+    addDetail(details, "Project", getProjectLabel(issue));
+    addDetail(details, "Assigned To", issue?.assignedTo?.name);
 
     return details;
   },
 };
 
 function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string) {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const rootEvent = execution.rootEvent;
+  const createdAt = execution.createdAt;
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
+  const rootComponentName = rootTriggerNode?.componentName;
+
+  if (!rootEvent || !createdAt || !rootComponentName) {
+    return undefined;
+  }
+
+  const rootTriggerRenderer = getTriggerRenderer(rootComponentName);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(createdAt),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt!)),
+      eventSubtitle: formatTimeAgo(new Date(createdAt)),
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: rootEvent.id || "",
     },
   ];
 }
@@ -121,4 +121,24 @@ function buildMetadata(node: NodeInfo) {
   }
 
   return metadata;
+}
+
+function addDetail(details: Record<string, string>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  details[label] = value;
+}
+
+function addFormattedTimestamp(details: Record<string, string>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  details[label] = new Date(value).toLocaleString();
+}
+
+function getProjectLabel(issue?: SentryIssue) {
+  return issue?.project?.name || issue?.project?.slug;
 }

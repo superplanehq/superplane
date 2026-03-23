@@ -1,5 +1,5 @@
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -28,6 +28,8 @@ interface SentryIssueEventData {
   };
 }
 
+type SentryIssue = NonNullable<NonNullable<SentryIssueEventData["data"]>["issue"]>;
+
 export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
     const eventData = context.event?.data as SentryIssueEventData;
@@ -53,14 +55,13 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const issue = eventData?.data?.issue;
     const details: Record<string, string> = {};
 
-    if (issue?.id) details["Issue ID"] = issue.id;
-    if (issue?.shortId) details["Short ID"] = issue.shortId;
-    if (issue?.title) details["Title"] = issue.title;
-    if (eventData?.action) details["Action"] = eventData.action;
-    if (issue?.status) details["Status"] = issue.status;
-    if (issue?.project?.name || issue?.project?.slug)
-      details["Project"] = issue.project?.name || issue.project?.slug || "";
-    if (issue?.assignedTo?.name) details["Assigned To"] = issue.assignedTo.name;
+    addDetail(details, "Issue ID", issue?.id);
+    addDetail(details, "Short ID", issue?.shortId);
+    addDetail(details, "Title", issue?.title);
+    addDetail(details, "Action", eventData?.action);
+    addDetail(details, "Status", issue?.status);
+    addDetail(details, "Project", getProjectLabel(issue));
+    addDetail(details, "Assigned To", issue?.assignedTo?.name);
 
     return details;
   },
@@ -100,3 +101,15 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function addDetail(details: Record<string, string>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  details[label] = value;
+}
+
+function getProjectLabel(issue?: SentryIssue) {
+  return issue?.project?.name || issue?.project?.slug;
+}
