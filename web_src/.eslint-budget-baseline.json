@@ -9,7 +9,7 @@
     "@typescript-eslint/no-non-null-asserted-optional-chain": 103,
     "react-hooks/exhaustive-deps": 65,
     "@typescript-eslint/no-unused-vars": 49,
-    "react-hooks/rules-of-hooks": 47,
+    "react-hooks/rules-of-hooks": 46,
     "react-refresh/only-export-components": 28,
     "eqeqeq": 16,
     "max-depth": 11,
