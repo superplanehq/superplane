@@ -5,6 +5,7 @@ interface Account {
   name: string;
   email: string;
   avatar_url: string;
+  installation_admin: boolean;
 }
 
 interface AccountContextType {

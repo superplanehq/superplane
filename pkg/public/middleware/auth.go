@@ -11,9 +11,11 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -22,8 +24,18 @@ type contextKey string
 
 const AccountContextKey contextKey = "account"
 const UserContextKey contextKey = "user"
+const ImpersonationContextKey contextKey = "impersonation"
 const OrganizationNotFoundError string = "organization_not_found_error"
 const AccountNotFoundError string = "account_not_found_error"
+
+// ImpersonationInfo is stored in the request context when an admin
+// is impersonating another user.
+type ImpersonationInfo struct {
+	AdminAccountID string
+	Active         bool
+	UserName       string
+	OrgName        string
+}
 
 var ownerSetupEnabled = os.Getenv("OWNER_SETUP_ENABLED") == "yes"
 
@@ -169,7 +181,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// Otherwise, we authenticate the account with the cookie,
 			// and expect an organization ID in the header or query parameters.
 			//
-			user, err := authenticateUserByCookie(jwtSigner, r)
+			user, impersonationInfo, err := authenticateUserByCookie(jwtSigner, r)
 			if err != nil {
 				if err.Error() == OrganizationNotFoundError {
 					http.Error(w, "Not Found", http.StatusNotFound)
@@ -181,6 +193,9 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			}
 
 			ctx := context.WithValue(r.Context(), UserContextKey, user)
+			if impersonationInfo != nil {
+				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
+			}
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
@@ -202,28 +217,91 @@ func authenticateUserByToken(r *http.Request) (*models.User, error) {
 	return models.FindActiveUserByTokenHash(hashedToken)
 }
 
-func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, error) {
+func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+	// Check for impersonation cookie first
+	if user, info, err := resolveImpersonatedUser(jwtSigner, r); err == nil {
+		return user, info, nil
+	}
+
 	accountID, err := getAccountFromCookie(r, jwtSigner)
 	if err != nil {
-		return nil, errors.New(AccountNotFoundError)
+		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
 	organizationID := findOrganizationID(r)
 	if organizationID == "" {
-		return nil, errors.New(OrganizationNotFoundError)
+		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
 	account, err := models.FindAccountByID(accountID)
 	if err != nil {
-		return nil, errors.New(AccountNotFoundError)
+		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
 	user, err := models.FindActiveUserByEmail(organizationID, account.Email)
 	if err != nil {
-		return nil, errors.New(OrganizationNotFoundError)
+		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
-	return user, nil
+	return user, nil, nil
+}
+
+// resolveImpersonatedUser checks if there's a valid impersonation session.
+// It validates both the impersonation token AND the admin's account token.
+func resolveImpersonatedUser(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
+	tokenStr, err := impersonation.ReadCookie(r)
+	if err != nil {
+		return nil, nil, fmt.Errorf("no impersonation cookie")
+	}
+
+	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid impersonation token: %w", err)
+	}
+
+	// Double-validate: the admin's regular session must also be valid
+	adminAccountID, err := getAccountFromCookie(r, jwtSigner)
+	if err != nil {
+		return nil, nil, fmt.Errorf("admin session invalid: %w", err)
+	}
+
+	if adminAccountID != claims.AdminAccountID {
+		return nil, nil, fmt.Errorf("admin account mismatch")
+	}
+
+	// Verify the admin is still an installation admin
+	admin, err := models.FindAccountByID(adminAccountID)
+	if err != nil || !admin.IsInstallationAdmin() {
+		return nil, nil, fmt.Errorf("admin account no longer valid")
+	}
+
+	// Look up the impersonated user
+	user, err := models.FindActiveUserByID(claims.ImpersonatedOrgID, claims.ImpersonatedUserID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("impersonated user not found: %w", err)
+	}
+
+	// Look up org name for the banner
+	orgName := ""
+	org, orgErr := models.FindOrganizationByID(claims.ImpersonatedOrgID)
+	if orgErr == nil {
+		orgName = org.Name
+	}
+
+	log.WithFields(log.Fields{
+		"admin_account_id": claims.AdminAccountID,
+		"impersonated_user": claims.ImpersonatedUserID,
+		"impersonated_org":  claims.ImpersonatedOrgID,
+	}).Debug("impersonation session active")
+
+	info := &ImpersonationInfo{
+		AdminAccountID: claims.AdminAccountID,
+		Active:         true,
+		UserName:       user.Name,
+		OrgName:        orgName,
+	}
+
+	return user, info, nil
 }
 
 func findOrganizationID(r *http.Request) string {
@@ -301,6 +379,11 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, error
 func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	user, ok := ctx.Value(UserContextKey).(*models.User)
 	return user, ok
+}
+
+func GetImpersonationFromContext(ctx context.Context) (*ImpersonationInfo, bool) {
+	info, ok := ctx.Value(ImpersonationContextKey).(*ImpersonationInfo)
+	return info, ok
 }
 
 func redirectToLoginWithOriginalURL(w http.ResponseWriter, r *http.Request) {

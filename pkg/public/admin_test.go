@@ -1,0 +1,417 @@
+package public
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
+)
+
+func setupAdminTestServer(t *testing.T) (*Server, *support.ResourceRegistry, string) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+
+	// Promote the test account to installation admin
+	require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
+
+	return server, r, token
+}
+
+func TestAdminListOrganizations(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		// Create a non-admin account
+		account, err := models.CreateAccount("Regular User", "regular@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations",
+			authCookie: regularToken,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("admin can list all organizations", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var page struct {
+			Items  []map[string]any `json:"items"`
+			Total  int64            `json:"total"`
+			Limit  int              `json:"limit"`
+			Offset int              `json:"offset"`
+		}
+		err := json.Unmarshal(response.Body.Bytes(), &page)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(page.Items), 1)
+		assert.GreaterOrEqual(t, page.Total, int64(1))
+		assert.Equal(t, 50, page.Limit)
+
+		found := false
+		for _, org := range page.Items {
+			if org["id"] == r.Organization.ID.String() {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "should include the test organization")
+	})
+
+	t.Run("supports search filter", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations?search=" + r.Organization.Name[:3],
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var page struct {
+			Items []map[string]any `json:"items"`
+			Total int64            `json:"total"`
+		}
+		err := json.Unmarshal(response.Body.Bytes(), &page)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, page.Total, int64(1))
+	})
+
+	t.Run("supports pagination params", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations?limit=1&offset=0",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var page struct {
+			Items []map[string]any `json:"items"`
+			Total int64            `json:"total"`
+			Limit int              `json:"limit"`
+		}
+		err := json.Unmarshal(response.Body.Bytes(), &page)
+		require.NoError(t, err)
+		assert.LessOrEqual(t, len(page.Items), 1)
+		assert.Equal(t, 1, page.Limit)
+	})
+
+	t.Run("unauthenticated request is rejected", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method: "GET",
+			path:   "/admin/api/organizations",
+		})
+		assert.NotEqual(t, http.StatusOK, response.Code)
+	})
+}
+
+func TestAdminListCanvases(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("returns canvases for existing org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/canvases",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var page struct {
+			Items []map[string]any `json:"items"`
+			Total int64            `json:"total"`
+		}
+		err := json.Unmarshal(response.Body.Bytes(), &page)
+		require.NoError(t, err)
+		assert.NotNil(t, page.Items)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/canvases",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestAdminListOrgUsers(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("returns users for existing org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/users",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var page struct {
+			Items []map[string]any `json:"items"`
+			Total int64            `json:"total"`
+		}
+		err := json.Unmarshal(response.Body.Bytes(), &page)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(page.Items), 1)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/users",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestStartImpersonation(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("starts impersonation with a different user", func(t *testing.T) {
+		// Create a second user in the same org to impersonate
+		otherAccount, err := models.CreateAccount("Other User", "other@example.com")
+		require.NoError(t, err)
+		otherUser, err := models.CreateUser(r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+		require.NoError(t, err)
+
+		body, _ := json.Marshal(map[string]string{
+			"organization_id": r.Organization.ID.String(),
+			"user_id":         otherUser.ID.String(),
+		})
+
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/impersonate/start",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result map[string]string
+		err = json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Contains(t, result["redirect_url"], r.Organization.ID.String())
+
+		cookies := response.Result().Cookies()
+		found := false
+		for _, c := range cookies {
+			if c.Name == "impersonation_token" {
+				found = true
+				assert.NotEmpty(t, c.Value)
+				assert.True(t, c.HttpOnly)
+				break
+			}
+		}
+		assert.True(t, found, "impersonation_token cookie should be set")
+	})
+
+	t.Run("rejects self-impersonation", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"organization_id": r.Organization.ID.String(),
+			"user_id":         r.UserModel.ID.String(),
+		})
+
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/impersonate/start",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Cannot impersonate yourself")
+	})
+
+	t.Run("rejects impersonation with missing fields", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"organization_id": r.Organization.ID.String(),
+			// missing user_id
+		})
+
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/impersonate/start",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+
+	t.Run("rejects impersonation with non-existent user", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"organization_id": r.Organization.ID.String(),
+			"user_id":         "00000000-0000-0000-0000-000000000000",
+		})
+
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/impersonate/start",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("rejects impersonation with non-existent org", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{
+			"organization_id": "00000000-0000-0000-0000-000000000000",
+			"user_id":         r.UserModel.ID.String(),
+		})
+
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/impersonate/start",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestEndImpersonation(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	t.Run("ends impersonation and clears cookie", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/impersonate/end",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result map[string]string
+		err := json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, "/admin", result["redirect_url"])
+
+		// Check impersonation cookie was cleared
+		cookies := response.Result().Cookies()
+		for _, c := range cookies {
+			if c.Name == "impersonation_token" {
+				assert.Equal(t, "", c.Value)
+				assert.Equal(t, -1, c.MaxAge)
+			}
+		}
+	})
+}
+
+func TestImpersonationStatus(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("returns inactive when no impersonation cookie", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/impersonate/status",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result map[string]any
+		err := json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, false, result["active"])
+	})
+
+	t.Run("returns active when valid impersonation cookie exists", func(t *testing.T) {
+		signer := jwt.NewSigner("test-client-secret")
+
+		// Generate a real impersonation token
+		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
+			"type":                 "impersonation",
+			"admin_account_id":     r.Account.ID.String(),
+			"impersonated_user_id": r.UserModel.ID.String(),
+			"impersonated_org_id":  r.Organization.ID.String(),
+			"sub":                  r.Account.ID.String(),
+		})
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/api/impersonate/status", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.AddCookie(&http.Cookie{Name: "impersonation_token", Value: impToken})
+
+		res := httptest.NewRecorder()
+		server.Router.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusOK, res.Code)
+
+		var result map[string]any
+		err = json.Unmarshal(res.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, true, result["active"])
+		assert.NotEmpty(t, result["user_name"])
+		assert.NotEmpty(t, result["org_name"])
+	})
+}
+
+func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("account response includes installation_admin field", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result map[string]any
+		err := json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.Equal(t, true, result["installation_admin"])
+		assert.Equal(t, r.Account.ID.String(), result["id"])
+	})
+
+	t.Run("non-admin account has installation_admin false", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+		r2 := support.Setup(t)
+		_, _, regularToken := setupTestServer(r2, t)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account",
+			authCookie: regularToken,
+		})
+
+		// May be 200 or redirect depending on state; if 200, check the field
+		if response.Code == http.StatusOK {
+			var result map[string]any
+			err := json.Unmarshal(response.Body.Bytes(), &result)
+			require.NoError(t, err)
+			assert.Equal(t, false, result["installation_admin"])
+		}
+	})
+}

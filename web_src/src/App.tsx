@@ -24,6 +24,10 @@ import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
+import AdminLayout from "./pages/admin/AdminLayout";
+import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
+import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
+import ImpersonationBanner from "./components/ImpersonationBanner";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -66,12 +70,19 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <ImpersonationBanner />
       <SetupGuard>
         <Routes>
           {/* public routes */}
           <Route path="login" element={<Login />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
+
+          {/* Admin dashboard routes */}
+          <Route path="admin" element={<AdminLayout />}>
+            <Route index element={<OrganizationsListAdmin />} />
+            <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
+          </Route>
 
           {/* Organization selection and creation */}
           <Route path="" element={withAuthOnly(OrganizationSelect)} />
