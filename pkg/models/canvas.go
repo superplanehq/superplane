@@ -215,6 +215,34 @@ func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 	return &canvas, nil
 }
 
+func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, int64, error) {
+	query := database.Conn().Where("organization_id = ?", orgID)
+
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Model(&Canvas{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var canvases []Canvas
+	if err := query.Order("name ASC").Find(&canvases).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return canvases, total, nil
+}
+
 func ListCanvases(orgID string, includeTemplates bool) ([]Canvas, error) {
 	var canvases []Canvas
 	var query *gorm.DB
