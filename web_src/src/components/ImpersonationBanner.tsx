@@ -19,10 +19,14 @@ const ImpersonationBanner: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         window.location.href = data.redirect_url;
+        return;
       }
     } catch {
-      window.location.href = "/admin";
+      // Network error — fall through to redirect
     }
+
+    // Always redirect to /admin on failure so the user isn't stuck
+    window.location.href = "/admin";
   };
 
   return (

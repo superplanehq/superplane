@@ -2,10 +2,10 @@ import { Text } from "@/components/Text/text";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/AccountContext";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Search, User as UserIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import AdminPagination from "./AdminPagination";
+import { startImpersonation } from "./useAccountActions";
 
 interface OrgUser {
   id: string;
@@ -22,31 +22,7 @@ const PAGE_SIZE = 50;
 
 function UserRow({ user }: { user: OrgUser }) {
   const { account } = useAccount();
-  const [loading, setLoading] = useState(false);
   const isSelf = user.account_id === account?.id;
-
-  const handleImpersonate = async () => {
-    if (!user.account_id) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/admin/api/impersonate/start", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ account_id: user.account_id }),
-      });
-      if (!res.ok) {
-        showErrorToast((await res.text()) || "Failed");
-        return;
-      }
-      showSuccessToast("Impersonation started");
-      window.location.href = (await res.json()).redirect_url;
-    } catch {
-      showErrorToast("Failed to start impersonation");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <tr className="border-b border-slate-50 last:border-0">
@@ -55,11 +31,11 @@ function UserRow({ user }: { user: OrgUser }) {
       <td className="px-4 py-2.5 text-right">
         {isSelf ? (
           <Text className="text-xs text-gray-400">You</Text>
-        ) : (
-          <Button variant="outline" size="sm" onClick={handleImpersonate} disabled={loading}>
-            {loading ? "Starting..." : "Impersonate"}
+        ) : user.account_id ? (
+          <Button variant="outline" size="sm" onClick={() => startImpersonation(user.account_id!)}>
+            Impersonate
           </Button>
-        )}
+        ) : null}
       </td>
     </tr>
   );
