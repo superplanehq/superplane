@@ -87,6 +87,9 @@ func (d *DigitalOcean) Components() []core.Component {
 		&UpdateAlertPolicy{},
 		&DeleteAlertPolicy{},
 		&GetDropletMetrics{},
+		&CreateApp{},
+		&DeleteApp{},
+		&UpdateApp{},
 	}
 }
 
