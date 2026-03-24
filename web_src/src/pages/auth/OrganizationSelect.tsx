@@ -1,8 +1,10 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
-import { Building, Palette, User } from "lucide-react";
+import { Heading } from "@/components/Heading/heading";
+import { Palette, Plus, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { getUsageLimitNotice } from "@/utils/usageLimits";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
@@ -21,6 +23,11 @@ interface OrganizationCreationStatus {
   maxOrganizations: number;
   message?: string;
 }
+
+const organizationInitial = (name: string) => {
+  const letter = name.trim().charAt(0);
+  return letter ? letter.toUpperCase() : "?";
+};
 
 const formatCount = (count: number, noun: string) => {
   const safeCount = Number.isFinite(count) ? count : 0;
@@ -99,31 +106,42 @@ const OrganizationSelect: React.FC = () => {
     organizationCreationStatus?.message ||
     "This account cannot create another organization right now.";
 
-  const createOrganizationCardClasses = createOrganizationDisabled
-    ? "h-48 bg-slate-200/70 border-1 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center text-slate-500 cursor-not-allowed"
-    : "h-48 bg-white/50 hover:bg-white border-1 border-dashed border-gray-400 rounded-lg p-6 flex flex-col items-center justify-center transition-colors cursor-pointer";
+  const listRowMinHeight = "min-h-[58px]";
 
-  const createOrganizationCard = (
-    <div
-      className={createOrganizationCardClasses}
-      aria-disabled={createOrganizationDisabled}
-      tabIndex={createOrganizationDisabled ? 0 : -1}
-    >
-      <div className="flex items-center">
-        <h4 className="text-lg font-medium text-center">+ Create new</h4>
-      </div>
-      <Text className="text-base/6 sm:text-sm/6 font-medium text-gray-500 text-center dark:text-gray-400">
-        {createOrganizationDisabled
-          ? "Organization limit reached for this account"
-          : "Start fresh with a new organization"}
-      </Text>
-    </div>
+  const createOrganizationEnabledClasses = cn(
+    "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-3 transition-colors dark:border-green-500 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-950/50 cursor-pointer",
+    listRowMinHeight,
+  );
+
+  const createOrganizationDisabledClasses = cn(
+    "relative flex w-full flex-row items-center gap-4 rounded-md border border-dashed border-slate-300 bg-slate-200/70 px-4 py-3 text-slate-500 cursor-not-allowed dark:border-slate-600 dark:bg-slate-800/50",
+    listRowMinHeight,
+  );
+
+  const createOrganizationInner = (
+    <>
+      <span
+        className={
+          createOrganizationDisabled
+            ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-400 text-white dark:bg-slate-500"
+            : "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white"
+        }
+      >
+        <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+      </span>
+      <Heading
+        level={3}
+        className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate dark:text-gray-100"
+      >
+        <span className="truncate">New Organization</span>
+      </Heading>
+    </>
   );
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 p-8">
-        <div className="flex flex-col items-center space-y-4">
+      <div className="min-h-screen bg-slate-100 p-8 flex justify-center">
+        <div className="w-full max-w-[640px] flex flex-col items-center justify-center gap-4 py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
           <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
         </div>
@@ -133,20 +151,20 @@ const OrganizationSelect: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <div className="p-8">
-        <div className="flex mb-4">
-          <img src={SuperplaneLogo} alt="Superplane" className="h-6" />
-        </div>
-        <div className="max-w-7xl w-full">
-          <div className="mb-6">
-            <Text className="font-medium text-gray-800 text-left">
-              Hey there{account?.name ? `, ${account.name}` : ""}!
-            </Text>
-            {organizations.length > 0 && (
-              <Text className="font-medium text-gray-500 text-left">
-                Select one of your organizations below to get started:
+      <div className="p-8 flex justify-center">
+        <div className="w-full max-w-[640px] mx-auto">
+          <div className="flex flex-col items-start mb-6">
+            <img src={SuperplaneLogo} alt="Superplane" className="h-6 mb-4" />
+            <div className="w-full text-left">
+              <Text className="font-medium text-gray-800 block">
+                Hey there{account?.name ? `, ${account.name}` : ""}!
               </Text>
-            )}
+              {organizations.length > 0 && (
+                <Text className="font-medium text-gray-500 block dark:text-gray-400">
+                  Select one of your organizations below to get started:
+                </Text>
+              )}
+            </div>
           </div>
 
           {error && (
@@ -156,9 +174,9 @@ const OrganizationSelect: React.FC = () => {
           )}
 
           {organizations.length === 0 && (
-            <div className="text-left py-2 mb-4">
-              <Text className="font-medium text-gray-800">You're not a member of any organizations yet.</Text>
-              <Text className="font-medium text-gray-800">
+            <div className="text-left py-2 mb-4 space-y-1">
+              <Text className="font-medium text-gray-800 block">You're not a member of any organizations yet.</Text>
+              <Text className="font-medium text-gray-800 block">
                 {createOrganizationDisabled
                   ? "This account has reached its organization limit."
                   : "Create a new organization to get started!"}
@@ -166,48 +184,59 @@ const OrganizationSelect: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <ul className="flex flex-col gap-3 list-none p-0 m-0">
             {organizations.map((org) => (
-              <Link
-                key={org.id}
-                to={`/${org.id}`}
-                className="h-48 bg-white dark:bg-gray-900 rounded-md shadow-sm p-6 outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer"
-              >
-                <div className="flex flex-col h-full justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1 text-gray-800 dark:text-white">
-                      <Building size={16} />
-                      <h4 className="text-lg font-medium truncate">{org.name}</h4>
-                    </div>
+              <li key={org.id}>
+                <Link
+                  to={`/${org.id}`}
+                  className={cn(
+                    "flex items-center justify-between gap-4 rounded-md bg-white dark:bg-gray-900 px-4 py-3 shadow-sm outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer",
+                    listRowMinHeight,
+                  )}
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-medium text-white"
+                      aria-hidden
+                    >
+                      {organizationInitial(org.name)}
+                    </span>
+                    <span className="text-base font-medium text-gray-800 dark:text-white truncate">{org.name}</span>
                   </div>
 
-                  <div className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400 flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <Palette size={16} />
+                  <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <Palette size={14} className="shrink-0" aria-hidden />
                       {formatCount(org.canvasCount ?? 0, "canvas")}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <User size={16} />
+                    </span>
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
+                      <User size={14} className="shrink-0" aria-hidden />
                       {formatCount(org.memberCount ?? 0, "member")}
-                    </div>
+                    </span>
                   </div>
-                </div>
-              </Link>
+                </Link>
+              </li>
             ))}
 
-            {createOrganizationDisabled ? (
-              <Tooltip>
-                <TooltipTrigger asChild>{createOrganizationCard}</TooltipTrigger>
-                <TooltipContent side="top" className="max-w-xs">
-                  {createOrganizationTooltip}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Link to="/create" className="block">
-                {createOrganizationCard}
-              </Link>
-            )}
-          </div>
+            <li>
+              {createOrganizationDisabled ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={createOrganizationDisabledClasses} aria-disabled tabIndex={0}>
+                      {createOrganizationInner}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    {createOrganizationTooltip}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Link to="/create" className={createOrganizationEnabledClasses} aria-label="Create new organization">
+                  {createOrganizationInner}
+                </Link>
+              )}
+            </li>
+          </ul>
         </div>
       </div>
     </div>
