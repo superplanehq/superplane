@@ -23,6 +23,7 @@ import (
 type contextKey string
 
 const AccountContextKey contextKey = "account"
+const EffectiveAccountContextKey contextKey = "effective_account"
 const UserContextKey contextKey = "user"
 const ImpersonationContextKey contextKey = "impersonation"
 const OrganizationNotFoundError string = "organization_not_found_error"
@@ -150,10 +151,63 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			}
 
 			ctx := context.WithValue(r.Context(), AccountContextKey, account)
+
+			// If there's a valid impersonation session, resolve the
+			// impersonated user's account so that non-admin handlers
+			// (getAccount, listOrganizations, etc.) see the target
+			// user's data instead of the admin's.
+			if impAccount, info := resolveImpersonatedAccount(jwtSigner, r, account); impAccount != nil {
+				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
+				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
+			}
+
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// resolveImpersonatedAccount checks for an impersonation cookie and,
+// if valid, returns the impersonated user's linked Account so it can
+// be used as the effective account for non-admin endpoints.
+func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *models.Account) (*models.Account, *ImpersonationInfo) {
+	tokenStr, err := impersonation.ReadCookie(r)
+	if err != nil {
+		return nil, nil
+	}
+
+	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
+	if err != nil {
+		return nil, nil
+	}
+
+	if claims.AdminAccountID != admin.ID.String() || !admin.IsInstallationAdmin() {
+		return nil, nil
+	}
+
+	user, err := models.FindActiveUserByID(claims.ImpersonatedOrgID, claims.ImpersonatedUserID)
+	if err != nil || user.AccountID == nil {
+		return nil, nil
+	}
+
+	impAccount, err := models.FindAccountByID(user.AccountID.String())
+	if err != nil {
+		return nil, nil
+	}
+
+	orgName := ""
+	if org, err := models.FindOrganizationByID(claims.ImpersonatedOrgID); err == nil {
+		orgName = org.Name
+	}
+
+	info := &ImpersonationInfo{
+		AdminAccountID: claims.AdminAccountID,
+		Active:         true,
+		UserName:       user.Name,
+		OrgName:        orgName,
+	}
+
+	return impAccount, info
 }
 
 func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
@@ -321,6 +375,16 @@ func findOrganizationID(r *http.Request) string {
 func GetAccountFromContext(ctx context.Context) (*models.Account, bool) {
 	account, ok := ctx.Value(AccountContextKey).(*models.Account)
 	return account, ok
+}
+
+// GetEffectiveAccountFromContext returns the impersonated account when
+// an impersonation session is active, otherwise the real account.
+// Use this in handlers that should reflect the impersonated user's data.
+func GetEffectiveAccountFromContext(ctx context.Context) (*models.Account, bool) {
+	if eff, ok := ctx.Value(EffectiveAccountContextKey).(*models.Account); ok {
+		return eff, true
+	}
+	return GetAccountFromContext(ctx)
 }
 
 func isOwnerSetupAllowedPath(path string) bool {

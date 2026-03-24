@@ -572,7 +572,7 @@ type organizationCreationStatusResponse struct {
 }
 
 func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -653,7 +653,7 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -762,7 +762,7 @@ type AccountResponse struct {
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -788,7 +788,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
