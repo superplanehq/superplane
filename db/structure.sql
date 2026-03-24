@@ -38,21 +38,6 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.account_magic_codes (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    email character varying(255) NOT NULL,
-    code_hash character varying(64) NOT NULL,
-    expires_at timestamp without time zone NOT NULL,
-    used_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    verify_attempts integer DEFAULT 0 NOT NULL
-);
-
-
---
 -- Name: account_password_auth; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -206,7 +191,7 @@ CREATE TABLE public.canvas_memories (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -658,14 +643,6 @@ ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
--- Name: account_magic_codes account_magic_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_magic_codes
-    ADD CONSTRAINT account_magic_codes_pkey PRIMARY KEY (id);
-
-
---
 -- Name: account_password_auth account_password_auth_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1074,20 +1051,6 @@ ALTER TABLE ONLY public.workflows
 
 
 --
--- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_account_magic_codes_email ON public.account_magic_codes USING btree (email);
-
-
---
--- Name: idx_account_magic_codes_email_code_hash; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_account_magic_codes_email_code_hash ON public.account_magic_codes USING btree (email, code_hash);
-
-
---
 -- Name: idx_account_password_auth_account_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1190,6 +1153,13 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 --
 
 CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --

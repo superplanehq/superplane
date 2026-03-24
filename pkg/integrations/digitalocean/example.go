@@ -176,3 +176,33 @@ var exampleOutputGetDropletMetrics map[string]any
 func (g *GetDropletMetrics) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDropletMetricsOnce, exampleOutputGetDropletMetricsBytes, &exampleOutputGetDropletMetrics)
 }
+
+//go:embed example_output_create_app.json
+var exampleOutputCreateAppBytes []byte
+
+var exampleOutputCreateAppOnce sync.Once
+var exampleOutputCreateApp map[string]any
+
+func (c *CreateApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
+}
+
+//go:embed example_output_delete_app.json
+var exampleOutputDeleteAppBytes []byte
+
+var exampleOutputDeleteAppOnce sync.Once
+var exampleOutputDeleteApp map[string]any
+
+func (d *DeleteApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAppOnce, exampleOutputDeleteAppBytes, &exampleOutputDeleteApp)
+}
+
+//go:embed example_output_update_app.json
+var exampleOutputUpdateAppBytes []byte
+
+var exampleOutputUpdateAppOnce sync.Once
+var exampleOutputUpdateApp map[string]any
+
+func (u *UpdateApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
+}
