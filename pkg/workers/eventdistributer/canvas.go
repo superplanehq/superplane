@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	CanvasCreatedEvent        = "canvas_created"
 	CanvasUpdatedEvent        = "canvas_updated"
 	CanvasVersionUpdatedEvent = "canvas_version_updated"
 	CanvasDeletedEvent        = "canvas_deleted"
@@ -25,6 +26,10 @@ type CanvasStatePayload struct {
 type CanvasStateWebsocketEvent struct {
 	Event   string             `json:"event"`
 	Payload CanvasStatePayload `json:"payload"`
+}
+
+func HandleCanvasCreated(messageBody []byte, wsHub *ws.Hub) error {
+	return handleCanvasState(messageBody, wsHub, CanvasCreatedEvent)
 }
 
 func HandleCanvasUpdated(messageBody []byte, wsHub *ws.Hub) error {
