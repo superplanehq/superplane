@@ -1,34 +1,11 @@
-import React, { useEffect, useState } from "react";
-
-interface ImpersonationStatus {
-  active: boolean;
-  user_name?: string;
-  org_name?: string;
-}
+import { useAccount } from "@/contexts/AccountContext";
+import React from "react";
 
 const ImpersonationBanner: React.FC = () => {
-  const [status, setStatus] = useState<ImpersonationStatus | null>(null);
+  const { account } = useAccount();
 
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch("/admin/api/impersonate/status", {
-          credentials: "include",
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setStatus(data);
-        }
-      } catch {
-        // Silently fail — banner just won't show
-      }
-    };
-
-    checkStatus();
-  }, []);
-
-  if (!status?.active) {
+  const impersonation = account?.impersonation;
+  if (!impersonation?.active) {
     return null;
   }
 
@@ -44,7 +21,6 @@ const ImpersonationBanner: React.FC = () => {
         window.location.href = data.redirect_url;
       }
     } catch {
-      // Fallback: just clear and redirect
       window.location.href = "/admin";
     }
   };
@@ -52,11 +28,11 @@ const ImpersonationBanner: React.FC = () => {
   return (
     <div className="bg-amber-400 text-amber-900 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-3 z-50">
       <span>
-        You are viewing as <strong>{status.user_name}</strong>
-        {status.org_name && (
+        You are viewing as <strong>{impersonation.user_name}</strong>
+        {impersonation.org_name && (
           <>
             {" "}
-            in <strong>{status.org_name}</strong>
+            in <strong>{impersonation.org_name}</strong>
           </>
         )}
       </span>

@@ -573,7 +573,7 @@ type organizationCreationStatusResponse struct {
 }
 
 func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
+	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -654,7 +654,7 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
+	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -754,12 +754,19 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+type AccountImpersonation struct {
+	Active   bool   `json:"active"`
+	UserName string `json:"user_name,omitempty"`
+	OrgName  string `json:"org_name,omitempty"`
+}
+
 type AccountResponse struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	Email             string `json:"email"`
-	AvatarURL         string `json:"avatar_url"`
-	InstallationAdmin bool   `json:"installation_admin"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	AvatarURL         string                `json:"avatar_url"`
+	InstallationAdmin bool                  `json:"installation_admin"`
+	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
@@ -782,6 +789,14 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Email:             account.Email,
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
+	}
+
+	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
+		accountResponse.Impersonation = &AccountImpersonation{
+			Active:   true,
+			UserName: info.UserName,
+			OrgName:  info.OrgName,
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -66,9 +66,21 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 		Memberships       []membershipItem `json:"memberships"`
 	}
 
+	accountIDs := make([]string, 0, len(accounts))
+	for _, a := range accounts {
+		accountIDs = append(accountIDs, a.ID.String())
+	}
+
+	allMemberships, err := models.FindOrgMembershipsForAccounts(accountIDs)
+	if err != nil {
+		log.Errorf("admin: failed to load account memberships: %v", err)
+		allMemberships = make(map[string][]models.AccountOrgMembership)
+	}
+
 	items := make([]accountItem, 0, len(accounts))
 	for _, a := range accounts {
-		memberships, _ := models.FindOrgMembershipsForAccount(a.ID.String())
+		id := a.ID.String()
+		memberships := allMemberships[id]
 
 		mItems := make([]membershipItem, 0, len(memberships))
 		for _, m := range memberships {
@@ -80,7 +92,7 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 		}
 
 		items = append(items, accountItem{
-			ID:                a.ID.String(),
+			ID:                id,
 			Name:              a.Name,
 			Email:             a.Email,
 			InstallationAdmin: a.IsInstallationAdmin(),

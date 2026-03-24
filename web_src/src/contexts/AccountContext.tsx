@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+interface AccountImpersonation {
+  active: boolean;
+  user_name?: string;
+  org_name?: string;
+}
+
 interface Account {
   id: string;
   name: string;
   email: string;
   avatar_url: string;
   installation_admin: boolean;
+  impersonation?: AccountImpersonation;
 }
 
 interface AccountContextType {

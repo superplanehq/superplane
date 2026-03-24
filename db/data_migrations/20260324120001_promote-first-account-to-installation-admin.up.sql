@@ -10,7 +10,7 @@ SET installation_admin = TRUE
 WHERE id = (
     SELECT id
     FROM accounts
-    ORDER BY id ASC
+    ORDER BY created_at ASC
     LIMIT 1
 )
 AND NOT installation_admin;
