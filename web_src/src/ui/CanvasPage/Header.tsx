@@ -1,5 +1,7 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { Copy, Download, Home, ChevronDown, LogOut, Palette, RotateCcw, Undo2, Pencil, Rocket } from "lucide-react";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { usePermissions } from "@/contexts/PermissionsContext";
+import { Copy, Download, ChevronDown, LogOut, Palette, Plus, RotateCcw, Undo2, Pencil, Rocket } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { Switch } from "../switch";
@@ -104,6 +106,8 @@ export function Header({
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const canCreateCanvas = permissionsLoading || canAct("canvases", "create");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
   const [exportAction, setExportAction] = useState<string>("");
@@ -178,15 +182,16 @@ export function Header({
     <>
       <header className="bg-white border-b border-slate-950/15">
         <div className="relative grid h-12 grid-cols-3 items-center px-4">
-          <div className="flex items-center gap-3 justify-self-start">
+          <div className="flex items-center justify-self-start">
             <OrganizationMenuButton organizationId={organizationId} onLogoClick={onLogoClick} />
 
             {/* Canvas Dropdown */}
             {organizationId && (
               <div className="relative flex items-center" ref={menuRef}>
                 <button
+                  type="button"
                   onClick={() => setIsMenuOpen((prev) => !prev)}
-                  className="flex items-center gap-1 cursor-pointer h-7"
+                  className="flex h-8 cursor-pointer items-center gap-1 rounded-md px-2.5 hover:bg-slate-100"
                   aria-label="Open canvas menu"
                   aria-expanded={isMenuOpen}
                   disabled={workflowsLoading}
@@ -200,18 +205,24 @@ export function Header({
                   />
                 </button>
                 {isMenuOpen && !workflowsLoading && (
-                  <div className="absolute left-0 top-13 z-50 min-w-[15rem] w-max rounded-md outline outline-slate-950/20 bg-white shadow-lg">
-                    <div className="px-4 pt-3 pb-4">
-                      {/* All Canvases Link */}
+                  <div className="absolute left-0 top-0 z-50 w-full min-w-[15rem] rounded-md border border-slate-950/20 bg-white shadow-md">
+                    <div className="px-4 py-2">
+                      {/* New Canvas */}
                       <div className="mb-2">
-                        <Link
-                          to={organizationId ? `/${organizationId}` : "/"}
-                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:text-gray-800"
-                          onClick={() => setIsMenuOpen(false)}
+                        <PermissionTooltip
+                          allowed={canCreateCanvas}
+                          message="You don't have permission to create canvases."
+                          className="w-full"
                         >
-                          <Home size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                          <span>All Canvases</span>
-                        </Link>
+                          <Link
+                            to={organizationId ? `/${organizationId}/canvases/new` : "/"}
+                            className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            <Plus size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                            <span>New Canvas</span>
+                          </Link>
+                        </PermissionTooltip>
                       </div>
                       {/* Divider */}
                       <div className="border-b border-gray-300 mb-2"></div>
@@ -509,18 +520,10 @@ export function Header({
               ? wrapWithTooltip(
                   enterEditModeDisabled,
                   enterEditModeDisabledTooltip,
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={onEnterEditMode}
-                      disabled={enterEditModeDisabled}
-                      className="h-8"
-                    >
-                      <Pencil className="h-2 w-2" />
-                      Edit
-                    </Button>
-                  </div>,
+                  <UIButton type="button" variant="outline" onClick={onEnterEditMode} disabled={enterEditModeDisabled}>
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </UIButton>,
                 )
               : null}
           </div>

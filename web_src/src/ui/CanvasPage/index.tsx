@@ -2807,6 +2807,31 @@ function CanvasContent({
                 />
               )}
               <div className="flex items-center gap-2">
+                {showVersionControlTrigger ? (
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="relative inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 items-center text-xs font-medium gap-1.5"
+                            onClick={onOpenVersionControl}
+                            aria-label="Open version control"
+                          >
+                            <GitBranch className="h-3 w-3" />
+                          </Button>
+                          {versionControlNotificationCount > 0 ? (
+                            <span className="absolute left-6 -top-2 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
+                              {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
+                            </span>
+                          ) : null}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
+                    </Tooltip>
+                  </div>
+                ) : null}
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
@@ -2886,31 +2911,6 @@ function CanvasContent({
                     }}
                   />
                 </ZoomSlider>
-                {showVersionControlTrigger ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="relative inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 items-center text-xs font-medium gap-1.5"
-                            onClick={onOpenVersionControl}
-                            aria-label="Open version control"
-                          >
-                            <GitBranch className="h-3 w-3" />
-                          </Button>
-                          {versionControlNotificationCount > 0 ? (
-                            <span className="absolute left-6 -top-2 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
-                              {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
-                            </span>
-                          ) : null}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                ) : null}
                 {showBottomStatusControls ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
                     <Tooltip>
