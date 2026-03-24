@@ -1,4 +1,4 @@
-package executions
+package runs
 
 import (
 	"fmt"
@@ -7,19 +7,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type CancelExecutionCommand struct {
-	CanvasID    *string
-	ExecutionID *string
+type CancelRunCommand struct {
+	CanvasID *string
+	RunID    *string
 }
 
-func (c *CancelExecutionCommand) Execute(ctx core.CommandContext) error {
+func (c *CancelRunCommand) Execute(ctx core.CommandContext) error {
 	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
 	if err != nil {
 		return err
 	}
 
 	response, _, err := ctx.API.CanvasNodeExecutionAPI.
-		CanvasesCancelExecution(ctx.Context, canvasID, *c.ExecutionID).
+		CanvasesCancelExecution(ctx.Context, canvasID, *c.RunID).
 		Body(map[string]any{}).
 		Execute()
 
@@ -32,7 +32,7 @@ func (c *CancelExecutionCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, err := fmt.Fprintf(stdout, "Execution cancelled: %s\n", *c.ExecutionID)
+		_, err := fmt.Fprintf(stdout, "Run cancelled: %s\n", *c.RunID)
 		return err
 	})
 }

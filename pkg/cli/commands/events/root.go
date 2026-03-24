@@ -14,7 +14,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 	root := &cobra.Command{
 		Use:     "events",
-		Short:   "List canvas events and executions",
+		Short:   "List canvas events and runs",
 		Aliases: []string{"event"},
 	}
 
@@ -38,23 +38,24 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}, options)
 
 	//
-	// List executions command
+	// List runs command
 	//
-	listExecutionsCmd := &cobra.Command{
-		Use:   "list-executions",
-		Short: "List executions for a root event",
-		Args:  cobra.NoArgs,
+	listRunsCmd := &cobra.Command{
+		Use:     "list-runs",
+		Short:   "List runs for a root event",
+		Aliases: []string{"list-executions"},
+		Args:    cobra.NoArgs,
 	}
-	listExecutionsCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
-	listExecutionsCmd.Flags().StringVar(&eventID, "event-id", "", "event ID")
-	_ = listExecutionsCmd.MarkFlagRequired("event-id")
-	core.Bind(listExecutionsCmd, &ListEventExecutionsCommand{
+	listRunsCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
+	listRunsCmd.Flags().StringVar(&eventID, "event-id", "", "event ID")
+	_ = listRunsCmd.MarkFlagRequired("event-id")
+	core.Bind(listRunsCmd, &ListEventRunsCommand{
 		CanvasID: &canvasID,
 		EventID:  &eventID,
 	}, options)
 
 	root.AddCommand(listCmd)
-	root.AddCommand(listExecutionsCmd)
+	root.AddCommand(listRunsCmd)
 
 	return root
 }
