@@ -124,6 +124,38 @@ func TestCreateCanvasInheritsOrganizationVersioningWhenEnabled(t *testing.T) {
 	require.True(t, createdCanvas.VersioningEnabled)
 }
 
+func TestCreateCanvasOnFreshOrganization(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	canvas := &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name:        "Health Check Monitor",
+			Description: "Quick start canvas on a fresh organization",
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+
+	response, err := CreateCanvas(ctx, r.Registry, r.Organization.ID.String(), canvas)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	require.NotNil(t, response.Canvas)
+	require.NotNil(t, response.Canvas.Metadata)
+	require.Equal(t, "Health Check Monitor", response.Canvas.Metadata.Name)
+	require.Equal(t, r.Organization.ID.String(), response.Canvas.Metadata.OrganizationId)
+	require.NotEmpty(t, response.Canvas.Metadata.Id)
+
+	canvasID, err := uuid.Parse(response.Canvas.Metadata.Id)
+	require.NoError(t, err)
+	persisted, err := models.FindCanvas(r.Organization.ID, canvasID)
+	require.NoError(t, err)
+	require.Equal(t, "Health Check Monitor", persisted.Name)
+	require.Equal(t, r.Organization.ID, persisted.OrganizationID)
+}
+
 func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

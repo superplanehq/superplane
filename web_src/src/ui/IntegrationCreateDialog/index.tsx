@@ -5,13 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
 import { getApiErrorMessage } from "@/utils/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
 import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
@@ -50,6 +51,12 @@ export interface IntegrationCreateDialogProps {
   initialStepFieldNames?: string[];
   /** Optional custom description for the webhook completion step. */
   webhookStepDescription?: ReactNode;
+  /** Pre-created integration state for resuming a flow started inline (e.g. browser action after inline creation). */
+  initialCreatedIntegrationId?: string;
+  initialBrowserAction?: OrganizationsBrowserAction;
+  initialWebhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
+  /** Existing configuration to pre-populate when resuming a pending integration flow. */
+  initialConfiguration?: Record<string, unknown>;
 }
 
 export function IntegrationCreateDialog({
@@ -65,6 +72,10 @@ export function IntegrationCreateDialog({
   instructionsEndBeforeHeading,
   initialStepFieldNames,
   webhookStepDescription,
+  initialCreatedIntegrationId,
+  initialBrowserAction,
+  initialWebhookSetup,
+  initialConfiguration,
 }: IntegrationCreateDialogProps) {
   const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
@@ -81,6 +92,7 @@ export function IntegrationCreateDialog({
   const [createError, setCreateError] = useState<unknown>(null);
   const [createdIntegrationId, setCreatedIntegrationId] = useState<string | undefined>(undefined);
   const [browserActionCompleted, setBrowserActionCompleted] = useState(false);
+  const prevOpenRef = useRef(false);
 
   const updateIntegrationMutation = useUpdateIntegration(
     organizationId,
@@ -101,15 +113,17 @@ export function IntegrationCreateDialog({
   }, [integrationDefinition?.configuration, initialStepFieldNames]);
 
   useEffect(() => {
-    if (open) {
-      setIntegrationName(defaultName);
-      setConfiguration({});
-      setCreateIntegrationBrowserAction(undefined);
-      setPendingWebhookSetup(null);
-      setCreatedIntegrationId(undefined);
-      setBrowserActionCompleted(false);
-    }
-  }, [open, defaultName]);
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
+    setIntegrationName(defaultName);
+    setConfiguration(initialConfiguration ? { ...initialConfiguration } : {});
+    setCreateIntegrationBrowserAction(initialBrowserAction ?? undefined);
+    setPendingWebhookSetup(initialWebhookSetup ?? null);
+    setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
+    setBrowserActionCompleted(false);
+  }, [open, defaultName, initialBrowserAction, initialWebhookSetup, initialCreatedIntegrationId, initialConfiguration]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {
@@ -151,12 +165,7 @@ export function IntegrationCreateDialog({
 
       const integration = result.integration;
       const browserAction = integration?.status?.browserAction;
-      const webhookUrl =
-        integration?.status?.metadata &&
-        typeof integration.status.metadata === "object" &&
-        "webhookUrl" in integration.status.metadata
-          ? (integration.status.metadata as { webhookUrl?: string }).webhookUrl
-          : undefined;
+      const webhookUrl = getIntegrationWebhookUrl(integration?.status?.metadata);
 
       if (browserAction) {
         setCreateIntegrationBrowserAction(browserAction);

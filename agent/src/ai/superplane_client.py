@@ -101,19 +101,21 @@ class SuperplaneClient:
         self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
 
-    def _api_request(self, callback: Any, operation: str) -> Any:
+    def _api_request(self, callback: Any, operation: str, fields: dict[str, Any] | None = None) -> Any:
         org_id = self._config.organization_id
+        fields_str = " ".join([f"{key}={value}" for key, value in fields.items()]) if fields else ""
+
         try:
             response = callback()
-            _debug_log(f"[api] org={org_id} operation={operation} status=200 OK")
+            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status=200 OK")
             return response
         except ApiException as error:
             status = error.status if isinstance(error.status, int) else "unknown"
-            _debug_log(f"[api] org={org_id} operation={operation} status={status} reason={error}")
+            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status={status} reason={error}")
 
             raise RuntimeError("Superplane API request failed.") from error
         except Exception as error:
-            _debug_log(f"[api] org={org_id} operation={operation} status=unknown_error reason={error}")
+            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status=unknown_error reason={error}")
 
             raise RuntimeError("Failed to reach Superplane API.") from error
 
@@ -124,6 +126,7 @@ class SuperplaneClient:
                 _request_timeout=self._config.timeout_seconds,
             ),
             operation="canvases_describe_canvas",
+            fields={"canvas_id": canvas_id},
         )
         if not isinstance(response, CanvasesDescribeCanvasResponse):
             raise ValueError("Expected typed response from Superplane API.")

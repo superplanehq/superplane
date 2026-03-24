@@ -174,13 +174,13 @@ func CreateCanvasWithAutoLayoutAndUsage(
 		return nil, err
 	}
 
+	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
+		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
+	}
+
 	proto, err := SerializeCanvas(&canvas, false)
 	if err != nil {
 		return nil, err
-	}
-
-	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
-		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
 	return &pb.CreateCanvasResponse{

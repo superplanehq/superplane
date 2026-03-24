@@ -159,23 +159,27 @@ export const IntegrationResourceFieldRenderer = ({
     }
   }, [isMulti, value, field.defaultValue, onChange]);
 
-  // Now we can do early returns
-  if (!organizationId || !integrationId) {
-    return (
-      <div className="text-sm text-red-500 dark:text-red-400">
-        Integration resource field requires organizationId and integrationId props
-      </div>
-    );
-  }
-
-  if (isLoadingResources) {
-    return <div className="text-sm text-gray-500 dark:text-gray-400">Loading {resourceType} resources...</div>;
-  }
-
-  if (resourcesError) {
-    return <div className="text-sm text-red-500 dark:text-red-400">Failed to load resources</div>;
-  }
+  const resourcesUnavailable = !organizationId || !integrationId || isLoadingResources || !!resourcesError;
   const hasResources = Boolean(resources && resources.length > 0);
+
+  const unavailablePlaceholder = isLoadingResources
+    ? `Loading ${resourceType} resources...`
+    : "Connect integration to load options";
+
+  const disabledPicker = (
+    <div>
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder={unavailablePlaceholder} />
+        </SelectTrigger>
+      </Select>
+      {resourcesError && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Options will be available once the integration is connected.
+        </p>
+      )}
+    </div>
+  );
 
   // Single select mode
   if (!isMulti) {
@@ -199,7 +203,9 @@ export const IntegrationResourceFieldRenderer = ({
 
     const expressionValue = typeof value === "string" ? value : "";
 
-    const picker = hasResources ? (
+    const picker = resourcesUnavailable ? (
+      disabledPicker
+    ) : hasResources ? (
       <AutoCompleteSelect
         options={options}
         value={selectedValue}
@@ -267,13 +273,19 @@ export const IntegrationResourceFieldRenderer = ({
   }
 
   // Multi-select mode
+  if (resourcesUnavailable) {
+    return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{disabledPicker}</div>;
+  }
+
   if (!hasResources) {
     return (
-      <Select disabled>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="No resources available" />
-        </SelectTrigger>
-      </Select>
+      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
+        <Select disabled>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="No resources available" />
+          </SelectTrigger>
+        </Select>
+      </div>
     );
   }
 
