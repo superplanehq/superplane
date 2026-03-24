@@ -11,11 +11,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
+  <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
   <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
+  <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
@@ -25,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
+  <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
 </CardGrid>
 
@@ -166,6 +169,108 @@ Returns the created alert policy including:
   },
   "timestamp": "2026-03-18T09:29:00.308296519Z",
   "type": "digitalocean.alertpolicy.created"
+}
+```
+
+<a id="create-app"></a>
+
+## Create App
+
+The Create App component provisions a new application on DigitalOcean's App Platform from a GitHub, GitLab, or Bitbucket repository.
+The component requires that you have connected your Git provider in your DigitalOcean account and granted access to the repository you want to deploy.
+You can do so by creating a sample app in the DigitalOcean control panel as illustrated here: https://docs.digitalocean.com/products/app-platform/getting-started/deploy-sample-apps/
+
+### Use Cases
+
+- **Deploy web services**: Provision web services and APIs with configurable instance sizes and HTTP ports
+- **Deploy static sites**: Host static websites and single-page applications with custom build and output directories
+- **Deploy workers**: Run background workers for processing tasks
+- **Deploy jobs**: Run one-off or scheduled jobs (pre-deploy, post-deploy, or failed-deploy)
+- **Automated provisioning**: Create app instances as part of infrastructure automation workflows
+- **Multi-environment setup**: Deploy separate app instances for dev, staging, and production
+
+### Configuration
+
+- **Name**: The name for the app (required)
+- **Region**: The region to deploy the app in (required)
+- **Component Type**: The type of component - Service, Static Site, Worker, or Job (required, defaults to Service)
+- **Source Provider**: The source code provider - GitHub, GitLab, or Bitbucket (required)
+- **Repository**: The repository in owner/repo format (required, shown based on selected provider)
+- **Branch**: The branch to deploy from (defaults to "main", shown based on selected provider)
+- **Deploy on Push**: Automatically deploy when code is pushed to the branch (default: true)
+- **Environment Slug**: The runtime environment/buildpack (e.g., go, node-js, python, html)
+- **Build Command**: Custom build command (e.g., npm install && npm run build)
+- **Run Command**: Custom run command for services, workers, and jobs (e.g., npm start)
+- **Source Directory**: Path to the source code within the repository (defaults to /)
+- **HTTP Port**: The port the service listens on (services only)
+- **Instance Size**: The instance size slug (e.g., apps-s-1vcpu-1gb) for services, workers, and jobs
+- **Instance Count**: Number of instances to run (services, workers, and jobs)
+- **Output Directory**: Build output directory for static sites (e.g., build, dist, public)
+- **Index Document**: Index document for static sites (defaults to index.html)
+- **Error Document**: Custom error document for static sites (e.g., 404.html)
+- **Catchall Document**: Catchall document for single-page applications (e.g., index.html)
+- **Environment Variables**: Key-value pairs for environment variables (optional)
+
+#### Ingress Configuration
+
+- **Ingress Path**: Path prefix for routing traffic to the component (e.g., /api for services, / for static sites)
+- **CORS Allow Origins**: Origins allowed for Cross-Origin Resource Sharing (e.g., https://example.com)
+- **CORS Allow Methods**: HTTP methods allowed for CORS requests (e.g., GET, POST, PUT)
+
+#### Database Configuration
+
+- **Add Database**: Attach a database to the app
+- **Database Component Name**: Name used to reference the database in env vars (e.g., $&lbrace;db.DATABASE_URL&rbrace;)
+- **Database Engine**: PostgreSQL, MySQL, Redis, or MongoDB
+- **Database Version**: Engine version (e.g., 16 for PostgreSQL)
+- **Use Managed Database**: Connect to an existing DigitalOcean Managed Database cluster instead of a dev database
+- **Database Cluster Name**: Name of the existing managed database cluster (required for managed databases)
+- **Database Name / User**: Optional database name and user for managed database connections
+
+#### VPC Configuration
+
+- **VPC**: ID of the VPC to deploy into. Apps in a VPC can communicate with other resources over the private network.
+
+### Output
+
+Returns the created app including:
+- **id**: The unique app ID
+- **name**: The app name
+- **defaultIngress**: The default ingress URL
+- **liveURL**: The live URL for the app
+- **region**: The region where the app is deployed
+- **activeDeployment**: Information about the active deployment
+
+### Notes
+
+- The app will be created with a single component of the selected type
+- Deployments are asynchronous and may take several minutes to complete
+- The component emits an output once the deployment reaches ACTIVE status
+- If the deployment fails, the component will report the failure
+- Dev databases are free and suitable for development; use managed databases for production
+- Use bindable variables (e.g., $&lbrace;db.DATABASE_URL&rbrace;) to reference database connection details in environment variables
+
+### Example Output
+
+```json
+{
+  "data": {
+    "defaultIngress": "https://my-app-22-b6v8c.ondigitalocean.app",
+    "id": "6d8abe1c-7cc5-4db3-b1aa-d9cdd1c127e7",
+    "liveURL": "https://my-app-22-b6v8c.ondigitalocean.app",
+    "name": "my-app-22",
+    "region": {
+      "continent": "Asia",
+      "data_centers": [
+        "blr1"
+      ],
+      "flag": "india",
+      "label": "Bangalore",
+      "slug": "blr"
+    }
+  },
+  "timestamp": "2026-03-24T07:01:24.678254095Z",
+  "type": "digitalocean.app.created"
 }
 ```
 
@@ -453,6 +558,45 @@ Returns information about the deleted policy:
   },
   "timestamp": "2026-03-17T10:00:00Z",
   "type": "digitalocean.alertpolicy.deleted"
+}
+```
+
+<a id="delete-app"></a>
+
+## Delete App
+
+The Delete App component removes a DigitalOcean App Platform application.
+
+### Use Cases
+
+- **Cleanup**: Remove applications that are no longer needed
+- **Environment teardown**: Delete temporary or test app instances
+- **Resource management**: Free up resources by deleting unused apps
+
+### Configuration
+
+- **App**: The app to delete (required)
+
+### Output
+
+Returns confirmation of the deleted app including:
+- **appId**: The ID of the deleted app
+
+### Notes
+
+- This operation is idempotent - deleting an already deleted app will succeed
+- All deployments and associated resources will be removed
+- This action cannot be undone
+
+### Example Output
+
+```json
+{
+  "data": {
+    "appId": "20e27025-f9c1-4da4-bfc4-00a13eb9ff42"
+  },
+  "timestamp": "2026-03-24T05:59:24.092664924Z",
+  "type": "digitalocean.app.deleted"
 }
 ```
 
@@ -935,6 +1079,100 @@ Returns the updated alert policy including:
   },
   "timestamp": "2026-03-18T09:29:00.308296519Z",
   "type": "digitalocean.alertpolicy.updated"
+}
+```
+
+<a id="update-app"></a>
+
+## Update App
+
+The Update App component modifies an existing DigitalOcean App Platform application.
+
+### Use Cases
+
+- **Update configuration**: Change app settings like environment variables, branch, build commands, and more
+- **Rename apps**: Update the app name
+- **Migrate regions**: Move the app to a different region
+- **Inject secrets**: Add or update environment variables such as database connection strings
+- **Switch branches**: Change the deployed branch without recreating the app
+- **Scale resources**: Adjust instance size and count for services, workers, and jobs
+- **Configure networking**: Update ingress paths, CORS settings, and VPC connections
+- **Manage databases**: Add or update database attachments (dev or managed)
+
+### Configuration
+
+- **App**: The app to update (required)
+- **Name**: Update the app name (optional)
+- **Region**: Update the region the app is deployed in (optional)
+- **Branch**: The branch to deploy from (optional, applies to all components' source providers)
+- **Deploy on Push**: Toggle automatic deployment when code is pushed to the branch
+- **Environment Slug**: Update the runtime environment/buildpack
+- **Build Command**: Update the build command
+- **Run Command**: Update the run command (services, workers, jobs)
+- **Source Directory**: Update the source directory path
+- **HTTP Port**: Update the service listening port
+- **Instance Size**: Update the instance size slug
+- **Instance Count**: Update the number of instances
+- **Output Directory**: Update the static site output directory
+- **Index/Error/Catchall Document**: Update static site document settings
+- **Environment Variables**: Key-value pairs to add or update (merges with existing)
+
+#### Ingress Configuration
+
+- **Ingress Path**: Update the path prefix for routing traffic
+- **CORS Allow Origins**: Update allowed origins for Cross-Origin Resource Sharing
+- **CORS Allow Methods**: Update HTTP methods allowed for CORS requests
+
+#### Database Configuration
+
+- **Add Database**: Attach a new database to the app
+- **Database Component Name, Engine, Version**: Configure the database
+- **Use Managed Database**: Connect to an existing managed database cluster
+
+#### VPC Configuration
+
+- **VPC**: Update the VPC ID for the app
+
+### Output
+
+Returns the updated app including:
+- **id**: The unique app ID
+- **name**: The app name
+- **region**: The region where the app is deployed
+- **liveURL**: The live URL for the app
+- **defaultIngress**: The default ingress URL
+- **activeDeployment**: Information about the updated deployment
+
+### Notes
+
+- Environment variables are merged with existing ones (not replaced)
+- Build/runtime settings are applied to all matching components
+- Updating an app triggers a new deployment
+- The component emits an output once the deployment reaches ACTIVE status
+- If the deployment fails, the component will report the failure
+- Dev databases are free and suitable for development; use managed databases for production
+
+### Example Output
+
+```json
+{
+  "data": {
+    "defaultIngress": "https://my-app-22-b6v8c.ondigitalocean.app",
+    "id": "6d8abe1c-7cc5-4db3-b1aa-d9cdd1c127e7",
+    "liveURL": "https://my-app-22-b6v8c.ondigitalocean.app",
+    "name": "my-app-22",
+    "region": {
+      "continent": "Asia",
+      "data_centers": [
+        "blr1"
+      ],
+      "flag": "india",
+      "label": "Bangalore",
+      "slug": "blr"
+    }
+  },
+  "timestamp": "2026-03-24T07:06:01.044139416Z",
+  "type": "digitalocean.app.updated"
 }
 ```
 
