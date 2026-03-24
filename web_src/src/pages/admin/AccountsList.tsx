@@ -153,7 +153,6 @@ const AccountsList: React.FC = () => {
                     isSelf={acc.id === currentAccount?.id}
                     toggling={toggling === acc.id}
                     onPromoteDemote={() => setConfirmTarget(acc)}
-                    onImpersonate={startImpersonation}
                     impersonateButton={<ImpersonateBtn acc={acc} onImpersonate={startImpersonation} />}
                   />
                 ))}

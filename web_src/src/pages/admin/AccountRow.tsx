@@ -22,7 +22,6 @@ interface AccountRowProps {
   isSelf: boolean;
   toggling: boolean;
   onPromoteDemote: () => void;
-  onImpersonate: (orgId: string, userId: string) => void;
   impersonateButton: React.ReactNode;
 }
 

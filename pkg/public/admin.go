@@ -378,6 +378,14 @@ func (s *Server) impersonationStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verify the token belongs to the currently authenticated admin
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok || claims.AdminAccountID != account.ID.String() {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"active": false})
+		return
+	}
+
 	userName := ""
 	orgName := ""
 
