@@ -11,13 +11,11 @@ import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
-  integrationKeys,
   useAvailableIntegrations,
   useCreateIntegration,
   useIntegration,
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
-import { useQueryClient } from "@tanstack/react-query";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast } from "@/utils/toast";
@@ -270,7 +268,6 @@ export const ComponentSidebar = ({
   // Use autocompleteExampleObj directly - current node is already filtered out upstream
   const resolvedAutocompleteExampleObj = autocompleteExampleObj ?? null;
 
-  const queryClient = useQueryClient();
   const { data: availableIntegrationDefinitions = [] } = useAvailableIntegrations();
   const { data: configureIntegration, isLoading: configureIntegrationLoading } = useIntegration(
     domainId ?? "",
@@ -780,18 +777,9 @@ export const ComponentSidebar = ({
                   canCreateIntegrations={canCreateIntegrations}
                   canUpdateIntegrations={canUpdateIntegrations}
                   integrationDefinition={createIntegrationDefinition}
-                  integrationDefinitionFull={createIntegrationDefinition}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
-                  onCreateIntegration={async (payload) => {
-                    const res = await createIntegrationMutation.mutateAsync(payload);
-                    return res.data;
-                  }}
-                  onIntegrationCreated={() => {
-                    void queryClient.invalidateQueries({ queryKey: integrationKeys.connected(domainId ?? "") });
-                  }}
-                  organizationId={domainId}
                 />
               </TabsContent>
             )}
