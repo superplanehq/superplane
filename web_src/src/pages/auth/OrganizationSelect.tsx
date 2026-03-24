@@ -122,8 +122,8 @@ const OrganizationSelect: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 p-8">
-        <div className="flex flex-col items-center space-y-4">
+      <div className="min-h-screen bg-slate-100 p-8 flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4 min-h-40 flex-1">
           <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
           <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
         </div>
