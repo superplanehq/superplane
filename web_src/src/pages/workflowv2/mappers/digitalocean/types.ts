@@ -129,3 +129,26 @@ export interface GetDropletMetricsOutput {
   avgPublicOutboundBandwidthMbps?: number;
   avgPublicInboundBandwidthMbps?: number;
 }
+
+export interface AppNodeMetadata {
+  appId?: string;
+  appName?: string;
+}
+
+export interface CreateAppConfiguration {
+  name: string;
+  region: string;
+  gitHubRepo: string;
+  gitHubBranch?: string;
+  envVars?: string[];
+}
+
+export interface DeleteAppConfiguration {
+  app: string;
+}
+
+export interface UpdateAppConfiguration {
+  app: string;
+  envVars?: string[];
+  gitHubBranch?: string;
+}
