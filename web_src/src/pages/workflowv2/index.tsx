@@ -335,6 +335,19 @@ function getNodeIntegrationName(
   return undefined;
 }
 
+function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
+  const map = new Map<string, { state?: string; description?: string }>();
+  for (const integration of integrations) {
+    if (integration.metadata?.id && integration.status?.state !== "ready") {
+      map.set(integration.metadata.id, {
+        state: integration.status?.state,
+        description: integration.status?.stateDescription,
+      });
+    }
+  }
+  return map;
+}
+
 function overlayIntegrationWarnings(
   nodes: CanvasNode[],
   integrations: OrganizationsIntegration[],
@@ -342,15 +355,7 @@ function overlayIntegrationWarnings(
 ): CanvasNode[] {
   if (!integrations.length || !canvasNodes) return nodes;
 
-  const nonReadyIntegrations = new Map<string, { state?: string; description?: string }>();
-  for (const integration of integrations) {
-    if (integration.metadata?.id && integration.status?.state !== "ready") {
-      nonReadyIntegrations.set(integration.metadata.id, {
-        state: integration.status?.state,
-        description: integration.status?.stateDescription,
-      });
-    }
-  }
+  const nonReadyIntegrations = buildNonReadyIntegrationMap(integrations);
   if (nonReadyIntegrations.size === 0) return nodes;
 
   const canvasNodeMap = new Map(canvasNodes.map((n) => [n.id, n]));
@@ -2426,6 +2431,16 @@ export function WorkflowPageV2() {
     return integrations.find((i) => i.spec?.integrationName === integrationDialogName && i.status?.state !== "ready");
   }, [integrationDialogName, integrations]);
 
+  const initialWebhookSetup = useMemo(() => {
+    const webhookUrl = getIntegrationWebhookUrl(integrationDialogPendingInstance?.status?.metadata);
+    if (!webhookUrl || !integrationDialogPendingInstance?.metadata?.id) return undefined;
+    return {
+      id: integrationDialogPendingInstance.metadata.id,
+      webhookUrl,
+      config: { ...(integrationDialogPendingInstance.spec?.configuration ?? {}) },
+    };
+  }, [integrationDialogPendingInstance]);
+
   const missingIntegrations: MissingIntegration[] = useMemo(() => {
     if (!canvas?.spec?.nodes || !canReadIntegrations) return [];
 
@@ -2455,15 +2470,11 @@ export function WorkflowPageV2() {
         const nonReadyInstance = integrations.find(
           (i) => i.spec?.integrationName === integrationName && i.status?.state !== "ready",
         );
+        const rawState = nonReadyInstance?.status?.state;
         missingMap.set(integrationName, {
           count: 1,
           definition: availableIntegrations.find((d) => d.name === integrationName),
-          state:
-            nonReadyInstance?.status?.state === "error"
-              ? "error"
-              : nonReadyInstance?.status?.state === "pending"
-                ? "pending"
-                : undefined,
+          state: rawState === "error" ? "error" : rawState === "pending" ? "pending" : undefined,
           stateDescription: nonReadyInstance?.status?.stateDescription,
         });
       }
@@ -5351,15 +5362,7 @@ export function WorkflowPageV2() {
         onCreated={(integrationId) => void handleIntegrationCreated(integrationId)}
         initialBrowserAction={integrationDialogPendingInstance?.status?.browserAction}
         initialCreatedIntegrationId={integrationDialogPendingInstance?.metadata?.id}
-        initialWebhookSetup={(() => {
-          const webhookUrl = getIntegrationWebhookUrl(integrationDialogPendingInstance?.status?.metadata);
-          if (!webhookUrl || !integrationDialogPendingInstance?.metadata?.id) return undefined;
-          return {
-            id: integrationDialogPendingInstance.metadata.id,
-            webhookUrl,
-            config: { ...(integrationDialogPendingInstance.spec?.configuration ?? {}) },
-          };
-        })()}
+        initialWebhookSetup={initialWebhookSetup}
       />
     </>
   );

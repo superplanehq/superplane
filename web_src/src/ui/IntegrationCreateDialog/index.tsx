@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
@@ -89,6 +89,7 @@ export function IntegrationCreateDialog({
   const [createError, setCreateError] = useState<unknown>(null);
   const [createdIntegrationId, setCreatedIntegrationId] = useState<string | undefined>(undefined);
   const [browserActionCompleted, setBrowserActionCompleted] = useState(false);
+  const prevOpenRef = useRef(false);
 
   const updateIntegrationMutation = useUpdateIntegration(
     organizationId,
@@ -109,14 +110,16 @@ export function IntegrationCreateDialog({
   }, [integrationDefinition?.configuration, initialStepFieldNames]);
 
   useEffect(() => {
-    if (open) {
-      setIntegrationName(defaultName);
-      setConfiguration({});
-      setCreateIntegrationBrowserAction(initialBrowserAction ?? undefined);
-      setPendingWebhookSetup(initialWebhookSetup ?? null);
-      setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
-      setBrowserActionCompleted(false);
-    }
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!justOpened) return;
+
+    setIntegrationName(defaultName);
+    setConfiguration({});
+    setCreateIntegrationBrowserAction(initialBrowserAction ?? undefined);
+    setPendingWebhookSetup(initialWebhookSetup ?? null);
+    setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
+    setBrowserActionCompleted(false);
   }, [open, defaultName, initialBrowserAction, initialWebhookSetup, initialCreatedIntegrationId]);
 
   const handleOpenChange = useCallback(
