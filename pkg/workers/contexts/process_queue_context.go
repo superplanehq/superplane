@@ -125,7 +125,9 @@ func BuildProcessQueueContext(
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
+			CanvasName:     "",
 			NodeID:         execution.NodeID,
+			NodeName:       node.Name,
 			Configuration:  execution.Configuration.Data(),
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
@@ -226,7 +228,9 @@ func BuildProcessQueueContext(
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
+			CanvasName:     "",
 			NodeID:         execution.NodeID,
+			NodeName:       node.Name,
 			Configuration:  execution.Configuration.Data(),
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, execution),
