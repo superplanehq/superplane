@@ -203,24 +203,22 @@ export const IntegrationResourceFieldRenderer = ({
 
     const expressionValue = typeof value === "string" ? value : "";
 
-    const picker = resourcesUnavailable
-      ? disabledPicker
-      : hasResources
-        ? (
-            <AutoCompleteSelect
-              options={options}
-              value={selectedValue}
-              onChange={(val) => onChange(val || undefined)}
-              placeholder={field.placeholder ?? `Select ${resourceType}`}
-            />
-          )
-        : (
-            <Select disabled>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="No resources available" />
-              </SelectTrigger>
-            </Select>
-          );
+    const picker = resourcesUnavailable ? (
+      disabledPicker
+    ) : hasResources ? (
+      <AutoCompleteSelect
+        options={options}
+        value={selectedValue}
+        onChange={(val) => onChange(val || undefined)}
+        placeholder={field.placeholder ?? `Select ${resourceType}`}
+      />
+    ) : (
+      <Select disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="No resources available" />
+        </SelectTrigger>
+      </Select>
+    );
 
     const expressionInput = (
       <AutoCompleteInput
@@ -276,11 +274,7 @@ export const IntegrationResourceFieldRenderer = ({
 
   // Multi-select mode
   if (resourcesUnavailable || !hasResources) {
-    return (
-      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
-        {disabledPicker}
-      </div>
-    );
+    return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{disabledPicker}</div>;
   }
 
   // Convert selected values to SelectOption objects
