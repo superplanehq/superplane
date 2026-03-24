@@ -61,12 +61,21 @@ func pollDeployment(ctx core.ActionContext, eventType string) error {
 
 		return ctx.ExecutionState.Fail("deployment_failed", message)
 
-	default:
-		// PENDING_BUILD, BUILDING, DEPLOYING — keep polling
+	case "SUPERSEDED":
+		return ctx.ExecutionState.Fail("deployment_superseded", "deployment was superseded by a newer deployment")
+
+	case "CANCELED":
+		return ctx.ExecutionState.Fail("deployment_canceled", "deployment was canceled")
+
+	case "PENDING_BUILD", "PENDING_DEPLOY", "BUILDING", "DEPLOYING":
+		// In-progress phases — keep polling
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{
 			"appID":        metadata.AppID,
 			"deploymentID": metadata.DeploymentID,
 		}, appPollInterval)
+
+	default:
+		return fmt.Errorf("deployment reached unexpected phase %q", deployment.Phase)
 	}
 }
 
@@ -76,12 +85,18 @@ func emitAppOutput(state core.ExecutionStateContext, eventType string, app *App)
 	if app.ActiveDeployment != nil {
 		deploymentStatus = app.ActiveDeployment.Phase
 	}
+
+	name := ""
+	if app.Spec != nil {
+		name = app.Spec.Name
+	}
+
 	return state.Emit(
 		core.DefaultOutputChannel.Name,
 		eventType,
 		[]any{map[string]any{
 			"id":               app.ID,
-			"name":             app.Spec.Name,
+			"name":             name,
 			"region":           app.Region,
 			"liveURL":          app.LiveURL,
 			"defaultIngress":   app.DefaultIngress,

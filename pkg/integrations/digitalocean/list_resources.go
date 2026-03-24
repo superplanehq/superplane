@@ -340,9 +340,14 @@ func listApps(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 
 	resources := make([]core.IntegrationResource, 0, len(apps))
 	for _, app := range apps {
+		name := app.ID
+		if app.Spec != nil {
+			name = app.Spec.Name
+		}
+
 		resources = append(resources, core.IntegrationResource{
 			Type: "app",
-			Name: app.Spec.Name,
+			Name: name,
 			ID:   app.ID,
 		})
 	}

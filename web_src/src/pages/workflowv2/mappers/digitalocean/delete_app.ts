@@ -33,7 +33,7 @@ export const deleteAppMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -41,10 +41,10 @@ export const deleteAppMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    details["App ID"] = result.appId || "-";
+    details["App ID"] = (result.appId as string) || "-";
     details["Status"] = "Deleted";
 
     return details;

@@ -33,7 +33,7 @@ export const updateAppMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -41,14 +41,15 @@ export const updateAppMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    details["App ID"] = result.id || "-";
-    details["App Name"] = result.name || "-";
-    details["Live URL"] = result.liveURL || "-";
-    details["Region"] = result.region?.label || result.region?.slug || "-";
-    details["Status"] = result.deploymentStatus || "Unknown";
+    details["App ID"] = (result.id as string) || "-";
+    details["App Name"] = (result.name as string) || "-";
+    details["Live URL"] = (result.liveURL as string) || "-";
+    const region = result.region as Record<string, unknown> | undefined;
+    details["Region"] = (region?.label as string) || (region?.slug as string) || "-";
+    details["Status"] = (result.deploymentStatus as string) || "Unknown";
 
     return details;
   },
