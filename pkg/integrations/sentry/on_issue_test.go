@@ -100,6 +100,38 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 	assert.Equal(t, "sentry.issue", eventCtx.Payloads[0].Type)
 }
 
+func Test__OnIssue__OnIntegrationMessage__UsesTopLevelWebhookTimestamp(t *testing.T) {
+	trigger := &OnIssue{}
+	eventCtx := &contexts.EventContext{}
+
+	err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+		Message: WebhookMessage{
+			Resource:  "issue",
+			Action:    "resolved",
+			Timestamp: "2026-03-24T10:15:00Z",
+			Data: map[string]any{
+				"issue": map[string]any{
+					"id":       "123",
+					"title":    "Broken deploy",
+					"lastSeen": "2026-03-20T09:00:00Z",
+				},
+			},
+		},
+		Configuration: map[string]any{
+			"actions": []string{"resolved"},
+		},
+		Events: eventCtx,
+		Logger: logrus.NewEntry(logrus.New()),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, eventCtx.Payloads, 1)
+
+	payload, ok := eventCtx.Payloads[0].Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "2026-03-24T10:15:00Z", payload["timestamp"])
+}
+
 func Test__OnIssue__OnIntegrationMessage__ArchivedAction(t *testing.T) {
 	trigger := &OnIssue{}
 	eventCtx := &contexts.EventContext{}

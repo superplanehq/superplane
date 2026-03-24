@@ -25,6 +25,9 @@ interface SentryIssueEventData {
       shortId?: string;
       title?: string;
       status?: string;
+      permalink?: string;
+      web_url?: string;
+      url?: string;
       project?: {
         slug?: string;
         name?: string;
@@ -63,10 +66,11 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as SentryIssueEventData;
     const issue = eventData?.data?.issue;
     const details: Record<string, string> = {};
+    const issueUrl = issue?.web_url || issue?.permalink || issue?.url;
 
     addFormattedTimestamp(details, "Triggered At", context.event?.createdAt);
-    addDetail(details, "Issue ID", issue?.id);
     addDetail(details, "Title", issue?.title);
+    addDetail(details, "Issue URL", issueUrl);
     addDetail(details, "Action", eventData?.action);
     addDetail(details, "Status", issue?.status);
     addDetail(details, "Project", getProjectLabel(issue));

@@ -197,7 +197,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"installation": message.Installation,
 		"data":         message.Data,
 		"actor":        message.Actor,
-		"timestamp":    issueTimestamp(message.Data),
+		"timestamp":    eventTimestamp(message),
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
@@ -221,6 +221,18 @@ func decodeWebhookMessage(message any) (*WebhookMessage, error) {
 		}
 		return &decoded, nil
 	}
+}
+
+func eventTimestamp(message *WebhookMessage) string {
+	if message != nil && message.Timestamp != "" {
+		return message.Timestamp
+	}
+
+	if message == nil {
+		return ""
+	}
+
+	return issueTimestamp(message.Data)
 }
 
 func issueTimestamp(data map[string]any) string {

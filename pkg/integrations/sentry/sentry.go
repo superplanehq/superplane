@@ -120,6 +120,7 @@ type WebhookInstallation struct {
 type WebhookMessage struct {
 	Resource     string              `json:"resource" mapstructure:"resource"`
 	Action       string              `json:"action" mapstructure:"action"`
+	Timestamp    string              `json:"timestamp,omitempty" mapstructure:"timestamp,omitempty"`
 	Installation WebhookInstallation `json:"installation" mapstructure:"installation"`
 	Data         map[string]any      `json:"data" mapstructure:"data"`
 	Actor        map[string]any      `json:"actor,omitempty" mapstructure:"actor,omitempty"`
@@ -486,6 +487,7 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 
 	var payload struct {
 		Action       string              `json:"action"`
+		Timestamp    string              `json:"timestamp"`
 		Installation WebhookInstallation `json:"installation"`
 		Data         map[string]any      `json:"data"`
 		Actor        map[string]any      `json:"actor"`
@@ -499,6 +501,7 @@ func (s *Sentry) handleWebhook(ctx core.HTTPRequestContext) {
 	message := WebhookMessage{
 		Resource:     resource,
 		Action:       payload.Action,
+		Timestamp:    payload.Timestamp,
 		Installation: payload.Installation,
 		Data:         payload.Data,
 		Actor:        payload.Actor,
