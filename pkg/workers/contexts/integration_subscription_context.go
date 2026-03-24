@@ -134,6 +134,7 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 	return &core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
+		OrganizationID: c.integration.OrganizationID.String(),
 		CanvasName:     canvasName,
 		NodeID:         execution.NodeID,
 		NodeName:       c.node.Name,
