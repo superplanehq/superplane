@@ -137,7 +137,6 @@ func (a *AzureIntegration) Triggers() []core.Trigger {
 		&OnVMRestarted{},
 		&OnServiceBusMessageAvailable{},
 		&OnServiceBusDeadLetterAvailable{},
-		&OnServiceBusMessageReceived{},
 	}
 }
 

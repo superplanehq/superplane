@@ -15,7 +15,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Image Pushed" href="#on-image-pushed" description="Listen to Azure Container Registry image push events" />
   <LinkCard title="On Service Bus Dead-Letter Available" href="#on-service-bus-dead-letter-available" description="Triggers when dead-letter messages are available in a Service Bus queue with no active consumers" />
   <LinkCard title="On Service Bus Message Available" href="#on-service-bus-message-available" description="Triggers when messages are available in a Service Bus queue with no active consumers" />
-  <LinkCard title="On Service Bus Message Received" href="#on-service-bus-message-received" description="Triggers when a message is received from an Azure Service Bus queue or topic subscription" />
   <LinkCard title="On VM Deallocated" href="#on-vm-deallocated" description="Listen to Azure VM deallocation events" />
   <LinkCard title="On VM Deleted" href="#on-vm-deleted" description="Listen to Azure VM deletion events" />
   <LinkCard title="On VM Restarted" href="#on-vm-restarted" description="Listen to Azure VM restart events" />
@@ -490,65 +489,6 @@ Each trigger event includes the full Azure Event Grid event payload:
   "metadataVersion": "1",
   "subject": "queues/my-queue",
   "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ServiceBus/namespaces/my-ns"
-}
-```
-
-<a id="on-service-bus-message-received"></a>
-
-## On Service Bus Message Received
-
-The On Service Bus Message Received trigger polls an Azure Service Bus queue or topic subscription
-and fires a workflow execution for each message received. Messages are consumed (deleted) after delivery.
-
-### Use Cases
-
-- **Queue processing**: Trigger workflows for each message published to a queue
-- **Event-driven pipelines**: React to messages published to a topic subscription
-- **Task distribution**: Fan out work to parallel workflow executions per message
-
-### How It Works
-
-1. SuperPlane polls the queue or topic subscription using long-polling (55-second timeout)
-2. When a message arrives, it is received and deleted (receive-and-delete mode)
-3. The message body and metadata are passed to the workflow as trigger event data
-4. Polling resumes immediately for the next message
-
-### Configuration
-
-- **Namespace**: The Service Bus namespace (short name, not FQDN)
-- **Entity Type**: Queue or topic subscription
-- **Queue Name**: The queue to receive from (when entity type is queue)
-- **Topic Name**: The topic containing the subscription (when entity type is topic)
-- **Subscription Name**: The subscription to receive from (when entity type is topic)
-
-### Event Data
-
-- **body**: The raw message body
-- **messageId**: The Service Bus message ID
-- **contentType**: The content type of the message
-- **namespaceName**: The Service Bus namespace
-- **entityPath**: The queue name or topic/subscription path
-- **properties**: Broker properties (MessageId, ContentType, etc.)
-
-### Notes
-
-- Uses receive-and-delete mode: messages are consumed atomically
-- Works with Standard and Premium tier namespaces (no Event Grid required)
-- Requires **Azure Service Bus Data Receiver** or **Data Owner** role
-
-### Example Data
-
-```json
-{
-  "body": "{\"event\": \"order_created\", \"orderId\": \"12345\"}",
-  "contentType": "application/json",
-  "entityPath": "my-queue",
-  "messageId": "abc123",
-  "namespaceName": "my-namespace",
-  "properties": {
-    "ContentType": "application/json",
-    "MessageId": "abc123"
-  }
 }
 ```
 

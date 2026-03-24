@@ -17,7 +17,6 @@ import {
 import {
   onServiceBusMessageAvailableTriggerRenderer,
   onServiceBusDeadLetterAvailableTriggerRenderer,
-  onServiceBusMessageReceivedTriggerRenderer,
 } from "./servicebus_triggers";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -38,7 +37,6 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onContainerImageDeleted: onImageDeletedTriggerRenderer,
   onServiceBusMessageAvailable: onServiceBusMessageAvailableTriggerRenderer,
   onServiceBusDeadLetterAvailable: onServiceBusDeadLetterAvailableTriggerRenderer,
-  onServiceBusMessageReceived: onServiceBusMessageReceivedTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
