@@ -2,13 +2,14 @@ import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useAccount } from "@/contexts/AccountContext";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { showErrorToast } from "@/utils/toast";
 import { ChevronDown, Eye } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
+import { startImpersonation, toggleAdmin } from "./useAccountActions";
 
 interface Membership {
   organization_id: string;
@@ -96,42 +97,11 @@ const AccountsList: React.FC = () => {
     return () => clearTimeout(t);
   }, [search, fetchAccounts]);
 
-  const executeToggle = async (acc: AdminAccount) => {
+  const onToggle = async (acc: AdminAccount) => {
     setConfirmTarget(null);
     setToggling(acc.id);
-    const action = acc.installation_admin ? "demote" : "promote";
-    try {
-      const res = await fetch(`/admin/api/accounts/${acc.id}/${action}`, { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        showErrorToast((await res.text()) || `Failed to ${action}`);
-        return;
-      }
-      showSuccessToast(acc.installation_admin ? `${acc.name} removed as admin` : `${acc.name} promoted to admin`);
-      fetchAccounts(search, offset);
-    } catch {
-      showErrorToast(`Failed to ${action}`);
-    } finally {
-      setToggling(null);
-    }
-  };
-
-  const handleImpersonate = async (orgId: string, userId: string) => {
-    try {
-      const res = await fetch("/admin/api/impersonate/start", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organization_id: orgId, user_id: userId }),
-      });
-      if (!res.ok) {
-        showErrorToast((await res.text()) || "Failed");
-        return;
-      }
-      showSuccessToast("Impersonation started");
-      window.location.href = (await res.json()).redirect_url;
-    } catch {
-      showErrorToast("Failed to start impersonation");
-    }
+    await toggleAdmin(acc, () => fetchAccounts(search, offset));
+    setToggling(null);
   };
 
   if (loading && accounts.length === 0)
@@ -147,21 +117,21 @@ const AccountsList: React.FC = () => {
       <ConfirmAdminDialog
         open={confirmTarget !== null}
         onClose={() => setConfirmTarget(null)}
-        onConfirm={() => confirmTarget && executeToggle(confirmTarget)}
+        onConfirm={() => confirmTarget && onToggle(confirmTarget)}
         accountName={confirmTarget?.name ?? ""}
         accountEmail={confirmTarget?.email ?? ""}
         isPromoting={confirmTarget != null && !confirmTarget.installation_admin}
       />
       <AdminSearchHeader
         title="Accounts"
-        subtitle={`${total} account${total !== 1 ? "s" : ""} across this installation`}
+        subtitle={`${total} account${total !== 1 ? "s" : ""}`}
         search={search}
         onSearchChange={setSearch}
         placeholder="Search by name or email..."
       />
       {accounts.length === 0 ? (
         <div className="text-center py-12">
-          <Text className="text-gray-500">{search ? "No accounts match your search." : "No accounts found."}</Text>
+          <Text className="text-gray-500">{search ? "No accounts match." : "No accounts found."}</Text>
         </div>
       ) : (
         <>
@@ -183,8 +153,8 @@ const AccountsList: React.FC = () => {
                     isSelf={acc.id === currentAccount?.id}
                     toggling={toggling === acc.id}
                     onPromoteDemote={() => setConfirmTarget(acc)}
-                    onImpersonate={handleImpersonate}
-                    impersonateButton={<ImpersonateBtn acc={acc} onImpersonate={handleImpersonate} />}
+                    onImpersonate={startImpersonation}
+                    impersonateButton={<ImpersonateBtn acc={acc} onImpersonate={startImpersonation} />}
                   />
                 ))}
               </tbody>
