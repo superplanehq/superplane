@@ -52,20 +52,39 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type membershipItem struct {
+		OrganizationID   string `json:"organization_id"`
+		OrganizationName string `json:"organization_name"`
+		UserID           string `json:"user_id"`
+	}
+
 	type accountItem struct {
-		ID                string `json:"id"`
-		Name              string `json:"name"`
-		Email             string `json:"email"`
-		InstallationAdmin bool   `json:"installation_admin"`
+		ID                string           `json:"id"`
+		Name              string           `json:"name"`
+		Email             string           `json:"email"`
+		InstallationAdmin bool             `json:"installation_admin"`
+		Memberships       []membershipItem `json:"memberships"`
 	}
 
 	items := make([]accountItem, 0, len(accounts))
 	for _, a := range accounts {
+		memberships, _ := models.FindOrgMembershipsForAccount(a.ID.String())
+
+		mItems := make([]membershipItem, 0, len(memberships))
+		for _, m := range memberships {
+			mItems = append(mItems, membershipItem{
+				OrganizationID:   m.OrganizationID,
+				OrganizationName: m.OrganizationName,
+				UserID:           m.UserID,
+			})
+		}
+
 		items = append(items, accountItem{
 			ID:                a.ID.String(),
 			Name:              a.Name,
 			Email:             a.Email,
 			InstallationAdmin: a.IsInstallationAdmin(),
+			Memberships:       mItems,
 		})
 	}
 

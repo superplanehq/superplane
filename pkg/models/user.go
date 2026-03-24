@@ -296,6 +296,28 @@ func FindMaybeDeletedUsersByIDs(ids []uuid.UUID) ([]User, error) {
 	return users, nil
 }
 
+type AccountOrgMembership struct {
+	OrganizationID   string
+	OrganizationName string
+	UserID           string
+}
+
+func FindOrgMembershipsForAccount(accountID string) ([]AccountOrgMembership, error) {
+	var results []AccountOrgMembership
+
+	err := database.Conn().
+		Table("users").
+		Select("users.organization_id, organizations.name AS organization_name, users.id AS user_id").
+		Joins("JOIN organizations ON organizations.id = users.organization_id").
+		Where("users.account_id = ?", accountID).
+		Where("users.deleted_at IS NULL").
+		Where("organizations.deleted_at IS NULL").
+		Scan(&results).
+		Error
+
+	return results, err
+}
+
 func FindOrganizationsForAccount(email string) ([]Organization, error) {
 	var organizations []Organization
 

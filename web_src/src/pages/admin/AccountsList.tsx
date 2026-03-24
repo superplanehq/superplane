@@ -1,16 +1,25 @@
 import { Text } from "@/components/Text/text";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { Search, Shield, ShieldOff } from "lucide-react";
+import { AlertTriangle, ChevronDown, Eye, Search, Shield, ShieldOff } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+
+interface Membership {
+  organization_id: string;
+  organization_name: string;
+  user_id: string;
+}
 
 interface AdminAccount {
   id: string;
   name: string;
   email: string;
   installation_admin: boolean;
+  memberships: Membership[];
 }
 
 interface PaginatedResponse<T> {
@@ -30,6 +39,8 @@ const AccountsList: React.FC = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<AdminAccount | null>(null);
+  const [impersonating, setImpersonating] = useState<string | null>(null);
 
   const fetchAccounts = useCallback(async (searchTerm: string, pageOffset: number) => {
     setLoading(true);
@@ -58,7 +69,8 @@ const AccountsList: React.FC = () => {
     return () => clearTimeout(t);
   }, [search, fetchAccounts]);
 
-  const handleToggleAdmin = async (account: AdminAccount) => {
+  const executeToggle = async (account: AdminAccount) => {
+    setConfirmTarget(null);
     setToggling(account.id);
     const action = account.installation_admin ? "demote" : "promote";
 
@@ -87,10 +99,89 @@ const AccountsList: React.FC = () => {
     }
   };
 
+  const handleImpersonate = async (orgId: string, userId: string) => {
+    setImpersonating(userId);
+    try {
+      const response = await fetch("/admin/api/impersonate/start", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ organization_id: orgId, user_id: userId }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        showErrorToast(errorText || "Failed to start impersonation");
+        return;
+      }
+
+      const data = await response.json();
+      showSuccessToast("Impersonation started");
+      window.location.href = data.redirect_url;
+    } catch {
+      showErrorToast("Failed to start impersonation");
+    } finally {
+      setImpersonating(null);
+    }
+  };
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const isPromoting = confirmTarget != null && !confirmTarget.installation_admin;
 
   return (
     <div>
+      {/* Confirmation modal */}
+      <Dialog open={confirmTarget !== null} onClose={() => setConfirmTarget(null)} size="md">
+        {confirmTarget && (
+          <>
+            <div className="flex items-center gap-3 mb-2">
+              <div
+                className={`p-2 rounded-full ${isPromoting ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"}`}
+              >
+                <AlertTriangle size={20} />
+              </div>
+              <DialogTitle className="text-gray-800">
+                {isPromoting ? "Promote to Installation Admin" : "Remove Installation Admin"}
+              </DialogTitle>
+            </div>
+
+            <DialogDescription className="text-sm text-gray-600 mt-2 space-y-2">
+              {isPromoting ? (
+                <>
+                  <p>
+                    You are about to grant <strong>{confirmTarget.name}</strong> ({confirmTarget.email}) installation
+                    admin access.
+                  </p>
+                  <p>This will allow them to:</p>
+                  <ul className="list-disc pl-5 space-y-1 text-gray-500">
+                    <li>View all organizations and their data across this installation</li>
+                    <li>Impersonate any user in any organization</li>
+                    <li>Promote or demote other installation admins</li>
+                  </ul>
+                </>
+              ) : (
+                <>
+                  <p>
+                    You are about to remove installation admin access from <strong>{confirmTarget.name}</strong> (
+                    {confirmTarget.email}).
+                  </p>
+                  <p>They will lose the ability to access the admin dashboard and impersonate users.</p>
+                </>
+              )}
+            </DialogDescription>
+
+            <DialogActions>
+              <Button variant={isPromoting ? "default" : "destructive"} onClick={() => executeToggle(confirmTarget)}>
+                {isPromoting ? "Promote to Admin" : "Remove Admin Access"}
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmTarget(null)}>
+                Cancel
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
       <div className="flex items-center justify-between mb-4">
         <div>
           <Heading className="text-gray-800 mb-0.5">Accounts</Heading>
@@ -156,30 +247,74 @@ const AccountsList: React.FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        {isSelf ? (
-                          <Text className="text-xs text-gray-400">Cannot change own access</Text>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleAdmin(acc)}
-                            disabled={toggling === acc.id}
-                          >
-                            {toggling === acc.id ? (
-                              "Updating..."
-                            ) : acc.installation_admin ? (
+                        <div className="flex items-center justify-end gap-2">
+                          {/* Impersonate */}
+                          {isSelf ? null : acc.memberships.length === 0 ? (
+                            <Text className="text-xs text-gray-400">No orgs</Text>
+                          ) : acc.memberships.length === 1 ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleImpersonate(acc.memberships[0].organization_id, acc.memberships[0].user_id)
+                              }
+                              disabled={impersonating === acc.memberships[0].user_id}
+                            >
                               <span className="flex items-center gap-1">
-                                <ShieldOff size={14} />
-                                Demote
+                                <Eye size={14} />
+                                {impersonating === acc.memberships[0].user_id ? "Starting..." : "Impersonate"}
                               </span>
-                            ) : (
-                              <span className="flex items-center gap-1">
-                                <Shield size={14} />
-                                Promote to Admin
-                              </span>
-                            )}
-                          </Button>
-                        )}
+                            </Button>
+                          ) : (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={impersonating !== null}>
+                                  <span className="flex items-center gap-1">
+                                    <Eye size={14} />
+                                    Impersonate
+                                    <ChevronDown size={12} />
+                                  </span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {acc.memberships.map((m) => (
+                                  <DropdownMenuItem
+                                    key={m.organization_id}
+                                    onClick={() => handleImpersonate(m.organization_id, m.user_id)}
+                                  >
+                                    {m.organization_name}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
+
+                          {/* Admin toggle */}
+                          {isSelf ? (
+                            <Text className="text-xs text-gray-400">Cannot change own access</Text>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirmTarget(acc)}
+                              disabled={toggling === acc.id}
+                            >
+                              {toggling === acc.id ? (
+                                "Updating..."
+                              ) : acc.installation_admin ? (
+                                <span className="flex items-center gap-1">
+                                  <ShieldOff size={14} />
+                                  Demote
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1">
+                                  <Shield size={14} />
+                                  Promote
+                                </span>
+                              )}
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
