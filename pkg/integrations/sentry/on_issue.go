@@ -115,11 +115,6 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to decode trigger metadata: %w", err)
 	}
 
-	subscriptionID, err := t.subscribe(ctx, metadata)
-	if err != nil {
-		return err
-	}
-
 	if config.Project != "" {
 		project := findProject(ctx.Integration, config.Project)
 		if project == nil {
@@ -128,6 +123,11 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 		metadata.Project = project
 	} else {
 		metadata.Project = nil
+	}
+
+	subscriptionID, err := t.subscribe(ctx, metadata)
+	if err != nil {
+		return err
 	}
 
 	metadata.AppSubscriptionID = subscriptionID

@@ -164,7 +164,7 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Label:       "Sentry Organization URL",
 			Type:        configuration.FieldTypeString,
 			Description: "Sentry instance URL. Use your org-specific URL (e.g., https://your-org.sentry.io) so SuperPlane can identify your organization automatically.",
-			Default:     "https://your-org-slug.sentry.io",
+			Default:     "",
 			Required:    true,
 		},
 		{
@@ -261,6 +261,7 @@ func (s *Sentry) createSetupPrompt(ctx core.SyncContext, config Configuration) e
 		URL:    newInternalIntegrationURL(config.BaseURL),
 		Method: http.MethodGet,
 	})
+	ctx.Integration.Error(missingCredentialsMessage(config))
 	return nil
 }
 
@@ -817,7 +818,7 @@ func normalizedIssueTitle(title string) string {
 		return title
 	}
 
-	return prefix
+	return suffix
 }
 
 func displayIssueLabel(shortID, title string) string {
@@ -832,4 +833,20 @@ func displayIssueLabel(shortID, title string) string {
 	default:
 		return shortID
 	}
+}
+
+func missingCredentialsMessage(config Configuration) string {
+	missing := make([]string, 0, 2)
+	if strings.TrimSpace(config.UserToken) == "" {
+		missing = append(missing, "User Token")
+	}
+	if strings.TrimSpace(config.ClientSecret) == "" {
+		missing = append(missing, "Client Secret")
+	}
+
+	if len(missing) == 0 {
+		return "Sentry credentials are required"
+	}
+
+	return fmt.Sprintf("Sentry configuration is incomplete: missing %s", strings.Join(missing, " and "))
 }

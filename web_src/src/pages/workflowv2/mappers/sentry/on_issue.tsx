@@ -42,10 +42,12 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const issue = eventData?.data?.issue;
     const parsedTitle = splitSentryIssueTitle(issue?.title);
     const title = parsedTitle.title || "Issue";
+    const action = eventData?.action?.trim();
+    const status = issue?.status?.trim();
 
     const subtitleParts = [
-      eventData?.action,
-      issue?.status,
+      action,
+      status && action?.toLowerCase() === status.toLowerCase() ? undefined : status,
       context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : undefined,
     ]
       .filter(Boolean)

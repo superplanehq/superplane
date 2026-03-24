@@ -42,6 +42,9 @@ func Test__Sentry__Sync(t *testing.T) {
 		})
 
 		require.NoError(t, err)
+		assert.Equal(t, "error", integrationCtx.State)
+		assert.Contains(t, integrationCtx.StateDescription, "missing User Token")
+		assert.Contains(t, integrationCtx.StateDescription, "Client Secret")
 		require.NotNil(t, integrationCtx.BrowserAction)
 		assert.Equal(t, "https://sentry.io/settings/", integrationCtx.BrowserAction.URL)
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Internal Integration")
@@ -54,6 +57,29 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Settings → Developer Settings → Custom Integrations")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Token Permissions")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Issue & Event -> Read & Write")
+	})
+
+	t.Run("missing credentials overrides previously ready state", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			IntegrationID: "8f5fbc57-2738-409a-a6f8-af65c2de733c",
+			State:         "ready",
+			Configuration: map[string]any{
+				"baseUrl":      "https://sentry.io",
+				"clientSecret": "client-secret",
+			},
+		}
+
+		err := impl.Sync(core.SyncContext{
+			Configuration:   integrationCtx.Configuration,
+			Integration:     integrationCtx,
+			BaseURL:         "https://app.example.com",
+			WebhooksBaseURL: "https://hooks.example.com",
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "error", integrationCtx.State)
+		assert.Equal(t, "Sentry configuration is incomplete: missing User Token", integrationCtx.StateDescription)
+		require.NotNil(t, integrationCtx.BrowserAction)
 	})
 
 	t.Run("valid token and integration name -> ready and webhook configured", func(t *testing.T) {
@@ -512,7 +538,7 @@ func Test__Sentry__ListResources(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, []core.IntegrationResource{
-			{Type: ResourceTypeIssue, ID: "123", Name: "EXAMPLE-1 · RuntimeError"},
+			{Type: ResourceTypeIssue, ID: "123", Name: "EXAMPLE-1 · API error"},
 			{Type: ResourceTypeIssue, ID: "456", Name: "EXAMPLE-2 · Worker timeout"},
 		}, resources)
 		require.Len(t, httpContext.Requests, 1)
@@ -527,7 +553,7 @@ func Test__Sentry__Configuration(t *testing.T) {
 
 	require.Len(t, fields, 4)
 	assert.Equal(t, "baseUrl", fields[0].Name)
-	assert.Equal(t, "https://your-org-slug.sentry.io", fields[0].Default)
+	assert.Equal(t, "", fields[0].Default)
 	assert.Equal(t, "Sentry Organization URL", fields[0].Label)
 	assert.Equal(t, "userToken", fields[1].Name)
 	assert.Equal(t, "User Token", fields[1].Label)

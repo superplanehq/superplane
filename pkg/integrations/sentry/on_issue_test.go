@@ -13,32 +13,58 @@ import (
 
 func Test__OnIssue__Setup(t *testing.T) {
 	trigger := &OnIssue{}
-	integrationCtx := &contexts.IntegrationContext{
-		Metadata: Metadata{
-			Projects: []ProjectSummary{
-				{ID: "1", Slug: "backend", Name: "Backend"},
+	t.Run("valid project persists subscription and project metadata", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				Projects: []ProjectSummary{
+					{ID: "1", Slug: "backend", Name: "Backend"},
+				},
 			},
-		},
-	}
-	metadataCtx := &contexts.MetadataContext{}
+		}
+		metadataCtx := &contexts.MetadataContext{}
 
-	err := trigger.Setup(core.TriggerContext{
-		Configuration: map[string]any{
-			"project": "backend",
-			"actions": []string{"created"},
-		},
-		Integration: integrationCtx,
-		Metadata:    metadataCtx,
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"project": "backend",
+				"actions": []string{"created"},
+			},
+			Integration: integrationCtx,
+			Metadata:    metadataCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+
+		metadata, ok := metadataCtx.Metadata.(OnIssueMetadata)
+		require.True(t, ok)
+		require.NotNil(t, metadata.AppSubscriptionID)
+		require.NotNil(t, metadata.Project)
+		assert.Equal(t, "backend", metadata.Project.Slug)
 	})
 
-	require.NoError(t, err)
-	require.Len(t, integrationCtx.Subscriptions, 1)
+	t.Run("invalid project does not create a subscription", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: Metadata{
+				Projects: []ProjectSummary{
+					{ID: "1", Slug: "backend", Name: "Backend"},
+				},
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{}
 
-	metadata, ok := metadataCtx.Metadata.(OnIssueMetadata)
-	require.True(t, ok)
-	require.NotNil(t, metadata.AppSubscriptionID)
-	require.NotNil(t, metadata.Project)
-	assert.Equal(t, "backend", metadata.Project.Slug)
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"project": "missing",
+				"actions": []string{"created"},
+			},
+			Integration: integrationCtx,
+			Metadata:    metadataCtx,
+		})
+
+		require.ErrorContains(t, err, `project "missing" was not found`)
+		assert.Empty(t, integrationCtx.Subscriptions)
+		assert.Nil(t, metadataCtx.Metadata)
+	})
 }
 
 func Test__OnIssue__OnIntegrationMessage(t *testing.T) {

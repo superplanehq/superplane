@@ -53,7 +53,7 @@ func Test__UpdateIssue__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, UpdateIssueNodeMetadata{IssueTitle: "EXAMPLE-1 · RuntimeError"}, metadata.Metadata)
+		assert.Equal(t, UpdateIssueNodeMetadata{IssueTitle: "EXAMPLE-1 · Database timeout"}, metadata.Metadata)
 	})
 
 	t.Run("uses issue resources", func(t *testing.T) {
