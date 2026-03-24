@@ -17,13 +17,28 @@ func NewSigner(secret string) *Signer {
 }
 
 func (s *Signer) Generate(subject string, duration time.Duration) (string, error) {
+	return s.GenerateWithClaims(duration, map[string]string{"sub": subject})
+}
+
+// GenerateWithClaims creates a JWT with the standard time claims plus any additional custom claims.
+// Extra claims must not override the reserved time claims (iat, nbf, exp).
+func (s *Signer) GenerateWithClaims(duration time.Duration, extraClaims map[string]string) (string, error) {
 	now := time.Now()
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	claims := jwt.MapClaims{
 		"iat": now.Unix(),
 		"nbf": now.Unix(),
 		"exp": now.Add(duration).Unix(),
-		"sub": subject,
-	})
+	}
+
+	for k, v := range extraClaims {
+		switch k {
+		case "iat", "nbf", "exp":
+			return "", fmt.Errorf("cannot override reserved claim %q", k)
+		}
+		claims[k] = v
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	tokenString, err := token.SignedString([]byte(s.Secret))
 	if err != nil {

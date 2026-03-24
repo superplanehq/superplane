@@ -442,6 +442,20 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 
+	// Admin API routes — requires account auth + installation admin
+	adminRoute := r.PathPrefix("/admin/api").Subrouter()
+	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.RequireInstallationAdmin())
+	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
+	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
+	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
+	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
+	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
+	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
+
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
 		publicRoute.Use(middleware)
@@ -740,15 +754,22 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+type AccountImpersonation struct {
+	Active   bool   `json:"active"`
+	UserName string `json:"user_name,omitempty"`
+}
+
 type AccountResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	AvatarURL string `json:"avatar_url"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	AvatarURL         string                `json:"avatar_url"`
+	InstallationAdmin bool                  `json:"installation_admin"`
+	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -762,10 +783,18 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountResponse := AccountResponse{
-		ID:        account.ID.String(),
-		Name:      account.Name,
-		Email:     account.Email,
-		AvatarURL: getAvatarURL(providers),
+		ID:                account.ID.String(),
+		Name:              account.Name,
+		Email:             account.Email,
+		AvatarURL:         getAvatarURL(providers),
+		InstallationAdmin: account.IsInstallationAdmin(),
+	}
+
+	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
+		accountResponse.Impersonation = &AccountImpersonation{
+			Active:   true,
+			UserName: info.UserName,
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -773,7 +802,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
