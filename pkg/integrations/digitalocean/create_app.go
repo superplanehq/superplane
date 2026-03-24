@@ -26,6 +26,8 @@ func (c *CreateApp) Description() string {
 
 func (c *CreateApp) Documentation() string {
 	return `The Create App component provisions a new application on DigitalOcean's App Platform from a GitHub, GitLab, or Bitbucket repository.
+The component requires that you have connected your Git provider in your DigitalOcean account and granted access to the repository you want to deploy.
+You can do so by creating a sample app in the DigitalOcean control panel as illustrated here: https://docs.digitalocean.com/products/app-platform/getting-started/deploy-sample-apps/
 
 ## Use Cases
 
@@ -157,7 +159,7 @@ func (c *CreateApp) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeSelect,
 			Required:    true,
 			Default:     "github",
-			Description: "The source code provider where the repository is hosted. The selected provider must be connected in your DigitalOcean account.",
+			Description: "The source code provider where the repository is hosted. The selected provider must be connected to your DigitalOcean account.",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
