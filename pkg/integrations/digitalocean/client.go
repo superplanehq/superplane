@@ -1832,8 +1832,13 @@ func resolveAppMetadata(ctx core.SetupContext, appID string) error {
 		return fmt.Errorf("failed to fetch app %q: %w", appID, err)
 	}
 
+	appName := appID
+	if app.Spec != nil {
+		appName = app.Spec.Name
+	}
+
 	return ctx.Metadata.Set(AppNodeMetadata{
 		AppID:   appID,
-		AppName: app.Spec.Name,
+		AppName: appName,
 	})
 }

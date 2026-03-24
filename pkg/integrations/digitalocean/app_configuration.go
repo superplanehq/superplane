@@ -63,12 +63,19 @@ func pollDeployment(ctx core.ActionContext, eventType string) error {
 
 	default:
 		// PENDING_BUILD, BUILDING, DEPLOYING — keep polling
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, appPollInterval)
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{
+			"appID":        metadata.AppID,
+			"deploymentID": metadata.DeploymentID,
+		}, appPollInterval)
 	}
 }
 
 // emitAppOutput emits the standard app output payload.
 func emitAppOutput(state core.ExecutionStateContext, eventType string, app *App) error {
+	deploymentStatus := ""
+	if app.ActiveDeployment != nil {
+		deploymentStatus = app.ActiveDeployment.Phase
+	}
 	return state.Emit(
 		core.DefaultOutputChannel.Name,
 		eventType,
@@ -78,7 +85,7 @@ func emitAppOutput(state core.ExecutionStateContext, eventType string, app *App)
 			"region":           app.Region,
 			"liveURL":          app.LiveURL,
 			"defaultIngress":   app.DefaultIngress,
-			"deploymentStatus": app.ActiveDeployment.Phase,
+			"deploymentStatus": deploymentStatus,
 		}},
 	)
 }

@@ -800,8 +800,6 @@ func Test__CreateApp__Execute(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
-		deployOnPush := false
-		_ = deployOnPush
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"name":           "my-app",
