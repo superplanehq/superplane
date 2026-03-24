@@ -337,10 +337,11 @@ func CountOrganizationsByBillingAccount(accountID string) (int64, error) {
 func CountOrganizationsByBillingAccountInTransaction(tx *gorm.DB, accountID string) (int64, error) {
 	subquery := tx.
 		Table("users").
-		Select("DISTINCT ON (organization_id) organization_id, account_id").
-		Where("account_id IS NOT NULL").
-		Where("type = ?", UserTypeHuman).
-		Order("organization_id, created_at ASC")
+		Select("DISTINCT ON (users.organization_id) users.organization_id, users.account_id").
+		Joins("JOIN organizations ON organizations.id = users.organization_id AND organizations.deleted_at IS NULL").
+		Where("users.account_id IS NOT NULL").
+		Where("users.type = ?", UserTypeHuman).
+		Order("users.organization_id, users.created_at ASC")
 
 	var count int64
 	err := tx.

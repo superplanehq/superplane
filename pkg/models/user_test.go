@@ -26,3 +26,26 @@ func TestFindFirstHumanUserByOrganizationSkipsDeletedUsers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, secondUser.ID, user.ID)
 }
+
+func TestCountOrganizationsByBillingAccountExcludesSoftDeletedOrgs(t *testing.T) {
+	r := support.Setup(t)
+
+	count, err := models.CountOrganizationsByBillingAccount(r.Account.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+
+	org2 := support.CreateOrganization(t, r, r.User)
+	_, err = models.CreateUser(org2.ID, r.Account.ID, r.Account.Email, r.Account.Name)
+	require.NoError(t, err)
+
+	count, err = models.CountOrganizationsByBillingAccount(r.Account.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), count)
+
+	err = models.SoftDeleteOrganization(org2.ID.String())
+	require.NoError(t, err)
+
+	count, err = models.CountOrganizationsByBillingAccount(r.Account.ID.String())
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count, "soft-deleted org should not count toward billing account limit")
+}
