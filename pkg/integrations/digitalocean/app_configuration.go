@@ -554,6 +554,82 @@ func buildIngressConfig(componentName, ingressPath string, corsOrigins, corsMeth
 	}
 }
 
+// mergeIngressConfig selectively updates an existing ingress configuration.
+// Only fields whose corresponding "set" flag is true are modified;
+// the rest are preserved from the existing config.
+func mergeIngressConfig(
+	existing *AppIngress,
+	componentName string,
+	ingressPath string, setPath bool,
+	corsOrigins []string, setOrigins bool,
+	corsMethods []string, setMethods bool,
+) *AppIngress {
+	// Find or create the rule for this component.
+	var rule *AppIngressRule
+	if existing != nil {
+		for _, r := range existing.Rules {
+			if r.Component != nil && r.Component.Name == componentName {
+				rule = r
+				break
+			}
+		}
+	}
+
+	if rule == nil {
+		rule = &AppIngressRule{
+			Component: &AppIngressRuleComponent{Name: componentName},
+		}
+	}
+
+	// Update path if toggled on.
+	if setPath {
+		if ingressPath != "" {
+			rule.Match = &AppIngressRuleMatch{
+				Path: &AppIngressRuleMatchPath{Prefix: ingressPath},
+			}
+		} else {
+			rule.Match = nil
+		}
+	}
+
+	// Update CORS if any CORS field is toggled on.
+	if setOrigins || setMethods {
+		if rule.CORS == nil {
+			rule.CORS = &AppCORS{}
+		}
+
+		if setOrigins {
+			var origins []*AppCORSAllowOrigin
+			for _, origin := range corsOrigins {
+				origins = append(origins, &AppCORSAllowOrigin{Exact: origin})
+			}
+			rule.CORS.AllowOrigins = origins
+		}
+
+		if setMethods {
+			rule.CORS.AllowMethods = corsMethods
+		}
+
+		// If both fields are cleared, remove the CORS object.
+		if len(rule.CORS.AllowOrigins) == 0 && len(rule.CORS.AllowMethods) == 0 {
+			rule.CORS = nil
+		}
+	}
+
+	// If the existing ingress had other rules, preserve them.
+	if existing != nil {
+		var otherRules []*AppIngressRule
+		for _, r := range existing.Rules {
+			if r.Component == nil || r.Component.Name != componentName {
+				otherRules = append(otherRules, r)
+			}
+		}
+		return &AppIngress{Rules: append(otherRules, rule)}
+	}
+
+	return &AppIngress{Rules: []*AppIngressRule{rule}}
+}
+
 func updateSourceConfig(github *GitHubSource, gitlab *GitLabSource, bitbucket *BitbucketSource, branch string, deployOnPush *bool) {
 	if branch != "" {
 		if github != nil {

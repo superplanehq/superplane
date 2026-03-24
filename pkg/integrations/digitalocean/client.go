@@ -1642,50 +1642,6 @@ type UpdateAppRequest struct {
 	Spec *AppSpec `json:"spec"`
 }
 
-type CreateAppSpec struct {
-	Name             string   `json:"name" mapstructure:"name"`
-	Region           string   `json:"region" mapstructure:"region"`
-	ComponentType    string   `json:"componentType" mapstructure:"componentType"`
-	SourceProvider   string   `json:"sourceProvider" mapstructure:"sourceProvider"`
-	GitHubRepo       string   `json:"gitHubRepo" mapstructure:"gitHubRepo"`
-	GitHubBranch     string   `json:"gitHubBranch" mapstructure:"gitHubBranch"`
-	GitLabRepo       string   `json:"gitLabRepo" mapstructure:"gitLabRepo"`
-	GitLabBranch     string   `json:"gitLabBranch" mapstructure:"gitLabBranch"`
-	BitbucketRepo    string   `json:"bitbucketRepo" mapstructure:"bitbucketRepo"`
-	BitbucketBranch  string   `json:"bitbucketBranch" mapstructure:"bitbucketBranch"`
-	DeployOnPush     *bool    `json:"deployOnPush" mapstructure:"deployOnPush"`
-	EnvironmentSlug  string   `json:"environmentSlug" mapstructure:"environmentSlug"`
-	BuildCommand     string   `json:"buildCommand" mapstructure:"buildCommand"`
-	RunCommand       string   `json:"runCommand" mapstructure:"runCommand"`
-	SourceDir        string   `json:"sourceDir" mapstructure:"sourceDir"`
-	HTTPPort         int64    `json:"httpPort" mapstructure:"httpPort"`
-	InstanceSizeSlug string   `json:"instanceSizeSlug" mapstructure:"instanceSizeSlug"`
-	InstanceCount    int64    `json:"instanceCount" mapstructure:"instanceCount"`
-	OutputDir        string   `json:"outputDir" mapstructure:"outputDir"`
-	IndexDocument    string   `json:"indexDocument" mapstructure:"indexDocument"`
-	ErrorDocument    string   `json:"errorDocument" mapstructure:"errorDocument"`
-	CatchallDocument string   `json:"catchallDocument" mapstructure:"catchallDocument"`
-	EnvVars          []string `json:"envVars" mapstructure:"envVars"`
-
-	// Ingress configuration
-	IngressPath      string   `json:"ingressPath" mapstructure:"ingressPath"`
-	CORSAllowOrigins []string `json:"corsAllowOrigins" mapstructure:"corsAllowOrigins"`
-	CORSAllowMethods []string `json:"corsAllowMethods" mapstructure:"corsAllowMethods"`
-
-	// Database configuration
-	AddDatabase         bool   `json:"addDatabase" mapstructure:"addDatabase"`
-	DatabaseName        string `json:"databaseName" mapstructure:"databaseName"`
-	DatabaseEngine      string `json:"databaseEngine" mapstructure:"databaseEngine"`
-	DatabaseVersion     string `json:"databaseVersion" mapstructure:"databaseVersion"`
-	DatabaseProduction  bool   `json:"databaseProduction" mapstructure:"databaseProduction"`
-	DatabaseClusterName string `json:"databaseClusterName" mapstructure:"databaseClusterName"`
-	DatabaseDBName      string `json:"databaseDBName" mapstructure:"databaseDBName"`
-	DatabaseDBUser      string `json:"databaseDBUser" mapstructure:"databaseDBUser"`
-
-	// VPC configuration
-	VPCID string `json:"vpcID" mapstructure:"vpcID"`
-}
-
 // CreateApp creates a new App Platform application
 func (c *Client) CreateApp(req CreateAppRequest) (*App, error) {
 	url := fmt.Sprintf("%s/apps", c.BaseURL)

@@ -400,16 +400,24 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	// Update ingress if configured
-	componentName := ""
-	if len(updatedSpec.Services) > 0 {
-		componentName = updatedSpec.Services[0].Name
-	} else if len(updatedSpec.StaticSites) > 0 {
-		componentName = updatedSpec.StaticSites[0].Name
-	}
-	if componentName != "" {
-		if ingress := buildIngressConfig(componentName, spec.IngressPath, spec.CORSAllowOrigins, spec.CORSAllowMethods); ingress != nil {
-			updatedSpec.Ingress = ingress
+	// Update ingress if any ingress-related fields are toggled on.
+	// Merge with existing ingress to avoid losing fields that weren't toggled.
+	if hasKey("ingressPath") || hasKey("corsAllowOrigins") || hasKey("corsAllowMethods") {
+		componentName := ""
+		if len(updatedSpec.Services) > 0 {
+			componentName = updatedSpec.Services[0].Name
+		} else if len(updatedSpec.StaticSites) > 0 {
+			componentName = updatedSpec.StaticSites[0].Name
+		}
+
+		if componentName != "" {
+			updatedSpec.Ingress = mergeIngressConfig(
+				updatedSpec.Ingress,
+				componentName,
+				spec.IngressPath, hasKey("ingressPath"),
+				spec.CORSAllowOrigins, hasKey("corsAllowOrigins"),
+				spec.CORSAllowMethods, hasKey("corsAllowMethods"),
+			)
 		}
 	}
 
