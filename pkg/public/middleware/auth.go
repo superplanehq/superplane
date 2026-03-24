@@ -343,7 +343,7 @@ func resolveImpersonatedUser(jwtSigner *jwt.Signer, r *http.Request) (*models.Us
 	}
 
 	log.WithFields(log.Fields{
-		"admin_account_id": claims.AdminAccountID,
+		"admin_account_id":  claims.AdminAccountID,
 		"impersonated_user": claims.ImpersonatedUserID,
 		"impersonated_org":  claims.ImpersonatedOrgID,
 	}).Debug("impersonation session active")

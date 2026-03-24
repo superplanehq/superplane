@@ -209,9 +209,7 @@ const AccountsList: React.FC = () => {
         </div>
       ) : accounts.length === 0 ? (
         <div className="text-center py-12">
-          <Text className="text-gray-500">
-            {search ? "No accounts match your search." : "No accounts found."}
-          </Text>
+          <Text className="text-gray-500">{search ? "No accounts match your search." : "No accounts found."}</Text>
         </div>
       ) : (
         <>

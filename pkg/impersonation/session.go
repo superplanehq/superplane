@@ -13,11 +13,11 @@ const (
 	TokenType  = "impersonation"
 	TTL        = 1 * time.Hour
 
-	claimType   = "type"
-	claimAdmin  = "admin_account_id"
-	claimUser   = "impersonated_user_id"
-	claimOrg    = "impersonated_org_id"
-	claimSub    = "sub"
+	claimType  = "type"
+	claimAdmin = "admin_account_id"
+	claimUser  = "impersonated_user_id"
+	claimOrg   = "impersonated_org_id"
+	claimSub   = "sub"
 )
 
 type Claims struct {

@@ -28,7 +28,7 @@ func TestRequireInstallationAdmin(t *testing.T) {
 	})
 
 	handler := AccountAuthMiddleware(signer)(
-		RequireInstallationAdmin(signer)(finalHandler),
+		RequireInstallationAdmin()(finalHandler),
 	)
 
 	t.Run("non-admin account gets 404", func(t *testing.T) {

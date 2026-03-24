@@ -1,6 +1,5 @@
 import { Text } from "@/components/Text/text";
 import { Heading } from "@/components/Heading/heading";
-import { Input } from "@/components/Input/input";
 import { Building, Palette, User, Search } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -134,9 +133,7 @@ const OrganizationsList: React.FC = () => {
                       <Building size={16} />
                       <h4 className="text-base font-medium truncate">{org.name}</h4>
                     </div>
-                    {org.description && (
-                      <Text className="text-xs text-gray-400 line-clamp-2">{org.description}</Text>
-                    )}
+                    {org.description && <Text className="text-xs text-gray-400 line-clamp-2">{org.description}</Text>}
                   </div>
 
                   <div className="mt-3 text-sm font-medium text-gray-500 flex gap-4">

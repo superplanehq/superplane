@@ -260,9 +260,14 @@ func (s *Server) adminListOrgUsers(w http.ResponseWriter, r *http.Request) {
 
 // startImpersonation begins an impersonation session.
 func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
-	if _, err := impersonation.ReadCookie(r); err == nil {
-		http.Error(w, "Already impersonating — end current session first", http.StatusBadRequest)
-		return
+	// Block nested impersonation only if the existing token is still valid.
+	// If it's expired or corrupt, clear the stale cookie and allow proceeding.
+	if tokenStr, err := impersonation.ReadCookie(r); err == nil {
+		if _, validErr := impersonation.ValidateToken(s.jwt, tokenStr); validErr == nil {
+			http.Error(w, "Already impersonating — end current session first", http.StatusBadRequest)
+			return
+		}
+		impersonation.ClearCookie(w, r)
 	}
 
 	account, ok := middleware.GetAccountFromContext(r.Context())

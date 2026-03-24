@@ -43,11 +43,11 @@ func TestValidateToken(t *testing.T) {
 	t.Run("rejects expired token", func(t *testing.T) {
 		// Generate a token with a very short TTL using GenerateWithClaims directly
 		token, err := signer.GenerateWithClaims(0*time.Second, map[string]string{
-			"type":                TokenType,
-			"admin_account_id":    "admin-1",
+			"type":                 TokenType,
+			"admin_account_id":     "admin-1",
 			"impersonated_user_id": "user-2",
-			"impersonated_org_id": "org-3",
-			"sub":                 "admin-1",
+			"impersonated_org_id":  "org-3",
+			"sub":                  "admin-1",
 		})
 		require.NoError(t, err)
 
