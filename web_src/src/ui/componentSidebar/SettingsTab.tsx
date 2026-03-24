@@ -27,6 +27,7 @@ interface SettingsTabProps {
   nodeId?: string;
   nodeName: string;
   nodeLabel?: string;
+  blockName?: string;
   configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
   onSave: (
@@ -55,6 +56,7 @@ export function SettingsTab({
   nodeId: _nodeId,
   nodeName,
   nodeLabel: _nodeLabel,
+  blockName,
   configuration,
   configurationFields,
   onSave,
@@ -126,6 +128,43 @@ export function SettingsTab({
       validateOnMount: false,
     },
   );
+
+  const componentSpecificRealtimeErrors = useMemo(() => {
+    if (!integrationName || !blockName) return [];
+
+    // Discord: Send Text Message requires either content or an embed (title/description).
+    if (integrationName === "discord" && blockName === "discord.sendTextMessage") {
+      const content = typeof nodeConfiguration.content === "string" ? nodeConfiguration.content.trim() : "";
+      const embedTitle = typeof nodeConfiguration.embedTitle === "string" ? nodeConfiguration.embedTitle.trim() : "";
+      const embedDescription =
+        typeof nodeConfiguration.embedDescription === "string" ? nodeConfiguration.embedDescription.trim() : "";
+
+      const hasAnyContent = content.length > 0 || embedTitle.length > 0 || embedDescription.length > 0;
+      if (!hasAnyContent) {
+        return [
+          {
+            field: "content",
+            message: "Provide Content or an Embed Title/Description",
+            type: "required",
+          },
+        ];
+      }
+    }
+
+    return [];
+  }, [integrationName, blockName, nodeConfiguration]);
+
+  const combinedRealtimeValidationErrors = useMemo(() => {
+    const merged = [...(realtimeValidationErrors ?? []), ...componentSpecificRealtimeErrors];
+    // Deduplicate by field+message+type
+    const seen = new Set<string>();
+    return merged.filter((e) => {
+      const key = `${e.field}:${e.type}:${e.message}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [realtimeValidationErrors, componentSpecificRealtimeErrors]);
 
   // Helper to check if node name has real-time validation error
   const hasNodeNameError = useMemo(() => {
@@ -492,7 +531,7 @@ export function SettingsTab({
                   }
                   validationErrors={showValidation ? validationErrors : undefined}
                   fieldPath={fieldName}
-                  realtimeValidationErrors={realtimeValidationErrors}
+                  realtimeValidationErrors={combinedRealtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                 />
