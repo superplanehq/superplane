@@ -9,9 +9,10 @@ import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
+import type { GroupNodeProps } from "../groupNode";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation";
+type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation" | "group";
 
 interface BlockAi {
   show: boolean;
@@ -49,6 +50,9 @@ export interface BlockData {
 
   // annotation node specific props
   annotation?: AnnotationComponentProps;
+
+  // group node specific props
+  group?: GroupNodeProps;
 }
 
 interface BlockProps extends ComponentActionsProps {
@@ -61,9 +65,8 @@ interface BlockProps extends ComponentActionsProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
 
   ai?: BlockAi;
 }
@@ -88,7 +91,7 @@ export function Block(props: BlockProps) {
     <>
       <AiPopup {...ai} />
 
-      <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={props.onClick}>
+      <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={(e) => props.onClick?.(e)}>
         <LeftHandle data={data} nodeId={props.nodeId} />
         <BlockContent {...props} />
         <RightHandle data={data} nodeId={props.nodeId} />
@@ -110,7 +113,7 @@ const HANDLE_STYLE = {
 };
 
 function LeftHandle({ data, nodeId }: BlockProps) {
-  if (data.type === "trigger" || data.type === "annotation") return null;
+  if (data.type === "trigger" || data.type === "annotation" || data.type === "group") return null;
 
   // Check if this handle is part of the hovered edge (this is the target)
   const hoveredEdge = (data as any)._hoveredEdge;
@@ -155,7 +158,7 @@ function RightHandle({ data, nodeId }: BlockProps) {
   // Hide right handle for template nodes, pending connection nodes, and annotation nodes
   const isTemplate = (data as any).isTemplate;
   const isPendingConnection = (data as any).isPendingConnection;
-  if (isTemplate || isPendingConnection || data.type === "annotation") return null;
+  if (isTemplate || isPendingConnection || data.type === "annotation" || data.type === "group") return null;
 
   const channels = data.outputChannels || ["default"];
 

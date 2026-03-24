@@ -54,6 +54,31 @@ export type VersionNodeDiffSummary = {
   removedCount: number;
 };
 
+/** Shared +N added / ~M updated / -K removed row (Create Change Request + version diff accordions). */
+export function NodeDiffSummaryCounts({
+  addedCount,
+  updatedCount,
+  removedCount,
+  className,
+}: {
+  addedCount: number;
+  updatedCount: number;
+  removedCount: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn("flex flex-wrap items-center gap-3 text-xs font-medium", className)}
+      role="status"
+      aria-live="polite"
+    >
+      <span className={cn(addedCount > 0 ? "text-emerald-600" : "text-slate-500")}>+{addedCount} added</span>
+      <span className={cn(updatedCount > 0 ? "text-sky-600" : "text-slate-500")}>~{updatedCount} updated</span>
+      <span className={cn(removedCount > 0 ? "text-red-600" : "text-slate-500")}>-{removedCount} removed</span>
+    </div>
+  );
+}
+
 export function summarizeNodeDiff(
   currentVersion?: CanvasesCanvasVersion,
   previousVersion?: CanvasesCanvasVersion,
@@ -264,26 +289,28 @@ export function VersionNodeDiffAccordion({
 }) {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <p className="text-sm text-slate-700">
-        Added: {summary.addedCount} · Updated: {summary.updatedCount} · Removed: {summary.removedCount}
-      </p>
+      <NodeDiffSummaryCounts
+        addedCount={summary.addedCount}
+        updatedCount={summary.updatedCount}
+        removedCount={summary.removedCount}
+      />
       {summary.items.length === 0 ? (
         <p className="text-xs text-slate-600">{emptyMessage}</p>
       ) : (
-        <Accordion type="multiple" className="w-full rounded-md border border-slate-200 px-3">
+        <Accordion type="multiple" className="w-full rounded-md border border-slate-200 px-2">
           {summary.items.map((item, index) => (
             <AccordionItem
               key={`${item.id}-${item.changeType}-${index}`}
               value={`${item.id}-${item.changeType}-${index}`}
-              className="border-slate-200"
+              className="border-b-0 border-slate-200"
             >
-              <AccordionTrigger className="py-3 hover:no-underline">
+              <AccordionTrigger className="py-2 hover:no-underline">
                 <div className="flex min-w-0 items-center gap-2">
                   <span
                     className={cn(
                       "inline-flex min-w-8 justify-center rounded px-1.5 py-0.5 text-[11px] font-semibold",
                       item.changeType === "removed"
-                        ? "bg-amber-100 text-amber-700"
+                        ? "bg-red-100 text-red-700"
                         : item.changeType === "added"
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-sky-100 text-sky-700",

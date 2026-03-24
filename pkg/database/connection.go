@@ -91,6 +91,7 @@ func TruncateTables() error {
 	return Conn().Exec(`
 		truncate table
 			secrets,
+			account_magic_codes,
 			account_password_auth,
 			accounts,
 			account_providers,

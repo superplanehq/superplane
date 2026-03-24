@@ -1,9 +1,11 @@
 package e2e
 
 import (
+	"regexp"
 	"testing"
 	"time"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -20,7 +22,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Open")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop A", models.Position{X: 500, Y: 220})
-		steps.waitForCanvasSaved()
+		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
 		steps.openCreatedChangeRequestFromList()
@@ -33,7 +35,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Publish")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Publish", models.Position{X: 500, Y: 220})
-		steps.waitForCanvasSaved()
+		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
 		steps.openCreatedChangeRequestFromList()
@@ -48,7 +50,7 @@ func TestCanvasChangeRequests(t *testing.T) {
 		steps.givenCanvasWithOrganizationVersioningEnabled("E2E CR Reject")
 		steps.enterEditMode()
 		steps.addNoopNode("Noop Reject", models.Position{X: 500, Y: 220})
-		steps.waitForCanvasSaved()
+		steps.waitForProposeChangeReady()
 		steps.proposeChange()
 		steps.createChangeRequest()
 		steps.openCreatedChangeRequestFromList()
@@ -64,8 +66,7 @@ type canvasChangeRequestSteps struct {
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
 
-	changeRequestID    string
-	changeRequestTitle string
+	changeRequestID string
 }
 
 func (s *canvasChangeRequestSteps) start() {
@@ -81,7 +82,6 @@ func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationVersioningEnabled(
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.changeRequestTitle = "Update " + name
 	s.session.AssertVisible(q.Locator(`header button:has-text("Edit")`))
 }
 
@@ -96,7 +96,14 @@ func (s *canvasChangeRequestSteps) setOrganizationVersioningInDB(enabled bool) {
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
 	s.session.Click(q.Locator(`header button:has-text("Edit")`))
-	s.session.AssertVisible(q.Locator(`header button:has-text("Editing")`))
+	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
+}
+
+// headerProposeChangeButton matches "Propose Change" or "Propose Change (n)" in the canvas header.
+func (s *canvasChangeRequestSteps) headerProposeChangeButton() pw.Locator {
+	return s.session.Page().Locator("header").GetByRole("button", pw.LocatorGetByRoleOptions{
+		Name: regexp.MustCompile(`Propose Change`),
+	})
 }
 
 func (s *canvasChangeRequestSteps) addNoopNode(name string, pos models.Position) {
@@ -104,22 +111,19 @@ func (s *canvasChangeRequestSteps) addNoopNode(name string, pos models.Position)
 	s.session.AssertText(name)
 }
 
-func (s *canvasChangeRequestSteps) waitForCanvasSaved() {
+func (s *canvasChangeRequestSteps) waitForProposeChangeReady() {
 	deadline := time.Now().Add(8 * time.Second)
+	propose := s.headerProposeChangeButton()
 
 	for {
-		savedVisible, savedErr := q.Locator(`header button:has-text("Saved")`).Run(s.session).IsVisible()
-		require.NoError(s.t, savedErr)
-
-		savingVisible, savingErr := q.Locator(`header button:has-text("Saving...")`).Run(s.session).IsVisible()
-		require.NoError(s.t, savingErr)
-
-		if savedVisible && !savingVisible {
+		disabled, err := propose.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
 			return
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("expected canvas to be saved before proposing change")
+			s.t.Fatalf("expected draft to be saved (Propose Change enabled) before proposing change")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -127,8 +131,7 @@ func (s *canvasChangeRequestSteps) waitForCanvasSaved() {
 }
 
 func (s *canvasChangeRequestSteps) proposeChange() {
-	s.session.Click(q.Locator(`header button:has-text("Editing")`))
-	s.session.Click(q.Locator(`button:has-text("Propose Change")`))
+	require.NoError(s.t, s.headerProposeChangeButton().Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.AssertText("Create Change Request")
 }
 
@@ -157,42 +160,54 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 }
 
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
-	s.session.Click(q.Locator(`header button:has-text("Versioning")`))
-
-	backButton := q.Locator(`button:has-text("Back to Change Requests")`).Run(s.session)
-	backVisible, err := backButton.IsVisible()
+	// After create, the version sidebar may already be open; otherwise use the canvas control.
+	openVersionControl := q.Locator(`button[aria-label="Open version control"]`).Run(s.session)
+	openVisible, err := openVersionControl.IsVisible()
 	require.NoError(s.t, err)
-	if backVisible {
-		s.session.Click(q.Locator(`button:has-text("Back to Change Requests")`))
+	if openVisible {
+		s.session.Click(q.Locator(`button[aria-label="Open version control"]`))
 	}
 
-	s.session.AssertText("Change Requests")
+	s.session.AssertText("Versions")
 
-	s.session.Click(q.Locator(`button:has-text("` + s.changeRequestTitle + `")`))
-	s.session.AssertVisible(q.Locator(`h3:has-text("` + s.changeRequestTitle + `")`))
+	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
+	// accessible-name collisions between pending and live "Preview v1" rows or on :has() CSS support.
+	// "View details" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
+	previewRow := s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
+	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
+	viewDetails := previewRow.Locator(`[aria-label="View details"]`)
+	require.NoError(s.t, viewDetails.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
+	require.NoError(s.t, viewDetails.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+
+	dialogTitle := s.session.Page().Locator(`[role=dialog] [data-slot="dialog-title"]`)
+	require.NoError(s.t, dialogTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
 	s.session.AssertText("Review Actions")
 }
 
 func (s *canvasChangeRequestSteps) approveChangeRequest() {
-	s.session.AssertVisible(q.Locator(`aside button:has-text("Approve")`))
-	s.session.Click(q.Locator(`aside button:has-text("Approve")`))
+	btn := s.session.Page().Locator("[role=dialog]").GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Approve", Exact: pw.Bool(true)})
+	require.NoError(s.t, btn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, btn.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.AssertText("Change request approved")
 }
 
 func (s *canvasChangeRequestSteps) publishChangeRequest() {
-	s.session.AssertVisible(q.Locator(`aside button:has-text("Publish")`))
-	s.session.Click(q.Locator(`aside button:has-text("Publish")`))
+	btn := s.session.Page().Locator("[role=dialog]").GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Publish", Exact: pw.Bool(true)})
+	require.NoError(s.t, btn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, btn.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 }
 
 func (s *canvasChangeRequestSteps) rejectChangeRequest() {
-	s.session.AssertVisible(q.Locator(`aside button:has-text("Reject")`))
-	s.session.Click(q.Locator(`aside button:has-text("Reject")`))
+	btn := s.session.Page().Locator("[role=dialog]").GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Reject", Exact: pw.Bool(true)})
+	require.NoError(s.t, btn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, btn.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.AssertText("Change request rejected")
 }
 
 func (s *canvasChangeRequestSteps) reopenChangeRequest() {
-	s.session.AssertVisible(q.Locator(`aside button:has-text("Reopen")`))
-	s.session.Click(q.Locator(`aside button:has-text("Reopen")`))
+	btn := s.session.Page().Locator("[role=dialog]").GetByRole("button", pw.LocatorGetByRoleOptions{Name: "Reopen", Exact: pw.Bool(true)})
+	require.NoError(s.t, btn.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
+	require.NoError(s.t, btn.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.AssertText("Change request reopened")
 }
 
