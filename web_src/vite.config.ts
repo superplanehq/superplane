@@ -45,6 +45,22 @@ export default defineConfig(({ command }: { command: string }) => {
           changeOrigin: true,
           secure: false,
         },
+        // Account session routes (same origin as production when served from Go; required for pure Vite dev)
+        "/account": {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/organizations": {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/auth": {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     resolve: {
