@@ -25,7 +25,7 @@ import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
 import { LatestTab } from "./LatestTab";
-import { SettingsTab } from "./SettingsTab";
+import { SettingsTab, type GetComponentSpecificRealtimeValidationErrors } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import {
   AuthorizationDomainType,
@@ -133,6 +133,7 @@ interface ComponentSidebarProps {
   blockName?: string;
   nodeConfiguration?: Record<string, unknown>;
   nodeConfigurationFields?: ConfigurationField[];
+  getComponentSpecificRealtimeValidationErrors?: GetComponentSpecificRealtimeValidationErrors;
   onNodeConfigSave?: (
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
@@ -220,6 +221,7 @@ export const ComponentSidebar = ({
   blockName,
   nodeConfiguration = {},
   nodeConfigurationFields = [],
+  getComponentSpecificRealtimeValidationErrors,
   onNodeConfigSave,
   onNodeConfigCancel,
   domainId,
@@ -765,6 +767,7 @@ export const ComponentSidebar = ({
                   blockName={blockName}
                   configuration={nodeConfiguration}
                   configurationFields={nodeConfigurationFields}
+                  getComponentSpecificRealtimeValidationErrors={getComponentSpecificRealtimeValidationErrors}
                   onSave={onNodeConfigSave || (() => {})}
                   onCancel={onNodeConfigCancel}
                   domainId={domainId}

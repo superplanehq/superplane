@@ -138,6 +138,7 @@ import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
+import { getSettingsRealtimeValidationErrors } from "./mappers/settingsValidation";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -5415,6 +5416,7 @@ export function WorkflowPageV2() {
           getNodeEditData={getNodeEditData}
           getAutocompleteExampleObj={getAutocompleteExampleObj}
           getCustomField={getCustomField}
+          getComponentSpecificRealtimeValidationErrors={getSettingsRealtimeValidationErrors}
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}

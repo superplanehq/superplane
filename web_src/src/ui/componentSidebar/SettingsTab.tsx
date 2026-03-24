@@ -21,7 +21,19 @@ import {
 } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
-import { getSettingsRealtimeValidationErrors } from "@/pages/workflowv2/mappers/settingsValidation";
+
+export type SettingsTabRealtimeValidationError = {
+  field: string;
+  message: string;
+  type: string;
+};
+
+export type GetComponentSpecificRealtimeValidationErrors = (context: {
+  blockName?: string;
+  integrationName?: string;
+  configurationFields: ConfigurationField[];
+  values: Record<string, unknown>;
+}) => SettingsTabRealtimeValidationError[];
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -51,6 +63,7 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  getComponentSpecificRealtimeValidationErrors?: GetComponentSpecificRealtimeValidationErrors;
 }
 
 export function SettingsTab({
@@ -76,6 +89,7 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  getComponentSpecificRealtimeValidationErrors,
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
@@ -131,13 +145,20 @@ export function SettingsTab({
   );
 
   const componentSpecificRealtimeErrors = useMemo(() => {
-    return getSettingsRealtimeValidationErrors({
+    if (!getComponentSpecificRealtimeValidationErrors) return [];
+    return getComponentSpecificRealtimeValidationErrors({
       blockName,
       integrationName,
       configurationFields,
       values: nodeConfiguration,
     });
-  }, [blockName, integrationName, configurationFields, nodeConfiguration]);
+  }, [
+    getComponentSpecificRealtimeValidationErrors,
+    blockName,
+    integrationName,
+    configurationFields,
+    nodeConfiguration,
+  ]);
 
   const combinedRealtimeValidationErrors = useMemo(() => {
     const merged = [...(realtimeValidationErrors ?? []), ...componentSpecificRealtimeErrors];

@@ -72,6 +72,7 @@ import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import type { GetComponentSpecificRealtimeValidationErrors } from "../componentSidebar/SettingsTab";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -309,6 +310,7 @@ export interface CanvasPageProps {
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getNodeEditData?: (nodeId: string) => NodeEditData | null;
   getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
+  getComponentSpecificRealtimeValidationErrors?: GetComponentSpecificRealtimeValidationErrors;
   onNodeConfigurationSave?: (
     nodeId: string,
     configuration: Record<string, any>,
@@ -1356,6 +1358,7 @@ function Sidebar({
   loadSidebarData,
   getTabData,
   getAutocompleteExampleObj,
+  getComponentSpecificRealtimeValidationErrors,
   onCancelQueueItem,
   onPushThrough,
   onCancelExecution,
@@ -1406,6 +1409,7 @@ function Sidebar({
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
+  getComponentSpecificRealtimeValidationErrors?: GetComponentSpecificRealtimeValidationErrors;
   onCancelQueueItem?: (id: string) => void;
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
@@ -1575,6 +1579,7 @@ function Sidebar({
       blockName={editingNodeData?.blockName}
       nodeConfiguration={editingNodeData?.configuration || {}}
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
+      getComponentSpecificRealtimeValidationErrors={getComponentSpecificRealtimeValidationErrors}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
