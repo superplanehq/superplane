@@ -27,6 +27,7 @@ import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
+import AccountsListAdmin from "./pages/admin/AccountsList";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
 // Create a client
@@ -81,6 +82,7 @@ function AppRouter() {
           {/* Admin dashboard routes */}
           <Route path="admin" element={<AdminLayout />}>
             <Route index element={<OrganizationsListAdmin />} />
+            <Route path="accounts" element={<AccountsListAdmin />} />
             <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
           </Route>
 

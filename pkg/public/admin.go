@@ -41,6 +41,43 @@ func parsePagination(r *http.Request) (search string, limit, offset int) {
 }
 
 // adminListOrganizations returns paginated organizations in the installation.
+// adminListAccounts returns paginated accounts in the installation.
+func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
+	search, limit, offset := parsePagination(r)
+
+	accounts, total, err := models.ListAccounts(search, limit, offset)
+	if err != nil {
+		log.Errorf("admin: failed to list accounts: %v", err)
+		http.Error(w, "Failed to list accounts", http.StatusInternalServerError)
+		return
+	}
+
+	type accountItem struct {
+		ID                string `json:"id"`
+		Name              string `json:"name"`
+		Email             string `json:"email"`
+		InstallationAdmin bool   `json:"installation_admin"`
+	}
+
+	items := make([]accountItem, 0, len(accounts))
+	for _, a := range accounts {
+		items = append(items, accountItem{
+			ID:                a.ID.String(),
+			Name:              a.Name,
+			Email:             a.Email,
+			InstallationAdmin: a.IsInstallationAdmin(),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(paginatedResponse{
+		Items:  items,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	})
+}
+
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
 	search, limit, offset := parsePagination(r)
 

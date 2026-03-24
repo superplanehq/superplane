@@ -48,6 +48,34 @@ func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, erro
 	return account, nil
 }
 
+func ListAccounts(search string, limit, offset int) ([]Account, int64, error) {
+	query := database.Conn().Model(&Account{})
+
+	if search != "" {
+		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var accounts []Account
+	if err := query.Order("name ASC").Find(&accounts).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return accounts, total, nil
+}
+
 func FindAccountByID(id string) (*Account, error) {
 	var account Account
 

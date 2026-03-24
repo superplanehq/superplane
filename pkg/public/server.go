@@ -446,6 +446,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
 	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	adminRoute.Use(middleware.RequireInstallationAdmin(s.jwt))
+	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
