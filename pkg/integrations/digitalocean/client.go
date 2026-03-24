@@ -1506,21 +1506,21 @@ type AppVPC struct {
 type GitHubSource struct {
 	Repo         string `json:"repo"`
 	Branch       string `json:"branch,omitempty"`
-	DeployOnPush bool   `json:"deploy_on_push,omitempty"`
+	DeployOnPush bool   `json:"deploy_on_push"`
 }
 
 // GitLabSource represents a GitLab repository source
 type GitLabSource struct {
 	Repo         string `json:"repo"`
 	Branch       string `json:"branch,omitempty"`
-	DeployOnPush bool   `json:"deploy_on_push,omitempty"`
+	DeployOnPush bool   `json:"deploy_on_push"`
 }
 
 // BitbucketSource represents a Bitbucket repository source
 type BitbucketSource struct {
 	Repo         string `json:"repo"`
 	Branch       string `json:"branch,omitempty"`
-	DeployOnPush bool   `json:"deploy_on_push,omitempty"`
+	DeployOnPush bool   `json:"deploy_on_push"`
 }
 
 // GitSource represents a generic Git repository source

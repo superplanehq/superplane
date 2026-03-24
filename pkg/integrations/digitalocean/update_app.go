@@ -236,6 +236,10 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get app: %v", err)
 	}
 
+	if app.Spec == nil {
+		return fmt.Errorf("app %s has no spec", spec.App)
+	}
+
 	updatedSpec := app.Spec
 
 	if spec.Name != "" {
