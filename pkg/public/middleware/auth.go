@@ -312,7 +312,16 @@ func isActiveImpersonation(jwtSigner *jwt.Signer, r *http.Request) bool {
 		return false
 	}
 
-	return claims.AdminAccountID == adminAccountID
+	if claims.AdminAccountID != adminAccountID {
+		return false
+	}
+
+	admin, err := models.FindAccountByID(adminAccountID)
+	if err != nil || !admin.IsInstallationAdmin() {
+		return false
+	}
+
+	return true
 }
 
 // resolveImpersonatedUser checks if there's a valid impersonation session.
