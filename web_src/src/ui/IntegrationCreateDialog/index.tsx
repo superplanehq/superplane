@@ -55,6 +55,8 @@ export interface IntegrationCreateDialogProps {
   initialCreatedIntegrationId?: string;
   initialBrowserAction?: OrganizationsBrowserAction;
   initialWebhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
+  /** Existing configuration to pre-populate when resuming a pending integration flow. */
+  initialConfiguration?: Record<string, unknown>;
 }
 
 export function IntegrationCreateDialog({
@@ -73,6 +75,7 @@ export function IntegrationCreateDialog({
   initialCreatedIntegrationId,
   initialBrowserAction,
   initialWebhookSetup,
+  initialConfiguration,
 }: IntegrationCreateDialogProps) {
   const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
@@ -115,12 +118,12 @@ export function IntegrationCreateDialog({
     if (!justOpened) return;
 
     setIntegrationName(defaultName);
-    setConfiguration({});
+    setConfiguration(initialConfiguration ? { ...initialConfiguration } : {});
     setCreateIntegrationBrowserAction(initialBrowserAction ?? undefined);
     setPendingWebhookSetup(initialWebhookSetup ?? null);
     setCreatedIntegrationId(initialCreatedIntegrationId ?? undefined);
     setBrowserActionCompleted(false);
-  }, [open, defaultName, initialBrowserAction, initialWebhookSetup, initialCreatedIntegrationId]);
+  }, [open, defaultName, initialBrowserAction, initialWebhookSetup, initialCreatedIntegrationId, initialConfiguration]);
 
   const handleOpenChange = useCallback(
     (next: boolean) => {

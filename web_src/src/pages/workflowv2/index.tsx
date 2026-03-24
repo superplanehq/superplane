@@ -5363,6 +5363,9 @@ export function WorkflowPageV2() {
         initialBrowserAction={integrationDialogPendingInstance?.status?.browserAction}
         initialCreatedIntegrationId={integrationDialogPendingInstance?.metadata?.id}
         initialWebhookSetup={initialWebhookSetup}
+        initialConfiguration={
+          integrationDialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined
+        }
       />
     </>
   );

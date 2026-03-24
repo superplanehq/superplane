@@ -273,8 +273,20 @@ export const IntegrationResourceFieldRenderer = ({
   }
 
   // Multi-select mode
-  if (resourcesUnavailable || !hasResources) {
+  if (resourcesUnavailable) {
     return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{disabledPicker}</div>;
+  }
+
+  if (!hasResources) {
+    return (
+      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
+        <Select disabled>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="No resources available" />
+          </SelectTrigger>
+        </Select>
+      </div>
+    );
   }
 
   // Convert selected values to SelectOption objects
