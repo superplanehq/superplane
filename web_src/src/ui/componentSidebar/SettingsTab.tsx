@@ -21,6 +21,7 @@ import {
 } from "@/utils/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
+import { getSettingsRealtimeValidationErrors } from "@/pages/workflowv2/mappers/settingsValidation";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -130,29 +131,13 @@ export function SettingsTab({
   );
 
   const componentSpecificRealtimeErrors = useMemo(() => {
-    if (!integrationName || !blockName) return [];
-
-    // Discord: Send Text Message requires either content or an embed (title/description).
-    if (integrationName === "discord" && blockName === "discord.sendTextMessage") {
-      const content = typeof nodeConfiguration.content === "string" ? nodeConfiguration.content.trim() : "";
-      const embedTitle = typeof nodeConfiguration.embedTitle === "string" ? nodeConfiguration.embedTitle.trim() : "";
-      const embedDescription =
-        typeof nodeConfiguration.embedDescription === "string" ? nodeConfiguration.embedDescription.trim() : "";
-
-      const hasAnyContent = content.length > 0 || embedTitle.length > 0 || embedDescription.length > 0;
-      if (!hasAnyContent) {
-        return [
-          {
-            field: "content",
-            message: "Provide Content or an Embed Title/Description",
-            type: "required",
-          },
-        ];
-      }
-    }
-
-    return [];
-  }, [integrationName, blockName, nodeConfiguration]);
+    return getSettingsRealtimeValidationErrors({
+      blockName,
+      integrationName,
+      configurationFields,
+      values: nodeConfiguration,
+    });
+  }, [blockName, integrationName, configurationFields, nodeConfiguration]);
 
   const combinedRealtimeValidationErrors = useMemo(() => {
     const merged = [...(realtimeValidationErrors ?? []), ...componentSpecificRealtimeErrors];

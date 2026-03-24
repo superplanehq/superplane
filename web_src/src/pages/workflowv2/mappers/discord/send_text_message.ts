@@ -14,6 +14,7 @@ import { getState, getStateMap, getTriggerRenderer } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
+import type { SettingsValidationContext } from "../settingsValidation";
 
 interface SendTextMessageConfiguration {
   channel?: string;
@@ -77,6 +78,26 @@ export const sendTextMessageMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+export function discordSendTextMessageSettingsValidation(context: SettingsValidationContext) {
+  if (context.integrationName && context.integrationName !== "discord") return [];
+
+  const content = typeof context.values.content === "string" ? context.values.content.trim() : "";
+  const embedTitle = typeof context.values.embedTitle === "string" ? context.values.embedTitle.trim() : "";
+  const embedDescription =
+    typeof context.values.embedDescription === "string" ? context.values.embedDescription.trim() : "";
+
+  const hasAnyContent = content.length > 0 || embedTitle.length > 0 || embedDescription.length > 0;
+  if (hasAnyContent) return [];
+
+  return [
+    {
+      field: "content",
+      message: "Provide Content or an Embed Title/Description",
+      type: "required" as const,
+    },
+  ];
+}
 
 function sendTextMessageMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
