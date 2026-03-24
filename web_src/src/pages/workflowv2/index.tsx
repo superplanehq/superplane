@@ -370,7 +370,12 @@ export function WorkflowPageV2() {
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
-  const { data: liveCanvas, isLoading: canvasLoading, error: canvasError } = useCanvas(organizationId!, canvasId!);
+  const {
+    data: liveCanvas,
+    isLoading: canvasLoading,
+    isFetching: canvasFetching,
+    error: canvasError,
+  } = useCanvas(organizationId!, canvasId!);
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
@@ -807,14 +812,29 @@ export function WorkflowPageV2() {
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
 
-  // Initialize store from workflow.status on workflow load (only once per workflow)
+  // Initialize store from workflow.status on workflow load.
+  // On canvas switch with cached data, the store initializes immediately from the
+  // cache (no loading gap) and then re-initializes once when the background refetch
+  // completes with fresh data (pendingStoreReinitRef).
   const hasInitializedStoreRef = useRef<string | null>(null);
+  const pendingStoreReinitRef = useRef(false);
   useEffect(() => {
-    if (canvas?.metadata?.id && hasInitializedStoreRef.current !== canvas.metadata.id) {
+    if (!canvas?.metadata?.id) return;
+
+    if (hasInitializedStoreRef.current !== canvas.metadata.id) {
       initializeFromWorkflow(canvas);
       hasInitializedStoreRef.current = canvas.metadata.id;
+      if (!canvasFetching) {
+        pendingStoreReinitRef.current = false;
+      }
+      return;
     }
-  }, [canvas, initializeFromWorkflow]);
+
+    if (pendingStoreReinitRef.current && !canvasFetching) {
+      initializeFromWorkflow(canvas);
+      pendingStoreReinitRef.current = false;
+    }
+  }, [canvas, canvasFetching, initializeFromWorkflow]);
 
   useEffect(() => {
     if (!canvas) {
@@ -835,6 +855,8 @@ export function WorkflowPageV2() {
     hasSyncedVersionFromURLRef.current = false;
     lastSavedWorkflowRef.current = null;
     lastLocalCanvasSaveAtRef.current = 0;
+    hasInitializedStoreRef.current = null;
+    pendingStoreReinitRef.current = true;
   }, [canvasId]);
 
   useEffect(() => {
