@@ -142,7 +142,7 @@ export function BuildingBlocksSidebar({
         data-testid="add-note-button"
         disabled={disabled}
       >
-        <StickyNote size={16} className="animate-pulse" />
+        <StickyNote size={16} />
         Add Note
       </Button>
     );

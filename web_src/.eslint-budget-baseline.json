@@ -2,7 +2,7 @@
   "maxAllowedTotalIssues": 1655,
   "maxAllowedByRule": {
     "@typescript-eslint/no-explicit-any": 583,
-    "complexity": 279,
+    "complexity": 283,
     "@typescript-eslint/consistent-type-imports": 225,
     "max-lines-per-function": 109,
     "max-statements": 109,

@@ -1,25 +1,14 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import {
-  CloudAlert,
-  CloudCheck,
-  CloudUpload,
-  Home,
-  ChevronDown,
-  LogOut,
-  Palette,
-  RotateCcw,
-  Undo2,
-  SquarePen,
-  Pencil,
-  Rocket,
-} from "lucide-react";
+import { Copy, Download, Home, ChevronDown, LogOut, Palette, RotateCcw, Undo2, Pencil, Rocket } from "lucide-react";
 import { Button } from "../button";
+import { Button as UIButton } from "@/components/ui/button";
 import { Switch } from "../switch";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
 export interface BreadcrumbItem {
   label: string;
@@ -59,11 +48,11 @@ interface HeaderProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "versioning";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "versioning") => void;
-  showVersioningTab?: boolean;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  onExportYamlCopy?: () => void;
+  onExportYamlDownload?: () => void;
   memoryItemCount?: number;
-  versioningItemCount?: number;
   mode?: HeaderMode;
   saveState?: SaveState;
   onEnterEditMode?: () => void;
@@ -72,7 +61,8 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  showPendingDraftBadge?: boolean;
+  /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
+  unpublishedDraftChangeCount?: number;
 }
 
 export function Header({
@@ -99,24 +89,24 @@ export function Header({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
-  showVersioningTab = true,
+  onExportYamlCopy,
+  onExportYamlDownload,
   memoryItemCount,
-  versioningItemCount,
   mode = "default",
-  saveState = "saved",
+  saveState: _saveState = "saved",
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  showPendingDraftBadge,
+  unpublishedDraftChangeCount = 0,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isEditingMenuOpen, setIsEditingMenuOpen] = useState(false);
-  const [isSaveMenuOpen, setIsSaveMenuOpen] = useState(false);
+  const [isYamlMenuOpen, setIsYamlMenuOpen] = useState(false);
+  const [exportAction, setExportAction] = useState<string>("");
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // Get the workflow name from the workflows list if workflowId is available
@@ -180,34 +170,9 @@ export function Header({
   const isVersioningDisabledMode = mode === "versioning-disabled";
   const isDefaultMode = mode === "default" || isVersioningDisabledMode;
   const showEditButton = mode === "version-live";
-  const showEditingDropdown = mode === "version-edit";
-  const showSaveDropdown = mode === "version-edit";
-  const showSaveUndoActions = showSaveDropdown && !isAutoSaveEnabled && saveState === "unsaved";
-  const autoSaveToggleDisabled = autoSaveDisabled || !onToggleAutoSave;
-  const saveStatusLabel = saveState === "saving" ? "Saving..." : saveState === "unsaved" ? "Unsaved" : "Saved";
-  const saveStatusIcon =
-    saveState === "saving" ? (
-      <CloudUpload className="h-4 w-4 animate-pulse text-sky-600" />
-    ) : saveState === "unsaved" ? (
-      <CloudAlert className="h-4 w-4 text-amber-600" />
-    ) : (
-      <CloudCheck className="h-4 w-4 text-emerald-600" />
-    );
-  const pendingDraftBadge = showPendingDraftBadge ? (
-    <div className="flex items-center relative">
-      <span className="rounded border border-amber-300 bg-amber-100 px-2 py-1 text-xs font-medium text-amber-900">
-        Unpublished Changes
-      </span>
-      <span
-        aria-hidden="true"
-        className="h-0 w-0 border-y-[6px] border-y-transparent border-l-[9px] border-l-amber-300"
-      />
-      <span
-        aria-hidden="true"
-        className="absolute bottom-1.8 right-0.5 h-0 w-0 border-y-[6.5px] border-y-transparent border-l-[9px] border-l-amber-100"
-      />
-    </div>
-  ) : null;
+  const showVersionEditActions = mode === "version-edit";
+  const proposeChangeLabel =
+    unpublishedDraftChangeCount > 0 ? `Propose Change (${unpublishedDraftChangeCount})` : "Propose Change";
 
   return (
     <>
@@ -304,7 +269,7 @@ export function Header({
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
+                  className={`rounded-sm px-2 py-1 text-xs font-medium ${
                     topViewMode === "canvas" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
@@ -313,7 +278,7 @@ export function Header({
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("yaml")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
+                  className={`rounded-sm px-2 py-1 text-xs font-medium ${
                     topViewMode === "yaml" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
@@ -322,7 +287,7 @@ export function Header({
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("memory")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
+                  className={`rounded-sm px-2 py-1 text-xs font-medium ${
                     topViewMode === "memory" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
@@ -336,28 +301,12 @@ export function Header({
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("settings")}
-                  className={`rounded px-2 py-1 text-xs font-medium ${
+                  className={`rounded-sm px-2 py-1 text-xs font-medium ${
                     topViewMode === "settings" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
                   }`}
                 >
                   Settings
                 </button>
-                {showVersioningTab ? (
-                  <button
-                    type="button"
-                    onClick={() => onTopViewModeChange("versioning")}
-                    className={`rounded px-2 py-1 text-xs font-medium ${
-                      topViewMode === "versioning" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      <span>Versioning</span>
-                      {versioningItemCount && versioningItemCount > 0 ? (
-                        <span aria-label={`${versioningItemCount} open change requests`}>({versioningItemCount})</span>
-                      ) : null}
-                    </span>
-                  </button>
-                ) : null}
               </div>
             )}
           </div>
@@ -365,6 +314,75 @@ export function Header({
           <div className="flex items-center gap-2 justify-self-end">
             {isDefaultMode ? (
               <>
+                {isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
+                  <Select
+                    value={exportAction || undefined}
+                    onValueChange={(value) => {
+                      setExportAction(value);
+                      if (value === "copy") {
+                        onExportYamlCopy();
+                      }
+                      if (value === "download") {
+                        onExportYamlDownload();
+                      }
+                      setExportAction("");
+                    }}
+                  >
+                    <SelectTrigger className="h-5 w-fit min-w-0 rounded-md border-gray-300 px-1 py-0 text-xs font-mono text-gray-500 data-[placeholder]:text-gray-500 shadow-none [&>svg]:hidden">
+                      <SelectValue placeholder=".yaml" />
+                    </SelectTrigger>
+                    <SelectContent align="end">
+                      <SelectItem value="copy">
+                        <span className="flex items-center gap-2">
+                          <Copy className="h-3.5 w-3.5" />
+                          Copy to Clipboard
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="download">
+                        <span className="flex items-center gap-2">
+                          <Download className="h-3.5 w-3.5" />
+                          Download File
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                {!isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (
+                  <DropdownMenu open={isYamlMenuOpen} onOpenChange={setIsYamlMenuOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 px-2 text-xs font-mono">
+                        .yaml
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-44 p-2">
+                      <UIButton
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        size="sm"
+                        onClick={() => {
+                          onExportYamlCopy();
+                          setIsYamlMenuOpen(false);
+                        }}
+                      >
+                        Copy to clipboard
+                      </UIButton>
+                      <UIButton
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        size="sm"
+                        onClick={() => {
+                          onExportYamlDownload();
+                          setIsYamlMenuOpen(false);
+                        }}
+                      >
+                        Download file
+                      </UIButton>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
                 {!isVersioningDisabledMode && unsavedMessage ? (
                   <span className="text-xs font-medium text-yellow-700 bg-orange-100 px-2 py-1 rounded hidden sm:inline">
                     {unsavedMessage}
@@ -423,164 +441,68 @@ export function Header({
               </>
             ) : null}
 
-            {pendingDraftBadge}
-            {showEditingDropdown ? (
-              <DropdownMenu open={isEditingMenuOpen} onOpenChange={setIsEditingMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-2">
-                    <SquarePen className="h-4 w-4" />
-                    Editing
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44 p-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="w-full">
-                        {wrapWithTooltip(
-                          publishVersionDisabled,
-                          publishVersionDisabledTooltip,
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              onPublishVersion?.();
-                              setIsEditingMenuOpen(false);
-                            }}
-                            disabled={publishVersionDisabled || !onPublishVersion}
-                          >
-                            <Rocket className="h-4 w-4" />
-                            Propose Change
-                          </Button>,
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">Create a change request from your current draft.</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="w-full">
-                        {wrapWithTooltip(
-                          discardVersionDisabled,
-                          discardVersionDisabledTooltip,
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              onDiscardVersion?.();
-                              setIsEditingMenuOpen(false);
-                            }}
-                            disabled={discardVersionDisabled || !onDiscardVersion}
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                            Discard
-                          </Button>,
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">
-                      Discard draft changes and reset it to match the current live version.
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="w-full">
-                        {wrapWithTooltip(
-                          exitEditModeDisabled,
-                          exitEditModeDisabledTooltip,
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="w-full justify-start"
-                            onClick={() => {
-                              onExitEditMode?.();
-                              setIsEditingMenuOpen(false);
-                            }}
-                            disabled={exitEditModeDisabled}
-                          >
-                            <LogOut className="h-4 w-4" />
-                            Exit
-                          </Button>,
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">Exit edit mode and return to the live version.</TooltipContent>
-                  </Tooltip>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-
-            {showSaveDropdown ? (
-              <DropdownMenu open={isSaveMenuOpen} onOpenChange={setIsSaveMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-2" disabled={saveDisabled}>
-                    {saveStatusIcon}
-                    <span>{saveStatusLabel}</span>
-                    <ChevronDown className="h-4 w-4 text-slate-500" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 p-2">
-                  <div className="flex items-center justify-center gap-3 rounded-md px-2 py-1.5">
-                    <span className="text-sm font-medium text-slate-800">Auto-save</span>
-                    {wrapWithTooltip(
-                      autoSaveToggleDisabled,
-                      autoSaveDisabledTooltip,
-                      <Switch
-                        checked={!!isAutoSaveEnabled}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            onSave?.();
-                          }
-                          onToggleAutoSave?.();
-                        }}
-                        disabled={autoSaveToggleDisabled}
-                      />,
-                    )}
-                  </div>
-
-                  {isAutoSaveEnabled ? (
-                    <p className="px-2 pb-2 text-xs text-slate-600 text-center">Changes are saved automatically.</p>
-                  ) : null}
-
-                  {showSaveUndoActions ? (
-                    <div className="space-y-1 border-t border-slate-200 pt-2">
-                      <Button
+            {showVersionEditActions ? (
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <UIButton
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start"
-                        onClick={() => {
-                          onSave?.();
-                          setIsSaveMenuOpen(false);
-                        }}
-                        disabled={saveDisabled || !onSave}
+                        variant="outline"
+                        size="icon-sm"
+                        className="h-8 shrink-0"
+                        onClick={() => onDiscardVersion?.()}
+                        disabled={discardVersionDisabled || !onDiscardVersion}
+                        aria-label="Discard draft"
                       >
-                        <CloudUpload className="h-4 w-4" />
-                        Save
-                      </Button>
-                      <Button
+                        <RotateCcw className="h-4 w-4" />
+                      </UIButton>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {discardVersionDisabled && discardVersionDisabledTooltip
+                      ? discardVersionDisabledTooltip
+                      : "Discard draft changes and reset to the current live version."}
+                  </TooltipContent>
+                </Tooltip>
+                {wrapWithTooltip(
+                  publishVersionDisabled,
+                  publishVersionDisabledTooltip,
+                  <UIButton
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={() => onPublishVersion?.()}
+                    disabled={publishVersionDisabled || !onPublishVersion}
+                  >
+                    <Rocket className="h-4 w-4" />
+                    {proposeChangeLabel}
+                  </UIButton>,
+                )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <UIButton
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start"
-                        onClick={() => {
-                          onUndo?.();
-                          setIsSaveMenuOpen(false);
-                        }}
-                        disabled={!onUndo || !canUndo}
+                        variant="outline"
+                        size="icon-sm"
+                        className="h-8 shrink-0"
+                        onClick={() => onExitEditMode?.()}
+                        disabled={exitEditModeDisabled}
+                        aria-label="Exit edit mode"
                       >
-                        <Undo2 className="h-4 w-4" />
-                        Undo
-                      </Button>
-                    </div>
-                  ) : null}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                        <LogOut className="h-4 w-4" />
+                      </UIButton>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {exitEditModeDisabled && exitEditModeDisabledTooltip
+                      ? exitEditModeDisabledTooltip
+                      : "Exit edit mode and return to the live version."}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             ) : null}
 
             {showEditButton
