@@ -463,10 +463,16 @@ func (c *CreateApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create app: %v", err)
 	}
 
+	deploymentID := getDeploymentIDForPolling(app)
+	if deploymentID == "" {
+		// Defensive fallback in case the API response has no pending/in-progress deployment.
+		return emitAppOutput(ctx.ExecutionState, "digitalocean.app.created", app)
+	}
+
 	// Store the app and deployment IDs for polling
 	err = ctx.Metadata.Set(appDeploymentMetadata{
 		AppID:        app.ID,
-		DeploymentID: app.PendingDeployment.ID,
+		DeploymentID: deploymentID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store metadata: %v", err)

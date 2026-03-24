@@ -425,10 +425,16 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to update app: %v", err)
 	}
 
+	deploymentID := getDeploymentIDForPolling(updatedApp)
+	if deploymentID == "" {
+		// No new deployment was created (for example, a no-op update), so emit the current app state immediately.
+		return emitAppOutput(ctx.ExecutionState, "digitalocean.app.updated", updatedApp)
+	}
+
 	// Store the app and deployment IDs for polling
 	err = ctx.Metadata.Set(appDeploymentMetadata{
 		AppID:        updatedApp.ID,
-		DeploymentID: updatedApp.PendingDeployment.ID,
+		DeploymentID: deploymentID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store metadata: %v", err)

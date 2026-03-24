@@ -577,3 +577,21 @@ func updateSourceConfig(github *GitHubSource, gitlab *GitLabSource, bitbucket *B
 		}
 	}
 }
+
+// getDeploymentIDForPolling returns the deployment ID to monitor after a create/update call.
+// DigitalOcean may omit pending_deployment for no-op updates, so in-progress is a valid fallback.
+func getDeploymentIDForPolling(app *App) string {
+	if app == nil {
+		return ""
+	}
+
+	if app.PendingDeployment.ID != "" {
+		return app.PendingDeployment.ID
+	}
+
+	if app.InProgressDeployment != nil && app.InProgressDeployment.ID != "" {
+		return app.InProgressDeployment.ID
+	}
+
+	return ""
+}
