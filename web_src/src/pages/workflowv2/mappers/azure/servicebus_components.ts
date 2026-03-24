@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,12 +7,12 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../utils";
 
 // ── Shared configuration interfaces ────────────────────────────────────────

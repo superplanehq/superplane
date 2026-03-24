@@ -1,10 +1,10 @@
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
 import { formatTimeAgo } from "@/utils/date";
 import { stringOrDash } from "../utils";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 // ── Shared configuration interfaces ─────────────────────────────────────────
 

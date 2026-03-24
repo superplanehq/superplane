@@ -420,7 +420,7 @@ func serviceBusTokenFromSecrets(ctx core.IntegrationContext) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Azure Service Bus access token not found: integration needs to sync")
+	return "", nil
 }
 
 // loadConfig reads the Azure integration configuration from the database
