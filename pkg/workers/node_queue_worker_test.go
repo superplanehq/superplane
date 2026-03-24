@@ -25,8 +25,8 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
-	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
 	defer executionConsumer.Stop()
@@ -111,8 +111,8 @@ func Test__NodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	logger := log.NewEntry(log.New())
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
-	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
 	defer executionConsumer.Stop()
@@ -231,8 +231,8 @@ func Test__NodeQueueWorker_PicksOldestQueueItem(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
-	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
 	defer executionConsumer.Stop()
@@ -336,8 +336,8 @@ func Test__NodeQueueWorker_EmptyQueue(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
-	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
 	defer executionConsumer.Stop()
@@ -392,8 +392,8 @@ func Test__NodeQueueWorker_PreventsConcurrentProcessing(t *testing.T) {
 	defer r.Close()
 
 	amqpURL, _ := config.RabbitMQURL()
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
-	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
 	defer executionConsumer.Stop()
@@ -481,7 +481,7 @@ func Test__NodeQueueWorker_ConfigurationBuildFailure(t *testing.T) {
 	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 
@@ -576,8 +576,8 @@ func Test__WorkflowNodeQueueWorker_MergeComponentReturnsNilExecution(t *testing.
 	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
-	queueConsumedConsumer := testconsumer.New(amqpURL, messages.WorkflowQueueItemConsumedRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
 	executionConsumer.Start()
 	queueConsumedConsumer.Start()
 	defer executionConsumer.Stop()
@@ -661,7 +661,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 	worker := NewNodeQueueWorker(r.Registry, amqpURL)
 	logger := log.NewEntry(log.New())
 
-	executionConsumer := testconsumer.New(amqpURL, messages.WorkflowExecutionRoutingKey)
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
 	executionConsumer.Start()
 	defer executionConsumer.Stop()
 

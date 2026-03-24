@@ -1,8 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata } from "./types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { BaseNodeMetadata } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
 interface OnWorkflowRunConfiguration {
@@ -52,7 +52,7 @@ interface OnWorkflowRunEventData {
  * Renderer for the "github.onWorkflowRun" trigger
  */
 export const onWorkflowRunTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnWorkflowRunEventData;
     const workflowName =
       eventData?.workflow_run?.display_title ||

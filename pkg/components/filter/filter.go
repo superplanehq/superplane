@@ -11,6 +11,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -185,6 +186,7 @@ func expressionOptions(env map[string]any) []expr.Option {
 		expr.AsBool(),
 		expr.WithContext("ctx"),
 		expr.Timezone(time.UTC.String()),
+		exprruntime.DateFunctionOption(),
 		expr.Function("root", func(params ...any) (any, error) {
 			if len(params) != 0 {
 				return nil, fmt.Errorf("root() takes no arguments")

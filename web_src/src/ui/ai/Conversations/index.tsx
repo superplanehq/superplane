@@ -2,7 +2,7 @@ import { BotIcon, CheckIcon, CopyIcon, FileIcon, ListIcon, PaperclipIcon, PlusIc
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button } from "../../button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { showErrorToast } from "@/utils/toast";
 
 export namespace Conversations {
@@ -160,6 +160,7 @@ export function Conversations({
 }: Conversations.Props) {
   const [mounted, setMounted] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const [showConversationsList, setShowConversationsList] = useState(false);
   const [panelWidth, setPanelWidth] = useState(initialWidth);
   const [isResizing, setIsResizing] = useState(false);
@@ -236,13 +237,16 @@ export function Conversations({
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !onSendMessage) return;
+    if (!inputMessage.trim() || !onSendMessage || isSending) return;
 
+    setIsSending(true);
     try {
       await onSendMessage(inputMessage, activeConversationId);
       setInputMessage("");
     } catch (_error) {
       showErrorToast("Failed to send message");
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -579,9 +583,14 @@ export function Conversations({
                 maxHeight: "120px",
               }}
             />
-            <Button onClick={handleSendMessage} disabled={!inputMessage.trim()}>
+            <LoadingButton
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim()}
+              loading={isSending}
+              loadingText="Sending..."
+            >
               Send
-            </Button>
+            </LoadingButton>
           </div>
         </div>
       )}

@@ -1,12 +1,13 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   OutputPayload,
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
   ExecutionDetailsContext,
 } from "../types";
-import { Issue } from "./types";
+import type { Issue } from "./types";
 import { baseProps } from "./base";
 import { buildGitlabExecutionSubtitle } from "./utils";
 import { getDetailsForApiIssue } from "./issue_utils";
@@ -16,7 +17,7 @@ export const createIssueMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     if (outputs?.default?.[0]?.data) {
       const issue = outputs.default[0].data as Issue;

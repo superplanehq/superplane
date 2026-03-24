@@ -1,7 +1,8 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { formatTimeAgo } from "@/utils/date";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import { buildCloudBuildSummaryDetails, cloudBuildStatusToTriggerState, type CloudBuildData } from "./cloudbuild";
 
@@ -11,7 +12,7 @@ export const onBuildCompleteTriggerRenderer: TriggerRenderer = {
     return cloudBuildStatusToTriggerState(data?.status);
   },
 
-  getTitleAndSubtitle: (_context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (_context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const title = "Cloud Build event";
     return { title, subtitle: "" };
   },
@@ -36,7 +37,7 @@ export const onBuildCompleteTriggerRenderer: TriggerRenderer = {
       ...(lastEvent && {
         lastEventData: {
           title: "Cloud Build event",
-          subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
+          subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: cloudBuildStatusToTriggerState(data?.status),
           eventId: lastEvent.id,

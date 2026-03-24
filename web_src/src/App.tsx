@@ -18,11 +18,17 @@ import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CustomComponent } from "./pages/custom-component";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
+import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import HomePage from "./pages/home";
 import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
+import AdminLayout from "./pages/admin/AdminLayout";
+import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
+import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
+import AccountsListAdmin from "./pages/admin/AccountsList";
+import ImpersonationBanner from "./components/ImpersonationBanner";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -65,12 +71,20 @@ function App() {
 function AppRouter() {
   return (
     <BrowserRouter>
+      <ImpersonationBanner />
       <SetupGuard>
         <Routes>
           {/* public routes */}
           <Route path="login" element={<Login />} />
           <Route path="create" element={<OrganizationCreate />} />
           <Route path="setup" element={<OwnerSetup />} />
+
+          {/* Admin dashboard routes */}
+          <Route path="admin" element={<AdminLayout />}>
+            <Route index element={<OrganizationsListAdmin />} />
+            <Route path="accounts" element={<AccountsListAdmin />} />
+            <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
+          </Route>
 
           {/* Organization selection and creation */}
           <Route path="" element={withAuthOnly(OrganizationSelect)} />
@@ -89,6 +103,7 @@ function AppRouter() {
               />
             )}
             <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+            <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
             <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
             <Route
               path="canvases/:canvasId/nodes/:nodeId/:executionId"

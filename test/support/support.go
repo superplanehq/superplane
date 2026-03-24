@@ -29,6 +29,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
+	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
@@ -39,6 +40,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
+	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 type ResourceRegistry struct {
@@ -326,15 +328,15 @@ func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []model
 	// Create canvas
 	//
 	workflow := &models.Canvas{
-		ID:                      uuid.New(),
-		OrganizationID:          orgID,
-		LiveVersionID:           &liveVersionID,
-		CanvasVersioningEnabled: canvasVersioningEnabled,
-		Name:                    RandomName("canvas"),
-		Description:             "Test canvas",
-		CreatedBy:               &userID,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:                uuid.New(),
+		OrganizationID:    orgID,
+		LiveVersionID:     &liveVersionID,
+		VersioningEnabled: canvasVersioningEnabled,
+		Name:              RandomName("canvas"),
+		Description:       "Test canvas",
+		CreatedBy:         &userID,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
 	}
 
 	//

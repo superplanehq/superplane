@@ -1,5 +1,6 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -26,13 +27,13 @@ export const publishCommitStatusMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    let details: Record<string, string> = {};
+    const details: Record<string, string> = {};
 
     if (outputs && outputs.default && outputs.default.length > 0) {
       const status = outputs.default[0].data as CommitStatus;

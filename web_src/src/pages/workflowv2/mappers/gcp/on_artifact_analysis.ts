@@ -1,10 +1,11 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
-import { OccurrenceData } from "./artifact_registry";
+import type { OccurrenceData } from "./artifact_registry";
 
 type OnArtifactAnalysisConfiguration = {
   kinds?: string[];
@@ -16,18 +17,18 @@ type OnArtifactAnalysisConfiguration = {
 export const onArtifactAnalysisTriggerRenderer: TriggerRenderer = {
   getEventState: () => "triggered",
 
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const data = context.event?.data as OccurrenceData | undefined;
     const kindLabel = getKindLabel(data?.kind);
     const imageRef = shortArtifactRef(data?.resourceUri);
     const title = imageRef ? `${kindLabel}: ${imageRef}` : `${kindLabel} event`;
 
-    const subtitleParts: string[] = [];
+    const subtitleParts: (string | React.ReactNode)[] = [];
     if (data?.vulnerability?.severity) {
       subtitleParts.push(`${data.vulnerability.severity} severity`);
     }
     if (context.event?.createdAt) {
-      subtitleParts.push(formatTimeAgo(new Date(context.event.createdAt)));
+      subtitleParts.push(renderTimeAgo(new Date(context.event.createdAt)));
     }
 
     return { title, subtitle: subtitleParts.join(" · ") };
@@ -74,7 +75,7 @@ export const onArtifactAnalysisTriggerRenderer: TriggerRenderer = {
       ...(lastEvent && {
         lastEventData: {
           title: eventTitleAndSubtitle?.title ?? "Container analysis event",
-          subtitle: eventTitleAndSubtitle?.subtitle ?? formatTimeAgo(new Date(lastEvent.createdAt)),
+          subtitle: eventTitleAndSubtitle?.subtitle ?? renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,

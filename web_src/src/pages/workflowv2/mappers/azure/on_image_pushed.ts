@@ -1,11 +1,12 @@
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type React from "react";
+import type { TriggerProps } from "@/ui/trigger";
 import azureIcon from "@/assets/icons/integrations/azure.svg";
-import { ACREventData } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { ACREventData } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../utils";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnImagePushedConfiguration {
   resourceGroup?: string;
@@ -15,13 +16,13 @@ export interface OnImagePushedConfiguration {
 }
 
 export const onImagePushedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as ACREventData;
     const repository = eventData?.target?.repository;
     const tag = eventData?.target?.tag;
 
     const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "Image pushed";
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },

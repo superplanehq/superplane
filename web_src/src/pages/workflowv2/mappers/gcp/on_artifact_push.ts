@@ -1,10 +1,11 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 import gcpArtifactRegistryIcon from "@/assets/icons/integrations/gcp.artifactregistry.svg";
-import { ArtifactPushData } from "./artifact_registry";
+import type { ArtifactPushData } from "./artifact_registry";
 
 type OnArtifactPushConfiguration = {
   location?: string;
@@ -14,17 +15,17 @@ type OnArtifactPushConfiguration = {
 export const onArtifactPushTriggerRenderer: TriggerRenderer = {
   getEventState: () => "triggered",
 
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const data = context.event?.data as ArtifactPushData | undefined;
     const imageRef = shortArtifactRef(data?.digest) ?? shortArtifactRef(data?.tag);
     const title = imageRef ? `Pushed ${imageRef}` : "Pushed artifact image";
 
-    const subtitleParts: string[] = [];
+    const subtitleParts: (string | React.ReactNode)[] = [];
     if (data?.action) {
       subtitleParts.push(formatPushAction(data.action));
     }
     if (context.event?.createdAt) {
-      subtitleParts.push(formatTimeAgo(new Date(context.event.createdAt)));
+      subtitleParts.push(renderTimeAgo(new Date(context.event.createdAt)));
     }
 
     return { title, subtitle: subtitleParts.join(" · ") };
@@ -71,7 +72,7 @@ export const onArtifactPushTriggerRenderer: TriggerRenderer = {
       ...(lastEvent && {
         lastEventData: {
           title: eventTitleAndSubtitle?.title ?? "Artifact push event",
-          subtitle: eventTitleAndSubtitle?.subtitle ?? formatTimeAgo(new Date(lastEvent.createdAt)),
+          subtitle: eventTitleAndSubtitle?.subtitle ?? renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,

@@ -20,8 +20,6 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
 }) => {
   const predicates: Predicate[] = Array.isArray(value) ? value : [];
   const operators = field.typeOptions?.anyPredicateList?.operators ?? [];
-
-  const useExpressionInput = !field.disallowExpression && allowExpressions;
   const placeholder = field.placeholder || "Value";
 
   const addPredicate = () => {
@@ -60,7 +58,7 @@ export const AnyPredicateListFieldRenderer: React.FC<FieldRendererProps> = ({
                 ))}
               </SelectContent>
             </Select>
-            {useExpressionInput ? (
+            {allowExpressions ? (
               <AutoCompleteInput
                 exampleObj={autocompleteExampleObj ?? null}
                 value={predicate.value ?? ""}

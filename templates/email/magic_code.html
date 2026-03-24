@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your SuperPlane sign-in code</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            color: #000000;
+            background-color: #ffffff;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .text {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .code-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .code {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 8px;
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            color: #000000;
+            padding: 16px 24px;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        .login-link {
+            color: #000000;
+            word-break: break-all;
+            text-decoration: underline;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .instruction-text {
+            font-size: 14px;
+            color: #666666;
+            margin-top: 15px;
+            font-style: italic;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #cccccc;
+            color: #000000;
+            font-size: 14px;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 600px) {
+            body {
+                padding: 20px 15px;
+            }
+
+            .code {
+                font-size: 24px;
+                letter-spacing: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="text">
+        Enter the following code to sign in to SuperPlane:
+    </div>
+
+    <div class="code-container">
+        <span class="code">{{.Code}}</span>
+    </div>
+
+    {{if .MagicLink}}
+    <div class="text">
+        Or sign in directly by clicking this link: <a href="{{.MagicLink}}" class="login-link">Sign in to SuperPlane</a>
+    </div>
+    {{end}}
+
+    <div class="instruction-text">
+        {{if .MagicLink}}This code and link expire in 10 minutes.{{else}}This code expires in 10 minutes.{{end}} If you didn't request this, you can safely ignore this email.
+    </div>
+
+    <div class="footer">
+        Best regards,<br>The SuperPlane Team
+    </div>
+</body>
+</html>

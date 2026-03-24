@@ -1,25 +1,26 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
-import { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
+import type { EcrImageScanEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
 import { buildRepositoryMetadataItems, formatTagLabel, formatTags, getRepositoryLabel } from "./utils";
-import { formatTimeAgo } from "@/utils/date";
-import { EcrImageScanDetail } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { EcrImageScanDetail } from "./types";
 import { numberOrZero, stringOrDash } from "../../utils";
 
 /**
  * Renderer for the "aws.ecr.onImageScan" trigger
  */
 export const onImageScanTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail;
     const repository = getRepositoryLabel(undefined, undefined, detail?.["repository-name"]);
     const tagLabel = formatTagLabel(detail?.["image-tags"]);
 
     const title = repository ? `${repository}${tagLabel ? `:${tagLabel}` : ""}` : "ECR image scan";
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
     return { title, subtitle };
   },
@@ -28,7 +29,7 @@ export const onImageScanTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as EcrImageScanEvent;
     const detail = eventData?.detail as EcrImageScanDetail;
 
-    let values: Record<string, string> = {
+    const values: Record<string, string> = {
       Repository: stringOrDash(getRepositoryLabel(undefined, undefined, detail?.["repository-name"])),
       "Image Tags": formatTags(detail?.["image-tags"]),
       "Image Digest": stringOrDash(detail?.["image-digest"]),

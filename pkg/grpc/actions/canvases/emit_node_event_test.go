@@ -164,7 +164,7 @@ func Test__EmitNodeEvent(t *testing.T) {
 
 	t.Run("successful event emission publishes RabbitMQ message", func(t *testing.T) {
 		amqpURL, _ := config.RabbitMQURL()
-		testconsumer := testconsumer.New(amqpURL, messages.WorkflowEventCreatedRoutingKey)
+		testconsumer := testconsumer.New(amqpURL, messages.CanvasEventCreatedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 

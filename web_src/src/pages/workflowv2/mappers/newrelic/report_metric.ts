@@ -1,7 +1,8 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getStateMap } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -9,10 +10,10 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
-import { NewRelicMetricPayload, ReportMetricConfiguration } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { NewRelicMetricPayload, ReportMetricConfiguration } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./utils";
 
 export const reportMetricMapper: ComponentBaseMapper = {
@@ -53,9 +54,9 @@ export const reportMetricMapper: ComponentBaseMapper = {
     return { ...details, ...getDetailsForMetric(metric) };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 

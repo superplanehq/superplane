@@ -18,6 +18,7 @@ const (
 	ResourceTypeVMSizeDropdown            = "azure.vmSize"
 	ResourceTypeVirtualNetworkDropdown    = "azure.virtualNetwork"
 	ResourceTypeSubnetDropdown            = "azure.subnet"
+	ResourceTypeStorageAccountDropdown    = "azure.storageAccount"
 	ResourceTypeContainerRegistryDropdown = "azure.containerRegistry"
 )
 
@@ -43,12 +44,14 @@ type armSubnet struct {
 
 func (a *AzureIntegration) ListResourceGroups(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	ctx.Logger.Info("listing Azure resource groups")
-
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+	return listResourceGroups(ctx, provider)
+}
 
+func listResourceGroups(ctx core.ListResourcesContext, provider *AzureProvider) ([]core.IntegrationResource, error) {
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourcegroups?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), armAPIVersionResources)
 
@@ -102,12 +105,15 @@ func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesCont
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	resourceGroup = azureResourceName(resourceGroup)
-
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+	return listResourceGroupLocations(ctx, provider, resourceGroup)
+}
+
+func listResourceGroupLocations(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
+	resourceGroup = azureResourceName(resourceGroup)
 
 	location, err := getResourceGroupLocation(context.Background(), provider, resourceGroup)
 	if err != nil {
@@ -133,16 +139,18 @@ func (a *AzureIntegration) ListResourceGroupLocations(ctx core.ListResourcesCont
 
 func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure VM sizes for resourceGroup=%s", resourceGroup)
-
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	resourceGroup = azureResourceName(resourceGroup)
-
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+	return listVMSizes(ctx, provider, resourceGroup)
+}
+
+func listVMSizes(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
+	resourceGroup = azureResourceName(resourceGroup)
 
 	location, err := getResourceGroupLocation(context.Background(), provider, resourceGroup)
 	if err != nil {
@@ -187,16 +195,18 @@ func (a *AzureIntegration) ListVMSizes(ctx core.ListResourcesContext, resourceGr
 
 func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure virtual networks for resourceGroup=%s", resourceGroup)
-
 	if resourceGroup == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	resourceGroup = azureResourceName(resourceGroup)
-
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+	return listVirtualNetworks(ctx, provider, resourceGroup)
+}
+
+func listVirtualNetworks(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
+	resourceGroup = azureResourceName(resourceGroup)
 
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, armAPIVersionNetwork)
@@ -242,17 +252,19 @@ func (a *AzureIntegration) ListVirtualNetworks(ctx core.ListResourcesContext, re
 
 func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGroup, vnetName string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure subnets for resourceGroup=%s vnet=%s", resourceGroup, vnetName)
-
 	if resourceGroup == "" || vnetName == "" {
 		return []core.IntegrationResource{}, nil
 	}
-	resourceGroup = azureResourceName(resourceGroup)
-	vnetName = azureResourceName(vnetName)
-
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+	return listSubnets(ctx, provider, resourceGroup, vnetName)
+}
+
+func listSubnets(ctx core.ListResourcesContext, provider *AzureProvider, resourceGroup, vnetName string) ([]core.IntegrationResource, error) {
+	resourceGroup = azureResourceName(resourceGroup)
+	vnetName = azureResourceName(vnetName)
 
 	listURL := fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/virtualNetworks/%s/subnets?api-version=%s",
 		armBaseURL, provider.GetSubscriptionID(), resourceGroup, vnetName, armAPIVersionNetwork)
@@ -296,6 +308,66 @@ func (a *AzureIntegration) ListSubnets(ctx core.ListResourcesContext, resourceGr
 	return resources, nil
 }
 
+type armStorageAccount struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+func (a *AzureIntegration) ListStorageAccounts(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
+	ctx.Logger.Infof("listing Azure storage accounts for resourceGroup=%s", resourceGroup)
+
+	provider, err := newProvider(ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	var listURL string
+	if resourceGroup != "" {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts?api-version=2023-01-01",
+			armBaseURL, provider.GetSubscriptionID(), resourceGroup)
+	} else {
+		listURL = fmt.Sprintf("%s/subscriptions/%s/providers/Microsoft.Storage/storageAccounts?api-version=2023-01-01",
+			armBaseURL, provider.GetSubscriptionID())
+	}
+
+	items, err := provider.getClient().listAll(context.Background(), listURL)
+	if err != nil {
+		if isARMNotFound(err) {
+			ctx.Logger.Warnf("resource group %s not found, returning empty storage accounts list", resourceGroup)
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("failed to list storage accounts: %w", err)
+	}
+
+	resources := []core.IntegrationResource{}
+	for _, raw := range items {
+		var account armStorageAccount
+		if err := json.Unmarshal(raw, &account); err != nil {
+			continue
+		}
+		if account.Name == "" {
+			continue
+		}
+
+		id := account.Name
+		if account.ID != "" {
+			id = account.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: ResourceTypeStorageAccountDropdown,
+			Name: account.Name,
+			ID:   id,
+		})
+	}
+
+	sort.Slice(resources, func(i, j int) bool {
+		return strings.ToLower(resources[i].Name) < strings.ToLower(resources[j].Name)
+	})
+
+	return resources, nil
+}
+
 // azureResourceName extracts the final resource name segment from an Azure resource ID.
 // It handles plain names, full ARM IDs, and URL-encoded ARM IDs (e.g. from query parameters).
 type armContainerRegistryProperties struct {
@@ -311,12 +383,14 @@ type armContainerRegistry struct {
 
 func (a *AzureIntegration) ListContainerRegistries(ctx core.ListResourcesContext, resourceGroup string) ([]core.IntegrationResource, error) {
 	ctx.Logger.Infof("listing Azure container registries for resource group: %s", resourceGroup)
-
-	provider, err := a.ensureProvider(ctx.Integration)
+	provider, err := newProvider(ctx.Integration)
 	if err != nil {
 		return nil, err
 	}
+	return listContainerRegistries(provider, resourceGroup)
+}
 
+func listContainerRegistries(provider *AzureProvider, resourceGroup string) ([]core.IntegrationResource, error) {
 	var listURL string
 	if resourceGroup != "" {
 		listURL = fmt.Sprintf("%s/subscriptions/%s/resourceGroups/%s/providers/Microsoft.ContainerRegistry/registries?api-version=2023-07-01",
@@ -333,22 +407,22 @@ func (a *AzureIntegration) ListContainerRegistries(ctx core.ListResourcesContext
 
 	resources := []core.IntegrationResource{}
 	for _, raw := range items {
-		var registry armContainerRegistry
-		if err := json.Unmarshal(raw, &registry); err != nil {
+		var reg armContainerRegistry
+		if err := json.Unmarshal(raw, &reg); err != nil {
 			continue
 		}
-		if registry.Name == "" {
+		if reg.Name == "" {
 			continue
 		}
 
-		id := registry.Name
-		if registry.ID != "" {
-			id = registry.ID
+		id := reg.Name
+		if reg.ID != "" {
+			id = reg.ID
 		}
 
 		resources = append(resources, core.IntegrationResource{
 			Type: ResourceTypeContainerRegistryDropdown,
-			Name: registry.Name,
+			Name: reg.Name,
 			ID:   id,
 		})
 	}

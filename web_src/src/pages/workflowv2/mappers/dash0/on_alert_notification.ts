@@ -1,7 +1,8 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import { stringOrDash } from "../utils";
 
@@ -36,13 +37,15 @@ interface OnAlertNotificationConfiguration {
 }
 
 export const onAlertNotificationTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as AlertNotificationEventData | undefined;
     const issue = eventData?.issue;
     const title = issue?.summary || issue?.issueIdentifier || issue?.id || "Dash0 alert notification";
     const subtitleParts = [issue?.status].filter(Boolean).join(" · ");
-    const timeAgo = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
-    const subtitle = subtitleParts && timeAgo ? `${subtitleParts} · ${timeAgo}` : subtitleParts || timeAgo;
+    const subtitle =
+      subtitleParts && context.event?.createdAt
+        ? renderWithTimeAgo(subtitleParts, new Date(context.event.createdAt))
+        : subtitleParts || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
 
     return {
       title,

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -163,6 +164,62 @@ func Test__CreateInvitation(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Contains(t, s.Message(), "Failed to create invitation")
+	})
+
+	t.Run("usage limit violation blocks accepted invitation for existing account", func(t *testing.T) {
+		account, err := models.CreateAccount(support.RandomName("account")+"@example.com", support.RandomName("user"))
+		require.NoError(t, err)
+		userCount, err := models.CountActiveHumanUsersByOrganization(r.Organization.ID.String())
+		require.NoError(t, err)
+
+		service := &fakeUsageService{
+			enabled: true,
+			checkOrganizationResp: &usagepb.CheckOrganizationLimitsResponse{
+				Allowed: false,
+				Violations: []*usagepb.LimitViolation{
+					{
+						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_USERS,
+						ConfiguredLimit: 1,
+						CurrentValue:    2,
+					},
+				},
+			},
+		}
+
+		_, err = CreateInvitationWithUsage(ctx, r.AuthService, service, r.Organization.ID.String(), account.Email)
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.ResourceExhausted, s.Code())
+		assert.Equal(t, "organization user limit exceeded", s.Message())
+		require.Len(t, service.checkOrganizationCalls, 1)
+		assert.Equal(t, int32(userCount+1), service.checkOrganizationCalls[0].state.Users)
+
+		_, err = models.FindActiveUserByEmail(r.Organization.ID.String(), account.Email)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("pending invitation skips usage enforcement", func(t *testing.T) {
+		service := &fakeUsageService{
+			enabled: true,
+			checkOrganizationResp: &usagepb.CheckOrganizationLimitsResponse{
+				Allowed: false,
+				Violations: []*usagepb.LimitViolation{
+					{
+						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_USERS,
+						ConfiguredLimit: 0,
+						CurrentValue:    1,
+					},
+				},
+			},
+		}
+
+		email := support.RandomName("pending") + "@example.com"
+		response, err := CreateInvitationWithUsage(ctx, r.AuthService, service, r.Organization.ID.String(), email)
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Equal(t, models.InvitationStatePending, response.Invitation.State)
+		assert.Empty(t, service.checkOrganizationCalls)
 	})
 }
 

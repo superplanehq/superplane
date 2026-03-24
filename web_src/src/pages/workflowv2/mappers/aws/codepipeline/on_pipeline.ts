@@ -1,10 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsCodePipelineIcon from "@/assets/icons/integrations/aws.codepipeline.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatPredicate, Predicate, stringOrDash } from "../../utils";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../../utils";
+import { formatPredicate, stringOrDash } from "../../utils";
 
 interface OnPipelineConfiguration {
   region?: string;
@@ -45,7 +47,7 @@ function buildMetadataItems(configuration?: OnPipelineConfiguration): MetadataIt
 }
 
 export const onPipelineTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as PipelineExecutionEvent;
     const pipeline = eventData?.detail?.pipeline;
     const state = eventData?.detail?.state;
@@ -57,7 +59,7 @@ export const onPipelineTriggerRenderer: TriggerRenderer = {
       title = pipeline;
     }
 
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
     return { title, subtitle };
   },
 

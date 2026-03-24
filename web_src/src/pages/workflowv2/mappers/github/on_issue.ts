@@ -1,9 +1,9 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerProps } from "@/ui/trigger";
 import { getDetailsForIssue } from "./base";
-import { BaseNodeMetadata, Issue } from "./types";
+import type { BaseNodeMetadata, Issue } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
 interface OnIssueConfiguration {
@@ -19,7 +19,7 @@ interface OnIssueEventData {
  * Renderer for the "github.onIssue" trigger
  */
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
 
     return {

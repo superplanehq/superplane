@@ -363,25 +363,6 @@ Makes a field optional with an explicit on/off toggle. When toggled off, the fie
 | Integrations | Advanced filters, service options | Power user features |
 | Triggers | Optional filtering criteria | Start simple, add filtering later |
 
-#### Disabling Expressions (`DisallowExpression: true`)
-
-Prevents users from using `{{ }}` expressions in a field. The field will only accept static values.
-
-**When to use:**
-- Field values that must be known at configuration time (not runtime)
-- Technical identifiers that shouldn't be dynamic
-- Fields where expressions would cause errors or security issues
-
-**Good candidates for DisallowExpression:**
-
-| Field Type | Allow Expressions? | Why |
-|------------|-------------------|-----|
-| Header names | No | Names must be static for HTTP protocol |
-| Header values | Yes | Values often come from payload data |
-| Field keys (in key-value pairs) | No | Keys define structure, should be static |
-| Field values (in key-value pairs) | Yes | Values are often dynamic |
-| Resource type identifiers | No | Affects parsing/routing logic |
-
 ### Required vs Optional Fields
 
 - **Required**: Fields essential for the component to function
@@ -973,7 +954,6 @@ Use this checklist when designing or reviewing components.
 - [ ] Field types match the data being collected
 - [ ] Sensible defaults that cover common use cases
 - [ ] `Togglable` used for optional feature sections
-- [ ] `DisallowExpression` used for static values (e.g., header names)
 - [ ] Visibility conditions hide advanced options appropriately
 
 ### Run Item Display

@@ -148,6 +148,7 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       );
       return response.data?.canvas;
     },
+    staleTime: 0,
     enabled: !!organizationId && !!canvasId,
   });
 };
@@ -358,7 +359,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
     mutationFn: async (data: {
       name?: string;
       description?: string;
-      canvasVersioningEnabled?: boolean;
+      versioningEnabled?: boolean;
       changeRequestApprovalConfig?: {
         items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
       };
@@ -369,7 +370,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
           body: {
             name: data.name,
             description: data.description,
-            canvasVersioningEnabled: data.canvasVersioningEnabled,
+            versioningEnabled: data.versioningEnabled,
             changeRequestApprovalConfig: data.changeRequestApprovalConfig,
           },
         }),
@@ -396,10 +397,10 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
               ...current.metadata,
               name: updatedMetadata?.name ?? variables.name ?? current.metadata?.name,
               description: updatedMetadata?.description ?? variables.description ?? current.metadata?.description,
-              canvasVersioningEnabled:
-                updatedMetadata?.canvasVersioningEnabled ??
-                variables.canvasVersioningEnabled ??
-                current.metadata?.canvasVersioningEnabled,
+              versioningEnabled:
+                updatedMetadata?.versioningEnabled ??
+                variables.versioningEnabled ??
+                current.metadata?.versioningEnabled,
               changeRequestApprovalConfig:
                 updatedMetadata?.changeRequestApprovalConfig ??
                 variables.changeRequestApprovalConfig ??
@@ -704,6 +705,7 @@ export const useCanvasEvents = (canvasId: string, enabled = true) => {
       );
       return response.data;
     },
+    staleTime: 0,
     refetchOnWindowFocus: false,
     enabled: !!canvasId && enabled,
   });

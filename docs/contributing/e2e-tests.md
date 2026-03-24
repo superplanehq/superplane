@@ -137,7 +137,7 @@ Use the `test/e2e/helpers/query.go` for lookup:
 
 Common test IDs:
 
-- Canvas: `canvas-drop-area`, `save-canvas-button`
+- Canvas: `canvas-drop-area`, `save-canvas-button`, `canvas-group-node` (group container), `multi-select-group` (multi-select toolbar)
 - Modals/Forms: `canvas-name-input`, `component-name-input`, `save-node-button`
 - Building blocks: `building-block-<name>` (e.g., `building-block-noop`, `building-block-approval`)
 

@@ -23,6 +23,7 @@ import {
   organizationsResetInviteLink,
   organizationsDeleteOrganization,
   organizationsGetAgentSettings,
+  organizationsDescribeUsage,
   organizationsUpdateAgentSettings,
   organizationsSetAgentOpenAiKey,
   organizationsDeleteAgentOpenAiKey,
@@ -44,6 +45,7 @@ export const organizationKeys = {
   canvases: (orgId: string) => [...organizationKeys.all, "canvases", orgId] as const,
   inviteLink: (orgId: string) => [...organizationKeys.all, "inviteLink", orgId] as const,
   agentSettings: (orgId: string) => [...organizationKeys.all, "agentSettings", orgId] as const,
+  usage: (orgId: string) => [...organizationKeys.all, "usage", orgId] as const,
 };
 
 // Hooks for fetching data
@@ -207,6 +209,23 @@ export const useOrganizationAgentSettings = (organizationId: string, enabled = t
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!organizationId && enabled,
+  });
+};
+
+export const useOrganizationUsage = (organizationId: string, enabled = true) => {
+  return useQuery({
+    queryKey: organizationKeys.usage(organizationId),
+    queryFn: async () => {
+      const response = await organizationsDescribeUsage(
+        withOrganizationHeader({
+          path: { id: organizationId },
+        }),
+      );
+      return response.data || null;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     enabled: !!organizationId && enabled,
   });
 };
@@ -596,7 +615,7 @@ export const useUpdateOrganization = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { name?: string; description?: string; canvasVersioningEnabled?: boolean }) => {
+    mutationFn: async (params: { name?: string; description?: string; versioningEnabled?: boolean }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
           path: { id: organizationId },
@@ -605,7 +624,7 @@ export const useUpdateOrganization = (organizationId: string) => {
               metadata: {
                 name: params.name,
                 description: params.description,
-                canvasVersioningEnabled: params.canvasVersioningEnabled,
+                versioningEnabled: params.versioningEnabled,
               },
             },
           },
@@ -614,7 +633,7 @@ export const useUpdateOrganization = (organizationId: string) => {
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) });
-      if (typeof variables.canvasVersioningEnabled === "boolean") {
+      if (typeof variables.versioningEnabled === "boolean") {
         queryClient.invalidateQueries({ queryKey: canvasKeys.all });
       }
     },

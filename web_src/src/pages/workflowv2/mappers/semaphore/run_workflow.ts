@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,20 +9,21 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
   EventSection,
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 interface ExecutionMetadata {
   workflow?: {
@@ -130,9 +131,9 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
@@ -266,7 +267,7 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   const executionState = runWorkflowStateFunction(execution);
   const subtitleTimestamp =
     executionState === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : undefined;
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : undefined;
 
   sections.push({
     receivedAt: new Date(execution.createdAt!),

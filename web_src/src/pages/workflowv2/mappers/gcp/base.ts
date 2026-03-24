@@ -1,6 +1,7 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -11,7 +12,7 @@ import {
 } from "../types";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { buildCloudBuildSummaryDetails, getCloudBuildData, getCloudBuildOutputPayload } from "./cloudbuild";
 
 export const baseMapper: ComponentBaseMapper = {
@@ -47,9 +48,9 @@ export const baseMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 
@@ -79,7 +80,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const fallbackSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const fallbackSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   const eventSubtitle = subtitle || fallbackSubtitle;
 
   return [

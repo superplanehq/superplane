@@ -1,17 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  DEFAULT_EVENT_STATE_MAP,
-  EventState,
-  EventStateMap,
-  EventStateStyle,
-  ComponentBaseSpecValue,
-} from "@/ui/componentBase";
-import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
+import type { EventState, EventStateMap, EventStateStyle, ComponentBaseSpecValue } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
-import { formatTimeAgo } from "@/utils/date";
+import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
@@ -72,7 +67,7 @@ type ErrorValue = {
 type ApprovalTimelineEntry = {
   label: string;
   status: string;
-  timestamp?: string;
+  timestamp?: React.ReactNode;
   comment?: string;
 };
 
@@ -126,6 +121,40 @@ interface ChainItemProps {
   ) => { map: EventStateMap; state: EventState };
 }
 
+function getReactNodeText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") {
+    return "";
+  }
+
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((child) => getReactNodeText(child)).join("");
+  }
+
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getReactNodeText(node.props.children);
+  }
+
+  return "";
+}
+
+function getComponentSubtitlePrefix(subtitle: React.ReactNode): string {
+  const subtitleText = getReactNodeText(subtitle);
+  if (!subtitleText.trim()) {
+    return "";
+  }
+
+  const [prefix] = subtitleText.split(" · ");
+  if (!subtitleText.includes(" · ") || !prefix?.trim()) {
+    return "";
+  }
+
+  return prefix.trim();
+}
+
 export const ChainItem: React.FC<ChainItemProps> = ({
   item,
   index,
@@ -170,12 +199,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       additionalData: { skipIssueCounts: true },
     });
 
-    const parts = subtitle ? subtitle.toString().split(" · ") : [];
-    if (parts.length > 1) {
-      return parts[0];
-    }
-
-    return "";
+    return getComponentSubtitlePrefix(subtitle);
   }, [item.workflowNode, item.originalExecution]);
 
   const copyToClipboard = useCallback((text: string) => {
@@ -315,7 +339,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-6 gap-2">
           <span className="text-[13px] text-gray-950/60">
-            {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
+            <TimeAgo date={new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || "")} />
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
               item.originalExecution?.updatedAt && (
@@ -426,54 +450,63 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         </span>
                         <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
                           <div className="flex flex-col gap-3">
-                            {value.map((entry, entryIndex) => (
-                              <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
-                                <div
-                                  className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
-                                    entry.status,
-                                  )}`}
-                                />
-                                {entryIndex < value.length - 1 && (
-                                  <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
-                                )}
-                                {entry.label.includes(" · ") ? (
-                                  // Handle combined label with status (e.g., "Check Name · STATUS")
-                                  // Status is in label, so we don't show the separate status line
-                                  <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                    {entry.label.split(" · ").map((part, idx) => (
-                                      <span key={idx}>
-                                        {idx === 0 ? (
-                                          <span>{part}</span>
-                                        ) : (
-                                          <span>
-                                            {" · "}
-                                            <span className="text-[12px] text-gray-600 font-normal">{part}</span>
-                                          </span>
-                                        )}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <>
+                            {value.map((entry, entryIndex) => {
+                              const timestampText = getReactNodeText(entry.timestamp).trim();
+
+                              return (
+                                <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
+                                  <div
+                                    className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
+                                      entry.status,
+                                    )}`}
+                                  />
+                                  {entryIndex < value.length - 1 && (
+                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                  )}
+                                  {entry.label.includes(" · ") ? (
+                                    // Handle combined label with status (e.g., "Check Name · STATUS")
+                                    // Status is in label, so we don't show the separate status line
                                     <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                      {entry.label}
+                                      {entry.label.split(" · ").map((part, idx) => (
+                                        <span key={idx}>
+                                          {idx === 0 ? (
+                                            <span>{part}</span>
+                                          ) : (
+                                            <span>
+                                              {" · "}
+                                              <span className="text-[12px] text-gray-600 font-normal">{part}</span>
+                                            </span>
+                                          )}
+                                        </span>
+                                      ))}
                                     </div>
-                                    {entry.status && (
+                                  ) : (
+                                    <>
                                       <div
-                                        className="text-[12px] text-gray-600 truncate"
-                                        title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
+                                        className="text-[13px] text-gray-800 font-medium truncate"
+                                        title={entry.label}
                                       >
-                                        {entry.status}
-                                        {entry.timestamp ? ` ${entry.timestamp}` : ""}
+                                        {entry.label}
                                       </div>
-                                    )}
-                                  </>
-                                )}
-                                {entry.comment && (
-                                  <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
-                                )}
-                              </div>
-                            ))}
+                                      {entry.status && (
+                                        <div
+                                          className="text-[12px] text-gray-600 truncate"
+                                          title={`${entry.status}${timestampText ? ` ${timestampText}` : ""}`}
+                                        >
+                                          {entry.status}
+                                          {entry.timestamp && <> {entry.timestamp}</>}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  {entry.comment && (
+                                    <div className="text-[12px] text-gray-500 italic break-words">
+                                      "{entry.comment}"
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -587,7 +620,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                       <>
                                         {" · "}
                                         <span className="text-[12px] font-normal text-gray-500">
-                                          {formatTimeAgo(new Date(incident.created_at))}
+                                          <TimeAgo date={new Date(incident.created_at)} />
                                         </span>
                                       </>
                                     )}

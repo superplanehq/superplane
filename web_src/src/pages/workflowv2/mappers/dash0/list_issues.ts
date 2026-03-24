@@ -1,13 +1,14 @@
-import {
+import type {
   ComponentBaseProps,
   EventSection,
   ComponentBaseSpec,
   EventState,
   EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type React from "react";
+import type {
   ComponentBaseMapper,
   OutputPayload,
   EventStateRegistry,
@@ -19,8 +20,8 @@ import {
   ExecutionInfo,
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
-import { ListIssuesConfiguration, PrometheusResponse } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { ListIssuesConfiguration, PrometheusResponse } from "./types";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_CLEAR = "clear";
@@ -100,24 +101,20 @@ export const listIssuesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
-    // Check if this is being called from ChainItem (which passes additionalData as undefined or a different structure)
-    // For ChainItem, just return the time without counts
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const date = new Date(context.execution.createdAt!);
 
     // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
-    // Otherwise, include counts for SidebarEventItem
     if (
       context.additionalData &&
       typeof context.additionalData === "object" &&
       "skipIssueCounts" in context.additionalData
     ) {
-      return timeAgo;
+      return renderTimeAgo(date);
     }
 
     const { critical, degraded } = getIssueCounts(context.execution);
 
-    // Build subtitle with counts and time
     const countParts: string[] = [];
     if (critical > 0) {
       countParts.push(`${critical} critical`);
@@ -127,11 +124,10 @@ export const listIssuesMapper: ComponentBaseMapper = {
     }
 
     if (countParts.length > 0) {
-      return `${countParts.join(", ")} · ${timeAgo}`;
+      return renderWithTimeAgo(countParts.join(", "), date);
     }
 
-    // No issues found - show "no issues" with time
-    return `no issues · ${timeAgo}`;
+    return renderWithTimeAgo("no issues", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -368,9 +364,8 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const { critical, degraded } = getIssueCounts(execution);
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  // Build subtitle with counts and time
   const countParts: string[] = [];
   if (critical > 0) {
     countParts.push(`${critical} critical`);
@@ -379,12 +374,11 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
     countParts.push(`${degraded} degraded`);
   }
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (countParts.length > 0) {
-    eventSubtitle = `${countParts.join(", ")} · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo(countParts.join(", "), date);
   } else {
-    // No issues found - show "no issues" with time
-    eventSubtitle = `no issues · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no issues", date);
   }
 
   return [

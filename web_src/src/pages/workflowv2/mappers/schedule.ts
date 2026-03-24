@@ -1,10 +1,16 @@
 import { getColorClass } from "@/utils/colors";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
 import { getNextCronExecution } from "@/utils/cron";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  TriggerRenderer,
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerRendererContext,
+  TriggerEventContext,
+} from "./types";
+import type { TriggerProps } from "@/ui/trigger";
 import React from "react";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 type ScheduleConfigurationType = "minutes" | "hours" | "days" | "weeks" | "months" | "cron";
 
@@ -312,7 +318,7 @@ function formatNextTrigger(configuration: ScheduleConfiguration, metadata?: { ne
  * Renderer for the "schedule" trigger type
  */
 export const scheduleTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventDate = new Date(context.event?.createdAt || "");
     const formattedDate = eventDate.toLocaleDateString("en-US", {
       year: "numeric",
@@ -326,7 +332,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
     return {
       title: `Schedule: ${formattedDate}`,
-      subtitle: formatTimeAgo(eventDate),
+      subtitle: renderTimeAgo(eventDate),
     };
   },
 
@@ -369,7 +375,7 @@ export const scheduleTriggerRenderer: TriggerRenderer = {
 
       props.lastEventData = {
         title: `Schedule: ${formattedDate}`,
-        subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
+        subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",
         eventId: lastEvent.id,

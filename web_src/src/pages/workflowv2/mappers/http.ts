@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -8,10 +8,17 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
+import type {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventStateMap,
+  EventState,
+} from "@/ui/componentBase";
+import type React from "react";
 import { getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import type { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
 
@@ -168,7 +175,7 @@ export const httpMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const state = httpStateFunction(context.execution);
 
     // For running state, show duration
@@ -200,20 +207,18 @@ export const httpMapper: ComponentBaseMapper = {
         responseCode = response.status.toString();
       }
 
-      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
-
-      if (responseCode && timeAgo) {
-        return `Response: ${responseCode} · ${timeAgo}`;
+      if (responseCode && context.execution.updatedAt) {
+        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(context.execution.updatedAt));
       } else if (responseCode) {
         return `Response: ${responseCode}`;
-      } else if (timeAgo) {
-        return timeAgo;
+      } else if (context.execution.updatedAt) {
+        return renderTimeAgo(new Date(context.execution.updatedAt));
       }
     }
 
     // Fallback: just show time ago
     if (context.execution.updatedAt) {
-      return formatTimeAgo(new Date(context.execution.updatedAt));
+      return renderTimeAgo(new Date(context.execution.updatedAt));
     }
 
     return "";
@@ -435,7 +440,7 @@ function getHTTPEventSections(
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const generateEventSubtitle = (): string => {
+  const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
 
     if (state === "running") {
@@ -471,20 +476,18 @@ function getHTTPEventSections(
         }
       }
 
-      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
-
-      if (responseCode && timeAgo) {
-        return `Response: ${responseCode} · ${timeAgo}`;
+      if (responseCode && execution.updatedAt) {
+        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(execution.updatedAt));
       } else if (responseCode) {
         return `Response: ${responseCode}`;
-      } else if (timeAgo) {
-        return timeAgo;
+      } else if (execution.updatedAt) {
+        return renderTimeAgo(new Date(execution.updatedAt));
       }
     }
 
     // Fallback: just show time ago
     if (execution.updatedAt) {
-      return formatTimeAgo(new Date(execution.updatedAt));
+      return renderTimeAgo(new Date(execution.updatedAt));
     }
 
     return "";

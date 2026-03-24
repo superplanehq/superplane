@@ -1,12 +1,12 @@
-import {
+import type {
   CanvasNodeExecutionResult,
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionState,
 } from "@/api-client";
-import { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
-import { TriggerProps } from "@/ui/trigger";
-import { QueryClient } from "@tanstack/react-query";
-import { ReactNode } from "react";
+import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
+import type { TriggerProps } from "@/ui/trigger";
+import type { QueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
 /**
  * A trigger renderer converts backend data into UI props for a specific trigger type.
@@ -38,7 +38,7 @@ export interface TriggerRenderer {
    * @param context The context for the trigger event
    * @returns The title and subtitle to display
    */
-  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string };
+  getTitleAndSubtitle: (context: TriggerEventContext) => { title: string; subtitle: string | React.ReactNode };
 
   /**
    * Optional event-state mapper for triggers that have meaningful terminal/running states.

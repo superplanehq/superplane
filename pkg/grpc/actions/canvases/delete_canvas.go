@@ -43,7 +43,7 @@ func DeleteCanvas(ctx context.Context, registry *registry.Registry, organization
 		return nil, status.Error(codes.Internal, "failed to delete canvas")
 	}
 
-	if err := messages.NewCanvasDeletedMessage(canvas.ID.String()).Publish(false); err != nil {
+	if err := messages.NewCanvasDeletedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishDeleted(); err != nil {
 		log.Errorf("failed to publish canvas deleted RabbitMQ message: %v", err)
 	}
 

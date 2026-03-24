@@ -1,10 +1,17 @@
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
+import React from "react";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import { getDetailsForAlert } from "./base";
-import { OnAlertConfiguration, OnAlertMetadata, PrometheusAlertPayload } from "./types";
+import type { OnAlertConfiguration, OnAlertMetadata, PrometheusAlertPayload } from "./types";
 
 const statusLabels: Record<string, string> = {
   firing: "Firing",
@@ -12,7 +19,7 @@ const statusLabels: Record<string, string> = {
 };
 
 export const onAlertTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as PrometheusAlertPayload;
     const title = buildEventTitle(eventData);
     const subtitle = buildEventSubtitle(eventData, context.event?.createdAt);
@@ -153,8 +160,8 @@ function buildEventTitle(eventData: PrometheusAlertPayload): string {
   return `Alert ${eventData?.status} · ${alertName}`;
 }
 
-function buildEventSubtitle(eventData: PrometheusAlertPayload, createdAt?: string): string {
-  const parts: string[] = [];
+function buildEventSubtitle(eventData: PrometheusAlertPayload, createdAt?: string): string | React.ReactNode {
+  const parts: (string | React.ReactNode)[] = [];
 
   const severity = eventData?.labels?.severity;
   if (severity) {
@@ -162,7 +169,7 @@ function buildEventSubtitle(eventData: PrometheusAlertPayload, createdAt?: strin
   }
 
   if (createdAt) {
-    parts.push(formatTimeAgo(new Date(createdAt)));
+    parts.push(renderTimeAgo(new Date(createdAt)));
   }
 
   return parts.join(" · ");

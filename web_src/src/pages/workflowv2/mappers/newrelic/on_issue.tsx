@@ -1,9 +1,16 @@
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
+import React from "react";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
-import { NewRelicIssuePayload, OnIssueConfiguration } from "./types";
+import type { NewRelicIssuePayload, OnIssueConfiguration } from "./types";
 
 const stateLabels: Record<string, string> = {
   CREATED: "Created",
@@ -20,7 +27,7 @@ const priorityLabels: Record<string, string> = {
 };
 
 export const onIssueTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as NewRelicIssuePayload;
     const title = buildEventTitle(eventData);
     const subtitle = buildEventSubtitle(eventData, context.event?.createdAt);
@@ -120,15 +127,15 @@ function buildEventTitle(eventData: NewRelicIssuePayload): string {
   return title;
 }
 
-function buildEventSubtitle(eventData: NewRelicIssuePayload, createdAt?: string): string {
-  const parts: string[] = [];
+function buildEventSubtitle(eventData: NewRelicIssuePayload, createdAt?: string): string | React.ReactNode {
+  const parts: (string | React.ReactNode)[] = [];
 
   if (eventData?.priority) {
     parts.push(priorityLabels[eventData.priority] || eventData.priority);
   }
 
   if (createdAt) {
-    parts.push(formatTimeAgo(new Date(createdAt)));
+    parts.push(renderTimeAgo(new Date(createdAt)));
   }
 
   return parts.join(" · ");

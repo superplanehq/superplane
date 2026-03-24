@@ -115,11 +115,10 @@ func (a *AWS) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:               "key",
-								Label:              "Key",
-								Type:               configuration.FieldTypeString,
-								Required:           true,
-								DisallowExpression: true,
+								Name:     "key",
+								Label:    "Key",
+								Type:     configuration.FieldTypeString,
+								Required: true,
 							},
 							{
 								Name:     "value",

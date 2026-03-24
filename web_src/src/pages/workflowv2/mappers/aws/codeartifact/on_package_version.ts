@@ -1,12 +1,14 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
+import type { PackageVersionDetail, PackageVersionEvent, Repository } from "./types";
 import { formatPackageLabel, formatPackageName } from "./utils";
-import { formatTimeAgo } from "@/utils/date";
-import { formatPredicate, numberOrZero, Predicate, stringOrDash } from "../../utils";
-import { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { Predicate } from "../../utils";
+import { formatPredicate, numberOrZero, stringOrDash } from "../../utils";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export interface Configuration {
   region?: string;
@@ -25,12 +27,12 @@ export interface Metadata {
  * Renderer for the "aws.codeArtifact.onPackageVersion" trigger
  */
 export const onPackageVersionTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as PackageVersionEvent;
     const detail = eventData?.detail;
     const packageLabel = formatPackageLabel(detail);
     const title = packageLabel || "CodeArtifact package version";
-    const subtitle = formatTimeAgo(new Date(context.event?.createdAt || ""));
+    const subtitle = renderTimeAgo(new Date(context.event?.createdAt || ""));
 
     return { title, subtitle };
   },

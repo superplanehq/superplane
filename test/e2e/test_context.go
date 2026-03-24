@@ -57,6 +57,7 @@ func (s *TestContext) Start() {
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
+	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
 
 	s.startVite()
 	s.startAppServer()

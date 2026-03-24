@@ -1,12 +1,13 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 
 export const onVMInstanceTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const data = context.event?.data as { resourceName?: string } | undefined;
     const resourceName = data?.resourceName ?? "";
     const title = "VM instance event";
@@ -31,7 +32,7 @@ export const onVMInstanceTriggerRenderer: TriggerRenderer = {
         lastEventData: {
           title: "VM instance event",
           subtitle:
-            (lastEvent.data as { resourceName?: string })?.resourceName ?? formatTimeAgo(new Date(lastEvent.createdAt)),
+            (lastEvent.data as { resourceName?: string })?.resourceName ?? renderTimeAgo(new Date(lastEvent.createdAt)),
           receivedAt: new Date(lastEvent.createdAt),
           state: "triggered",
           eventId: lastEvent.id,

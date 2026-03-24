@@ -1,12 +1,20 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { CustomFieldRenderer, NodeInfo, TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import React from "react";
+import type {
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
-import { Repository, RepositoryMetadata } from "./types";
-import { formatTimeAgo } from "@/utils/date";
+import type { Repository, RepositoryMetadata } from "./types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { formatPredicate, Predicate, stringOrDash } from "../utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../utils";
+import { formatPredicate, stringOrDash } from "../utils";
+import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnImagePushMetadata {
   repository?: RepositoryMetadata;
@@ -34,13 +42,13 @@ interface ImagePushEvent {
  * Renderer for the "dockerhub.onImagePush" trigger
  */
 export const onImagePushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as ImagePushEvent;
     const repository = eventData?.repository?.repo_name;
     const tag = eventData?.push_data?.tag;
 
     const title = repository ? `${repository}${tag ? `:${tag}` : ""}` : "Image push";
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event?.createdAt || "")) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event?.createdAt || "")) : "";
 
     return { title, subtitle };
   },

@@ -1,9 +1,10 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import rootlyIcon from "@/assets/icons/integrations/rootly.svg";
-import { IncidentEvent } from "./types";
+import type { IncidentEvent } from "./types";
 
 interface IncidentSummary {
   id?: string;
@@ -23,7 +24,7 @@ interface OnEventEventData extends IncidentEvent {
  * Renderer for the "rootly.onIncidentTimelineEvent" trigger type
  */
 export const onEventTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnEventEventData;
     const incident = eventData?.incident;
     const title = eventData?.event || incident?.title || "Incident event";
@@ -122,13 +123,16 @@ export const onEventTriggerRenderer: TriggerRenderer = {
   },
 };
 
-function buildSubtitle(content: string, createdAt?: string): string {
-  const timeAgo = createdAt ? formatTimeAgo(new Date(createdAt)) : "";
-  if (content && timeAgo) {
-    return `${content} · ${timeAgo}`;
+function buildSubtitle(content: string, createdAt?: string): string | React.ReactNode {
+  if (content && createdAt) {
+    return renderWithTimeAgo(content, new Date(createdAt));
   }
 
-  return content || timeAgo;
+  if (createdAt) {
+    return renderTimeAgo(new Date(createdAt));
+  }
+
+  return content;
 }
 
 function getDetailsForIncidentEventPayload(eventData?: OnEventEventData): Record<string, string> {

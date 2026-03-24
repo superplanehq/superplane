@@ -6,11 +6,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
@@ -26,6 +30,17 @@ func CreateCanvas(ctx context.Context, registry *registry.Registry, organization
 
 func CreateCanvasWithAutoLayout(
 	ctx context.Context,
+	registry *registry.Registry,
+	organizationID string,
+	pbCanvas *pb.Canvas,
+	autoLayout *pb.CanvasAutoLayout,
+) (*pb.CreateCanvasResponse, error) {
+	return CreateCanvasWithAutoLayoutAndUsage(ctx, nil, registry, organizationID, pbCanvas, autoLayout)
+}
+
+func CreateCanvasWithAutoLayoutAndUsage(
+	ctx context.Context,
+	usageService usage.Service,
 	registry *registry.Registry,
 	organizationID string,
 	pbCanvas *pb.Canvas,
@@ -66,19 +81,35 @@ func CreateCanvasWithAutoLayout(
 			return nil, status.Errorf(codes.Internal, "failed to load organization canvas versioning: %v", err)
 		}
 	}
+
+	if !isTemplate {
+		canvasCount, err := models.CountCanvasesByOrganization(organizationID)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to count organization canvases: %v", err)
+		}
+
+		if err := usage.EnsureOrganizationWithinLimits(ctx, usageService, organizationID, &usagepb.OrganizationState{
+			Canvases: int32(canvasCount + 1),
+		}, &usagepb.CanvasState{
+			Nodes: int32(len(expandedNodes)),
+		}); err != nil {
+			return nil, err
+		}
+	}
+
 	liveVersionID := uuid.New()
 
 	canvas := models.Canvas{
-		ID:                      uuid.New(),
-		OrganizationID:          targetOrganizationID,
-		LiveVersionID:           &liveVersionID,
-		IsTemplate:              isTemplate,
-		CanvasVersioningEnabled: canvasVersioningEnabled,
-		Name:                    pbCanvas.Metadata.Name,
-		Description:             pbCanvas.Metadata.Description,
-		CreatedBy:               &createdBy,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		ID:                uuid.New(),
+		OrganizationID:    targetOrganizationID,
+		LiveVersionID:     &liveVersionID,
+		IsTemplate:        isTemplate,
+		VersioningEnabled: canvasVersioningEnabled,
+		Name:              pbCanvas.Metadata.Name,
+		Description:       pbCanvas.Metadata.Description,
+		CreatedBy:         &createdBy,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -141,6 +172,10 @@ func CreateCanvasWithAutoLayout(
 
 	if err != nil {
 		return nil, err
+	}
+
+	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
+		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
 	proto, err := SerializeCanvas(&canvas, false)

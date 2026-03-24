@@ -1,7 +1,8 @@
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type React from "react";
 import jfrogIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
-import { TriggerProps } from "@/ui/trigger";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass } from "@/utils/colors";
 
 interface OnArtifactUploadedConfiguration {
@@ -17,12 +18,12 @@ interface OnArtifactUploadedEventData {
 }
 
 export const onArtifactUploadedTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as OnArtifactUploadedEventData;
     const name = eventData?.name || "Artifact";
     const repo = eventData?.repo;
     const title = repo ? `${name} in ${repo}` : name;
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },
@@ -78,7 +79,7 @@ export const onArtifactUploadedTriggerRenderer: TriggerRenderer = {
       const name = eventData?.name || "Artifact";
       const repo = eventData?.repo;
       const title = repo ? `${name} in ${repo}` : name;
-      const subtitle = lastEvent.createdAt ? formatTimeAgo(new Date(lastEvent.createdAt)) : "";
+      const subtitle = lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "";
 
       props.lastEventData = {
         title,

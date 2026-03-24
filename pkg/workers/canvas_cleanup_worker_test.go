@@ -2,6 +2,7 @@ package workers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -108,6 +109,9 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
 	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+	deletedCanvas, err = models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
 
 	//
 	// Process the deleted canvas with cleanup worker
@@ -205,6 +209,9 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
 	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+	deletedCanvas, err = models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
 
 	//
 	// Process the deleted canvas with cleanup worker
@@ -260,6 +267,9 @@ func Test__CanvasCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
 	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
 	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+	deletedCanvas, err = models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
 
 	//
 	// Process the deleted canvas with cleanup worker
@@ -313,6 +323,9 @@ func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
 	require.NoError(t, err)
 	require.True(t, deletedCanvas.DeletedAt.Valid, "DeletedAt should be set")
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", time.Now().AddDate(0, 0, -31)).Error)
+	deletedCanvas, err = models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
 
 	//
 	// Have two workers try to process the same canvas concurrently

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
@@ -10,16 +10,16 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
   EventSection,
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import { buildGithubExecutionSubtitle } from "./utils";
@@ -127,7 +127,7 @@ export const runWorkflowMapper: ComponentBaseMapper = {
       eventStateMap: RUN_WORKFLOW_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

@@ -27,7 +27,7 @@ func UpdateCanvas(
 	id string,
 	name *string,
 	description *string,
-	canvasVersioningEnabled *bool,
+	versioningEnabled *bool,
 	changeRequestApprovalConfig *pb.CanvasChangeRequestApprovalConfig,
 ) (*pb.UpdateCanvasResponse, error) {
 	canvasID, err := uuid.Parse(id)
@@ -90,8 +90,8 @@ func UpdateCanvas(
 		}
 	}
 
-	if canvasVersioningEnabled != nil && canvas.CanvasVersioningEnabled != *canvasVersioningEnabled {
-		canvas.CanvasVersioningEnabled = *canvasVersioningEnabled
+	if versioningEnabled != nil && canvas.VersioningEnabled != *versioningEnabled {
+		canvas.VersioningEnabled = *versioningEnabled
 		changed = true
 	}
 
@@ -108,7 +108,7 @@ func UpdateCanvas(
 		}
 	}
 
-	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String()).Publish(true); publishErr != nil {
+	if publishErr := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); publishErr != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
 	}
 

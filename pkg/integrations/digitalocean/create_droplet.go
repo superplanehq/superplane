@@ -20,13 +20,17 @@ var validHostnameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.\-]*$`)
 type CreateDroplet struct{}
 
 type CreateDropletSpec struct {
-	Name     string   `json:"name"`
-	Region   string   `json:"region"`
-	Size     string   `json:"size"`
-	Image    string   `json:"image"`
-	SSHKeys  []string `json:"sshKeys"`
-	Tags     []string `json:"tags"`
-	UserData string   `json:"userData"`
+	Name       string   `json:"name"`
+	Region     string   `json:"region"`
+	Size       string   `json:"size"`
+	Image      string   `json:"image"`
+	SSHKeys    []string `json:"sshKeys"`
+	Tags       []string `json:"tags"`
+	UserData   string   `json:"userData"`
+	Backups    bool     `json:"backups"`
+	IPv6       bool     `json:"ipv6"`
+	Monitoring bool     `json:"monitoring"`
+	VpcUUID    string   `json:"vpcUuid"`
 }
 
 func (c *CreateDroplet) Name() string {
@@ -56,9 +60,13 @@ func (c *CreateDroplet) Documentation() string {
 - **Region**: Region slug where the droplet will be created (required)
 - **Size**: Size slug for the droplet (required)
 - **Image**: Image slug or ID for the droplet OS (required)
-- **SSH Keys**: SSH key fingerprints or IDs to add to the droplet (optional)
+- **SSH Keys**: SSH keys to add to the droplet. Must have been added to the DigitalOcean team. (optional)
 - **Tags**: Tags to apply to the droplet (optional)
 - **User Data**: Cloud-init user data script (optional)
+- **Backups**: Enable automated backups for the droplet (optional)
+- **IPv6**: Enable IPv6 networking on the droplet (optional)
+- **Monitoring**: Enable DigitalOcean monitoring agent on the droplet (optional)
+- **VPC UUID**: UUID of the VPC to create the droplet in (optional)
 
 ## Output
 
@@ -133,16 +141,15 @@ func (c *CreateDroplet) Configuration() []configuration.Field {
 		{
 			Name:        "sshKeys",
 			Label:       "SSH Keys",
-			Type:        configuration.FieldTypeList,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Togglable:   true,
-			Description: "SSH key fingerprints or IDs to add to the droplet",
+			Description: "SSH keys to add to the droplet",
+			Placeholder: "Select SSH keys",
 			TypeOptions: &configuration.TypeOptions{
-				List: &configuration.ListTypeOptions{
-					ItemLabel: "SSH Key",
-					ItemDefinition: &configuration.ListItemDefinition{
-						Type: configuration.FieldTypeString,
-					},
+				Resource: &configuration.ResourceTypeOptions{
+					Type:  "ssh_key",
+					Multi: true,
 				},
 			},
 		},
@@ -169,6 +176,41 @@ func (c *CreateDroplet) Configuration() []configuration.Field {
 			Required:    false,
 			Togglable:   true,
 			Description: "Cloud-init user data script",
+		},
+		{
+			Name:        "backups",
+			Label:       "Enable Backups",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Enable automated backups for the droplet",
+		},
+		{
+			Name:        "ipv6",
+			Label:       "Enable IPv6",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Enable IPv6 networking on the droplet",
+		},
+		{
+			Name:        "monitoring",
+			Label:       "Enable Monitoring",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Enable DigitalOcean monitoring agent on the droplet",
+		},
+		{
+			Name:        "vpcUuid",
+			Label:       "VPC",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "VPC to create the droplet in",
+			Placeholder: "Select a VPC",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "vpc",
+				},
+			},
 		},
 	}
 }
@@ -223,13 +265,17 @@ func (c *CreateDroplet) Execute(ctx core.ExecutionContext) error {
 	}
 
 	droplet, err := client.CreateDroplet(CreateDropletRequest{
-		Name:     spec.Name,
-		Region:   spec.Region,
-		Size:     spec.Size,
-		Image:    spec.Image,
-		SSHKeys:  spec.SSHKeys,
-		Tags:     spec.Tags,
-		UserData: spec.UserData,
+		Name:       spec.Name,
+		Region:     spec.Region,
+		Size:       spec.Size,
+		Image:      spec.Image,
+		SSHKeys:    spec.SSHKeys,
+		Tags:       spec.Tags,
+		UserData:   spec.UserData,
+		Backups:    spec.Backups,
+		IPv6:       spec.IPv6,
+		Monitoring: spec.Monitoring,
+		VpcUUID:    spec.VpcUUID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create droplet: %v", err)

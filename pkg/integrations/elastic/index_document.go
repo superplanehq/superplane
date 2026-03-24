@@ -3,6 +3,7 @@ package elastic
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,10 +14,16 @@ import (
 
 type IndexDocument struct{}
 
+const defaultDocumentTimestampTemplate = `{{ now().UTC().Format("2006-01-02T15:04:05Z") }}`
+
 type IndexDocumentConfiguration struct {
 	Index      string         `json:"index" mapstructure:"index"`
 	Document   map[string]any `json:"document" mapstructure:"document"`
 	DocumentID string         `json:"documentId" mapstructure:"documentId"`
+}
+
+type IndexDocumentSetupMetadata struct {
+	Index string `json:"index" mapstructure:"index"`
 }
 
 func (c *IndexDocument) Name() string  { return "elastic.indexDocument" }
@@ -39,7 +46,7 @@ func (c *IndexDocument) Documentation() string {
 ## Configuration
 
 - **Index**: The Elasticsearch index name to write to (e.g. ` + "`workflow-audit`" + `)
-- **Document**: The JSON object to index
+- **Document**: The JSON object to index. The editor starts with an ` + "`@timestamp`" + ` template so documents are compatible with On Document Indexed by default.
 - **Document ID** *(optional)*: A stable ID for idempotent writes. If omitted, Elasticsearch generates one automatically. Providing an ID means re-runs update the existing document rather than creating a duplicate.
 
 ## Outputs
@@ -70,12 +77,14 @@ func (c *IndexDocument) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "document",
-			Label:       "Document",
-			Type:        configuration.FieldTypeObject,
-			Required:    true,
-			Default:     map[string]any{},
-			Description: "The JSON document to index.",
+			Name:     "document",
+			Label:    "Document",
+			Type:     configuration.FieldTypeObject,
+			Required: true,
+			Default: map[string]any{
+				onDocumentIndexedTimeField: defaultDocumentTimestampTemplate,
+			},
+			Description: "The JSON document to index. Defaults to include an @timestamp field template.",
 		},
 		{
 			Name:        "documentId",
@@ -93,12 +102,41 @@ func (c *IndexDocument) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if strings.TrimSpace(config.Index) == "" {
+	config.Index = strings.TrimSpace(config.Index)
+	if config.Index == "" {
 		return fmt.Errorf("index is required")
 	}
 
 	if config.Document == nil {
 		return fmt.Errorf("document is required and must be a JSON object")
+	}
+
+	resolvedIndex := config.Index
+	if !isTemplateExpression(config.Index) {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create Elastic client: %w", err)
+		}
+
+		indices, err := client.ListIndices()
+		if err != nil {
+			return fmt.Errorf("failed to list Elasticsearch indices: %w", err)
+		}
+
+		match := slices.IndexFunc(indices, func(index IndexInfo) bool {
+			return strings.EqualFold(index.Index, config.Index)
+		})
+		if match == -1 {
+			return fmt.Errorf("selected index %q was not found in Elasticsearch", config.Index)
+		}
+
+		resolvedIndex = indices[match].Index
+	}
+
+	if ctx.Metadata != nil {
+		if err := ctx.Metadata.Set(IndexDocumentSetupMetadata{Index: resolvedIndex}); err != nil {
+			return fmt.Errorf("failed to save metadata: %w", err)
+		}
 	}
 
 	return nil

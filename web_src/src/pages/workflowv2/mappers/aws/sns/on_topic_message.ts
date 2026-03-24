@@ -1,8 +1,9 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsSnsIcon from "@/assets/icons/integrations/aws.sns.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../../utils";
 
 interface OnTopicMessageConfiguration {
@@ -32,10 +33,10 @@ interface TopicMessageEvent {
 }
 
 export const onTopicMessageTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as TopicMessageEvent;
     const title = eventData?.MessageId ? eventData.MessageId : "SNS topic message";
-    const subtitle = context.event?.createdAt ? formatTimeAgo(new Date(context.event.createdAt)) : "";
+    const subtitle = context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "";
 
     return { title, subtitle };
   },

@@ -1,4 +1,5 @@
-import {
+import type React from "react";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -6,7 +7,7 @@ import {
   SubtitleContext,
   NodeInfo,
 } from "../../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 import { buildSnsProps, buildSubtitle, extractArnResourceName } from "./common";
 
@@ -38,7 +39,7 @@ export const deleteTopicMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildSubtitle(context);
   },
 };

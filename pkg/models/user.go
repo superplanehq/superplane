@@ -170,6 +170,36 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 	return &user, err
 }
 
+func ListActiveUsersByOrganization(orgID, search string, limit, offset int) ([]User, int64, error) {
+	query := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("type = ?", UserTypeHuman)
+
+	if search != "" {
+		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Model(&User{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var users []User
+	if err := query.Order("name ASC").Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}
+
 func ListActiveUsersByID(orgID string, ids []string) ([]User, error) {
 	return ListActiveUsersByIDInTransaction(database.Conn(), orgID, ids)
 }
@@ -311,6 +341,50 @@ func CountActiveUsersByOrganizationIDs(orgIDs []string) (map[string]int64, error
 	return counts, nil
 }
 
+func CountActiveHumanUsersByOrganization(orgID string) (int64, error) {
+	return CountActiveHumanUsersByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func CountActiveHumanUsersByOrganizationInTransaction(tx *gorm.DB, orgID string) (int64, error) {
+	var count int64
+	err := tx.
+		Model(&User{}).
+		Where("organization_id = ?", orgID).
+		Where("type = ?", UserTypeHuman).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func CountOrganizationsByBillingAccount(accountID string) (int64, error) {
+	return CountOrganizationsByBillingAccountInTransaction(database.Conn(), accountID)
+}
+
+func CountOrganizationsByBillingAccountInTransaction(tx *gorm.DB, accountID string) (int64, error) {
+	subquery := tx.
+		Table("users").
+		Select("DISTINCT ON (organization_id) organization_id, account_id").
+		Where("account_id IS NOT NULL").
+		Where("type = ?", UserTypeHuman).
+		Order("organization_id, created_at ASC")
+
+	var count int64
+	err := tx.
+		Table("(?) AS first_human_users", subquery).
+		Where("account_id = ?", accountID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func FindAnyUserByEmail(email string) (*User, error) {
 	var user User
 
@@ -320,4 +394,26 @@ func FindAnyUserByEmail(email string) (*User, error) {
 		Error
 
 	return &user, err
+}
+
+func FindFirstHumanUserByOrganization(orgID string) (*User, error) {
+	return FindFirstHumanUserByOrganizationInTransaction(database.Conn(), orgID)
+}
+
+func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*User, error) {
+	var user User
+
+	err := tx.
+		Where("organization_id = ?", orgID).
+		Where("account_id IS NOT NULL").
+		Where("type = ?", UserTypeHuman).
+		Order("created_at ASC").
+		First(&user).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }

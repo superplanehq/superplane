@@ -26,6 +26,12 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listLoadBalancers(ctx)
 	case "reserved_ip":
 		return listReservedIPs(ctx)
+	case "ssh_key":
+		return listSSHKeys(ctx)
+	case "vpc":
+		return listVPCs(ctx)
+	case "alert_policy":
+		return listAlertPolicies(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -244,6 +250,75 @@ func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource,
 			Type: "reserved_ip",
 			Name: ip.IP,
 			ID:   ip.IP,
+		})
+	}
+
+	return resources, nil
+}
+
+func listSSHKeys(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	keys, err := client.ListSSHKeys()
+	if err != nil {
+		return nil, fmt.Errorf("error listing SSH keys: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(keys))
+	for _, key := range keys {
+		resources = append(resources, core.IntegrationResource{
+			Type: "ssh_key",
+			Name: key.Name,
+			ID:   key.Fingerprint,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAlertPolicies(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	policies, err := client.ListAlertPolicies()
+	if err != nil {
+		return nil, fmt.Errorf("error listing alert policies: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(policies))
+	for _, policy := range policies {
+		resources = append(resources, core.IntegrationResource{
+			Type: "alert_policy",
+			Name: policy.Description,
+			ID:   policy.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	vpcs, err := client.ListVPCs()
+	if err != nil {
+		return nil, fmt.Errorf("error listing VPCs: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(vpcs))
+	for _, vpc := range vpcs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "vpc",
+			Name: vpc.Name,
+			ID:   vpc.ID,
 		})
 	}
 

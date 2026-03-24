@@ -1,11 +1,12 @@
 import { getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
-import { TriggerProps } from "@/ui/trigger";
+import type React from "react";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
+import type { TriggerProps } from "@/ui/trigger";
 import awsEc2Icon from "@/assets/icons/integrations/aws.ec2.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
-import { AmiStateChangeEvent } from "./types";
+import type { AmiStateChangeEvent } from "./types";
 
 interface Configuration {
   region?: string;
@@ -27,19 +28,22 @@ function buildMetadata(configuration?: Configuration): MetadataItem[] {
 }
 
 export const onImageTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     const eventData = context.event?.data as AmiStateChangeEvent;
     const imageId = eventData?.detail?.ImageId;
     const state = eventData?.detail?.State || "";
     const title = imageId || "EC2 AMI state change";
-    const subtitle = `${state} · ${formatTimeAgo(new Date(context.event?.createdAt || ""))}`;
+    const subtitle =
+      state && context.event?.createdAt
+        ? renderWithTimeAgo(state, new Date(context.event.createdAt))
+        : state || (context.event?.createdAt ? renderTimeAgo(new Date(context.event.createdAt)) : "");
     return { title, subtitle };
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as AmiStateChangeEvent;
 
-    let details: Record<string, string> = {
+    const details: Record<string, string> = {
       "Image ID": stringOrDash(eventData?.detail?.ImageId),
       State: stringOrDash(eventData?.detail?.State),
       Region: stringOrDash(eventData?.region),

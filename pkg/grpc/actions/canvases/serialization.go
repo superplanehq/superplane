@@ -47,15 +47,15 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:                      canvas.ID.String(),
-				OrganizationId:          canvas.OrganizationID.String(),
-				Name:                    canvas.Name,
-				Description:             canvas.Description,
-				CreatedAt:               timestamppb.New(*canvas.CreatedAt),
-				UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
-				CreatedBy:               createdBy,
-				IsTemplate:              canvas.IsTemplate,
-				CanvasVersioningEnabled: canvasVersioningEnabled,
+				Id:                canvas.ID.String(),
+				OrganizationId:    canvas.OrganizationID.String(),
+				Name:              canvas.Name,
+				Description:       canvas.Description,
+				CreatedAt:         timestamppb.New(*canvas.CreatedAt),
+				UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
+				CreatedBy:         createdBy,
+				IsTemplate:        canvas.IsTemplate,
+				VersioningEnabled: canvasVersioningEnabled,
 				ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
 					canvas.EffectiveChangeRequestApprovers(),
 				),
@@ -113,15 +113,15 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 
 	return &pb.Canvas{
 		Metadata: &pb.Canvas_Metadata{
-			Id:                      canvas.ID.String(),
-			OrganizationId:          canvas.OrganizationID.String(),
-			Name:                    canvas.Name,
-			Description:             canvas.Description,
-			CreatedAt:               timestamppb.New(*canvas.CreatedAt),
-			UpdatedAt:               timestamppb.New(*canvas.UpdatedAt),
-			CreatedBy:               createdBy,
-			IsTemplate:              canvas.IsTemplate,
-			CanvasVersioningEnabled: canvasVersioningEnabled,
+			Id:                canvas.ID.String(),
+			OrganizationId:    canvas.OrganizationID.String(),
+			Name:              canvas.Name,
+			Description:       canvas.Description,
+			CreatedAt:         timestamppb.New(*canvas.CreatedAt),
+			UpdatedAt:         timestamppb.New(*canvas.UpdatedAt),
+			CreatedBy:         createdBy,
+			IsTemplate:        canvas.IsTemplate,
+			VersioningEnabled: canvasVersioningEnabled,
 			ChangeRequestApprovalConfig: serializeCanvasChangeRequestApprovalConfig(
 				canvas.EffectiveChangeRequestApprovers(),
 			),
@@ -259,6 +259,47 @@ func ParseCanvas(registry *registry.Registry, orgID string, canvas *pb.Canvas) (
 
 		if nodeTypeByID[edge.TargetId] == compb.Node_TYPE_WIDGET {
 			return nil, nil, status.Errorf(codes.InvalidArgument, "edge %d: widget nodes cannot be used as target nodes", i)
+		}
+	}
+
+	groupNodeIDs := make(map[string]bool)
+	for _, node := range canvas.Spec.Nodes {
+		if node.Type == compb.Node_TYPE_WIDGET && node.Widget != nil && node.Widget.Name == "group" {
+			groupNodeIDs[node.Id] = true
+		}
+	}
+
+	claimedChildren := make(map[string]string)
+	for _, node := range canvas.Spec.Nodes {
+		if node.Type != compb.Node_TYPE_WIDGET || node.Widget == nil || node.Widget.Name != "group" {
+			continue
+		}
+
+		config := node.Configuration.AsMap()
+		childIDs, _ := config["childNodeIds"].([]any)
+		for _, raw := range childIDs {
+			childID, ok := raw.(string)
+			if !ok || childID == "" {
+				continue
+			}
+
+			if !nodeIDs[childID] {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s not found", node.Id, childID)
+			}
+
+			if childID == node.Id {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: cannot reference itself as a child", node.Id)
+			}
+
+			if groupNodeIDs[childID] {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is a group (nested groups are not supported)", node.Id, childID)
+			}
+
+			if ownerID, taken := claimedChildren[childID]; taken {
+				return nil, nil, status.Errorf(codes.InvalidArgument, "group %s: child node %s is already claimed by group %s", node.Id, childID, ownerID)
+			}
+
+			claimedChildren[childID] = node.Id
 		}
 	}
 

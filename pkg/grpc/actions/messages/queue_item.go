@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	WorkflowQueueItemCreatedRoutingKey  = "workflow-queue-item-created"
-	WorkflowQueueItemConsumedRoutingKey = "workflow-queue-item-consumed"
+	CanvasQueueItemCreatedRoutingKey  = "canvas-queue-item-created"
+	CanvasQueueItemConsumedRoutingKey = "canvas-queue-item-consumed"
 )
 
 type CanvasQueueItemMessage struct {
@@ -27,7 +27,7 @@ func NewCanvasQueueItemMessage(canvasId string, queueItemID, nodeID string) Canv
 
 func (m CanvasQueueItemMessage) Publish(consumed bool) error {
 	if consumed {
-		return Publish(WorkflowExchange, WorkflowQueueItemConsumedRoutingKey, toBytes(m.message))
+		return Publish(CanvasExchange, CanvasQueueItemConsumedRoutingKey, toBytes(m.message))
 	}
-	return Publish(WorkflowExchange, WorkflowQueueItemCreatedRoutingKey, toBytes(m.message))
+	return Publish(CanvasExchange, CanvasQueueItemCreatedRoutingKey, toBytes(m.message))
 }

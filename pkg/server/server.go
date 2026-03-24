@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 
 	// Import integrations, components and triggers to register them via init()
@@ -32,6 +33,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
+	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/timegate"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
@@ -83,6 +85,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
+	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
@@ -166,32 +169,48 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		w := workers.NewCanvasCleanupWorker()
 		go w.Start(context.Background())
 	}
+
+	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
+		log.Println("Starting Organization Cleanup Worker")
+
+		w := workers.NewOrganizationCleanupWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
+		usageService, err := usage.NewServiceFromEnv()
+		if err != nil {
+			log.Fatalf("failed to initialize usage service worker dependency: %v", err)
+		}
+
+		if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" && usageService.Enabled() {
+			log.Println("Starting Event Retention Worker")
+			w := workers.NewEventRetentionWorker(usageService)
+			go w.Start(context.Background())
+		}
+
+		if os.Getenv("START_USAGE_SYNC_WORKER") == "yes" && usageService.Enabled() {
+			log.Println("Starting Usage Sync Worker")
+			w := workers.NewUsageSyncWorker(rabbitMQURL, usageService)
+			go w.Start(context.Background())
+		}
+	}
+
 }
 
 func startEmailConsumers(rabbitMQURL string, encryptor crypto.Encryptor, baseURL string, authService authorization.Authorization) {
-	templateDir := os.Getenv("TEMPLATE_DIR")
-	if templateDir == "" {
-		log.Warn("Email Consumers not started - missing required environment variable (TEMPLATE_DIR)")
+	emailService := services.BuildEmailService(encryptor, services.EmailServiceConfig{
+		TemplateDir:       os.Getenv("TEMPLATE_DIR"),
+		OwnerSetupEnabled: os.Getenv("OWNER_SETUP_ENABLED") == "yes",
+		ResendAPIKey:      os.Getenv("RESEND_API_KEY"),
+		FromName:          os.Getenv("EMAIL_FROM_NAME"),
+		FromEmail:         os.Getenv("EMAIL_FROM_ADDRESS"),
+	})
+	if emailService == nil {
+		log.Warn("Email Consumers not started - missing required environment variables")
 		return
 	}
 
-	if os.Getenv("OWNER_SETUP_ENABLED") == "yes" {
-		log.Println("Starting SMTP Email Consumers (self-hosted)")
-		settingsProvider := &services.DatabaseEmailSettingsProvider{Encryptor: encryptor}
-		emailService := services.NewSMTPEmailService(settingsProvider, templateDir)
-		startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
-		return
-	}
-
-	resendAPIKey := os.Getenv("RESEND_API_KEY")
-	fromName := os.Getenv("EMAIL_FROM_NAME")
-	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
-	if resendAPIKey == "" || fromName == "" || fromEmail == "" {
-		log.Warn("Email Consumers not started - missing required environment variables (RESEND_API_KEY, EMAIL_FROM_NAME, EMAIL_FROM_ADDRESS)")
-		return
-	}
-
-	emailService := services.NewResendEmailService(resendAPIKey, fromName, fromEmail, templateDir)
 	startEmailConsumersWithService(rabbitMQURL, emailService, baseURL, authService)
 }
 
@@ -203,6 +222,10 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	log.Println("Starting Notification Email Consumer")
 	notificationEmailConsumer := workers.NewNotificationEmailConsumer(rabbitMQURL, emailService, authService)
 	go notificationEmailConsumer.Start()
+
+	log.Println("Starting Magic Code Email Consumer")
+	magicCodeEmailConsumer := workers.NewMagicCodeEmailConsumer(rabbitMQURL, emailService, baseURL)
+	go magicCodeEmailConsumer.Start()
 }
 
 func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {
@@ -216,9 +239,26 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 	appEnv := os.Getenv("APP_ENV")
 	templateDir := os.Getenv("TEMPLATE_DIR")
 	blockSignup := os.Getenv("BLOCK_SIGNUP") == "yes"
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Panicf("failed to initialize usage service for public api: %v", err)
+	}
 
 	webhooksBaseURL := getWebhookBaseURL(baseURL)
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcProvider, basePath, baseURL, webhooksBaseURL, appEnv, templateDir, authService, blockSignup)
+	server, err := public.NewServer(
+		encryptor,
+		registry,
+		jwtSigner,
+		oidcProvider,
+		basePath,
+		baseURL,
+		webhooksBaseURL,
+		appEnv,
+		templateDir,
+		authService,
+		usageService,
+		blockSignup,
+	)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}

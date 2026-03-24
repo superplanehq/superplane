@@ -4,6 +4,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Link } from "@/components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/Table/table";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/Textarea/textarea";
@@ -11,7 +12,7 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/utils/errors";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Copy, Loader2 } from "lucide-react";
+import { Bot, Copy } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
@@ -296,21 +297,16 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
               </div>
 
               <div className="flex justify-start gap-3 mt-6">
-                <Button
+                <LoadingButton
                   type="submit"
-                  disabled={createMutation.isPending || !name?.trim()}
+                  disabled={!name?.trim()}
+                  loading={createMutation.isPending}
+                  loadingText="Creating..."
                   className="flex items-center gap-2"
                   data-testid="sa-create-submit"
                 >
-                  {createMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create"
-                  )}
-                </Button>
+                  Create
+                </LoadingButton>
                 <Button
                   type="button"
                   variant="outline"

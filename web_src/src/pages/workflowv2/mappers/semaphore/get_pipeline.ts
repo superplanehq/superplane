@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -6,12 +6,13 @@ import {
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface GetPipelineConfiguration {
   pipelineId?: string;
@@ -40,9 +41,9 @@ export const getPipelineMapper: ComponentBaseMapper = {
       eventStateMap: getStateMap(componentName),
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
@@ -122,7 +123,7 @@ function getPipelineEventSections(
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
-      eventSubtitle: subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "",
+      eventSubtitle: subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "",
       eventState: executionState,
       eventId: execution.rootEvent.id,
     },

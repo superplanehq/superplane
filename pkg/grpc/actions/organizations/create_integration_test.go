@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -251,5 +252,47 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		assert.Equal(t, models.IntegrationStateReady, response.Integration.Status.State)
 		assert.Empty(t, response.Integration.Status.StateDescription)
+	})
+
+	t.Run("usage limit violation blocks integration creation", func(t *testing.T) {
+		name := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
+		require.NoError(t, err)
+		integrationCount, err := models.CountIntegrationsByOrganization(r.Organization.ID.String())
+		require.NoError(t, err)
+
+		service := &fakeUsageService{
+			enabled: true,
+			checkOrganizationResp: &usagepb.CheckOrganizationLimitsResponse{
+				Allowed: false,
+				Violations: []*usagepb.LimitViolation{
+					{
+						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_INTEGRATIONS,
+						ConfiguredLimit: 0,
+						CurrentValue:    1,
+					},
+				},
+			},
+		}
+
+		_, err = CreateIntegrationWithUsage(
+			ctx,
+			service,
+			r.Registry,
+			nil,
+			baseURL,
+			baseURL,
+			r.Organization.ID.String(),
+			"github",
+			name,
+			appConfig,
+		)
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.ResourceExhausted, s.Code())
+		assert.Equal(t, "organization integration limit exceeded", s.Message())
+		require.Len(t, service.checkOrganizationCalls, 1)
+		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
 	})
 }

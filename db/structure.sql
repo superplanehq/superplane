@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -36,6 +36,21 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_magic_codes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255) NOT NULL,
+    code_hash character varying(64) NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    used_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    verify_attempts integer DEFAULT 0 NOT NULL
+);
+
 
 --
 -- Name: account_password_auth; Type: TABLE; Schema: public; Owner: -
@@ -80,7 +95,8 @@ CREATE TABLE public.accounts (
     email character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    installation_admin boolean DEFAULT false NOT NULL
 );
 
 
@@ -342,7 +358,10 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    canvas_versioning_enabled boolean DEFAULT false NOT NULL
+    versioning_enabled boolean DEFAULT false NOT NULL,
+    usage_synced_at timestamp with time zone,
+    usage_retention_window_days integer,
+    usage_limits_synced_at timestamp with time zone
 );
 
 
@@ -627,7 +646,7 @@ CREATE TABLE public.workflows (
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
-    canvas_versioning_enabled boolean DEFAULT false NOT NULL,
+    versioning_enabled boolean DEFAULT false NOT NULL,
     change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL
 );
 
@@ -637,6 +656,14 @@ CREATE TABLE public.workflows (
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: account_magic_codes account_magic_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_magic_codes
+    ADD CONSTRAINT account_magic_codes_pkey PRIMARY KEY (id);
 
 
 --
@@ -1045,6 +1072,20 @@ ALTER TABLE ONLY public.workflows
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_magic_codes_email ON public.account_magic_codes USING btree (email);
+
+
+--
+-- Name: idx_account_magic_codes_email_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_magic_codes_email_code_hash ON public.account_magic_codes USING btree (email, code_hash);
 
 
 --
@@ -1920,7 +1961,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1939,7 +1980,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260310154909	f
+20260324120000	f
 \.
 
 
@@ -1956,7 +1997,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1975,7 +2016,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260202201226	f
+20260324120001	f
 \.
 
 

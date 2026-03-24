@@ -1,10 +1,10 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import { TriggerProps } from "@/ui/trigger";
-import { BaseNodeMetadata, Push } from "./types";
+import type { TriggerProps } from "@/ui/trigger";
+import type { BaseNodeMetadata, Push } from "./types";
 import { buildGithubSubtitle, createGithubMetadataItems } from "./utils";
-import { Predicate } from "../utils";
+import type { Predicate } from "../utils";
 
 interface GithubConfiguration {
   refs: Predicate[];
@@ -14,7 +14,7 @@ interface GithubConfiguration {
  * Renderer for the "github.onPush" trigger
  */
 export const onPushTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as Push;
     const shortSha = eventData?.head_commit?.id?.slice(0, 7) || "";
 

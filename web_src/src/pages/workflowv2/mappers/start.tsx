@@ -1,8 +1,14 @@
 import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
-import { TriggerRenderer, CustomFieldRenderer, NodeInfo, TriggerRendererContext, TriggerEventContext } from "./types";
-import { TriggerProps } from "@/ui/trigger";
+import type {
+  TriggerRenderer,
+  CustomFieldRenderer,
+  NodeInfo,
+  TriggerRendererContext,
+  TriggerEventContext,
+} from "./types";
+import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
@@ -20,7 +26,7 @@ interface StartConfiguration {
  * Default renderer for the start trigger
  */
 export const startTriggerRenderer: TriggerRenderer = {
-  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
+  getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
     return { title: `Event received at ${new Date(context.event?.createdAt || "").toLocaleString()}`, subtitle: "" };
   },
 
@@ -68,7 +74,7 @@ export const startTriggerRenderer: TriggerRenderer = {
     if (lastEvent) {
       props.lastEventData = {
         title: "Event emitted by trigger",
-        subtitle: formatTimeAgo(new Date(lastEvent.createdAt)),
+        subtitle: renderTimeAgo(new Date(lastEvent.createdAt)),
         receivedAt: new Date(lastEvent.createdAt!),
         state: "triggered",
         eventId: lastEvent.id,

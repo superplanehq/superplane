@@ -1,7 +1,8 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
-import {
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -53,9 +54,9 @@ export const cloudDNSMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 

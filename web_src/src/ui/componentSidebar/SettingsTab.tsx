@@ -4,8 +4,9 @@ import {
   ConfigurationField,
   OrganizationsIntegration,
 } from "@/api-client";
-import { useCallback, useEffect, useMemo, useState, ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -32,7 +33,7 @@ interface SettingsTabProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
@@ -83,6 +84,8 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
@@ -156,7 +159,7 @@ export function SettingsTab({
 
         // Check validation rules (cross-field validation)
         if (value !== undefined && value !== null && value !== "") {
-          const validationErrors = validateFieldForSubmission(field, value, values);
+          const validationErrors = validateFieldForSubmission(field, value);
 
           if (validationErrors.length > 0) {
             // Add validation rule errors to the error set
@@ -247,16 +250,24 @@ export function SettingsTab({
     });
   }, [integrationsOfType, selectedIntegration]);
 
-  const isIntegrationReady =
-    !integrationName || !allowIntegrations || selectedIntegrationFull?.status?.state === "ready";
-  const shouldShowConfiguration = (!integrationName || !!selectedIntegration?.id) && isIntegrationReady;
+  const shouldShowConfiguration = true;
 
-  const handleSave = () => {
-    if (isReadOnly) {
+  const handleSave = async () => {
+    if (isReadOnly || savingRef.current) {
       return;
     }
     validateNow();
-    onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    if (result instanceof Promise) {
+      savingRef.current = true;
+      setIsSaving(true);
+      try {
+        await result;
+      } finally {
+        savingRef.current = false;
+        setIsSaving(false);
+      }
+    }
   };
 
   return (
@@ -505,9 +516,16 @@ export function SettingsTab({
       </div>
 
       <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button data-testid="save-node-button" variant="default" onClick={handleSave} disabled={isReadOnly}>
+        <LoadingButton
+          data-testid="save-node-button"
+          variant="default"
+          onClick={handleSave}
+          disabled={isReadOnly}
+          loading={isSaving}
+          loadingText="Saving..."
+        >
           Save
-        </Button>
+        </LoadingButton>
       </div>
     </div>
   );

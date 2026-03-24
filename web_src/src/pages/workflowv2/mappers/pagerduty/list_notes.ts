@@ -1,10 +1,11 @@
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -12,7 +13,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ListNotesResponse, Note } from "./types";
+import type { ListNotesResponse, Note } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -63,15 +64,15 @@ export const listNotesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const date = new Date(context.execution.createdAt!);
     const notes = getNotes(context.execution);
 
     if (notes.length > 0) {
-      return `${notes.length} note${notes.length === 1 ? "" : "s"} · ${timeAgo}`;
+      return renderWithTimeAgo(`${notes.length} note${notes.length === 1 ? "" : "s"}`, date);
     }
 
-    return `no notes · ${timeAgo}`;
+    return renderWithTimeAgo("no notes", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -107,13 +108,13 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const notes = getNotes(execution);
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (notes.length > 0) {
-    eventSubtitle = `${notes.length} note${notes.length === 1 ? "" : "s"} · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo(`${notes.length} note${notes.length === 1 ? "" : "s"}`, date);
   } else {
-    eventSubtitle = `no notes · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no notes", date);
   }
 
   return [

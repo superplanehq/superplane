@@ -1,5 +1,6 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import {
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import type {
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
@@ -8,12 +9,12 @@ import {
   OutputPayload,
   NodeInfo,
 } from "../types";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import { buildSubtitle } from "../utils";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface DeleteFeatureFlagConfiguration {
   projectKey?: string;
@@ -31,7 +32,7 @@ function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo, component
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   return [
     {
       receivedAt: new Date(execution.createdAt!),
@@ -77,7 +78,7 @@ export const deleteFeatureFlagMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildSubtitle("", context.execution.updatedAt || context.execution.createdAt);
   },
 

@@ -1,10 +1,11 @@
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -12,7 +13,7 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { ListLogEntriesResponse, LogEntry } from "./types";
+import type { ListLogEntriesResponse, LogEntry } from "./types";
 
 /**
  * Extracts the first payload from execution outputs.
@@ -63,15 +64,15 @@ export const listLogEntriesMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
-    const timeAgo = formatTimeAgo(new Date(context.execution.createdAt!));
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const date = new Date(context.execution.createdAt!);
     const logEntries = getLogEntries(context.execution);
 
     if (logEntries.length > 0) {
-      return `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
+      return renderWithTimeAgo(`${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"}`, date);
     }
 
-    return `no log entries · ${timeAgo}`;
+    return renderWithTimeAgo("no log entries", date);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -111,13 +112,13 @@ function baseEventSections(nodes: { id: string }[], execution: ExecutionInfo, co
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const logEntries = getLogEntries(execution);
-  const timeAgo = formatTimeAgo(new Date(execution.createdAt!));
+  const date = new Date(execution.createdAt!);
 
-  let eventSubtitle: string;
+  let eventSubtitle: string | React.ReactNode;
   if (logEntries.length > 0) {
-    eventSubtitle = `${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"} · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo(`${logEntries.length} log entr${logEntries.length === 1 ? "y" : "ies"}`, date);
   } else {
-    eventSubtitle = `no log entries · ${timeAgo}`;
+    eventSubtitle = renderWithTimeAgo("no log entries", date);
   }
 
   return [

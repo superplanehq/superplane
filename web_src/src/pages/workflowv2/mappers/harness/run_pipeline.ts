@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -9,20 +9,21 @@ import {
   StateFunction,
   SubtitleContext,
 } from "../types";
-import {
+import type {
   ComponentBaseProps,
   ComponentBaseSpec,
-  DEFAULT_EVENT_STATE_MAP,
   EventSection,
   EventState,
   EventStateMap,
 } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import type { MetadataItem } from "@/ui/metadataList";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "..";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -103,9 +104,9 @@ export const runPipelineMapper: ComponentBaseMapper = {
       eventStateMap: RUN_PIPELINE_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const details: Record<string, any> = {};
@@ -204,7 +205,7 @@ function runPipelineEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   const eventID = execution.rootEvent?.id || execution.id || "execution";
 
   return [
