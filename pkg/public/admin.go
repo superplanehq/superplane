@@ -301,12 +301,24 @@ func (s *Server) endImpersonation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.WithFields(log.Fields{
+	// Read the token before clearing it so we can log the target identity
+	fields := log.Fields{
 		"admin_account_id": account.ID.String(),
 		"admin_email":      account.Email,
 		"action":           "impersonation_end",
 		"client_ip":        r.RemoteAddr,
-	}).Info("admin impersonation ended")
+	}
+
+	if tokenStr, err := impersonation.ReadCookie(r); err == nil {
+		if claims, err := impersonation.ValidateToken(s.jwt, tokenStr); err == nil {
+			fields["target_account_id"] = claims.ImpersonatedAccountID
+			if target, err := models.FindAccountByID(claims.ImpersonatedAccountID); err == nil {
+				fields["target_email"] = target.Email
+			}
+		}
+	}
+
+	log.WithFields(fields).Info("admin impersonation ended")
 
 	impersonation.ClearCookie(w, r)
 

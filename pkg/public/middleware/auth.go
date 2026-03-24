@@ -259,9 +259,15 @@ func authenticateUserByToken(r *http.Request) (*models.User, error) {
 }
 
 func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
-	// Check for impersonation cookie first
-	if user, info, err := resolveImpersonatedUser(jwtSigner, r); err == nil {
+	// If a valid impersonation session exists, commit to it — never fall
+	// through to the admin's own identity. This prevents silently showing
+	// admin data when the impersonated user isn't in the requested org.
+	user, info, err := resolveImpersonatedUser(jwtSigner, r)
+	if err == nil {
 		return user, info, nil
+	}
+	if isActiveImpersonation(jwtSigner, r) {
+		return nil, nil, err
 	}
 
 	accountID, err := getAccountFromCookie(r, jwtSigner)
@@ -279,12 +285,34 @@ func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.U
 		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
-	user, err := models.FindActiveUserByEmail(organizationID, account.Email)
+	user, err = models.FindActiveUserByEmail(organizationID, account.Email)
 	if err != nil {
 		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
 	return user, nil, nil
+}
+
+// isActiveImpersonation returns true if there's a valid, non-expired
+// impersonation token belonging to the current admin. Used to decide
+// whether to commit to impersonation or fall through to normal auth.
+func isActiveImpersonation(jwtSigner *jwt.Signer, r *http.Request) bool {
+	tokenStr, err := impersonation.ReadCookie(r)
+	if err != nil {
+		return false
+	}
+
+	claims, err := impersonation.ValidateToken(jwtSigner, tokenStr)
+	if err != nil {
+		return false
+	}
+
+	adminAccountID, err := getAccountFromCookie(r, jwtSigner)
+	if err != nil {
+		return false
+	}
+
+	return claims.AdminAccountID == adminAccountID
 }
 
 // resolveImpersonatedUser checks if there's a valid impersonation session.
