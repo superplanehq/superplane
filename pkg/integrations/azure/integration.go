@@ -210,7 +210,8 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 
 	sbToken, err := provider.getClient().serviceBusToken(context.Background())
 	if err != nil {
-		return fmt.Errorf("failed to get Service Bus access token: %w", err)
+		ctx.Logger.Warnf("Service Bus token unavailable (Service Bus features will require a resync): %v", err)
+		sbToken = ""
 	}
 
 	if err := ctx.Integration.SetSecret(secretServiceBusAccessToken, []byte(sbToken)); err != nil {
