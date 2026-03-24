@@ -122,10 +122,18 @@ func BuildProcessQueueContext(
 			return nil, err
 		}
 
+		orgID := ""
+		canvasName := ""
+		if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
+			orgID = workflow.OrganizationID.String()
+			canvasName = workflow.Name
+		}
+
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
-			CanvasName:     "",
+			OrganizationID: orgID,
+			CanvasName:     canvasName,
 			NodeID:         execution.NodeID,
 			NodeName:       node.Name,
 			Configuration:  execution.Configuration.Data(),
