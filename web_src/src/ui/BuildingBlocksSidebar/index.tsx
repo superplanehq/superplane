@@ -234,7 +234,6 @@ export function BuildingBlocksSidebar({
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
   const agentUrl = getAgentUrl().replace(/\/+$/, "");
-
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
@@ -254,7 +253,7 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, aiMessages, agentUrl, canvasId, isGeneratingResponse, organizationId],
+    [agentUrl, aiInput, aiMessages, canvasId, isGeneratingResponse, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {

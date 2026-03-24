@@ -135,16 +135,11 @@ def _stream_repl_answer(
     web_url: str,
     payload: CanvasQuestionRequest,
     model: str,
-    base_url: str | None = None,
     token: str | None = None,
-    org_id: str | None = None,
 ) -> str:
     started_at = time.perf_counter()
     request_payload = payload.model_dump(mode="json")
     request_payload["model"] = model
-    request_payload["base_url"] = base_url
-    request_payload["token"] = token
-    request_payload["org_id"] = org_id
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
         url=f"{web_url.rstrip('/')}/v1/agent/chat/stream",
@@ -155,6 +150,8 @@ def _stream_repl_answer(
             "accept": "text/event-stream",
         },
     )
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
 
     chunks: list[str] = []
     run_failed_error: str | None = None
@@ -415,9 +412,7 @@ def main() -> None:
                     web_url=web_url,
                     payload=payload,
                     model=args.model,
-                    base_url=base_url,
                     token=token,
-                    org_id=org_id,
                 )
         finally:
             if server is not None:
@@ -430,9 +425,7 @@ def main() -> None:
             web_url=web_url,
             payload=payload,
             model=args.model,
-            base_url=base_url,
             token=token,
-            org_id=org_id,
         )
     except Exception as error:
         raise SystemExit(f"Error: {error}") from error

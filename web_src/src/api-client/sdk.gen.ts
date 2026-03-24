@@ -3,6 +3,9 @@
 import type { Client, Options as Options2, TDataShape } from "./client";
 import { client } from "./client.gen";
 import type {
+  AgentsCreateAgentChatSessionData,
+  AgentsCreateAgentChatSessionErrors,
+  AgentsCreateAgentChatSessionResponses,
   BlueprintsCreateBlueprintData,
   BlueprintsCreateBlueprintErrors,
   BlueprintsCreateBlueprintResponses,
@@ -315,6 +318,27 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
    */
   meta?: Record<string, unknown>;
 };
+
+/**
+ * Create an agent chat session
+ *
+ * Mints a short-lived scoped token for agent chat on a canvas
+ */
+export const agentsCreateAgentChatSession = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsCreateAgentChatSessionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    AgentsCreateAgentChatSessionResponses,
+    AgentsCreateAgentChatSessionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/agents/chat/sessions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * List blueprints

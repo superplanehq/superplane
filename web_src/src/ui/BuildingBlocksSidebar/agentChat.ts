@@ -311,7 +311,7 @@ export async function sendAgentChatPrompt({
   focusInput,
 }: SendAgentChatPromptArgs): Promise<void> {
   const nextPrompt = (value ?? aiInput).trim();
-  if (!nextPrompt || isGeneratingResponse || !canvasId) {
+  if (!nextPrompt || isGeneratingResponse || !canvasId || !organizationId) {
     return;
   }
 
@@ -352,16 +352,37 @@ export async function sendAgentChatPrompt({
     );
     setPendingProposal(null);
 
+    const sessionResponse = await fetch("/api/v1/agents/chat/sessions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-organization-id": organizationId,
+      },
+      body: JSON.stringify({
+        canvas_id: canvasId,
+      }),
+    });
+
+    if (!sessionResponse.ok) {
+      const responseText = await sessionResponse.text();
+      throw new Error(responseText || `Request failed with status ${sessionResponse.status}`);
+    }
+
+    const sessionPayload = (await sessionResponse.json()) as { token?: unknown };
+    if (typeof sessionPayload.token !== "string" || sessionPayload.token.trim().length === 0) {
+      throw new Error("Invalid agent session response");
+    }
+
     const response = await fetch(`${agentUrl}/v1/agent/chat/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
+        Authorization: `Bearer ${sessionPayload.token}`,
       },
       body: JSON.stringify({
         question: contextualPrompt,
         canvas_id: canvasId,
-        org_id: organizationId || undefined,
       }),
     });
 
