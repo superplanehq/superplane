@@ -25,3 +25,23 @@ export function splitSentryIssueTitle(title?: string): { title?: string; prefix?
     prefix,
   };
 }
+
+export function addDetail(details: Record<string, string>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  details[label] = value;
+}
+
+export function addFormattedTimestamp(details: Record<string, string>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  details[label] = new Date(value).toLocaleString();
+}
+
+export function getProjectLabel(issue?: { project?: { name?: string; slug?: string } }) {
+  return issue?.project?.name || issue?.project?.slug;
+}

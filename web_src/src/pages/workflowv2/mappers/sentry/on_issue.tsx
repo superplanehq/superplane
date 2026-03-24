@@ -3,7 +3,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import { splitSentryIssueTitle } from "./utils";
+import { addDetail, addFormattedTimestamp, getProjectLabel, splitSentryIssueTitle } from "./utils";
 
 interface OnIssueConfiguration {
   project?: string;
@@ -28,8 +28,6 @@ interface SentryIssueEventData {
     };
   };
 }
-
-type SentryIssue = NonNullable<NonNullable<SentryIssueEventData["data"]>["issue"]>;
 
 export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string } => {
@@ -103,23 +101,3 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
-function addDetail(details: Record<string, string>, label: string, value?: string) {
-  if (!value) {
-    return;
-  }
-
-  details[label] = value;
-}
-
-function addFormattedTimestamp(details: Record<string, string>, label: string, value?: string) {
-  if (!value) {
-    return;
-  }
-
-  details[label] = new Date(value).toLocaleString();
-}
-
-function getProjectLabel(issue?: SentryIssue) {
-  return issue?.project?.name || issue?.project?.slug;
-}

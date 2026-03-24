@@ -3,6 +3,7 @@ import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
+import { addDetail, addFormattedTimestamp, getProjectLabel } from "./utils";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -122,24 +123,4 @@ function buildMetadata(node: NodeInfo) {
   }
 
   return metadata;
-}
-
-function addDetail(details: Record<string, string>, label: string, value?: string) {
-  if (!value) {
-    return;
-  }
-
-  details[label] = value;
-}
-
-function addFormattedTimestamp(details: Record<string, string>, label: string, value?: string) {
-  if (!value) {
-    return;
-  }
-
-  details[label] = new Date(value).toLocaleString();
-}
-
-function getProjectLabel(issue?: SentryIssue) {
-  return issue?.project?.name || issue?.project?.slug;
 }
