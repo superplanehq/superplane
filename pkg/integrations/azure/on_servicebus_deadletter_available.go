@@ -150,7 +150,7 @@ func (t *OnServiceBusDeadLetterAvailable) Setup(ctx core.TriggerContext) error {
 	namespaceName := azureResourceName(config.NamespaceName)
 
 	err := ctx.Integration.RequestWebhook(AzureWebhookConfiguration{
-		EventTypes:    []string{EventTypeServiceBusDeadLetterMessages},
+		EventTypes:    []string{EventTypeServiceBusDeadLetterMessages, EventTypeServiceBusDeadLetterMessagesPeriodic},
 		ResourceGroup: config.ResourceGroup,
 		TopicContains: fmt.Sprintf("/providers/Microsoft.ServiceBus/namespaces/%s", namespaceName),
 	})
