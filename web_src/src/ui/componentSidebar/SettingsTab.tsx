@@ -250,9 +250,7 @@ export function SettingsTab({
     });
   }, [integrationsOfType, selectedIntegration]);
 
-  const isIntegrationReady =
-    !integrationName || !allowIntegrations || selectedIntegrationFull?.status?.state === "ready";
-  const shouldShowConfiguration = (!integrationName || !!selectedIntegration?.id) && isIntegrationReady;
+  const shouldShowConfiguration = true;
 
   const handleSave = async () => {
     if (isReadOnly || savingRef.current) {
