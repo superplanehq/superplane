@@ -136,7 +136,12 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 
 func (t *OnIssue) subscribe(ctx core.TriggerContext, metadata OnIssueMetadata) (*string, error) {
 	if metadata.AppSubscriptionID != nil {
-		return metadata.AppSubscriptionID, nil
+		// Verify the subscription still exists — it may be gone if the integration was
+		// deleted and re-created. If the current integration has no subscriptions, create one.
+		existing, err := ctx.Integration.ListSubscriptions()
+		if err == nil && len(existing) > 0 {
+			return metadata.AppSubscriptionID, nil
+		}
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(SubscriptionConfiguration{

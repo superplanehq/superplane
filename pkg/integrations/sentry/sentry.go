@@ -25,19 +25,21 @@ const (
 	ResourceTypeProject = "project"
 	ResourceTypeTeam    = "team"
 	ResourceTypeIssue   = "issue"
+
+	SentryPersonalTokensURL          = "https://sentry.io/settings/account/api/auth-tokens/"
+	SentryInternalIntegrationsDocURL = "https://docs.sentry.io/product/integrations/integration-platform/internal-integration/"
 )
 
 const (
 	appSetupDescription = `
-- If you already created a Sentry internal integration named ` + "`%s`" + `, close this prompt and paste the **User Token** and **Client Secret** into SuperPlane.
-- Click **Continue** to open Sentry's internal integration flow.
-- In Sentry go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
-- Fill in:
-  - **Integration Name**: ` + "`%s`" + `
-  - Leave **Webhook URL** empty — SuperPlane sets this automatically.
-- Save — Sentry shows the **Client Secret** on the integration page. Copy it.
-- Get your **User Token** from **Settings → Developer Settings → Auth Tokens**.
-- Paste both into SuperPlane along with your org URL (e.g. ` + "`https://your-org.sentry.io`" + `), then click **Save**.
+1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry. Copy the token.
+
+> **Token Permissions:**  
+> ` + "`Project -> Read`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
+
+2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
+3. Name it ` + "`%s`" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
+4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
 `
 
 	manualWebhookDescription = `
@@ -141,23 +143,17 @@ func (s *Sentry) Description() string {
 
 func (s *Sentry) Instructions() string {
 	return `
-SuperPlane connects to Sentry via a **Custom Internal Integration** that you create in your Sentry account.
-
-**What you need:**
-- **User Token** – your Sentry personal auth token from **Settings → Developer Settings → Auth Tokens**
-- **Client Secret** – from the internal integration page in Sentry, used to verify incoming webhooks
-- **Sentry URL** – use your org-specific URL, e.g. ` + "`https://your-org.sentry.io`" + `
-- **Integration Name** – the name you gave the integration in Sentry (default: ` + "`SuperPlane`" + `)
 
 **Setup steps:**
-1. In Sentry go to **Settings → Developer Settings → Auth Tokens** and create a personal auth token. Copy it — this is your **User Token**.
-2. Go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
-3. Set the name (e.g. ` + "`SuperPlane`" + `) and leave **Webhook URL** empty — SuperPlane sets this automatically.
-4. Save — Sentry shows the **Client Secret** on the integration page. Copy it.
-5. In SuperPlane fill in **Sentry URL** (org URL), **Integration Name**, **User Token**, and **Client Secret**, then save.
-6. SuperPlane finds the integration by name, sets the webhook URL on it, and subscribes it to issue events automatically.
+1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry with the permissions below. Copy the token.
 
-After that the integration is **ready** — any issue event Sentry sends will be routed to your ` + "`OnIssue`" + ` triggers.
+> **Token Permissions:**  
+> ` + "Project -> `Read`" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
+
+2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
+3. Name it ` + "(e.g. `SuperPlane`)" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
+4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
+
 `
 }
 
@@ -165,10 +161,19 @@ func (s *Sentry) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "baseUrl",
-			Label:       "Sentry URL",
+			Label:       "Sentry Organization URL",
 			Type:        configuration.FieldTypeString,
 			Description: "Sentry instance URL. Use your org-specific URL (e.g., https://your-org.sentry.io) so SuperPlane can identify your organization automatically.",
-			Default:     DefaultBaseURL,
+			Default:     "https://your-org-slug.sentry.io",
+			Required:    true,
+		},
+		{
+			Name:        "userToken",
+			Label:       "User Token",
+			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
+			Description: "Personal auth token from Sentry.",
+			Required:    true,
 		},
 		{
 			Name:        "integrationName",
@@ -177,14 +182,6 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Description: "Name of the Sentry internal integration that SuperPlane should manage",
 			Default:     "SuperPlane",
 			Required:    false,
-		},
-		{
-			Name:        "userToken",
-			Label:       "User Token",
-			Type:        configuration.FieldTypeString,
-			Sensitive:   true,
-			Description: "Your Sentry personal auth token. Found in Sentry under Settings > Developer Settings > Auth Tokens.",
-			Required:    true,
 		},
 		{
 			Name:        "clientSecret",
@@ -224,13 +221,6 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
-	subscriptions, err := ctx.Integration.ListSubscriptions()
-	if err == nil && len(subscriptions) == 0 {
-		ctx.Integration.RemoveBrowserAction()
-		ctx.Integration.Ready()
-		return nil
-	}
-
 	warning, err := s.reconcileWebhook(ctx, config)
 	if err != nil {
 		ctx.Integration.Error(err.Error())
@@ -251,6 +241,11 @@ func (s *Sentry) Sync(ctx core.SyncContext) error {
 			URL:         developerSettingsURL(config.BaseURL, orgSlug),
 			Method:      http.MethodGet,
 		})
+
+		if syncWarningShouldError(warning) {
+			ctx.Integration.Error(warning)
+			return nil
+		}
 	}
 
 	ctx.Integration.Ready()
@@ -261,7 +256,6 @@ func (s *Sentry) createSetupPrompt(ctx core.SyncContext, config Configuration) e
 	ctx.Integration.NewBrowserAction(core.BrowserAction{
 		Description: fmt.Sprintf(
 			appSetupDescription,
-			displayIntegrationName(config.IntegrationName),
 			displayIntegrationName(config.IntegrationName),
 		),
 		URL:    newInternalIntegrationURL(config.BaseURL),
@@ -382,6 +376,19 @@ func webhookBrowserActionDescription(integrationName, warning, webhookURL string
 		return noIntegrationsDescription
 	default:
 		return fmt.Sprintf(manualWebhookDescription, name, webhookURL)
+	}
+}
+
+func syncWarningShouldError(warning string) bool {
+	switch {
+	case strings.HasPrefix(warning, "could not find an internal integration named"):
+		return true
+	case strings.HasPrefix(warning, "multiple internal integrations named"):
+		return true
+	case warning == "no custom integrations were found for this organization":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -575,7 +582,7 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 			resources = append(resources, core.IntegrationResource{
 				Type: ResourceTypeIssue,
 				ID:   issue.ID,
-				Name: normalizedIssueTitle(issue.Title),
+				Name: displayIssueLabel(issue.ShortID, issue.Title),
 			})
 		}
 
@@ -811,4 +818,18 @@ func normalizedIssueTitle(title string) string {
 	}
 
 	return prefix
+}
+
+func displayIssueLabel(shortID, title string) string {
+	normalizedTitle := normalizedIssueTitle(title)
+	shortID = strings.TrimSpace(shortID)
+
+	switch {
+	case shortID != "" && normalizedTitle != "":
+		return fmt.Sprintf("%s · %s", shortID, normalizedTitle)
+	case normalizedTitle != "":
+		return normalizedTitle
+	default:
+		return shortID
+	}
 }

@@ -47,13 +47,13 @@ func Test__UpdateIssue__Setup(t *testing.T) {
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
-					sentryMockResponse(http.StatusOK, `{"id":"123","title":"RuntimeError: Database timeout"}`),
+					sentryMockResponse(http.StatusOK, `{"id":"123","shortId":"EXAMPLE-1","title":"RuntimeError: Database timeout"}`),
 				},
 			},
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, UpdateIssueNodeMetadata{IssueTitle: "RuntimeError"}, metadata.Metadata)
+		assert.Equal(t, UpdateIssueNodeMetadata{IssueTitle: "EXAMPLE-1 · RuntimeError"}, metadata.Metadata)
 	})
 
 	t.Run("uses issue resources", func(t *testing.T) {

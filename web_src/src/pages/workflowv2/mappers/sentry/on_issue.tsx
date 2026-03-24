@@ -10,6 +10,13 @@ interface OnIssueConfiguration {
   actions?: string[];
 }
 
+interface OnIssueNodeMetadata {
+  project?: {
+    name?: string;
+    slug?: string;
+  };
+}
+
 interface SentryIssueEventData {
   action?: string;
   data?: {
@@ -69,10 +76,12 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
     const configuration = node.configuration as OnIssueConfiguration | undefined;
+    const nodeMetadata = node.metadata as OnIssueNodeMetadata | undefined;
     const metadata = [];
 
-    if (configuration?.project) {
-      metadata.push({ icon: "folder", label: configuration.project });
+    const projectLabel = nodeMetadata?.project?.name || nodeMetadata?.project?.slug || configuration?.project;
+    if (projectLabel) {
+      metadata.push({ icon: "folder", label: projectLabel });
     }
 
     if (configuration?.actions?.length) {

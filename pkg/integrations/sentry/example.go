@@ -1,43 +1,28 @@
 package sentry
 
+import (
+	_ "embed"
+	"sync"
+
+	"github.com/superplanehq/superplane/pkg/utils"
+)
+
+//go:embed example_data_on_issue.json
+var exampleDataOnIssueBytes []byte
+
+var exampleDataOnIssueOnce sync.Once
+var exampleDataOnIssue map[string]any
+
+//go:embed example_output_update_issue.json
+var exampleOutputUpdateIssueBytes []byte
+
+var exampleOutputUpdateIssueOnce sync.Once
+var exampleOutputUpdateIssue map[string]any
+
 func (t *OnIssue) ExampleData() map[string]any {
-	return map[string]any{
-		"resource": "issue",
-		"action":   "created",
-		"installation": map[string]any{
-			"uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9",
-		},
-		"actor": map[string]any{
-			"type": "user",
-			"id":   "789",
-			"name": "Person",
-		},
-		"data": map[string]any{
-			"issue": sentryIssueExample(),
-		},
-		"timestamp": "2022-04-04T18:17:18.320000Z",
-	}
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }
 
-func sentryIssueExample() map[string]any {
-	return map[string]any{
-		"id":        "123",
-		"shortId":   "IPE-1",
-		"title":     "Error #1: This is a test error!",
-		"culprit":   "SentryCustomError(frontend/src/util)",
-		"level":     "error",
-		"status":    "unresolved",
-		"firstSeen": "2022-04-04T18:17:18.320000Z",
-		"lastSeen":  "2022-04-04T18:17:18.320000Z",
-		"project": map[string]any{
-			"id":   "456",
-			"name": "ipe",
-			"slug": "ipe",
-		},
-		"assignedTo": map[string]any{
-			"type": "user",
-			"id":   "789",
-			"name": "Person",
-		},
-	}
+func (c *UpdateIssue) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueOnce, exampleOutputUpdateIssueBytes, &exampleOutputUpdateIssue)
 }

@@ -60,10 +60,6 @@ func (c *UpdateIssue) Color() string {
 	return "gray"
 }
 
-func (c *UpdateIssue) ExampleOutput() map[string]any {
-	return sentryIssueExample()
-}
-
 func (c *UpdateIssue) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -127,7 +123,7 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 	}
 
 	return ctx.Metadata.Set(UpdateIssueNodeMetadata{
-		IssueTitle: normalizedIssueTitle(issue.Title),
+		IssueTitle: displayIssueLabel(issue.ShortID, issue.Title),
 	})
 }
 
