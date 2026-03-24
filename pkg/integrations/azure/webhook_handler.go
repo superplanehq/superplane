@@ -252,8 +252,8 @@ func decodeAzureWebhookConfiguration(raw any) (AzureWebhookConfiguration, error)
 		return AzureWebhookConfiguration{}, fmt.Errorf("failed to decode webhook configuration: %w", err)
 	}
 
-	if config.ResourceType == "" && config.Scope == "" {
-		return AzureWebhookConfiguration{}, fmt.Errorf("resourceType or scope is required")
+	if config.ResourceType == "" && config.Scope == "" && config.TopicContains == "" {
+		return AzureWebhookConfiguration{}, fmt.Errorf("resourceType, scope, or topicContains is required")
 	}
 
 	if len(config.EventTypes) == 0 {

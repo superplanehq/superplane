@@ -134,4 +134,3 @@ export const onServiceBusDeadLetterAvailableTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
-
