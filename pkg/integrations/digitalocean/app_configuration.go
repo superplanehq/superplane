@@ -153,6 +153,7 @@ func appConfigurationFields(v *appFieldVisibility) []configuration.Field {
 			Name:        "deployOnPush",
 			Label:       "Deploy on Push",
 			Type:        configuration.FieldTypeBool,
+			Togglable:   true,
 			Default:     true,
 			Description: "Automatically deploy when code is pushed to the configured branch",
 		},
