@@ -1201,7 +1201,7 @@ func Test__CreateApp__Configuration(t *testing.T) {
 		field := findField("deployOnPush")
 		require.NotNil(t, field, "deployOnPush field must exist")
 		assert.Equal(t, "boolean", field.Type)
-		assert.True(t, field.Togglable)
+		assert.False(t, field.Togglable)
 		assert.Equal(t, true, field.Default)
 	})
 

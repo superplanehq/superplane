@@ -189,7 +189,9 @@ func (u *UpdateApp) Configuration() []configuration.Field {
 		},
 	}
 
-	fields = append(fields, appConfigurationFields(nil)...)
+	fields = append(fields, appConfigurationFields(&appFieldVisibility{
+		DeployOnPushTogglable: true,
+	})...)
 
 	return fields
 }

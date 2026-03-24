@@ -136,10 +136,11 @@ func collectErrorStepsRecursive(step *DeploymentProgressStep) []string {
 }
 
 type appFieldVisibility struct {
-	ServiceWorkerJob  []configuration.VisibilityCondition
-	ServiceOnly       []configuration.VisibilityCondition
-	StaticSite        []configuration.VisibilityCondition
-	ServiceStaticSite []configuration.VisibilityCondition
+	ServiceWorkerJob      []configuration.VisibilityCondition
+	ServiceOnly           []configuration.VisibilityCondition
+	StaticSite            []configuration.VisibilityCondition
+	ServiceStaticSite     []configuration.VisibilityCondition
+	DeployOnPushTogglable bool
 }
 
 func appConfigurationFields(v *appFieldVisibility) []configuration.Field {
@@ -153,7 +154,7 @@ func appConfigurationFields(v *appFieldVisibility) []configuration.Field {
 			Name:        "deployOnPush",
 			Label:       "Deploy on Push",
 			Type:        configuration.FieldTypeBool,
-			Togglable:   true,
+			Togglable:   v.DeployOnPushTogglable,
 			Default:     true,
 			Description: "Automatically deploy when code is pushed to the configured branch",
 		},

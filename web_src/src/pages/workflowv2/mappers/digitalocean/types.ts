@@ -138,8 +138,13 @@ export interface AppNodeMetadata {
 export interface CreateAppConfiguration {
   name: string;
   region: string;
-  gitHubRepo: string;
+  sourceProvider?: string;
+  gitHubRepo?: string;
   gitHubBranch?: string;
+  gitLabRepo?: string;
+  gitLabBranch?: string;
+  bitbucketRepo?: string;
+  bitbucketBranch?: string;
   envVars?: string[];
 }
 

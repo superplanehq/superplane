@@ -70,6 +70,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.gitHubRepo) {
     metadata.push({ icon: "github", label: configuration.gitHubRepo });
+  } else if (configuration?.gitLabRepo) {
+    metadata.push({ icon: "git-branch", label: configuration.gitLabRepo });
+  } else if (configuration?.bitbucketRepo) {
+    metadata.push({ icon: "git-branch", label: configuration.bitbucketRepo });
   }
 
   return metadata;
