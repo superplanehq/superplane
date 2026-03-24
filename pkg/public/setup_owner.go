@@ -87,10 +87,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// The first account is automatically an installation admin
-		account.InstallationAdmin = true
-		if err := tx.Save(account).Error; err != nil {
+		if err := tx.Model(account).Update("installation_admin", true).Error; err != nil {
 			return err
 		}
+		account.InstallationAdmin = true
 
 		if err := usage.EnsureAccountWithinLimits(r.Context(), s.usageService, account.ID.String(), &usagepb.AccountState{
 			Organizations: 1,
