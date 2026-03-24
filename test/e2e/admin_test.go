@@ -46,6 +46,7 @@ func TestAdminDashboard(t *testing.T) {
 	t.Run("admin user can start and end impersonation", func(t *testing.T) {
 		steps := &adminSteps{t: t}
 		steps.start()
+		steps.createImpersonationTarget()
 		steps.promoteToAdmin()
 		steps.session.Login()
 
@@ -53,7 +54,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Visit("/admin")
 		steps.clickOrganization("e2e-org")
 
-		// Start impersonation
+		// Start impersonation on the other user
 		steps.clickImpersonate()
 		steps.session.Sleep(2000)
 
@@ -89,6 +90,13 @@ type adminSteps struct {
 func (s *adminSteps) start() {
 	s.session = ctx.NewSession(s.t)
 	s.session.Start()
+}
+
+func (s *adminSteps) createImpersonationTarget() {
+	account, err := models.CreateAccount("Other User", "other@superplane.local")
+	require.NoError(s.t, err)
+	_, err = models.CreateUser(s.session.OrgID, account.ID, account.Email, account.Name)
+	require.NoError(s.t, err)
 }
 
 func (s *adminSteps) promoteToAdmin() {
