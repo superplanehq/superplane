@@ -11,93 +11,23 @@ import (
 )
 
 const (
-	armAPIVersionServiceBus          = "2024-01-01"
-	serviceBusLongPollTimeoutSeconds = 55
+	armAPIVersionServiceBus = "2024-01-01"
 )
 
 // serviceBusDataClient wraps HTTP calls to the Azure Service Bus data plane REST API.
 // It authenticates using a Service Bus-scoped OAuth2 token (servicebus.azure.net).
 type serviceBusDataClient struct {
-	armClient      *armClient
-	namespaceFQDN  string // e.g. "myns.servicebus.windows.net"
-	httpClient     *http.Client
-	longPollClient *http.Client
+	armClient     *armClient
+	namespaceFQDN string // e.g. "myns.servicebus.windows.net"
+	httpClient    *http.Client
 }
 
 func newServiceBusDataClient(armClient *armClient, namespaceName string) *serviceBusDataClient {
 	return &serviceBusDataClient{
-		armClient:      armClient,
-		namespaceFQDN:  fmt.Sprintf("%s.servicebus.windows.net", namespaceName),
-		httpClient:     &http.Client{Timeout: 30 * time.Second},
-		longPollClient: &http.Client{Timeout: 70 * time.Second},
+		armClient:     armClient,
+		namespaceFQDN: fmt.Sprintf("%s.servicebus.windows.net", namespaceName),
+		httpClient:    &http.Client{Timeout: 30 * time.Second},
 	}
-}
-
-// ReceivedMessage holds the content and metadata of a received Service Bus message.
-type ReceivedMessage struct {
-	Body        string         `json:"body"`
-	MessageID   string         `json:"messageId"`
-	ContentType string         `json:"contentType"`
-	Properties  map[string]any `json:"properties"`
-}
-
-// receiveMessage destructively receives (receive-and-delete) one message from the given entity path.
-// entityPath is the queue name, or "topicName/subscriptions/subscriptionName".
-// Returns nil, nil when no message is available (204 response / timeout expired).
-func (c *serviceBusDataClient) receiveMessage(ctx context.Context, entityPath string) (*ReceivedMessage, error) {
-	token, err := c.armClient.serviceBusToken(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Service Bus token: %w", err)
-	}
-
-	if token == "" {
-		return nil, fmt.Errorf("Service Bus token is empty: integration needs to sync")
-	}
-
-	url := fmt.Sprintf("https://%s/%s/messages/head?timeout=%d", c.namespaceFQDN, entityPath, serviceBusLongPollTimeoutSeconds)
-	c.armClient.logger.Debugf("Service Bus long-poll DELETE %s", url)
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := c.longPollClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to receive message: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNoContent {
-		return nil, nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Service Bus receive failed (HTTP %d): %s", resp.StatusCode, string(body))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read message body: %w", err)
-	}
-
-	var brokerProps map[string]any
-	if bp := resp.Header.Get("BrokerProperties"); bp != "" {
-		_ = json.Unmarshal([]byte(bp), &brokerProps)
-	}
-
-	messageID, _ := brokerProps["MessageId"].(string)
-	contentType := resp.Header.Get("Content-Type")
-
-	return &ReceivedMessage{
-		Body:        string(body),
-		MessageID:   messageID,
-		ContentType: contentType,
-		Properties:  brokerProps,
-	}, nil
 }
 
 // sendMessage posts a message to a Service Bus queue or topic.
