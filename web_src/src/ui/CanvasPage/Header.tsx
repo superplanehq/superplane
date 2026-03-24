@@ -509,18 +509,10 @@ export function Header({
               ? wrapWithTooltip(
                   enterEditModeDisabled,
                   enterEditModeDisabledTooltip,
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={onEnterEditMode}
-                      disabled={enterEditModeDisabled}
-                      className="h-8"
-                    >
-                      <Pencil className="h-2 w-2" />
-                      Edit
-                    </Button>
-                  </div>,
+                  <UIButton type="button" variant="outline" onClick={onEnterEditMode} disabled={enterEditModeDisabled}>
+                    <Pencil className="h-4 w-4" />
+                    Edit
+                  </UIButton>,
                 )
               : null}
           </div>

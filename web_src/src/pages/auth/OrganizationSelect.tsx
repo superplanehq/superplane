@@ -112,7 +112,7 @@ const OrganizationSelect: React.FC = () => {
       <div className="flex items-center">
         <h4 className="text-lg font-medium text-center">+ Create new</h4>
       </div>
-      <Text className="text-[13px] font-medium text-center">
+      <Text className="text-base/6 sm:text-sm/6 font-medium text-gray-500 text-center dark:text-gray-400">
         {createOrganizationDisabled
           ? "Organization limit reached for this account"
           : "Start fresh with a new organization"}
