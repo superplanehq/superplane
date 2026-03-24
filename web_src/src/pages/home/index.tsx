@@ -1,6 +1,18 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { Box, GitBranch, MoreVertical, Pencil, Plus, Rainbow, Search, Trash2, Upload } from "lucide-react";
+import {
+  Box,
+  Grid3x3,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Palette,
+  Rainbow,
+  Rows3,
+  Search,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -16,7 +28,7 @@ import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData";
 import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
-import { resolveIcon } from "../../lib/utils";
+import { cn, resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
 import { showErrorToast, showSuccessToast } from "../../utils/toast";
 import { ImportYamlDialog } from "../canvas/ImportYamlDialog";
@@ -29,6 +41,7 @@ import { OnboardingWelcome } from "./OnboardingWelcome";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type TabType = "canvases" | "custom-components";
+type CanvasViewMode = "grid" | "list";
 interface BlueprintCardData {
   id: string;
   name: string;
@@ -53,6 +66,7 @@ const HomePage = () => {
   usePageTitle(["Home"]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [canvasViewMode, setCanvasViewMode] = useState<CanvasViewMode>("grid");
   const [activeTab, setActiveTab] = useState<TabType>("canvases");
   const [isImportYamlOpen, setIsImportYamlOpen] = useState(false);
 
@@ -147,15 +161,6 @@ const HomePage = () => {
 
   const error = activeTab === "custom-components" ? blueprintError : canvasError;
 
-  const onNewClick = () => {
-    if (activeTab === "custom-components" && isCustomComponentsEnabled()) {
-      if (!canCreateBlueprints) return;
-      customComponentModalState.onOpen();
-    } else {
-      if (!canCreateCanvases) return;
-      navigate(`/${organizationId}/canvases/new`);
-    }
-  };
   const showTabs = false;
 
   return (
@@ -165,14 +170,12 @@ const HomePage = () => {
       </header>
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="bg-slate-100 w-full flex-grow-1">
-          <div className="p-8">
+          <div className="mx-auto w-full max-w-6xl p-8">
             {!(activeTab === "canvases" && canvases.length === 0 && !searchQuery) && (
               <PageHeader
                 activeTab={activeTab}
-                onNewClick={onNewClick}
                 onImportYamlClick={() => setIsImportYamlOpen(true)}
                 canCreateCanvases={canCreateCanvases}
-                canCreateBlueprints={canCreateBlueprints}
                 permissionsLoading={permissionsLoading}
               />
             )}
@@ -188,8 +191,14 @@ const HomePage = () => {
                   />
                 )}
 
-                <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between">
-                  <SearchBar activeTab={activeTab} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+                <div className="mb-6">
+                  <SearchBar
+                    activeTab={activeTab}
+                    searchQuery={searchQuery}
+                    setSearchQuery={setSearchQuery}
+                    canvasViewMode={canvasViewMode}
+                    onCanvasViewModeChange={setCanvasViewMode}
+                  />
                 </div>
               </>
             )}
@@ -205,13 +214,16 @@ const HomePage = () => {
                 filteredCanvases={filteredCanvases}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
+                canvasViewMode={canvasViewMode}
                 onEditCanvas={canvasModalState.onOpenEdit}
                 canCreateCanvases={canCreateCanvases}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
+                canCreateBlueprints={canCreateBlueprints}
                 canUpdateBlueprints={canUpdateBlueprints}
                 canDeleteBlueprints={canDeleteBlueprints}
                 permissionsLoading={permissionsLoading}
+                onCreateBlueprint={isCustomComponentsEnabled() ? customComponentModalState.onOpen : undefined}
               />
             )}
           </div>
@@ -277,14 +289,16 @@ interface SearchBarProps {
   activeTab: string;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  canvasViewMode: CanvasViewMode;
+  onCanvasViewModeChange: (mode: CanvasViewMode) => void;
 }
 
-function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
-  const searchPlaceholder = activeTab === "custom-components" ? "Search Bundles..." : "Search canvases...";
+function SearchBar({ activeTab, searchQuery, setSearchQuery, canvasViewMode, onCanvasViewModeChange }: SearchBarProps) {
+  const searchPlaceholder = activeTab === "custom-components" ? "Search Bundles..." : "Filter canvases…";
 
   return (
-    <div className="flex items-center gap-2 w-full">
-      <div className="flex-1 max-w-sm">
+    <div className="flex w-full flex-wrap items-center justify-between gap-4">
+      <div className="min-w-0 w-full shrink-0 md:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)]">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <Input
@@ -295,38 +309,55 @@ function SearchBar({ activeTab, searchQuery, setSearchQuery }: SearchBarProps) {
           />
         </div>
       </div>
+      {activeTab === "canvases" && (
+        <div className="ml-auto flex shrink-0 items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
+              canvasViewMode === "grid" ? "opacity-100" : "opacity-50 hover:opacity-100",
+            )}
+            aria-label="Grid view"
+            aria-pressed={canvasViewMode === "grid"}
+            onClick={() => onCanvasViewModeChange("grid")}
+          >
+            <Grid3x3 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 bg-transparent p-0 hover:bg-transparent dark:hover:bg-transparent",
+              canvasViewMode === "list" ? "opacity-100" : "opacity-50 hover:opacity-100",
+            )}
+            aria-label="List view"
+            aria-pressed={canvasViewMode === "list"}
+            onClick={() => onCanvasViewModeChange("list")}
+          >
+            <Rows3 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
 
 interface PageHeaderProps {
   activeTab: TabType;
-  onNewClick: () => void;
   onImportYamlClick: () => void;
   canCreateCanvases: boolean;
-  canCreateBlueprints: boolean;
   permissionsLoading: boolean;
 }
 
-function PageHeader({
-  activeTab,
-  onNewClick,
-  onImportYamlClick,
-  canCreateCanvases,
-  canCreateBlueprints,
-  permissionsLoading,
-}: PageHeaderProps) {
+function PageHeader({ activeTab, onImportYamlClick, canCreateCanvases, permissionsLoading }: PageHeaderProps) {
   const heading = activeTab === "custom-components" ? "Bundles" : "Canvases";
   const description =
     activeTab === "custom-components"
       ? "Bundles let you group multiple Components into a single reusable unit."
       : "Overview of all mapped automations across your organization.";
-  const buttonText = activeTab === "custom-components" ? "New Bundle" : "New Canvas";
-  const canCreate = activeTab === "custom-components" ? canCreateBlueprints : canCreateCanvases;
-  const createMessage =
-    activeTab === "custom-components"
-      ? "You don't have permission to create bundles."
-      : "You don't have permission to create canvases.";
 
   return (
     <div className="flex items-center justify-between mb-6">
@@ -337,28 +368,24 @@ function PageHeader({
         <Text className="text-gray-800 dark:text-gray-400">{description}</Text>
       </div>
 
-      <div className="flex items-center gap-2">
-        {activeTab === "canvases" && (
-          <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
+      {activeTab === "canvases" ? (
+        <div className="flex items-center gap-2">
+          <PermissionTooltip
+            allowed={canCreateCanvases || permissionsLoading}
+            message="You don't have permission to create canvases."
+          >
             <Button
               data-testid="import-yaml-button"
               variant="outline"
-              size="sm"
               onClick={onImportYamlClick}
-              disabled={!canCreate}
+              disabled={!canCreateCanvases}
             >
               <Upload size={16} />
               Import YAML
             </Button>
           </PermissionTooltip>
-        )}
-        <PermissionTooltip allowed={canCreate || permissionsLoading} message={createMessage}>
-          <Button onClick={onNewClick} size="sm" disabled={!canCreate}>
-            <Plus size={16} />
-            {buttonText}
-          </Button>
-        </PermissionTooltip>
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -385,26 +412,32 @@ function Content({
   filteredCanvases,
   organizationId,
   searchQuery,
+  canvasViewMode,
   onEditCanvas,
   canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
+  canCreateBlueprints,
   canUpdateBlueprints,
   canDeleteBlueprints,
   permissionsLoading,
+  onCreateBlueprint,
 }: {
   activeTab: TabType;
   filteredBlueprints: BlueprintCardData[];
   filteredCanvases: CanvasCardData[];
   organizationId: string;
   searchQuery: string;
+  canvasViewMode: CanvasViewMode;
   onEditCanvas: (canvas: CanvasCardData) => void;
   canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
+  canCreateBlueprints: boolean;
   canUpdateBlueprints: boolean;
   canDeleteBlueprints: boolean;
   permissionsLoading: boolean;
+  onCreateBlueprint?: () => void;
 }) {
   if (activeTab === "canvases") {
     if (filteredCanvases.length === 0) {
@@ -424,7 +457,10 @@ function Content({
       <CanvasGridView
         filteredCanvases={filteredCanvases}
         organizationId={organizationId}
+        view={canvasViewMode}
+        searchQuery={searchQuery}
         onEditCanvas={onEditCanvas}
+        canCreateCanvases={canCreateCanvases}
         canUpdateCanvases={canUpdateCanvases}
         canDeleteCanvases={canDeleteCanvases}
         permissionsLoading={permissionsLoading}
@@ -432,7 +468,14 @@ function Content({
     );
   } else if (activeTab === "custom-components") {
     if (filteredBlueprints.length === 0) {
-      return <CustomComponentsEmptyState searchQuery={searchQuery} />;
+      return (
+        <CustomComponentsEmptyState
+          searchQuery={searchQuery}
+          onCreateBlueprint={onCreateBlueprint}
+          canCreateBlueprints={canCreateBlueprints}
+          permissionsLoading={permissionsLoading}
+        />
+      );
     }
 
     return (
@@ -449,7 +492,17 @@ function Content({
   throw new Error("Invalid activeTab value");
 }
 
-function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
+function CustomComponentsEmptyState({
+  searchQuery,
+  onCreateBlueprint,
+  canCreateBlueprints,
+  permissionsLoading,
+}: {
+  searchQuery: string;
+  onCreateBlueprint?: () => void;
+  canCreateBlueprints: boolean;
+  permissionsLoading: boolean;
+}) {
   return (
     <div className="text-center py-12">
       <Box className="mx-auto text-gray-400 mb-4" size={48} />
@@ -457,8 +510,21 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
         {searchQuery ? "No Bundles found" : "No Bundles yet"}
       </Heading>
       <Text className="text-gray-500 dark:text-gray-400 mb-6">
-        {searchQuery ? "Try adjusting your search criteria." : "Get started by creating your first Bundle."}
+        {searchQuery
+          ? "Nothing matches that filter, try another word or clear it"
+          : "Get started by creating your first Bundle."}
       </Text>
+      {!searchQuery && onCreateBlueprint ? (
+        <PermissionTooltip
+          allowed={canCreateBlueprints || permissionsLoading}
+          message="You don't have permission to create bundles."
+        >
+          <Button onClick={onCreateBlueprint} disabled={!canCreateBlueprints}>
+            <Plus size={16} />
+            New Bundle
+          </Button>
+        </PermissionTooltip>
+      ) : null}
     </div>
   );
 }
@@ -466,11 +532,13 @@ function CustomComponentsEmptyState({ searchQuery }: { searchQuery: string }) {
 function CanvasesSearchEmptyState() {
   return (
     <div className="text-center py-12">
-      <GitBranch className="mx-auto text-gray-400 mb-4" size={48} />
+      <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
         No canvases found
       </Heading>
-      <Text className="text-gray-500 dark:text-gray-400 mb-6">Try adjusting your search criteria.</Text>
+      <Text className="text-gray-500 dark:text-gray-400 mb-6">
+        Nothing matches that filter, try another word or clear it
+      </Text>
     </div>
   );
 }
@@ -478,22 +546,136 @@ function CanvasesSearchEmptyState() {
 interface CanvasGridViewProps {
   filteredCanvases: CanvasCardData[];
   organizationId: string;
+  view: CanvasViewMode;
+  searchQuery: string;
   onEditCanvas: (canvas: CanvasCardData) => void;
+  canCreateCanvases: boolean;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
   permissionsLoading: boolean;
 }
 
+function NewCanvasCard({
+  organizationId,
+  canCreateCanvases,
+  permissionsLoading,
+}: {
+  organizationId: string;
+  canCreateCanvases: boolean;
+  permissionsLoading: boolean;
+}) {
+  const allowed = canCreateCanvases || permissionsLoading;
+
+  return (
+    <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases." className="min-w-0">
+      <Link
+        to={`/${organizationId}/canvases/new`}
+        aria-label="Create new canvas"
+        className={cn(
+          "relative flex min-h-48 flex-col items-center justify-center rounded-md border border-dashed border-green-500 bg-green-50 text-center transition-colors dark:border-green-500 dark:bg-green-950/30",
+          "hover:bg-green-100 dark:hover:bg-green-950/50",
+          allowed && "cursor-pointer",
+        )}
+      >
+        <div className="flex flex-col items-center justify-center gap-3 px-4">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
+            <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </span>
+          <Heading
+            level={3}
+            className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 max-w-[15vw] truncate"
+          >
+            <span className="truncate">New Canvas</span>
+          </Heading>
+        </div>
+      </Link>
+    </PermissionTooltip>
+  );
+}
+
+function NewCanvasListRow({
+  organizationId,
+  canCreateCanvases,
+  permissionsLoading,
+}: {
+  organizationId: string;
+  canCreateCanvases: boolean;
+  permissionsLoading: boolean;
+}) {
+  const allowed = canCreateCanvases || permissionsLoading;
+
+  return (
+    <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases." className="min-w-0">
+      <Link
+        to={`/${organizationId}/canvases/new`}
+        aria-label="Create new canvas"
+        className={cn(
+          "relative flex flex-row items-center gap-4 rounded-md border border-dashed border-green-500 bg-green-50 px-4 py-3 transition-colors dark:border-green-500 dark:bg-green-950/30",
+          "hover:bg-green-100 dark:hover:bg-green-950/50",
+          allowed && "cursor-pointer",
+        )}
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-500 text-white">
+          <Plus className="h-4 w-4" strokeWidth={2} aria-hidden />
+        </span>
+        <Heading
+          level={3}
+          className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate"
+        >
+          <span className="truncate">New Canvas</span>
+        </Heading>
+      </Link>
+    </PermissionTooltip>
+  );
+}
+
 function CanvasGridView({
   filteredCanvases,
   organizationId,
+  view,
+  searchQuery,
   onEditCanvas,
+  canCreateCanvases,
   canUpdateCanvases,
   canDeleteCanvases,
   permissionsLoading,
 }: CanvasGridViewProps) {
+  const showNewCanvasEntry = searchQuery.trim() === "";
+
+  if (view === "list") {
+    return (
+      <div className="flex flex-col gap-3">
+        {showNewCanvasEntry ? (
+          <NewCanvasListRow
+            organizationId={organizationId}
+            canCreateCanvases={canCreateCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        ) : null}
+        {filteredCanvases.map((canvas) => (
+          <CanvasListRow
+            key={canvas.id}
+            canvas={canvas}
+            organizationId={organizationId}
+            onEdit={onEditCanvas}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {showNewCanvasEntry ? (
+        <NewCanvasCard
+          organizationId={organizationId}
+          canCreateCanvases={canCreateCanvases}
+          permissionsLoading={permissionsLoading}
+        />
+      ) : null}
       {filteredCanvases.map((canvas) => (
         <CanvasCard
           key={canvas.id}
@@ -534,9 +716,7 @@ function CanvasCard({
     <div className="relative min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-gray-950/15 hover:shadow-md transition-shadow cursor-pointer">
       <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
       <div className="pointer-events-none relative flex flex-col h-full">
-        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
-
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col flex-1 min-w-0">
               <Heading
@@ -578,6 +758,8 @@ function CanvasCard({
             </p>
           </div>
         </div>
+
+        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
       </div>
     </div>
   );
@@ -596,7 +778,7 @@ function CanvasMiniMap({ nodes = [], edges = [] }: CanvasMiniMapProps) {
   if (!positionedNodes.length) {
     return (
       <div className="p-4">
-        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center pt-4 gap-1 text-[13px] text-gray-500">
+        <div className="h-28 w-full bg-transparent flex flex-col items-center justify-center gap-1 text-[13px] text-gray-500">
           <Rainbow size={24} className="text-gray-500" />
           Canvas is empty
         </div>
@@ -797,7 +979,7 @@ function CanvasActionsMenu({
                   disabled={!canUpdateCanvases}
                 >
                   <Pencil size={16} />
-                  Edit
+                  Change Name
                 </DropdownMenuItem>
               </PermissionTooltip>
               <PermissionTooltip
@@ -850,6 +1032,59 @@ function CanvasActionsMenu({
         </DialogActions>
       </Dialog>
     </>
+  );
+}
+
+function CanvasListRow({
+  canvas,
+  organizationId,
+  onEdit,
+  canUpdateCanvases,
+  canDeleteCanvases,
+  permissionsLoading,
+}: CanvasCardProps) {
+  const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
+
+  return (
+    <div className="relative overflow-hidden rounded-md bg-white outline outline-gray-950/15 hover:shadow-md dark:bg-gray-800">
+      <Link to={canvasHref} aria-label={`Open canvas ${canvas.name}`} className="absolute inset-0 rounded-md" />
+      <div className="pointer-events-none relative flex w-full min-w-0 flex-col justify-center p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <Heading
+              level={3}
+              className="!text-base font-medium text-gray-800 transition-colors mb-0 !leading-6 line-clamp-2 truncate"
+            >
+              <span className="truncate">{canvas.name}</span>
+            </Heading>
+          </div>
+          <div className="pointer-events-auto">
+            <CanvasActionsMenu
+              canvas={canvas}
+              organizationId={organizationId}
+              onEdit={onEdit}
+              canUpdateCanvases={canUpdateCanvases}
+              canDeleteCanvases={canDeleteCanvases}
+              permissionsLoading={permissionsLoading}
+            />
+          </div>
+        </div>
+        {canvas.description ? (
+          <Text className="mt-1 text-left text-[13px] !leading-normal text-gray-800 dark:text-gray-400 line-clamp-2">
+            {canvas.description}
+          </Text>
+        ) : null}
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {canvas.createdBy?.name ? (
+            <>
+              Created by {canvas.createdBy.name}, on {canvas.createdAt}
+            </>
+          ) : (
+            <>Created on {canvas.createdAt}</>
+          )}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -1011,7 +1246,7 @@ function BlueprintGridView({
   permissionsLoading,
 }: BlueprintGridViewProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {filteredBlueprints.map((blueprint) => {
         const IconComponent = resolveIcon("component");
         const blueprintHref = `/${organizationId}/custom-components/${blueprint.id}`;
