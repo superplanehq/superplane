@@ -2,6 +2,7 @@ import {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
+  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -44,9 +45,9 @@ interface PublishMessageConfiguration {
 
 // ── Helper: build event sections ────────────────────────────────────────────
 
-function buildEventSections(nodes: NodeInfo[], execution: any, componentName: string): EventSection[] {
+function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   return [
@@ -90,7 +91,7 @@ function makeQueueMapper(componentName: string): ComponentBaseMapper {
       };
     },
     subtitle: subtitleFromExecution,
-    getExecutionDetails(_context: ExecutionDetailsContext): Record<string, any> {
+    getExecutionDetails(_context: ExecutionDetailsContext) {
       return {};
     },
   };
@@ -121,7 +122,7 @@ function makeTopicMapper(componentName: string): ComponentBaseMapper {
       };
     },
     subtitle: subtitleFromExecution,
-    getExecutionDetails(_context: ExecutionDetailsContext): Record<string, any> {
+    getExecutionDetails(_context: ExecutionDetailsContext) {
       return {};
     },
   };
@@ -172,7 +173,7 @@ export const sendServiceBusMessageMapper: ComponentBaseMapper = {
     };
   },
   subtitle: subtitleFromExecution,
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext) {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const result = outputs?.default?.[0]?.data as SendMessageOutput | undefined;
     if (!result) return {};
@@ -229,7 +230,7 @@ export const publishServiceBusMessageMapper: ComponentBaseMapper = {
     };
   },
   subtitle: subtitleFromExecution,
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext) {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const result = outputs?.default?.[0]?.data as PublishMessageOutput | undefined;
     if (!result) return {};

@@ -41,7 +41,7 @@ export const onServiceBusMessageAvailableTriggerRenderer: TriggerRenderer = {
     return { title, subtitle };
   },
 
-  getRootEventValues(context: TriggerEventContext): Record<string, any> {
+  getRootEventValues(context: TriggerEventContext) {
     const event = context.event?.data as ServiceBusEventGridEvent | undefined;
     return {
       Namespace: stringOrDash(event?.data?.namespaceName),
@@ -94,7 +94,7 @@ export const onServiceBusDeadLetterAvailableTriggerRenderer: TriggerRenderer = {
     return { title, subtitle };
   },
 
-  getRootEventValues(context: TriggerEventContext): Record<string, any> {
+  getRootEventValues(context: TriggerEventContext) {
     const event = context.event?.data as ServiceBusEventGridEvent | undefined;
     return {
       Namespace: stringOrDash(event?.data?.namespaceName),
