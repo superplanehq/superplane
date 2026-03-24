@@ -5,6 +5,12 @@ parameters:
   - name: REL_VERSION
     required: true
 
+  - name: DEMO_IMAGE_REPO
+    default_value: ghcr.io/superplanehq/superplane-demo
+
+  - name: STANDARD_IMAGE_REPO
+    default_value: ghcr.io/superplanehq/superplane
+
 agent:
   machine:
     type: f1-standard-2
@@ -14,12 +20,6 @@ global_job_config:
   env_vars:
     - name: DOCKER_BUILDKIT
       value: "1"
-
-    - name: DEMO_IMAGE_REPO
-      value: ghcr.io/superplanehq/superplane-demo
-
-    - name: STANDARD_IMAGE_REPO
-      value: ghcr.io/superplanehq/superplane
 
 
   secrets:
