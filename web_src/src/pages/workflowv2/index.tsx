@@ -83,6 +83,7 @@ import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { Button } from "@/components/ui/button";
 import {
   getComponentAdditionalDataBuilder,
@@ -332,6 +333,56 @@ function getNodeIntegrationName(
     return match?.name;
   }
   return undefined;
+}
+
+function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
+  const map = new Map<string, { state?: string; description?: string }>();
+  for (const integration of integrations) {
+    if (integration.metadata?.id && integration.status?.state !== "ready") {
+      map.set(integration.metadata.id, {
+        state: integration.status?.state,
+        description: integration.status?.stateDescription,
+      });
+    }
+  }
+  return map;
+}
+
+function overlayIntegrationWarnings(
+  nodes: CanvasNode[],
+  integrations: OrganizationsIntegration[],
+  canvasNodes: ComponentsNode[] | undefined,
+): CanvasNode[] {
+  if (!integrations.length || !canvasNodes) return nodes;
+
+  const nonReadyIntegrations = buildNonReadyIntegrationMap(integrations);
+  if (nonReadyIntegrations.size === 0) return nodes;
+
+  const canvasNodeMap = new Map(canvasNodes.map((n) => [n.id, n]));
+  return nodes.map((canvasNode) => {
+    const sourceNode = canvasNodeMap.get(canvasNode.id);
+    const integrationId = sourceNode?.integration?.id;
+    if (!integrationId) return canvasNode;
+    const status = nonReadyIntegrations.get(integrationId);
+    if (!status) return canvasNode;
+
+    const data = canvasNode.data as Record<string, unknown>;
+    const warningMsg =
+      status.state === "error"
+        ? `Integration error${status.description ? `: ${status.description}` : ""}`
+        : `Integration is ${status.state ?? "not ready"}`;
+
+    const component = data.component as Record<string, unknown> | undefined;
+    const trigger = data.trigger as Record<string, unknown> | undefined;
+
+    if (component && !component.error) {
+      return { ...canvasNode, data: { ...data, component: { ...component, error: warningMsg } } };
+    }
+    if (trigger && !trigger.error) {
+      return { ...canvasNode, data: { ...data, trigger: { ...trigger, error: warningMsg } } };
+    }
+    return canvasNode;
+  });
 }
 
 export function WorkflowPageV2() {
@@ -1470,8 +1521,7 @@ export function WorkflowPageV2() {
     [triggers, components, blueprints, availableIntegrations],
   );
 
-  const { nodes, edges } = useMemo(() => {
-    // Don't prepare data until everything is loaded
+  const { nodes: preparedNodes, edges } = useMemo(() => {
     if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
       return { nodes: [], edges: [] };
     }
@@ -1508,6 +1558,13 @@ export function WorkflowPageV2() {
     organizationId,
     account,
   ]);
+
+  const nodesWithIntegrationStatus = useMemo(
+    () => overlayIntegrationWarnings(preparedNodes, integrations, canvas?.spec?.nodes),
+    [preparedNodes, integrations, canvas?.spec?.nodes],
+  );
+
+  const nodes = nodesWithIntegrationStatus;
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -2391,34 +2448,67 @@ export function WorkflowPageV2() {
     [availableIntegrations, integrationDialogName],
   );
 
+  const integrationDialogPendingInstance = useMemo(() => {
+    if (!integrationDialogName) return undefined;
+    return integrations.find((i) => i.spec?.integrationName === integrationDialogName && i.status?.state !== "ready");
+  }, [integrationDialogName, integrations]);
+
+  const initialWebhookSetup = useMemo(() => {
+    const webhookUrl = getIntegrationWebhookUrl(integrationDialogPendingInstance?.status?.metadata);
+    if (!webhookUrl || !integrationDialogPendingInstance?.metadata?.id) return undefined;
+    return {
+      id: integrationDialogPendingInstance.metadata.id,
+      webhookUrl,
+      config: { ...(integrationDialogPendingInstance.spec?.configuration ?? {}) },
+    };
+  }, [integrationDialogPendingInstance]);
+
   const missingIntegrations: MissingIntegration[] = useMemo(() => {
     if (!canvas?.spec?.nodes || !canReadIntegrations) return [];
 
-    const missingMap = new Map<string, { count: number; definition?: (typeof availableIntegrations)[0] }>();
+    const missingMap = new Map<
+      string,
+      {
+        count: number;
+        definition?: (typeof availableIntegrations)[0];
+        state?: "pending" | "error";
+        stateDescription?: string;
+      }
+    >();
 
     for (const node of canvas.spec.nodes) {
       const integrationName = getNodeIntegrationName(node, availableIntegrations);
       if (!integrationName) continue;
 
-      const hasConnectedInstance = integrations.some((i) => i.spec?.integrationName === integrationName);
-      if (hasConnectedInstance) continue;
+      const hasReadyInstance = integrations.some(
+        (i) => i.spec?.integrationName === integrationName && i.status?.state === "ready",
+      );
+      if (hasReadyInstance) continue;
 
       const existing = missingMap.get(integrationName);
       if (existing) {
         existing.count++;
       } else {
+        const nonReadyInstance = integrations.find(
+          (i) => i.spec?.integrationName === integrationName && i.status?.state !== "ready",
+        );
+        const rawState = nonReadyInstance?.status?.state;
         missingMap.set(integrationName, {
           count: 1,
           definition: availableIntegrations.find((d) => d.name === integrationName),
+          state: rawState === "error" ? "error" : rawState === "pending" ? "pending" : undefined,
+          stateDescription: nonReadyInstance?.status?.stateDescription,
         });
       }
     }
 
-    return Array.from(missingMap.entries()).map(([name, { count, definition }]) => ({
+    return Array.from(missingMap.entries()).map(([name, { count, definition, state, stateDescription }]) => ({
       integrationName: name,
       affectedNodeCount: count,
       definition,
-      justConnected: justConnectedIntegrations.has(name),
+      justConnected: !state && justConnectedIntegrations.has(name),
+      state,
+      stateDescription,
     }));
   }, [canvas?.spec?.nodes, availableIntegrations, integrations, canReadIntegrations, justConnectedIntegrations]);
 
@@ -5290,8 +5380,14 @@ export function WorkflowPageV2() {
           return res.data;
         }}
         onReset={() => createIntegrationMutation.reset()}
-        defaultName={integrationDialogDefinition?.name ?? ""}
+        defaultName={integrationDialogPendingInstance?.metadata?.name ?? integrationDialogDefinition?.name ?? ""}
         onCreated={(integrationId) => void handleIntegrationCreated(integrationId)}
+        initialBrowserAction={integrationDialogPendingInstance?.status?.browserAction}
+        initialCreatedIntegrationId={integrationDialogPendingInstance?.metadata?.id}
+        initialWebhookSetup={initialWebhookSetup}
+        initialConfiguration={
+          integrationDialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined
+        }
       />
     </>
   );
