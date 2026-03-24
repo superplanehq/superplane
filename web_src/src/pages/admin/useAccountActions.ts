@@ -21,13 +21,13 @@ export async function toggleAdmin(acc: AdminAccount, onDone: () => void) {
   }
 }
 
-export async function startImpersonation(orgId: string, userId: string) {
+export async function startImpersonation(accountId: string) {
   try {
     const res = await fetch("/admin/api/impersonate/start", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ organization_id: orgId, user_id: userId }),
+      body: JSON.stringify({ account_id: accountId }),
     });
     if (!res.ok) {
       showErrorToast((await res.text()) || "Failed");

@@ -15,15 +15,14 @@ func TestGenerateToken(t *testing.T) {
 	signer := jwt.NewSigner("test-secret")
 
 	t.Run("generates a valid token with all claims", func(t *testing.T) {
-		token, err := GenerateToken(signer, "admin-123", "user-456", "org-789")
+		token, err := GenerateToken(signer, "admin-123", "account-456")
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
 
 		claims, err := ValidateToken(signer, token)
 		require.NoError(t, err)
 		assert.Equal(t, "admin-123", claims.AdminAccountID)
-		assert.Equal(t, "user-456", claims.ImpersonatedUserID)
-		assert.Equal(t, "org-789", claims.ImpersonatedOrgID)
+		assert.Equal(t, "account-456", claims.ImpersonatedAccountID)
 	})
 }
 
@@ -32,7 +31,7 @@ func TestValidateToken(t *testing.T) {
 
 	t.Run("rejects token signed with different secret", func(t *testing.T) {
 		otherSigner := jwt.NewSigner("other-secret")
-		token, err := GenerateToken(otherSigner, "admin-1", "user-2", "org-3")
+		token, err := GenerateToken(otherSigner, "admin-1", "account-2")
 		require.NoError(t, err)
 
 		claims, err := ValidateToken(signer, token)
@@ -41,17 +40,14 @@ func TestValidateToken(t *testing.T) {
 	})
 
 	t.Run("rejects expired token", func(t *testing.T) {
-		// Generate a token with a very short TTL using GenerateWithClaims directly
 		token, err := signer.GenerateWithClaims(0*time.Second, map[string]string{
-			"type":                 TokenType,
-			"admin_account_id":     "admin-1",
-			"impersonated_user_id": "user-2",
-			"impersonated_org_id":  "org-3",
-			"sub":                  "admin-1",
+			"type":                    TokenType,
+			"admin_account_id":        "admin-1",
+			"impersonated_account_id": "account-2",
+			"sub":                     "admin-1",
 		})
 		require.NoError(t, err)
 
-		// Wait for expiry
 		time.Sleep(1100 * time.Millisecond)
 
 		claims, err := ValidateToken(signer, token)
@@ -60,7 +56,6 @@ func TestValidateToken(t *testing.T) {
 	})
 
 	t.Run("rejects token with wrong type claim", func(t *testing.T) {
-		// Generate a regular account token (no "type" claim)
 		token, err := signer.Generate("account-123", time.Hour)
 		require.NoError(t, err)
 
@@ -74,7 +69,6 @@ func TestValidateToken(t *testing.T) {
 		token, err := signer.GenerateWithClaims(time.Hour, map[string]string{
 			"type":             TokenType,
 			"admin_account_id": "admin-1",
-			// missing user_id and org_id
 		})
 		require.NoError(t, err)
 

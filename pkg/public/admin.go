@@ -52,51 +52,20 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type membershipItem struct {
-		OrganizationID   string `json:"organization_id"`
-		OrganizationName string `json:"organization_name"`
-		UserID           string `json:"user_id"`
-	}
-
 	type accountItem struct {
-		ID                string           `json:"id"`
-		Name              string           `json:"name"`
-		Email             string           `json:"email"`
-		InstallationAdmin bool             `json:"installation_admin"`
-		Memberships       []membershipItem `json:"memberships"`
-	}
-
-	accountIDs := make([]string, 0, len(accounts))
-	for _, a := range accounts {
-		accountIDs = append(accountIDs, a.ID.String())
-	}
-
-	allMemberships, err := models.FindOrgMembershipsForAccounts(accountIDs)
-	if err != nil {
-		log.Errorf("admin: failed to load account memberships: %v", err)
-		allMemberships = make(map[string][]models.AccountOrgMembership)
+		ID                string `json:"id"`
+		Name              string `json:"name"`
+		Email             string `json:"email"`
+		InstallationAdmin bool   `json:"installation_admin"`
 	}
 
 	items := make([]accountItem, 0, len(accounts))
 	for _, a := range accounts {
-		id := a.ID.String()
-		memberships := allMemberships[id]
-
-		mItems := make([]membershipItem, 0, len(memberships))
-		for _, m := range memberships {
-			mItems = append(mItems, membershipItem{
-				OrganizationID:   m.OrganizationID,
-				OrganizationName: m.OrganizationName,
-				UserID:           m.UserID,
-			})
-		}
-
 		items = append(items, accountItem{
-			ID:                id,
+			ID:                a.ID.String(),
 			Name:              a.Name,
 			Email:             a.Email,
 			InstallationAdmin: a.IsInstallationAdmin(),
-			Memberships:       mItems,
 		})
 	}
 
@@ -261,7 +230,6 @@ func (s *Server) adminListOrgUsers(w http.ResponseWriter, r *http.Request) {
 // startImpersonation begins an impersonation session.
 func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 	// Block nested impersonation only if the existing token is still valid.
-	// If it's expired or corrupt, clear the stale cookie and allow proceeding.
 	if tokenStr, err := impersonation.ReadCookie(r); err == nil {
 		if _, validErr := impersonation.ValidateToken(s.jwt, tokenStr); validErr == nil {
 			http.Error(w, "Already impersonating — end current session first", http.StatusBadRequest)
@@ -270,15 +238,14 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 		impersonation.ClearCookie(w, r)
 	}
 
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	admin, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	var req struct {
-		OrganizationID string `json:"organization_id"`
-		UserID         string `json:"user_id"`
+		AccountID string `json:"account_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -286,29 +253,23 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.OrganizationID == "" || req.UserID == "" {
-		http.Error(w, "organization_id and user_id are required", http.StatusBadRequest)
+	if req.AccountID == "" {
+		http.Error(w, "account_id is required", http.StatusBadRequest)
 		return
 	}
 
-	org, err := models.FindOrganizationByID(req.OrganizationID)
-	if err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-
-	user, err := models.FindActiveUserByID(req.OrganizationID, req.UserID)
-	if err != nil {
-		http.Error(w, "User not found in organization", http.StatusNotFound)
-		return
-	}
-
-	if user.AccountID != nil && user.AccountID.String() == account.ID.String() {
+	if req.AccountID == admin.ID.String() {
 		http.Error(w, "Cannot impersonate yourself", http.StatusBadRequest)
 		return
 	}
 
-	token, err := impersonation.GenerateToken(s.jwt, account.ID.String(), user.ID.String(), org.ID.String())
+	target, err := models.FindAccountByID(req.AccountID)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+
+	token, err := impersonation.GenerateToken(s.jwt, admin.ID.String(), target.ID.String())
 	if err != nil {
 		log.Errorf("admin: failed to generate impersonation token: %v", err)
 		http.Error(w, "Failed to start impersonation", http.StatusInternalServerError)
@@ -317,25 +278,18 @@ func (s *Server) startImpersonation(w http.ResponseWriter, r *http.Request) {
 
 	impersonation.SetCookie(w, r, token)
 
-	userName := user.Name
-	if user.Email != nil {
-		userName = *user.Email
-	}
-
 	log.WithFields(log.Fields{
-		"admin_account_id": account.ID.String(),
-		"admin_email":      account.Email,
-		"target_user_id":   user.ID.String(),
-		"target_user_name": userName,
-		"target_org_id":    org.ID.String(),
-		"target_org_name":  org.Name,
-		"action":           "impersonation_start",
-		"client_ip":        r.RemoteAddr,
+		"admin_account_id":  admin.ID.String(),
+		"admin_email":       admin.Email,
+		"target_account_id": target.ID.String(),
+		"target_email":      target.Email,
+		"action":            "impersonation_start",
+		"client_ip":         r.RemoteAddr,
 	}).Info("admin impersonation started")
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
-		"redirect_url": "/" + org.ID.String(),
+		"redirect_url": "/",
 	})
 }
 
@@ -387,21 +341,14 @@ func (s *Server) impersonationStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userName := ""
-	orgName := ""
-
-	if user, err := models.FindActiveUserByID(claims.ImpersonatedOrgID, claims.ImpersonatedUserID); err == nil {
-		userName = user.Name
-	}
-
-	if org, err := models.FindOrganizationByID(claims.ImpersonatedOrgID); err == nil {
-		orgName = org.Name
+	if target, err := models.FindAccountByID(claims.ImpersonatedAccountID); err == nil {
+		userName = target.Name
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"active":           true,
 		"user_name":        userName,
-		"org_name":         orgName,
 		"admin_account_id": claims.AdminAccountID,
 	})
 }

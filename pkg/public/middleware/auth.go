@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/gorilla/mux"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -35,7 +34,6 @@ type ImpersonationInfo struct {
 	AdminAccountID string
 	Active         bool
 	UserName       string
-	OrgName        string
 }
 
 var ownerSetupEnabled = os.Getenv("OWNER_SETUP_ENABLED") == "yes"
@@ -168,8 +166,8 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 }
 
 // resolveImpersonatedAccount checks for an impersonation cookie and,
-// if valid, returns the impersonated user's linked Account so it can
-// be used as the effective account for non-admin endpoints.
+// if valid, returns the impersonated Account so it can be used as the
+// effective account for non-admin endpoints.
 func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *models.Account) (*models.Account, *ImpersonationInfo) {
 	tokenStr, err := impersonation.ReadCookie(r)
 	if err != nil {
@@ -185,26 +183,15 @@ func resolveImpersonatedAccount(jwtSigner *jwt.Signer, r *http.Request, admin *m
 		return nil, nil
 	}
 
-	user, err := models.FindActiveUserByID(claims.ImpersonatedOrgID, claims.ImpersonatedUserID)
-	if err != nil || user.AccountID == nil {
-		return nil, nil
-	}
-
-	impAccount, err := models.FindAccountByID(user.AccountID.String())
+	impAccount, err := models.FindAccountByID(claims.ImpersonatedAccountID)
 	if err != nil {
 		return nil, nil
-	}
-
-	orgName := ""
-	if org, err := models.FindOrganizationByID(claims.ImpersonatedOrgID); err == nil {
-		orgName = org.Name
 	}
 
 	info := &ImpersonationInfo{
 		AdminAccountID: claims.AdminAccountID,
 		Active:         true,
-		UserName:       user.Name,
-		OrgName:        orgName,
+		UserName:       impAccount.Name,
 	}
 
 	return impAccount, info
@@ -301,7 +288,8 @@ func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.U
 }
 
 // resolveImpersonatedUser checks if there's a valid impersonation session.
-// It validates both the impersonation token AND the admin's account token.
+// It validates the impersonation token AND the admin's account token, then
+// finds the impersonated user in the organization from the request header.
 func resolveImpersonatedUser(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
 	tokenStr, err := impersonation.ReadCookie(r)
 	if err != nil {
@@ -329,30 +317,27 @@ func resolveImpersonatedUser(jwtSigner *jwt.Signer, r *http.Request) (*models.Us
 		return nil, nil, fmt.Errorf("admin account no longer valid")
 	}
 
-	// Look up the impersonated user
-	user, err := models.FindActiveUserByID(claims.ImpersonatedOrgID, claims.ImpersonatedUserID)
+	// Look up the impersonated account
+	impAccount, err := models.FindAccountByID(claims.ImpersonatedAccountID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("impersonated user not found: %w", err)
+		return nil, nil, fmt.Errorf("impersonated account not found: %w", err)
 	}
 
-	// Look up org name for the banner
-	orgName := ""
-	org, orgErr := models.FindOrganizationByID(claims.ImpersonatedOrgID)
-	if orgErr == nil {
-		orgName = org.Name
+	// Find the user in the org from the request header
+	organizationID := findOrganizationID(r)
+	if organizationID == "" {
+		return nil, nil, errors.New(OrganizationNotFoundError)
 	}
 
-	log.WithFields(log.Fields{
-		"admin_account_id":  claims.AdminAccountID,
-		"impersonated_user": claims.ImpersonatedUserID,
-		"impersonated_org":  claims.ImpersonatedOrgID,
-	}).Debug("impersonation session active")
+	user, err := models.FindActiveUserByEmail(organizationID, impAccount.Email)
+	if err != nil {
+		return nil, nil, errors.New(OrganizationNotFoundError)
+	}
 
 	info := &ImpersonationInfo{
 		AdminAccountID: claims.AdminAccountID,
 		Active:         true,
-		UserName:       user.Name,
-		OrgName:        orgName,
+		UserName:       impAccount.Name,
 	}
 
 	return user, info, nil

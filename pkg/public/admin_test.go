@@ -189,16 +189,12 @@ func TestAdminListOrgUsers(t *testing.T) {
 func TestStartImpersonation(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
-	t.Run("starts impersonation with a different user", func(t *testing.T) {
-		// Create a second user in the same org to impersonate
+	t.Run("starts impersonation with a different account", func(t *testing.T) {
 		otherAccount, err := models.CreateAccount("Other User", "other@example.com")
-		require.NoError(t, err)
-		otherUser, err := models.CreateUser(r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
 		require.NoError(t, err)
 
 		body, _ := json.Marshal(map[string]string{
-			"organization_id": r.Organization.ID.String(),
-			"user_id":         otherUser.ID.String(),
+			"account_id": otherAccount.ID.String(),
 		})
 
 		response := execRequest(server, requestParams{
@@ -214,7 +210,7 @@ func TestStartImpersonation(t *testing.T) {
 		var result map[string]string
 		err = json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
-		assert.Contains(t, result["redirect_url"], r.Organization.ID.String())
+		assert.Equal(t, "/", result["redirect_url"])
 
 		cookies := response.Result().Cookies()
 		found := false
@@ -231,8 +227,7 @@ func TestStartImpersonation(t *testing.T) {
 
 	t.Run("rejects self-impersonation", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{
-			"organization_id": r.Organization.ID.String(),
-			"user_id":         r.UserModel.ID.String(),
+			"account_id": r.Account.ID.String(),
 		})
 
 		response := execRequest(server, requestParams{
@@ -247,11 +242,8 @@ func TestStartImpersonation(t *testing.T) {
 		assert.Contains(t, response.Body.String(), "Cannot impersonate yourself")
 	})
 
-	t.Run("rejects impersonation with missing fields", func(t *testing.T) {
-		body, _ := json.Marshal(map[string]string{
-			"organization_id": r.Organization.ID.String(),
-			// missing user_id
-		})
+	t.Run("rejects impersonation with missing account_id", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]string{})
 
 		response := execRequest(server, requestParams{
 			method:      "POST",
@@ -264,27 +256,9 @@ func TestStartImpersonation(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 	})
 
-	t.Run("rejects impersonation with non-existent user", func(t *testing.T) {
+	t.Run("rejects impersonation with non-existent account", func(t *testing.T) {
 		body, _ := json.Marshal(map[string]string{
-			"organization_id": r.Organization.ID.String(),
-			"user_id":         "00000000-0000-0000-0000-000000000000",
-		})
-
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        "/admin/api/impersonate/start",
-			body:        body,
-			authCookie:  token,
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, http.StatusNotFound, response.Code)
-	})
-
-	t.Run("rejects impersonation with non-existent org", func(t *testing.T) {
-		body, _ := json.Marshal(map[string]string{
-			"organization_id": "00000000-0000-0000-0000-000000000000",
-			"user_id":         r.UserModel.ID.String(),
+			"account_id": "00000000-0000-0000-0000-000000000000",
 		})
 
 		response := execRequest(server, requestParams{
@@ -346,15 +320,15 @@ func TestImpersonationStatus(t *testing.T) {
 	})
 
 	t.Run("returns active when valid impersonation cookie exists", func(t *testing.T) {
-		signer := jwt.NewSigner("test-client-secret")
+		otherAccount, err := models.CreateAccount("Status Target", "status-target@example.com")
+		require.NoError(t, err)
 
-		// Generate a real impersonation token
+		signer := jwt.NewSigner("test-client-secret")
 		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                 "impersonation",
-			"admin_account_id":     r.Account.ID.String(),
-			"impersonated_user_id": r.UserModel.ID.String(),
-			"impersonated_org_id":  r.Organization.ID.String(),
-			"sub":                  r.Account.ID.String(),
+			"type":                    "impersonation",
+			"admin_account_id":        r.Account.ID.String(),
+			"impersonated_account_id": otherAccount.ID.String(),
+			"sub":                     r.Account.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -372,7 +346,6 @@ func TestImpersonationStatus(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, true, result["active"])
 		assert.NotEmpty(t, result["user_name"])
-		assert.NotEmpty(t, result["org_name"])
 	})
 }
 
@@ -417,20 +390,19 @@ func TestGetAccountIncludesInstallationAdmin(t *testing.T) {
 }
 
 // makeImpersonationRequest creates an HTTP request carrying both the admin's
-// account_token and a valid impersonation_token for the given target user/org.
+// account_token and a valid impersonation_token for the given target account.
 func makeImpersonationRequest(
 	t *testing.T,
 	method, path, adminToken string,
-	adminAccountID, targetUserID, targetOrgID string,
+	adminAccountID, targetAccountID string,
 ) *http.Request {
 	t.Helper()
 	signer := jwt.NewSigner("test-client-secret")
 	impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-		"type":                 "impersonation",
-		"admin_account_id":     adminAccountID,
-		"impersonated_user_id": targetUserID,
-		"impersonated_org_id":  targetOrgID,
-		"sub":                  adminAccountID,
+		"type":                    "impersonation",
+		"admin_account_id":        adminAccountID,
+		"impersonated_account_id": targetAccountID,
+		"sub":                     adminAccountID,
 	})
 	require.NoError(t, err)
 
@@ -443,15 +415,15 @@ func makeImpersonationRequest(
 func TestImpersonationEffectiveAccount(t *testing.T) {
 	server, r, adminToken := setupAdminTestServer(t)
 
-	// Create a second (non-admin) account + user in the same org
 	otherAccount, err := models.CreateAccount("Target User", "target@example.com")
 	require.NoError(t, err)
-	otherUser, err := models.CreateUser(r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
+	// Create a user in the org so the target account has org membership
+	_, err = models.CreateUser(r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
 	require.NoError(t, err)
 
 	t.Run("GET /account returns impersonated user data during impersonation", func(t *testing.T) {
 		req := makeImpersonationRequest(t, http.MethodGet, "/account",
-			adminToken, r.Account.ID.String(), otherUser.ID.String(), r.Organization.ID.String())
+			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -468,7 +440,7 @@ func TestImpersonationEffectiveAccount(t *testing.T) {
 
 	t.Run("GET /organizations returns impersonated user orgs during impersonation", func(t *testing.T) {
 		req := makeImpersonationRequest(t, http.MethodGet, "/organizations",
-			adminToken, r.Account.ID.String(), otherUser.ID.String(), r.Organization.ID.String())
+			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -478,7 +450,6 @@ func TestImpersonationEffectiveAccount(t *testing.T) {
 		var orgs []map[string]any
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &orgs))
 
-		// The target user is only in the test org
 		for _, org := range orgs {
 			assert.Equal(t, r.Organization.ID.String(), org["id"],
 				"should only see the impersonated user's organizations")
@@ -487,7 +458,7 @@ func TestImpersonationEffectiveAccount(t *testing.T) {
 
 	t.Run("admin endpoints still use real admin account during impersonation", func(t *testing.T) {
 		req := makeImpersonationRequest(t, http.MethodGet, "/admin/api/organizations",
-			adminToken, r.Account.ID.String(), otherUser.ID.String(), r.Organization.ID.String())
+			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -501,23 +472,18 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 
 	otherAccount, err := models.CreateAccount("Target", "target-sec@example.com")
 	require.NoError(t, err)
-	otherUser, err := models.CreateUser(r.Organization.ID, otherAccount.ID, otherAccount.Email, otherAccount.Name)
-	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test-client-secret")
 
 	t.Run("non-admin with impersonation cookie is ignored", func(t *testing.T) {
-		// Create a regular (non-admin) account token
 		regularToken, err := signer.Generate(otherAccount.ID.String(), time.Hour)
 		require.NoError(t, err)
 
-		// Forge an impersonation token claiming this non-admin is the admin
 		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                 "impersonation",
-			"admin_account_id":     otherAccount.ID.String(),
-			"impersonated_user_id": r.UserModel.ID.String(),
-			"impersonated_org_id":  r.Organization.ID.String(),
-			"sub":                  otherAccount.ID.String(),
+			"type":                    "impersonation",
+			"admin_account_id":        otherAccount.ID.String(),
+			"impersonated_account_id": r.Account.ID.String(),
+			"sub":                     otherAccount.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -533,19 +499,16 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		var result map[string]any
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
 
-		// Should return the regular user's own data, NOT the impersonated user
 		assert.Equal(t, otherAccount.ID.String(), result["id"],
 			"non-admin impersonation cookie must be ignored")
 	})
 
 	t.Run("impersonation cookie with mismatched admin ID is ignored", func(t *testing.T) {
-		// Token claims a different admin than the actual account_token owner
 		impToken, err := signer.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                 "impersonation",
-			"admin_account_id":     "00000000-0000-0000-0000-000000000000",
-			"impersonated_user_id": otherUser.ID.String(),
-			"impersonated_org_id":  r.Organization.ID.String(),
-			"sub":                  "00000000-0000-0000-0000-000000000000",
+			"type":                    "impersonation",
+			"admin_account_id":        "00000000-0000-0000-0000-000000000000",
+			"impersonated_account_id": otherAccount.ID.String(),
+			"sub":                     "00000000-0000-0000-0000-000000000000",
 		})
 		require.NoError(t, err)
 
@@ -561,7 +524,6 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		var result map[string]any
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &result))
 
-		// Should return the admin's own data, impersonation cookie is rejected
 		assert.Equal(t, r.Account.ID.String(), result["id"],
 			"mismatched admin ID should cause impersonation to be ignored")
 	})
@@ -569,11 +531,10 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	t.Run("impersonation cookie signed with wrong secret is ignored", func(t *testing.T) {
 		wrongSigner := jwt.NewSigner("wrong-secret")
 		impToken, err := wrongSigner.GenerateWithClaims(time.Hour, map[string]string{
-			"type":                 "impersonation",
-			"admin_account_id":     r.Account.ID.String(),
-			"impersonated_user_id": otherUser.ID.String(),
-			"impersonated_org_id":  r.Organization.ID.String(),
-			"sub":                  r.Account.ID.String(),
+			"type":                    "impersonation",
+			"admin_account_id":        r.Account.ID.String(),
+			"impersonated_account_id": otherAccount.ID.String(),
+			"sub":                     r.Account.ID.String(),
 		})
 		require.NoError(t, err)
 
@@ -594,9 +555,8 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	})
 
 	t.Run("impersonation stops working after admin is demoted", func(t *testing.T) {
-		// First verify impersonation works
 		req := makeImpersonationRequest(t, http.MethodGet, "/account",
-			adminToken, r.Account.ID.String(), otherUser.ID.String(), r.Organization.ID.String())
+			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res := httptest.NewRecorder()
 		server.Router.ServeHTTP(res, req)
@@ -606,12 +566,10 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		require.NoError(t, json.Unmarshal(res.Body.Bytes(), &before))
 		assert.Equal(t, otherAccount.ID.String(), before["id"], "impersonation should be active")
 
-		// Demote the admin
 		require.NoError(t, models.DemoteFromInstallationAdmin(r.Account.ID.String()))
 
-		// Same request — impersonation should no longer work
 		req2 := makeImpersonationRequest(t, http.MethodGet, "/account",
-			adminToken, r.Account.ID.String(), otherUser.ID.String(), r.Organization.ID.String())
+			adminToken, r.Account.ID.String(), otherAccount.ID.String())
 
 		res2 := httptest.NewRecorder()
 		server.Router.ServeHTTP(res2, req2)
@@ -622,7 +580,6 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		assert.Equal(t, r.Account.ID.String(), after["id"],
 			"after demotion, should return admin's own account, not impersonated")
 
-		// Re-promote for other tests
 		require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
 	})
 }

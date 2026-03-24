@@ -757,7 +757,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 type AccountImpersonation struct {
 	Active   bool   `json:"active"`
 	UserName string `json:"user_name,omitempty"`
-	OrgName  string `json:"org_name,omitempty"`
 }
 
 type AccountResponse struct {
@@ -795,7 +794,6 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		accountResponse.Impersonation = &AccountImpersonation{
 			Active:   true,
 			UserName: info.UserName,
-			OrgName:  info.OrgName,
 		}
 	}
 

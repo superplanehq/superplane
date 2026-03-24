@@ -1,9 +1,8 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast } from "@/utils/toast";
-import { ChevronDown, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
@@ -11,55 +10,14 @@ import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
 import { startImpersonation, toggleAdmin } from "./useAccountActions";
 
-interface Membership {
-  organization_id: string;
-  organization_name: string;
-  user_id: string;
-}
 interface AdminAccount {
   id: string;
   name: string;
   email: string;
   installation_admin: boolean;
-  memberships: Membership[];
 }
 
 const PAGE_SIZE = 50;
-
-function ImpersonateBtn({ acc, onImpersonate }: { acc: AdminAccount; onImpersonate: (o: string, u: string) => void }) {
-  if (acc.memberships.length === 0) return <Text className="text-xs text-gray-400">No orgs</Text>;
-  if (acc.memberships.length === 1) {
-    const m = acc.memberships[0];
-    return (
-      <Button variant="outline" size="sm" onClick={() => onImpersonate(m.organization_id, m.user_id)}>
-        <span className="flex items-center gap-1">
-          <Eye size={14} />
-          Impersonate
-        </span>
-      </Button>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <span className="flex items-center gap-1">
-            <Eye size={14} />
-            Impersonate
-            <ChevronDown size={12} />
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {acc.memberships.map((m) => (
-          <DropdownMenuItem key={m.organization_id} onClick={() => onImpersonate(m.organization_id, m.user_id)}>
-            {m.organization_name}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 const AccountsList: React.FC = () => {
   const { account: currentAccount } = useAccount();
@@ -153,7 +111,14 @@ const AccountsList: React.FC = () => {
                     isSelf={acc.id === currentAccount?.id}
                     toggling={toggling === acc.id}
                     onPromoteDemote={() => setConfirmTarget(acc)}
-                    impersonateButton={<ImpersonateBtn acc={acc} onImpersonate={startImpersonation} />}
+                    impersonateButton={
+                      <Button variant="outline" size="sm" onClick={() => startImpersonation(acc.id)}>
+                        <span className="flex items-center gap-1">
+                          <Eye size={14} />
+                          Impersonate
+                        </span>
+                      </Button>
+                    }
                   />
                 ))}
               </tbody>

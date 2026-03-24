@@ -50,15 +50,15 @@ func TestAdminDashboard(t *testing.T) {
 		steps.promoteToAdmin()
 		steps.session.Login()
 
-		// Navigate to admin and click into the org
-		steps.session.Visit("/admin")
-		steps.clickOrganization("e2e-org")
+		// Navigate to admin accounts page
+		steps.session.Visit("/admin/accounts")
+		steps.session.Sleep(500)
 
 		// Start impersonation on the other user
 		steps.clickImpersonate()
 		steps.session.Sleep(2000)
 
-		// Should see the impersonation banner
+		// Should land on org selector with the impersonation banner
 		steps.assertImpersonationBannerVisible()
 
 		// End impersonation by clicking Exit

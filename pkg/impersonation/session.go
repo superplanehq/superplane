@@ -13,27 +13,24 @@ const (
 	TokenType  = "impersonation"
 	TTL        = 1 * time.Hour
 
-	claimType  = "type"
-	claimAdmin = "admin_account_id"
-	claimUser  = "impersonated_user_id"
-	claimOrg   = "impersonated_org_id"
-	claimSub   = "sub"
+	claimType    = "type"
+	claimAdmin   = "admin_account_id"
+	claimAccount = "impersonated_account_id"
+	claimSub     = "sub"
 )
 
 type Claims struct {
-	AdminAccountID     string
-	ImpersonatedUserID string
-	ImpersonatedOrgID  string
+	AdminAccountID        string
+	ImpersonatedAccountID string
 }
 
 // GenerateToken creates a signed JWT for an impersonation session.
-func GenerateToken(signer *jwt.Signer, adminAccountID, userID, orgID string) (string, error) {
+func GenerateToken(signer *jwt.Signer, adminAccountID, targetAccountID string) (string, error) {
 	return signer.GenerateWithClaims(TTL, map[string]string{
-		claimType:  TokenType,
-		claimAdmin: adminAccountID,
-		claimUser:  userID,
-		claimOrg:   orgID,
-		claimSub:   adminAccountID,
+		claimType:    TokenType,
+		claimAdmin:   adminAccountID,
+		claimAccount: targetAccountID,
+		claimSub:     adminAccountID,
 	})
 }
 
@@ -50,17 +47,15 @@ func ValidateToken(signer *jwt.Signer, tokenString string) (*Claims, error) {
 	}
 
 	adminID, _ := jwtClaims[claimAdmin].(string)
-	userID, _ := jwtClaims[claimUser].(string)
-	orgID, _ := jwtClaims[claimOrg].(string)
+	accountID, _ := jwtClaims[claimAccount].(string)
 
-	if adminID == "" || userID == "" || orgID == "" {
+	if adminID == "" || accountID == "" {
 		return nil, fmt.Errorf("incomplete impersonation claims")
 	}
 
 	return &Claims{
-		AdminAccountID:     adminID,
-		ImpersonatedUserID: userID,
-		ImpersonatedOrgID:  orgID,
+		AdminAccountID:        adminID,
+		ImpersonatedAccountID: accountID,
 	}, nil
 }
 

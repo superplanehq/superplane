@@ -29,12 +29,6 @@ const ImpersonationBanner: React.FC = () => {
     <div className="bg-amber-400 text-amber-900 px-4 py-2 text-center text-sm font-medium flex items-center justify-center gap-3 z-50">
       <span>
         You are viewing as <strong>{impersonation.user_name}</strong>
-        {impersonation.org_name && (
-          <>
-            {" "}
-            in <strong>{impersonation.org_name}</strong>
-          </>
-        )}
       </span>
       <button
         onClick={handleEndImpersonation}

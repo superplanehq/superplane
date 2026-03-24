@@ -20,19 +20,20 @@ interface PaginatedResponse<T> {
 
 const PAGE_SIZE = 50;
 
-function UserRow({ user, orgId }: { user: OrgUser; orgId: string }) {
+function UserRow({ user }: { user: OrgUser }) {
   const { account } = useAccount();
   const [loading, setLoading] = useState(false);
   const isSelf = user.account_id === account?.id;
 
   const handleImpersonate = async () => {
+    if (!user.account_id) return;
     setLoading(true);
     try {
       const res = await fetch("/admin/api/impersonate/start", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organization_id: orgId, user_id: user.id }),
+        body: JSON.stringify({ account_id: user.account_id }),
       });
       if (!res.ok) {
         showErrorToast((await res.text()) || "Failed");
@@ -129,7 +130,7 @@ export function OrgUsersTable({ orgId }: { orgId: string }) {
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <UserRow key={u.id} user={u} orgId={orgId} />
+                  <UserRow key={u.id} user={u} />
                 ))}
               </tbody>
             </table>

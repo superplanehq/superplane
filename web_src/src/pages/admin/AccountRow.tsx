@@ -3,18 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Shield, ShieldOff } from "lucide-react";
 import React from "react";
 
-interface Membership {
-  organization_id: string;
-  organization_name: string;
-  user_id: string;
-}
-
 interface AdminAccount {
   id: string;
   name: string;
   email: string;
   installation_admin: boolean;
-  memberships: Membership[];
 }
 
 interface AccountRowProps {
