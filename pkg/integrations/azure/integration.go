@@ -13,7 +13,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const secretAccessToken = "accessToken"
+const (
+	secretAccessToken           = "accessToken"
+	secretServiceBusAccessToken = "serviceBusAccessToken"
+)
 
 func init() {
 	integration := &AzureIntegration{}
@@ -64,7 +67,11 @@ Enter the following information below and create the integration:
 
 After creation, you will be guided through configuring the Federated Identity Credential and granting the required permissions.
 
-SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.`
+SuperPlane will use Workload Identity Federation to authenticate without storing any credentials.
+
+> **Using Service Bus?** The namespace must exist in Azure before you use any Service Bus actions or triggers — SuperPlane does not create it for you. You will also need to assign the **Azure Service Bus Data Owner** role to your app registration on the namespace.
+>
+> **Tier requirements:** The "On Message Available" and "On Dead-Letter Available" triggers rely on Azure Event Grid integration, which is only available on **Premium** tier namespaces. Topic actions (Create/Get/Delete Topic, Publish Message) require **Standard** tier or above — they are not available on Basic.`
 }
 
 func (a *AzureIntegration) Configuration() []configuration.Field {
@@ -104,6 +111,16 @@ func (a *AzureIntegration) Components() []core.Component {
 		&StopVMComponent{},
 		&DeallocateVMComponent{},
 		&RestartVMComponent{},
+		// Service Bus — Queues
+		&CreateServiceBusQueueComponent{},
+		&DeleteServiceBusQueueComponent{},
+		&GetServiceBusQueueComponent{},
+		&SendServiceBusMessageComponent{},
+		// Service Bus — Topics
+		&CreateServiceBusTopicComponent{},
+		&DeleteServiceBusTopicComponent{},
+		&GetServiceBusTopicComponent{},
+		&PublishServiceBusMessageComponent{},
 	}
 }
 
@@ -118,6 +135,8 @@ func (a *AzureIntegration) Triggers() []core.Trigger {
 		&OnVMStopped{},
 		&OnVMDeallocated{},
 		&OnVMRestarted{},
+		&OnServiceBusMessageAvailable{},
+		&OnServiceBusDeadLetterAvailable{},
 	}
 }
 
@@ -189,6 +208,15 @@ func (a *AzureIntegration) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to store access token: %w", err)
 	}
 
+	sbToken, err := provider.getClient().serviceBusToken(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to get Service Bus access token: %w", err)
+	}
+
+	if err := ctx.Integration.SetSecret(secretServiceBusAccessToken, []byte(sbToken)); err != nil {
+		return fmt.Errorf("failed to store Service Bus access token: %w", err)
+	}
+
 	if err := ctx.Integration.ScheduleResync(30 * time.Minute); err != nil {
 		return fmt.Errorf("failed to schedule resync: %w", err)
 	}
@@ -219,6 +247,12 @@ Assign Azure RBAC roles to your app registration at the subscription or resource
 - **Virtual Machine Contributor** – For VM management
 - **Network Contributor** – For network resource management
 - **EventGrid Contributor** – For Event Grid subscriptions
+- **Azure Service Bus Data Owner** – For Service Bus queue/topic management and message sending
+
+> **Service Bus setup notes:**
+> - Your Service Bus namespace must already exist — SuperPlane will not create it automatically. Assign the **Azure Service Bus Data Owner** role to your app registration directly on the namespace.
+> - The **On Message Available** and **On Dead-Letter Available** triggers require a **Premium** tier namespace (Event Grid integration is not available on Standard/Basic).
+> - Topic actions (Create/Get/Delete Topic, Publish Message) require **Standard** tier or above and are not supported on Basic namespaces.
 
 **3. Complete Setup**
 
@@ -272,6 +306,26 @@ func (a *AzureIntegration) ListResources(resourceType string, ctx core.ListResou
 
 	case ResourceTypeContainerRegistryDropdown:
 		return a.ListContainerRegistries(ctx, firstNonEmptyParameter(ctx.Parameters, "resourceGroup"))
+	case ResourceTypeServiceBusNamespace:
+		return a.ListServiceBusNamespaces(ctx, firstNonEmptyParameter(ctx.Parameters, "resourceGroup"))
+
+	case ResourceTypeServiceBusQueue:
+		return a.ListServiceBusQueues(ctx,
+			firstNonEmptyParameter(ctx.Parameters, "resourceGroup"),
+			firstNonEmptyParameter(ctx.Parameters, "namespaceName"),
+		)
+
+	case ResourceTypeServiceBusTopic:
+		return a.ListServiceBusTopics(ctx,
+			firstNonEmptyParameter(ctx.Parameters, "resourceGroup"),
+			firstNonEmptyParameter(ctx.Parameters, "namespaceName"),
+		)
+
+	case ResourceTypeServiceBusSubscription:
+		return a.ListServiceBusSubscriptions(ctx,
+			firstNonEmptyParameter(ctx.Parameters, "namespaceName"),
+			firstNonEmptyParameter(ctx.Parameters, "topicName"),
+		)
 
 	case "resourceGroup", "virtualNetwork", "subnet":
 		return []core.IntegrationResource{}, nil
@@ -312,12 +366,18 @@ func newProvider(ctx core.IntegrationContext) (*AzureProvider, error) {
 		return nil, err
 	}
 
+	sbToken, err := serviceBusTokenFromSecrets(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	logger := logrus.NewEntry(logrus.StandardLogger())
 	client := &armClient{
-		subscriptionID: config.SubscriptionID,
-		tokenFunc:      func(_ context.Context) (string, error) { return token, nil },
-		httpClient:     &http.Client{Timeout: 120 * time.Second},
-		logger:         logger,
+		subscriptionID:      config.SubscriptionID,
+		tokenFunc:           func(_ context.Context) (string, error) { return token, nil },
+		serviceBusTokenFunc: func(_ context.Context) (string, error) { return sbToken, nil },
+		httpClient:          &http.Client{Timeout: 120 * time.Second},
+		logger:              logger,
 	}
 
 	return &AzureProvider{
@@ -341,6 +401,26 @@ func accessTokenFromSecrets(ctx core.IntegrationContext) (string, error) {
 	}
 
 	return "", fmt.Errorf("Azure access token not found: integration needs to sync")
+}
+
+// serviceBusTokenFromSecrets reads the Service Bus data plane token stored by Sync.
+func serviceBusTokenFromSecrets(ctx core.IntegrationContext) (string, error) {
+	secrets, err := ctx.GetSecrets()
+	if err != nil {
+		return "", fmt.Errorf("failed to get integration secrets: %w", err)
+	}
+
+	for _, s := range secrets {
+		if s.Name == secretServiceBusAccessToken {
+			token := string(s.Value)
+			if token == "" {
+				return "", fmt.Errorf("Azure Service Bus access token is empty: integration needs to sync")
+			}
+			return token, nil
+		}
+	}
+
+	return "", fmt.Errorf("Azure Service Bus access token not found: integration needs to sync")
 }
 
 // loadConfig reads the Azure integration configuration from the database
