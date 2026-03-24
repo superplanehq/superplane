@@ -63,6 +63,31 @@ dataset = Dataset(
                 )
             ],
         ),
+        Case(
+            name="agent_labeled_issue_auto_resolve",
+            inputs="Build a workflow that auto-resolves GitHub issues",
+            evaluators=[
+                WorkflowShape(
+                  nodes=[
+                      "github.onIssue",
+                      "filter",
+                      "github.createIssueComment",
+                      "daytona.executeCode",
+                      "github.updateIssue",
+                      "github.createIssueComment",
+                      "github.createIssueComment",
+                  ],
+                  edges=[
+                      ("github.onIssue", "filter"),
+                      ("filter", "github.createIssueComment"),
+                      ("github.createIssueComment", "daytona.executeCode"),
+                      ("daytona.executeCode", "github.updateIssue"),
+                      ("github.updateIssue", "github.createIssueComment"),
+                      ("daytona.executeCode", "github.createIssueComment"),
+                  ],
+                )
+            ],
+        ),
     ],
 )
 
