@@ -580,6 +580,19 @@ func updateSourceConfig(github *GitHubSource, gitlab *GitLabSource, bitbucket *B
 	}
 }
 
+// hasConfigKey returns true if the given key is present in the raw configuration map.
+// This is used to distinguish between a togglable field that is toggled off (key absent)
+// and one that is toggled on with an empty/zero value (key present).
+func hasConfigKey(configuration any, key string) bool {
+	configMap, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	_, exists := configMap[key]
+	return exists
+}
+
 // getDeploymentIDForPolling returns the deployment ID to monitor after a create/update call.
 // DigitalOcean may omit pending_deployment for no-op updates, so in-progress is a valid fallback.
 func getDeploymentIDForPolling(app *App) string {

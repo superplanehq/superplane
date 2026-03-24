@@ -228,6 +228,10 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
+	hasKey := func(key string) bool {
+		return hasConfigKey(ctx.Configuration, key)
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
@@ -244,10 +248,10 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 
 	updatedSpec := app.Spec
 
-	if spec.Name != "" {
+	if hasKey("name") {
 		updatedSpec.Name = spec.Name
 	}
-	if spec.Region != "" {
+	if hasKey("region") {
 		updatedSpec.Region = spec.Region
 	}
 
@@ -286,25 +290,25 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 	for i, service := range updatedSpec.Services {
 		updateSourceConfig(service.GitHub, service.GitLab, service.Bitbucket, spec.Branch, spec.DeployOnPush)
 
-		if spec.EnvironmentSlug != "" {
+		if hasKey("environmentSlug") {
 			updatedSpec.Services[i].EnvironmentSlug = spec.EnvironmentSlug
 		}
-		if spec.BuildCommand != "" {
+		if hasKey("buildCommand") {
 			updatedSpec.Services[i].BuildCommand = spec.BuildCommand
 		}
-		if spec.RunCommand != "" {
+		if hasKey("runCommand") {
 			updatedSpec.Services[i].RunCommand = spec.RunCommand
 		}
-		if spec.SourceDir != "" {
+		if hasKey("sourceDir") {
 			updatedSpec.Services[i].SourceDir = spec.SourceDir
 		}
-		if spec.HTTPPort > 0 {
+		if hasKey("httpPort") {
 			updatedSpec.Services[i].HTTPPort = spec.HTTPPort
 		}
-		if spec.InstanceSizeSlug != "" {
+		if hasKey("instanceSizeSlug") {
 			updatedSpec.Services[i].InstanceSizeSlug = spec.InstanceSizeSlug
 		}
-		if spec.InstanceCount > 0 {
+		if hasKey("instanceCount") {
 			updatedSpec.Services[i].InstanceCount = spec.InstanceCount
 		}
 		if len(newEnvVars) > 0 {
@@ -316,22 +320,22 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 	for i, worker := range updatedSpec.Workers {
 		updateSourceConfig(worker.GitHub, worker.GitLab, worker.Bitbucket, spec.Branch, spec.DeployOnPush)
 
-		if spec.EnvironmentSlug != "" {
+		if hasKey("environmentSlug") {
 			updatedSpec.Workers[i].EnvironmentSlug = spec.EnvironmentSlug
 		}
-		if spec.BuildCommand != "" {
+		if hasKey("buildCommand") {
 			updatedSpec.Workers[i].BuildCommand = spec.BuildCommand
 		}
-		if spec.RunCommand != "" {
+		if hasKey("runCommand") {
 			updatedSpec.Workers[i].RunCommand = spec.RunCommand
 		}
-		if spec.SourceDir != "" {
+		if hasKey("sourceDir") {
 			updatedSpec.Workers[i].SourceDir = spec.SourceDir
 		}
-		if spec.InstanceSizeSlug != "" {
+		if hasKey("instanceSizeSlug") {
 			updatedSpec.Workers[i].InstanceSizeSlug = spec.InstanceSizeSlug
 		}
-		if spec.InstanceCount > 0 {
+		if hasKey("instanceCount") {
 			updatedSpec.Workers[i].InstanceCount = spec.InstanceCount
 		}
 		if len(newEnvVars) > 0 {
@@ -343,22 +347,22 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 	for i, job := range updatedSpec.Jobs {
 		updateSourceConfig(job.GitHub, job.GitLab, job.Bitbucket, spec.Branch, spec.DeployOnPush)
 
-		if spec.EnvironmentSlug != "" {
+		if hasKey("environmentSlug") {
 			updatedSpec.Jobs[i].EnvironmentSlug = spec.EnvironmentSlug
 		}
-		if spec.BuildCommand != "" {
+		if hasKey("buildCommand") {
 			updatedSpec.Jobs[i].BuildCommand = spec.BuildCommand
 		}
-		if spec.RunCommand != "" {
+		if hasKey("runCommand") {
 			updatedSpec.Jobs[i].RunCommand = spec.RunCommand
 		}
-		if spec.SourceDir != "" {
+		if hasKey("sourceDir") {
 			updatedSpec.Jobs[i].SourceDir = spec.SourceDir
 		}
-		if spec.InstanceSizeSlug != "" {
+		if hasKey("instanceSizeSlug") {
 			updatedSpec.Jobs[i].InstanceSizeSlug = spec.InstanceSizeSlug
 		}
-		if spec.InstanceCount > 0 {
+		if hasKey("instanceCount") {
 			updatedSpec.Jobs[i].InstanceCount = spec.InstanceCount
 		}
 		if len(newEnvVars) > 0 {
@@ -370,25 +374,25 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 	for i, site := range updatedSpec.StaticSites {
 		updateSourceConfig(site.GitHub, site.GitLab, site.Bitbucket, spec.Branch, spec.DeployOnPush)
 
-		if spec.EnvironmentSlug != "" {
+		if hasKey("environmentSlug") {
 			updatedSpec.StaticSites[i].EnvironmentSlug = spec.EnvironmentSlug
 		}
-		if spec.BuildCommand != "" {
+		if hasKey("buildCommand") {
 			updatedSpec.StaticSites[i].BuildCommand = spec.BuildCommand
 		}
-		if spec.SourceDir != "" {
+		if hasKey("sourceDir") {
 			updatedSpec.StaticSites[i].SourceDir = spec.SourceDir
 		}
-		if spec.OutputDir != "" {
+		if hasKey("outputDir") {
 			updatedSpec.StaticSites[i].OutputDir = spec.OutputDir
 		}
-		if spec.IndexDocument != "" {
+		if hasKey("indexDocument") {
 			updatedSpec.StaticSites[i].IndexDocument = spec.IndexDocument
 		}
-		if spec.ErrorDocument != "" {
+		if hasKey("errorDocument") {
 			updatedSpec.StaticSites[i].ErrorDocument = spec.ErrorDocument
 		}
-		if spec.CatchallDocument != "" {
+		if hasKey("catchallDocument") {
 			updatedSpec.StaticSites[i].CatchallDocument = spec.CatchallDocument
 		}
 		if len(newEnvVars) > 0 {
@@ -415,7 +419,7 @@ func (u *UpdateApp) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Update VPC if configured
-	if spec.VPCID != "" {
+	if hasKey("vpcID") {
 		updatedSpec.VPC = &AppVPC{ID: spec.VPCID}
 	}
 
