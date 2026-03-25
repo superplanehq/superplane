@@ -22,31 +22,31 @@ import (
 // AgentAPIService AgentAPI service
 type AgentAPIService service
 
-type ApiAgentsCreateAgentChatSessionRequest struct {
+type ApiAgentsGenerateAgentChatTokenRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	body       *AgentsCreateAgentChatSessionRequest
+	body       *AgentsGenerateAgentChatTokenRequest
 }
 
-func (r ApiAgentsCreateAgentChatSessionRequest) Body(body AgentsCreateAgentChatSessionRequest) ApiAgentsCreateAgentChatSessionRequest {
+func (r ApiAgentsGenerateAgentChatTokenRequest) Body(body AgentsGenerateAgentChatTokenRequest) ApiAgentsGenerateAgentChatTokenRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAgentsCreateAgentChatSessionRequest) Execute() (*AgentsCreateAgentChatSessionResponse, *http.Response, error) {
-	return r.ApiService.AgentsCreateAgentChatSessionExecute(r)
+func (r ApiAgentsGenerateAgentChatTokenRequest) Execute() (*AgentsGenerateAgentChatTokenResponse, *http.Response, error) {
+	return r.ApiService.AgentsGenerateAgentChatTokenExecute(r)
 }
 
 /*
-AgentsCreateAgentChatSession Create an agent chat session
+AgentsGenerateAgentChatToken Generates a new token for an agent chat
 
 Mints a short-lived scoped token for agent chat on a canvas
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiAgentsCreateAgentChatSessionRequest
+	@return ApiAgentsGenerateAgentChatTokenRequest
 */
-func (a *AgentAPIService) AgentsCreateAgentChatSession(ctx context.Context) ApiAgentsCreateAgentChatSessionRequest {
-	return ApiAgentsCreateAgentChatSessionRequest{
+func (a *AgentAPIService) AgentsGenerateAgentChatToken(ctx context.Context) ApiAgentsGenerateAgentChatTokenRequest {
+	return ApiAgentsGenerateAgentChatTokenRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -54,21 +54,21 @@ func (a *AgentAPIService) AgentsCreateAgentChatSession(ctx context.Context) ApiA
 
 // Execute executes the request
 //
-//	@return AgentsCreateAgentChatSessionResponse
-func (a *AgentAPIService) AgentsCreateAgentChatSessionExecute(r ApiAgentsCreateAgentChatSessionRequest) (*AgentsCreateAgentChatSessionResponse, *http.Response, error) {
+//	@return AgentsGenerateAgentChatTokenResponse
+func (a *AgentAPIService) AgentsGenerateAgentChatTokenExecute(r ApiAgentsGenerateAgentChatTokenRequest) (*AgentsGenerateAgentChatTokenResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsCreateAgentChatSessionResponse
+		localVarReturnValue *AgentsGenerateAgentChatTokenResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsCreateAgentChatSession")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsGenerateAgentChatToken")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chat/sessions"
+	localVarPath := localBasePath + "/api/v1/agents/chat/tokens"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

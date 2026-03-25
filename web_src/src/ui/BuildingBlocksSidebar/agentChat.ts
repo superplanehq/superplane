@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { agentsCreateAgentChatSession } from "@/api-client";
+import { agentsGenerateAgentChatToken } from "@/api-client";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AiCanvasOperation } from "./index";
 
@@ -354,7 +354,7 @@ export async function sendAgentChatPrompt({
     );
     setPendingProposal(null);
 
-    const sessionResponse = await agentsCreateAgentChatSession(
+    const tokenResponse = await agentsGenerateAgentChatToken(
       withOrganizationHeader({
         organizationId,
         body: {
@@ -363,8 +363,8 @@ export async function sendAgentChatPrompt({
       }),
     );
 
-    const sessionPayload = sessionResponse.data as { token?: unknown };
-    if (typeof sessionPayload.token !== "string" || sessionPayload.token.trim().length === 0) {
+    const tokenPayload = tokenResponse.data as { token?: unknown };
+    if (typeof tokenPayload.token !== "string" || tokenPayload.token.trim().length === 0) {
       throw new Error("Invalid agent session response");
     }
 
@@ -373,7 +373,7 @@ export async function sendAgentChatPrompt({
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
-        Authorization: `Bearer ${sessionPayload.token}`,
+        Authorization: `Bearer ${tokenPayload.token}`,
       },
       body: JSON.stringify({
         question: contextualPrompt,

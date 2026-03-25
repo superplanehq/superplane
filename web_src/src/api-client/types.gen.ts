@@ -12,11 +12,11 @@ export type ActOnCanvasChangeRequestRequestAction =
   | "ACTION_PUBLISH"
   | "ACTION_UNAPPROVE";
 
-export type AgentsCreateAgentChatSessionRequest = {
+export type AgentsGenerateAgentChatTokenRequest = {
   canvasId?: string;
 };
 
-export type AgentsCreateAgentChatSessionResponse = {
+export type AgentsGenerateAgentChatTokenResponse = {
   token?: string;
 };
 
@@ -1376,32 +1376,32 @@ export type ProtobufAny = {
  */
 export type ProtobufNullValue = "NULL_VALUE";
 
-export type AgentsCreateAgentChatSessionData = {
-  body: AgentsCreateAgentChatSessionRequest;
+export type AgentsGenerateAgentChatTokenData = {
+  body: AgentsGenerateAgentChatTokenRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/agents/chat/sessions";
+  url: "/api/v1/agents/chat/tokens";
 };
 
-export type AgentsCreateAgentChatSessionErrors = {
+export type AgentsGenerateAgentChatTokenErrors = {
   /**
    * An unexpected error response.
    */
   default: GooglerpcStatus;
 };
 
-export type AgentsCreateAgentChatSessionError =
-  AgentsCreateAgentChatSessionErrors[keyof AgentsCreateAgentChatSessionErrors];
+export type AgentsGenerateAgentChatTokenError =
+  AgentsGenerateAgentChatTokenErrors[keyof AgentsGenerateAgentChatTokenErrors];
 
-export type AgentsCreateAgentChatSessionResponses = {
+export type AgentsGenerateAgentChatTokenResponses = {
   /**
    * A successful response.
    */
-  200: AgentsCreateAgentChatSessionResponse;
+  200: AgentsGenerateAgentChatTokenResponse;
 };
 
-export type AgentsCreateAgentChatSessionResponse2 =
-  AgentsCreateAgentChatSessionResponses[keyof AgentsCreateAgentChatSessionResponses];
+export type AgentsGenerateAgentChatTokenResponse2 =
+  AgentsGenerateAgentChatTokenResponses[keyof AgentsGenerateAgentChatTokenResponses];
 
 export type BlueprintsListBlueprintsData = {
   body?: never;

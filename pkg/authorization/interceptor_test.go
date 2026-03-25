@@ -27,7 +27,7 @@ func TestDefaultResourceResolver(t *testing.T) {
 
 func TestCanvasResourceResolver(t *testing.T) {
 	t.Run("returns canvas id when available", func(t *testing.T) {
-		resourceIDs := canvasResourceResolver(&pbAgents.CreateAgentChatSessionRequest{CanvasId: "canvas-123"})
+		resourceIDs := canvasResourceResolver(&pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"})
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
 
@@ -130,7 +130,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:read:canvas-123"}),
 				),
 			),
-			req:         &pbAgents.CreateAgentChatSessionRequest{CanvasId: "canvas-123"},
+			req:         &pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: true,
 		},
@@ -143,7 +143,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:read:canvas-456"}),
 				),
 			),
-			req:         &pbAgents.CreateAgentChatSessionRequest{CanvasId: "canvas-123"},
+			req:         &pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: false,
 		},
@@ -156,7 +156,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:update"}),
 				),
 			),
-			req:         &pbAgents.CreateAgentChatSessionRequest{CanvasId: "canvas-123"},
+			req:         &pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: false,
 		},

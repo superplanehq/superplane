@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateAgentChatSession(authService authorization.Authorization, jwtSigner *jwt.Signer, userID string, organizationID string, canvasID string) (*pb.CreateAgentChatSessionResponse, error) {
+func GenerateAgentChatToken(authService authorization.Authorization, jwtSigner *jwt.Signer, userID string, organizationID string, canvasID string) (*pb.GenerateAgentChatTokenResponse, error) {
 	org, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "invalid organization")
@@ -51,7 +51,7 @@ func CreateAgentChatSession(authService authorization.Authorization, jwtSigner *
 		return nil, status.Error(codes.Internal, "failed to mint agent chat session")
 	}
 
-	return &pb.CreateAgentChatSessionResponse{Token: token}, nil
+	return &pb.GenerateAgentChatTokenResponse{Token: token}, nil
 }
 
 func allowedAgentChatPermissions(authService authorization.Authorization, userID, orgID, canvasID string) ([]jwt.Permission, error) {

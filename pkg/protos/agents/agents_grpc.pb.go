@@ -19,14 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agents_CreateAgentChatSession_FullMethodName = "/Superplane.Agents.Agents/CreateAgentChatSession"
+	Agents_GenerateAgentChatToken_FullMethodName = "/Superplane.Agents.Agents/GenerateAgentChatToken"
 )
 
 // AgentsClient is the client API for Agents service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentsClient interface {
-	CreateAgentChatSession(ctx context.Context, in *CreateAgentChatSessionRequest, opts ...grpc.CallOption) (*CreateAgentChatSessionResponse, error)
+	GenerateAgentChatToken(ctx context.Context, in *GenerateAgentChatTokenRequest, opts ...grpc.CallOption) (*GenerateAgentChatTokenResponse, error)
 }
 
 type agentsClient struct {
@@ -37,10 +37,10 @@ func NewAgentsClient(cc grpc.ClientConnInterface) AgentsClient {
 	return &agentsClient{cc}
 }
 
-func (c *agentsClient) CreateAgentChatSession(ctx context.Context, in *CreateAgentChatSessionRequest, opts ...grpc.CallOption) (*CreateAgentChatSessionResponse, error) {
+func (c *agentsClient) GenerateAgentChatToken(ctx context.Context, in *GenerateAgentChatTokenRequest, opts ...grpc.CallOption) (*GenerateAgentChatTokenResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateAgentChatSessionResponse)
-	err := c.cc.Invoke(ctx, Agents_CreateAgentChatSession_FullMethodName, in, out, cOpts...)
+	out := new(GenerateAgentChatTokenResponse)
+	err := c.cc.Invoke(ctx, Agents_GenerateAgentChatToken_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (c *agentsClient) CreateAgentChatSession(ctx context.Context, in *CreateAge
 // All implementations should embed UnimplementedAgentsServer
 // for forward compatibility.
 type AgentsServer interface {
-	CreateAgentChatSession(context.Context, *CreateAgentChatSessionRequest) (*CreateAgentChatSessionResponse, error)
+	GenerateAgentChatToken(context.Context, *GenerateAgentChatTokenRequest) (*GenerateAgentChatTokenResponse, error)
 }
 
 // UnimplementedAgentsServer should be embedded to have
@@ -61,8 +61,8 @@ type AgentsServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentsServer struct{}
 
-func (UnimplementedAgentsServer) CreateAgentChatSession(context.Context, *CreateAgentChatSessionRequest) (*CreateAgentChatSessionResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateAgentChatSession not implemented")
+func (UnimplementedAgentsServer) GenerateAgentChatToken(context.Context, *GenerateAgentChatTokenRequest) (*GenerateAgentChatTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateAgentChatToken not implemented")
 }
 func (UnimplementedAgentsServer) testEmbeddedByValue() {}
 
@@ -84,20 +84,20 @@ func RegisterAgentsServer(s grpc.ServiceRegistrar, srv AgentsServer) {
 	s.RegisterService(&Agents_ServiceDesc, srv)
 }
 
-func _Agents_CreateAgentChatSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateAgentChatSessionRequest)
+func _Agents_GenerateAgentChatToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateAgentChatTokenRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentsServer).CreateAgentChatSession(ctx, in)
+		return srv.(AgentsServer).GenerateAgentChatToken(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agents_CreateAgentChatSession_FullMethodName,
+		FullMethod: Agents_GenerateAgentChatToken_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentsServer).CreateAgentChatSession(ctx, req.(*CreateAgentChatSessionRequest))
+		return srv.(AgentsServer).GenerateAgentChatToken(ctx, req.(*GenerateAgentChatTokenRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -110,8 +110,8 @@ var Agents_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AgentsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateAgentChatSession",
-			Handler:    _Agents_CreateAgentChatSession_Handler,
+			MethodName: "GenerateAgentChatToken",
+			Handler:    _Agents_GenerateAgentChatToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -23,27 +23,27 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type CreateAgentChatSessionRequest struct {
+type GenerateAgentChatTokenRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateAgentChatSessionRequest) Reset() {
-	*x = CreateAgentChatSessionRequest{}
+func (x *GenerateAgentChatTokenRequest) Reset() {
+	*x = GenerateAgentChatTokenRequest{}
 	mi := &file_agents_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateAgentChatSessionRequest) String() string {
+func (x *GenerateAgentChatTokenRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateAgentChatSessionRequest) ProtoMessage() {}
+func (*GenerateAgentChatTokenRequest) ProtoMessage() {}
 
-func (x *CreateAgentChatSessionRequest) ProtoReflect() protoreflect.Message {
+func (x *GenerateAgentChatTokenRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agents_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -55,39 +55,39 @@ func (x *CreateAgentChatSessionRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateAgentChatSessionRequest.ProtoReflect.Descriptor instead.
-func (*CreateAgentChatSessionRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GenerateAgentChatTokenRequest.ProtoReflect.Descriptor instead.
+func (*GenerateAgentChatTokenRequest) Descriptor() ([]byte, []int) {
 	return file_agents_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateAgentChatSessionRequest) GetCanvasId() string {
+func (x *GenerateAgentChatTokenRequest) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-type CreateAgentChatSessionResponse struct {
+type GenerateAgentChatTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateAgentChatSessionResponse) Reset() {
-	*x = CreateAgentChatSessionResponse{}
+func (x *GenerateAgentChatTokenResponse) Reset() {
+	*x = GenerateAgentChatTokenResponse{}
 	mi := &file_agents_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateAgentChatSessionResponse) String() string {
+func (x *GenerateAgentChatTokenResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateAgentChatSessionResponse) ProtoMessage() {}
+func (*GenerateAgentChatTokenResponse) ProtoMessage() {}
 
-func (x *CreateAgentChatSessionResponse) ProtoReflect() protoreflect.Message {
+func (x *GenerateAgentChatTokenResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agents_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -99,12 +99,12 @@ func (x *CreateAgentChatSessionResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateAgentChatSessionResponse.ProtoReflect.Descriptor instead.
-func (*CreateAgentChatSessionResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GenerateAgentChatTokenResponse.ProtoReflect.Descriptor instead.
+func (*GenerateAgentChatTokenResponse) Descriptor() ([]byte, []int) {
 	return file_agents_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *CreateAgentChatSessionResponse) GetToken() string {
+func (x *GenerateAgentChatTokenResponse) GetToken() string {
 	if x != nil {
 		return x.Token
 	}
@@ -116,13 +116,13 @@ var File_agents_proto protoreflect.FileDescriptor
 const file_agents_proto_rawDesc = "" +
 	"\n" +
 	"\fagents.proto\x12\x11Superplane.Agents\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"<\n" +
-	"\x1dCreateAgentChatSessionRequest\x12\x1b\n" +
+	"\x1dGenerateAgentChatTokenRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"6\n" +
-	"\x1eCreateAgentChatSessionResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token2\x97\x02\n" +
-	"\x06Agents\x12\x8c\x02\n" +
-	"\x16CreateAgentChatSession\x120.Superplane.Agents.CreateAgentChatSessionRequest\x1a1.Superplane.Agents.CreateAgentChatSessionResponse\"\x8c\x01\x92Ab\n" +
-	"\x05Agent\x12\x1cCreate an agent chat session\x1a;Mints a short-lived scoped token for agent chat on a canvas\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/api/v1/agents/chat/sessionsB\xca\x01\x92A\x90\x01\x12f\n" +
+	"\x1eGenerateAgentChatTokenResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token2\xa0\x02\n" +
+	"\x06Agents\x12\x95\x02\n" +
+	"\x16GenerateAgentChatToken\x120.Superplane.Agents.GenerateAgentChatTokenRequest\x1a1.Superplane.Agents.GenerateAgentChatTokenResponse\"\x95\x01\x92Am\n" +
+	"\x05Agent\x12'Generates a new token for an agent chat\x1a;Mints a short-lived scoped token for agent chat on a canvas\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/agents/chat/tokensB\xca\x01\x92A\x90\x01\x12f\n" +
 	"\x15SuperPlane Agents API\x12!API for SuperPlane agent sessions\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
 
@@ -140,12 +140,12 @@ func file_agents_proto_rawDescGZIP() []byte {
 
 var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_agents_proto_goTypes = []any{
-	(*CreateAgentChatSessionRequest)(nil),  // 0: Superplane.Agents.CreateAgentChatSessionRequest
-	(*CreateAgentChatSessionResponse)(nil), // 1: Superplane.Agents.CreateAgentChatSessionResponse
+	(*GenerateAgentChatTokenRequest)(nil),  // 0: Superplane.Agents.GenerateAgentChatTokenRequest
+	(*GenerateAgentChatTokenResponse)(nil), // 1: Superplane.Agents.GenerateAgentChatTokenResponse
 }
 var file_agents_proto_depIdxs = []int32{
-	0, // 0: Superplane.Agents.Agents.CreateAgentChatSession:input_type -> Superplane.Agents.CreateAgentChatSessionRequest
-	1, // 1: Superplane.Agents.Agents.CreateAgentChatSession:output_type -> Superplane.Agents.CreateAgentChatSessionResponse
+	0, // 0: Superplane.Agents.Agents.GenerateAgentChatToken:input_type -> Superplane.Agents.GenerateAgentChatTokenRequest
+	1, // 1: Superplane.Agents.Agents.GenerateAgentChatToken:output_type -> Superplane.Agents.GenerateAgentChatTokenResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

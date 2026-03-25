@@ -26,8 +26,8 @@ client.go
 configuration.go
 docs/ActOnCanvasChangeRequestRequestAction.md
 docs/AgentAPI.md
-docs/AgentsCreateAgentChatSessionRequest.md
-docs/AgentsCreateAgentChatSessionResponse.md
+docs/AgentsGenerateAgentChatTokenRequest.md
+docs/AgentsGenerateAgentChatTokenResponse.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
 docs/BlueprintAPI.md
@@ -264,8 +264,8 @@ docs/WidgetsListWidgetsResponse.md
 docs/WidgetsWidget.md
 git_push.sh
 model_act_on_canvas_change_request_request_action.go
-model_agents_create_agent_chat_session_request.go
-model_agents_create_agent_chat_session_response.go
+model_agents_generate_agent_chat_token_request.go
+model_agents_generate_agent_chat_token_response.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_blueprints_blueprint.go

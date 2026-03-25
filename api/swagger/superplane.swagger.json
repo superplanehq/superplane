@@ -64,16 +64,16 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents/chat/sessions": {
+    "/api/v1/agents/chat/tokens": {
       "post": {
-        "summary": "Create an agent chat session",
+        "summary": "Generates a new token for an agent chat",
         "description": "Mints a short-lived scoped token for agent chat on a canvas",
-        "operationId": "Agents_CreateAgentChatSession",
+        "operationId": "Agents_GenerateAgentChatToken",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsCreateAgentChatSessionResponse"
+              "$ref": "#/definitions/AgentsGenerateAgentChatTokenResponse"
             }
           },
           "default": {
@@ -89,7 +89,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AgentsCreateAgentChatSessionRequest"
+              "$ref": "#/definitions/AgentsGenerateAgentChatTokenRequest"
             }
           }
         ],
@@ -3944,7 +3944,7 @@
       ],
       "default": "ACTION_UNSPECIFIED"
     },
-    "AgentsCreateAgentChatSessionRequest": {
+    "AgentsGenerateAgentChatTokenRequest": {
       "type": "object",
       "properties": {
         "canvasId": {
@@ -3952,7 +3952,7 @@
         }
       }
     },
-    "AgentsCreateAgentChatSessionResponse": {
+    "AgentsGenerateAgentChatTokenResponse": {
       "type": "object",
       "properties": {
         "token": {

@@ -24,23 +24,23 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Agents {
-  rpc CreateAgentChatSession(CreateAgentChatSessionRequest) returns (CreateAgentChatSessionResponse) {
+  rpc GenerateAgentChatToken(GenerateAgentChatTokenRequest) returns (GenerateAgentChatTokenResponse) {
     option (google.api.http) = {
-      post: "/api/v1/agents/chat/sessions"
+      post: "/api/v1/agents/chat/tokens"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create an agent chat session";
+      summary: "Generates a new token for an agent chat";
       description: "Mints a short-lived scoped token for agent chat on a canvas";
       tags: "Agent";
     };
   }
 }
 
-message CreateAgentChatSessionRequest {
+message GenerateAgentChatTokenRequest {
   string canvas_id = 1;
 }
 
-message CreateAgentChatSessionResponse {
+message GenerateAgentChatTokenResponse {
   string token = 1;
 }
