@@ -5120,7 +5120,7 @@ export function WorkflowPageV2() {
 
   const handleImportYaml = useCallback(
     async (data: { nodes: unknown[]; edges: unknown[] }) => {
-      if (!canvas || !organizationId || !canvasId) return;
+      if (!canvas || !organizationId || !canvasId) throw new Error("Canvas data is not available");
       if (!canUpdateCanvas) throw new Error("You don't have permission to update this canvas");
       if (isTemplate) throw new Error("Template canvases are read-only");
       if (!activeCanvasVersionId && !isVersioningDisabled) throw new Error("Enable edit mode before saving changes");
