@@ -1,11 +1,18 @@
+import type { SuperplaneComponentsOutputChannel } from "@/api-client";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import Editor from "@monaco-editor/react";
 import JsonView from "@uiw/react-json-view";
-import { Copy, Check, Maximize2 } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { BuildingBlock } from "./index";
-import type { SuperplaneComponentsOutputChannel } from "@/api-client";
+import { PayloadDialog } from "./PayloadDialog";
+
+const jsonViewStyle = {
+  fontSize: "12px",
+  fontFamily: 'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+  backgroundColor: "#ffffff",
+  color: "#24292e",
+  padding: "8px",
+} as const;
 
 interface BuildingBlockPreviewProps {
   block: BuildingBlock;
@@ -14,29 +21,19 @@ interface BuildingBlockPreviewProps {
 
 export function BuildingBlockPreview({ block, children }: BuildingBlockPreviewProps) {
   const [isPayloadOpen, setIsPayloadOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const examplePayload = block.exampleOutput || block.exampleData;
   const hasPayload = examplePayload && Object.keys(examplePayload).length > 0;
-  const hasDescription = !!block.description;
   const payloadLabel = block.type === "trigger" ? "Example Data" : "Example Output";
 
   const outputChannels = (block.outputChannels || []).filter(
     (ch): ch is SuperplaneComponentsOutputChannel => "label" in ch || "description" in ch,
   );
 
-  const hasContent = hasDescription || outputChannels.length > 0 || hasPayload;
-  if (!hasContent) return <>{children}</>;
+  if (!block.description && outputChannels.length === 0 && !hasPayload) {
+    return <>{children}</>;
+  }
 
   const payloadString = hasPayload ? JSON.stringify(examplePayload, null, 2) : "";
-  const lineCount = payloadString.split("\n").length;
-  const lineHeight = 19;
-  const editorHeight = Math.min(Math.max(lineCount * lineHeight + 10, 100), 500);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(payloadString);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <>
@@ -81,14 +78,7 @@ export function BuildingBlockPreview({ block, children }: BuildingBlockPreviewPr
                 <div className="max-h-48 overflow-auto rounded">
                   <JsonView
                     value={examplePayload}
-                    style={{
-                      fontSize: "12px",
-                      fontFamily:
-                        'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-                      backgroundColor: "#ffffff",
-                      color: "#24292e",
-                      padding: "8px",
-                    }}
+                    style={jsonViewStyle}
                     className="json-viewer-hide-types"
                     displayObjectSize={false}
                     enableClipboard={false}
@@ -100,51 +90,13 @@ export function BuildingBlockPreview({ block, children }: BuildingBlockPreviewPr
         </HoverCardContent>
       </HoverCard>
 
-      <Dialog open={isPayloadOpen} onOpenChange={setIsPayloadOpen}>
-        <DialogContent
-          size="large"
-          className="w-[60vw] max-w-[60vw] h-auto max-h-[80vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle>{block.label || block.name}</DialogTitle>
-              <DialogDescription className="text-sm text-gray-500">{payloadLabel}</DialogDescription>
-            </div>
-            <button
-              onClick={handleCopy}
-              className="px-3 py-1 text-sm text-gray-800 bg-gray-50 hover:bg-gray-200 rounded flex items-center gap-1"
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? "Copied" : "Copy"}
-            </button>
-          </div>
-          <div className="flex-1 overflow-hidden border border-gray-200 dark:border-gray-700 rounded-md">
-            <Editor
-              height={`${editorHeight}px`}
-              defaultLanguage="json"
-              value={payloadString}
-              theme="vs"
-              options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                fontSize: 13,
-                lineNumbers: "on",
-                wordWrap: "on",
-                folding: true,
-                scrollBeyondLastLine: false,
-                renderWhitespace: "none",
-                contextmenu: true,
-                domReadOnly: true,
-                scrollbar: {
-                  vertical: "auto",
-                  horizontal: "auto",
-                },
-              }}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PayloadDialog
+        open={isPayloadOpen}
+        onOpenChange={setIsPayloadOpen}
+        title={block.label || block.name}
+        label={payloadLabel}
+        payloadString={payloadString}
+      />
     </>
   );
 }
