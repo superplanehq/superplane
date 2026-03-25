@@ -27,8 +27,7 @@ const (
 	ResourceTypeIssue    = "issue"
 	ResourceTypeAssignee = "assignee"
 
-	SentryPersonalTokensURL          = "https://sentry.io/settings/account/api/auth-tokens/"
-	SentryInternalIntegrationsDocURL = "https://docs.sentry.io/product/integrations/integration-platform/internal-integration/"
+	SentryPersonalTokensURL = "https://sentry.io/settings/account/api/auth-tokens/"
 )
 
 const (
@@ -39,6 +38,7 @@ const (
    > ` + "`Project -> Read`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
+   Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
 3. Name it ` + "`%s`" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
 4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
 `
@@ -153,6 +153,7 @@ func (s *Sentry) Instructions() string {
    > ` + "Project -> `Read`" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
+   Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
 3. Name it ` + "(e.g. `SuperPlane`)" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
 4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
 
