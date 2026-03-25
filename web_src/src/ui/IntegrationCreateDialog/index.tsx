@@ -42,7 +42,7 @@ export interface IntegrationCreateDialogProps {
   onReset?: () => void;
   defaultName?: string;
   integrationHomeHref?: string;
-  onCreated?: (integrationId: string) => void;
+  onCreated?: (integrationId: string, instanceName: string) => void;
   /** If set, instructions are truncated at this heading (e.g. "## Webhook integration") so only the part before is shown in the create step. */
   instructionsEndBeforeHeading?: string;
   /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
@@ -185,7 +185,7 @@ export function IntegrationCreateDialog({
       }
       handleClose();
       if (integration?.metadata?.id) {
-        onCreated?.(integration.metadata.id);
+        onCreated?.(integration.metadata.id, nextName);
       }
     } catch (error) {
       setCreateError(error);
@@ -212,11 +212,11 @@ export function IntegrationCreateDialog({
         configuration: { ...pendingWebhookSetup.config, ...configuration },
       });
       handleClose();
-      onCreated?.(pendingWebhookSetup.id);
+      onCreated?.(pendingWebhookSetup.id, integrationName);
     } catch {
       showErrorToast("Failed to complete setup");
     }
-  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated]);
+  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, integrationName]);
 
   const handleBrowserActionContinue = useCallback(async () => {
     if (!createIntegrationBrowserAction) return;
@@ -418,7 +418,7 @@ export function IntegrationCreateDialog({
                   try {
                     await updateIntegrationMutation.mutateAsync({ configuration: { ...configuration } });
                     await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
-                    if (createdIntegrationId) onCreated?.(createdIntegrationId);
+                    if (createdIntegrationId) onCreated?.(createdIntegrationId, integrationName);
                     handleClose();
                   } catch {
                     showErrorToast("Failed to sync integration");

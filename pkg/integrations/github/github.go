@@ -459,8 +459,8 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	redirectURL := fmt.Sprintf(
 		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
 	)
-	if metadata.ReturnPath != "" {
-		redirectURL = fmt.Sprintf("%s%s", ctx.BaseURL, metadata.ReturnPath)
+	if p := metadata.ReturnPath; len(p) > 1 && p[0] == '/' && p[1] != '/' {
+		redirectURL = fmt.Sprintf("%s%s", ctx.BaseURL, p)
 	}
 
 	http.Redirect(

@@ -2654,7 +2654,7 @@ export function WorkflowPageV2() {
   }, []);
 
   const handleIntegrationCreated = useCallback(
-    async (integrationId: string) => {
+    async (integrationId: string, instanceName: string) => {
       if (!canvas || !organizationId || !canvasId || !integrationDialogName) return;
 
       setJustConnectedIntegrations((prev) => new Set(prev).add(integrationDialogName));
@@ -2670,7 +2670,7 @@ export function WorkflowPageV2() {
 
       const integrationRef: ComponentsIntegrationRef = {
         id: integrationId,
-        name: integrationDialogName,
+        name: instanceName,
       };
 
       const updatedNodes = canvas.spec?.nodes?.map((node) => {
@@ -5686,7 +5686,7 @@ export function WorkflowPageV2() {
         }}
         onReset={() => createIntegrationMutation.reset()}
         defaultName={integrationDialogPendingInstance?.metadata?.name ?? integrationDialogDefinition?.name ?? ""}
-        onCreated={(integrationId) => void handleIntegrationCreated(integrationId)}
+        onCreated={(integrationId, instanceName) => void handleIntegrationCreated(integrationId, instanceName)}
         initialBrowserAction={integrationDialogPendingInstance?.status?.browserAction}
         initialCreatedIntegrationId={integrationDialogPendingInstance?.metadata?.id}
         initialWebhookSetup={initialWebhookSetup}
