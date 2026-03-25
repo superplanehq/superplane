@@ -1,8 +1,6 @@
 import os
-from dataclasses import dataclass
-
 import jwt
-
+from dataclasses import dataclass
 
 def _normalize_optional(value: str | None) -> str | None:
     if value is None:
@@ -10,13 +8,11 @@ def _normalize_optional(value: str | None) -> str | None:
     normalized = value.strip()
     return normalized or None
 
-
 @dataclass(frozen=True)
 class Permission:
     resource_type: str
     action: str
     resources: list[str]
-
 
 @dataclass(frozen=True)
 class JwtClaims:
@@ -24,7 +20,6 @@ class JwtClaims:
     org_id: str
     purpose: str
     permissions: list[Permission]
-
 
 class JwtValidator:
     def __init__(self, jwt_secret: str, audience: str = "superplane_api") -> None:
@@ -60,47 +55,55 @@ class JwtValidator:
         if not isinstance(payload, dict):
             raise ValueError("Invalid JWT payload.")
 
-        token_type = payload.get("token_type")
-        if token_type != "scoped":
+        if payload.get("token_type") != "scoped":
             raise ValueError("Invalid JWT type.")
 
         purpose = payload.get("purpose")
-        if not isinstance(purpose, str) or purpose.strip() != "agent_chat":
-            raise ValueError("Invalid JWT purpose.")
+        if not isinstance(purpose, str) or purpose.strip() != "agent-builder":
+            raise ValueError("purpose is required.")
 
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
-            raise ValueError("JWT subject is required.")
+            raise ValueError("subject is required.")
 
         org_id = payload.get("org_id")
         if not isinstance(org_id, str) or not org_id.strip():
-            raise ValueError("JWT org_id is required.")
+            raise ValueError("org_id is required.")
 
         permissions = payload.get("permissions")
         if not isinstance(permissions, list) or len(permissions) == 0:
             raise ValueError("JWT permissions are required.")
 
-        scoped_permissions: list[Permission] = []
-        for permission in permissions:
-            if not isinstance(permission, dict):
-                raise ValueError("Scoped token permissions are invalid.")
+        return JwtClaims(
+            subject=subject.strip(),
+            org_id=org_id.strip(),
+            purpose=purpose.strip(),
+            permissions=self._parse_permissions(permissions),
+        )
 
-            resource_type = permission.get("resourceType")
-            action = permission.get("action")
-            raw_resources = permission.get("resources")
+    def _parse_permissions(self, raw: list[object]) -> list[Permission]:
+        permissions: list[Permission] = []
+        for p in raw:
+            if not isinstance(p, dict):
+                raise ValueError("Permissions are invalid.")
 
+            resource_type = p.get("resourceType")
             if not isinstance(resource_type, str) or not resource_type.strip():
-                raise ValueError("Scoped token permission resourceType is required.")
+                raise ValueError("resourceType is required.")
+
+            action = p.get("action")
             if not isinstance(action, str) or not action.strip():
-                raise ValueError("Scoped token permission action is required.")
+                raise ValueError("action is required.")
+
+            raw_resources = p.get("resources")
             if raw_resources is None:
                 resources: list[str] = []
             elif isinstance(raw_resources, list) and all(isinstance(resource, str) for resource in raw_resources):
                 resources = raw_resources
             else:
-                raise ValueError("Scoped token permission resources are invalid.")
+                raise ValueError("Permission resources are invalid.")
 
-            scoped_permissions.append(
+            permissions.append(
                 Permission(
                     resource_type=resource_type,
                     action=action,
@@ -108,15 +111,10 @@ class JwtValidator:
                 )
             )
 
-        if not scoped_permissions:
-            raise ValueError("Scoped token permissions are required.")
+        if not permissions:
+            raise ValueError("Permissions are required.")
 
-        return JwtClaims(
-            subject=subject.strip(),
-            org_id=org_id.strip(),
-            purpose=purpose.strip(),
-            permissions=scoped_permissions,
-        )
+        return permissions
 
     def allowed_canvas_ids(self, claims: JwtClaims) -> list[str]:
         canvas_ids: list[str] = []

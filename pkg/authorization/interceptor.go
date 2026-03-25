@@ -153,8 +153,8 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 
 		// Agent rules
 		pbAgents.Agents_CreateAgentChatSession_FullMethodName: {
-			Resource:         "agents",
-			Action:           "create",
+			Resource:         "canvases",
+			Action:           "read",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

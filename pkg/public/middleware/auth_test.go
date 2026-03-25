@@ -84,7 +84,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 	t.Run("scoped token reaches next handler", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			OrgID:   r.Organization.ID.String(),
-			Purpose: "agent_chat",
+			Purpose: "agent-builder",
 			Permissions: []jwt.Permission{
 				{
 					ResourceType: "canvases",
@@ -109,7 +109,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 	t.Run("scoped token with wrong org returns unauthorized", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			OrgID:   uuid.NewString(),
-			Purpose: "agent_chat",
+			Purpose: "agent-builder",
 			Permissions: []jwt.Permission{
 				{
 					ResourceType: "canvases",
