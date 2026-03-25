@@ -26,6 +26,8 @@ const (
 	ResourceTypeTeam     = "team"
 	ResourceTypeIssue    = "issue"
 	ResourceTypeAssignee = "assignee"
+	ResourceTypeRelease  = "release"
+	ResourceTypeAlert    = "alert"
 
 	SentryPersonalTokensURL = "https://sentry.io/settings/account/api/auth-tokens/"
 )
@@ -199,6 +201,11 @@ func (s *Sentry) Configuration() []configuration.Field {
 
 func (s *Sentry) Components() []core.Component {
 	return []core.Component{
+		&GetIssue{},
+		&ListAlerts{},
+		&GetAlert{},
+		&CreateRelease{},
+		&CreateDeploy{},
 		&UpdateIssue{},
 	}
 }
@@ -633,6 +640,73 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 
 		return resources, nil
+
+	case ResourceTypeRelease:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		projectSlug := strings.TrimSpace(ctx.Parameters["project"])
+
+		releases, err := client.ListReleases()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list releases: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(releases))
+		for _, release := range releases {
+			if projectSlug != "" && !releaseContainsProject(release, projectSlug) {
+				continue
+			}
+
+			version := strings.TrimSpace(release.Version)
+			if version == "" {
+				continue
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeRelease,
+				ID:   version,
+				Name: version,
+			})
+		}
+
+		return resources, nil
+
+	case ResourceTypeAlert:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		projectSlug := strings.TrimSpace(ctx.Parameters["project"])
+
+		alertRules, err := client.ListAlertRules()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list alerts: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(alertRules))
+		for _, alertRule := range alertRules {
+			if projectSlug != "" && !alertRuleContainsProject(alertRule, projectSlug) {
+				continue
+			}
+
+			alertID := strings.TrimSpace(alertRule.ID)
+			alertName := strings.TrimSpace(alertRule.Name)
+			if alertID == "" || alertName == "" {
+				continue
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeAlert,
+				ID:   alertID,
+				Name: displayAlertRuleLabel(alertRule),
+			})
+		}
+
+		return resources, nil
 	}
 
 	return []core.IntegrationResource{}, nil
@@ -879,6 +953,49 @@ func displayIssueLabel(shortID, title string) string {
 	default:
 		return shortID
 	}
+}
+
+func isExpressionValue(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.Contains(value, "{{") || strings.Contains(value, "$[")
+}
+
+func releaseContainsProject(release Release, projectSlug string) bool {
+	projectSlug = strings.TrimSpace(projectSlug)
+	if projectSlug == "" {
+		return true
+	}
+
+	return slices.ContainsFunc(release.Projects, func(project ReleaseProject) bool {
+		return strings.TrimSpace(project.Slug) == projectSlug
+	})
+}
+
+func alertRuleContainsProject(alertRule MetricAlertRule, projectSlug string) bool {
+	projectSlug = strings.TrimSpace(projectSlug)
+	if projectSlug == "" {
+		return true
+	}
+
+	return slices.ContainsFunc(alertRule.Projects, func(project string) bool {
+		return strings.TrimSpace(project) == projectSlug
+	})
+}
+
+func displayAlertRuleLabel(alertRule MetricAlertRule) string {
+	name := strings.TrimSpace(alertRule.Name)
+	if name == "" {
+		return strings.TrimSpace(alertRule.ID)
+	}
+
+	if len(alertRule.Projects) == 1 {
+		project := strings.TrimSpace(alertRule.Projects[0])
+		if project != "" {
+			return fmt.Sprintf("%s · %s", name, project)
+		}
+	}
+
+	return name
 }
 
 func missingCredentialsMessage(config Configuration) string {

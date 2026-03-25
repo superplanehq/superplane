@@ -618,6 +618,78 @@ func Test__Sentry__ListResources(t *testing.T) {
 		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/members/", httpContext.Requests[1].URL.String())
 		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/teams/", httpContext.Requests[2].URL.String())
 	})
+
+	t.Run("lists releases for the selected project", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"version":"2026.03.25","projects":[{"slug":"backend","name":"Backend"}]},{"version":"2026.03.24","projects":[{"slug":"frontend","name":"Frontend"}]},{"version":"2026.03.23","projects":[{"slug":"backend","name":"Backend"},{"slug":"frontend","name":"Frontend"}]}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeRelease, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"project": "backend",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeRelease, ID: "2026.03.25", Name: "2026.03.25"},
+			{Type: ResourceTypeRelease, ID: "2026.03.23", Name: "2026.03.23"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/releases/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("lists alerts for the selected project", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"7","name":"High error rate","projects":["backend"]},{"id":"8","name":"Latency alert","projects":["frontend"]},{"id":"9","name":"Cross-project issue count","projects":["backend","frontend"]}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeAlert, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"project": "backend",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeAlert, ID: "7", Name: "High error rate · backend"},
+			{Type: ResourceTypeAlert, ID: "9", Name: "Cross-project issue count"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/alert-rules/", httpContext.Requests[0].URL.String())
+	})
 }
 
 func Test__Sentry__Configuration(t *testing.T) {

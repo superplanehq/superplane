@@ -108,14 +108,41 @@ type Issue struct {
 	ID            string         `json:"id" mapstructure:"id"`
 	ShortID       string         `json:"shortId" mapstructure:"shortId"`
 	Title         string         `json:"title" mapstructure:"title"`
+	Count         string         `json:"count" mapstructure:"count"`
 	Status        string         `json:"status" mapstructure:"status"`
 	Priority      string         `json:"priority" mapstructure:"priority"`
 	HasSeen       bool           `json:"hasSeen" mapstructure:"hasSeen"`
 	IsPublic      bool           `json:"isPublic" mapstructure:"isPublic"`
 	IsSubscribed  bool           `json:"isSubscribed" mapstructure:"isSubscribed"`
 	StatusDetails any            `json:"statusDetails" mapstructure:"statusDetails"`
+	NumComments   int            `json:"numComments" mapstructure:"numComments"`
+	UserCount     int            `json:"userCount" mapstructure:"userCount"`
+	Permalink     string         `json:"permalink" mapstructure:"permalink"`
+	WebURL        string         `json:"web_url" mapstructure:"web_url"`
+	Metadata      map[string]any `json:"metadata" mapstructure:"metadata"`
+	Tags          []IssueTag     `json:"tags" mapstructure:"tags"`
+	Stats         map[string]any `json:"stats" mapstructure:"stats"`
+	Events        []IssueEvent   `json:"events,omitempty" mapstructure:"events"`
 	AssignedTo    *IssueAssignee `json:"assignedTo" mapstructure:"assignedTo"`
 	Project       *IssueProject  `json:"project" mapstructure:"project"`
+}
+
+type IssueTag struct {
+	Key   string `json:"key" mapstructure:"key"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
+type IssueEvent struct {
+	ID          string         `json:"id" mapstructure:"id"`
+	EventID     string         `json:"eventID" mapstructure:"eventID"`
+	Title       string         `json:"title" mapstructure:"title"`
+	Message     string         `json:"message" mapstructure:"message"`
+	DateCreated string         `json:"dateCreated" mapstructure:"dateCreated"`
+	Platform    string         `json:"platform" mapstructure:"platform"`
+	Location    string         `json:"location" mapstructure:"location"`
+	Culprit     string         `json:"culprit" mapstructure:"culprit"`
+	Tags        []IssueTag     `json:"tags" mapstructure:"tags"`
+	User        map[string]any `json:"user" mapstructure:"user"`
 }
 
 type IssueAssignee struct {
@@ -177,6 +204,123 @@ type UpdateIssueRequest struct {
 	HasSeen      *bool  `json:"hasSeen,omitempty"`
 	IsPublic     *bool  `json:"isPublic,omitempty"`
 	IsSubscribed *bool  `json:"isSubscribed,omitempty"`
+}
+
+type Release struct {
+	ID           int              `json:"id" mapstructure:"id"`
+	Version      string           `json:"version" mapstructure:"version"`
+	ShortVersion string           `json:"shortVersion" mapstructure:"shortVersion"`
+	Ref          string           `json:"ref" mapstructure:"ref"`
+	URL          string           `json:"url" mapstructure:"url"`
+	DateCreated  string           `json:"dateCreated" mapstructure:"dateCreated"`
+	DateReleased string           `json:"dateReleased" mapstructure:"dateReleased"`
+	CommitCount  int              `json:"commitCount" mapstructure:"commitCount"`
+	DeployCount  int              `json:"deployCount" mapstructure:"deployCount"`
+	NewGroups    int              `json:"newGroups" mapstructure:"newGroups"`
+	Projects     []ReleaseProject `json:"projects" mapstructure:"projects"`
+	LastDeploy   *Deploy          `json:"lastDeploy,omitempty" mapstructure:"lastDeploy"`
+}
+
+type ReleaseProject struct {
+	Name string `json:"name" mapstructure:"name"`
+	Slug string `json:"slug" mapstructure:"slug"`
+}
+
+type ReleaseCommit struct {
+	ID          string `json:"id" mapstructure:"id"`
+	Repository  string `json:"repository,omitempty" mapstructure:"repository"`
+	Message     string `json:"message,omitempty" mapstructure:"message"`
+	AuthorName  string `json:"author_name,omitempty" mapstructure:"author_name"`
+	AuthorEmail string `json:"author_email,omitempty" mapstructure:"author_email"`
+	Timestamp   string `json:"timestamp,omitempty" mapstructure:"timestamp"`
+}
+
+type ReleaseRef struct {
+	Repository     string `json:"repository" mapstructure:"repository"`
+	Commit         string `json:"commit" mapstructure:"commit"`
+	PreviousCommit string `json:"previousCommit,omitempty" mapstructure:"previousCommit"`
+}
+
+type CreateReleaseRequest struct {
+	Version      string          `json:"version"`
+	Projects     []string        `json:"projects"`
+	Ref          string          `json:"ref,omitempty"`
+	URL          string          `json:"url,omitempty"`
+	DateReleased string          `json:"dateReleased,omitempty"`
+	Commits      []ReleaseCommit `json:"commits,omitempty"`
+	Refs         []ReleaseRef    `json:"refs,omitempty"`
+}
+
+type Deploy struct {
+	ID             string   `json:"id" mapstructure:"id"`
+	Environment    string   `json:"environment" mapstructure:"environment"`
+	Name           string   `json:"name" mapstructure:"name"`
+	URL            string   `json:"url" mapstructure:"url"`
+	DateStarted    string   `json:"dateStarted" mapstructure:"dateStarted"`
+	DateFinished   string   `json:"dateFinished" mapstructure:"dateFinished"`
+	ReleaseVersion string   `json:"releaseVersion,omitempty" mapstructure:"releaseVersion"`
+	Projects       []string `json:"projects,omitempty" mapstructure:"projects"`
+}
+
+type CreateDeployRequest struct {
+	Environment  string   `json:"environment"`
+	Name         string   `json:"name,omitempty"`
+	URL          string   `json:"url,omitempty"`
+	Projects     []string `json:"projects,omitempty"`
+	DateStarted  string   `json:"dateStarted,omitempty"`
+	DateFinished string   `json:"dateFinished,omitempty"`
+}
+
+type MetricAlertRule struct {
+	ID               string                    `json:"id" mapstructure:"id"`
+	Name             string                    `json:"name" mapstructure:"name"`
+	OrganizationID   string                    `json:"organizationId" mapstructure:"organizationId"`
+	QueryType        int                       `json:"queryType" mapstructure:"queryType"`
+	Dataset          string                    `json:"dataset" mapstructure:"dataset"`
+	Query            string                    `json:"query" mapstructure:"query"`
+	Aggregate        string                    `json:"aggregate" mapstructure:"aggregate"`
+	ThresholdType    int                       `json:"thresholdType" mapstructure:"thresholdType"`
+	ResolveThreshold any                       `json:"resolveThreshold" mapstructure:"resolveThreshold"`
+	TimeWindow       float64                   `json:"timeWindow" mapstructure:"timeWindow"`
+	Environment      any                       `json:"environment" mapstructure:"environment"`
+	Projects         []string                  `json:"projects" mapstructure:"projects"`
+	Owner            *string                   `json:"owner" mapstructure:"owner"`
+	OriginalRuleID   any                       `json:"originalAlertRuleId" mapstructure:"originalAlertRuleId"`
+	ComparisonDelta  any                       `json:"comparisonDelta" mapstructure:"comparisonDelta"`
+	DateModified     string                    `json:"dateModified" mapstructure:"dateModified"`
+	DateCreated      string                    `json:"dateCreated" mapstructure:"dateCreated"`
+	CreatedBy        *MetricAlertRuleCreatedBy `json:"createdBy" mapstructure:"createdBy"`
+	EventTypes       []string                  `json:"eventTypes" mapstructure:"eventTypes"`
+	Triggers         []MetricAlertTrigger      `json:"triggers" mapstructure:"triggers"`
+}
+
+type MetricAlertTrigger struct {
+	ID               string              `json:"id" mapstructure:"id"`
+	AlertRuleID      string              `json:"alertRuleId" mapstructure:"alertRuleId"`
+	Label            string              `json:"label" mapstructure:"label"`
+	ThresholdType    int                 `json:"thresholdType" mapstructure:"thresholdType"`
+	AlertThreshold   any                 `json:"alertThreshold" mapstructure:"alertThreshold"`
+	ResolveThreshold any                 `json:"resolveThreshold" mapstructure:"resolveThreshold"`
+	DateCreated      string              `json:"dateCreated" mapstructure:"dateCreated"`
+	Actions          []MetricAlertAction `json:"actions" mapstructure:"actions"`
+}
+
+type MetricAlertAction struct {
+	ID                 string  `json:"id" mapstructure:"id"`
+	AlertRuleTriggerID string  `json:"alertRuleTriggerId" mapstructure:"alertRuleTriggerId"`
+	Type               string  `json:"type" mapstructure:"type"`
+	TargetType         string  `json:"targetType" mapstructure:"targetType"`
+	TargetIdentifier   string  `json:"targetIdentifier" mapstructure:"targetIdentifier"`
+	InputChannelID     *string `json:"inputChannelId" mapstructure:"inputChannelId"`
+	IntegrationID      *string `json:"integrationId" mapstructure:"integrationId"`
+	SentryAppID        any     `json:"sentryAppId" mapstructure:"sentryAppId"`
+	DateCreated        string  `json:"dateCreated" mapstructure:"dateCreated"`
+}
+
+type MetricAlertRuleCreatedBy struct {
+	ID    any    `json:"id" mapstructure:"id"`
+	Name  string `json:"name" mapstructure:"name"`
+	Email string `json:"email" mapstructure:"email"`
 }
 
 func (c *Client) ListOrganizations() ([]Organization, error) {
@@ -402,6 +546,60 @@ func (c *Client) ListIssues() ([]Issue, error) {
 	return issues, nil
 }
 
+func (c *Client) ListReleases() ([]Release, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/releases/", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	releases := []Release{}
+	if err := json.Unmarshal(responseBody, &releases); err != nil {
+		return nil, err
+	}
+
+	return releases, nil
+}
+
+func (c *Client) ListAlertRules() ([]MetricAlertRule, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	alertRules := []MetricAlertRule{}
+	if err := json.Unmarshal(responseBody, &alertRules); err != nil {
+		return nil, err
+	}
+
+	return alertRules, nil
+}
+
+func (c *Client) GetAlertRule(alertRuleID string) (*MetricAlertRule, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/alert-rules/%s/", c.orgSlug, url.PathEscape(alertRuleID)),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	alertRule := MetricAlertRule{}
+	if err := json.Unmarshal(responseBody, &alertRule); err != nil {
+		return nil, err
+	}
+
+	return &alertRule, nil
+}
+
 func (c *Client) GetIssue(issueID string) (*Issue, error) {
 	responseBody, err := c.doJSON(
 		http.MethodGet,
@@ -418,6 +616,24 @@ func (c *Client) GetIssue(issueID string) (*Issue, error) {
 	}
 
 	return &issue, nil
+}
+
+func (c *Client) ListIssueEvents(issueID string) ([]IssueEvent, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/issues/%s/events/?limit=10", c.orgSlug, url.PathEscape(issueID)),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	events := []IssueEvent{}
+	if err := json.Unmarshal(responseBody, &events); err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {
@@ -459,6 +675,47 @@ func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (*Issue
 	}
 
 	return c.GetIssue(issueID)
+}
+
+func (c *Client) CreateRelease(request CreateReleaseRequest) (*Release, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPost,
+		fmt.Sprintf("/api/0/organizations/%s/releases/", c.orgSlug),
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	release := Release{}
+	if err := json.Unmarshal(responseBody, &release); err != nil {
+		return nil, err
+	}
+
+	return &release, nil
+}
+
+func (c *Client) CreateDeploy(version string, request CreateDeployRequest) (*Deploy, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPost,
+		fmt.Sprintf("/api/0/organizations/%s/releases/%s/deploys/", c.orgSlug, url.PathEscape(version)),
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	deploy := Deploy{}
+	if err := json.Unmarshal(responseBody, &deploy); err != nil {
+		return nil, err
+	}
+
+	deploy.ReleaseVersion = version
+	if len(request.Projects) > 0 {
+		deploy.Projects = append([]string(nil), request.Projects...)
+	}
+
+	return &deploy, nil
 }
 
 func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
