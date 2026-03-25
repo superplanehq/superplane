@@ -291,6 +291,7 @@ export interface CanvasPageProps {
   versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
+  hideAddControls?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -1109,22 +1110,24 @@ function CanvasPage(props: CanvasPageProps) {
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
-          <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen}
-            onToggle={handleSidebarToggle}
-            blocks={props.buildingBlocks || []}
-            showAiBuilderTab={props.showAiBuilderTab}
-            canvasId={props.canvasId}
-            organizationId={props.organizationId}
-            canvasNodes={canvasNodesForAiContext}
-            onApplyAiOperations={props.onApplyAiOperations}
-            integrations={props.integrations}
-            canvasZoom={canvasZoom}
-            disabled={readOnly}
-            disabledMessage="You don't have permission to edit this canvas."
-            onBlockClick={handleBuildingBlockClick}
-            onAddNote={handleAddNote}
-          />
+          {props.hideAddControls ? null : (
+            <BuildingBlocksSidebar
+              isOpen={isBuildingBlocksSidebarOpen}
+              onToggle={handleSidebarToggle}
+              blocks={props.buildingBlocks || []}
+              showAiBuilderTab={props.showAiBuilderTab}
+              canvasId={props.canvasId}
+              organizationId={props.organizationId}
+              canvasNodes={canvasNodesForAiContext}
+              onApplyAiOperations={props.onApplyAiOperations}
+              integrations={props.integrations}
+              canvasZoom={canvasZoom}
+              disabled={readOnly}
+              disabledMessage="You don't have permission to edit this canvas."
+              onBlockClick={handleBuildingBlockClick}
+              onAddNote={handleAddNote}
+            />
+          )}
 
           <div className={`flex-1 relative ${canvasStateBorderClass}`}>
             {showPreviewFloatingBar || showAwaitingFloatingBar ? (
