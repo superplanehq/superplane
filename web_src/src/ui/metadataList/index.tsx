@@ -11,6 +11,7 @@ export interface MetadataListProps {
   className?: string;
   iconSize?: number;
   underlined?: boolean;
+  /** When set, only the first N items are shown. When omitted, all items are shown. */
   maxVisibleItems?: number;
 }
 
@@ -19,13 +20,14 @@ export const MetadataList: React.FC<MetadataListProps> = ({
   className = "px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1",
   iconSize = 16,
   underlined = false,
-  maxVisibleItems = 3,
+  maxVisibleItems,
 }) => {
   if (!items || items.length === 0) {
     return null;
   }
 
-  const visibleItems = items.slice(0, maxVisibleItems);
+  const visibleItems =
+    maxVisibleItems != null && Number.isFinite(maxVisibleItems) ? items.slice(0, Math.max(0, maxVisibleItems)) : items;
 
   return (
     <div className={className}>

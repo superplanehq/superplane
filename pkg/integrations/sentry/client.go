@@ -405,7 +405,7 @@ func (c *Client) ListIssues() ([]Issue, error) {
 func (c *Client) GetIssue(issueID string) (*Issue, error) {
 	responseBody, err := c.doJSON(
 		http.MethodGet,
-		fmt.Sprintf("/api/0/organizations/%s/issues/%s/", c.orgSlug, issueID),
+		fmt.Sprintf("/api/0/organizations/%s/issues/%s/", c.orgSlug, url.PathEscape(issueID)),
 		nil,
 	)
 	if err != nil {
