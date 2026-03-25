@@ -32,6 +32,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listVPCs(ctx)
 	case "alert_policy":
 		return listAlertPolicies(ctx)
+	case "app":
+		return listApps(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -319,6 +321,34 @@ func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 			Type: "vpc",
 			Name: vpc.Name,
 			ID:   vpc.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listApps(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	apps, err := client.ListApps()
+	if err != nil {
+		return nil, fmt.Errorf("error listing apps: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(apps))
+	for _, app := range apps {
+		name := app.ID
+		if app.Spec != nil {
+			name = app.Spec.Name
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "app",
+			Name: name,
+			ID:   app.ID,
 		})
 	}
 
