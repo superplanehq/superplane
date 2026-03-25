@@ -412,7 +412,9 @@ export function IntegrationCreateDialog({
                 color="blue"
                 onClick={async () => {
                   try {
-                    await updateIntegrationMutation.mutateAsync({ configuration: { ...configuration } });
+                    await updateIntegrationMutation.mutateAsync({
+                      configuration: { ...configuration, installed: "true" },
+                    });
                     await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
                     if (createdIntegrationId) onCreated?.(createdIntegrationId, integrationName);
                     handleClose();
