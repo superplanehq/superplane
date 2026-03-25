@@ -12,12 +12,18 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+// spacesConfig uses the new format: credentials are on the integration,
+// bucket encodes the region as "region/bucket-name", objectKey is now filePath.
 var spacesConfig = map[string]any{
-	"region":          "fra1",
-	"bucket":          "my-space",
-	"objectKey":       "reports/daily.csv",
-	"spacesAccessKey": "test-access-key",
-	"spacesSecretKey": "test-secret-key",
+	"bucket":   "fra1/my-space",
+	"filePath": "reports/daily.csv",
+}
+
+var spacesIntegration = &contexts.IntegrationContext{
+	Configuration: map[string]any{
+		"spacesAccessKey": "test-access-key",
+		"spacesSecretKey": "test-secret-key",
+	},
 }
 
 var emptyTaggingResponse = `<Tagging><TagSet/></Tagging>`
@@ -33,75 +39,69 @@ var taggingResponse = `
 func Test__GetObject__Setup(t *testing.T) {
 	component := &GetObject{}
 
-	t.Run("missing region returns error", func(t *testing.T) {
+	t.Run("missing spaces access key returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"bucket":          "my-space",
-				"objectKey":       "reports/daily.csv",
-				"spacesAccessKey": "test-access-key",
-				"spacesSecretKey": "test-secret-key",
+			Configuration: spacesConfig,
+			Metadata:      &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{},
 			},
-			Metadata: &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, "region is required")
+		require.ErrorContains(t, err, "spaces access key is missing")
+	})
+
+	t.Run("missing spaces secret key returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: spacesConfig,
+			Metadata:      &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"spacesAccessKey": "test-access-key",
+				},
+			},
+		})
+		require.ErrorContains(t, err, "spaces secret key is missing")
 	})
 
 	t.Run("missing bucket returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":          "fra1",
-				"objectKey":       "reports/daily.csv",
-				"spacesAccessKey": "test-access-key",
-				"spacesSecretKey": "test-secret-key",
+				"filePath": "reports/daily.csv",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Integration: spacesIntegration,
 		})
 		require.ErrorContains(t, err, "bucket is required")
 	})
 
-	t.Run("missing objectKey returns error", func(t *testing.T) {
+	t.Run("invalid bucket format returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":          "fra1",
-				"bucket":          "my-space",
-				"spacesAccessKey": "test-access-key",
-				"spacesSecretKey": "test-secret-key",
+				"bucket":   "my-space",
+				"filePath": "reports/daily.csv",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Integration: spacesIntegration,
 		})
-		require.ErrorContains(t, err, "objectKey is required")
+		require.ErrorContains(t, err, "invalid bucket value")
 	})
 
-	t.Run("missing spacesAccessKey returns error", func(t *testing.T) {
+	t.Run("missing filePath returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"region":          "fra1",
-				"bucket":          "my-space",
-				"objectKey":       "reports/daily.csv",
-				"spacesSecretKey": "test-secret-key",
+				"bucket": "fra1/my-space",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Integration: spacesIntegration,
 		})
-		require.ErrorContains(t, err, "spacesAccessKey is required")
-	})
-
-	t.Run("missing spacesSecretKey returns error", func(t *testing.T) {
-		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{
-				"region":          "fra1",
-				"bucket":          "my-space",
-				"objectKey":       "reports/daily.csv",
-				"spacesAccessKey": "test-access-key",
-			},
-			Metadata: &contexts.MetadataContext{},
-		})
-		require.ErrorContains(t, err, "spacesSecretKey is required")
+		require.ErrorContains(t, err, "filePath is required")
 	})
 
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: spacesConfig,
 			Metadata:      &contexts.MetadataContext{},
+			Integration:   spacesIntegration,
 		})
 		require.NoError(t, err)
 	})
@@ -136,6 +136,7 @@ func Test__GetObject__Execute(t *testing.T) {
 			Configuration:  spacesConfig,
 			HTTP:           httpContext,
 			ExecutionState: executionState,
+			Integration:    spacesIntegration,
 		})
 
 		require.NoError(t, err)
@@ -149,9 +150,10 @@ func Test__GetObject__Execute(t *testing.T) {
 		payload, ok := wrapped["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "my-space", payload["bucket"])
-		assert.Equal(t, "reports/daily.csv", payload["key"])
+		assert.Equal(t, "reports/daily.csv", payload["filePath"])
+		assert.Equal(t, "https://my-space.fra1.digitaloceanspaces.com/reports/daily.csv", payload["endpoint"])
 		assert.Equal(t, "text/csv", payload["contentType"])
-		assert.Equal(t, int64(42300), payload["contentLength"])
+		assert.Equal(t, "41.31 KiB", payload["size"])
 		assert.Equal(t, "Wed, 25 Mar 2026 08:45:00 GMT", payload["lastModified"])
 		assert.Equal(t, "a1b2c3d4ef567890", payload["eTag"])
 		assert.Nil(t, payload["body"])
@@ -188,6 +190,7 @@ func Test__GetObject__Execute(t *testing.T) {
 			Configuration:  spacesConfig,
 			HTTP:           httpContext,
 			ExecutionState: executionState,
+			Integration:    spacesIntegration,
 		})
 
 		require.NoError(t, err)
@@ -228,15 +231,13 @@ func Test__GetObject__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"region":          "fra1",
-				"bucket":          "my-space",
-				"objectKey":       "hello.txt",
-				"includeBody":     true,
-				"spacesAccessKey": "test-access-key",
-				"spacesSecretKey": "test-secret-key",
+				"bucket":      "fra1/my-space",
+				"filePath":    "hello.txt",
+				"includeBody": true,
 			},
 			HTTP:           httpContext,
 			ExecutionState: executionState,
+			Integration:    spacesIntegration,
 		})
 
 		require.NoError(t, err)
@@ -248,7 +249,6 @@ func Test__GetObject__Execute(t *testing.T) {
 		payload, ok := wrapped["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "hello, world!", payload["body"])
-		assert.Nil(t, payload["bodyEncoding"])
 	})
 
 	t.Run("object not found -> emits not_found", func(t *testing.T) {
@@ -268,6 +268,7 @@ func Test__GetObject__Execute(t *testing.T) {
 			Configuration:  spacesConfig,
 			HTTP:           httpContext,
 			ExecutionState: executionState,
+			Integration:    spacesIntegration,
 		})
 
 		require.NoError(t, err)
@@ -280,7 +281,7 @@ func Test__GetObject__Execute(t *testing.T) {
 		payload, ok := wrapped["data"].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "my-space", payload["bucket"])
-		assert.Equal(t, "reports/daily.csv", payload["key"])
+		assert.Equal(t, "reports/daily.csv", payload["filePath"])
 	})
 
 	t.Run("API error on object fetch -> returns error", func(t *testing.T) {
@@ -300,6 +301,7 @@ func Test__GetObject__Execute(t *testing.T) {
 			Configuration:  spacesConfig,
 			HTTP:           httpContext,
 			ExecutionState: executionState,
+			Integration:    spacesIntegration,
 		})
 
 		require.Error(t, err)
@@ -334,6 +336,7 @@ func Test__GetObject__Execute(t *testing.T) {
 			Configuration:  spacesConfig,
 			HTTP:           httpContext,
 			ExecutionState: executionState,
+			Integration:    spacesIntegration,
 		})
 
 		require.Error(t, err)
