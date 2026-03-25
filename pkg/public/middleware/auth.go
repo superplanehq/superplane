@@ -25,6 +25,7 @@ const AccountContextKey contextKey = "account"
 const EffectiveAccountContextKey contextKey = "effective_account"
 const UserContextKey contextKey = "user"
 const ImpersonationContextKey contextKey = "impersonation"
+const ScopedTokenClaimsContextKey contextKey = "scopedTokenClaims"
 const OrganizationNotFoundError string = "organization_not_found_error"
 const AccountNotFoundError string = "account_not_found_error"
 
@@ -206,13 +207,16 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			// we expect a user API token.
 			//
 			if r.Header.Get("Authorization") != "" {
-				user, err := authenticateUserByToken(r)
+				user, scopedClaims, err := authenticateUserByToken(r, jwtSigner)
 				if err != nil {
 					http.Error(w, "Unauthorized", http.StatusUnauthorized)
 					return
 				}
 
 				ctx := context.WithValue(r.Context(), UserContextKey, user)
+				if scopedClaims != nil {
+					ctx = context.WithValue(ctx, ScopedTokenClaimsContextKey, scopedClaims)
+				}
 				r = r.WithContext(ctx)
 				next.ServeHTTP(w, r)
 				return
@@ -243,19 +247,58 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	}
 }
 
-func authenticateUserByToken(r *http.Request) (*models.User, error) {
+func authenticateUserByToken(r *http.Request, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
+	token, err := getBearerToken(r)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	//
+	// Try to authenticate the token as if it was a scoped-token first.
+	//
+	user, scopedClaims, err := authenticateUserByScopedToken(token, jwtSigner)
+	if err == nil {
+		return user, scopedClaims, nil
+	}
+
+	//
+	// If the token is not a scoped-token, try to authenticate it as if it was a API token.
+	//
+	hashedToken := crypto.HashToken(token)
+	user, err = models.FindActiveUserByTokenHash(hashedToken)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return user, nil, nil
+}
+
+func getBearerToken(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return nil, fmt.Errorf("authorization header not found")
+		return "", fmt.Errorf("authorization header not found")
 	}
 
 	headerParts := strings.Split(authHeader, "Bearer ")
 	if len(headerParts) != 2 {
-		return nil, fmt.Errorf("invalid authorization header")
+		return "", fmt.Errorf("invalid authorization header")
 	}
 
-	hashedToken := crypto.HashToken(headerParts[1])
-	return models.FindActiveUserByTokenHash(hashedToken)
+	return strings.TrimSpace(headerParts[1]), nil
+}
+
+func authenticateUserByScopedToken(token string, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
+	claims, err := jwtSigner.ValidateScopedToken(token)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	user, err := models.FindActiveUserByID(claims.OrgID, claims.Subject)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return user, claims, nil
 }
 
 func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, *ImpersonationInfo, error) {
@@ -470,6 +513,11 @@ func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 func GetImpersonationFromContext(ctx context.Context) (*ImpersonationInfo, bool) {
 	info, ok := ctx.Value(ImpersonationContextKey).(*ImpersonationInfo)
 	return info, ok
+}
+
+func GetScopedTokenClaimsFromContext(ctx context.Context) (*jwt.ScopedTokenClaims, bool) {
+	claims, ok := ctx.Value(ScopedTokenClaimsContextKey).(*jwt.ScopedTokenClaims)
+	return claims, ok
 }
 
 func redirectToLoginWithOriginalURL(w http.ResponseWriter, r *http.Request) {
