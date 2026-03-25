@@ -1484,7 +1484,7 @@ func (c *SpacesClient) GetObject(bucket, key string, includeBody bool) (*ObjectR
 		}
 	}
 
-	if includeBody {
+	if includeBody && isReadableContentType(result.ContentType) {
 		bodyBytes, err := io.ReadAll(res.Body)
 		if err != nil {
 			return nil, fmt.Errorf("error reading body: %v", err)
