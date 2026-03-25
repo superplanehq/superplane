@@ -667,7 +667,7 @@ Emits the list of recipients and the subject to the default output channel.
 
 ## SSH Command
 
-Run a single command on a remote host via SSH.
+Run one or more commands on a remote host via SSH.
 
 ### Authentication
 
@@ -679,7 +679,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ### Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
-- **Command**: The command to run (supports expressions).
+- **Commands**: One or more commands to run, one per line (supports expressions). The output payload is based on the last command.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
