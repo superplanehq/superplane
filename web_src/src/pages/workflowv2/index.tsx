@@ -100,6 +100,7 @@ import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
@@ -463,51 +464,7 @@ export function WorkflowPageV2() {
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
-  /** Keep "Saving…" visible at least this long for clearer UX (actual request may finish sooner). */
-  const MIN_HEADER_SAVING_DISPLAY_MS = 1000;
-  const canvasSaveStartedAtRef = useRef<number | null>(null);
-  const minSavingHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [holdSavingDisplay, setHoldSavingDisplay] = useState(false);
-
-  useEffect(() => {
-    if (updateCanvasVersionMutation.isPending) {
-      if (minSavingHoldTimerRef.current) {
-        clearTimeout(minSavingHoldTimerRef.current);
-        minSavingHoldTimerRef.current = null;
-      }
-      canvasSaveStartedAtRef.current = Date.now();
-      setHoldSavingDisplay(false);
-      return;
-    }
-
-    if (canvasSaveStartedAtRef.current === null) {
-      return;
-    }
-
-    const start = canvasSaveStartedAtRef.current;
-    const elapsed = Date.now() - start;
-    const remaining = Math.max(0, MIN_HEADER_SAVING_DISPLAY_MS - elapsed);
-
-    if (remaining === 0) {
-      canvasSaveStartedAtRef.current = null;
-      setHoldSavingDisplay(false);
-      return;
-    }
-
-    setHoldSavingDisplay(true);
-    minSavingHoldTimerRef.current = setTimeout(() => {
-      minSavingHoldTimerRef.current = null;
-      canvasSaveStartedAtRef.current = null;
-      setHoldSavingDisplay(false);
-    }, remaining);
-
-    return () => {
-      if (minSavingHoldTimerRef.current) {
-        clearTimeout(minSavingHoldTimerRef.current);
-        minSavingHoldTimerRef.current = null;
-      }
-    };
-  }, [updateCanvasVersionMutation.isPending]);
+  const holdSavingDisplay = useMinSavingDisplayHold(updateCanvasVersionMutation.isPending);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
