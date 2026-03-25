@@ -2562,11 +2562,29 @@ export function WorkflowPageV2() {
         };
       }
 
+      const resolvedConfiguration = (() => {
+        const configuration = (node.configuration || {}) as Record<string, unknown>;
+        if (node.type !== "TYPE_COMPONENT") {
+          return configuration;
+        }
+
+        // Backward compatibility: SSH used to use `command` (single-line). It is now `commands` (multi-line).
+        if (node.component?.name === "ssh") {
+          const commands = typeof configuration.commands === "string" ? configuration.commands : "";
+          const legacy = typeof configuration.command === "string" ? configuration.command : "";
+          if (commands.trim() === "" && legacy.trim() !== "") {
+            return { ...configuration, commands: legacy };
+          }
+        }
+
+        return configuration;
+      })();
+
       return {
         nodeId: node.id!,
         nodeName: node.name!,
         displayLabel,
-        configuration: node.configuration || {},
+        configuration: resolvedConfiguration,
         configurationFields,
         integrationName,
         blockName,
