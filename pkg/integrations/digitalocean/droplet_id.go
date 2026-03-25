@@ -52,4 +52,3 @@ func parseDropletID(raw string) (int, error) {
 
 	return int(f), nil
 }
-
