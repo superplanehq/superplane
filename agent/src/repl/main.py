@@ -285,7 +285,7 @@ def _create_agent_chat_session(
 ) -> str:
     request_body = json.dumps({"canvas_id": canvas_id}).encode("utf-8")
     request = Request(
-        url=f"{base_url.rstrip('/')}/api/v1/agents/chat/sessions",
+        url=f"{base_url.rstrip('/')}/api/v1/agents/chat/tokens",
         data=request_body,
         method="POST",
         headers={
