@@ -3,22 +3,14 @@ import { BookOpen, ExternalLink, KeyRound, Loader2 } from "lucide-react";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { CopyButton } from "./CopyButton";
+import { detectPlatform } from "@/utils/cli";
+import { CopyButton } from "@/ui/CopyButton";
 
 const CLI_COMMANDS = [
   { label: "Create a canvas from template", command: "superplane canvases create -f canvas.yaml" },
   { label: "List available components", command: "superplane index components" },
   { label: "List available triggers", command: "superplane index triggers" },
 ];
-
-function detectPlatform(): string {
-  const ua = navigator.userAgent.toLowerCase();
-  const isLinux = ua.includes("linux");
-  const isArm = ua.includes("arm") || ua.includes("aarch64");
-  const os = isLinux ? "linux" : "darwin";
-  const arch = isArm ? "arm64" : "amd64";
-  return `${os}-${arch}`;
-}
 
 export function CLIPanel({ organizationId }: { organizationId: string }) {
   const platform = detectPlatform();
@@ -54,7 +46,7 @@ export function CLIPanel({ organizationId }: { organizationId: string }) {
           <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">
             Install ({platform})
           </span>
-          <CopyButton text={installCommand} />
+          <CopyButton text={installCommand} dark />
         </div>
         <div className="text-green-400 break-all leading-relaxed">
           <span className="text-gray-500 select-none">$ </span>
@@ -73,7 +65,7 @@ export function CLIPanel({ organizationId }: { organizationId: string }) {
       <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">Connect</span>
-          {connectCommand && <CopyButton text={connectCommand} />}
+          {connectCommand && <CopyButton text={connectCommand} dark />}
         </div>
         {connectCommand ? (
           <div className="text-gray-300 break-all">
@@ -119,7 +111,7 @@ export function CLIPanel({ organizationId }: { organizationId: string }) {
                   <span className="text-gray-500 select-none">$ </span>
                   {cmd.command}
                 </div>
-                <CopyButton text={cmd.command} />
+                <CopyButton text={cmd.command} dark />
               </div>
             </div>
           ))}
@@ -129,7 +121,7 @@ export function CLIPanel({ organizationId }: { organizationId: string }) {
       <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
         <div className="flex items-center justify-between mb-3">
           <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">AI Skills</span>
-          <CopyButton text="npx skills add superplanehq/skills" />
+          <CopyButton text="npx skills add superplanehq/skills" dark />
         </div>
         <div className="text-[11px] font-sans text-gray-500 mb-1.5">
           Install skills for AI agents (Cursor, Claude Code, Codex, etc.)
