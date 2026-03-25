@@ -35,6 +35,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -248,6 +249,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbAgents.RegisterAgentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -274,6 +280,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
 	return nil
@@ -282,6 +289,8 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 func headersMatcher(key string) (string, bool) {
 	switch key {
 	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
+		return key, true
+	case "X-Token-Scopes":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
@@ -302,6 +311,23 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+
+		//
+		// Remove the scoped token scopes from the request header,
+		// to not allow them to be spoofed by the client.
+		//
+		r2.Header.Del("x-Token-Scopes")
+
+		scopedClaims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context())
+		if ok {
+			scopes, err := json.Marshal(scopedClaims.Scopes)
+			if err != nil {
+				http.Error(w, "Failed to encode scoped token scopes", http.StatusInternalServerError)
+				return
+			}
+			r2.Header.Set("x-Token-Scopes", string(scopes))
+		}
+
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }

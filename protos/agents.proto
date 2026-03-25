@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package Superplane.Agents;
+
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/agents";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "SuperPlane Agents API";
+    version: "1.0";
+    description: "API for SuperPlane agent sessions";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Agents {
+  rpc GenerateAgentChatToken(GenerateAgentChatTokenRequest) returns (GenerateAgentChatTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/chat/tokens"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Generates a new token for an agent chat";
+      description: "Mints a short-lived scoped token for agent chat on a canvas";
+      tags: "Agent";
+    };
+  }
+}
+
+message GenerateAgentChatTokenRequest {
+  string canvas_id = 1;
+}
+
+message GenerateAgentChatTokenResponse {
+  string token = 1;
+}
