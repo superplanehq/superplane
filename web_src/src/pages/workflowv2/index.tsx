@@ -5121,6 +5121,9 @@ export function WorkflowPageV2() {
   const handleImportYaml = useCallback(
     async (data: { nodes: unknown[]; edges: unknown[] }) => {
       if (!canvas || !organizationId || !canvasId) return;
+      if (!canUpdateCanvas) throw new Error("You don't have permission to update this canvas");
+      if (isTemplate) throw new Error("Template canvases are read-only");
+      if (!activeCanvasVersionId && !isVersioningDisabled) throw new Error("Enable edit mode before saving changes");
 
       const updatedWorkflow = {
         ...canvas,
@@ -5131,10 +5134,27 @@ export function WorkflowPageV2() {
         },
       };
 
+      await updateCanvasVersionMutation.mutateAsync({
+        versionId: activeCanvasVersionId || undefined,
+        name: updatedWorkflow.metadata?.name ?? "",
+        description: updatedWorkflow.metadata?.description,
+        nodes: updatedWorkflow.spec?.nodes,
+        edges: updatedWorkflow.spec?.edges,
+      });
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-      await handleSaveWorkflow(updatedWorkflow, { showToast: true });
+      showSuccessToast("Canvas changes saved");
     },
-    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow],
+    [
+      canvas,
+      organizationId,
+      canvasId,
+      canUpdateCanvas,
+      isTemplate,
+      activeCanvasVersionId,
+      isVersioningDisabled,
+      updateCanvasVersionMutation,
+      queryClient,
+    ],
   );
 
   const isInitialCanvasBootstrapLoading =
