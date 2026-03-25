@@ -55,6 +55,8 @@ export interface IntegrationCreateDialogProps {
   initialWebhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
   /** Existing configuration to pre-populate when resuming a pending integration flow. */
   initialConfiguration?: Record<string, unknown>;
+  /** If set, the backend will redirect to this path (relative to base URL) after completing an external setup flow (e.g. GitHub App installation). */
+  returnPath?: string;
 }
 
 export function IntegrationCreateDialog({
@@ -74,6 +76,7 @@ export function IntegrationCreateDialog({
   initialBrowserAction,
   initialWebhookSetup,
   initialConfiguration,
+  returnPath,
 }: IntegrationCreateDialogProps) {
   const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
@@ -158,7 +161,7 @@ export function IntegrationCreateDialog({
       const result = await onCreateIntegration({
         integrationName: integrationDefinition.name,
         name: nextName,
-        configuration,
+        configuration: returnPath ? { ...configuration, returnPath } : configuration,
       });
 
       const integration = result.integration;
@@ -198,6 +201,7 @@ export function IntegrationCreateDialog({
     onCreateIntegration,
     handleClose,
     onCreated,
+    returnPath,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
@@ -345,21 +349,23 @@ export function IntegrationCreateDialog({
                   />
                 ))}
             </>
-          ) : browserActionCompleted ? null : (
+          ) : (
             <>
-              <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                  Integration Name
-                  <span className="text-gray-800 ml-1">*</span>
-                </Label>
-                <Input
-                  type="text"
-                  value={integrationName}
-                  onChange={(e) => setIntegrationName(e.target.value)}
-                  placeholder="e.g., my-app-integration"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
-              </div>
+              {!browserActionCompleted && (
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    value={integrationName}
+                    onChange={(e) => setIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                </div>
+              )}
               {configurationFields.length > 0 && (
                 <div className="space-y-4">
                   {configurationFields.map((field: ConfigurationField) => {
@@ -406,45 +412,26 @@ export function IntegrationCreateDialog({
             </>
           ) : createIntegrationBrowserAction ? (
             <>
-              {browserActionCompleted ? (
-                <Button
-                  color="blue"
-                  onClick={async () => {
-                    await queryClient.invalidateQueries({
-                      queryKey: integrationKeys.connected(organizationId),
-                    });
-                    if (createdIntegrationId) {
-                      onCreated?.(createdIntegrationId);
-                    }
+              <LoadingButton
+                color="blue"
+                onClick={async () => {
+                  try {
+                    await updateIntegrationMutation.mutateAsync({ configuration: { ...configuration } });
+                    await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+                    if (createdIntegrationId) onCreated?.(createdIntegrationId);
                     handleClose();
-                  }}
-                >
-                  Done
-                </Button>
-              ) : (
-                <>
-                  <LoadingButton
-                    color="blue"
-                    onClick={async () => {
-                      try {
-                        await updateIntegrationMutation.mutateAsync({ configuration: { ...configuration } });
-                        await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
-                        if (createdIntegrationId) onCreated?.(createdIntegrationId);
-                        handleClose();
-                      } catch {
-                        showErrorToast("Failed to sync integration");
-                      }
-                    }}
-                    loading={updateIntegrationMutation.isPending}
-                    loadingText="Saving..."
-                  >
-                    Save
-                  </LoadingButton>
-                  <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
-                    Cancel
-                  </Button>
-                </>
-              )}
+                  } catch {
+                    showErrorToast("Failed to sync integration");
+                  }
+                }}
+                loading={updateIntegrationMutation.isPending}
+                loadingText="Saving..."
+              >
+                Save
+              </LoadingButton>
+              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
+                Cancel
+              </Button>
             </>
           ) : (
             <>

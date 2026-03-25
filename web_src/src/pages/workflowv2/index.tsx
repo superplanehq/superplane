@@ -5693,6 +5693,7 @@ export function WorkflowPageV2() {
         initialConfiguration={
           integrationDialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined
         }
+        returnPath={`/${organizationId}/canvases/${canvasId}`}
       />
     </>
   );
