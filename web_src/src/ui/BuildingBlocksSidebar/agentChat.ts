@@ -1,4 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
+import { agentsGenerateAgentChatToken } from "@/api-client";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AiCanvasOperation } from "./index";
 
 export type AiBuilderMessage = {
@@ -311,7 +313,7 @@ export async function sendAgentChatPrompt({
   focusInput,
 }: SendAgentChatPromptArgs): Promise<void> {
   const nextPrompt = (value ?? aiInput).trim();
-  if (!nextPrompt || isGeneratingResponse || !canvasId) {
+  if (!nextPrompt || isGeneratingResponse || !canvasId || !organizationId) {
     return;
   }
 
@@ -340,9 +342,9 @@ export async function sendAgentChatPrompt({
   });
   setAiError(null);
   setIsGeneratingResponse(true);
+  const assistantMessageId = `assistant-${Date.now()}`;
 
   try {
-    const assistantMessageId = `assistant-${Date.now()}`;
     setAiMessages((prev) =>
       pushAiMessages(prev, {
         id: assistantMessageId,
@@ -352,16 +354,30 @@ export async function sendAgentChatPrompt({
     );
     setPendingProposal(null);
 
+    const tokenResponse = await agentsGenerateAgentChatToken(
+      withOrganizationHeader({
+        organizationId,
+        body: {
+          canvasId,
+        },
+      }),
+    );
+
+    const tokenPayload = tokenResponse.data as { token?: unknown };
+    if (typeof tokenPayload.token !== "string" || tokenPayload.token.trim().length === 0) {
+      throw new Error("Invalid agent session response");
+    }
+
     const response = await fetch(`${agentUrl}/v1/agent/chat/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
+        Authorization: `Bearer ${tokenPayload.token}`,
       },
       body: JSON.stringify({
         question: contextualPrompt,
         canvas_id: canvasId,
-        org_id: organizationId || undefined,
       }),
     });
 
@@ -566,13 +582,32 @@ export async function sendAgentChatPrompt({
     }
   } catch (error) {
     setAiError(error instanceof Error ? error.message : GENERIC_FAILURE_MESSAGE);
-    setAiMessages((prev) =>
-      pushAiMessages(prev, {
+    setAiMessages((prev) => {
+      const existingIndex = prev.findIndex((message) => message.id === assistantMessageId);
+      if (existingIndex < 0) {
+        return pushAiMessages(prev, {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: GENERIC_FAILURE_MESSAGE,
+        });
+      }
+
+      const existingMessage = prev[existingIndex];
+      if (existingMessage.role === "assistant" && existingMessage.content.trim().length === 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...existingMessage,
+          content: GENERIC_FAILURE_MESSAGE,
+        };
+        return trimAiMessages(updated);
+      }
+
+      return pushAiMessages(prev, {
         id: `assistant-${Date.now()}`,
         role: "assistant",
         content: GENERIC_FAILURE_MESSAGE,
-      }),
-    );
+      });
+    });
   } finally {
     setIsGeneratingResponse(false);
   }

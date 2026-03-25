@@ -4,10 +4,13 @@ import { getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { GitBranch, Loader2, Puzzle } from "lucide-react";
+import { ArrowLeft, Loader2, Puzzle } from "lucide-react";
 import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
 import {
   BlueprintsBlueprint,
@@ -83,6 +86,7 @@ import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { filterVisibleConfiguration } from "@/utils/components";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { Button } from "@/components/ui/button";
 import {
   getComponentAdditionalDataBuilder,
@@ -131,8 +135,10 @@ import {
 import { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
+import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
+import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
-import { CanvasChangeRequestsView } from "./CanvasChangeRequestsView";
+import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
 
@@ -192,6 +198,56 @@ function versionSortValue(raw?: string): number {
 
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+type ChangeRequestVersionRow = {
+  version: CanvasesCanvasVersion;
+  changeRequest: CanvasesCanvasChangeRequest;
+};
+
+function buildChangeRequestVersionRows(
+  canvasChangeRequests: CanvasesCanvasChangeRequest[],
+  visibleCanvasVersions: CanvasesCanvasVersion[],
+  statusFilter: string,
+): ChangeRequestVersionRow[] {
+  const matchingChangeRequests = canvasChangeRequests
+    .filter((changeRequest) => (changeRequest.metadata?.status || "").toLowerCase().includes(statusFilter))
+    .sort(
+      (left, right) =>
+        versionSortValue(right.metadata?.updatedAt || right.metadata?.createdAt) -
+        versionSortValue(left.metadata?.updatedAt || left.metadata?.createdAt),
+    );
+
+  const indexedVisibleVersions = new Map<string, CanvasesCanvasVersion>();
+  visibleCanvasVersions.forEach((version) => {
+    const id = version.metadata?.id;
+    if (!id) {
+      return;
+    }
+    indexedVisibleVersions.set(id, version);
+  });
+
+  const seenVersionIds = new Set<string>();
+  const rows: ChangeRequestVersionRow[] = [];
+
+  matchingChangeRequests.forEach((changeRequest) => {
+    const versionFromRequest = changeRequest.version;
+    const versionId = versionFromRequest?.metadata?.id || changeRequest.metadata?.versionId || "";
+    const resolvedVersion =
+      versionFromRequest?.metadata?.id || versionFromRequest?.spec
+        ? versionFromRequest
+        : indexedVisibleVersions.get(versionId);
+
+    const resolvedVersionId = resolvedVersion?.metadata?.id || versionId;
+    if (!resolvedVersion || !resolvedVersionId || seenVersionIds.has(resolvedVersionId)) {
+      return;
+    }
+
+    seenVersionIds.add(resolvedVersionId);
+    rows.push({ version: resolvedVersion, changeRequest });
+  });
+
+  return rows;
 }
 
 function resolveApiErrorMessage(error: unknown, fallback: string): string {
@@ -334,6 +390,56 @@ function getNodeIntegrationName(
   return undefined;
 }
 
+function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
+  const map = new Map<string, { state?: string; description?: string }>();
+  for (const integration of integrations) {
+    if (integration.metadata?.id && integration.status?.state !== "ready") {
+      map.set(integration.metadata.id, {
+        state: integration.status?.state,
+        description: integration.status?.stateDescription,
+      });
+    }
+  }
+  return map;
+}
+
+function overlayIntegrationWarnings(
+  nodes: CanvasNode[],
+  integrations: OrganizationsIntegration[],
+  canvasNodes: ComponentsNode[] | undefined,
+): CanvasNode[] {
+  if (!integrations.length || !canvasNodes) return nodes;
+
+  const nonReadyIntegrations = buildNonReadyIntegrationMap(integrations);
+  if (nonReadyIntegrations.size === 0) return nodes;
+
+  const canvasNodeMap = new Map(canvasNodes.map((n) => [n.id, n]));
+  return nodes.map((canvasNode) => {
+    const sourceNode = canvasNodeMap.get(canvasNode.id);
+    const integrationId = sourceNode?.integration?.id;
+    if (!integrationId) return canvasNode;
+    const status = nonReadyIntegrations.get(integrationId);
+    if (!status) return canvasNode;
+
+    const data = canvasNode.data as Record<string, unknown>;
+    const warningMsg =
+      status.state === "error"
+        ? `Integration error${status.description ? `: ${status.description}` : ""}`
+        : `Integration is ${status.state ?? "not ready"}`;
+
+    const component = data.component as Record<string, unknown> | undefined;
+    const trigger = data.trigger as Record<string, unknown> | undefined;
+
+    if (component && !component.error) {
+      return { ...canvasNode, data: { ...data, component: { ...component, error: warningMsg } } };
+    }
+    if (trigger && !trigger.error) {
+      return { ...canvasNode, data: { ...data, trigger: { ...trigger, error: warningMsg } } };
+    }
+    return canvasNode;
+  });
+}
+
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
@@ -349,12 +455,11 @@ export function WorkflowPageV2() {
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
   const [selectedChangeRequestId, setSelectedChangeRequestId] = useState("");
+  const [resolvingConflictChangeRequestId, setResolvingConflictChangeRequestId] = useState("");
   const [isCreateChangeRequestMode, setIsCreateChangeRequestMode] = useState(false);
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
-  const [createChangeRequestDescriptionMode, setCreateChangeRequestDescriptionMode] = useState<"write" | "preview">(
-    "write",
-  );
+  const hasInitializedCreateChangeRequestFormRef = useRef(false);
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
@@ -516,6 +621,43 @@ export function WorkflowPageV2() {
     });
     return profilesByID;
   }, [organizationUsers]);
+  const pendingApprovalVersions = useMemo(
+    () => buildChangeRequestVersionRows(canvasChangeRequests, visibleCanvasVersions, "open"),
+    [canvasChangeRequests, visibleCanvasVersions],
+  );
+  const rejectedVersions = useMemo(
+    () => buildChangeRequestVersionRows(canvasChangeRequests, visibleCanvasVersions, "reject"),
+    [canvasChangeRequests, visibleCanvasVersions],
+  );
+  const pendingApprovalVersionIds = useMemo(() => {
+    const ids = new Set<string>();
+    pendingApprovalVersions.forEach((item) => {
+      const id = item.version.metadata?.id;
+      if (!id) {
+        return;
+      }
+      ids.add(id);
+    });
+    return ids;
+  }, [pendingApprovalVersions]);
+  const selectableVersionsById = useMemo(() => {
+    const indexedVersions = new Map<string, CanvasesCanvasVersion>();
+    visibleCanvasVersions.forEach((version) => {
+      const id = version.metadata?.id;
+      if (!id) {
+        return;
+      }
+      indexedVersions.set(id, version);
+    });
+    pendingApprovalVersions.forEach((item) => {
+      const id = item.version.metadata?.id;
+      if (!id || indexedVersions.has(id)) {
+        return;
+      }
+      indexedVersions.set(id, item.version);
+    });
+    return indexedVersions;
+  }, [visibleCanvasVersions, pendingApprovalVersions]);
   const draftVersions = useMemo(
     () =>
       visibleCanvasVersions
@@ -527,7 +669,6 @@ export function WorkflowPageV2() {
         ),
     [visibleCanvasVersions],
   );
-  const liveVersionsTotalCount = paginatedVersionPages[0]?.totalCount || liveVersions.length;
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
@@ -540,12 +681,19 @@ export function WorkflowPageV2() {
   );
   const selectedCanvasVersion = activeCanvasVersionId ? loadedCanvasVersion || activeCanvasVersion : null;
   const createChangeRequestVersion = useMemo(() => {
-    if (activeCanvasVersionId && selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished) {
+    const selectedVersionID = selectedCanvasVersion?.metadata?.id || "";
+    const isPendingApprovalVersion = pendingApprovalVersionIds.has(selectedVersionID);
+    if (
+      activeCanvasVersionId &&
+      selectedCanvasVersion &&
+      !selectedCanvasVersion.metadata?.isPublished &&
+      !isPendingApprovalVersion
+    ) {
       return selectedCanvasVersion;
     }
 
     return draftVersions[0];
-  }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions]);
+  }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions, pendingApprovalVersionIds]);
   const latestDraftVersion = draftVersions[0];
   const createChangeRequestNodeDiffSummary = useMemo(
     () => buildDraftNodeDiffSummary(liveCanvasVersion, createChangeRequestVersion),
@@ -563,7 +711,11 @@ export function WorkflowPageV2() {
     () => buildDraftNodeDiffSummary(liveCanvasVersion, latestDraftVersion),
     [liveCanvasVersion, latestDraftVersion],
   );
-  const isViewingDraftVersion = !!selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished;
+  const selectedCanvasVersionID = selectedCanvasVersion?.metadata?.id || "";
+  const isViewingPendingApprovalVersion =
+    !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
+  const isViewingDraftVersion =
+    !!selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished && !isViewingPendingApprovalVersion;
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
@@ -592,8 +744,7 @@ export function WorkflowPageV2() {
   const isVersioningDisabled = !(liveCanvas?.metadata?.versioningEnabled ?? false);
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
-    (!!activeCanvasVersionId && !selectedCanvasVersion?.metadata?.isPublished) ||
-    (isVersioningDisabled && !activeCanvasVersionId);
+    (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
   const {
     data: canvasMemoryEntries = [],
@@ -613,7 +764,7 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings" | "versioning">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -631,6 +782,23 @@ export function WorkflowPageV2() {
       return true;
     }
   });
+  /** After creating a change request, hide "Unpublished Changes" until the user enters edit mode again. */
+  const [suppressUnpublishedChangesBadge, setSuppressUnpublishedChangesBadge] = useState(false);
+  const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
+  const versionNodeDiffLiveChangeRequest = useMemo(() => {
+    const fallback = versionNodeDiffContext?.changeRequest;
+    const id = fallback?.metadata?.id;
+    if (!id) {
+      return fallback;
+    }
+    return canvasChangeRequests.find((c) => c.metadata?.id === id) ?? fallback;
+  }, [canvasChangeRequests, versionNodeDiffContext?.changeRequest]);
+  const resolvingConflictChangeRequest = useMemo(() => {
+    if (!resolvingConflictChangeRequestId) {
+      return undefined;
+    }
+    return canvasChangeRequests.find((c) => c.metadata?.id === resolvingConflictChangeRequestId);
+  }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
   // Warm up org users and roles cache so approval specs can pretty-print
@@ -701,7 +869,8 @@ export function WorkflowPageV2() {
     }
     return true;
   });
-  const canAutoSave = isAutoSaveEnabled && !isTemplate && hasEditableVersion;
+  // Draft editing always auto-saves when versioning is enabled.
+  const canAutoSave = !isTemplate && hasEditableVersion && (showVersioningUI || isAutoSaveEnabled);
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY);
@@ -718,28 +887,33 @@ export function WorkflowPageV2() {
 
   useEffect(() => {
     if (!isCreateChangeRequestMode) {
+      hasInitializedCreateChangeRequestFormRef.current = false;
       return;
     }
 
-    const canvasNameForTitle = canvas?.metadata?.name || "Canvas";
-    setCreateChangeRequestTitle(`Update ${canvasNameForTitle}`);
+    if (hasInitializedCreateChangeRequestFormRef.current) {
+      return;
+    }
+
+    hasInitializedCreateChangeRequestFormRef.current = true;
+    const nextVersionNumber = canvasChangeRequests.length + 1;
+    setCreateChangeRequestTitle(`v${nextVersionNumber}`);
     setCreateChangeRequestDescription("");
-    setCreateChangeRequestDescriptionMode("write");
-  }, [isCreateChangeRequestMode, canvas?.metadata?.name]);
+  }, [isCreateChangeRequestMode, canvasChangeRequests.length]);
 
   useEffect(() => {
     if (!isVersioningDisabled) {
       return;
     }
 
-    if (topViewMode === "versioning") {
-      setTopViewMode("canvas");
-    }
     if (isVersionControlOpen) {
       setIsVersionControlOpen(false);
     }
     if (selectedChangeRequestId) {
       setSelectedChangeRequestId("");
+    }
+    if (resolvingConflictChangeRequestId) {
+      setResolvingConflictChangeRequestId("");
     }
     if (isCreateChangeRequestMode) {
       setIsCreateChangeRequestMode(false);
@@ -756,9 +930,9 @@ export function WorkflowPageV2() {
     }
   }, [
     isVersioningDisabled,
-    topViewMode,
     isVersionControlOpen,
     selectedChangeRequestId,
+    resolvingConflictChangeRequestId,
     isCreateChangeRequestMode,
     activeCanvasVersionId,
     searchParams,
@@ -870,7 +1044,7 @@ export function WorkflowPageV2() {
     if (
       isVersioningDisabled ||
       hasSyncedVersionFromURLRef.current ||
-      !visibleCanvasVersions.length ||
+      selectableVersionsById.size === 0 ||
       activeCanvasVersionId
     ) {
       return;
@@ -886,7 +1060,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    const requestedVersion = visibleCanvasVersions.find((version) => version.metadata?.id === requestedVersionID);
+    const requestedVersion = selectableVersionsById.get(requestedVersionID);
     if (!requestedVersion) {
       hasSyncedVersionFromURLRef.current = true;
       return;
@@ -894,8 +1068,9 @@ export function WorkflowPageV2() {
 
     const isPublishedVersion = !!requestedVersion.metadata?.isPublished;
     const isOwnedDraft = !isPublishedVersion && isSameUserID(requestedVersion.metadata?.owner?.id, currentUserId);
+    const isPendingApprovalVersion = pendingApprovalVersionIds.has(requestedVersion.metadata?.id || "");
     const isCurrentLive = requestedVersion.metadata?.id === liveCanvasVersionId;
-    if (!isOwnedDraft && !isPublishedVersion) {
+    if (!isOwnedDraft && !isPublishedVersion && !isPendingApprovalVersion) {
       hasSyncedVersionFromURLRef.current = true;
       return;
     }
@@ -924,11 +1099,12 @@ export function WorkflowPageV2() {
     });
     hasSyncedVersionFromURLRef.current = true;
   }, [
-    visibleCanvasVersions,
+    selectableVersionsById,
     activeCanvasVersionId,
     selectedCanvasVersion?.metadata?.id,
     searchParams,
     currentUserId,
+    pendingApprovalVersionIds,
     liveCanvasVersionId,
     isVersioningDisabled,
     setSearchParams,
@@ -956,6 +1132,18 @@ export function WorkflowPageV2() {
       setSelectedChangeRequestId("");
     }
   }, [canvasChangeRequests, selectedChangeRequestId]);
+
+  useEffect(() => {
+    if (!resolvingConflictChangeRequestId) {
+      return;
+    }
+    const stillExists = canvasChangeRequests.some(
+      (changeRequest) => changeRequest.metadata?.id === resolvingConflictChangeRequestId,
+    );
+    if (!stillExists) {
+      setResolvingConflictChangeRequestId("");
+    }
+  }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
 
   useEffect(() => {
     if (!organizationId || !canvasId || !activeCanvasVersionId || !loadedCanvasVersion?.spec) {
@@ -1470,8 +1658,7 @@ export function WorkflowPageV2() {
     [triggers, components, blueprints, availableIntegrations],
   );
 
-  const { nodes, edges } = useMemo(() => {
-    // Don't prepare data until everything is loaded
+  const { nodes: preparedNodes, edges } = useMemo(() => {
     if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
       return { nodes: [], edges: [] };
     }
@@ -1508,6 +1695,13 @@ export function WorkflowPageV2() {
     organizationId,
     account,
   ]);
+
+  const nodesWithIntegrationStatus = useMemo(
+    () => overlayIntegrationWarnings(preparedNodes, integrations, canvas?.spec?.nodes),
+    [preparedNodes, integrations, canvas?.spec?.nodes],
+  );
+
+  const nodes = nodesWithIntegrationStatus;
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -2391,34 +2585,67 @@ export function WorkflowPageV2() {
     [availableIntegrations, integrationDialogName],
   );
 
+  const integrationDialogPendingInstance = useMemo(() => {
+    if (!integrationDialogName) return undefined;
+    return integrations.find((i) => i.spec?.integrationName === integrationDialogName && i.status?.state !== "ready");
+  }, [integrationDialogName, integrations]);
+
+  const initialWebhookSetup = useMemo(() => {
+    const webhookUrl = getIntegrationWebhookUrl(integrationDialogPendingInstance?.status?.metadata);
+    if (!webhookUrl || !integrationDialogPendingInstance?.metadata?.id) return undefined;
+    return {
+      id: integrationDialogPendingInstance.metadata.id,
+      webhookUrl,
+      config: { ...(integrationDialogPendingInstance.spec?.configuration ?? {}) },
+    };
+  }, [integrationDialogPendingInstance]);
+
   const missingIntegrations: MissingIntegration[] = useMemo(() => {
     if (!canvas?.spec?.nodes || !canReadIntegrations) return [];
 
-    const missingMap = new Map<string, { count: number; definition?: (typeof availableIntegrations)[0] }>();
+    const missingMap = new Map<
+      string,
+      {
+        count: number;
+        definition?: (typeof availableIntegrations)[0];
+        state?: "pending" | "error";
+        stateDescription?: string;
+      }
+    >();
 
     for (const node of canvas.spec.nodes) {
       const integrationName = getNodeIntegrationName(node, availableIntegrations);
       if (!integrationName) continue;
 
-      const hasConnectedInstance = integrations.some((i) => i.spec?.integrationName === integrationName);
-      if (hasConnectedInstance) continue;
+      const hasReadyInstance = integrations.some(
+        (i) => i.spec?.integrationName === integrationName && i.status?.state === "ready",
+      );
+      if (hasReadyInstance) continue;
 
       const existing = missingMap.get(integrationName);
       if (existing) {
         existing.count++;
       } else {
+        const nonReadyInstance = integrations.find(
+          (i) => i.spec?.integrationName === integrationName && i.status?.state !== "ready",
+        );
+        const rawState = nonReadyInstance?.status?.state;
         missingMap.set(integrationName, {
           count: 1,
           definition: availableIntegrations.find((d) => d.name === integrationName),
+          state: rawState === "error" ? "error" : rawState === "pending" ? "pending" : undefined,
+          stateDescription: nonReadyInstance?.status?.stateDescription,
         });
       }
     }
 
-    return Array.from(missingMap.entries()).map(([name, { count, definition }]) => ({
+    return Array.from(missingMap.entries()).map(([name, { count, definition, state, stateDescription }]) => ({
       integrationName: name,
       affectedNodeCount: count,
       definition,
-      justConnected: justConnectedIntegrations.has(name),
+      justConnected: !state && justConnectedIntegrations.has(name),
+      state,
+      stateDescription,
     }));
   }, [canvas?.spec?.nodes, availableIntegrations, integrations, canReadIntegrations, justConnectedIntegrations]);
 
@@ -4025,62 +4252,6 @@ export function WorkflowPageV2() {
     setSearchParams,
   ]);
 
-  const handleSubmitCreateChangeRequest = useCallback(
-    async ({ title, description }: { title: string; description: string }) => {
-      if (!organizationId || !canvasId) {
-        return;
-      }
-
-      if (isVersioningDisabled) {
-        showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
-        return;
-      }
-
-      const editVersionID = createChangeRequestVersion?.metadata?.id || "";
-
-      if (!editVersionID) {
-        showErrorToast("Enable edit mode before creating a change request");
-        return;
-      }
-
-      if (hasUnsavedChanges && editVersionID === activeCanvasVersionId) {
-        showErrorToast("Save your version before creating a change request");
-        return;
-      }
-
-      try {
-        const response = await createCanvasChangeRequestMutation.mutateAsync({
-          title,
-          description,
-        });
-        const changeRequest = response?.data?.changeRequest;
-        const changeRequestID = changeRequest?.metadata?.id;
-        if (changeRequestID) {
-          setSelectedChangeRequestId(changeRequestID);
-        }
-
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-        setIsCreateChangeRequestMode(false);
-        setTopViewMode("versioning");
-        showSuccessToast("Change request created");
-      } catch (error) {
-        showErrorToast(
-          getUsageLimitToastMessage(error, resolveApiErrorMessage(error, "Failed to create change request")),
-        );
-      }
-    },
-    [
-      organizationId,
-      canvasId,
-      isVersioningDisabled,
-      activeCanvasVersionId,
-      createChangeRequestVersion,
-      hasUnsavedChanges,
-      createCanvasChangeRequestMutation,
-      queryClient,
-    ],
-  );
-
   const handleActOnChangeRequest = useCallback(
     async ({
       changeRequestId,
@@ -4185,6 +4356,109 @@ export function WorkflowPageV2() {
     [handleActOnChangeRequest],
   );
 
+  const handleGoToVersioningToResolveConflicts = useCallback((changeRequestId: string) => {
+    setVersionNodeDiffContext(null);
+    setSelectedChangeRequestId(changeRequestId);
+    setResolvingConflictChangeRequestId(changeRequestId);
+    setIsVersionControlOpen(true);
+    setTopViewMode("canvas");
+  }, []);
+
+  const handlePreviewPreviousVersionViewDetails = useCallback(() => {
+    if (!selectedCanvasVersionID || !selectedCanvasVersion) {
+      return;
+    }
+    const index = liveVersions.findIndex((version) => version.metadata?.id === selectedCanvasVersionID);
+    if (index < 0) {
+      return;
+    }
+    const previousVersion = liveVersions[index + 1];
+    if (!previousVersion) {
+      return;
+    }
+    const changeRequest = liveVersionChangeRequestsByVersionId.get(selectedCanvasVersionID);
+    setVersionNodeDiffContext({
+      version: selectedCanvasVersion,
+      previousVersion,
+      changeRequest,
+    });
+  }, [selectedCanvasVersionID, selectedCanvasVersion, liveVersions, liveVersionChangeRequestsByVersionId]);
+
+  const handleOpenAwaitingApprovalNodeDiff = useCallback(() => {
+    if (!selectedCanvasVersionID) {
+      return;
+    }
+    const entry = pendingApprovalVersions.find((item) => item.version.metadata?.id === selectedCanvasVersionID);
+    const baseline = liveVersions[0];
+    if (!entry || !baseline) {
+      return;
+    }
+    setVersionNodeDiffContext({
+      version: entry.version,
+      previousVersion: baseline,
+      changeRequest: entry.changeRequest,
+    });
+  }, [selectedCanvasVersionID, pendingApprovalVersions, liveVersions]);
+
+  const awaitingApprovalBanner = useMemo(() => {
+    if (!isViewingPendingApprovalVersion || !selectedCanvasVersionID) {
+      return undefined;
+    }
+
+    const entry = pendingApprovalVersions.find((item) => item.version.metadata?.id === selectedCanvasVersionID);
+    const changeRequest = entry?.changeRequest;
+    const changeRequestId = changeRequest?.metadata?.id;
+    if (!changeRequestId) {
+      return undefined;
+    }
+
+    const phase = getChangeRequestReviewPhase(changeRequest, liveCanvas?.metadata?.changeRequestApprovalConfig);
+    const reviewUi =
+      phase.kind === "none"
+        ? {
+            label: "Awaiting Approval",
+            floatingBarBgClassName: "bg-orange-50",
+            dotClassName: "text-[11px] text-orange-500 shrink-0",
+            titleClassName: "font-medium text-orange-500 truncate",
+          }
+        : {
+            label: phase.label,
+            floatingBarBgClassName: phase.floatingBarBgClassName,
+            dotClassName: `${phase.floatingBarDotClassName} shrink-0`,
+            titleClassName: `truncate font-medium ${phase.floatingBarTitleClassName}`,
+          };
+
+    return {
+      title: changeRequest.metadata?.title?.trim() || "Change request",
+      description: changeRequest.metadata?.description?.trim(),
+      onApprove: () => handleApproveChangeRequest(changeRequestId),
+      onReject: () => handleRejectChangeRequest(changeRequestId),
+      onPublish: () => handlePublishChangeRequest(changeRequestId),
+      onOpenVersioningTab: () => {
+        setSelectedChangeRequestId(changeRequestId);
+        setIsVersionControlOpen(true);
+        setTopViewMode("canvas");
+      },
+      onViewNodeDiff: handleOpenAwaitingApprovalNodeDiff,
+      canAct: canUpdateCanvas && !isTemplate && !canvasDeletedRemotely,
+      actionPending: actOnCanvasChangeRequestMutation.isPending,
+      reviewUi,
+    };
+  }, [
+    isViewingPendingApprovalVersion,
+    selectedCanvasVersionID,
+    pendingApprovalVersions,
+    liveCanvas?.metadata?.changeRequestApprovalConfig,
+    handleApproveChangeRequest,
+    handleRejectChangeRequest,
+    handlePublishChangeRequest,
+    handleOpenAwaitingApprovalNodeDiff,
+    canUpdateCanvas,
+    isTemplate,
+    canvasDeletedRemotely,
+    actOnCanvasChangeRequestMutation.isPending,
+  ]);
+
   const handleResolveChangeRequest = useCallback(
     async (data: { changeRequestId: string; nodes: Record<string, unknown>[]; edges: Record<string, unknown>[] }) => {
       if (!organizationId || !canvasId || !canvas?.metadata?.name) {
@@ -4213,6 +4487,7 @@ export function WorkflowPageV2() {
 
         const resolvedChangeRequestID = response?.data?.changeRequest?.metadata?.id || data.changeRequestId;
         setSelectedChangeRequestId(resolvedChangeRequestID);
+        setResolvingConflictChangeRequestId("");
         showSuccessToast("Change request conflicts resolved");
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, resolveApiErrorMessage(error, "Failed to resolve")));
@@ -4234,7 +4509,7 @@ export function WorkflowPageV2() {
         return;
       }
 
-      const version = visibleCanvasVersions.find((item) => item.metadata?.id === versionID);
+      const version = selectableVersionsById.get(versionID);
       if (!version) {
         showErrorToast("Version not found");
         return;
@@ -4244,9 +4519,10 @@ export function WorkflowPageV2() {
 
       const isPublishedVersion = !!version.metadata?.isPublished;
       const isOwnedDraft = !isPublishedVersion && isSameUserID(version.metadata?.owner?.id, currentUserId);
+      const isPendingApprovalVersion = pendingApprovalVersionIds.has(version.metadata?.id || "");
       const isCurrentLive = version.metadata?.id === liveCanvasVersionId;
-      if (!isOwnedDraft && !isPublishedVersion) {
-        showErrorToast("You can only use your edit version or published live history");
+      if (!isOwnedDraft && !isPublishedVersion && !isPendingApprovalVersion) {
+        showErrorToast("You can only use your edit version, open change requests, or published live history");
         return;
       }
 
@@ -4334,8 +4610,9 @@ export function WorkflowPageV2() {
     [
       organizationId,
       canvasId,
-      visibleCanvasVersions,
+      selectableVersionsById,
       currentUserId,
+      pendingApprovalVersionIds,
       liveCanvasVersionId,
       liveCanvasVersion?.spec,
       liveCanvas?.spec,
@@ -4345,6 +4622,69 @@ export function WorkflowPageV2() {
       setSearchParams,
       canvasChangeRequests,
       initializeFromWorkflow,
+    ],
+  );
+
+  const handleSubmitCreateChangeRequest = useCallback(
+    async ({ title, description }: { title: string; description: string }) => {
+      if (!organizationId || !canvasId) {
+        return;
+      }
+
+      if (isVersioningDisabled) {
+        showErrorToast("Versioning is disabled. Enable canvas versioning in canvas settings.");
+        return;
+      }
+
+      const editVersionID = createChangeRequestVersion?.metadata?.id || "";
+
+      if (!editVersionID) {
+        showErrorToast("Enable edit mode before creating a change request");
+        return;
+      }
+
+      if (hasUnsavedChanges && editVersionID === activeCanvasVersionId) {
+        showErrorToast("Save your version before creating a change request");
+        return;
+      }
+
+      try {
+        const response = await createCanvasChangeRequestMutation.mutateAsync({
+          title,
+          description,
+        });
+        const changeRequest = response?.data?.changeRequest;
+        const changeRequestID = changeRequest?.metadata?.id || "";
+
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+        setIsCreateChangeRequestMode(false);
+        setTopViewMode("canvas");
+        if (liveCanvasVersionId) {
+          handleUseVersion(liveCanvasVersionId);
+        }
+        if (changeRequestID) {
+          setSelectedChangeRequestId(changeRequestID);
+        }
+        setIsVersionControlOpen(true);
+        setSuppressUnpublishedChangesBadge(true);
+        showSuccessToast("Change request created");
+      } catch (error) {
+        showErrorToast(
+          getUsageLimitToastMessage(error, resolveApiErrorMessage(error, "Failed to create change request")),
+        );
+      }
+    },
+    [
+      organizationId,
+      canvasId,
+      isVersioningDisabled,
+      activeCanvasVersionId,
+      createChangeRequestVersion,
+      hasUnsavedChanges,
+      createCanvasChangeRequestMutation,
+      queryClient,
+      liveCanvasVersionId,
+      handleUseVersion,
     ],
   );
 
@@ -4376,6 +4716,8 @@ export function WorkflowPageV2() {
       handleUseVersion(liveCanvasVersionId);
       return;
     }
+
+    setSuppressUnpublishedChangesBadge(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
     if (existingDraftVersionID) {
@@ -4748,19 +5090,6 @@ export function WorkflowPageV2() {
         .filter((item): item is { name: string; label: string } => !!item),
     [organizationRoles],
   );
-  const changeRequestRoleDisplayNamesByName = useMemo(() => {
-    const result = new Map<string, string>();
-    organizationRoles.forEach((role) => {
-      const name = role.metadata?.name || "";
-      if (!name) {
-        return;
-      }
-
-      result.set(name, role.spec?.displayName || name);
-    });
-
-    return result;
-  }, [organizationRoles]);
   const handleSaveCanvasSettings = useCallback(
     async (values: {
       name: string;
@@ -4788,6 +5117,63 @@ export function WorkflowPageV2() {
     nodes,
     getYamlExportPayload,
   });
+
+  const importYamlGuardError =
+    !canvas || !organizationId || !canvasId
+      ? "Canvas data is not available"
+      : !canUpdateCanvas
+        ? "You don't have permission to update this canvas"
+        : isTemplate
+          ? "Template canvases are read-only"
+          : !activeCanvasVersionId && !isVersioningDisabled
+            ? "Enable edit mode before saving changes"
+            : null;
+
+  const handleImportYaml = useCallback(
+    async (data: { nodes: unknown[]; edges: unknown[] }) => {
+      if (importYamlGuardError) throw new Error(importYamlGuardError);
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas!.spec,
+          nodes: data.nodes as ComponentsNode[],
+          edges: data.edges as ComponentsEdge[],
+        },
+      };
+
+      const savingVersionID = activeCanvasVersionId || undefined;
+      lastLocalCanvasSaveAtRef.current = Date.now();
+      const updateResponse = await updateCanvasVersionMutation.mutateAsync({
+        versionId: savingVersionID,
+        name: updatedWorkflow.metadata?.name ?? "",
+        description: updatedWorkflow.metadata?.description,
+        nodes: updatedWorkflow.spec?.nodes,
+        edges: updatedWorkflow.spec?.edges,
+      });
+      if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
+        setActiveCanvasVersion(updateResponse.data.version);
+      }
+      if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
+        return;
+      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+      setInitialWorkflowSnapshot(null);
+      lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
+      showSuccessToast("Canvas changes saved");
+    },
+    [
+      importYamlGuardError,
+      canvas,
+      activeCanvasVersionId,
+      updateCanvasVersionMutation,
+      organizationId,
+      canvasId,
+      queryClient,
+    ],
+  );
 
   const isInitialCanvasBootstrapLoading =
     !canvas &&
@@ -4870,15 +5256,75 @@ export function WorkflowPageV2() {
       </div>
     </div>
   ) : null;
+  const templateIntegrations = isTemplate ? extractIntegrations(canvas?.spec?.nodes) : [];
+  const templateTags = isTemplate ? getTemplateTags(canvas?.metadata?.name) : [];
+  const templateNodeCounts = isTemplate ? countNodesByType(canvas?.spec?.nodes) : { components: 0, triggers: 0 };
   const templateBanner = isTemplate ? (
-    <div className="bg-orange-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-900">Template preview</p>
-        <p className="text-[13px] text-black/60">Read-only template. Save your edits to a new canvas.</p>
+    <div className="bg-orange-50 border-b border-orange-200 px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 mb-1 truncate">{canvas?.metadata?.name || "Template"}</p>
+
+          {canvas?.metadata?.description ? (
+            <p className="text-[13px] text-gray-600 mb-2 max-w-2xl">{canvas.metadata.description}</p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {templateTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {templateTags.map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-[11px] px-1.5 py-0 text-gray-600 bg-white">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">Requires:</span>
+              {templateIntegrations.length > 0 ? (
+                <div className="flex items-center gap-2.5">
+                  {templateIntegrations.map((name) => {
+                    const iconSrc = getIntegrationIconSrc(name);
+                    if (!iconSrc) return null;
+                    return (
+                      <span key={name} className="inline-flex items-center gap-1">
+                        <span className="inline-block h-4 w-4 shrink-0">
+                          <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
+                        </span>
+                        <span className="text-xs text-gray-600 capitalize">{name}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-xs text-gray-500">No integrations needed</span>
+              )}
+            </div>
+
+            <span className="text-xs text-gray-500">
+              {templateNodeCounts.components > 0 &&
+                `${templateNodeCounts.components} ${templateNodeCounts.components === 1 ? "component" : "components"}`}
+              {templateNodeCounts.components > 0 && templateNodeCounts.triggers > 0 && " · "}
+              {templateNodeCounts.triggers > 0 &&
+                `${templateNodeCounts.triggers} ${templateNodeCounts.triggers === 1 ? "trigger" : "triggers"}`}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 shrink-0 self-start">
+          <Link
+            to={`/${organizationId}/templates`}
+            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            <span>Back to templates</span>
+          </Link>
+          <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
+            {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
+          </Button>
+        </div>
       </div>
-      <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
-        {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
-      </Button>
     </div>
   ) : null;
 
@@ -4954,25 +5400,25 @@ export function WorkflowPageV2() {
         : hasUnsavedChanges
           ? "Save your version before creating a change request."
           : undefined;
-  const versioningItemCount = canvasChangeRequests.filter((changeRequest) => {
-    const status = (changeRequest.metadata?.status || "").toLowerCase();
-    return status.includes("open");
-  }).length;
   const headerMode = isVersioningDisabled
     ? "versioning-disabled"
     : hasEditableVersion
       ? "version-edit"
       : "version-live";
   const headerSaveState = updateCanvasVersionMutation.isPending ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
-  const showPendingDraftBadge =
-    !isVersioningDisabled && !!latestDraftVersion && pendingDraftDiffSummary.items.length > 0;
+  const unpublishedDraftChangeCount =
+    !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
+      ? pendingDraftDiffSummary.items.length
+      : 0;
   const canvasStateMode = !showVersioningUI
     ? "default"
     : hasEditableVersion
       ? "editing"
-      : !isViewingCurrentLiveVersion
-        ? "previewing-previous-version"
-        : "default";
+      : isViewingPendingApprovalVersion
+        ? "awaiting-approval"
+        : !isViewingCurrentLiveVersion
+          ? "previewing-previous-version"
+          : "default";
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = !canUpdateCanvas
@@ -5010,6 +5456,8 @@ export function WorkflowPageV2() {
         filename={yamlPayload.filename}
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
+        onImport={!isReadOnly ? handleImportYaml : undefined}
+        isImporting={updateCanvasVersionMutation.isPending}
       />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
@@ -5033,47 +5481,11 @@ export function WorkflowPageV2() {
         availableRoles={canvasSettingsApproverRoles}
         onSave={handleSaveCanvasSettings}
       />
-    ) : topViewMode === "versioning" ? (
-      <CanvasChangeRequestsView
-        changeRequests={canvasChangeRequests}
-        canvasVersions={liveVersions}
-        selectedChangeRequestId={selectedChangeRequestId}
-        canUpdateCanvas={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
-        currentUserId={currentUserId}
-        actionPending={actOnCanvasChangeRequestMutation.isPending}
-        resolvePending={resolveCanvasChangeRequestMutation.isPending}
-        liveCanvasVersion={liveCanvasVersion}
-        changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
-        ownerProfilesByID={liveVersionOwnerProfilesById}
-        roleDisplayNamesByName={changeRequestRoleDisplayNamesByName}
-        canvasName={canvas?.metadata?.name || ""}
-        canvasDescription={canvas?.metadata?.description}
-        onSelectChangeRequest={setSelectedChangeRequestId}
-        onApprove={handleApproveChangeRequest}
-        onUnapprove={handleUnapproveChangeRequest}
-        onPublish={handlePublishChangeRequest}
-        onReject={handleRejectChangeRequest}
-        onReopen={handleReopenChangeRequest}
-        onResolve={handleResolveChangeRequest}
-      />
     ) : null;
 
   return (
     <>
       <div className="relative h-full w-full">
-        {showVersioningUI && !hasEditableVersion && topViewMode === "canvas" && !isVersionControlOpen ? (
-          <div className="absolute left-4 top-16 z-20">
-            <Button
-              variant="outline"
-              onClick={() => setIsVersionControlOpen(true)}
-              aria-label="Open versions"
-              data-testid="open-versions-button"
-            >
-              <GitBranch size={16} />
-              Versions
-            </Button>
-          </div>
-        ) : null}
         <CanvasPage
           key={canvasViewKey}
           // Persist right sidebar in query params
@@ -5095,17 +5507,25 @@ export function WorkflowPageV2() {
           }}
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
-          topViewMode={showVersioningUI || topViewMode !== "versioning" ? topViewMode : "canvas"}
+          topViewMode={topViewMode}
           canvasStateMode={canvasStateMode}
+          onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
+          awaitingApprovalBanner={awaitingApprovalBanner}
           onTopViewModeChange={(mode) => {
             setIsCreateChangeRequestMode(false);
             setTopViewMode(mode);
           }}
-          showVersioningTab={showVersioningUI}
           isVersionControlOpen={showVersioningUI ? isVersionControlOpen : false}
-          showBottomStatusControls={true}
+          onOpenVersionControl={
+            showVersioningUI && !hasEditableVersion && topViewMode === "canvas"
+              ? () => setIsVersionControlOpen(true)
+              : undefined
+          }
+          versionControlButtonTooltip="Open versions"
+          versionControlNotificationCount={pendingApprovalVersions.length}
+          showBottomStatusControls={!isTemplate}
+          hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
-          versioningItemCount={versioningItemCount}
           dataViewContent={dataViewContent}
           nodes={nodes}
           edges={edges}
@@ -5184,7 +5604,7 @@ export function WorkflowPageV2() {
           onExitEditMode={showVersioningUI ? handleToggleEditMode : undefined}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          showPendingDraftBadge={showPendingDraftBadge}
+          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}
@@ -5215,7 +5635,7 @@ export function WorkflowPageV2() {
           breadcrumbs={[
             {
               label: isTemplate ? "Templates" : "Canvases",
-              href: `/${organizationId}`,
+              href: isTemplate ? `/${organizationId}/templates` : `/${organizationId}`,
             },
             {
               label: canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
@@ -5228,22 +5648,58 @@ export function WorkflowPageV2() {
                 onToggle={setIsVersionControlOpen}
                 liveCanvasVersionId={liveCanvasVersionId}
                 selectedCanvasVersion={selectedCanvasVersion}
+                pendingApprovalVersions={pendingApprovalVersions}
                 liveVersions={liveVersions}
                 liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-                liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
-                liveVersionsTotalCount={liveVersionsTotalCount}
                 canUpdateCanvas={canUpdateCanvas}
                 isTemplate={isTemplate}
                 canvasDeletedRemotely={canvasDeletedRemotely}
                 onUseVersion={handleUseVersion}
+                onVersionNodeDiffContextChange={setVersionNodeDiffContext}
                 onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
                 loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
                 loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
+                changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
+                rejectedVersions={rejectedVersions}
               />
             ) : undefined
           }
         />
       </div>
+      {resolvingConflictChangeRequest ? (
+        <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
+          <CanvasChangeRequestConflictResolver
+            liveCanvasVersion={liveCanvasVersion}
+            changeRequest={resolvingConflictChangeRequest}
+            canvasName={canvas?.metadata?.name || ""}
+            canvasDescription={canvas?.metadata?.description}
+            isSubmitting={resolveCanvasChangeRequestMutation.isPending}
+            onBack={() => setResolvingConflictChangeRequestId("")}
+            onSubmit={handleResolveChangeRequest}
+          />
+        </div>
+      ) : null}
+      <CanvasVersionNodeDiffDialog
+        context={versionNodeDiffContext}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVersionNodeDiffContext(null);
+          }
+        }}
+        liveVersionOwnerProfilesById={liveVersionOwnerProfilesById}
+        changeRequestApprovalConfig={liveCanvas?.metadata?.changeRequestApprovalConfig}
+        canActOnChangeRequests={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
+        currentUserId={currentUserId}
+        changeRequestActionPending={actOnCanvasChangeRequestMutation.isPending}
+        onApproveChangeRequest={handleApproveChangeRequest}
+        onUnapproveChangeRequest={handleUnapproveChangeRequest}
+        onPublishChangeRequest={handlePublishChangeRequest}
+        onRejectChangeRequest={handleRejectChangeRequest}
+        onReopenChangeRequest={handleReopenChangeRequest}
+        liveChangeRequest={versionNodeDiffLiveChangeRequest}
+        resolvePending={resolveCanvasChangeRequestMutation.isPending}
+        onGoToVersioningToResolveConflicts={handleGoToVersioningToResolveConflicts}
+      />
       <CanvasPageModals
         organizationId={organizationId || ""}
         canvas={canvas}
@@ -5261,10 +5717,8 @@ export function WorkflowPageV2() {
         createChangeRequestVersion={createChangeRequestVersion}
         createChangeRequestTitle={createChangeRequestTitle}
         createChangeRequestDescription={createChangeRequestDescription}
-        createChangeRequestDescriptionMode={createChangeRequestDescriptionMode}
         onCreateChangeRequestTitleChange={setCreateChangeRequestTitle}
         onCreateChangeRequestDescriptionChange={setCreateChangeRequestDescription}
-        onCreateChangeRequestDescriptionModeChange={setCreateChangeRequestDescriptionMode}
         createChangeRequestNodeDiffSummary={createChangeRequestNodeDiffSummary}
         isCreateChangeRequestDraftOutdated={isCreateChangeRequestDraftOutdated}
         onSubmitCreateChangeRequest={() =>
@@ -5290,8 +5744,14 @@ export function WorkflowPageV2() {
           return res.data;
         }}
         onReset={() => createIntegrationMutation.reset()}
-        defaultName={integrationDialogDefinition?.name ?? ""}
+        defaultName={integrationDialogPendingInstance?.metadata?.name ?? integrationDialogDefinition?.name ?? ""}
         onCreated={(integrationId) => void handleIntegrationCreated(integrationId)}
+        initialBrowserAction={integrationDialogPendingInstance?.status?.browserAction}
+        initialCreatedIntegrationId={integrationDialogPendingInstance?.metadata?.id}
+        initialWebhookSetup={initialWebhookSetup}
+        initialConfiguration={
+          integrationDialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined
+        }
       />
     </>
   );

@@ -7,6 +7,7 @@ import (
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -122,7 +123,11 @@ func (steps *TestLoginPageSteps) LoginAndReturnToRedirectedURL() {
 	}
 
 	steps.session.Visit("/login?redirect=" + url.QueryEscape(redirectParam))
-	steps.session.Sleep(500)
+	// Authenticated /login triggers a client-side redirect via Login.tsx; wait instead of a fixed sleep (flaky on CI).
+	waitErr := steps.session.Page().WaitForURL("**"+steps.protectedURLPath+"**", pw.PageWaitForURLOptions{
+		Timeout: pw.Float(30000),
+	})
+	require.NoError(steps.t, waitErr)
 }
 
 func (steps *TestLoginPageSteps) SetInvalidAuthCookie() {

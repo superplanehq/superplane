@@ -8,8 +8,7 @@ from pydantic_evals import Case, Dataset
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-
-from evals.evaluators import WorkflowShape
+from evals.evaluators import NoDollarDataAsRoot, WorkflowShape
 from evals.report import ReportBuilder
 
 dataset = Dataset(
@@ -36,6 +35,20 @@ dataset = Dataset(
             ],
         ),
         Case(
+            name="github_issue_opened_to_discord",
+            inputs=(
+                "When a GitHub issue is opened, post a Discord message "
+                "that includes the issue title"
+            ),
+            evaluators=[
+                WorkflowShape(
+                    nodes=["github.onIssue", "discord.sendTextMessage"],
+                    edges=[("github.onIssue", "discord.sendTextMessage")],
+                ),
+                NoDollarDataAsRoot(),
+            ],
+        ),
+        Case(
             name="ephemeral_pr_preview_machines",
             inputs="Build a workflow that creates ephemeral preview machines for pull requests. On PR open, create infra and post the preview URL to the PR. On PR close or after 48 hours, tear it down.",
             evaluators=[
@@ -59,6 +72,31 @@ dataset = Dataset(
                       ("wait", "daytona.deleteSandbox"),
                       ("github.onPullRequest", "readMemory"),
                       ("readMemory", "daytona.deleteSandbox"),
+                  ],
+                )
+            ],
+        ),
+        Case(
+            name="agent_labeled_issue_auto_resolve",
+            inputs="Build a workflow that auto-resolves GitHub issues",
+            evaluators=[
+                WorkflowShape(
+                  nodes=[
+                      "github.onIssue",
+                      "filter",
+                      "github.createIssueComment",
+                      "daytona.executeCode",
+                      "github.updateIssue",
+                      "github.createIssueComment",
+                      "github.createIssueComment",
+                  ],
+                  edges=[
+                      ("github.onIssue", "filter"),
+                      ("filter", "github.createIssueComment"),
+                      ("github.createIssueComment", "daytona.executeCode"),
+                      ("daytona.executeCode", "github.updateIssue"),
+                      ("github.updateIssue", "github.createIssueComment"),
+                      ("daytona.executeCode", "github.createIssueComment"),
                   ],
                 )
             ],

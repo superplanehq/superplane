@@ -14,14 +14,10 @@ import (
 )
 
 func TestImportYaml(t *testing.T) {
-	// TODO: quarantined — the import-yaml-button lives in PageHeader which is
-	// hidden on empty orgs now that the onboarding page is shown instead.
-	t.Skip("quarantined: import YAML button not visible on empty-org onboarding page")
-
 	t.Run("importing a canvas from pasted YAML", func(t *testing.T) {
 		steps := &ImportYamlSteps{t: t}
 		steps.start()
-		steps.visitHomePage()
+		steps.visitCreateCanvasPage()
 		steps.openImportDialog()
 		steps.pasteYaml(validCanvasYaml("Imported Canvas"))
 		steps.submitImport()
@@ -31,7 +27,7 @@ func TestImportYaml(t *testing.T) {
 	t.Run("importing a canvas from a YAML file", func(t *testing.T) {
 		steps := &ImportYamlSteps{t: t}
 		steps.start()
-		steps.visitHomePage()
+		steps.visitCreateCanvasPage()
 		steps.openImportDialog()
 		steps.uploadYamlFile("test-canvas.yaml", validCanvasYaml("File Import Canvas"))
 		steps.submitImport()
@@ -41,7 +37,7 @@ func TestImportYaml(t *testing.T) {
 	t.Run("showing error for invalid YAML syntax", func(t *testing.T) {
 		steps := &ImportYamlSteps{t: t}
 		steps.start()
-		steps.visitHomePage()
+		steps.visitCreateCanvasPage()
 		steps.openImportDialog()
 		steps.pasteYaml("invalid: yaml: [unterminated")
 		steps.submitImport()
@@ -51,7 +47,7 @@ func TestImportYaml(t *testing.T) {
 	t.Run("showing error when metadata name is missing", func(t *testing.T) {
 		steps := &ImportYamlSteps{t: t}
 		steps.start()
-		steps.visitHomePage()
+		steps.visitCreateCanvasPage()
 		steps.openImportDialog()
 		steps.pasteYaml("apiVersion: v1\nkind: Canvas\nmetadata:\n  description: no name\nspec:\n  nodes: []\n  edges: []")
 		steps.submitImport()
@@ -74,8 +70,8 @@ func (s *ImportYamlSteps) start() {
 	s.session.Login()
 }
 
-func (s *ImportYamlSteps) visitHomePage() {
-	s.session.VisitHomePage()
+func (s *ImportYamlSteps) visitCreateCanvasPage() {
+	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
 	s.session.Sleep(500)
 }
 

@@ -35,6 +35,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -248,6 +249,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbAgents.RegisterAgentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -274,6 +280,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
 	return nil
@@ -282,6 +289,8 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 func headersMatcher(key string) (string, bool) {
 	switch key {
 	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
+		return key, true
+	case "X-Token-Scopes":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
@@ -302,6 +311,23 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+
+		//
+		// Remove the scoped token scopes from the request header,
+		// to not allow them to be spoofed by the client.
+		//
+		r2.Header.Del("x-Token-Scopes")
+
+		scopedClaims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context())
+		if ok {
+			scopes, err := json.Marshal(scopedClaims.Scopes)
+			if err != nil {
+				http.Error(w, "Failed to encode scoped token scopes", http.StatusInternalServerError)
+				return
+			}
+			r2.Header.Set("x-Token-Scopes", string(scopes))
+		}
+
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }
@@ -441,6 +467,20 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
+
+	// Admin API routes — requires account auth + installation admin
+	adminRoute := r.PathPrefix("/admin/api").Subrouter()
+	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.RequireInstallationAdmin())
+	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
+	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
+	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
+	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
+	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
+	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -740,15 +780,22 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+type AccountImpersonation struct {
+	Active   bool   `json:"active"`
+	UserName string `json:"user_name,omitempty"`
+}
+
 type AccountResponse struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	AvatarURL string `json:"avatar_url"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	AvatarURL         string                `json:"avatar_url"`
+	InstallationAdmin bool                  `json:"installation_admin"`
+	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -762,10 +809,18 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountResponse := AccountResponse{
-		ID:        account.ID.String(),
-		Name:      account.Name,
-		Email:     account.Email,
-		AvatarURL: getAvatarURL(providers),
+		ID:                account.ID.String(),
+		Name:              account.Name,
+		Email:             account.Email,
+		AvatarURL:         getAvatarURL(providers),
+		InstallationAdmin: account.IsInstallationAdmin(),
+	}
+
+	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
+		accountResponse.Impersonation = &AccountImpersonation{
+			Active:   true,
+			UserName: info.UserName,
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -773,7 +828,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return

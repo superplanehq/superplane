@@ -16,13 +16,15 @@ fi
 VERSION="$1"
 ARCH="$2"
 
-echo "Building SuperPlane image"
+IMAGE_REPO="${STANDARD_IMAGE_REPO:-ghcr.io/superplanehq/superplane}"
+
+echo "Building SuperPlane image (${IMAGE_REPO})"
 
 docker buildx build \
   --platform "linux/${ARCH}" \
   --progress=plain \
   --provenance=false \
   --push \
-  -t "ghcr.io/superplanehq/superplane:${VERSION}-${ARCH}" \
+  -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
   -f Dockerfile \
   .

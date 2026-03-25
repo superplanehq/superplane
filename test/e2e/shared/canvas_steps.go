@@ -29,10 +29,9 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 }
 
 func (s *CanvasSteps) Create() {
-	s.session.VisitHomePage()
-	s.session.Click(q.Text("New Canvas"))
+	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
 	s.session.FillIn(q.TestID("canvas-name-input"), s.CanvasName)
-	s.session.Click(q.Text("Create canvas"))
+	s.session.Click(q.TestID("create-canvas-button"))
 	s.session.Sleep(500)
 
 	wf, err := models.FindCanvasByName(s.CanvasName, s.session.OrgID)

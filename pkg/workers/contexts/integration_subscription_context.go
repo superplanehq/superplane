@@ -126,10 +126,18 @@ func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value str
 		return nil, err
 	}
 
+	canvasName := ""
+	if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(c.tx, execution.WorkflowID); err == nil && workflow != nil {
+		canvasName = workflow.Name
+	}
+
 	return &core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
+		OrganizationID: c.integration.OrganizationID.String(),
+		CanvasName:     canvasName,
 		NodeID:         execution.NodeID,
+		NodeName:       c.node.Name,
 		Configuration:  execution.Configuration.Data(),
 		HTTP:           c.registry.HTTPContext(),
 		Metadata:       NewExecutionMetadataContext(c.tx, execution),

@@ -3,15 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
-  BookOpen,
-  Check,
   ChevronRight,
   Clock,
-  Copy,
   Database,
-  ExternalLink,
   Globe,
-  KeyRound,
   LayoutTemplate,
   Loader2,
   Mail,
@@ -33,12 +28,13 @@ import {
   canvasesListCanvasEvents,
   canvasesListEventExecutions,
   canvasesUpdateCanvasVersion2,
-  meRegenerateToken,
 } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { showErrorToast } from "@/utils/toast";
 import { useAccount } from "@/contexts/AccountContext";
 import { useMe } from "@/hooks/useMe";
+import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
+import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
 
 const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
 
@@ -97,213 +93,6 @@ const FLOW_STEPS = [
   },
 ];
 
-const CLI_COMMANDS = [
-  { label: "Create a canvas from template", command: "superplane canvases create -f canvas.yaml" },
-  { label: "List available components", command: "superplane index components" },
-  { label: "List available triggers", command: "superplane index triggers" },
-];
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="p-1 rounded hover:bg-gray-700 transition-colors shrink-0"
-      title="Copy to clipboard"
-    >
-      {copied ? (
-        <Check size={14} className="text-green-400" />
-      ) : (
-        <Copy size={14} className="text-gray-400 hover:text-gray-200" />
-      )}
-    </button>
-  );
-}
-
-function detectPlatform(): string {
-  const ua = navigator.userAgent.toLowerCase();
-  const isLinux = ua.includes("linux");
-  const isArm = ua.includes("arm") || ua.includes("aarch64");
-  const os = isLinux ? "linux" : "darwin";
-  const arch = isArm ? "arm64" : "amd64";
-  return `${os}-${arch}`;
-}
-
-function CLIPanel({ organizationId }: { organizationId: string }) {
-  const platform = detectPlatform();
-  const installCommand = `curl -L https://install.superplane.com/superplane-cli-${platform} -o superplane && chmod +x superplane && sudo mv superplane /usr/local/bin/`;
-  const [connectCommand, setConnectCommand] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-
-  const handleGenerateConnect = async () => {
-    try {
-      setGenerating(true);
-      const response = await meRegenerateToken(withOrganizationHeader({ organizationId }));
-      const token = response.data?.token;
-      if (!token) {
-        showErrorToast("Failed to generate API token");
-        return;
-      }
-      const baseURL = window.location.origin;
-      const cmd = `superplane connect ${baseURL} ${token}`;
-      setConnectCommand(cmd);
-      await navigator.clipboard.writeText(cmd);
-      showSuccessToast("Connect command copied to clipboard");
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : "Failed to generate token");
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">
-            Install ({platform})
-          </span>
-          <CopyButton text={installCommand} />
-        </div>
-        <div className="text-green-400 break-all leading-relaxed">
-          <span className="text-gray-500 select-none">$ </span>
-          {installCommand}
-        </div>
-        <a
-          href="https://docs.superplane.com/installation/cli"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block mt-2 text-[11px] font-sans text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          Other platforms
-        </a>
-      </div>
-
-      <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">Connect</span>
-          {connectCommand && <CopyButton text={connectCommand} />}
-        </div>
-        {connectCommand ? (
-          <div className="text-gray-300 break-all">
-            <span className="text-gray-500 select-none">$ </span>
-            {connectCommand}
-          </div>
-        ) : (
-          <div>
-            <div className="text-[11px] font-sans text-gray-500 mb-2.5">
-              Generate a personal API token and get a ready-to-paste connect command.
-            </div>
-            <button
-              type="button"
-              onClick={handleGenerateConnect}
-              disabled={generating}
-              className="inline-flex items-center gap-1.5 font-sans text-[12px] font-medium text-gray-900 bg-gray-100 hover:bg-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
-            >
-              {generating ? <Loader2 size={12} className="animate-spin" /> : <KeyRound size={12} />}
-              {generating ? "Generating..." : "Generate connect command"}
-            </button>
-          </div>
-        )}
-        <div className="mt-2">
-          <a
-            href={`/${organizationId}/settings/profile`}
-            className="text-[11px] font-sans text-gray-500 hover:text-gray-300 transition-colors"
-          >
-            Manage your API token in Settings
-          </a>
-        </div>
-      </div>
-
-      <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
-        <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">
-          Quick reference
-        </span>
-        <div className="mt-3 space-y-3">
-          {CLI_COMMANDS.map((cmd) => (
-            <div key={cmd.command}>
-              <div className="text-[11px] font-sans text-gray-500 mb-0.5">{cmd.label}</div>
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-gray-300 truncate">
-                  <span className="text-gray-500 select-none">$ </span>
-                  {cmd.command}
-                </div>
-                <CopyButton text={cmd.command} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-[11px] font-sans font-medium text-gray-400 uppercase tracking-wider">AI Skills</span>
-          <CopyButton text="npx skills add superplanehq/skills" />
-        </div>
-        <div className="text-[11px] font-sans text-gray-500 mb-1.5">
-          Install skills for AI agents (Cursor, Claude Code, Codex, etc.)
-        </div>
-        <div className="text-gray-300">
-          <span className="text-gray-500 select-none">$ </span>
-          npx skills add superplanehq/skills
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4 mt-4">
-        <a
-          href="https://docs.superplane.com/installation/cli"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors"
-        >
-          <BookOpen size={13} />
-          CLI docs
-          <ExternalLink size={10} />
-        </a>
-        <a
-          href="https://docs.superplane.com/get-started/quickstart"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-[12px] text-gray-500 dark:text-gray-400 hover:text-primary transition-colors"
-        >
-          <BookOpen size={13} />
-          Quickstart guide
-          <ExternalLink size={10} />
-        </a>
-      </div>
-    </div>
-  );
-}
-
-function AgentPanel() {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="rounded-2xl bg-gradient-to-br from-violet-100 to-purple-50 dark:from-violet-900/30 dark:to-purple-900/20 p-4 mb-4">
-        <Sparkles size={28} className="text-violet-500 dark:text-violet-400" />
-      </div>
-      <Heading level={3} className="!text-lg mb-2">
-        AI-powered Canvas builder
-      </Heading>
-      <p className="text-[13px] text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed mb-3">
-        Describe what you want in plain English and let the agent build your Canvas. Connect triggers, configure
-        components, and wire everything up from a single prompt.
-      </p>
-      <Badge variant="secondary" className="text-xs">
-        Coming soon
-      </Badge>
-    </div>
-  );
-}
-
 interface OnboardingWelcomeProps {
   organizationId: string;
   canCreateCanvases: boolean;
@@ -319,6 +108,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
   const { data: templates = [] } = useCanvasTemplates(organizationId);
   const [mode, setMode] = useState<Mode>("ui");
   const [isLaunchingQuickStart, setIsLaunchingQuickStart] = useState(false);
+  const [isCreatingBlankCanvas, setIsCreatingBlankCanvas] = useState(false);
 
   const firstName = account?.name?.split(" ")[0] || "";
 
@@ -481,6 +271,33 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       showErrorToast(message);
     } finally {
       setIsLaunchingQuickStart(false);
+    }
+  };
+
+  const handleCreateBlankCanvas = async () => {
+    setIsCreatingBlankCanvas(true);
+    try {
+      const result = await canvasesCreateCanvas(
+        withOrganizationHeader({
+          body: {
+            canvas: {
+              metadata: { name: "Untitled Canvas", description: "" },
+              spec: { nodes: [], edges: [] },
+            },
+          },
+        }),
+      );
+
+      const canvasId = result.data?.canvas?.metadata?.id;
+      if (!canvasId) return;
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.lists() });
+      navigate(`/${organizationId}/canvases/${canvasId}`, { replace: true });
+    } catch (error) {
+      const message = (error as Error)?.message || "Failed to create canvas";
+      showErrorToast(message);
+    } finally {
+      setIsCreatingBlankCanvas(false);
     }
   };
 
@@ -651,17 +468,21 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                 <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
                   <button
                     type="button"
-                    disabled={!canCreateCanvases}
-                    onClick={() => navigate(`/${organizationId}/canvases/new`)}
+                    disabled={!canCreateCanvases || isCreatingBlankCanvas}
+                    onClick={handleCreateBlankCanvas}
                     className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-2">
-                        <Plus size={18} className="text-gray-600 dark:text-gray-300" />
+                        {isCreatingBlankCanvas ? (
+                          <Loader2 size={18} className="text-gray-600 dark:text-gray-300 animate-spin" />
+                        ) : (
+                          <Plus size={18} className="text-gray-600 dark:text-gray-300" />
+                        )}
                       </div>
                       <div>
                         <Heading level={3} className="!text-sm mb-1">
-                          New Canvas
+                          Blank Canvas
                         </Heading>
                         <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
                           Start from scratch. You know what you&rsquo;re doing.

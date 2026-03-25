@@ -15,6 +15,10 @@ export interface MissingIntegration {
   definition?: IntegrationsIntegrationDefinition;
   /** Whether this integration was just connected (for success animation) */
   justConnected?: boolean;
+  /** State of the existing integration instance, if one exists but isn't ready */
+  state?: "pending" | "error";
+  /** Description of the error state */
+  stateDescription?: string;
 }
 
 export interface IntegrationStatusIndicatorProps {
@@ -22,6 +26,31 @@ export interface IntegrationStatusIndicatorProps {
   onConnect: (integrationName: string) => void;
   readOnly?: boolean;
   canCreateIntegrations?: boolean;
+}
+
+function IntegrationStateBadge({ state, description }: { state: "pending" | "error"; description?: string }) {
+  const label = state === "error" ? "Error" : "Pending";
+  const colorClass =
+    state === "error"
+      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+
+  const badge = (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none ${description ? "cursor-help" : ""} ${colorClass}`}
+    >
+      {label}
+    </span>
+  );
+
+  if (!description) return badge;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent className="max-w-64 whitespace-normal">{description}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function IntegrationStatusIndicator({
@@ -101,7 +130,12 @@ export function IntegrationStatusIndicator({
                 className="h-5 w-5 flex-shrink-0"
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{displayName}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{displayName}</p>
+                  {integration.state && (
+                    <IntegrationStateBadge state={integration.state} description={integration.stateDescription} />
+                  )}
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {integration.affectedNodeCount} {integration.affectedNodeCount === 1 ? "node" : "nodes"}
                 </p>
@@ -119,7 +153,7 @@ export function IntegrationStatusIndicator({
                   onClick={() => handleConnect(integration.integrationName)}
                   disabled={readOnly || !canCreateIntegrations}
                 >
-                  Connect
+                  {integration.state ? "Configure" : "Connect"}
                 </Button>
               )}
             </div>
