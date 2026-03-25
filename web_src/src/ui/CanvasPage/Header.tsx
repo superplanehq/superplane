@@ -2,6 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Copy, Download, ChevronDown, LogOut, Palette, Plus, RotateCcw, Undo2, Pencil, Rocket } from "lucide-react";
+import { CliCommandsPopover } from "./CliCommandsPopover";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { Switch } from "../switch";
@@ -52,6 +53,7 @@ interface HeaderProps {
   autoSaveDisabledTooltip?: string;
   topViewMode?: "canvas" | "yaml" | "memory" | "settings";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  canvasId?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
@@ -91,6 +93,7 @@ export function Header({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
+  canvasId,
   onExportYamlCopy,
   onExportYamlDownload,
   memoryItemCount,
@@ -295,6 +298,7 @@ export function Header({
                 >
                   YAML
                 </button>
+                <CliCommandsPopover canvasId={canvasId} organizationId={organizationId} />
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("memory")}
