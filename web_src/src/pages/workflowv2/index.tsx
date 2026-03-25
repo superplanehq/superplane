@@ -873,9 +873,8 @@ export function WorkflowPageV2() {
     }
     return true;
   });
-  // Draft editing always auto-saves when versioning is enabled. Non-versioned canvases always auto-save (no toggle).
-  const canAutoSave =
-    !isTemplate && hasEditableVersion && (showVersioningUI || isVersioningDisabled || isAutoSaveEnabled);
+  // Non-versioned canvases always auto-save. When versioning is enabled, auto-save follows `isAutoSaveEnabled`.
+  const canAutoSave = !isTemplate && hasEditableVersion && (isVersioningDisabled || isAutoSaveEnabled);
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY);
