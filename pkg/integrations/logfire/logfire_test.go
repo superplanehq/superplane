@@ -87,6 +87,103 @@ func Test__Logfire__Sync__Success_FirstUsableProject(t *testing.T) {
 	assert.Contains(t, httpCtx.Requests[1].URL.Path, "/api/v1/projects/proj_123/read-tokens/")
 }
 
+func Test__Logfire__Sync__ReusesValidReadTokenSkipsBootstrap(t *testing.T) {
+	integration := &Logfire{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"columns":[],"rows":[]}`)),
+			},
+		},
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiKey": "lf_api_key_123",
+		},
+		Metadata: map[string]any{
+			"externalOrganizationId": "acme-org",
+			"externalProjectId":      "proj_123",
+			"supportsWebhookSetup":   true,
+		},
+		Secrets: map[string]core.IntegrationSecret{
+			readTokenSecretName: {Name: readTokenSecretName, Value: []byte("existing_read_token")},
+		},
+	}
+
+	err := integration.Sync(core.SyncContext{
+		Configuration: integrationCtx.Configuration,
+		HTTP:          httpCtx,
+		Integration:   integrationCtx,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "ready", integrationCtx.State)
+
+	require.Len(t, httpCtx.Requests, 1)
+	assert.Equal(t, "/v1/query", httpCtx.Requests[0].URL.Path)
+	assert.Equal(t, "Bearer existing_read_token", httpCtx.Requests[0].Header.Get("Authorization"))
+
+	secret := integrationCtx.Secrets[readTokenSecretName]
+	assert.Equal(t, "existing_read_token", string(secret.Value))
+
+	metadata, ok := integrationCtx.Metadata.(Metadata)
+	require.True(t, ok)
+	assert.Equal(t, "acme-org", metadata.ExternalOrganizationID)
+	assert.Equal(t, "proj_123", metadata.ExternalProjectID)
+	assert.True(t, metadata.SupportsWebhookSetup)
+}
+
+func Test__Logfire__Sync__InvalidStoredToken_FallsBackToBootstrap(t *testing.T) {
+	integration := &Logfire{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusUnauthorized,
+				Body:       io.NopCloser(strings.NewReader(`{"error":"unauthorized"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(
+					`[{"id":"proj_123","organization_name":"acme-org","project_name":"backend"}]`,
+				)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"token":"lf_read_token_new"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"columns":[],"rows":[]}`)),
+			},
+		},
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiKey": "lf_api_key_123",
+		},
+		Secrets: map[string]core.IntegrationSecret{
+			readTokenSecretName: {Name: readTokenSecretName, Value: []byte("expired_read_token")},
+		},
+	}
+
+	err := integration.Sync(core.SyncContext{
+		Configuration: integrationCtx.Configuration,
+		HTTP:          httpCtx,
+		Integration:   integrationCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 4)
+	assert.Equal(t, "/v1/query", httpCtx.Requests[0].URL.Path)
+
+	secret, ok := integrationCtx.Secrets[readTokenSecretName]
+	require.True(t, ok)
+	assert.Equal(t, "lf_read_token_new", string(secret.Value))
+}
+
 func Test__Logfire__Sync__Success_SecondProjectUsable(t *testing.T) {
 	integration := &Logfire{}
 	httpCtx := &contexts.HTTPContext{

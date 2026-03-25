@@ -99,13 +99,21 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	bootstrap, err := client.FindFirstUsableReadToken(defaultReadTokenName)
-	if err != nil {
-		return err
+	var bootstrap *IntegrationBootstrapResult
+	if err := client.ValidateCredentials(); err == nil {
+		// Stored read token still works; do not create another on every sync.
+		bootstrap = nil
+	} else {
+		bootstrap, err = client.FindFirstUsableReadToken(defaultReadTokenName)
+		if err != nil {
+			return err
+		}
 	}
 
-	if err := ctx.Integration.SetSecret(readTokenSecretName, []byte(bootstrap.ReadToken)); err != nil {
-		return fmt.Errorf("failed to store Logfire read token: %w", err)
+	if bootstrap != nil {
+		if err := ctx.Integration.SetSecret(readTokenSecretName, []byte(bootstrap.ReadToken)); err != nil {
+			return fmt.Errorf("failed to store Logfire read token: %w", err)
+		}
 	}
 
 	metadata := Metadata{
@@ -125,8 +133,10 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 			metadata.SupportsWebhookSetup = true
 		}
 	}
-	metadata.ExternalOrganizationID = bootstrap.Project.OrganizationName
-	metadata.ExternalProjectID = bootstrap.Project.ID
+	if bootstrap != nil {
+		metadata.ExternalOrganizationID = bootstrap.Project.OrganizationName
+		metadata.ExternalProjectID = bootstrap.Project.ID
+	}
 
 	ctx.Integration.SetMetadata(metadata)
 	ctx.Integration.Ready()
