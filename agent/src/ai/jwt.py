@@ -3,11 +3,7 @@ import jwt
 from dataclasses import dataclass
 
 
-def _normalize_optional(value: str | None) -> str | None:
-    if value is None:
-        return None
-    normalized = value.strip()
-    return normalized or None
+from ai.text import normalize_optional
 
 
 @dataclass(frozen=True)
@@ -24,7 +20,7 @@ class JwtValidator:
 
     @classmethod
     def from_env(cls) -> "JwtValidator":
-        jwt_secret = _normalize_optional(os.getenv("JWT_SECRET"))
+        jwt_secret = normalize_optional(os.getenv("JWT_SECRET"))
         if jwt_secret is None:
             raise ValueError("Missing required setting: JWT_SECRET")
         return cls(jwt_secret=jwt_secret)
@@ -113,12 +109,14 @@ class JwtValidator:
         requested_canvas_id: str | None,
         claims: JwtClaims,
     ) -> str:
-        canvas_id = _normalize_optional(requested_canvas_id)
+        canvas_id = normalize_optional(requested_canvas_id)
         if canvas_id is None:
             raise ValueError("Missing required request field: canvas_id")
 
         allowed_canvas_ids = self.allowed_canvas_ids(claims)
-        if allowed_canvas_ids and canvas_id not in allowed_canvas_ids:
+        if not allowed_canvas_ids:
+            raise ValueError("Scoped token does not allow canvases.")
+        if canvas_id not in allowed_canvas_ids:
             raise ValueError("Scoped token does not allow the requested canvas.")
 
         return canvas_id

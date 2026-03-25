@@ -29,6 +29,7 @@ from pydantic_ai.run import AgentRunResultEvent
 from ai.agent import AgentDeps, build_agent
 from ai.jwt import JwtValidator
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from ai.text import normalize_optional
 
 
 @dataclass(frozen=True)
@@ -48,13 +49,6 @@ class ReplStreamRequest(BaseModel):
     base_url: str | None = None
 
 
-def _normalize_optional(value: str | None) -> str | None:
-    if value is None:
-        return None
-    normalized = value.strip()
-    return normalized or None
-
-
 def _debug_enabled() -> bool:
     return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -70,14 +64,14 @@ def _debug_log(message: str, **fields: Any) -> None:
 
 
 def _resolve_required(value: str | None, env_name: str) -> str:
-    resolved = _normalize_optional(value) or _normalize_optional(os.getenv(env_name))
+    resolved = normalize_optional(value) or normalize_optional(os.getenv(env_name))
     if resolved is None:
         raise ValueError(f"Missing required setting: {env_name}")
     return resolved
 
 
 def _resolve_header(request: Request, header_name: str) -> str | None:
-    return _normalize_optional(request.headers.get(header_name))
+    return normalize_optional(request.headers.get(header_name))
 
 
 def _resolve_bearer_token(request: Request) -> str | None:
@@ -87,7 +81,7 @@ def _resolve_bearer_token(request: Request) -> str | None:
     prefix = "bearer "
     if not auth_header.lower().startswith(prefix):
         return None
-    return _normalize_optional(auth_header[len(prefix) :])
+    return normalize_optional(auth_header[len(prefix) :])
 
 
 def _resolve_required_bearer_token(request: Request) -> str:
@@ -362,7 +356,7 @@ def _create_app() -> FastAPI:
             "incoming stream request",
             model=payload.model,
             canvas_id=payload.canvas_id,
-            has_base_url=bool(_normalize_optional(payload.base_url) or _normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
+            has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
             has_token=bool(_resolve_bearer_token(request)),
         )
 
