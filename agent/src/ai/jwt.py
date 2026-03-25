@@ -2,24 +2,20 @@ import os
 import jwt
 from dataclasses import dataclass
 
+
 def _normalize_optional(value: str | None) -> str | None:
     if value is None:
         return None
     normalized = value.strip()
     return normalized or None
 
-@dataclass(frozen=True)
-class Permission:
-    resource_type: str
-    action: str
-    resources: list[str]
 
 @dataclass(frozen=True)
 class JwtClaims:
     subject: str
     org_id: str
     purpose: str
-    permissions: list[Permission]
+    scopes: list[str]
 
 class JwtValidator:
     def __init__(self, jwt_secret: str, audience: str = "superplane_api") -> None:
@@ -70,60 +66,45 @@ class JwtValidator:
         if not isinstance(org_id, str) or not org_id.strip():
             raise ValueError("org_id is required.")
 
-        permissions = payload.get("permissions")
-        if not isinstance(permissions, list) or len(permissions) == 0:
-            raise ValueError("JWT permissions are required.")
+        scopes = payload.get("scopes")
+        if not isinstance(scopes, list) or len(scopes) == 0:
+            raise ValueError("JWT scopes are required.")
 
         return JwtClaims(
             subject=subject.strip(),
             org_id=org_id.strip(),
             purpose=purpose.strip(),
-            permissions=self._parse_permissions(permissions),
+            scopes=self._parse_scopes(scopes),
         )
 
-    def _parse_permissions(self, raw: list[object]) -> list[Permission]:
-        permissions: list[Permission] = []
-        for p in raw:
-            if not isinstance(p, dict):
-                raise ValueError("Permissions are invalid.")
+    def _parse_scopes(self, raw: list[object]) -> list[str]:
+        scopes: list[str] = []
+        for scope in raw:
+            if not isinstance(scope, str):
+                raise ValueError("Scopes are invalid.")
+            normalized = scope.strip()
+            if not normalized:
+                continue
+            if normalized not in scopes:
+                scopes.append(normalized)
 
-            resource_type = p.get("resourceType")
-            if not isinstance(resource_type, str) or not resource_type.strip():
-                raise ValueError("resourceType is required.")
+        if not scopes:
+            raise ValueError("Scopes are required.")
 
-            action = p.get("action")
-            if not isinstance(action, str) or not action.strip():
-                raise ValueError("action is required.")
-
-            raw_resources = p.get("resources")
-            if raw_resources is None:
-                resources: list[str] = []
-            elif isinstance(raw_resources, list) and all(isinstance(resource, str) for resource in raw_resources):
-                resources = raw_resources
-            else:
-                raise ValueError("Permission resources are invalid.")
-
-            permissions.append(
-                Permission(
-                    resource_type=resource_type,
-                    action=action,
-                    resources=resources,
-                )
-            )
-
-        if not permissions:
-            raise ValueError("Permissions are required.")
-
-        return permissions
+        return scopes
 
     def allowed_canvas_ids(self, claims: JwtClaims) -> list[str]:
         canvas_ids: list[str] = []
-        for permission in claims.permissions:
-            if permission.resource_type != "canvases" or permission.action != "read":
+        for scope in claims.scopes:
+            parts = scope.split(":")
+            if len(parts) != 3:
                 continue
-            for resource in permission.resources:
-                if resource not in canvas_ids:
-                    canvas_ids.append(resource)
+            resource_type, action, resource_id = parts
+            if resource_type != "canvases" or action != "read":
+                continue
+            normalized_resource = resource_id.strip()
+            if normalized_resource and normalized_resource not in canvas_ids:
+                canvas_ids.append(normalized_resource)
 
         return canvas_ids
 

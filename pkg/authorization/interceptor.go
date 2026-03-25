@@ -412,8 +412,8 @@ func hasRequiredScopedTokenPermission(ctx context.Context, req any, rule Authori
 		return true
 	}
 
-	permissionsValue := firstMetadataValue(md, "x-scoped-token-permissions")
-	if permissionsValue == "" {
+	scopesValue := firstMetadataValue(md, "x-token-scopes")
+	if scopesValue == "" {
 		return true
 	}
 
@@ -452,17 +452,17 @@ func hasRequiredScopedTokenPermission(ctx context.Context, req any, rule Authori
 }
 
 func metadataScopedTokenPermissions(md metadata.MD) ([]jwt.Permission, error) {
-	value := firstMetadataValue(md, "x-scoped-token-permissions")
+	value := firstMetadataValue(md, "x-token-scopes")
 	if value == "" {
 		return nil, nil
 	}
 
-	var permissions []jwt.Permission
-	if err := json.Unmarshal([]byte(value), &permissions); err != nil {
+	var scopes []string
+	if err := json.Unmarshal([]byte(value), &scopes); err != nil {
 		return nil, err
 	}
 
-	return permissions, nil
+	return jwt.PermissionsFromScopes(scopes), nil
 }
 
 func firstMetadataValue(md metadata.MD, key string) string {

@@ -1,4 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
+import { agentsCreateAgentChatSession } from "@/api-client";
+import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AiCanvasOperation } from "./index";
 
 export type AiBuilderMessage = {
@@ -352,23 +354,16 @@ export async function sendAgentChatPrompt({
     );
     setPendingProposal(null);
 
-    const sessionResponse = await fetch("/api/v1/agents/chat/sessions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-organization-id": organizationId,
-      },
-      body: JSON.stringify({
-        canvas_id: canvasId,
+    const sessionResponse = await agentsCreateAgentChatSession(
+      withOrganizationHeader({
+        organizationId,
+        body: {
+          canvasId,
+        },
       }),
-    });
+    );
 
-    if (!sessionResponse.ok) {
-      const responseText = await sessionResponse.text();
-      throw new Error(responseText || `Request failed with status ${sessionResponse.status}`);
-    }
-
-    const sessionPayload = (await sessionResponse.json()) as { token?: unknown };
+    const sessionPayload = sessionResponse.data as { token?: unknown };
     if (typeof sessionPayload.token !== "string" || sessionPayload.token.trim().length === 0) {
       throw new Error("Invalid agent session response");
     }

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	gojwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -41,12 +40,10 @@ func CreateAgentChatSession(authService authorization.Authorization, jwtSigner *
 	}
 
 	claims := jwt.ScopedTokenClaims{
-		OrgID:       organizationID,
-		Purpose:     "agent-builder",
-		Permissions: permissions,
-		RegisteredClaims: gojwt.RegisteredClaims{
-			Subject: userID,
-		},
+		Subject: userID,
+		OrgID:   organizationID,
+		Purpose: "agent-builder",
+		Scopes:  jwt.ScopesFromPermissions(permissions),
 	}
 
 	token, err := jwtSigner.GenerateScopedToken(claims, 15*time.Minute)

@@ -11,12 +11,10 @@ def test_jwt_validator_decodes_agent_builder_token() -> None:
             "purpose": "agent-builder",
             "sub": "user-123",
             "org_id": "org-123",
-            "permissions": [
-                {
-                    "resourceType": "canvases",
-                    "action": "read",
-                    "resources": ["canvas-123"],
-                }
+            "scopes": [
+                "canvases:read:canvas-123",
+                "canvases:read:canvas-123",
+                "org:read",
             ],
         },
         "secret",
@@ -28,5 +26,4 @@ def test_jwt_validator_decodes_agent_builder_token() -> None:
     assert claims.subject == "user-123"
     assert claims.org_id == "org-123"
     assert claims.purpose == "agent-builder"
-    assert len(claims.permissions) == 1
-    assert claims.permissions[0].resources == ["canvas-123"]
+    assert claims.scopes == ["canvases:read:canvas-123", "org:read"]
