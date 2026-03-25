@@ -51,7 +51,7 @@ func parseDropletID(raw string) (int, error) {
 	// Do not convert before range-checking, otherwise we risk undefined behavior / overflow.
 	if strconv.IntSize == 64 {
 		// float64(maxInt64) rounds up to exactly 2^63, so treat 2^63 as the exclusive upper bound.
-		if f >= float64(int64(1)<<63) {
+		if f >= math.Exp2(63) {
 			return 0, fmt.Errorf("is too large")
 		}
 	} else {
