@@ -60,20 +60,10 @@ const getLayoutedElements = async (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges };
 };
 
-// Helper function to map component type to block type
-const getBlockType = (componentName: string): BlockData["type"] => {
-  const typeMap: Record<string, BlockData["type"]> = {
-    if: "component",
-    filter: "component",
-    approval: "component",
-    noop: "component",
-    http: "component",
-    semaphore: "component",
-    wait: "component",
-    timeGate: "component",
-    merge: "merge",
-  };
-  return typeMap[componentName] || "component"; // Default to noop for unknown components
+// In the builder, all components render as "component" type since there are
+// no executions or events to display with type-specific renderers.
+const getBlockType = (_componentName: string): BlockData["type"] => {
+  return "component";
 };
 
 // Helper function to create minimal BlockData for a component

@@ -21,18 +21,6 @@ export const mockNodes: Node[] = [
             values: parseExpression("config.environment == prod"),
           },
         ],
-        eventSections: [
-          {
-            title: "TRUE",
-            eventTitle: "No events received yet",
-            eventState: "neutral" as const,
-          },
-          {
-            title: "FALSE",
-            eventTitle: "No events received yet",
-            eventState: "neutral" as const,
-          },
-        ],
         collapsed: false,
       },
     },
@@ -70,13 +58,6 @@ export const mockNodes: Node[] = [
             ],
           },
         ],
-        eventSections: [
-          {
-            title: "Approval Status",
-            eventTitle: "Awaiting approvals",
-            eventState: "running",
-          },
-        ],
       },
     },
   },
@@ -99,13 +80,6 @@ export const mockNodes: Node[] = [
             values: parseExpression("service.enabled == true"),
           },
         ],
-        eventSections: [
-          {
-            title: "Last Event",
-            eventTitle: "No events received yet",
-            eventState: "neutral" as const,
-          },
-        ],
         collapsed: false,
       },
     },
@@ -123,13 +97,6 @@ export const mockNodes: Node[] = [
         title: "Skip Approval",
         iconSlug: "circle-off",
         collapsed: false,
-        eventSections: [
-          {
-            title: "Last Run",
-            eventTitle: "No events received yet",
-            eventState: "neutral" as const,
-          },
-        ],
       },
     },
   },
