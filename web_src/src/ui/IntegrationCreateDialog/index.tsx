@@ -15,8 +15,6 @@ import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLim
 import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -239,24 +237,10 @@ export function IntegrationCreateDialog({
       window.open(url, "_blank");
     }
 
-    // Trigger a resync so the backend transitions from pending to ready
     if (createdIntegrationId) {
-      try {
-        await organizationsUpdateIntegration(
-          withOrganizationHeader({
-            path: { id: organizationId, integrationId: createdIntegrationId },
-            body: { configuration: { ...configuration, installed: "true" } },
-          }),
-        );
-        await queryClient.invalidateQueries({
-          queryKey: integrationKeys.connected(organizationId),
-        });
-      } catch {
-        // Resync is best-effort; the integration will be resynced eventually
-      }
       setBrowserActionCompleted(true);
     }
-  }, [createIntegrationBrowserAction, createdIntegrationId, configuration, organizationId, queryClient]);
+  }, [createIntegrationBrowserAction, createdIntegrationId]);
 
   if (!integrationDefinition) return null;
 
@@ -425,7 +409,10 @@ export function IntegrationCreateDialog({
               {browserActionCompleted ? (
                 <Button
                   color="blue"
-                  onClick={() => {
+                  onClick={async () => {
+                    await queryClient.invalidateQueries({
+                      queryKey: integrationKeys.connected(organizationId),
+                    });
                     if (createdIntegrationId) {
                       onCreated?.(createdIntegrationId);
                     }

@@ -397,6 +397,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 			),
 			http.StatusSeeOther,
 		)
+		return
 	}
 
 	installationID := ctx.Request.URL.Query().Get("installation_id")
