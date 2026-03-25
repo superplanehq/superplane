@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	gojwt "github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,17 +82,10 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 	t.Run("scoped token reaches next handler", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject: r.User.String(),
 			OrgID:   r.Organization.ID.String(),
 			Purpose: "agent-builder",
-			Permissions: []jwt.Permission{
-				{
-					ResourceType: "canvases",
-					Action:       "read",
-				},
-			},
-			RegisteredClaims: gojwt.RegisteredClaims{
-				Subject: r.User.String(),
-			},
+			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
 
@@ -108,17 +100,10 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 	t.Run("scoped token with wrong org returns unauthorized", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject: r.User.String(),
 			OrgID:   uuid.NewString(),
 			Purpose: "agent-builder",
-			Permissions: []jwt.Permission{
-				{
-					ResourceType: "canvases",
-					Action:       "read",
-				},
-			},
-			RegisteredClaims: gojwt.RegisteredClaims{
-				Subject: r.User.String(),
-			},
+			Scopes:  []string{"canvases:read"},
 		}, time.Minute)
 		require.NoError(t, err)
 

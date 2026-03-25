@@ -4,11 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"google.golang.org/grpc/metadata"
 )
 
-const ScopedTokenPermissionsMetadataKey = "x-scoped-token-permissions"
+const TokenScopesMetadataKey = "x-token-scopes"
 
 func SetUserIdInMetadata(ctx context.Context, userId string) context.Context {
 	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", userId))
@@ -42,22 +41,22 @@ func GetOrganizationIdFromMetadata(ctx context.Context) (string, bool) {
 	return userMeta[0], true
 }
 
-func GetScopedTokenPermissionsFromMetadata(ctx context.Context) ([]jwt.Permission, bool) {
-	value, ok := getFirstMetadataValue(ctx, ScopedTokenPermissionsMetadataKey)
+func GetScopedTokenScopesFromMetadata(ctx context.Context) ([]string, bool) {
+	value, ok := getFirstMetadataValue(ctx, TokenScopesMetadataKey)
 	if !ok {
 		return nil, false
 	}
 
-	var permissions []jwt.Permission
-	if err := json.Unmarshal([]byte(value), &permissions); err != nil {
+	var scopes []string
+	if err := json.Unmarshal([]byte(value), &scopes); err != nil {
 		return nil, false
 	}
 
-	if len(permissions) == 0 {
+	if len(scopes) == 0 {
 		return nil, false
 	}
 
-	return permissions, true
+	return scopes, true
 }
 
 func getFirstMetadataValue(ctx context.Context, key string) (string, bool) {

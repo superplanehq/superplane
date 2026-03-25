@@ -290,7 +290,7 @@ func headersMatcher(key string) (string, bool) {
 	switch key {
 	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
 		return key, true
-	case "X-Scoped-Token-Permissions":
+	case "X-Token-Scopes":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
@@ -313,19 +313,19 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
 
 		//
-		// Remove the scoped token permissions from the request header,
+		// Remove the scoped token scopes from the request header,
 		// to not allow them to be spoofed by the client.
 		//
-		r2.Header.Del("x-Scoped-Token-Permissions")
+		r2.Header.Del("x-Token-Scopes")
 
 		scopedClaims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context())
 		if ok {
-			permissions, err := json.Marshal(scopedClaims.Permissions)
+			scopes, err := json.Marshal(scopedClaims.Scopes)
 			if err != nil {
-				http.Error(w, "Failed to encode scoped token permissions", http.StatusInternalServerError)
+				http.Error(w, "Failed to encode scoped token scopes", http.StatusInternalServerError)
 				return
 			}
-			r2.Header.Set("x-Scoped-Token-Permissions", string(permissions))
+			r2.Header.Set("x-Token-Scopes", string(scopes))
 		}
 
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
