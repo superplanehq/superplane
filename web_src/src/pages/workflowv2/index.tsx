@@ -5392,6 +5392,25 @@ export function WorkflowPageV2() {
               ? "Save canvas changes before running"
               : undefined;
 
+  const handleImportYaml = useCallback(
+    async (data: { nodes: unknown[]; edges: unknown[] }) => {
+      if (!canvas || !organizationId || !canvasId) return;
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas.spec,
+          nodes: data.nodes as any[],
+          edges: data.edges as any[],
+        },
+      };
+
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      await handleSaveWorkflow(updatedWorkflow, { showToast: true });
+    },
+    [canvas, organizationId, canvasId, queryClient, handleSaveWorkflow],
+  );
+
   const dataViewContent =
     topViewMode === "yaml" && yamlPayload ? (
       <CanvasYamlView
@@ -5399,6 +5418,8 @@ export function WorkflowPageV2() {
         filename={yamlPayload.filename}
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
+        onImport={canUpdateCanvas && !isTemplate ? handleImportYaml : undefined}
+        isImporting={updateCanvasVersionMutation.isPending}
       />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
