@@ -11,6 +11,7 @@ type AuthConfig = {
   providers: string[];
   passwordLoginEnabled: boolean;
   signupEnabled: boolean;
+  magicCodeEnabled: boolean;
 };
 
 const isValidRedirectPath = (path: string | null): path is string => {
@@ -49,11 +50,14 @@ const getProviderLabel = (provider: string) => {
   }
 };
 
+type MagicCodeStep = "email" | "code";
+
 export const Login: React.FC = () => {
   const [authConfig, setAuthConfig] = useState<AuthConfig>({
     providers: [],
     passwordLoginEnabled: false,
     signupEnabled: false,
+    magicCodeEnabled: false,
   });
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -67,6 +71,12 @@ export const Login: React.FC = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+
+  const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
+  const [magicCodeEmail, setMagicCodeEmail] = useState("");
+  const [magicCode, setMagicCode] = useState("");
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false);
+
   const [searchParams] = useSearchParams();
   const { account, loading: accountLoading } = useAccount();
 
@@ -82,11 +92,48 @@ export const Login: React.FC = () => {
     return parts.length >= 3 ? parts[2] : "";
   }, [safeRedirect]);
 
+  const magicLinkToken = searchParams.get("magic_link_token");
+
   useEffect(() => {
     if (!accountLoading && account) {
       window.location.href = safeRedirect || "/";
     }
   }, [account, accountLoading, safeRedirect]);
+
+  useEffect(() => {
+    if (!magicLinkToken) return;
+
+    const verifyMagicLink = async () => {
+      setSubmitLoading(true);
+      try {
+        const formData = new URLSearchParams();
+        formData.append("token", magicLinkToken);
+        if (inviteToken) {
+          formData.append("invite_token", inviteToken);
+        }
+
+        const response = await fetch("/auth/magic-code/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          credentials: "include",
+          body: formData.toString(),
+        });
+
+        if (!response.ok) {
+          setFormError("Invalid or expired link. Please request a new code.");
+          setSubmitLoading(false);
+          return;
+        }
+
+        await handleRedirectAfterAuth(response);
+      } catch {
+        setFormError("Network error occurred");
+        setSubmitLoading(false);
+      }
+    };
+
+    verifyMagicLink();
+  }, [magicLinkToken, inviteToken]);
 
   useEffect(() => {
     let canceled = false;
@@ -104,6 +151,7 @@ export const Login: React.FC = () => {
             providers: data.providers || [],
             passwordLoginEnabled: Boolean(data.passwordLoginEnabled),
             signupEnabled: Boolean(data.signupEnabled),
+            magicCodeEnabled: Boolean(data.magicCodeEnabled),
           });
         }
       } catch (err) {
@@ -134,6 +182,7 @@ export const Login: React.FC = () => {
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
   const redirectTarget = safeRedirect || "";
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
+  const useMagicCodePrimary = authConfig.magicCodeEnabled && !showPasswordLogin;
 
   useEffect(() => {
     if (!canSignup && isSignupMode) {
@@ -144,6 +193,126 @@ export const Login: React.FC = () => {
 
   const handleToggleMode = (nextMode: "login" | "signup") => {
     setIsSignupMode(nextMode === "signup");
+    setFormError(null);
+  };
+
+  const handleRedirectAfterAuth = async (response: Response) => {
+    if (redirectTarget) {
+      window.location.href = redirectTarget;
+      return;
+    }
+
+    try {
+      const orgsResponse = await fetch("/organizations", {
+        credentials: "include",
+      });
+
+      if (orgsResponse.ok) {
+        const organizations = await orgsResponse.json();
+        if (organizations.length === 1) {
+          window.location.href = `/${organizations[0].id}`;
+          return;
+        }
+      }
+    } catch {
+      // fall through to default redirect
+    }
+
+    const finalURL = response.url || "/";
+    window.location.href = finalURL;
+  };
+
+  const handleMagicCodeRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!magicCodeEmail.trim()) {
+      setFormError("Email is required");
+      return;
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append("email", magicCodeEmail.trim());
+      if (redirectTarget) {
+        formData.append("redirect", redirectTarget);
+      }
+
+      const response = await fetch("/auth/magic-code/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        setFormError("Failed to send code. Please try again.");
+        setSubmitLoading(false);
+        return;
+      }
+
+      setMagicCodeStep("code");
+      setSubmitLoading(false);
+    } catch {
+      setFormError("Network error occurred");
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleMagicCodeVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!magicCode.trim()) {
+      setFormError("Code is required");
+      return;
+    }
+
+    setSubmitLoading(true);
+
+    try {
+      const formData = new URLSearchParams();
+      formData.append("email", magicCodeEmail.trim());
+      formData.append("code", magicCode.trim());
+      if (inviteToken) {
+        formData.append("invite_token", inviteToken);
+      }
+
+      const url = redirectTarget
+        ? `/auth/magic-code/verify?redirect=${encodeURIComponent(redirectTarget)}`
+        : "/auth/magic-code/verify";
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        credentials: "include",
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setFormError("Invalid or expired code. Please try again.");
+        } else if (response.status === 403) {
+          const errorText = await response.text();
+          setFormError(errorText || "Sign-up is not allowed.");
+        } else {
+          setFormError("Verification failed. Please try again.");
+        }
+        setSubmitLoading(false);
+        return;
+      }
+
+      await handleRedirectAfterAuth(response);
+    } catch {
+      setFormError("Network error occurred");
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleMagicCodeBack = () => {
+    setMagicCodeStep("email");
+    setMagicCode("");
     setFormError(null);
   };
 
@@ -183,29 +352,7 @@ export const Login: React.FC = () => {
         return;
       }
 
-      if (redirectTarget) {
-        window.location.href = redirectTarget;
-        return;
-      }
-
-      try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
-          if (organizations.length === 1) {
-            window.location.href = `/${organizations[0].id}`;
-            return;
-          }
-        }
-      } catch {
-        // fall through to default redirect
-      }
-
-      const finalURL = response.url || "/";
-      window.location.href = finalURL;
+      await handleRedirectAfterAuth(response);
     } catch {
       setFormError("Network error occurred");
       setSubmitLoading(false);
@@ -268,33 +415,25 @@ export const Login: React.FC = () => {
         return;
       }
 
-      if (redirectTarget) {
-        window.location.href = redirectTarget;
-        return;
-      }
-
-      try {
-        const orgsResponse = await fetch("/organizations", {
-          credentials: "include",
-        });
-
-        if (orgsResponse.ok) {
-          const organizations = await orgsResponse.json();
-          if (organizations.length === 1) {
-            window.location.href = `/${organizations[0].id}`;
-            return;
-          }
-        }
-      } catch {
-        // fall through to default redirect
-      }
-
-      const finalURL = response.url || "/";
-      window.location.href = finalURL;
+      await handleRedirectAfterAuth(response);
     } catch {
       setFormError("Network error occurred");
       setSubmitLoading(false);
     }
+  };
+
+  const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
+
+  const getHeading = () => {
+    if (isSignupMode) return "Create your account";
+    if (useMagicCodePrimary && magicCodeStep === "code") return "Check your email";
+    return "Welcome to SuperPlane";
+  };
+
+  const getSubheading = () => {
+    if (isSignupMode) return "Set up your account.";
+    if (useMagicCodePrimary && magicCodeStep === "code") return `We sent a code to ${magicCodeEmail}`;
+    return "Log in to continue.";
   };
 
   return (
@@ -302,10 +441,8 @@ export const Login: React.FC = () => {
       <div className="max-w-sm w-full bg-white dark:bg-gray-900 rounded-lg outline outline-gray-950/10 shadow-sm p-8">
         <div className="text-center">
           <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto h-8 w-8" />
-          <h1 className="mt-4 !text-lg font-medium text-gray-900">
-            {isSignupMode ? "Create your account" : "Welcome to SuperPlane"}
-          </h1>
-          <p className="mt-1 text-sm text-gray-800">{isSignupMode ? "Set up your account." : "Log in to continue."}</p>
+          <h1 className="mt-4 !text-lg font-medium text-gray-900">{getHeading()}</h1>
+          <p className="mt-1 text-sm text-gray-800">{getSubheading()}</p>
         </div>
 
         <div className="pt-8">
@@ -321,11 +458,9 @@ export const Login: React.FC = () => {
             <p className="text-sm text-gray-500">Signups are currently disabled.</p>
           )}
 
-          {!configLoading &&
-            !isSignupMode &&
-            !showProviderButtons &&
-            !canLoginWithPassword &&
-            !canSignupWithPassword && <p className="text-sm text-gray-500">No login methods are configured.</p>}
+          {!configLoading && !isSignupMode && !hasAnyFormMethod && (
+            <p className="text-sm text-gray-500">No login methods are configured.</p>
+          )}
 
           {!configLoading && formError && (
             <div className="mb-4 rounded-md border border-red-300 bg-white px-3 py-1 text-sm text-red-500">
@@ -333,7 +468,61 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && canLoginWithPassword && (
+          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "email" && (
+            <form onSubmit={handleMagicCodeRequest} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  name="email"
+                  placeholder="you@example.com"
+                  required
+                  autoComplete="email"
+                  value={magicCodeEmail}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCodeEmail(e.target.value)}
+                />
+              </div>
+
+              <LoadingButton type="submit" loading={submitLoading} loadingText="Sending code..." className="w-full">
+                Continue with email
+              </LoadingButton>
+            </form>
+          )}
+
+          {!configLoading && !isSignupMode && useMagicCodePrimary && magicCodeStep === "code" && (
+            <form onSubmit={handleMagicCodeVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Code</Label>
+                <Input
+                  type="text"
+                  name="code"
+                  placeholder="Enter 6-digit code"
+                  required
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  maxLength={7}
+                  value={magicCode}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMagicCode(e.target.value)}
+                />
+              </div>
+
+              <LoadingButton type="submit" loading={submitLoading} loadingText="Verifying..." className="w-full">
+                Sign in
+              </LoadingButton>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handleMagicCodeBack}
+                  className="text-sm text-gray-500 underline underline-offset-2"
+                >
+                  Use a different email
+                </button>
+              </div>
+            </form>
+          )}
+
+          {!configLoading && !isSignupMode && !useMagicCodePrimary && canLoginWithPassword && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label>Email</Label>
@@ -344,7 +533,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="email"
                   value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginEmail(e.target.value)}
                 />
               </div>
 
@@ -357,7 +546,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="current-password"
                   value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginPassword(e.target.value)}
                 />
               </div>
 
@@ -379,7 +568,7 @@ export const Login: React.FC = () => {
                     required
                     autoComplete="given-name"
                     value={signupFirstName}
-                    onChange={(e) => setSignupFirstName(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupFirstName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -391,7 +580,7 @@ export const Login: React.FC = () => {
                     required
                     autoComplete="family-name"
                     value={signupLastName}
-                    onChange={(e) => setSignupLastName(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupLastName(e.target.value)}
                   />
                 </div>
               </div>
@@ -405,7 +594,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="email"
                   value={signupEmail}
-                  onChange={(e) => setSignupEmail(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupEmail(e.target.value)}
                 />
               </div>
 
@@ -418,7 +607,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="new-password"
                   value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupPassword(e.target.value)}
                 />
               </div>
 
@@ -431,7 +620,7 @@ export const Login: React.FC = () => {
                   required
                   autoComplete="new-password"
                   value={signupConfirmPassword}
-                  onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupConfirmPassword(e.target.value)}
                 />
               </div>
 
@@ -447,15 +636,59 @@ export const Login: React.FC = () => {
             </form>
           )}
 
-          {!configLoading && showProviderButtons && (isSignupMode ? canSignupWithPassword : canLoginWithPassword) && (
-            <div className="my-5 flex items-center gap-3 text-sm text-gray-800">
-              <div className="h-px flex-1 bg-gray-300" />
-              <span>or</span>
-              <div className="h-px flex-1 bg-gray-300" />
-            </div>
-          )}
+          {!configLoading &&
+            useMagicCodePrimary &&
+            !isSignupMode &&
+            magicCodeStep === "email" &&
+            canLoginWithPassword && (
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordLogin(true);
+                    setFormError(null);
+                  }}
+                  className="text-sm text-gray-500 underline underline-offset-2"
+                >
+                  Sign in with password instead
+                </button>
+              </div>
+            )}
 
-          {!configLoading && showProviderButtons && (
+          {!configLoading &&
+            !isSignupMode &&
+            showPasswordLogin &&
+            !useMagicCodePrimary &&
+            authConfig.magicCodeEnabled && (
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPasswordLogin(false);
+                    setFormError(null);
+                  }}
+                  className="text-sm text-gray-500 underline underline-offset-2"
+                >
+                  Sign in with email code instead
+                </button>
+              </div>
+            )}
+
+          {!configLoading &&
+            showProviderButtons &&
+            (isSignupMode
+              ? canSignupWithPassword
+              : useMagicCodePrimary
+                ? magicCodeStep === "email"
+                : canLoginWithPassword) && (
+              <div className="my-5 flex items-center gap-3 text-sm text-gray-800">
+                <div className="h-px flex-1 bg-gray-300" />
+                <span>or</span>
+                <div className="h-px flex-1 bg-gray-300" />
+              </div>
+            )}
+
+          {!configLoading && showProviderButtons && (!useMagicCodePrimary || magicCodeStep === "email") && (
             <div className="space-y-3">
               {activeProviders.map((provider) => (
                 <Button key={provider} variant="outline" className="w-full justify-center gap-2" asChild>
@@ -480,7 +713,7 @@ export const Login: React.FC = () => {
             </div>
           )}
 
-          {!configLoading && !isSignupMode && canSignup && (
+          {!configLoading && !isSignupMode && canSignup && !useMagicCodePrimary && (
             <div className="mt-6 text-sm text-gray-500">
               {"Don't have an account? "}
               <button

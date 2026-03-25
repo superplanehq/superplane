@@ -25,10 +25,8 @@ interface CanvasPageModalsProps {
   createChangeRequestVersion?: CanvasesCanvasVersion;
   createChangeRequestTitle: string;
   createChangeRequestDescription: string;
-  createChangeRequestDescriptionMode: "write" | "preview";
   onCreateChangeRequestTitleChange: (value: string) => void;
   onCreateChangeRequestDescriptionChange: (value: string) => void;
-  onCreateChangeRequestDescriptionModeChange: (mode: "write" | "preview") => void;
   createChangeRequestNodeDiffSummary: DraftNodeDiffSummary;
   isCreateChangeRequestDraftOutdated: boolean;
   onSubmitCreateChangeRequest: () => void;
@@ -49,10 +47,8 @@ export function CanvasPageModals({
   createChangeRequestVersion,
   createChangeRequestTitle,
   createChangeRequestDescription,
-  createChangeRequestDescriptionMode,
   onCreateChangeRequestTitleChange,
   onCreateChangeRequestDescriptionChange,
-  onCreateChangeRequestDescriptionModeChange,
   createChangeRequestNodeDiffSummary,
   isCreateChangeRequestDraftOutdated,
   onSubmitCreateChangeRequest,
@@ -87,10 +83,8 @@ export function CanvasPageModals({
         version={createChangeRequestVersion}
         title={createChangeRequestTitle}
         description={createChangeRequestDescription}
-        descriptionMode={createChangeRequestDescriptionMode}
         onTitleChange={onCreateChangeRequestTitleChange}
         onDescriptionChange={onCreateChangeRequestDescriptionChange}
-        onDescriptionModeChange={onCreateChangeRequestDescriptionModeChange}
         diffSummary={createChangeRequestNodeDiffSummary}
         isDraftOutdated={isCreateChangeRequestDraftOutdated}
         onPublish={onSubmitCreateChangeRequest}

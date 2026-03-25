@@ -1,0 +1,13 @@
+Your SuperPlane sign-in code is: {{.Code}}
+
+Enter this code to sign in to SuperPlane.
+
+{{if .MagicLink}}
+Or sign in directly using this link:
+{{.MagicLink}}
+{{end}}
+
+{{if .MagicLink}}This code and link expire in 10 minutes.{{else}}This code expires in 10 minutes.{{end}} If you didn't request this, you can safely ignore this email.
+
+Best regards,
+The SuperPlane Team

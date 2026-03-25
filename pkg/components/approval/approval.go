@@ -744,8 +744,22 @@ func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata
 		)
 	}
 
-	title := "Approval required"
-	body := "A canvas run item is waiting for your approval. Please visit the URL below to handle it."
+	canvasName := ctx.CanvasName
+	if canvasName == "" {
+		canvasName = "Canvas"
+	}
+
+	approvalName := ctx.NodeName
+	if approvalName == "" {
+		approvalName = "Approval"
+	}
+
+	title := fmt.Sprintf("Approval required: %s — %s", canvasName, approvalName)
+	body := fmt.Sprintf(
+		"An approval is waiting for you.\n\nCanvas: %s\nApproval: %s",
+		canvasName,
+		approvalName,
+	)
 
 	receivers := core.NotificationReceivers{}
 	emailSet := map[string]struct{}{}

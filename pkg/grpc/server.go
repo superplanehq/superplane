@@ -12,7 +12,9 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -55,7 +57,15 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, port int) {
+func RunServer(
+	baseURL, webhooksBaseURL, basePath string,
+	encryptor crypto.Encryptor,
+	jwtSigner *jwt.Signer,
+	authService authorization.Authorization,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	port int,
+) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -141,6 +151,9 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
+
+	agentsService := NewAgentsService(authService, jwtSigner)
+	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
 
 	reflection.Register(grpcServer)
 

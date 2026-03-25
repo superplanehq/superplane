@@ -134,6 +134,13 @@ func (s *invitationSteps) followInviteLinkToLogin(token string) {
 }
 
 func (s *invitationSteps) openSignupForm() {
+	// With magic code enabled, toggle to password login first
+	// so the "Create an account" link becomes visible.
+	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
+	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
+		require.NoError(s.t, toggle.Click())
+	}
+
 	button := s.session.Page().Locator("text=Create an account").First()
 	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
 	require.NoError(s.t, button.Click())
