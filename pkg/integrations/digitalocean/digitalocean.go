@@ -54,7 +54,7 @@ func (d *DigitalOcean) Instructions() string {
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
 
-## Spaces Access and Secret Keys (optional)
+## Spaces Access Key ID and Secret Access Key (optional)
 
 Spaces Access Key and Secret Key are only required if you plan to use **Spaces Object Storage** components (e.g. Get Object). Other components such as Droplets, DNS, Load Balancers, and Snapshots work with the API Token alone.
 
@@ -65,7 +65,7 @@ To generate Spaces access keys:
 3. Select the access scope:
    - **Full Access** — works across all buckets
    - **Limited Access** — scoped to specific buckets with Read or Read/Write/Delete permissions
-4. Copy both the **Access Key** and the **Secret Key** immediately — the secret is only shown once`
+4. Copy both the **Access Key ID** and the **Secret Access Key** immediately — the secret is only shown once`
 }
 
 func (d *DigitalOcean) Configuration() []configuration.Field {
@@ -80,7 +80,7 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "spacesAccessKey",
-			Label:       "Spaces Access Key",
+			Label:       "Spaces Access Key ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Sensitive:   true,
@@ -88,7 +88,7 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "spacesSecretKey",
-			Label:       "Spaces Secret Key",
+			Label:       "Spaces Secret Access Key",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Sensitive:   true,
