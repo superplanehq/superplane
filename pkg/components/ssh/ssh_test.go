@@ -43,7 +43,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 			Configuration: map[string]any{
 				"username":       "root",
 				"authentication": authWithKey,
-				"command":        "ls",
+				"commands":       "ls",
 			},
 		})
 		require.Error(t, err)
@@ -55,14 +55,14 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 			Configuration: map[string]any{
 				"host":           "example.com",
 				"authentication": authWithKey,
-				"command":        "ls",
+				"commands":       "ls",
 			},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "username")
 	})
 
-	t.Run("missing command", func(t *testing.T) {
+	t.Run("missing commands", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"host":           "example.com",
@@ -72,7 +72,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 			},
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "command")
+		assert.Contains(t, err.Error(), "commands")
 	})
 
 	t.Run("ssh_key auth without secret ref", func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 				"host":           "example.com",
 				"username":       "root",
 				"authentication": authConfig(AuthMethodSSHKey, nil, nil),
-				"command":        "ls",
+				"commands":       "ls",
 				"timeout":        60,
 			},
 		})
@@ -95,7 +95,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 				"host":           "example.com",
 				"username":       "root",
 				"authentication": authConfig(AuthMethodPassword, nil, nil),
-				"command":        "ls",
+				"commands":       "ls",
 				"timeout":        60,
 			},
 		})
@@ -109,7 +109,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 				"host":           "example.com",
 				"username":       "root",
 				"authentication": authWithKey,
-				"command":        "ls -la",
+				"commands":       "ls -la",
 				"timeout":        60,
 			},
 		})
@@ -122,7 +122,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 				"host":           "example.com",
 				"username":       "root",
 				"authentication": authWithPass,
-				"command":        "whoami",
+				"commands":       "whoami",
 				"timeout":        60,
 			},
 		})
@@ -135,7 +135,7 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 				"host":           "example.com",
 				"username":       "root",
 				"authentication": authWithPass,
-				"command":        "whoami",
+				"commands":       "whoami",
 				"timeout":        60,
 				"environment": []map[string]any{
 					{
@@ -159,7 +159,7 @@ func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 			"host":     "example.com",
 			"port":     22,
 			"username": "root",
-			"command":  "ls -la",
+			"commands": "ls -la",
 			"timeout":  60,
 			"authentication": map[string]any{
 				"authMethod": "invalid",
@@ -205,5 +205,19 @@ func TestSSHCommand_BuildRemoteCommand(t *testing.T) {
 			"env PLAIN='ok' SPECIAL='a'\"'\"'b;$PATH $(whoami)' sh -lc 'echo \"$SPECIAL\"'",
 			command,
 		)
+	})
+}
+
+func TestBuildCombinedCommands(t *testing.T) {
+	t.Run("joins non-empty lines with && and returns last", func(t *testing.T) {
+		combined, last := buildCombinedCommands("echo 1\n\n  echo 2  \n")
+		assert.Equal(t, "echo 1 && echo 2", combined)
+		assert.Equal(t, "echo 2", last)
+	})
+
+	t.Run("empty input yields empty strings", func(t *testing.T) {
+		combined, last := buildCombinedCommands("\n \n")
+		assert.Equal(t, "", combined)
+		assert.Equal(t, "", last)
 	})
 }
