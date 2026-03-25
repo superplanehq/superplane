@@ -5154,6 +5154,9 @@ export function WorkflowPageV2() {
       if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
         setActiveCanvasVersion(updateResponse.data.version);
       }
+      if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
+        return;
+      }
       queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);

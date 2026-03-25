@@ -1,9 +1,5 @@
-import { useState } from "react";
 import { BookOpen, ExternalLink, KeyRound, Loader2 } from "lucide-react";
-import { meRegenerateToken } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { detectPlatform } from "@/utils/cli";
+import { detectPlatform, getInstallCommand, useConnectCommand } from "@/utils/cli";
 import { CopyButton } from "@/ui/CopyButton";
 
 const CLI_COMMANDS = [
@@ -14,30 +10,8 @@ const CLI_COMMANDS = [
 
 export function CLIPanel({ organizationId }: { organizationId: string }) {
   const platform = detectPlatform();
-  const installCommand = `curl -L https://install.superplane.com/superplane-cli-${platform} -o superplane && chmod +x superplane && sudo mv superplane /usr/local/bin/`;
-  const [connectCommand, setConnectCommand] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-
-  const handleGenerateConnect = async () => {
-    try {
-      setGenerating(true);
-      const response = await meRegenerateToken(withOrganizationHeader({ organizationId }));
-      const token = response.data?.token;
-      if (!token) {
-        showErrorToast("Failed to generate API token");
-        return;
-      }
-      const baseURL = window.location.origin;
-      const cmd = `superplane connect ${baseURL} ${token}`;
-      setConnectCommand(cmd);
-      await navigator.clipboard.writeText(cmd);
-      showSuccessToast("Connect command copied to clipboard");
-    } catch (err) {
-      showErrorToast(err instanceof Error ? err.message : "Failed to generate token");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  const installCommand = getInstallCommand(platform);
+  const { connectCommand, generating, handleGenerateConnect } = useConnectCommand(organizationId);
 
   return (
     <div className="space-y-4">
