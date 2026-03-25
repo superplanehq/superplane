@@ -23,7 +23,7 @@ type QueryLogfireConfiguration struct {
 }
 
 // To ensure query is read-only.
-var forbiddenWriteSQLPattern = regexp.MustCompile(`(?i)\b(insert|update|delete)\b`)
+var forbiddenWriteSQLPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|drop|alter|truncate|create|grant)\b`)
 
 func (c *QueryLogfire) Name() string {
 	return "logfire.queryLogfire"
@@ -243,7 +243,7 @@ func sanitizeQueryLogfireConfiguration(config QueryLogfireConfiguration) QueryLo
 
 func validateReadOnlySQL(sql string) error {
 	if forbiddenWriteSQLPattern.MatchString(sql) {
-		return fmt.Errorf("only read-only queries are allowed: INSERT, UPDATE, and DELETE are not permitted")
+		return fmt.Errorf("only read-only queries are allowed: INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, and GRANT are not permitted")
 	}
 	return nil
 }

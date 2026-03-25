@@ -105,6 +105,20 @@ func TestValidateReadOnlySQL(t *testing.T) {
 
 	require.NoError(t, validateReadOnlySQL("SELECT * FROM records"))
 	require.ErrorContains(t, validateReadOnlySQL("update records set message = 'x'"), "only read-only queries are allowed")
+
+	destructiveQueries := []string{
+		"INSERT INTO records (message) VALUES ('x')",
+		"DELETE FROM records",
+		"DROP TABLE records",
+		"ALTER TABLE records ADD COLUMN foo TEXT",
+		"TRUNCATE TABLE records",
+		"CREATE TABLE records_copy AS SELECT * FROM records",
+		"GRANT SELECT ON records TO role_reader",
+	}
+
+	for _, query := range destructiveQueries {
+		require.ErrorContains(t, validateReadOnlySQL(query), "only read-only queries are allowed")
+	}
 }
 
 func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {

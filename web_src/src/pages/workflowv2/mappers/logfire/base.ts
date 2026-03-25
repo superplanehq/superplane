@@ -134,7 +134,7 @@ function buildQueryMetadata(configuration: QueryLogfireNodeConfiguration | undef
     return [
       {
         icon: "code",
-        label: `SQL: ${truncateText(sql.replace(/\\s+/g, " "), 60)}`,
+        label: `SQL: ${truncateText(sql.replace(/\s+/g, " "), 60)}`,
       },
     ];
   }

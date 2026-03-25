@@ -363,10 +363,6 @@ func (c *Client) listAlertChannels(path string) ([]AlertChannel, error) {
 	return channels, nil
 }
 
-type alertDetails struct {
-	ChannelIDs []string
-}
-
 func (c *Client) FindAssignedAlertChannelID(projectID, alertID, preferredLabel, webhookURL string) (string, bool, error) {
 	alertChannelIDs, err := c.GetAlertChannelIDs(projectID, alertID)
 	if err != nil {
