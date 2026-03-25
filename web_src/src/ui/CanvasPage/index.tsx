@@ -291,6 +291,7 @@ export interface CanvasPageProps {
   versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
+  hideAddControls?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -558,7 +559,7 @@ function CanvasPage(props: CanvasPageProps) {
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1096,6 +1097,7 @@ function CanvasPage(props: CanvasPageProps) {
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
+          canvasId={props.canvasId}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1109,22 +1111,24 @@ function CanvasPage(props: CanvasPageProps) {
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
-          <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen}
-            onToggle={handleSidebarToggle}
-            blocks={props.buildingBlocks || []}
-            showAiBuilderTab={props.showAiBuilderTab}
-            canvasId={props.canvasId}
-            organizationId={props.organizationId}
-            canvasNodes={canvasNodesForAiContext}
-            onApplyAiOperations={props.onApplyAiOperations}
-            integrations={props.integrations}
-            canvasZoom={canvasZoom}
-            disabled={readOnly}
-            disabledMessage="You don't have permission to edit this canvas."
-            onBlockClick={handleBuildingBlockClick}
-            onAddNote={handleAddNote}
-          />
+          {props.hideAddControls ? null : (
+            <BuildingBlocksSidebar
+              isOpen={isBuildingBlocksSidebarOpen}
+              onToggle={handleSidebarToggle}
+              blocks={props.buildingBlocks || []}
+              showAiBuilderTab={props.showAiBuilderTab}
+              canvasId={props.canvasId}
+              organizationId={props.organizationId}
+              canvasNodes={canvasNodesForAiContext}
+              onApplyAiOperations={props.onApplyAiOperations}
+              integrations={props.integrations}
+              canvasZoom={canvasZoom}
+              disabled={readOnly}
+              disabledMessage="You don't have permission to edit this canvas."
+              onBlockClick={handleBuildingBlockClick}
+              onAddNote={handleAddNote}
+            />
+          )}
 
           <div className={`flex-1 relative ${canvasStateBorderClass}`}>
             {showPreviewFloatingBar || showAwaitingFloatingBar ? (
@@ -1437,8 +1441,8 @@ function Sidebar({
   editingNodeData?: NodeEditData | null;
   onSaveConfiguration?: (configuration: Record<string, any>, nodeName: string) => void;
   onEdit?: (nodeId: string) => void;
-  currentTab?: "latest" | "settings";
-  onTabChange?: (tab: "latest" | "settings") => void;
+  currentTab?: "latest" | "settings" | "docs";
+  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
@@ -1498,6 +1502,31 @@ function Sidebar({
     }
     return getAutocompleteExampleObj(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleObj]);
+
+  const componentDocsData = useMemo(() => {
+    const blockName = editingNodeData?.blockName;
+    if (!blockName) return null;
+
+    const matchedComponent = components?.find((c) => c.name === blockName);
+    if (matchedComponent) {
+      return {
+        description: matchedComponent.description,
+        examplePayload: matchedComponent.exampleOutput,
+        payloadLabel: "Example Output" as const,
+      };
+    }
+
+    const matchedTrigger = triggers?.find((t) => t.name === blockName);
+    if (matchedTrigger) {
+      return {
+        description: matchedTrigger.description,
+        examplePayload: matchedTrigger.exampleData,
+        payloadLabel: "Example Data" as const,
+      };
+    }
+
+    return null;
+  }, [editingNodeData?.blockName, components, triggers]);
 
   if (!sidebarData) {
     return null;
@@ -1596,6 +1625,9 @@ function Sidebar({
       canCreateIntegrations={canCreateIntegrations}
       canUpdateIntegrations={canUpdateIntegrations}
       autocompleteExampleObj={autocompleteExampleObj}
+      componentDescription={componentDocsData?.description}
+      componentExamplePayload={componentDocsData?.examplePayload}
+      componentPayloadLabel={componentDocsData?.payloadLabel}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
@@ -1609,6 +1641,7 @@ function Sidebar({
       executionChainRequestId={focusRequest?.requestId}
       onExecutionChainHandled={onExecutionChainHandled}
       hideRunsTab={isAnnotationNode}
+      hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
       readOnly={readOnly}
     />
@@ -1654,6 +1687,7 @@ function CanvasContentHeader({
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
+  canvasId,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1693,6 +1727,7 @@ function CanvasContentHeader({
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  canvasId?: string;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1762,6 +1797,7 @@ function CanvasContentHeader({
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
+      canvasId={canvasId}
     />
   );
 }
@@ -1930,7 +1966,7 @@ function CanvasContent({
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
-  setCurrentTab?: (tab: "latest" | "settings") => void;
+  setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   onUndo?: () => void;
   canUndo?: boolean;
   organizationId?: string;

@@ -18,7 +18,7 @@ import (
 func ListNodeQueueItems(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeQueueItemsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
 	limit = getLimit(limit)

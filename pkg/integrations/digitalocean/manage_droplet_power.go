@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -164,9 +163,9 @@ func (m *ManageDropletPower) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	dropletID, err := strconv.Atoi(spec.Droplet)
+	dropletID, err := parseDropletID(spec.Droplet)
 	if err != nil {
-		return fmt.Errorf("invalid droplet ID %q: must be a number", spec.Droplet)
+		return fmt.Errorf("invalid droplet ID %q: %w", spec.Droplet, err)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

@@ -17,6 +17,9 @@ import { deleteAlertPolicyMapper } from "./delete_alert_policy";
 import { updateAlertPolicyMapper } from "./update_alert_policy";
 import { getDropletMetricsMapper } from "./get_droplet_metrics";
 import { getObjectMapper, GET_OBJECT_STATE_REGISTRY } from "./get_object";
+import { createAppMapper } from "./create_app";
+import { deleteAppMapper } from "./delete_app";
+import { updateAppMapper } from "./update_app";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -38,6 +41,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateAlertPolicy: updateAlertPolicyMapper,
   getDropletMetrics: getDropletMetricsMapper,
   getObject: getObjectMapper,
+  createApp: createAppMapper,
+  deleteApp: deleteAppMapper,
+  updateApp: updateAppMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -61,4 +67,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateAlertPolicy: buildActionStateRegistry("updated"),
   getDropletMetrics: buildActionStateRegistry("fetched"),
   getObject: GET_OBJECT_STATE_REGISTRY,
+  createApp: buildActionStateRegistry("created"),
+  deleteApp: buildActionStateRegistry("deleted"),
+  updateApp: buildActionStateRegistry("updated"),
 };

@@ -228,9 +228,26 @@ func startEmailConsumersWithService(rabbitMQURL string, emailService services.Em
 	go magicCodeEmailConsumer.Start()
 }
 
-func startInternalAPI(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider) {
+func startInternalAPI(
+	baseURL, webhooksBaseURL, basePath string,
+	encryptor crypto.Encryptor,
+	jwtSigner *jwt.Signer,
+	authService authorization.Authorization,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(baseURL, webhooksBaseURL, basePath, encryptor, authService, registry, oidcProvider, lookupInternalAPIPort())
+	grpc.RunServer(
+		baseURL,
+		webhooksBaseURL,
+		basePath,
+		encryptor,
+		jwtSigner,
+		authService,
+		registry,
+		oidcProvider,
+		lookupInternalAPIPort(),
+	)
 }
 
 func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
@@ -433,7 +450,7 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, authService, registry, oidcProvider)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider)
 	}
 
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)

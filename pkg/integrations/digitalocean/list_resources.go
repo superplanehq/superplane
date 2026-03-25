@@ -34,6 +34,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listAlertPolicies(ctx)
 	case "spaces_bucket":
 		return listSpacesBuckets(ctx)
+	case "app":
+		return listApps(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -304,10 +306,26 @@ func listAlertPolicies(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
-var allSpacesRegions = []string{"nyc3", "ams3", "sfo3", "sgp1", "fra1", "blr1", "syd1"}
+var allSpacesRegions = []string{
+	"nyc1",
+	"nyc2",
+	"nyc3",
+	"sfo2",
+	"sfo3",
+	"ams3",
+	"sgp1",
+	"fra1",
+	"blr1",
+	"syd1",
+	"lon1",
+	"tor1",
+	"atl1",
+	"ric1",
+}
 
 func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	resources := make([]core.IntegrationResource, 0)
+	var firstErr error
 
 	for _, region := range allSpacesRegions {
 		client, err := NewSpacesClient(ctx.HTTP, ctx.Integration, region)
@@ -317,7 +335,10 @@ func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 
 		buckets, err := client.ListBuckets()
 		if err != nil {
-			// skip regions that are inaccessible or have no buckets
+			if firstErr == nil {
+				firstErr = fmt.Errorf("region %s: %w", region, err)
+			}
+
 			continue
 		}
 
@@ -328,6 +349,10 @@ func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 				ID:   fmt.Sprintf("%s/%s", region, name),
 			})
 		}
+	}
+
+	if firstErr != nil {
+		return nil, fmt.Errorf("error listing spaces buckets: %w", firstErr)
 	}
 
 	return resources, nil
@@ -350,6 +375,34 @@ func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 			Type: "vpc",
 			Name: vpc.Name,
 			ID:   vpc.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listApps(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	apps, err := client.ListApps()
+	if err != nil {
+		return nil, fmt.Errorf("error listing apps: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(apps))
+	for _, app := range apps {
+		name := app.ID
+		if app.Spec != nil {
+			name = app.Spec.Name
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "app",
+			Name: name,
+			ID:   app.ID,
 		})
 	}
 

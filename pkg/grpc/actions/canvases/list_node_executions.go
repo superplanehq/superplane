@@ -23,7 +23,7 @@ import (
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
 	workflowNode, err := models.FindCanvasNode(database.Conn(), wfID, nodeID)

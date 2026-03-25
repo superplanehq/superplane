@@ -148,3 +148,31 @@ export interface GetObjectOutput {
   tags?: Record<string, string>;
   body?: string;
 }
+
+export interface AppNodeMetadata {
+  appId?: string;
+  appName?: string;
+}
+
+export interface CreateAppConfiguration {
+  name: string;
+  region: string;
+  sourceProvider?: string;
+  gitHubRepo?: string;
+  gitHubBranch?: string;
+  gitLabRepo?: string;
+  gitLabBranch?: string;
+  bitbucketRepo?: string;
+  bitbucketBranch?: string;
+  envVars?: string[];
+}
+
+export interface DeleteAppConfiguration {
+  app: string;
+}
+
+export interface UpdateAppConfiguration {
+  app: string;
+  envVars?: string[];
+  gitHubBranch?: string;
+}
