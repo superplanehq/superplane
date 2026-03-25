@@ -170,7 +170,10 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
     });
   }
   if (config?.commands) {
-    const oneline = config.commands.split("\n").join(" && ");
+    const oneline = config.commands
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .join(" && ");
     metadata.push({
       icon: "terminal",
       label: oneline,
