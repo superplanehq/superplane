@@ -296,6 +296,7 @@ export function CreateCanvasPage() {
 
                   <button
                     type="button"
+                    data-testid="import-yaml-button"
                     onClick={() => setIsImportYamlOpen(true)}
                     className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer"
                   >
