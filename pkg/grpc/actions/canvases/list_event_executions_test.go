@@ -4,12 +4,37 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
+
+func Test__ListEventExecutions__ReturnsErrorForInvalidCanvasID(t *testing.T) {
+	r := support.Setup(t)
+
+	response, err := ListEventExecutions(context.Background(), r.Registry, "invalid-uuid", uuid.New().String())
+	require.Error(t, err)
+	assert.Nil(t, response)
+	s, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, s.Code())
+}
+
+func Test__ListEventExecutions__ReturnsErrorForInvalidEventID(t *testing.T) {
+	r := support.Setup(t)
+
+	response, err := ListEventExecutions(context.Background(), r.Registry, uuid.New().String(), "bogus")
+	require.Error(t, err)
+	assert.Nil(t, response)
+	s, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, s.Code())
+}
 
 func Test__ListEventExecutions__ReturnsEmptyListWhenNoExecutionsExist(t *testing.T) {
 	r := support.Setup(t)

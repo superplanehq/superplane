@@ -38,6 +38,21 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_magic_codes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255) NOT NULL,
+    code_hash character varying(64) NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    used_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    verify_attempts integer DEFAULT 0 NOT NULL
+);
+
+
+--
 -- Name: account_password_auth; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -80,7 +95,8 @@ CREATE TABLE public.accounts (
     email character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    installation_admin boolean DEFAULT false NOT NULL
 );
 
 
@@ -643,6 +659,14 @@ ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.
 
 
 --
+-- Name: account_magic_codes account_magic_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_magic_codes
+    ADD CONSTRAINT account_magic_codes_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: account_password_auth account_password_auth_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1048,6 +1072,20 @@ ALTER TABLE ONLY public.workflows
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_magic_codes_email ON public.account_magic_codes USING btree (email);
+
+
+--
+-- Name: idx_account_magic_codes_email_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_magic_codes_email_code_hash ON public.account_magic_codes USING btree (email, code_hash);
 
 
 --
@@ -1942,7 +1980,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260320183003	f
+20260324120000	f
 \.
 
 
@@ -1978,7 +2016,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260202201226	f
+20260324120001	f
 \.
 
 

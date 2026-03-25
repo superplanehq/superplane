@@ -4,11 +4,39 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 )
+
+func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidCanvasID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	response, err := DeleteNodeQueueItem(context.Background(), r.Registry, "invalid-uuid", "node-1", uuid.New().String())
+	require.Error(t, err)
+	assert.Nil(t, response)
+	s, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, s.Code())
+}
+
+func Test_DeleteNodeQueueItem_ReturnsErrorForInvalidItemID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	response, err := DeleteNodeQueueItem(context.Background(), r.Registry, uuid.New().String(), "node-1", "bogus")
+	require.Error(t, err)
+	assert.Nil(t, response)
+	s, ok := status.FromError(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.InvalidArgument, s.Code())
+}
 
 func Test_DeleteNodeQueueItem(t *testing.T) {
 	r := support.Setup(t)

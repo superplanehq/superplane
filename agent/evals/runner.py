@@ -8,8 +8,8 @@ from pydantic_evals import Case, Dataset
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-
-from evals.evaluators import WorkflowShape
+from evals.evaluators import NoDollarDataAsRoot, WorkflowShape
+from evals.report import ReportBuilder
 
 dataset = Dataset(
     cases=[
@@ -29,8 +29,75 @@ dataset = Dataset(
             inputs="Listen to pull-request comments and send a slack message when a comment is made",
             evaluators=[
                 WorkflowShape(
-                  nodes=["github.onPRReviewComment", "slack.sendTextMessage"],
-                  edges=[("github.onPRReviewComment", "slack.sendTextMessage")],
+                  nodes=["github.onPRComment", "slack.sendTextMessage"],
+                  edges=[("github.onPRComment", "slack.sendTextMessage")],
+                )
+            ],
+        ),
+        Case(
+            name="github_issue_opened_to_discord",
+            inputs=(
+                "When a GitHub issue is opened, post a Discord message "
+                "that includes the issue title"
+            ),
+            evaluators=[
+                WorkflowShape(
+                    nodes=["github.onIssue", "discord.sendTextMessage"],
+                    edges=[("github.onIssue", "discord.sendTextMessage")],
+                ),
+                NoDollarDataAsRoot(),
+            ],
+        ),
+        Case(
+            name="ephemeral_pr_preview_machines",
+            inputs="Build a workflow that creates ephemeral preview machines for pull requests. On PR open, create infra and post the preview URL to the PR. On PR close or after 48 hours, tear it down.",
+            evaluators=[
+                WorkflowShape(
+                  nodes=[
+                      "github.onPullRequest",
+                      "daytona.createRepositorySandbox",
+                      "upsertMemory",
+                      "github.createIssueComment",
+                      "wait",
+                      "daytona.deleteSandbox",
+                      "github.onPullRequest",
+                      "readMemory",
+                      "daytona.deleteSandbox",
+                  ],
+                  edges=[
+                      ("github.onPullRequest", "daytona.createRepositorySandbox"),
+                      ("daytona.createRepositorySandbox", "upsertMemory"),
+                      ("upsertMemory", "github.createIssueComment"),
+                      ("github.createIssueComment", "wait"),
+                      ("wait", "daytona.deleteSandbox"),
+                      ("github.onPullRequest", "readMemory"),
+                      ("readMemory", "daytona.deleteSandbox"),
+                  ],
+                )
+            ],
+        ),
+        Case(
+            name="agent_labeled_issue_auto_resolve",
+            inputs="Build a workflow that auto-resolves GitHub issues",
+            evaluators=[
+                WorkflowShape(
+                  nodes=[
+                      "github.onIssue",
+                      "filter",
+                      "github.createIssueComment",
+                      "daytona.executeCode",
+                      "github.updateIssue",
+                      "github.createIssueComment",
+                      "github.createIssueComment",
+                  ],
+                  edges=[
+                      ("github.onIssue", "filter"),
+                      ("filter", "github.createIssueComment"),
+                      ("github.createIssueComment", "daytona.executeCode"),
+                      ("daytona.executeCode", "github.updateIssue"),
+                      ("github.updateIssue", "github.createIssueComment"),
+                      ("daytona.executeCode", "github.createIssueComment"),
+                  ],
                 )
             ],
         ),
@@ -67,7 +134,7 @@ async def runner() -> None:
         return result.output
 
     report = await dataset.evaluate(task, progress=True)
-    report.print(include_output=True, include_input=True, include_reasons=True)
+    ReportBuilder(report).render()
 
 def main() -> None:
     asyncio.run(runner())

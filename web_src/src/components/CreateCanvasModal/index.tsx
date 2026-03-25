@@ -85,7 +85,8 @@ export function CreateCanvasModal({
       setSubmitError(null);
       await onSubmit({
         name: name.trim(),
-        description: description.trim() || undefined,
+        // Send "" so the API clears the description; `undefined` is omitted from JSON and skips the update.
+        description: description.trim(),
         templateId: templateId || undefined,
       });
 
