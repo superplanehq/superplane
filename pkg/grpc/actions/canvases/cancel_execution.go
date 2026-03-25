@@ -84,9 +84,17 @@ func cancelExecutionInTransaction(tx *gorm.DB, authService authorization.Authori
 
 			logger := logging.ForExecution(execution, nil)
 			orgUUID := uuid.MustParse(organizationID)
+			canvasName := ""
+			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
+				canvasName = workflow.Name
+			}
 			ctx := core.ExecutionContext{
 				ID:             execution.ID,
 				WorkflowID:     execution.WorkflowID.String(),
+				OrganizationID: organizationID,
+				CanvasName:     canvasName,
+				NodeID:         execution.NodeID,
+				NodeName:       node.Name,
 				Configuration:  execution.Configuration.Data(),
 				HTTP:           registry.HTTPContext(),
 				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
