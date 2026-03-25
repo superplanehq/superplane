@@ -8,8 +8,7 @@ from pydantic_evals import Case, Dataset
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-
-from evals.evaluators import WorkflowShape
+from evals.evaluators import NoDollarDataAsRoot, WorkflowShape
 from evals.report import ReportBuilder
 
 dataset = Dataset(
@@ -33,6 +32,20 @@ dataset = Dataset(
                   nodes=["github.onPRComment", "slack.sendTextMessage"],
                   edges=[("github.onPRComment", "slack.sendTextMessage")],
                 )
+            ],
+        ),
+        Case(
+            name="github_issue_opened_to_discord",
+            inputs=(
+                "When a GitHub issue is opened, post a Discord message "
+                "that includes the issue title"
+            ),
+            evaluators=[
+                WorkflowShape(
+                    nodes=["github.onIssue", "discord.sendTextMessage"],
+                    edges=[("github.onIssue", "discord.sendTextMessage")],
+                ),
+                NoDollarDataAsRoot(),
             ],
         ),
         Case(

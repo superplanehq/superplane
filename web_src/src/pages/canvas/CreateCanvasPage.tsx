@@ -15,8 +15,12 @@ import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { getApiErrorMessage } from "@/utils/errors";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { showErrorToast } from "../../utils/toast";
-import type { ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
 import { Rainbow } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { extractIntegrations, getTemplateTags, countNodesByType } from "./templateMetadata";
 
 const MAX_CANVAS_NAME_LENGTH = 50;
 const MAX_CANVAS_DESCRIPTION_LENGTH = 200;
@@ -205,52 +209,110 @@ export function CreateCanvasPage() {
   );
 }
 interface TemplateCardProps {
-  template: any;
+  template: CanvasesCanvas;
   organizationId: string;
+  showTags?: boolean;
 }
 
-export function TemplateCard({ template, organizationId }: TemplateCardProps) {
-  const previewNodes = (template.spec?.nodes || []) as ComponentsNode[];
-  const previewEdges = (template.spec?.edges || []) as ComponentsEdge[];
-  const templateId = template.metadata?.id;
+function NodeCountLabel({ components, triggers }: { components: number; triggers: number }) {
+  const parts: string[] = [];
+  if (components > 0) parts.push(`${components} ${components === 1 ? "component" : "components"}`);
+  if (triggers > 0) parts.push(`${triggers} ${triggers === 1 ? "trigger" : "triggers"}`);
+  if (parts.length === 0) return null;
+  return <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">{parts.join(" · ")}</div>;
+}
+
+function IntegrationIcons({ integrations }: { integrations: string[] }) {
+  if (integrations.length === 0) {
+    return <span className="text-[11px] text-gray-400 dark:text-gray-500">No integrations needed</span>;
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      {integrations.map((name) => {
+        const iconSrc = getIntegrationIconSrc(name);
+        if (!iconSrc) return null;
+        return (
+          <Tooltip key={name}>
+            <TooltipTrigger asChild>
+              <span className="inline-block h-4 w-4 shrink-0">
+                <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <span className="capitalize">{name}</span>
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+function TagBadges({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return <div />;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {tags.map((tag) => (
+        <Badge key={tag} variant="outline" className="text-[11px] px-1.5 py-0 text-gray-600 dark:text-gray-400">
+          {tag}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+export function TemplateCard({ template, organizationId, showTags = false }: TemplateCardProps) {
+  const metadata = template.metadata;
+  const nodes = template.spec?.nodes;
+  const previewNodes = (nodes ?? []) as ComponentsNode[];
+  const previewEdges = (template.spec?.edges ?? []) as ComponentsEdge[];
+  const templateId = metadata?.id;
 
   if (!templateId) return null;
 
-  const templateHref = `/${organizationId}/templates/${templateId}`;
+  const templateName = metadata?.name ?? "Untitled template";
+  const description = metadata?.description ?? "";
+  const tags = showTags ? getTemplateTags(metadata?.name) : [];
+  const integrations = extractIntegrations(nodes);
+  const { components, triggers } = countNodesByType(nodes);
 
   return (
     <Link
-      to={templateHref}
-      className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group"
+      to={`/${organizationId}/templates/${templateId}`}
+      className="min-h-48 bg-white dark:bg-gray-800 rounded-md outline outline-slate-950/10 hover:shadow-md transition-shadow cursor-pointer group flex flex-col"
     >
-      <div className="flex flex-col h-full">
-        <div className="relative">
-          <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
-          <div
-            className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-t-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-            aria-hidden
-          >
-            <span className="text-sm text-gray-800 dark:text-gray-900 bg-white/80 rounded-sm outline outline-1 outline-gray-400 dark:outline-gray-600 px-2 py-1">
-              Preview
-            </span>
-          </div>
+      <div className="relative">
+        <CanvasMiniMap nodes={previewNodes} edges={previewEdges} />
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-white/80 rounded-t-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+          aria-hidden
+        >
+          <span className="text-sm text-gray-800 dark:text-gray-900 bg-white/80 rounded-sm outline outline-1 outline-gray-400 dark:outline-gray-600 px-2 py-1">
+            Preview
+          </span>
         </div>
+      </div>
 
-        <div className="p-4 border-t border-gray-200">
-          <Heading
-            level={3}
-            className="!text-base font-medium text-gray-800 transition-colors mb-1 !leading-6 line-clamp-2"
-          >
-            {template.metadata?.name || "Untitled template"}
-          </Heading>
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex flex-col flex-1">
+        <Heading
+          level={3}
+          className="!text-base font-medium text-gray-800 transition-colors mb-1 !leading-6 line-clamp-2"
+        >
+          {templateName}
+        </Heading>
 
-          {template.metadata?.description ? (
-            <div>
-              <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
-                {template.metadata.description}
-              </Text>
-            </div>
-          ) : null}
+        {description ? (
+          <Text className="text-[13px] !leading-normal text-left text-gray-800 dark:text-gray-400 line-clamp-3">
+            {description}
+          </Text>
+        ) : null}
+
+        <NodeCountLabel components={components} triggers={triggers} />
+
+        <div className="mt-auto pt-3 flex items-end justify-between gap-2">
+          <TagBadges tags={tags} />
+          <IntegrationIcons integrations={integrations} />
         </div>
       </div>
     </Link>

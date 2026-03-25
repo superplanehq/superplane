@@ -1,7 +1,6 @@
 import os
 from dataclasses import dataclass, field
-from typing import Any
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
@@ -53,9 +52,20 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "Use exact block names from catalog tools, include node references by nodeId "
             "for existing nodes, and keep operation order executable. "
             "Do not invent unknown fields or operation types. "
-            "Use get_canvas at most once per answer unless the user asks to refresh or use a different canvas. "
-            "Keep responses short by default (about 3-5 lines) unless the user asks for deep analysis."
-            "If a tool returns an error payload, continue with other tools and provide the best-effort proposal instead of aborting."
+            "In proposals, expression fields use this model: $ is the message chain—"
+            "a map of upstream node outputs keyed by each node's name on the canvas "
+            "(use keyed access like $['Node name']...); it is not the run-start event object. "
+            "root() is the original event that started the run; "
+            "when that payload nests under data, "
+            "use root().data.... previous() refers to upstream output. "
+            "Never use $.data. for run-start payload fields; use root().data. or the correct path "
+            "under root() instead. "
+            "Use get_canvas at most once per answer unless the user asks to refresh or "
+            "use a different canvas. "
+            "Keep responses short by default (about 3-5 lines) unless the user asks for "
+            "deep analysis. "
+            "If a tool returns an error payload, continue with other tools and provide the "
+            "best-effort proposal instead of aborting. "
             "Common patterns: "
             "- if the user says 'pull-request comments' it maps to 'github.onPRComment'"
         ),

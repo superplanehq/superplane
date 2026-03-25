@@ -4,10 +4,13 @@ import { getUsageLimitToastMessage } from "@/utils/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { Loader2, Puzzle } from "lucide-react";
+import { ArrowLeft, Loader2, Puzzle } from "lucide-react";
 import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
 import {
   BlueprintsBlueprint,
@@ -5196,15 +5199,75 @@ export function WorkflowPageV2() {
       </div>
     </div>
   ) : null;
+  const templateIntegrations = isTemplate ? extractIntegrations(canvas?.spec?.nodes) : [];
+  const templateTags = isTemplate ? getTemplateTags(canvas?.metadata?.name) : [];
+  const templateNodeCounts = isTemplate ? countNodesByType(canvas?.spec?.nodes) : { components: 0, triggers: 0 };
   const templateBanner = isTemplate ? (
-    <div className="bg-orange-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-900">Template preview</p>
-        <p className="text-[13px] text-black/60">Read-only template. Save your edits to a new canvas.</p>
+    <div className="bg-orange-50 border-b border-orange-200 px-4 py-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 mb-1 truncate">{canvas?.metadata?.name || "Template"}</p>
+
+          {canvas?.metadata?.description ? (
+            <p className="text-[13px] text-gray-600 mb-2 max-w-2xl">{canvas.metadata.description}</p>
+          ) : null}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {templateTags.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {templateTags.map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-[11px] px-1.5 py-0 text-gray-600 bg-white">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">Requires:</span>
+              {templateIntegrations.length > 0 ? (
+                <div className="flex items-center gap-2.5">
+                  {templateIntegrations.map((name) => {
+                    const iconSrc = getIntegrationIconSrc(name);
+                    if (!iconSrc) return null;
+                    return (
+                      <span key={name} className="inline-flex items-center gap-1">
+                        <span className="inline-block h-4 w-4 shrink-0">
+                          <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
+                        </span>
+                        <span className="text-xs text-gray-600 capitalize">{name}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-xs text-gray-500">No integrations needed</span>
+              )}
+            </div>
+
+            <span className="text-xs text-gray-500">
+              {templateNodeCounts.components > 0 &&
+                `${templateNodeCounts.components} ${templateNodeCounts.components === 1 ? "component" : "components"}`}
+              {templateNodeCounts.components > 0 && templateNodeCounts.triggers > 0 && " · "}
+              {templateNodeCounts.triggers > 0 &&
+                `${templateNodeCounts.triggers} ${templateNodeCounts.triggers === 1 ? "trigger" : "triggers"}`}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end gap-2 shrink-0 self-start">
+          <Link
+            to={`/${organizationId}/templates`}
+            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft size={14} />
+            <span>Back to templates</span>
+          </Link>
+          <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
+            {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
+          </Button>
+        </div>
       </div>
-      <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
-        {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
-      </Button>
     </div>
   ) : null;
 
@@ -5401,7 +5464,8 @@ export function WorkflowPageV2() {
           }
           versionControlButtonTooltip="Open versions"
           versionControlNotificationCount={pendingApprovalVersions.length}
-          showBottomStatusControls={true}
+          showBottomStatusControls={!isTemplate}
+          hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           dataViewContent={dataViewContent}
           nodes={nodes}
@@ -5512,7 +5576,7 @@ export function WorkflowPageV2() {
           breadcrumbs={[
             {
               label: isTemplate ? "Templates" : "Canvases",
-              href: `/${organizationId}`,
+              href: isTemplate ? `/${organizationId}/templates` : `/${organizationId}`,
             },
             {
               label: canvas?.metadata?.name || (isTemplate ? "Template" : "Canvas"),
