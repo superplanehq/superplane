@@ -1,9 +1,12 @@
+import argparse
 import socket
+from types import SimpleNamespace
 
 import pytest
 
 from ai.models import CanvasQuestionRequest
 from ai.web import WebServer, WebServerConfig
+import repl.main as repl_main
 from repl.main import _parse_stream_event, _stream_repl_answer
 
 
@@ -37,3 +40,96 @@ def test_stream_repl_answer_reads_sse_response_end_to_end(
     assert answer == "success (no tool calls)"
     captured = capsys.readouterr()
     assert "success (no tool calls)" in captured.out
+
+
+def test_web_server_start_raises_when_port_is_already_in_use() -> None:
+    port = _next_free_port()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(("127.0.0.1", port))
+    sock.listen()
+
+    server = WebServer(WebServerConfig(host="127.0.0.1", port=port))
+    with pytest.raises(RuntimeError, match="Failed to start REPL web server"):
+        server.start()
+
+    sock.close()
+
+
+def test_main_non_test_mode_mints_agent_chat_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_calls: list[dict[str, str]] = []
+    stream_calls: list[dict[str, str | None]] = []
+
+    def fake_parse_args(self: argparse.ArgumentParser) -> SimpleNamespace:
+        return SimpleNamespace(
+            healthcheck=False,
+            question="hello",
+            interactive=False,
+            canvas_id="canvas-123",
+            base_url="http://app:8000",
+            token="token-123",
+            org_id="org-123",
+            server=False,
+            test_repl_web_host="127.0.0.1",
+            test_repl_web_port=8090,
+            repl_web_url="http://127.0.0.1:8090",
+            start_repl_web=False,
+            start_test_repl_web=False,
+            model="anthropic:claude-sonnet-4-6",
+        )
+
+    def fake_stream_repl_answer(
+        web_url: str,
+        payload: CanvasQuestionRequest,
+        model: str,
+        token: str | None = None,
+    ) -> str:
+        stream_calls.append(
+            {
+                "web_url": web_url,
+                "canvas_id": payload.canvas_id,
+                "model": model,
+                "token": token,
+            }
+        )
+        return "ok"
+
+    def fake_create_agent_chat_session(
+        base_url: str,
+        api_token: str,
+        org_id: str,
+        canvas_id: str,
+    ) -> str:
+        session_calls.append(
+            {
+                "base_url": base_url,
+                "api_token": api_token,
+                "org_id": org_id,
+                "canvas_id": canvas_id,
+            }
+        )
+        return "session-token-123"
+
+    monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
+    monkeypatch.setattr(repl_main, "_create_agent_chat_session", fake_create_agent_chat_session)
+    monkeypatch.setattr(repl_main, "_stream_repl_answer", fake_stream_repl_answer)
+
+    repl_main.main()
+
+    assert session_calls == [
+        {
+            "base_url": "http://app:8000",
+            "api_token": "token-123",
+            "org_id": "org-123",
+            "canvas_id": "canvas-123",
+        }
+    ]
+    assert stream_calls == [
+        {
+            "web_url": "http://127.0.0.1:8090",
+            "canvas_id": "canvas-123",
+            "model": "anthropic:claude-sonnet-4-6",
+            "token": "session-token-123",
+        }
+    ]

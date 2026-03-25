@@ -137,7 +137,9 @@ type ExecutionContext struct {
 	ID             uuid.UUID
 	WorkflowID     string
 	OrganizationID string
+	CanvasName     string
 	NodeID         string
+	NodeName       string
 	SourceNodeID   string
 	BaseURL        string
 	Data           any

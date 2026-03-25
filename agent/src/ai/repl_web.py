@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -27,7 +27,9 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
+from ai.jwt import JwtValidator
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from ai.text import normalize_optional
 
 
 @dataclass(frozen=True)
@@ -45,15 +47,6 @@ class ReplStreamRequest(BaseModel):
         max_length=200,
     )
     base_url: str | None = None
-    token: str | None = None
-    org_id: str | None = None
-
-
-def _normalize_optional(value: str | None) -> str | None:
-    if value is None:
-        return None
-    normalized = value.strip()
-    return normalized or None
 
 
 def _debug_enabled() -> bool:
@@ -71,17 +64,31 @@ def _debug_log(message: str, **fields: Any) -> None:
 
 
 def _resolve_required(value: str | None, env_name: str) -> str:
-    resolved = _normalize_optional(value) or _normalize_optional(os.getenv(env_name))
+    resolved = normalize_optional(value) or normalize_optional(os.getenv(env_name))
     if resolved is None:
         raise ValueError(f"Missing required setting: {env_name}")
     return resolved
 
 
-def _resolve_required_payload(value: str | None, field_name: str) -> str:
-    resolved = _normalize_optional(value)
-    if resolved is None:
-        raise ValueError(f"Missing required request field: {field_name}")
-    return resolved
+def _resolve_header(request: Request, header_name: str) -> str | None:
+    return normalize_optional(request.headers.get(header_name))
+
+
+def _resolve_bearer_token(request: Request) -> str | None:
+    auth_header = _resolve_header(request, "authorization")
+    if auth_header is None:
+        return None
+    prefix = "bearer "
+    if not auth_header.lower().startswith(prefix):
+        return None
+    return normalize_optional(auth_header[len(prefix) :])
+
+
+def _resolve_required_bearer_token(request: Request) -> str:
+    token = _resolve_bearer_token(request)
+    if token is None:
+        raise ValueError("Authorization header is required.")
+    return token
 
 
 def _encode_sse_event(data: dict[str, Any]) -> str:
@@ -110,21 +117,13 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
-    if payload.canvas_id is None:
-        _debug_log(
-            "missing canvas_id in payload",
-            model=payload.model,
-            org_id=payload.org_id,
-            has_base_url=bool(_normalize_optional(payload.base_url)),
-            has_token=bool(_normalize_optional(payload.token)),
-            question_preview=payload.question[:120],
-        )
-        raise ValueError("canvas_id is required for non-test models.")
-
+def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
     base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
-    api_token = _resolve_required(payload.token, "SUPERPLANE_API_TOKEN")
-    organization_id = _resolve_required_payload(payload.org_id, "org_id")
+    api_token = _resolve_required_bearer_token(request)
+    jwt_validator = JwtValidator.from_env()
+    claims = jwt_validator.decode(api_token)
+    canvas_id = jwt_validator.validate_canvas(payload.canvas_id, claims)
+    organization_id = claims.org_id
     client = SuperplaneClient(
         SuperplaneClientConfig(
             base_url=base_url,
@@ -135,34 +134,39 @@ def _build_deps(payload: ReplStreamRequest) -> AgentDeps:
     _debug_log(
         "resolved non-test deps",
         model=payload.model,
-        canvas_id=payload.canvas_id,
+        canvas_id=canvas_id,
         base_url=base_url,
         organization_id=organization_id,
         has_token=bool(api_token),
     )
     return AgentDeps(
         client=client,
-        canvas_id=payload.canvas_id,
+        canvas_id=canvas_id,
     )
 
 
-async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[str, Any]]:
+async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
+    resolved_canvas_id: str | None = None
+    deps: AgentDeps | None = None
+    if payload.model != "test":
+        deps = _build_deps(payload, request)
+        resolved_canvas_id = deps.canvas_id
+
     _debug_log(
         "starting agent run",
         model=payload.model,
-        canvas_id=payload.canvas_id,
-        org_id=payload.org_id,
+        canvas_id=resolved_canvas_id,
         question_preview=payload.question[:120],
     )
     yield {
         "type": "run_started",
         "model": payload.model,
-        "canvas_id": payload.canvas_id,
+        "canvas_id": resolved_canvas_id,
     }
 
     if payload.model == "test":
-        _debug_log("using test model run path", canvas_id=payload.canvas_id)
+        _debug_log("using test model run path", canvas_id=resolved_canvas_id)
         test_agent: Agent[None, str] = Agent(model=TestModel(), output_type=str)
         async for event in test_agent.run_stream_events(user_prompt=payload.question):
             if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
@@ -189,12 +193,12 @@ async def _stream_agent_run(payload: ReplStreamRequest) -> AsyncIterator[dict[st
         return
 
     agent = build_agent(model=payload.model)
-    deps = _build_deps(payload)
+    if deps is None:
+        raise ValueError("Agent dependencies are missing.")
     _debug_log(
         "running non-test agent",
         model=payload.model,
-        canvas_id=payload.canvas_id,
-        org_id=payload.org_id,
+        canvas_id=resolved_canvas_id,
     )
 
     output_tool_call_id: str | None = None
@@ -345,18 +349,20 @@ def _create_app() -> FastAPI:
 
     @app.post("/v1/agent/chat/stream")
     async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+        if payload.model != "test" and _resolve_bearer_token(request) is None:
+            raise HTTPException(status_code=401, detail="Authorization header is required")
+
         _debug_log(
             "incoming stream request",
             model=payload.model,
             canvas_id=payload.canvas_id,
-            org_id=payload.org_id,
-            has_base_url=bool(_normalize_optional(payload.base_url)),
-            has_token=bool(_normalize_optional(payload.token)),
+            has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
+            has_token=bool(_resolve_bearer_token(request)),
         )
 
         async def event_generator() -> AsyncIterator[str]:
             try:
-                async for event in _stream_agent_run(payload):
+                async for event in _stream_agent_run(payload, request):
                     if await request.is_disconnected():
                         _debug_log("client disconnected")
                         break
@@ -416,8 +422,14 @@ class WebServer:
         self._thread.start()
         for _ in range(200):
             if self._server.started:
+                return
+            if not self._thread.is_alive():
                 break
             time.sleep(0.01)
+        raise RuntimeError(
+            f"Failed to start REPL web server at {self.base_url}. "
+            "Check whether the port is already in use."
+        )
 
     def stop(self) -> None:
         self._server.should_exit = True
