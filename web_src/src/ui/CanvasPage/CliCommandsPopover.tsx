@@ -1,47 +1,12 @@
 import { useState } from "react";
-import { BookOpen, Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2 } from "lucide-react";
+import { BookOpen, ChevronDown, ExternalLink, KeyRound, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
-
-function detectPlatform(): string {
-  const ua = navigator.userAgent.toLowerCase();
-  const isLinux = ua.includes("linux");
-  const isArm = ua.includes("arm") || ua.includes("aarch64");
-  const os = isLinux ? "linux" : "darwin";
-  const arch = isArm ? "arm64" : "amd64";
-  return `${os}-${arch}`;
-}
-
-function CopyButton({ text, dark }: { text: string; dark?: boolean }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className={`p-1 rounded transition-colors shrink-0 ${
-        dark ? "hover:bg-gray-700" : "hover:bg-gray-200 dark:hover:bg-gray-700"
-      }`}
-      title="Copy to clipboard"
-    >
-      {copied ? (
-        <Check size={13} className={dark ? "text-green-400" : "text-green-600 dark:text-green-400"} />
-      ) : (
-        <Copy size={13} className={dark ? "text-gray-400 hover:text-gray-200" : "text-gray-400"} />
-      )}
-    </button>
-  );
-}
+import { detectPlatform } from "@/utils/cli";
+import { CopyButton } from "@/ui/CopyButton";
 
 function CommandRow({ label, command }: { label: string; command: string }) {
   return (

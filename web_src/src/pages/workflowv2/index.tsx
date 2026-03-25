@@ -5418,7 +5418,7 @@ export function WorkflowPageV2() {
         filename={yamlPayload.filename}
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
-        onImport={canUpdateCanvas && !isTemplate ? handleImportYaml : undefined}
+        onImport={!isReadOnly ? handleImportYaml : undefined}
         isImporting={updateCanvasVersionMutation.isPending}
       />
     ) : topViewMode === "memory" ? (

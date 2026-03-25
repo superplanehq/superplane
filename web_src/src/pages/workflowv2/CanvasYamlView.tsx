@@ -16,7 +16,7 @@ interface CanvasYamlViewProps {
   filename: string;
   onCopy?: () => void;
   onDownload?: () => void;
-  onImport?: (data: { nodes: unknown[]; edges: unknown[] }) => void;
+  onImport?: (data: { nodes: unknown[]; edges: unknown[] }) => Promise<void>;
   isImporting?: boolean;
 }
 

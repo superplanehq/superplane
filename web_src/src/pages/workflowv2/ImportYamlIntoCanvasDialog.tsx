@@ -71,7 +71,7 @@ function parseCanvasYaml(text: string): { data: { nodes: unknown[]; edges: unkno
 export interface ImportYamlDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onImport: (data: { nodes: unknown[]; edges: unknown[] }) => void;
+  onImport: (data: { nodes: unknown[]; edges: unknown[] }) => Promise<void>;
   isImporting?: boolean;
 }
 
@@ -164,15 +164,19 @@ export function ImportYamlIntoCanvasDialog({ open, onOpenChange, onImport, isImp
     reader.readAsText(file);
   }, []);
 
-  const handleImport = useCallback(() => {
+  const handleImport = useCallback(async () => {
     setParseError(null);
     const result = parseCanvasYaml(yamlText);
     if ("error" in result) {
       setParseError(result.error);
       return;
     }
-    onImport(result.data);
-    handleOpenChange(false);
+    try {
+      await onImport(result.data);
+      handleOpenChange(false);
+    } catch (err) {
+      setParseError(err instanceof Error ? err.message : "Import failed. Please try again.");
+    }
   }, [yamlText, onImport, handleOpenChange]);
 
   return (
