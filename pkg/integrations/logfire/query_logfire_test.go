@@ -58,10 +58,6 @@ func TestQueryLogfire_Execute_Success(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"token":"read_token_123_project"}`)),
-			},
-			{
-				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{"columns":[{"name":"message"}],"rows":[["ok"]]}`)),
 			},
 		},
@@ -129,11 +125,7 @@ func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"token":"lf_read_token_proj_123"}`)),
-			},
-			{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"columns":[],"rows":[]}`)),
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"proj_123","project_name":"Project 123"}]`)),
 			},
 		},
 	}
@@ -157,7 +149,7 @@ func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Len(t, httpCtx.Requests, 2)
+	require.Len(t, httpCtx.Requests, 1)
 }
 
 func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
@@ -167,8 +159,8 @@ func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
-				StatusCode: http.StatusForbidden,
-				Body:       io.NopCloser(strings.NewReader(`{"detail":"forbidden"}`)),
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"proj_other","project_name":"Other"}]`)),
 			},
 		},
 	}
@@ -190,5 +182,5 @@ func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	require.ErrorContains(t, err, "failed to create Logfire read token for project")
+	require.ErrorContains(t, err, "invalid Logfire project selection")
 }

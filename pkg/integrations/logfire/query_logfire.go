@@ -174,19 +174,21 @@ func (c *QueryLogfire) Setup(ctx core.SetupContext) error {
 	}
 
 	if config.ProjectID != "" {
-		readToken, err := client.CreateReadToken(config.ProjectID, defaultReadTokenName)
+		projects, err := client.ListProjects()
 		if err != nil {
-			return fmt.Errorf("failed to create Logfire read token for project %q: %w", config.ProjectID, err)
+			return fmt.Errorf("failed to list Logfire projects: %w", err)
 		}
-		// Override the read token so ValidateCredentials() runs against the selected project.
-		client.ReadToken = readToken
-	}
 
-	if err := client.ValidateCredentials(); err != nil {
-		if config.ProjectID != "" {
-			return fmt.Errorf("invalid Logfire project selection %q: %w", config.ProjectID, err)
+		projectExists := false
+		for i := range projects {
+			if strings.TrimSpace(projects[i].ID) == config.ProjectID {
+				projectExists = true
+				break
+			}
 		}
-		return fmt.Errorf("invalid Logfire read token: %w", err)
+		if !projectExists {
+			return fmt.Errorf("invalid Logfire project selection %q", config.ProjectID)
+		}
 	}
 
 	return nil
@@ -205,14 +207,6 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Logfire client: %w", err)
-	}
-
-	if config.ProjectID != "" {
-		readToken, err := client.CreateReadToken(config.ProjectID, defaultReadTokenName)
-		if err != nil {
-			return fmt.Errorf("failed to create Logfire read token for project %q: %w", config.ProjectID, err)
-		}
-		client.ReadToken = readToken
 	}
 
 	response, err := client.ExecuteQuery(QueryRequest{
