@@ -55,7 +55,9 @@ function parseCanvasYaml(text: string): { data: { nodes: unknown[]; edges: unkno
     return { error: `Invalid YAML syntax: ${e instanceof Error ? e.message : "Unknown error"}` };
   }
 
-  if (!parsed || typeof parsed !== "object") return { error: "YAML content must be a valid object." };
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { error: "YAML content must be a valid object." };
+  }
 
   const validationError = validateCanvasYaml(parsed);
   if (validationError) return { error: validationError };

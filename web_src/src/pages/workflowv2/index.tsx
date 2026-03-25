@@ -5118,41 +5118,55 @@ export function WorkflowPageV2() {
     getYamlExportPayload,
   });
 
+  const importYamlGuardError = !canvas || !organizationId || !canvasId
+    ? "Canvas data is not available"
+    : !canUpdateCanvas
+      ? "You don't have permission to update this canvas"
+      : isTemplate
+        ? "Template canvases are read-only"
+        : !activeCanvasVersionId && !isVersioningDisabled
+          ? "Enable edit mode before saving changes"
+          : null;
+
   const handleImportYaml = useCallback(
     async (data: { nodes: unknown[]; edges: unknown[] }) => {
-      if (!canvas || !organizationId || !canvasId) throw new Error("Canvas data is not available");
-      if (!canUpdateCanvas) throw new Error("You don't have permission to update this canvas");
-      if (isTemplate) throw new Error("Template canvases are read-only");
-      if (!activeCanvasVersionId && !isVersioningDisabled) throw new Error("Enable edit mode before saving changes");
+      if (importYamlGuardError) throw new Error(importYamlGuardError);
 
       const updatedWorkflow = {
         ...canvas,
         spec: {
-          ...canvas.spec,
+          ...canvas!.spec,
           nodes: data.nodes as ComponentsNode[],
           edges: data.edges as ComponentsEdge[],
         },
       };
 
-      await updateCanvasVersionMutation.mutateAsync({
-        versionId: activeCanvasVersionId || undefined,
+      const savingVersionID = activeCanvasVersionId || undefined;
+      lastLocalCanvasSaveAtRef.current = Date.now();
+      const updateResponse = await updateCanvasVersionMutation.mutateAsync({
+        versionId: savingVersionID,
         name: updatedWorkflow.metadata?.name ?? "",
         description: updatedWorkflow.metadata?.description,
         nodes: updatedWorkflow.spec?.nodes,
         edges: updatedWorkflow.spec?.edges,
       });
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
+        setActiveCanvasVersion(updateResponse.data.version);
+      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+      setInitialWorkflowSnapshot(null);
+      lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
       showSuccessToast("Canvas changes saved");
     },
     [
+      importYamlGuardError,
       canvas,
+      activeCanvasVersionId,
+      updateCanvasVersionMutation,
       organizationId,
       canvasId,
-      canUpdateCanvas,
-      isTemplate,
-      activeCanvasVersionId,
-      isVersioningDisabled,
-      updateCanvasVersionMutation,
       queryClient,
     ],
   );
