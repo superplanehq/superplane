@@ -48,6 +48,9 @@
     },
     {
       "name": "ServiceAccounts"
+    },
+    {
+      "name": "Agents"
     }
   ],
   "schemes": [
@@ -61,6 +64,40 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/agents/chat/tokens": {
+      "post": {
+        "summary": "Generates a new token for an agent chat",
+        "description": "Mints a short-lived scoped token for agent chat on a canvas",
+        "operationId": "Agents_GenerateAgentChatToken",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsGenerateAgentChatTokenResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AgentsGenerateAgentChatTokenRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
     "/api/v1/blueprints": {
       "get": {
         "summary": "List blueprints",
@@ -3906,6 +3943,22 @@
         "ACTION_UNAPPROVE"
       ],
       "default": "ACTION_UNSPECIFIED"
+    },
+    "AgentsGenerateAgentChatTokenRequest": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsGenerateAgentChatTokenResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      }
     },
     "AuthorizationDomainType": {
       "type": "string",

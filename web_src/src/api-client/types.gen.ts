@@ -12,6 +12,14 @@ export type ActOnCanvasChangeRequestRequestAction =
   | "ACTION_PUBLISH"
   | "ACTION_UNAPPROVE";
 
+export type AgentsGenerateAgentChatTokenRequest = {
+  canvasId?: string;
+};
+
+export type AgentsGenerateAgentChatTokenResponse = {
+  token?: string;
+};
+
 /**
  * Enums
  */
@@ -1367,6 +1375,33 @@ export type ProtobufAny = {
  * - NULL_VALUE: Null value.
  */
 export type ProtobufNullValue = "NULL_VALUE";
+
+export type AgentsGenerateAgentChatTokenData = {
+  body: AgentsGenerateAgentChatTokenRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/agents/chat/tokens";
+};
+
+export type AgentsGenerateAgentChatTokenErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsGenerateAgentChatTokenError =
+  AgentsGenerateAgentChatTokenErrors[keyof AgentsGenerateAgentChatTokenErrors];
+
+export type AgentsGenerateAgentChatTokenResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsGenerateAgentChatTokenResponse;
+};
+
+export type AgentsGenerateAgentChatTokenResponse2 =
+  AgentsGenerateAgentChatTokenResponses[keyof AgentsGenerateAgentChatTokenResponses];
 
 export type BlueprintsListBlueprintsData = {
   body?: never;

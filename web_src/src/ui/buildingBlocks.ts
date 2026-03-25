@@ -59,6 +59,7 @@ export function buildBuildingBlockCategories(
         icon: t.icon,
         color: t.color,
         isLive: true,
+        exampleData: t.exampleData,
       };
       block.componentSubtype = getComponentSubtype(block);
       return block;
@@ -74,6 +75,7 @@ export function buildBuildingBlockCategories(
         icon: c.icon,
         color: c.color,
         isLive: true,
+        exampleOutput: c.exampleOutput,
       };
       block.componentSubtype = getComponentSubtype(block);
       return block;
@@ -122,6 +124,7 @@ export function buildBuildingBlockCategories(
           color: t.color,
           isLive: true,
           integrationName: integration.name,
+          exampleData: t.exampleData,
         };
         block.componentSubtype = getComponentSubtype(block);
         blocks.push(block);
@@ -142,6 +145,7 @@ export function buildBuildingBlockCategories(
           color: c.color,
           isLive: true,
           integrationName: integration.name,
+          exampleOutput: c.exampleOutput,
         };
         block.componentSubtype = getComponentSubtype(block);
         blocks.push(block);

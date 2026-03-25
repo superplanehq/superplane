@@ -49,6 +49,8 @@ type APIClient struct {
 
 	// API Services
 
+	AgentAPI *AgentAPIService
+
 	BlueprintAPI *BlueprintAPIService
 
 	CanvasAPI *CanvasAPIService
@@ -102,6 +104,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.common.client = c
 
 	// API Services
+	c.AgentAPI = (*AgentAPIService)(&c.common)
 	c.BlueprintAPI = (*BlueprintAPIService)(&c.common)
 	c.CanvasAPI = (*CanvasAPIService)(&c.common)
 	c.CanvasChangeRequestAPI = (*CanvasChangeRequestAPIService)(&c.common)
