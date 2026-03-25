@@ -79,6 +79,7 @@ export function SettingsTab({
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
+  const showManualSaveFooter = configurationSaveMode !== "auto" && !isReadOnly;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -309,10 +310,7 @@ export function SettingsTab({
   ]);
 
   return (
-    <div
-      className={`p-4 overflow-y-auto ${configurationSaveMode === "auto" ? "pb-4" : "pb-20"}`}
-      style={{ maxHeight: "80vh" }}
-    >
+    <div className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`} style={{ maxHeight: "80vh" }}>
       <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
@@ -556,7 +554,7 @@ export function SettingsTab({
         )}
       </div>
 
-      {configurationSaveMode !== "auto" ? (
+      {showManualSaveFooter ? (
         <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
           <LoadingButton
             data-testid="save-node-button"
