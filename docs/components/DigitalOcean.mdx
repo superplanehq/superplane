@@ -822,23 +822,15 @@ All metric values are rounded to two decimal places.
 
 The Get Object component retrieves an object and its metadata from a DigitalOcean Spaces bucket.
 
-### Use Cases
+### Prerequisites
 
-- **Change detection**: Retrieve LastModified and ETag to detect if a file has been updated since the last workflow run
-- **Config reading**: Fetch a JSON or YAML config file and use its contents in downstream workflow steps
-- **Pre-flight checks**: Verify a file exists and check its size or type before processing
-- **Backup verification**: Confirm a backup file was created today by checking LastModified
-- **Conditional processing**: Route workflow based on whether an object exists or not
-- **Tag-based routing**: Use object tags to route workflow logic (e.g. status=ready)
+Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcean integration settings. The integration works without them for other components (Droplets, DNS, etc.), but they are required for any Spaces operation.
 
 ### Configuration
 
-- **Region**: The Spaces region where the bucket is located (required)
-- **Bucket**: The Spaces bucket to read from (required)
-- **File Path**: The path to the object within the bucket, e.g. reports/daily.csv (required)
-- **Include Body**: Download the object content. Only available for text-based content types (JSON, YAML, plain text, etc.).
-
-> Spaces Access Key and Secret Key are configured in the DigitalOcean integration settings.
+- **Bucket**: The Spaces bucket to read from. The dropdown lists all buckets across all regions — the region is determined automatically.
+- **File Path**: The path to the object within the bucket (e.g. reports/daily.csv)
+- **Include Body**: Download the object content. Only supported for text-based content types (JSON, YAML, CSV, plain text, etc.)
 
 ### Output Channels
 
@@ -856,7 +848,15 @@ The Get Object component retrieves an object and its metadata from a DigitalOcea
 - **eTag**: MD5 hash of the object content — changes when the file changes
 - **metadata**: Custom metadata key-value pairs set on the object (x-amz-meta-* headers)
 - **tags**: Key-value tags applied to the object
-- **body**: Object content as a string (only present for readable content types when Include Body is enabled)
+- **body**: Object content as a string (only present for text-based content types when Include Body is enabled)
+
+### Use Cases
+
+- **Config reading**: Fetch a JSON or YAML config file and use its contents in downstream workflow steps
+- **File existence check**: Verify a file exists before triggering a process — route to not_found if it is missing
+- **Change detection**: Compare ETag or LastModified with a previously stored value to detect updates
+- **Backup verification**: Confirm a backup file was written today by checking LastModified
+- **Tag-based routing**: Read object tags to drive workflow logic (e.g. status=ready)
 
 ### Example Output
 
