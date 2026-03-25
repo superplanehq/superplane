@@ -28,6 +28,19 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
+// WaitForCanvasSaveStatusSaved waits until the header autosave indicator shows a completed save.
+func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		el := q.Locator(`[data-testid="canvas-save-status"][data-state="saved"]`).Run(s.session)
+		if isVisible, _ := el.IsVisible(); isVisible {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for canvas save status saved")
+}
+
 func (s *CanvasSteps) Create() {
 	s.session.VisitHomePage()
 	s.session.Click(q.Text("New Canvas"))
@@ -105,8 +118,8 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(1000)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
@@ -125,8 +138,8 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	generatedName, err := loc.InputValue()
 	require.NoError(s.t, err)
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(1000)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 
 	return generatedName
 }
@@ -142,8 +155,8 @@ func (s *CanvasSteps) Save() {
 		return
 	}
 
-	// Auto-save may have already persisted the changes.
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -163,9 +176,8 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
@@ -176,8 +188,8 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -201,8 +213,8 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
@@ -215,8 +227,8 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -247,8 +259,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {

@@ -117,8 +117,8 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *TimeGateSteps) openNodeSettings(node string) {

@@ -99,7 +99,7 @@ export function IntegrationStatusIndicator({
   }
 
   return (
-    <div className="w-80 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-800 rounded-lg shadow-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="w-80 bg-white dark:bg-gray-900 border border-orange-300 dark:border-orange-800 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
       <button
         onClick={handleToggle}
         className="w-full px-3 py-2 flex items-center justify-between border-b border-orange-200 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-950/30 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-950/50 transition-colors"

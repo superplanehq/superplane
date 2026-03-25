@@ -78,8 +78,8 @@ func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 
 	s.typeIntoMonacoEditor(body)
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *SendEmailSteps) typeIntoMonacoEditor(text string) {
@@ -143,8 +143,8 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 
 	s.typeIntoMonacoEditor("This is a test email body")
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *SendEmailSteps) runManualTrigger() {
