@@ -150,15 +150,15 @@ function buildMetadata(node: NodeInfo) {
     metadata.push({ icon: "flag", label: configuration.priority });
   }
 
-  if (configuration?.hasSeen !== undefined) {
+  if (configuration?.hasSeen != null) {
     metadata.push({ icon: "eye", label: `Seen: ${formatBoolean(configuration.hasSeen)}` });
   }
 
-  if (configuration?.isPublic !== undefined) {
+  if (configuration?.isPublic != null) {
     metadata.push({ icon: "globe", label: `Public: ${formatBoolean(configuration.isPublic)}` });
   }
 
-  if (configuration?.isSubscribed !== undefined) {
+  if (configuration?.isSubscribed != null) {
     metadata.push({ icon: "bell", label: `Subscribed: ${formatBoolean(configuration.isSubscribed)}` });
   }
 
