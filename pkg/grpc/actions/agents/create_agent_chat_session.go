@@ -42,7 +42,7 @@ func CreateAgentChatSession(authService authorization.Authorization, jwtSigner *
 
 	claims := jwt.ScopedTokenClaims{
 		OrgID:       organizationID,
-		Purpose:     "agent_chat",
+		Purpose:     "agent-builder",
 		Permissions: permissions,
 		RegisteredClaims: gojwt.RegisteredClaims{
 			Subject: userID,

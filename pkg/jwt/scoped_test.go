@@ -14,7 +14,7 @@ func TestGenerateAndValidateScopedToken(t *testing.T) {
 
 	token, err := signer.GenerateScopedToken(ScopedTokenClaims{
 		OrgID:   "org-123",
-		Purpose: "agent_chat",
+		Purpose: "agent-builder",
 		Permissions: []Permission{
 			{
 				ResourceType: "canvases",
@@ -43,7 +43,7 @@ func TestGenerateAndValidateScopedToken(t *testing.T) {
 	assert.Equal(t, ScopedTokenType, claims.TokenType)
 	assert.Equal(t, "user-123", claims.Subject)
 	assert.Equal(t, "org-123", claims.OrgID)
-	assert.Equal(t, "agent_chat", claims.Purpose)
+	assert.Equal(t, "agent-builder", claims.Purpose)
 	assert.Equal(
 		t,
 		[]Permission{
@@ -68,7 +68,7 @@ func TestGenerateScopedTokenRequiresPermissions(t *testing.T) {
 
 	_, err := signer.GenerateScopedToken(ScopedTokenClaims{
 		OrgID:   "org-123",
-		Purpose: "agent_chat",
+		Purpose: "agent-builder",
 		RegisteredClaims: gojwt.RegisteredClaims{
 			Subject: "user-123",
 		},
@@ -83,7 +83,7 @@ func TestValidateScopedTokenRejectsWrongTokenType(t *testing.T) {
 	token := gojwt.NewWithClaims(gojwt.SigningMethodHS256, ScopedTokenClaims{
 		TokenType: "session",
 		OrgID:     "org-123",
-		Purpose:   "agent_chat",
+		Purpose:   "agent-builder",
 		Permissions: []Permission{
 			{
 				ResourceType: "canvases",

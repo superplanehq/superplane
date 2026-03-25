@@ -162,7 +162,7 @@ dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
 dev.agent.console:
-	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(CANVAS_ID)" --start-repl-web
+	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)" --repl-web-url http://127.0.0.1:8090
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
