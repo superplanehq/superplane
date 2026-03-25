@@ -152,7 +152,7 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			Label:       "Seen",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Togglable:   true,
+			Togglable:   false,
 			Description: "Optionally mark the issue as seen for the connected user",
 		},
 		{
@@ -160,7 +160,7 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			Label:       "Public",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Togglable:   true,
+			Togglable:   false,
 			Description: "Optionally make the issue public or private",
 		},
 		{
@@ -168,7 +168,7 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			Label:       "Subscribed",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Togglable:   true,
+			Togglable:   false,
 			Description: "Optionally subscribe or unsubscribe the connected user",
 		},
 	}
