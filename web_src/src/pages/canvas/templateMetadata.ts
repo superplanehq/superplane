@@ -32,8 +32,11 @@ export function extractIntegrations(nodes: ComponentsNode[] | undefined): string
     const blockName = node.component?.name || node.trigger?.name;
     if (!blockName) continue;
 
-    const prefix = blockName.split(".")[0];
-    if (prefix && prefix !== blockName && INTEGRATION_APP_LOGO_MAP[prefix]) {
+    const rawPrefix = blockName.split(".")[0];
+    if (!rawPrefix || rawPrefix === blockName) continue;
+
+    const prefix = rawPrefix.toLowerCase();
+    if (INTEGRATION_APP_LOGO_MAP[prefix]) {
       integrations.add(prefix);
     }
   }
