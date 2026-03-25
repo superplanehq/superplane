@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -171,9 +170,9 @@ func (a *AssignReservedIP) Execute(ctx core.ExecutionContext) error {
 
 	var dropletIDPtr *int
 	if spec.Action == "assign" {
-		id, err := strconv.Atoi(spec.Droplet)
+		id, err := parseDropletID(spec.Droplet)
 		if err != nil {
-			return fmt.Errorf("invalid droplet ID %q: must be a number", spec.Droplet)
+			return fmt.Errorf("invalid droplet ID %q: %w", spec.Droplet, err)
 		}
 		dropletIDPtr = &id
 	}

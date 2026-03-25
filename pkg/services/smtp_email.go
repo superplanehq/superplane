@@ -1,16 +1,13 @@
 package services
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"html/template"
 	"io"
 	"net/smtp"
-	"path/filepath"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -166,6 +163,28 @@ func (s *SMTPEmailService) SendInvitationEmail(toEmail, organizationName, invita
 	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
 }
 
+func (s *SMTPEmailService) SendMagicCodeEmail(toEmail, code, magicLink string) error {
+	settings, err := s.settingsProvider.GetSMTPSettings(context.Background())
+	if err != nil {
+		return err
+	}
+
+	templateData := MagicCodeTemplateData{Code: code, MagicLink: magicLink}
+
+	plainTextContent, err := s.renderTemplate("magic_code.txt", templateData)
+	if err != nil {
+		return fmt.Errorf("failed to render magic code plain text template: %w", err)
+	}
+
+	htmlContent, err := s.renderTemplate("magic_code.html", templateData)
+	if err != nil {
+		return fmt.Errorf("failed to render magic code HTML template: %w", err)
+	}
+
+	subject := "Your SuperPlane sign-in code"
+	return s.sendEmail(settings, []string{toEmail}, nil, subject, plainTextContent, htmlContent)
+}
+
 func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body, url, urlLabel string) error {
 	if len(bccEmails) == 0 {
 		return nil
@@ -201,19 +220,7 @@ func (s *SMTPEmailService) SendNotificationEmail(bccEmails []string, title, body
 }
 
 func (s *SMTPEmailService) renderTemplate(templateName string, data any) (string, error) {
-	templatePath := filepath.Join(s.templateDir, "email", templateName)
-	tmpl, err := template.ParseFiles(templatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template %s: %w", templatePath, err)
-	}
-
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute template %s: %w", templatePath, err)
-	}
-
-	return buf.String(), nil
+	return renderEmailTemplate(s.templateDir, templateName, data)
 }
 
 func (s *SMTPEmailService) sendEmail(settings *SMTPSettings, to []string, bcc []string, subject, textBody, htmlBody string) error {

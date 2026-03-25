@@ -40,6 +40,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
 	_ "github.com/superplanehq/superplane/pkg/triggers/start"
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
+	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
 type ResourceRegistry struct {

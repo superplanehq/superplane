@@ -170,6 +170,36 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 	return &user, err
 }
 
+func ListActiveUsersByOrganization(orgID, search string, limit, offset int) ([]User, int64, error) {
+	query := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("type = ?", UserTypeHuman)
+
+	if search != "" {
+		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Model(&User{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var users []User
+	if err := query.Order("name ASC").Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}
+
 func ListActiveUsersByID(orgID string, ids []string) ([]User, error) {
 	return ListActiveUsersByIDInTransaction(database.Conn(), orgID, ids)
 }

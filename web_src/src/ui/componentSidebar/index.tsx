@@ -24,6 +24,7 @@ import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
+import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -124,9 +125,15 @@ interface ComponentSidebarProps {
   // Settings tab props
   showSettingsTab?: boolean;
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
+  hideDocsTab?: boolean; // Hide the "Info" tab (e.g. for annotation nodes)
   hideNodeId?: boolean; // Hide the node ID with copy functionality
-  currentTab?: "latest" | "settings";
-  onTabChange?: (tab: "latest" | "settings") => void;
+  currentTab?: "latest" | "settings" | "docs";
+  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+
+  // Docs tab props
+  componentDescription?: string;
+  componentExamplePayload?: Record<string, unknown>;
+  componentPayloadLabel?: string;
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
@@ -211,6 +218,7 @@ export const ComponentSidebar = ({
   getExecutionState,
   showSettingsTab = false,
   hideRunsTab = false,
+  hideDocsTab = false,
   hideNodeId = false,
   currentTab = "latest",
   onTabChange,
@@ -232,6 +240,9 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
+  componentDescription,
+  componentExamplePayload,
+  componentPayloadLabel,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -691,7 +702,7 @@ export const ComponentSidebar = ({
         >
           <Tabs
             value={activeTab}
-            onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
+            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
             className="flex-1"
           >
             {showSettingsTab && (
@@ -722,6 +733,18 @@ export const ComponentSidebar = ({
                       <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                     )}
                   </button>
+                  {!hideDocsTab && (
+                    <button
+                      onClick={() => onTabChange?.("docs")}
+                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                        activeTab === "docs"
+                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      }`}
+                    >
+                      Info
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -780,6 +803,17 @@ export const ComponentSidebar = ({
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
+                />
+              </TabsContent>
+            )}
+
+            {showSettingsTab && !hideDocsTab && (
+              <TabsContent value="docs" className="mt-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
+                <DocsTab
+                  description={componentDescription}
+                  examplePayload={componentExamplePayload}
+                  payloadLabel={componentPayloadLabel}
+                  configurationFields={nodeConfigurationFields}
                 />
               </TabsContent>
             )}

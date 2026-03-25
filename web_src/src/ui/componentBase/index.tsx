@@ -468,7 +468,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               />
             ))}
 
-            {includeEmptyState && <EmptyState {...emptyStateProps} />}
+            {includeEmptyState && <EmptyState compact {...emptyStateProps} />}
 
             {customFieldPosition === "after" &&
               (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}

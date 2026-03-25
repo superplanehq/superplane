@@ -30,6 +30,34 @@ func (o *Organization) IsProviderAllowed(provider string) bool {
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
+func ListAllOrganizations(search string, limit, offset int) ([]Organization, int64, error) {
+	query := database.Conn().Where("deleted_at IS NULL")
+
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Model(&Organization{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var organizations []Organization
+	if err := query.Order("name ASC").Find(&organizations).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return organizations, total, nil
+}
+
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 	var organizations []Organization
 
