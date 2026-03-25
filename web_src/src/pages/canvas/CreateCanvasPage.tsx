@@ -10,7 +10,7 @@ import { Textarea } from "../../components/ui/textarea";
 import { Button } from "../../components/ui/button";
 import { LoadingButton } from "../../components/ui/loading-button";
 import { Badge } from "../../components/ui/badge";
-import { useCreateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
+import { useCreateCanvas } from "../../hooks/useCanvasData";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { getApiErrorMessage } from "@/utils/errors";
@@ -18,8 +18,9 @@ import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLim
 import { showErrorToast } from "../../utils/toast";
 import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
 import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
+import { ImportYamlDialog } from "./ImportYamlDialog";
 import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
-import { LayoutTemplate, Monitor, Rainbow, Sparkles, Terminal } from "lucide-react";
+import { LayoutTemplate, Monitor, Rainbow, Sparkles, Terminal, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "./templateMetadata";
@@ -27,26 +28,20 @@ import { extractIntegrations, getTemplateTags, countNodesByType } from "./templa
 const MAX_CANVAS_NAME_LENGTH = 50;
 const MAX_CANVAS_DESCRIPTION_LENGTH = 200;
 
-type CreationMethod = "ui" | "template" | "cli" | "ai";
+type CreationMethod = "ui" | "cli" | "ai";
 
 const CREATION_METHODS = [
   {
     mode: "ui" as CreationMethod,
     icon: Monitor,
     title: "Build in UI",
-    subtitle: "Name it and start building",
-  },
-  {
-    mode: "template" as CreationMethod,
-    icon: LayoutTemplate,
-    title: "From Template",
-    subtitle: "Pre-built starting points",
+    subtitle: "Visual drag-and-drop builder",
   },
   {
     mode: "cli" as CreationMethod,
     icon: Terminal,
     title: "Use CLI",
-    subtitle: "Create from YAML",
+    subtitle: "Create from YAML config",
   },
   {
     mode: "ai" as CreationMethod,
@@ -67,9 +62,9 @@ export function CreateCanvasPage() {
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
   const [submitError, setSubmitError] = useState<unknown>(null);
+  const [isImportYamlOpen, setIsImportYamlOpen] = useState(false);
 
   const createMutation = useCreateCanvas(organizationId || "");
-  const { data: workflowTemplates = [], isLoading: templatesLoading } = useCanvasTemplates(organizationId || "");
 
   const handleSubmit = async () => {
     setNameError("");
@@ -133,7 +128,7 @@ export function CreateCanvasPage() {
 
           {/* Method tiles */}
           <div
-            className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 animate-in fade-in-0 slide-in-from-bottom-2 duration-500"
+            className="grid grid-cols-3 gap-3 mb-8 animate-in fade-in-0 slide-in-from-bottom-2 duration-500"
             style={{ animationDelay: "150ms", animationFillMode: "backwards" }}
           >
             {CREATION_METHODS.map((m) => {
@@ -182,96 +177,153 @@ export function CreateCanvasPage() {
           {/* Content panel */}
           <div key={method} className="min-h-[400px] animate-in fade-in-0 slide-in-from-bottom-1 duration-300">
             {method === "ui" && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-6 space-y-6">
-                {usageLimitNotice ? <UsageLimitAlert notice={usageLimitNotice} /> : null}
-                {submitError && !usageLimitNotice ? (
-                  <Alert variant="destructive">
-                    <AlertTitle>Unable to create canvas</AlertTitle>
-                    <AlertDescription>{getApiErrorMessage(submitError, "Failed to create canvas")}</AlertDescription>
-                  </Alert>
-                ) : null}
-                <Field>
-                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Canvas name *
-                  </Label>
-                  <Input
-                    data-testid="canvas-name-input"
-                    type="text"
-                    autoComplete="off"
-                    value={name}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
-                        setName(e.target.value);
-                      }
-                      if (nameError) {
-                        setNameError("");
-                      }
-                      if (submitError) {
-                        setSubmitError(null);
-                      }
-                    }}
-                    placeholder=""
-                    className={`w-full ${nameError ? "border-red-500" : ""}`}
-                    autoFocus
-                    maxLength={MAX_CANVAS_NAME_LENGTH}
-                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmit();
-                      }
-                    }}
-                  />
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
-                  </div>
-                  {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
-                </Field>
+              <>
+                <div className="bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-6 space-y-6">
+                  {usageLimitNotice ? <UsageLimitAlert notice={usageLimitNotice} /> : null}
+                  {submitError && !usageLimitNotice ? (
+                    <Alert variant="destructive">
+                      <AlertTitle>Unable to create canvas</AlertTitle>
+                      <AlertDescription>{getApiErrorMessage(submitError, "Failed to create canvas")}</AlertDescription>
+                    </Alert>
+                  ) : null}
+                  <Field>
+                    <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Canvas name *
+                    </Label>
+                    <Input
+                      data-testid="canvas-name-input"
+                      type="text"
+                      autoComplete="off"
+                      value={name}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        if (e.target.value.length <= MAX_CANVAS_NAME_LENGTH) {
+                          setName(e.target.value);
+                        }
+                        if (nameError) {
+                          setNameError("");
+                        }
+                        if (submitError) {
+                          setSubmitError(null);
+                        }
+                      }}
+                      placeholder=""
+                      className={`w-full ${nameError ? "border-red-500" : ""}`}
+                      autoFocus
+                      maxLength={MAX_CANVAS_NAME_LENGTH}
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSubmit();
+                        }
+                      }}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {name.length}/{MAX_CANVAS_NAME_LENGTH} characters
+                    </div>
+                    {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
+                  </Field>
 
-                <Field>
-                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => {
-                      if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
-                        setDescription(e.target.value);
-                      }
-                      if (submitError) {
-                        setSubmitError(null);
-                      }
-                    }}
-                    placeholder="Describe what it does (optional)"
-                    rows={3}
-                    className="w-full"
-                    maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
-                  />
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
-                  </div>
-                </Field>
+                  <Field>
+                    <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Description
+                    </Label>
+                    <Textarea
+                      value={description}
+                      onChange={(e) => {
+                        if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
+                          setDescription(e.target.value);
+                        }
+                        if (submitError) {
+                          setSubmitError(null);
+                        }
+                      }}
+                      placeholder="Describe what it does (optional)"
+                      rows={3}
+                      className="w-full"
+                      maxLength={MAX_CANVAS_DESCRIPTION_LENGTH}
+                    />
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {description.length}/{MAX_CANVAS_DESCRIPTION_LENGTH} characters
+                    </div>
+                  </Field>
 
-                <div className="flex justify-start gap-3">
-                  <LoadingButton
-                    onClick={handleSubmit}
-                    disabled={!name.trim() || !!nameError}
-                    loading={createMutation.isPending}
-                    loadingText="Creating Canvas..."
-                    data-testid="create-canvas-button"
-                  >
-                    Create Canvas
-                  </LoadingButton>
-                  <Button variant="outline" onClick={handleCancel}>
-                    Cancel
-                  </Button>
+                  <div className="flex justify-start gap-3">
+                    <LoadingButton
+                      onClick={handleSubmit}
+                      disabled={!name.trim() || !!nameError}
+                      loading={createMutation.isPending}
+                      loadingText="Creating Canvas..."
+                      data-testid="create-canvas-button"
+                    >
+                      Create Canvas
+                    </LoadingButton>
+                    <Button variant="outline" onClick={handleCancel}>
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {method === "template" && (
-              <TemplatePanel
-                templates={workflowTemplates}
-                loading={templatesLoading}
-                organizationId={organizationId || ""}
-              />
+                {/* Divider */}
+                <div className="flex items-center gap-3 my-5">
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <span className="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wider">
+                    or
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                </div>
+
+                {/* Secondary cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/${organizationId}/templates`)}
+                    className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-2">
+                        <LayoutTemplate size={18} className="text-gray-600 dark:text-gray-300" />
+                      </div>
+                      <div>
+                        <Heading level={3} className="!text-sm mb-1">
+                          Browse Templates
+                        </Heading>
+                        <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          Start from a pre-built canvas. Ready to go.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsImportYamlOpen(true)}
+                    className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-2">
+                        <Upload size={18} className="text-gray-600 dark:text-gray-300" />
+                      </div>
+                      <div>
+                        <Heading level={3} className="!text-sm mb-1">
+                          Import YAML
+                        </Heading>
+                        <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                          Upload or paste a canvas definition file.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {organizationId && (
+                  <ImportYamlDialog
+                    open={isImportYamlOpen}
+                    onOpenChange={setIsImportYamlOpen}
+                    organizationId={organizationId}
+                    onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+                  />
+                )}
+              </>
             )}
 
             {method === "cli" && <CLIPanel organizationId={organizationId || ""} />}
@@ -280,49 +332,6 @@ export function CreateCanvasPage() {
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-function TemplatePanel({
-  templates,
-  loading,
-  organizationId,
-}: {
-  templates: any[];
-  loading: boolean;
-  organizationId: string;
-}) {
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-primary mb-3" />
-        <Text className="text-[13px] text-gray-500 dark:text-gray-400">Loading templates...</Text>
-      </div>
-    );
-  }
-
-  if (templates.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="rounded-2xl bg-gray-100 dark:bg-gray-800 p-4 mb-4">
-          <LayoutTemplate size={28} className="text-gray-400 dark:text-gray-500" />
-        </div>
-        <Heading level={3} className="!text-lg mb-2">
-          No templates yet
-        </Heading>
-        <Text className="text-[13px] text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">
-          Templates will appear here once they are available for your organization.
-        </Text>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {templates.map((template) => (
-        <TemplateCard key={template.metadata?.id} template={template} organizationId={organizationId} />
-      ))}
     </div>
   );
 }

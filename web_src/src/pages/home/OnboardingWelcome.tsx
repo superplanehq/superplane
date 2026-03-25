@@ -108,6 +108,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
   const { data: templates = [] } = useCanvasTemplates(organizationId);
   const [mode, setMode] = useState<Mode>("ui");
   const [isLaunchingQuickStart, setIsLaunchingQuickStart] = useState(false);
+  const [isCreatingBlankCanvas, setIsCreatingBlankCanvas] = useState(false);
 
   const firstName = account?.name?.split(" ")[0] || "";
 
@@ -270,6 +271,33 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       showErrorToast(message);
     } finally {
       setIsLaunchingQuickStart(false);
+    }
+  };
+
+  const handleCreateBlankCanvas = async () => {
+    setIsCreatingBlankCanvas(true);
+    try {
+      const result = await canvasesCreateCanvas(
+        withOrganizationHeader({
+          body: {
+            canvas: {
+              metadata: { name: "Untitled Canvas", description: "" },
+              spec: { nodes: [], edges: [] },
+            },
+          },
+        }),
+      );
+
+      const canvasId = result.data?.canvas?.metadata?.id;
+      if (!canvasId) return;
+
+      queryClient.invalidateQueries({ queryKey: canvasKeys.lists() });
+      navigate(`/${organizationId}/canvases/${canvasId}`, { replace: true });
+    } catch (error) {
+      const message = (error as Error)?.message || "Failed to create canvas";
+      showErrorToast(message);
+    } finally {
+      setIsCreatingBlankCanvas(false);
     }
   };
 
@@ -440,17 +468,21 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                 <PermissionTooltip allowed={permissionAllowed} message="You don't have permission to create canvases.">
                   <button
                     type="button"
-                    disabled={!canCreateCanvases}
-                    onClick={() => navigate(`/${organizationId}/canvases/new`)}
+                    disabled={!canCreateCanvases || isCreatingBlankCanvas}
+                    onClick={handleCreateBlankCanvas}
                     className="w-full text-left bg-white dark:bg-gray-800 rounded-xl outline outline-slate-950/10 dark:outline-gray-700 p-5 hover:shadow-md transition-shadow cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-start gap-3">
                       <div className="mt-0.5 rounded-lg bg-gray-100 dark:bg-gray-700 p-2">
-                        <Plus size={18} className="text-gray-600 dark:text-gray-300" />
+                        {isCreatingBlankCanvas ? (
+                          <Loader2 size={18} className="text-gray-600 dark:text-gray-300 animate-spin" />
+                        ) : (
+                          <Plus size={18} className="text-gray-600 dark:text-gray-300" />
+                        )}
                       </div>
                       <div>
                         <Heading level={3} className="!text-sm mb-1">
-                          New Canvas
+                          Blank Canvas
                         </Heading>
                         <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
                           Start from scratch. You know what you&rsquo;re doing.
