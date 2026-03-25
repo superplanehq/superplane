@@ -1509,7 +1509,6 @@ function Sidebar({
         description: matchedComponent.description,
         examplePayload: matchedComponent.exampleOutput,
         payloadLabel: "Example Output" as const,
-        outputChannels: matchedComponent.outputChannels,
       };
     }
 
@@ -1519,7 +1518,6 @@ function Sidebar({
         description: matchedTrigger.description,
         examplePayload: matchedTrigger.exampleData,
         payloadLabel: "Example Data" as const,
-        outputChannels: undefined,
       };
     }
 
@@ -1639,6 +1637,7 @@ function Sidebar({
       executionChainRequestId={focusRequest?.requestId}
       onExecutionChainHandled={onExecutionChainHandled}
       hideRunsTab={isAnnotationNode}
+      hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
       readOnly={readOnly}
     />

@@ -1,16 +1,5 @@
 import type { ConfigurationField } from "@/api-client";
-import { PayloadDialog } from "@/ui/BuildingBlocksSidebar/PayloadDialog";
-import JsonView from "@uiw/react-json-view";
-import { Copy, Check, Maximize2 } from "lucide-react";
-import { useState } from "react";
-
-const jsonViewStyle = {
-  fontSize: "12px",
-  fontFamily: 'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
-  backgroundColor: "#ffffff",
-  color: "#24292e",
-  padding: "8px",
-} as const;
+import { PayloadPreview } from "@/ui/BuildingBlocksSidebar/PayloadPreview";
 
 function ConfigTable({ fields }: { fields: ConfigurationField[] }) {
   return (
@@ -62,17 +51,7 @@ export function DocsTab({
   payloadLabel = "Example Output",
   configurationFields = [],
 }: DocsTabProps) {
-  const [isPayloadOpen, setIsPayloadOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
   const hasPayload = examplePayload && Object.keys(examplePayload).length > 0;
-
-  const payloadString = hasPayload ? JSON.stringify(examplePayload, null, 2) : "";
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(payloadString);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   if (!description && !hasPayload && configurationFields.length === 0) {
     return (
@@ -83,50 +62,30 @@ export function DocsTab({
   }
 
   return (
-    <>
-      <div className="pb-8">
-        {description && (
-          <div className="w-full px-4 pt-3 pb-3">
-            <span className="text-[13px] font-medium text-gray-500">Description</span>
-            <p className="text-[13px] text-gray-800 mt-1 leading-relaxed">{description}</p>
+    <div className="pb-8">
+      {description && (
+        <div className="w-full px-4 pt-3 pb-3">
+          <span className="text-[13px] font-medium text-gray-500">Description</span>
+          <p className="text-[13px] text-gray-800 mt-1 leading-relaxed">{description}</p>
+        </div>
+      )}
+
+      {hasPayload && (
+        <div className="w-full px-2 py-2 border-t border-gray-200">
+          <div className="px-2">
+            <PayloadPreview
+              value={examplePayload!}
+              label={payloadLabel}
+              dialogTitle={payloadLabel}
+              maxHeight="max-h-64"
+              showCopy
+              labelSize="md"
+            />
           </div>
-        )}
+        </div>
+      )}
 
-        {hasPayload && (
-          <div className="w-full px-2 py-2 border-t border-gray-200">
-            <div className="flex items-center justify-between mb-2 relative">
-              <span className="text-[13px] font-medium text-gray-500 px-2">{payloadLabel}</span>
-              <div className="flex items-center gap-1">
-                <button onClick={handleCopy} className="p-1 text-gray-500 hover:text-gray-800">
-                  {copied ? <Check size={16} /> : <Copy size={16} />}
-                </button>
-                <button onClick={() => setIsPayloadOpen(true)} className="p-1 text-gray-500 hover:text-gray-800">
-                  <Maximize2 size={16} />
-                </button>
-              </div>
-            </div>
-            <div className="max-h-64 overflow-auto rounded">
-              <JsonView
-                value={examplePayload!}
-                style={jsonViewStyle}
-                className="json-viewer-hide-types"
-                displayObjectSize={false}
-                enableClipboard={false}
-              />
-            </div>
-          </div>
-        )}
-
-        {configurationFields.length > 0 && <ConfigTable fields={configurationFields} />}
-      </div>
-
-      <PayloadDialog
-        open={isPayloadOpen}
-        onOpenChange={setIsPayloadOpen}
-        title={payloadLabel}
-        label="Example payload viewer"
-        payloadString={payloadString}
-      />
-    </>
+      {configurationFields.length > 0 && <ConfigTable fields={configurationFields} />}
+    </div>
   );
 }
