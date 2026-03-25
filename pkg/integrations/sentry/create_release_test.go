@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,9 +44,10 @@ func Test__CreateRelease__Configuration(t *testing.T) {
 	fields := component.Configuration()
 
 	assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[0].Type)
-	assert.Equal(t, configuration.FieldTypeExpression, fields[1].Type)
+	assert.Equal(t, configuration.FieldTypeString, fields[1].Type)
+	assert.Equal(t, configuration.FieldTypeString, fields[2].Type)
+	assert.Equal(t, configuration.FieldTypeList, fields[4].Type)
 	assert.Equal(t, configuration.FieldTypeList, fields[5].Type)
-	assert.Equal(t, configuration.FieldTypeList, fields[6].Type)
 }
 
 func Test__CreateRelease__Execute(t *testing.T) {
@@ -56,14 +58,14 @@ func Test__CreateRelease__Execute(t *testing.T) {
 		},
 	}
 	executionState := &contexts.ExecutionStateContext{}
+	before := time.Now().UTC()
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"project":      "backend",
-			"version":      "2026.03.25",
-			"ref":          "abc123",
-			"url":          "https://example.com/releases/2026.03.25",
-			"dateReleased": "2026-03-25T10:00:00Z",
+			"project": "backend",
+			"version": "2026.03.25",
+			"ref":     "abc123",
+			"url":     "https://example.com/releases/2026.03.25",
 			"commits": []map[string]any{
 				{
 					"id":          "abc123",
@@ -96,6 +98,7 @@ func Test__CreateRelease__Execute(t *testing.T) {
 		},
 		ExecutionState: executionState,
 	})
+	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.True(t, executionState.Passed)
@@ -111,7 +114,12 @@ func Test__CreateRelease__Execute(t *testing.T) {
 	assert.Equal(t, "2026.03.25", requestBody["version"])
 	assert.Equal(t, "abc123", requestBody["ref"])
 	assert.Equal(t, "https://example.com/releases/2026.03.25", requestBody["url"])
-	assert.Equal(t, "2026-03-25T10:00:00Z", requestBody["dateReleased"])
+	dateReleasedValue, ok := requestBody["dateReleased"].(string)
+	require.True(t, ok)
+	dateReleased, parseErr := time.Parse(time.RFC3339, dateReleasedValue)
+	require.NoError(t, parseErr)
+	assert.False(t, dateReleased.Before(before.Add(-time.Second)))
+	assert.False(t, dateReleased.After(after.Add(time.Second)))
 	assert.Equal(t, []any{"backend"}, requestBody["projects"])
 	require.Len(t, requestBody["commits"], 1)
 	require.Len(t, requestBody["refs"], 1)

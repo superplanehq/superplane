@@ -62,7 +62,12 @@ func Test__CreateDeploy__Configuration(t *testing.T) {
 	fields := component.Configuration()
 
 	assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[0].Type)
-	assert.Equal(t, configuration.FieldTypeExpression, fields[1].Type)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[1].Type)
+	require.NotNil(t, fields[1].TypeOptions)
+	require.NotNil(t, fields[1].TypeOptions.Resource)
+	assert.Equal(t, ResourceTypeRelease, fields[1].TypeOptions.Resource.Type)
+	require.Len(t, fields[1].TypeOptions.Resource.Parameters, 1)
+	assert.Equal(t, "project", fields[1].TypeOptions.Resource.Parameters[0].Name)
 	assert.Equal(t, configuration.FieldTypeDateTime, fields[5].Type)
 	assert.Equal(t, configuration.FieldTypeDateTime, fields[6].Type)
 }

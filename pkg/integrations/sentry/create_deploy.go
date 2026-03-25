@@ -51,7 +51,7 @@ func (c *CreateDeploy) Documentation() string {
 ## Configuration
 
 - **Project**: Optional Sentry project to associate with the deploy
-- **Release Version**: The existing Sentry release version to deploy
+- **Release**: Select the existing Sentry release to deploy
 - **Environment**: The target environment, such as staging or production
 - **Name**: Optional deploy name
 - **Deploy URL**: Optional URL for the deployment
@@ -91,10 +91,23 @@ func (c *CreateDeploy) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "releaseVersion",
-			Label:       "Release Version",
-			Type:        configuration.FieldTypeExpression,
+			Label:       "Release",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Existing Sentry release version to deploy",
+			Description: "Existing Sentry release to deploy",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeRelease,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "project",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "project",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "environment",
