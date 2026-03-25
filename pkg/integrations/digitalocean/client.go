@@ -1533,7 +1533,6 @@ func (c *SpacesClient) ListBuckets() ([]string, error) {
 	return names, nil
 }
 
-
 // GetObjectTagging retrieves the tags applied to an object in a Spaces bucket.
 func (c *SpacesClient) GetObjectTagging(bucket, key string) (map[string]string, error) {
 	res, err := c.execSpacesRequest(http.MethodGet, bucket, key, "tagging=")
