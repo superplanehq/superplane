@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -18,13 +19,12 @@ type CreateReleaseNodeMetadata struct {
 }
 
 type CreateReleaseConfiguration struct {
-	Project      string                             `json:"project" mapstructure:"project"`
-	Version      string                             `json:"version" mapstructure:"version"`
-	Ref          string                             `json:"ref" mapstructure:"ref"`
-	URL          string                             `json:"url" mapstructure:"url"`
-	DateReleased string                             `json:"dateReleased" mapstructure:"dateReleased"`
-	Commits      []CreateReleaseCommitConfiguration `json:"commits" mapstructure:"commits"`
-	Refs         []CreateReleaseRefConfiguration    `json:"refs" mapstructure:"refs"`
+	Project string                             `json:"project" mapstructure:"project"`
+	Version string                             `json:"version" mapstructure:"version"`
+	Ref     string                             `json:"ref" mapstructure:"ref"`
+	URL     string                             `json:"url" mapstructure:"url"`
+	Commits []CreateReleaseCommitConfiguration `json:"commits" mapstructure:"commits"`
+	Refs    []CreateReleaseRefConfiguration    `json:"refs" mapstructure:"refs"`
 }
 
 type CreateReleaseCommitConfiguration struct {
@@ -69,7 +69,6 @@ func (c *CreateRelease) Documentation() string {
 - **Version**: The release version identifier
 - **Ref**: Optional commit or tag reference for the release
 - **Release URL**: Optional URL for the release, build, or changelog
-- **Released At**: Optional date/time when the release went live
 - **Commits**: Optional commit metadata to associate with the release
 - **Refs**: Optional repository head/previous commit refs for release comparison
 
@@ -107,14 +106,14 @@ func (c *CreateRelease) Configuration() []configuration.Field {
 		{
 			Name:        "version",
 			Label:       "Version",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "Release version identifier, such as 2026.03.25 or a commit SHA",
 		},
 		{
 			Name:        "ref",
 			Label:       "Ref",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional tag or commit reference for the release",
 		},
@@ -124,13 +123,6 @@ func (c *CreateRelease) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional URL to the release, build, or changelog",
-		},
-		{
-			Name:        "dateReleased",
-			Label:       "Released At",
-			Type:        configuration.FieldTypeDateTime,
-			Required:    false,
-			Description: "Optional date/time when the release went live",
 		},
 		{
 			Name:        "commits",
@@ -147,7 +139,7 @@ func (c *CreateRelease) Configuration() []configuration.Field {
 							{
 								Name:     "id",
 								Label:    "Commit SHA",
-								Type:     configuration.FieldTypeExpression,
+								Type:     configuration.FieldTypeString,
 								Required: true,
 							},
 							{
@@ -206,13 +198,13 @@ func (c *CreateRelease) Configuration() []configuration.Field {
 							{
 								Name:     "commit",
 								Label:    "Commit",
-								Type:     configuration.FieldTypeExpression,
+								Type:     configuration.FieldTypeString,
 								Required: true,
 							},
 							{
 								Name:     "previousCommit",
 								Label:    "Previous Commit",
-								Type:     configuration.FieldTypeExpression,
+								Type:     configuration.FieldTypeString,
 								Required: false,
 							},
 						},
@@ -267,7 +259,7 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 		Projects:     []string{config.Project},
 		Ref:          config.Ref,
 		URL:          config.URL,
-		DateReleased: config.DateReleased,
+		DateReleased: time.Now().UTC().Format(time.RFC3339),
 		Commits:      buildReleaseCommitPayload(config.Commits),
 		Refs:         buildReleaseRefPayload(config.Refs),
 	})
@@ -308,7 +300,6 @@ func decodeCreateReleaseConfiguration(input any) (CreateReleaseConfiguration, er
 	config.Version = strings.TrimSpace(config.Version)
 	config.Ref = strings.TrimSpace(config.Ref)
 	config.URL = strings.TrimSpace(config.URL)
-	config.DateReleased = strings.TrimSpace(config.DateReleased)
 
 	for index := range config.Commits {
 		config.Commits[index].ID = strings.TrimSpace(config.Commits[index].ID)

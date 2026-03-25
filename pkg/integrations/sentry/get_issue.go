@@ -92,6 +92,10 @@ func (c *GetIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("issueId is required")
 	}
 
+	if isExpressionValue(config.IssueID) {
+		return ctx.Metadata.Set(GetIssueNodeMetadata{})
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create sentry client: %w", err)
