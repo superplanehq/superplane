@@ -44,7 +44,6 @@ type GitHub struct {
 
 type Configuration struct {
 	Organization string `mapstructure:"organization" json:"organization"`
-	ReturnPath   string `mapstructure:"returnPath" json:"returnPath"`
 }
 
 type Metadata struct {
@@ -53,7 +52,6 @@ type Metadata struct {
 	Owner          string            `mapstructure:"owner" json:"owner"`
 	Repositories   []Repository      `mapstructure:"repositories" json:"repositories"`
 	GitHubApp      GitHubAppMetadata `mapstructure:"githubApp" json:"githubApp"`
-	ReturnPath     string            `mapstructure:"returnPath" json:"returnPath,omitempty"`
 }
 
 type GitHubAppMetadata struct {
@@ -171,9 +169,8 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	})
 
 	ctx.Integration.SetMetadata(Metadata{
-		Owner:      config.Organization,
-		State:      state,
-		ReturnPath: config.ReturnPath,
+		Owner: config.Organization,
+		State: state,
 	})
 
 	return nil
@@ -456,17 +453,12 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)
 	ctx.Logger.Infof("Repositories: %v", metadata.Repositories)
 
-	redirectURL := fmt.Sprintf(
-		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-	)
-	if p := metadata.ReturnPath; len(p) > 1 && p[0] == '/' && p[1] != '/' {
-		redirectURL = fmt.Sprintf("%s%s", ctx.BaseURL, p)
-	}
-
 	http.Redirect(
 		ctx.Response,
 		ctx.Request,
-		redirectURL,
+		fmt.Sprintf(
+			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
+		),
 		http.StatusSeeOther,
 	)
 }

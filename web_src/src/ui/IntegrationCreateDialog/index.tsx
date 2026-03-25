@@ -55,8 +55,6 @@ export interface IntegrationCreateDialogProps {
   initialWebhookSetup?: { id: string; webhookUrl: string; config: Record<string, unknown> };
   /** Existing configuration to pre-populate when resuming a pending integration flow. */
   initialConfiguration?: Record<string, unknown>;
-  /** If set, the backend will redirect to this path (relative to base URL) after completing an external setup flow (e.g. GitHub App installation). */
-  returnPath?: string;
 }
 
 export function IntegrationCreateDialog({
@@ -76,7 +74,6 @@ export function IntegrationCreateDialog({
   initialBrowserAction,
   initialWebhookSetup,
   initialConfiguration,
-  returnPath,
 }: IntegrationCreateDialogProps) {
   const queryClient = useQueryClient();
   const [integrationName, setIntegrationName] = useState(defaultName);
@@ -161,7 +158,7 @@ export function IntegrationCreateDialog({
       const result = await onCreateIntegration({
         integrationName: integrationDefinition.name,
         name: nextName,
-        configuration: returnPath ? { ...configuration, returnPath } : configuration,
+        configuration,
       });
 
       const integration = result.integration;
@@ -201,7 +198,6 @@ export function IntegrationCreateDialog({
     onCreateIntegration,
     handleClose,
     onCreated,
-    returnPath,
   ]);
 
   const handleCompleteWebhookSetup = useCallback(async () => {
