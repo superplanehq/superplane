@@ -853,7 +853,7 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
 ### Use Cases
 
 - **Config reading**: Fetch a JSON or YAML config file and use its contents in downstream workflow steps
-- **File existence check**: Verify a file exists before triggering a process — route to not_found if it is missing
+- **File existence check**: Verify a file exists before triggering a process — route to notFound if it is missing
 - **Change detection**: Compare ETag or LastModified with a previously stored value to detect updates
 - **Backup verification**: Confirm a backup file was written today by checking LastModified
 - **Tag-based routing**: Read object tags to drive workflow logic (e.g. status=ready)

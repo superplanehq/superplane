@@ -40,11 +40,11 @@ export const getObjectMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as
-      | { found?: { data: GetObjectOutput }[]; not_found?: { data: GetObjectOutput }[] }
+      | { found?: { data: GetObjectOutput }[]; notFound?: { data: GetObjectOutput }[] }
       | undefined;
 
     const result = outputs?.found?.[0]?.data;
-    const notFound = outputs?.not_found?.[0]?.data;
+    const notFound = outputs?.notFound?.[0]?.data;
 
     if (notFound) {
       details["File Path"] = notFound.filePath || "-";

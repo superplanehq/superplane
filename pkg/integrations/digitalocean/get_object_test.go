@@ -251,7 +251,7 @@ func Test__GetObject__Execute(t *testing.T) {
 		assert.Equal(t, "hello, world!", payload["body"])
 	})
 
-	t.Run("object not found -> emits not_found", func(t *testing.T) {
+	t.Run("object not found -> emits notFound", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
