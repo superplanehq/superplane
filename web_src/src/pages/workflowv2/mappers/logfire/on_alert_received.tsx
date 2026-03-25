@@ -4,6 +4,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";
+import type { MetadataItem } from "@/ui/metadataList";
 
 interface LogfireAlertEventData {
   alertId?: string;
@@ -37,27 +38,46 @@ export const onAlertReceivedTriggerRenderer: TriggerRenderer = {
     };
   },
 
-  getRootEventValues: (context: TriggerEventContext): Record<string, any> => {
+  getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as LogfireAlertEventData;
+
     return {
+      "Received At": getReceivedAtValue(context, eventData),
+      "Event Type": eventData?.eventType || "",
       "Alert ID": eventData?.alertId || "",
       "Alert Name": eventData?.alertName || "",
-      "Event Type": eventData?.eventType || "",
       Severity: eventData?.severity || "",
       Message: eventData?.message || "",
       URL: eventData?.url || "",
-      Timestamp: eventData?.timestamp || "",
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
     const { node, definition, lastEvent } = context;
+
+    type LogfireOnAlertReceivedConfiguration = {
+      projectId?: string;
+      alertId?: string;
+    };
+
+    const configuration = node.configuration as LogfireOnAlertReceivedConfiguration | undefined;
+    const projectId = configuration?.projectId?.trim();
+    const alertId = configuration?.alertId?.trim();
+
+    const metadata: MetadataItem[] = [];
+    if (projectId) {
+      metadata.push({ icon: "folder", label: `Project: ${projectId}` });
+    }
+    if (alertId) {
+      metadata.push({ icon: "bell", label: `Alert: ${alertId}` });
+    }
+
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: logfireIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: [{ icon: "link", label: "Webhook endpoint configured" }],
+      metadata: metadata.slice(0, 3),
     };
 
     if (lastEvent) {
@@ -94,4 +114,14 @@ function buildTitle(eventData: LogfireAlertEventData | undefined): string {
     return eventData.message;
   }
   return "Logfire alert received";
+}
+
+function getReceivedAtValue(context: TriggerEventContext, eventData: LogfireAlertEventData): string {
+  const createdAt = context.event?.createdAt;
+  if (!createdAt) return eventData.timestamp || "";
+
+  const receivedAtDate = new Date(createdAt);
+  if (Number.isNaN(receivedAtDate.getTime())) return eventData.timestamp || "";
+
+  return receivedAtDate.toLocaleString();
 }

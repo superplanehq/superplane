@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"strings"
 )
 
 func init() {
@@ -49,14 +50,12 @@ func (l *Logfire) Instructions() string {
 2. Under **ORG: <your-username>**, select **API Keys**.
 3. Click **New API Key**.
 4. Enter a key name.
-5. Enable these scopes:
+5. Enable these **five** scopes:
    - **Organization scopes**: ` + "`organization:write_channel`" + ` (required for auto-creating webhook channels)
-   - **Project scopes**: ` + "`project:read`" + ` and ` + "`project:read_token`" + `
-6. Choose project access:
-   - **All projects**, or
-   - Select a specific project from the dropdown.
+   - **Project scopes**: ` + "`project:read `, " + "`project:read_token `, " + "`project:read_alert `, " + "and " + "`project:write_alert`" + `
+6. Select **All Project** or a specific project from the dropdown.
 7. Click **Create API Key**.
-8. Copy the API key and paste it into SuperPlane integration settings.`
+8. Copy the API key and paste it.`
 }
 
 func (l *Logfire) Configuration() []configuration.Field {
@@ -100,7 +99,7 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	bootstrap, err := client.BootstrapIntegration("superplane-query-token")
+	bootstrap, err := client.FindFirstUsableReadToken(defaultReadTokenName)
 	if err != nil {
 		return err
 	}
@@ -135,7 +134,71 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 }
 
 func (l *Logfire) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	return []core.IntegrationResource{}, nil
+	if resourceType != "project" && resourceType != "alert" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("error creating client: %v", err)
+	}
+
+	if resourceType == "project" {
+		projects, err := client.ListProjects()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list Logfire projects: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(projects))
+		for _, project := range projects {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: project.ProjectName,
+				ID:   project.ID,
+			})
+		}
+
+		return resources, nil
+	}
+
+	// resourceType == "alert"
+	projectID := ctx.Parameters["projectId"]
+	if isUnsetProjectID(projectID) {
+		// Project is selected in a separate dropdown. When it isn't selected yet,
+		// populate an empty alert dropdown instead of failing the resource load.
+		return []core.IntegrationResource{}, nil
+	}
+
+	projectID = strings.TrimSpace(projectID)
+	alerts, err := client.ListAlerts(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list Logfire alerts: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(alerts))
+	for _, alert := range alerts {
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: alert.Name,
+			ID:   alert.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func isUnsetProjectID(projectID string) bool {
+	trimmed := strings.TrimSpace(projectID)
+	if trimmed == "" {
+		return true
+	}
+
+	switch strings.ToLower(trimmed) {
+	case "undefined", "null":
+		return true
+	default:
+		return false
+	}
 }
 
 func (l *Logfire) HandleRequest(ctx core.HTTPRequestContext) {

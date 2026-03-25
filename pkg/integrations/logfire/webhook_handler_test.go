@@ -18,15 +18,15 @@ func TestLogfireWebhookHandler_CompareConfig(t *testing.T) {
 	handler := &LogfireWebhookHandler{}
 
 	same, err := handler.CompareConfig(
-		map[string]any{"eventType": " Alert.Received ", "resource": " Alerts "},
-		map[string]any{"eventType": "alert.received", "resource": "alerts"},
+		map[string]any{"eventType": " Alert.Received ", "resource": " Alerts ", "projectId": "proj_1", "alertId": "alt_1"},
+		map[string]any{"eventType": "alert.received", "resource": "alerts", "projectId": "proj_1", "alertId": "alt_1"},
 	)
 	require.NoError(t, err)
 	assert.True(t, same)
 
 	same, err = handler.CompareConfig(
-		map[string]any{"eventType": "alert.received", "resource": "alerts"},
-		map[string]any{"eventType": "alert.resolved", "resource": "alerts"},
+		map[string]any{"eventType": "alert.received", "resource": "alerts", "projectId": "proj_1", "alertId": "alt_1"},
+		map[string]any{"eventType": "alert.resolved", "resource": "alerts", "projectId": "proj_1", "alertId": "alt_1"},
 	)
 	require.NoError(t, err)
 	assert.False(t, same)
@@ -43,14 +43,32 @@ func TestLogfireWebhookHandler_Setup_Success(t *testing.T) {
 		ID:     "node_123",
 		URL:    "https://example.com/webhook",
 		Secret: []byte("secret-123"),
+		Configuration: map[string]any{
+			"eventType": onAlertReceivedEventType,
+			"resource":  onAlertReceivedResource,
+			"projectId": "proj_123",
+			"alertId":   "alt_456",
+		},
 	}
 
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
 		HTTP: &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"channel_ids":[]}`)),
+				},
+				{
 					StatusCode: http.StatusCreated,
 					Body:       io.NopCloser(strings.NewReader(`{"id":"channel_123","label":"superplane-webhook-node_123"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"channel_ids":[]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{}`)),
 				},
 			},
 		},
@@ -78,6 +96,10 @@ func TestLogfireWebhookHandler_Setup_UnsupportedProvisioning(t *testing.T) {
 		HTTP: &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"channel_ids":[]}`)),
+				},
+				{
 					StatusCode: http.StatusNotFound,
 					Body:       io.NopCloser(strings.NewReader(`{"error":"not found"}`)),
 				},
@@ -88,6 +110,12 @@ func TestLogfireWebhookHandler_Setup_UnsupportedProvisioning(t *testing.T) {
 			ID:     "node_123",
 			URL:    "https://example.com/webhook",
 			Secret: []byte("secret-123"),
+			Configuration: map[string]any{
+				"eventType": onAlertReceivedEventType,
+				"resource":  onAlertReceivedResource,
+				"projectId": "proj_123",
+				"alertId":   "alt_456",
+			},
 		},
 	})
 	require.NoError(t, err)

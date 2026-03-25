@@ -25,6 +25,10 @@ func TestOnAlertReceived_Setup_RequestsStableWebhookConfiguration(t *testing.T) 
 
 	err := trigger.Setup(core.TriggerContext{
 		Integration: integrationCtx,
+		Configuration: map[string]any{
+			"projectId": "proj_123",
+			"alertId":   "alt_456",
+		},
 	})
 	require.NoError(t, err)
 	require.Len(t, integrationCtx.WebhookRequests, 1)
@@ -33,6 +37,8 @@ func TestOnAlertReceived_Setup_RequestsStableWebhookConfiguration(t *testing.T) 
 	require.True(t, ok)
 	assert.Equal(t, onAlertReceivedEventType, requestedConfig.EventType)
 	assert.Equal(t, onAlertReceivedResource, requestedConfig.Resource)
+	assert.Equal(t, "proj_123", requestedConfig.ProjectID)
+	assert.Equal(t, "alt_456", requestedConfig.AlertID)
 }
 
 func TestOnAlertReceived_HandleWebhook(t *testing.T) {

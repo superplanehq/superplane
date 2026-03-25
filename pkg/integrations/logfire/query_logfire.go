@@ -15,6 +15,7 @@ type QueryLogfire struct{}
 
 type QueryLogfireConfiguration struct {
 	SQL          string `json:"sql" mapstructure:"sql"`
+	ProjectID    string `json:"projectId" mapstructure:"projectId"`
 	MinTimestamp string `json:"minTimestamp,omitempty" mapstructure:"minTimestamp"`
 	MaxTimestamp string `json:"maxTimestamp,omitempty" mapstructure:"maxTimestamp"`
 	Limit        int    `json:"limit,omitempty" mapstructure:"limit"`
@@ -102,6 +103,19 @@ func (c *QueryLogfire) Configuration() []configuration.Field {
 			Placeholder: "SELECT start_timestamp FROM records LIMIT 1",
 		},
 		{
+			Name:        "projectId",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Logfire project to query (scopes the generated read token)",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "project",
+					UseNameAsValue: false,
+				},
+			},
+		},
+		{
 			Name:        "minTimestamp",
 			Label:       "Min Timestamp",
 			Type:        configuration.FieldTypeString,
@@ -154,6 +168,27 @@ func (c *QueryLogfire) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("limit must be greater than or equal to 0")
 	}
 
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Logfire client: %w", err)
+	}
+
+	if config.ProjectID != "" {
+		readToken, err := client.CreateReadToken(config.ProjectID, defaultReadTokenName)
+		if err != nil {
+			return fmt.Errorf("failed to create Logfire read token for project %q: %w", config.ProjectID, err)
+		}
+		// Override the read token so ValidateCredentials() runs against the selected project.
+		client.ReadToken = readToken
+	}
+
+	if err := client.ValidateCredentials(); err != nil {
+		if config.ProjectID != "" {
+			return fmt.Errorf("invalid Logfire project selection %q: %w", config.ProjectID, err)
+		}
+		return fmt.Errorf("invalid Logfire read token: %w", err)
+	}
+
 	return nil
 }
 
@@ -170,6 +205,14 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Logfire client: %w", err)
+	}
+
+	if config.ProjectID != "" {
+		readToken, err := client.CreateReadToken(config.ProjectID, defaultReadTokenName)
+		if err != nil {
+			return fmt.Errorf("failed to create Logfire read token for project %q: %w", config.ProjectID, err)
+		}
+		client.ReadToken = readToken
 	}
 
 	response, err := client.ExecuteQuery(QueryRequest{
@@ -192,6 +235,7 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 
 func sanitizeQueryLogfireConfiguration(config QueryLogfireConfiguration) QueryLogfireConfiguration {
 	config.SQL = strings.TrimSpace(config.SQL)
+	config.ProjectID = strings.TrimSpace(config.ProjectID)
 	config.MinTimestamp = strings.TrimSpace(config.MinTimestamp)
 	config.MaxTimestamp = strings.TrimSpace(config.MaxTimestamp)
 	return config

@@ -3,6 +3,7 @@ package logfire
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"net/http"
@@ -12,9 +13,16 @@ import (
 
 type OnAlertReceived struct{}
 
+type onAlertReceivedConfiguration struct {
+	ProjectID string `json:"projectId" mapstructure:"projectId"`
+	AlertID   string `json:"alertId" mapstructure:"alertId"`
+}
+
 type onAlertReceivedWebhookConfiguration struct {
 	EventType string `json:"eventType"`
 	Resource  string `json:"resource"`
+	ProjectID string `json:"projectId"`
+	AlertID   string `json:"alertId"`
 }
 
 const (
@@ -38,8 +46,7 @@ func (t *OnAlertReceived) Documentation() string {
 	return `The On Alert Received trigger starts a workflow execution when Logfire sends an alert payload to your SuperPlane webhook URL.
 
 ## Configuration
-
-This trigger does not require any additional fields.
+Select the Logfire Project and Alert you want to trigger the workflow.
 
 ## Webhook setup
 
@@ -68,13 +75,56 @@ func (t *OnAlertReceived) ExampleData() map[string]any {
 }
 
 func (t *OnAlertReceived) Configuration() []configuration.Field {
-	return []configuration.Field{}
+	return []configuration.Field{
+		{
+			Name:        "projectId",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Logfire project to select alerts from",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "project",
+					UseNameAsValue: false,
+				},
+			},
+		},
+		{
+			Name:        "alertId",
+			Label:       "Alert",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "Logfire alert to trigger the workflow",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "alert",
+					UseNameAsValue: false,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "projectId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func (t *OnAlertReceived) Setup(ctx core.TriggerContext) error {
+	var config onAlertReceivedConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	config.ProjectID = strings.TrimSpace(config.ProjectID)
+	config.AlertID = strings.TrimSpace(config.AlertID)
+
 	return ctx.Integration.RequestWebhook(onAlertReceivedWebhookConfiguration{
 		EventType: onAlertReceivedEventType,
 		Resource:  onAlertReceivedResource,
+		ProjectID: config.ProjectID,
+		AlertID:   config.AlertID,
 	})
 }
 

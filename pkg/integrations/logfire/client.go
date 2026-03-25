@@ -89,11 +89,10 @@ func (c *Client) ValidateCredentials() error {
 	return fmt.Errorf("could not connect to Logfire - please verify your read token and base URL, then try again: %w", err)
 }
 
-// BootstrapIntegration follows the verified API-key flow:
-// 1) List projects using API key.
-// 2) Create read token for the project using API key.
-// 3) Verify the generated read token by running a simple query.
-func (c *Client) BootstrapIntegration(readTokenName string) (*IntegrationBootstrapResult, error) {
+// FindFirstUsableReadToken tries to create a read token in each accessible project.
+// It returns the first project where creating a token succeeds and the token passes ValidateCredentials.
+// If none of the projects allow token creation, it fails with a clear permission error.
+func (c *Client) FindFirstUsableReadToken(tokenName string) (*IntegrationBootstrapResult, error) {
 	projects, err := c.ListProjects()
 	if err != nil {
 		return nil, fmt.Errorf("invalid Logfire API key - please verify your key and try again: %w", err)
@@ -102,20 +101,32 @@ func (c *Client) BootstrapIntegration(readTokenName string) (*IntegrationBootstr
 		return nil, fmt.Errorf("no Logfire projects available for this API key")
 	}
 
-	readToken, err := c.CreateReadToken(projects[0].ID, readTokenName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Logfire read token: %w", err)
+	anyCreateSuccess := false
+	for i := range projects {
+		readToken, createErr := c.CreateReadToken(projects[i].ID, tokenName)
+		if createErr != nil {
+			continue
+		}
+
+		anyCreateSuccess = true
+		c.ReadToken = readToken
+
+		// Treat an unvalidated token as unusable and try the next project.
+		if err := c.ValidateCredentials(); err != nil {
+			continue
+		}
+
+		return &IntegrationBootstrapResult{
+			Project:   projects[i],
+			ReadToken: readToken,
+		}, nil
 	}
 
-	c.ReadToken = readToken
-	if err := c.ValidateCredentials(); err != nil {
-		return nil, err
+	if !anyCreateSuccess {
+		return nil, fmt.Errorf("api key has no permission to create read tokens in any accessible project")
 	}
 
-	return &IntegrationBootstrapResult{
-		Project:   projects[0],
-		ReadToken: readToken,
-	}, nil
+	return nil, fmt.Errorf("failed to validate a Logfire read token in any accessible project")
 }
 
 func isUnauthorizedError(err error) bool {
@@ -157,8 +168,11 @@ type IntegrationBootstrapResult struct {
 }
 
 type AlertChannel struct {
-	ID    string `json:"id"`
-	Label string `json:"label"`
+	ID     string `json:"id"`
+	Label  string `json:"label"`
+	Config *struct {
+		URL string `json:"url"`
+	} `json:"config,omitempty"`
 }
 
 func (c *Client) ExecuteQuery(request QueryRequest) (*QueryResponse, error) {
@@ -347,6 +361,186 @@ func (c *Client) listAlertChannels(path string) ([]AlertChannel, error) {
 	}
 
 	return channels, nil
+}
+
+type alertDetails struct {
+	ChannelIDs []string
+}
+
+func (c *Client) FindAssignedAlertChannelID(projectID, alertID, preferredLabel, webhookURL string) (string, bool, error) {
+	alertChannelIDs, err := c.GetAlertChannelIDs(projectID, alertID)
+	if err != nil {
+		return "", false, err
+	}
+	if len(alertChannelIDs) == 0 {
+		return "", false, nil
+	}
+
+	channels, err := c.listAlertChannels(defaultChannelsPath)
+	if err != nil {
+		return "", false, err
+	}
+
+	// Prefer a channel with the expected label, but fall back to any channel that matches our webhook URL.
+	var preferredID string
+	var urlMatchID string
+	for _, ch := range channels {
+		if strings.EqualFold(ch.Label, preferredLabel) {
+			if ch.Config != nil && strings.TrimSpace(ch.Config.URL) != "" && strings.TrimSpace(ch.Config.URL) != webhookURL {
+				continue
+			}
+			preferredID = ch.ID
+		}
+
+		if ch.Config != nil && strings.TrimSpace(ch.Config.URL) == webhookURL {
+			urlMatchID = ch.ID
+		}
+	}
+
+	if preferredID != "" {
+		for _, id := range alertChannelIDs {
+			if id == preferredID {
+				return preferredID, true, nil
+			}
+		}
+	}
+
+	if urlMatchID != "" {
+		for _, id := range alertChannelIDs {
+			if id == urlMatchID {
+				return urlMatchID, true, nil
+			}
+		}
+	}
+
+	return "", false, nil
+}
+
+func (c *Client) EnsureAlertHasChannelID(projectID, alertID, channelID string) error {
+	channelIDs, err := c.GetAlertChannelIDs(projectID, alertID)
+	if err != nil {
+		return err
+	}
+
+	for _, id := range channelIDs {
+		if id == channelID {
+			return nil
+		}
+	}
+
+	channelIDs = append(channelIDs, channelID)
+
+	payload, err := json.Marshal(map[string]any{
+		"channel_ids": channelIDs,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to encode alert patch payload: %w", err)
+	}
+
+	// Logfire API supports PATCH on alert endpoints. If not, this will fail and be retried.
+	alertURL := fmt.Sprintf("%s/api/v1/projects/%s/alerts/%s/", c.APIBaseURL, strings.TrimSpace(projectID), strings.TrimSpace(alertID))
+
+	attemptMethods := []string{http.MethodPatch, http.MethodPut, http.MethodPost}
+	var lastErr error
+	for _, method := range attemptMethods {
+		_, methodErr := c.execRequest(method, alertURL, bytes.NewReader(payload), c.APIKey)
+		if methodErr == nil {
+			return nil
+		}
+
+		lastErr = methodErr
+		var apiErr *APIError
+		if !errors.As(methodErr, &apiErr) || apiErr.StatusCode != http.StatusMethodNotAllowed {
+			// For non-405 errors, don't keep retrying with other methods.
+			return methodErr
+		}
+	}
+
+	return fmt.Errorf("failed to update Logfire alert channels (methods tried: %v): %w", attemptMethods, lastErr)
+}
+
+func (c *Client) GetAlertChannelIDs(projectID, alertID string) ([]string, error) {
+	alertURL := fmt.Sprintf("%s/api/v1/projects/%s/alerts/%s/", c.APIBaseURL, strings.TrimSpace(projectID), strings.TrimSpace(alertID))
+	body, err := c.execRequest(http.MethodGet, alertURL, nil, c.APIKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("failed to decode alert details: %w", err)
+	}
+
+	var ids []string
+	for _, key := range []string{"channel_ids", "channelIds", "channels"} {
+		if v, ok := raw[key]; ok {
+			switch typed := v.(type) {
+			case []any:
+				for _, item := range typed {
+					if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+						ids = append(ids, s)
+					}
+				}
+			case []string:
+				for _, s := range typed {
+					if strings.TrimSpace(s) != "" {
+						ids = append(ids, s)
+					}
+				}
+			}
+		}
+	}
+
+	return ids, nil
+}
+
+type Alert struct {
+	ID   string
+	Name string
+}
+
+func (c *Client) ListAlerts(projectID string) ([]Alert, error) {
+	alertsURL := fmt.Sprintf("%s/api/v1/projects/%s/alerts/", c.APIBaseURL, strings.TrimSpace(projectID))
+	body, err := c.execRequest(http.MethodGet, alertsURL, nil, c.APIKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw []map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		// Try list shape that isn't an array of objects.
+		var fallback any
+		if err2 := json.Unmarshal(body, &fallback); err2 != nil {
+			return nil, fmt.Errorf("failed to decode alerts response: %w", err)
+		}
+		return nil, fmt.Errorf("failed to decode alerts response")
+	}
+
+	out := make([]Alert, 0, len(raw))
+	for _, item := range raw {
+		id := ""
+		if v, ok := item["id"].(string); ok {
+			id = v
+		} else if v, ok := item["alert_id"].(string); ok {
+			id = v
+		}
+
+		name := ""
+		if v, ok := item["name"].(string); ok {
+			name = v
+		} else if v, ok := item["alert_name"].(string); ok {
+			name = v
+		}
+
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+
+		out = append(out, Alert{ID: id, Name: strings.TrimSpace(name)})
+	}
+
+	return out, nil
 }
 
 func isChannelAlreadyExistsError(err error) bool {

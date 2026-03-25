@@ -16,6 +16,8 @@ type LogfireWebhookHandler struct{}
 type logfireWebhookConfiguration struct {
 	EventType string `json:"eventType"`
 	Resource  string `json:"resource"`
+	ProjectID string `json:"projectId"`
+	AlertID   string `json:"alertId"`
 }
 
 type LogfireWebhookMetadata struct {
@@ -37,8 +39,22 @@ func (h *LogfireWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, fmt.Errorf("failed to decode requested webhook config: %w", err)
 	}
 
-	return strings.EqualFold(strings.TrimSpace(configA.EventType), strings.TrimSpace(configB.EventType)) &&
-		strings.EqualFold(strings.TrimSpace(configA.Resource), strings.TrimSpace(configB.Resource)), nil
+	matchEventResource := strings.EqualFold(strings.TrimSpace(configA.EventType), strings.TrimSpace(configB.EventType)) &&
+		strings.EqualFold(strings.TrimSpace(configA.Resource), strings.TrimSpace(configB.Resource))
+
+	projectIDA := strings.TrimSpace(configA.ProjectID)
+	alertIDA := strings.TrimSpace(configA.AlertID)
+	projectIDB := strings.TrimSpace(configB.ProjectID)
+	alertIDB := strings.TrimSpace(configB.AlertID)
+
+	// Logfire alert-specific webhook configuration is required.
+	if projectIDA == "" || alertIDA == "" || projectIDB == "" || alertIDB == "" {
+		return false, nil
+	}
+
+	return matchEventResource &&
+		strings.EqualFold(projectIDA, projectIDB) &&
+		strings.EqualFold(alertIDA, alertIDB), nil
 }
 
 func (h *LogfireWebhookHandler) Merge(current, requested any) (any, bool, error) {
@@ -50,6 +66,14 @@ func (h *LogfireWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Logfire client: %w", err)
 	}
+
+	requestedConfig := logfireWebhookConfiguration{}
+	if err := decodeAny(ctx.Webhook.GetConfiguration(), &requestedConfig); err != nil {
+		return nil, fmt.Errorf("failed to decode webhook configuration: %w", err)
+	}
+
+	requestedConfig.ProjectID = strings.TrimSpace(requestedConfig.ProjectID)
+	requestedConfig.AlertID = strings.TrimSpace(requestedConfig.AlertID)
 
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
@@ -63,25 +87,61 @@ func (h *LogfireWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 	}
 
 	channelName := fmt.Sprintf("superplane-webhook-%s", strings.ToLower(ctx.Webhook.GetID()))
-	channel, channelsPath, err := client.UpsertAlertChannel(channelName, ctx.Webhook.GetURL(), string(secret))
+	if requestedConfig.ProjectID == "" || requestedConfig.AlertID == "" {
+		return nil, fmt.Errorf("missing required logfire webhook configuration: projectId and alertId are required")
+	}
+
+	// If the selected Logfire alert already has the channel that points to our webhook
+	// URL, we don't need to create a new channel.
+	assignedChannelID, assigned, err := client.FindAssignedAlertChannelID(
+		requestedConfig.ProjectID,
+		requestedConfig.AlertID,
+		channelName,
+		ctx.Webhook.GetURL(),
+	)
 	if err != nil {
-		if isUnsupportedWebhookProvisioningError(err) || isPermissionDeniedWebhookProvisioningError(err) {
-			setWebhookSetupSupport(ctx.Integration, false)
-			return LogfireWebhookMetadata{
-				ManagedChannel:       false,
-				SupportsWebhookSetup: false,
-			}, nil
+		return nil, fmt.Errorf("failed to check existing alert webhook assignment: %w", err)
+	}
+
+	managedChannel := false
+	channelsPath := defaultChannelsPath
+	channelID := assignedChannelID
+	channelLabel := channelName
+
+	if !assigned {
+		channel, channelPath, upsertErr := client.UpsertAlertChannel(channelName, ctx.Webhook.GetURL(), string(secret))
+		if upsertErr != nil {
+			if isUnsupportedWebhookProvisioningError(upsertErr) || isPermissionDeniedWebhookProvisioningError(upsertErr) {
+				setWebhookSetupSupport(ctx.Integration, false)
+				return LogfireWebhookMetadata{
+					ManagedChannel:       false,
+					SupportsWebhookSetup: false,
+				}, nil
+			}
+
+			return nil, fmt.Errorf("failed to provision Logfire alert channel: %w", upsertErr)
 		}
 
-		return nil, fmt.Errorf("failed to provision Logfire alert channel: %w", err)
+		managedChannel = true
+		channelsPath = channelPath
+		channelID = channel.ID
+		channelLabel = channel.Label
+
+		if err := client.EnsureAlertHasChannelID(requestedConfig.ProjectID, requestedConfig.AlertID, channelID); err != nil {
+			return nil, fmt.Errorf("failed to assign Logfire channel to alert: %w", err)
+		}
+	} else if assignedChannelID != "" {
+		// The alert is already configured; no channel creation necessary.
+		managedChannel = false
+		channelsPath = defaultChannelsPath
 	}
 
 	setWebhookSetupSupport(ctx.Integration, true)
 	return LogfireWebhookMetadata{
-		ManagedChannel:       true,
+		ManagedChannel:       managedChannel,
 		SupportsWebhookSetup: true,
-		ChannelID:            channel.ID,
-		ChannelName:          channel.Label,
+		ChannelID:            channelID,
+		ChannelName:          channelLabel,
 		ChannelsPath:         channelsPath,
 	}, nil
 }

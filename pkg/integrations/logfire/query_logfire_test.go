@@ -58,6 +58,10 @@ func TestQueryLogfire_Execute_Success(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"token":"read_token_123_project"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(`{"columns":[{"name":"message"}],"rows":[["ok"]]}`)),
 			},
 		},
@@ -76,7 +80,8 @@ func TestQueryLogfire_Execute_Success(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"sql": "SELECT message FROM records",
+			"sql":       "SELECT message FROM records",
+			"projectId": "proj_123",
 		},
 		HTTP:           httpCtx,
 		ExecutionState: executionState,
@@ -100,4 +105,76 @@ func TestValidateReadOnlySQL(t *testing.T) {
 
 	require.NoError(t, validateReadOnlySQL("SELECT * FROM records"))
 	require.ErrorContains(t, validateReadOnlySQL("update records set message = 'x'"), "only read-only queries are allowed")
+}
+
+func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {
+	t.Parallel()
+
+	component := &QueryLogfire{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"token":"lf_read_token_proj_123"}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"columns":[],"rows":[]}`)),
+			},
+		},
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiKey": "lf_api_us_123",
+		},
+		Secrets: map[string]core.IntegrationSecret{},
+	}
+
+	err := component.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"sql":         "SELECT message FROM records LIMIT 1",
+			"projectId":   "proj_123",
+			"limit":       10,
+			"rowOriented": false,
+		},
+		HTTP:        httpCtx,
+		Integration: integrationCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 2)
+}
+
+func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
+	t.Parallel()
+
+	component := &QueryLogfire{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"forbidden"}`)),
+			},
+		},
+	}
+
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiKey": "lf_api_us_123",
+		},
+		Secrets: map[string]core.IntegrationSecret{},
+	}
+
+	err := component.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"sql":       "SELECT message FROM records LIMIT 1",
+			"projectId": "proj_123",
+		},
+		HTTP:        httpCtx,
+		Integration: integrationCtx,
+	})
+
+	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to create Logfire read token for project")
 }
