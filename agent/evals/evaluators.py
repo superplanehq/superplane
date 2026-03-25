@@ -1,7 +1,12 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
-from pydantic_evals.evaluators import Evaluator, EvaluatorContext, EvaluationReason
-from ai.models import CanvasAnswer, CanvasOperation
 from typing import Any
+
+from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
+
+from ai.models import CanvasAnswer, CanvasOperation
+
+_FORBIDDEN_DOLLAR_DATA = "$.data."
 
 @dataclass
 class WorkflowShape(Evaluator):
@@ -23,14 +28,62 @@ class WorkflowShape(Evaluator):
 
     # Check if the number of nodes and edges match
     if len(wf.nodes) != len(self.nodes):
-      return EvaluationReason(value=False, reason=f"Workflow has {len(wf.nodes)} nodes, expected {len(self.nodes)}")
+      return EvaluationReason(
+          value=False,
+          reason=f"Workflow has {len(wf.nodes)} nodes, expected {len(self.nodes)}",
+      )
 
     # Check if the number of edges match
     if len(wf.edges) != len(self.edges):
-      return EvaluationReason(value=False, reason=f"Workflow has {len(wf.edges)} edges, expected {len(self.edges)}")
+      return EvaluationReason(
+          value=False,
+          reason=f"Workflow has {len(wf.edges)} edges, expected {len(self.edges)}",
+      )
 
     # Everything matches, return success
     return EvaluationReason(value=True, reason="Workflow shape matches")
+
+
+@dataclass
+class NoDollarDataAsRoot(Evaluator):
+    """Reject proposals that treat $.data. as run-start payload (use root().data...)."""
+
+    def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
+        if ctx.output.proposal is None:
+            return EvaluationReason(value=True, reason="No proposal to check")
+
+        for text in iter_config_strings_from_operations(ctx.output.proposal.operations):
+            if _FORBIDDEN_DOLLAR_DATA in text:
+                snippet = text if len(text) <= 120 else text[:117] + "..."
+                msg = "Forbidden $.data. in configuration; use root().data... for run-start fields"
+                return EvaluationReason(
+                    value=False,
+                    reason=f"{msg}; example: {snippet!r}",
+                )
+
+        return EvaluationReason(value=True, reason="No forbidden $.data. in configuration")
+
+
+def iter_config_strings_from_operations(
+    operations: list[CanvasOperation],
+) -> Iterator[str]:
+    for op in operations:
+        if op.type == "add_node":
+            yield from _iter_strings_in_value(op.configuration)
+        elif op.type == "update_node_config":
+            yield from _iter_strings_in_value(op.configuration)
+
+
+def _iter_strings_in_value(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for nested in value.values():
+            yield from _iter_strings_in_value(nested)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_strings_in_value(item)
+
 
 # Helper functions
 
