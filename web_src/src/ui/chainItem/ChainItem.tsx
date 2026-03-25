@@ -155,6 +155,22 @@ function getComponentSubtitlePrefix(subtitle: React.ReactNode): string {
   return prefix.trim();
 }
 
+function escapeStringValuesForJsonView(value: unknown): unknown {
+  if (typeof value === "string") {
+    return JSON.stringify(value).slice(1, -1);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => escapeStringValuesForJsonView(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, escapeStringValuesForJsonView(item)]));
+  }
+
+  return value;
+}
+
 export const ChainItem: React.FC<ChainItemProps> = ({
   item,
   index,
@@ -218,6 +234,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
   const EventBackground = eventStateStyle.backgroundColor;
   const EventBadgeColor = eventStateStyle.badgeColor;
+  const payloadPreview = useMemo(
+    () => (item.tabData ? escapeStringValuesForJsonView(item.tabData.payload) : undefined),
+    [item.tabData],
+  );
+  const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
 
   const showConnectingLine = totalItems && index < totalItems - 1;
   const isDetailValue = (value: unknown): value is DetailValue => {
@@ -990,9 +1011,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 </div>
                 <div className="h-50 overflow-auto rounded -mt-2">
                   <JsonView
-                    value={
-                      typeof item.tabData.payload === "string" ? JSON.parse(item.tabData.payload) : item.tabData.payload
-                    }
+                    value={payloadPreview as Record<string, unknown>}
                     style={{
                       fontSize: "12px",
                       fontFamily:
@@ -1046,7 +1065,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               <div className="p-4">
                 {modalPayload && (
                   <JsonView
-                    value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
+                    value={modalPayloadPreview as Record<string, unknown>}
                     style={{
                       fontSize: "14px",
                       fontFamily:
