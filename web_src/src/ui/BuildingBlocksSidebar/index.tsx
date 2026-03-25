@@ -7,7 +7,7 @@ import type {
 } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -25,6 +25,7 @@ import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/int
 import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
 import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
+import { BuildingBlockPreview } from "./BuildingBlockPreview";
 
 export interface BuildingBlock {
   name: string;
@@ -40,6 +41,8 @@ export interface BuildingBlock {
   isLive?: boolean; // marks items that actually work now
   integrationName?: string; // for components/triggers from integrations
   deprecated?: boolean; // marks items that are deprecated
+  exampleOutput?: Record<string, unknown>;
+  exampleData?: Record<string, unknown>;
 }
 
 export type BuildingBlockCategory = {
@@ -846,122 +849,140 @@ function CategorySection({
 
           const isLive = !!block.isLive;
           return (
-            <Item
-              data-testid={toTestId(`building-block-${block.name}`)}
-              key={`${block.type}-${block.name}`}
-              draggable={isLive}
-              onClick={() => {
-                if (isLive && onBlockClick) {
-                  onBlockClick(block);
-                }
-              }}
-              onMouseEnter={() => {
-                if (isLive) {
-                  setHoveredBlock(block);
-                }
-              }}
-              onMouseLeave={() => {
-                setHoveredBlock(null);
-              }}
-              onDragStart={(e) => {
-                if (!isLive) {
-                  e.preventDefault();
-                  return;
-                }
-                isDraggingRef.current = true;
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
+            <BuildingBlockPreview key={`preview-${block.type}-${block.name}`} block={block}>
+              <Item
+                data-testid={toTestId(`building-block-${block.name}`)}
+                draggable={isLive}
+                onClick={() => {
+                  if (isLive && onBlockClick) {
+                    onBlockClick(block);
+                  }
+                }}
+                onMouseEnter={() => {
+                  if (isLive) {
+                    setHoveredBlock(block);
+                  }
+                }}
+                onMouseLeave={() => {
+                  setHoveredBlock(null);
+                }}
+                onDragStart={(e) => {
+                  if (!isLive) {
+                    e.preventDefault();
+                    return;
+                  }
+                  isDraggingRef.current = true;
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
 
-                // Use the pre-rendered drag preview
-                const previewElement = dragPreviewRef.current?.firstChild as HTMLElement;
-                if (previewElement) {
-                  // Clone the pre-rendered element
-                  const clone = previewElement.cloneNode(true) as HTMLElement;
+                  // Use the pre-rendered drag preview
+                  const previewElement = dragPreviewRef.current?.firstChild as HTMLElement;
+                  if (previewElement) {
+                    // Clone the pre-rendered element
+                    const clone = previewElement.cloneNode(true) as HTMLElement;
 
-                  // Create a container div to hold the scaled element
-                  const container = document.createElement("div");
-                  container.style.cssText = `
+                    // Create a container div to hold the scaled element
+                    const container = document.createElement("div");
+                    container.style.cssText = `
                     position: absolute;
                     top: -10000px;
                     left: -10000px;
                     pointer-events: none;
                   `;
 
-                  // Apply zoom and opacity to the clone
-                  clone.style.transform = `scale(${canvasZoom})`;
-                  clone.style.transformOrigin = "top left";
-                  clone.style.opacity = "0.85";
+                    // Apply zoom and opacity to the clone
+                    clone.style.transform = `scale(${canvasZoom})`;
+                    clone.style.transformOrigin = "top left";
+                    clone.style.opacity = "0.85";
 
-                  container.appendChild(clone);
-                  document.body.appendChild(container);
+                    container.appendChild(clone);
+                    document.body.appendChild(container);
 
-                  // Get dimensions for centering
-                  const rect = previewElement.getBoundingClientRect();
-                  const offsetX = (rect.width / 2) * canvasZoom;
-                  const offsetY = 30 * canvasZoom;
-                  e.dataTransfer.setDragImage(container, offsetX, offsetY);
+                    // Get dimensions for centering
+                    const rect = previewElement.getBoundingClientRect();
+                    const offsetX = (rect.width / 2) * canvasZoom;
+                    const offsetY = 30 * canvasZoom;
+                    e.dataTransfer.setDragImage(container, offsetX, offsetY);
 
-                  // Cleanup after drag starts
-                  setTimeout(() => {
-                    if (document.body.contains(container)) {
-                      document.body.removeChild(container);
-                    }
-                  }, 0);
-                }
-              }}
-              onDragEnd={() => {
-                isDraggingRef.current = false;
-                setHoveredBlock(null);
-              }}
-              aria-disabled={!isLive}
-              title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${(() => {
-                const subtype = block.componentSubtype || getComponentSubtype(block);
-                return subtype === "trigger"
-                  ? "hover:bg-sky-100 dark:hover:bg-sky-900/20"
-                  : subtype === "flow"
-                    ? "hover:bg-purple-100 dark:hover:bg-purple-900/20"
-                    : "hover:bg-green-100 dark:hover:bg-green-900/20";
-              })()}`}
-              size="sm"
-            >
-              <ItemMedia>
-                {appIconSrc ? (
-                  <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
-                ) : (
-                  <IconComponent size={14} className="text-gray-500" />
-                )}
-              </ItemMedia>
+                    // Cleanup after drag starts
+                    setTimeout(() => {
+                      if (document.body.contains(container)) {
+                        document.body.removeChild(container);
+                      }
+                    }, 0);
+                  }
+                }}
+                onDragEnd={() => {
+                  isDraggingRef.current = false;
+                  setHoveredBlock(null);
+                }}
+                aria-disabled={!isLive}
+                title={isLive ? undefined : "Coming soon"}
+                className={`group/block ml-3 px-2 py-1.5 flex items-center gap-2.5 cursor-grab active:cursor-grabbing ${(() => {
+                  const subtype = block.componentSubtype || getComponentSubtype(block);
+                  return subtype === "trigger"
+                    ? "hover:bg-sky-50 dark:hover:bg-sky-900/20"
+                    : subtype === "flow"
+                      ? "hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                      : "hover:bg-green-50 dark:hover:bg-green-900/20";
+                })()}`}
+                size="sm"
+              >
+                {(() => {
+                  const subtype = block.componentSubtype || getComponentSubtype(block);
+                  const iconBg =
+                    subtype === "trigger"
+                      ? "bg-sky-100 dark:bg-sky-900/30"
+                      : subtype === "flow"
+                        ? "bg-purple-100 dark:bg-purple-900/30"
+                        : "bg-green-100 dark:bg-green-900/30";
+                  const iconColor =
+                    subtype === "trigger"
+                      ? "text-sky-600 dark:text-sky-400"
+                      : subtype === "flow"
+                        ? "text-purple-600 dark:text-purple-400"
+                        : "text-green-600 dark:text-green-400";
+                  return (
+                    <div className={`flex items-center justify-center size-7 rounded-md flex-shrink-0 ${iconBg}`}>
+                      {appIconSrc ? (
+                        <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
+                      ) : (
+                        <IconComponent size={15} className={iconColor} />
+                      )}
+                    </div>
+                  );
+                })()}
 
-              <ItemContent>
-                <div className="flex items-center gap-2 w-full min-w-0">
-                  <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
-                    <span className="block min-w-0 truncate">{block.label || block.name}</span>
-                  </ItemTitle>
-                  {(() => {
-                    const subtype = block.componentSubtype || getComponentSubtype(block);
-                    const badgeClass =
-                      subtype === "trigger"
-                        ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400 rounded whitespace-nowrap flex-shrink-0"
-                        : subtype === "flow"
-                          ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
-                          : "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400 rounded whitespace-nowrap flex-shrink-0";
-                    return (
-                      <span className={`${badgeClass} ml-auto`}>
-                        {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
+                <ItemContent>
+                  <div className="flex items-center gap-2 w-full min-w-0">
+                    <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
+                      <span className="block min-w-0 truncate">{block.label || block.name}</span>
+                    </ItemTitle>
+                    {(() => {
+                      const subtype = block.componentSubtype || getComponentSubtype(block);
+                      const badgeClass =
+                        subtype === "trigger"
+                          ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400 rounded whitespace-nowrap flex-shrink-0"
+                          : subtype === "flow"
+                            ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
+                            : "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400 rounded whitespace-nowrap flex-shrink-0";
+                      return (
+                        <span className={`${badgeClass} ml-auto`}>
+                          {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
+                        </span>
+                      );
+                    })()}
+                    {block.deprecated && (
+                      <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
+                        Deprecated
                       </span>
-                    );
-                  })()}
-                  {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
-                      Deprecated
-                    </span>
-                  )}
-                </div>
-              </ItemContent>
+                    )}
+                  </div>
+                </ItemContent>
 
-              <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
-            </Item>
+                <GripVerticalIcon className="text-gray-500 hover:text-gray-800 flex-shrink-0" size={14} />
+              </Item>
+            </BuildingBlockPreview>
           );
         })}
       </ItemGroup>
