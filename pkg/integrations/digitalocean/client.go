@@ -2,12 +2,16 @@ package digitalocean
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -1308,6 +1312,312 @@ type VPC struct {
 	IPRange     string `json:"ip_range"`
 	CreatedAt   string `json:"created_at"`
 	Default     bool   `json:"default"`
+}
+
+// SpacesClient handles S3-compatible requests to DigitalOcean Spaces.
+// It uses AWS Signature Version 4 for authentication.
+type SpacesClient struct {
+	AccessKey string
+	SecretKey string
+	Region    string
+	http      core.HTTPContext
+}
+
+// NewSpacesClient creates a new SpacesClient using credentials from the integration configuration.
+func NewSpacesClient(httpCtx core.HTTPContext, ctx core.IntegrationContext, region string) (*SpacesClient, error) {
+	accessKey, err := ctx.GetConfig("spacesAccessKey")
+	if err != nil || string(accessKey) == "" {
+		return nil, fmt.Errorf("spaces access key is required — set it in the DigitalOcean integration configuration")
+	}
+
+	secretKey, err := ctx.GetConfig("spacesSecretKey")
+	if err != nil || string(secretKey) == "" {
+		return nil, fmt.Errorf("spaces secret key is required — set it in the DigitalOcean integration configuration")
+	}
+
+	return &SpacesClient{
+		AccessKey: string(accessKey),
+		SecretKey: string(secretKey),
+		Region:    region,
+		http:      httpCtx,
+	}, nil
+}
+
+// execSpacesRequest signs and executes an HTTP request to the Spaces S3-compatible API.
+// If bucket is empty, a region-level request is made (e.g. ListBuckets).
+// queryString is already encoded, e.g. "" or "tagging=".
+func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string) (*http.Response, error) {
+	var host, endpoint string
+	if bucket == "" {
+		host = fmt.Sprintf("%s.digitaloceanspaces.com", c.Region)
+		endpoint = fmt.Sprintf("https://%s/", host)
+	} else {
+		host = fmt.Sprintf("%s.%s.digitaloceanspaces.com", bucket, c.Region)
+		endpoint = fmt.Sprintf("https://%s/%s", host, key)
+	}
+
+	if queryString != "" {
+		endpoint += "?" + queryString
+	}
+
+	now := time.Now().UTC()
+	dateStamp := now.Format("20060102")
+	amzDate := now.Format("20060102T150405Z")
+
+	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	canonicalHeaders := fmt.Sprintf("host:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
+		host, payloadHash, amzDate)
+	signedHeaders := "host;x-amz-content-sha256;x-amz-date"
+
+	path := "/"
+	if key != "" {
+		path = "/" + key
+	}
+
+	canonicalRequest := strings.Join([]string{
+		method,
+		path,
+		queryString,
+		canonicalHeaders,
+		signedHeaders,
+		payloadHash,
+	}, "\n")
+
+	credentialScope := fmt.Sprintf("%s/%s/s3/aws4_request", dateStamp, c.Region)
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalRequest))),
+	}, "\n")
+
+	signingKey := hmacSHA256(
+		hmacSHA256(
+			hmacSHA256(
+				hmacSHA256([]byte("AWS4"+c.SecretKey), dateStamp),
+				c.Region,
+			),
+			"s3",
+		),
+		"aws4_request",
+	)
+
+	signature := fmt.Sprintf("%x", hmacSHA256(signingKey, stringToSign))
+
+	authHeader := fmt.Sprintf(
+		"AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s",
+		c.AccessKey, credentialScope, signedHeaders, signature,
+	)
+
+	req, err := http.NewRequest(method, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Host", host)
+	req.Header.Set("x-amz-date", amzDate)
+	req.Header.Set("x-amz-content-sha256", payloadHash)
+	req.Header.Set("Authorization", authHeader)
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	return res, nil
+}
+
+// ObjectResult holds the response from a GetObject call.
+type ObjectResult struct {
+	ContentType   string
+	ContentLength int64
+	LastModified  string
+	ETag          string
+	Metadata      map[string]string
+	Body          []byte
+	NotFound      bool
+}
+
+// GetObject retrieves an object (and optionally its body) from a Spaces bucket.
+func (c *SpacesClient) GetObject(bucket, key string, includeBody bool) (*ObjectResult, error) {
+	method := http.MethodGet
+	if !includeBody {
+		method = http.MethodHead
+	}
+
+	res, err := c.execSpacesRequest(method, bucket, key, "")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusNotFound {
+		return &ObjectResult{NotFound: true}, nil
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	result := &ObjectResult{
+		ContentType:  res.Header.Get("Content-Type"),
+		LastModified: res.Header.Get("Last-Modified"),
+		ETag:         strings.Trim(res.Header.Get("ETag"), `"`),
+		Metadata:     map[string]string{},
+	}
+
+	if cl := res.Header.Get("Content-Length"); cl != "" {
+		if n, err := strconv.ParseInt(cl, 10, 64); err == nil {
+			result.ContentLength = n
+		}
+	}
+
+	for k, v := range res.Header {
+		lower := strings.ToLower(k)
+		if strings.HasPrefix(lower, "x-amz-meta-") {
+			metaKey := strings.TrimPrefix(lower, "x-amz-meta-")
+			if len(v) > 0 {
+				result.Metadata[metaKey] = v[0]
+			}
+		}
+	}
+
+	if includeBody && isReadableContentType(result.ContentType) {
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading body: %v", err)
+		}
+		result.Body = bodyBytes
+	}
+
+	return result, nil
+}
+
+// ListBuckets returns all Spaces buckets in the client's region.
+func (c *SpacesClient) ListBuckets() ([]string, error) {
+	res, err := c.execSpacesRequest(http.MethodGet, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading list buckets response: %v", err)
+	}
+
+	var result struct {
+		Buckets struct {
+			Buckets []struct {
+				Name string `xml:"Name"`
+			} `xml:"Bucket"`
+		} `xml:"Buckets"`
+	}
+
+	if err := xml.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("error parsing list buckets response: %v", err)
+	}
+
+	names := make([]string, 0, len(result.Buckets.Buckets))
+	for _, b := range result.Buckets.Buckets {
+		names = append(names, b.Name)
+	}
+
+	return names, nil
+}
+
+// GetObjectTagging retrieves the tags applied to an object in a Spaces bucket.
+func (c *SpacesClient) GetObjectTagging(bucket, key string) (map[string]string, error) {
+	res, err := c.execSpacesRequest(http.MethodGet, bucket, key, "tagging=")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading tagging response: %v", err)
+	}
+
+	var tagging struct {
+		TagSet struct {
+			Tags []struct {
+				Key   string `xml:"Key"`
+				Value string `xml:"Value"`
+			} `xml:"Tag"`
+		} `xml:"TagSet"`
+	}
+
+	if err := xml.Unmarshal(bodyBytes, &tagging); err != nil {
+		return nil, fmt.Errorf("error parsing tagging response: %v", err)
+	}
+
+	tags := make(map[string]string, len(tagging.TagSet.Tags))
+	for _, tag := range tagging.TagSet.Tags {
+		tags[tag.Key] = tag.Value
+	}
+
+	return tags, nil
+}
+
+// FormatSize converts a byte count to a human-readable string (KiB, MiB, GiB).
+func FormatSize(bytes int64) string {
+	const (
+		kib = 1024
+		mib = 1024 * kib
+		gib = 1024 * mib
+	)
+
+	switch {
+	case bytes >= gib:
+		return fmt.Sprintf("%.2f GiB", float64(bytes)/float64(gib))
+	case bytes >= mib:
+		return fmt.Sprintf("%.2f MiB", float64(bytes)/float64(mib))
+	case bytes >= kib:
+		return fmt.Sprintf("%.2f KiB", float64(bytes)/float64(kib))
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
+
+// isReadableContentType returns true if the content type is human-readable text.
+func isReadableContentType(contentType string) bool {
+	ct := strings.ToLower(strings.Split(contentType, ";")[0])
+	readable := []string{
+		"text/",
+		"application/json",
+		"application/xml",
+		"application/yaml",
+		"application/x-yaml",
+		"application/javascript",
+		"application/toml",
+		"application/x-www-form-urlencoded",
+	}
+	for _, r := range readable {
+		if strings.HasPrefix(ct, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// hmacSHA256 computes HMAC-SHA256 of data with key.
+func hmacSHA256(key []byte, data string) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(data))
+	return h.Sum(nil)
 }
 
 // ListVPCs retrieves all VPCs in the account

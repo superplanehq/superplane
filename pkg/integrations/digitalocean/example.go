@@ -177,6 +177,16 @@ func (g *GetDropletMetrics) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDropletMetricsOnce, exampleOutputGetDropletMetricsBytes, &exampleOutputGetDropletMetrics)
 }
 
+//go:embed example_output_get_object.json
+var exampleOutputGetObjectBytes []byte
+
+var exampleOutputGetObjectOnce sync.Once
+var exampleOutputGetObject map[string]any
+
+func (g *GetObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetObjectOnce, exampleOutputGetObjectBytes, &exampleOutputGetObject)
+}
+
 //go:embed example_output_create_app.json
 var exampleOutputCreateAppBytes []byte
 
