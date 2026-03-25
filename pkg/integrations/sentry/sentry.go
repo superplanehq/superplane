@@ -35,8 +35,8 @@ const (
 	appSetupDescription = `
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry. Copy the token.
 
-> **Token Permissions:**  
-> ` + "`Project -> Read`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
+   > **Token Permissions:**  
+   > ` + "`Project -> Read`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it ` + "`%s`" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
@@ -149,8 +149,8 @@ func (s *Sentry) Instructions() string {
 **Setup steps:**
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry with the permissions below. Copy the token.
 
-> **Token Permissions:**  
-> ` + "Project -> `Read`" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
+   > **Token Permissions:**  
+   > ` + "Project -> `Read`" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it ` + "(e.g. `SuperPlane`)" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
