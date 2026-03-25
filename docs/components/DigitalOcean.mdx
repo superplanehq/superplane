@@ -25,6 +25,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
+  <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
@@ -45,6 +46,19 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 5. Copy the token and paste it below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+## Spaces Access Key ID and Secret Access Key (optional)
+
+Spaces Access Key and Secret Key are only required if you plan to use **Spaces Object Storage** components (e.g. Get Object). Other components such as Droplets, DNS, Load Balancers, and Snapshots work with the API Token alone.
+
+To generate Spaces access keys:
+
+1. Open the [Spaces Access Keys page](https://cloud.digitalocean.com/spaces/access_keys)
+2. Click **Create Access Key**
+3. Select the access scope:
+   - **Full Access** — works across all buckets
+   - **Limited Access** — scoped to specific buckets with Read or Read/Write/Delete permissions
+4. Copy both the **Access Key ID** and the **Secret Access Key** immediately — the secret is only shown once
 
 <a id="assign-reserved-ip"></a>
 
@@ -943,6 +957,74 @@ All metric values are rounded to two decimal places.
   },
   "timestamp": "2026-03-19T08:36:37.115389929Z",
   "type": "digitalocean.droplet.metrics"
+}
+```
+
+<a id="get-object"></a>
+
+## Get Object
+
+The Get Object component retrieves an object and its metadata from a DigitalOcean Spaces bucket.
+
+### Prerequisites
+
+Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcean integration settings. The integration works without them for other components (Droplets, DNS, etc.), but they are required for any Spaces operation.
+
+### Configuration
+
+- **Bucket**: The Spaces bucket to read from. The dropdown lists all buckets across all regions — the region is determined automatically.
+- **File Path**: The path to the object within the bucket (e.g. reports/daily.csv)
+- **Include Body**: Download the object content. Only supported for text-based content types (JSON, YAML, CSV, plain text, etc.)
+
+### Output Channels
+
+- **Found**: The object exists — metadata, tags, and optional body are returned
+- **Not Found**: The object does not exist in the bucket (404)
+
+### Output
+
+- **bucket**: The bucket name
+- **filePath**: The path to the object within the bucket
+- **endpoint**: The full Spaces URL of the object
+- **contentType**: MIME type of the object
+- **size**: Human-readable file size (e.g. 1.23 MiB)
+- **lastModified**: When the object was last modified (RFC1123 format)
+- **eTag**: MD5 hash of the object content — changes when the file changes
+- **metadata**: Custom metadata key-value pairs set on the object (x-amz-meta-* headers)
+- **tags**: Key-value tags applied to the object
+- **body**: Object content as a string (only present for text-based content types when Include Body is enabled)
+
+### Use Cases
+
+- **Config reading**: Fetch a JSON or YAML config file and use its contents in downstream workflow steps
+- **File existence check**: Verify a file exists before triggering a process — route to notFound if it is missing
+- **Change detection**: Compare ETag or LastModified with a previously stored value to detect updates
+- **Backup verification**: Confirm a backup file was written today by checking LastModified
+- **Tag-based routing**: Read object tags to drive workflow logic (e.g. status=ready)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-company-assets",
+    "contentType": "text/csv",
+    "eTag": "a1b2c3d4ef567890a1b2c3d4ef567890",
+    "endpoint": "https://my-company-assets.fra1.digitaloceanspaces.com/reports/daily.csv",
+    "filePath": "reports/daily.csv",
+    "lastModified": "Wed, 25 Mar 2026 08:45:00 GMT",
+    "metadata": {
+      "env": "production",
+      "uploaded-by": "pipeline"
+    },
+    "size": "41.31 KiB",
+    "tags": {
+      "env": "production",
+      "status": "ready"
+    }
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.fetched"
 }
 ```
 

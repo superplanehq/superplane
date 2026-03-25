@@ -39,7 +39,6 @@ export function withOrganizationHeader(options: any = {}): any {
 
   // Avoid leaking our internal option into fetch/init objects.
   // Codegen clients ignore unknown top-level fields, but callers may also pass this to native fetch.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { organizationId: _ignored, ...rest } = options ?? {};
 
   return {
