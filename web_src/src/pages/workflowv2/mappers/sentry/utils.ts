@@ -42,6 +42,16 @@ export function addFormattedTimestamp(details: Record<string, string>, label: st
   details[label] = new Date(value).toLocaleString();
 }
 
+export function addOrderedDetails(details: Record<string, string>, entries: Array<{ label: string; value?: string }>) {
+  entries.forEach(({ label, value }) => {
+    if (!value) {
+      return;
+    }
+
+    details[label] = value;
+  });
+}
+
 export function getProjectLabel(issue?: { project?: { name?: string; slug?: string } }) {
   return issue?.project?.name || issue?.project?.slug;
 }
