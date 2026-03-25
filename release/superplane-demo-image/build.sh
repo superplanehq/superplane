@@ -15,7 +15,7 @@ fi
 
 VERSION="$1"
 ARCH="$2"
-.
+
 IMAGE_REPO="${DEMO_IMAGE_REPO:-ghcr.io/superplanehq/superplane-demo}"
 
 echo "Building SuperPlane demo image (${IMAGE_REPO})"

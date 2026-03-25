@@ -1,16 +1,6 @@
 version: v1.0
 name: "Superplane Release Pipeline"
 
-parameters:
-  - name: REL_VERSION
-    required: true
-
-  - name: DEMO_IMAGE_REPO
-    default_value: ghcr.io/superplanehq/superplane-demo
-
-  - name: STANDARD_IMAGE_REPO
-    default_value: ghcr.io/superplanehq/superplane
-
 agent:
   machine:
     type: f1-standard-2
@@ -21,7 +11,6 @@ global_job_config:
     - name: DOCKER_BUILDKIT
       value: "1"
 
-
   secrets:
     - name: ghcr-push-token
 
@@ -30,7 +19,12 @@ global_job_config:
       - git clone https://github.com/superplanehq/superplane.git
       - cd superplane
       - touch agent/.env
-      - git checkout $REL_VERSION
+      - |
+        if git show-ref --verify --quiet refs/heads/$REL_VERSION || git show-ref --verify --quiet refs/tags/$REL_VERSION; then
+          git checkout $REL_VERSION
+        else
+          git checkout -b $REL_VERSION
+        fi
       - |
         cat <<EOF > release-metadata.json
         {
@@ -109,7 +103,7 @@ blocks:
           commands:
             - docker manifest inspect $STANDARD_IMAGE_REPO:$REL_VERSION
             - docker manifest inspect $DEMO_IMAGE_REPO:$REL_VERSION
-            
+
   - name: "SuperPlane Helm Chart"
     dependencies: ["Verify Images"]
     task:
