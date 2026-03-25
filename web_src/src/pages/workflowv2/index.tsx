@@ -5118,6 +5118,63 @@ export function WorkflowPageV2() {
     getYamlExportPayload,
   });
 
+  const importYamlGuardError =
+    !canvas || !organizationId || !canvasId
+      ? "Canvas data is not available"
+      : !canUpdateCanvas
+        ? "You don't have permission to update this canvas"
+        : isTemplate
+          ? "Template canvases are read-only"
+          : !activeCanvasVersionId && !isVersioningDisabled
+            ? "Enable edit mode before saving changes"
+            : null;
+
+  const handleImportYaml = useCallback(
+    async (data: { nodes: unknown[]; edges: unknown[] }) => {
+      if (importYamlGuardError) throw new Error(importYamlGuardError);
+
+      const updatedWorkflow = {
+        ...canvas,
+        spec: {
+          ...canvas!.spec,
+          nodes: data.nodes as ComponentsNode[],
+          edges: data.edges as ComponentsEdge[],
+        },
+      };
+
+      const savingVersionID = activeCanvasVersionId || undefined;
+      lastLocalCanvasSaveAtRef.current = Date.now();
+      const updateResponse = await updateCanvasVersionMutation.mutateAsync({
+        versionId: savingVersionID,
+        name: updatedWorkflow.metadata?.name ?? "",
+        description: updatedWorkflow.metadata?.description,
+        nodes: updatedWorkflow.spec?.nodes,
+        edges: updatedWorkflow.spec?.edges,
+      });
+      if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
+        setActiveCanvasVersion(updateResponse.data.version);
+      }
+      if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
+        return;
+      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+      setInitialWorkflowSnapshot(null);
+      lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
+      showSuccessToast("Canvas changes saved");
+    },
+    [
+      importYamlGuardError,
+      canvas,
+      activeCanvasVersionId,
+      updateCanvasVersionMutation,
+      organizationId,
+      canvasId,
+      queryClient,
+    ],
+  );
+
   const isInitialCanvasBootstrapLoading =
     !canvas &&
     (canvasLoading ||
@@ -5399,6 +5456,8 @@ export function WorkflowPageV2() {
         filename={yamlPayload.filename}
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
+        onImport={!isReadOnly ? handleImportYaml : undefined}
+        isImporting={updateCanvasVersionMutation.isPending}
       />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView

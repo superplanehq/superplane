@@ -1,0 +1,38 @@
+{
+  "resource": "issue",
+  "action": "created",
+  "installation": {
+    "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
+  },
+  "actor": {
+    "type": "user",
+    "id": "789",
+    "name": "Person"
+  },
+  "data": {
+    "issue": {
+      "id": "123",
+      "shortId": "IPE-1",
+      "title": "Error #1: This is a test error!",
+      "culprit": "SentryCustomError(frontend/src/util)",
+      "level": "error",
+      "status": "unresolved",
+      "substatus": "new",
+      "firstSeen": "2022-04-04T18:17:18.320000Z",
+      "lastSeen": "2022-04-04T18:17:18.320000Z",
+      "permalink": "https://your-org.sentry.io/issues/123/",
+      "web_url": "https://your-org.sentry.io/issues/123/",
+      "project": {
+        "id": "456",
+        "name": "ipe",
+        "slug": "ipe"
+      },
+      "assignedTo": {
+        "type": "user",
+        "id": "789",
+        "name": "Person"
+      }
+    }
+  },
+  "timestamp": "2022-04-04T18:17:18.320000Z"
+}
