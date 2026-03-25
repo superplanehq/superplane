@@ -41,6 +41,9 @@ function validateCanvasYaml(parsed: ParsedCanvas): string | null {
   if (parsed.kind && parsed.kind !== "Canvas") {
     return `Unsupported kind "${parsed.kind}". Only "Canvas" is supported.`;
   }
+  if (!parsed.spec || !Array.isArray(parsed.spec.nodes)) {
+    return "YAML must contain a spec with a nodes array. Is this a valid Canvas definition?";
+  }
   return null;
 }
 

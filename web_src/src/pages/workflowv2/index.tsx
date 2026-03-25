@@ -5118,15 +5118,16 @@ export function WorkflowPageV2() {
     getYamlExportPayload,
   });
 
-  const importYamlGuardError = !canvas || !organizationId || !canvasId
-    ? "Canvas data is not available"
-    : !canUpdateCanvas
-      ? "You don't have permission to update this canvas"
-      : isTemplate
-        ? "Template canvases are read-only"
-        : !activeCanvasVersionId && !isVersioningDisabled
-          ? "Enable edit mode before saving changes"
-          : null;
+  const importYamlGuardError =
+    !canvas || !organizationId || !canvasId
+      ? "Canvas data is not available"
+      : !canUpdateCanvas
+        ? "You don't have permission to update this canvas"
+        : isTemplate
+          ? "Template canvases are read-only"
+          : !activeCanvasVersionId && !isVersioningDisabled
+            ? "Enable edit mode before saving changes"
+            : null;
 
   const handleImportYaml = useCallback(
     async (data: { nodes: unknown[]; edges: unknown[] }) => {
