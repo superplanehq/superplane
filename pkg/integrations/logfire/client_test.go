@@ -115,6 +115,74 @@ func TestClient_CreateReadToken_EmptyTokenReturned(t *testing.T) {
 	require.ErrorContains(t, err, "read token not returned by Logfire")
 }
 
+func TestClient_FindFirstUsableReadToken_DeletesInvalidToken(t *testing.T) {
+	t.Parallel()
+
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`[{"id":"p1","organization_name":"o","project_name":"a"},{"id":"p2","organization_name":"o","project_name":"b"}]`,
+			))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"rt1","token":"invalid_tok"}`))},
+			{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{}`))},
+			{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader(``))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"rt2","token":"valid_tok"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"columns":[],"rows":[]}`))},
+		},
+	}
+
+	client := &Client{
+		APIKey:     "key",
+		BaseURL:    logfireUSBaseURL,
+		APIBaseURL: logfireUSAPIBaseURL,
+		ReadToken:  "prior",
+		http:       httpCtx,
+	}
+
+	result, err := client.FindFirstUsableReadToken("tokname")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "p2", result.Project.ID)
+	assert.Equal(t, "valid_tok", result.ReadToken)
+	assert.Equal(t, "valid_tok", client.ReadToken)
+
+	var deleteSeen bool
+	for _, req := range httpCtx.Requests {
+		if req.Method == http.MethodDelete && strings.Contains(req.URL.Path, "/read-tokens/rt1/") {
+			deleteSeen = true
+			break
+		}
+	}
+	assert.True(t, deleteSeen)
+}
+
+func TestClient_FindFirstUsableReadToken_KeepsOriginalReadTokenWhenNoneValidate(t *testing.T) {
+	t.Parallel()
+
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+				`[{"id":"p1","organization_name":"o","project_name":"a"}]`,
+			))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"rt1","token":"invalid_tok"}`))},
+			{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{}`))},
+			{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader(``))},
+		},
+	}
+
+	client := &Client{
+		APIKey:     "key",
+		BaseURL:    logfireUSBaseURL,
+		APIBaseURL: logfireUSAPIBaseURL,
+		ReadToken:  "original-token",
+		http:       httpCtx,
+	}
+
+	_, err := client.FindFirstUsableReadToken("tokname")
+	require.ErrorContains(t, err, "failed to validate a Logfire read token in any accessible project")
+	assert.Equal(t, "original-token", client.ReadToken)
+}
+
 func TestClient_DeriveAPIBaseURL(t *testing.T) {
 	t.Parallel()
 

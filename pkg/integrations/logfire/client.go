@@ -78,7 +78,15 @@ func (c *Client) ValidateCredentials() error {
 		return fmt.Errorf("logfire read token is required")
 	}
 
-	_, err := c.ExecuteQuery(QueryRequest{SQL: validateQuerySQL, Limit: 1})
+	return c.validateReadToken(c.ReadToken)
+}
+
+func (c *Client) validateReadToken(readToken string) error {
+	if strings.TrimSpace(readToken) == "" {
+		return fmt.Errorf("logfire read token is required")
+	}
+
+	_, err := c.executeQuery(readToken, QueryRequest{SQL: validateQuerySQL, Limit: 1})
 	if err == nil {
 		return nil
 	}
@@ -103,22 +111,26 @@ func (c *Client) FindFirstUsableReadToken(tokenName string) (*IntegrationBootstr
 
 	anyCreateSuccess := false
 	for i := range projects {
-		readToken, createErr := c.CreateReadToken(projects[i].ID, tokenName)
+		created, createErr := c.createReadToken(projects[i].ID, tokenName)
 		if createErr != nil {
 			continue
 		}
 
 		anyCreateSuccess = true
-		c.ReadToken = readToken
 
 		// Treat an unvalidated token as unusable and try the next project.
-		if err := c.ValidateCredentials(); err != nil {
+		if err := c.validateReadToken(created.Token); err != nil {
+			// Remove token we created so repeated Sync does not accumulate orphans.
+			if strings.TrimSpace(created.ID) != "" {
+				_ = c.DeleteReadToken(projects[i].ID, created.ID)
+			}
 			continue
 		}
 
+		c.ReadToken = created.Token
 		return &IntegrationBootstrapResult{
 			Project:   projects[i],
-			ReadToken: readToken,
+			ReadToken: created.Token,
 		}, nil
 	}
 
@@ -176,6 +188,10 @@ type AlertChannel struct {
 }
 
 func (c *Client) ExecuteQuery(request QueryRequest) (*QueryResponse, error) {
+	return c.executeQuery(c.ReadToken, request)
+}
+
+func (c *Client) executeQuery(readToken string, request QueryRequest) (*QueryResponse, error) {
 	sql := strings.TrimSpace(request.SQL)
 	if sql == "" {
 		return nil, fmt.Errorf("sql is required")
@@ -187,7 +203,7 @@ func (c *Client) ExecuteQuery(request QueryRequest) (*QueryResponse, error) {
 	}
 	queryURL.RawQuery = buildQueryParams(sql, request).Encode()
 
-	body, err := c.execRequest(http.MethodGet, queryURL.String(), nil, c.ReadToken)
+	body, err := c.execRequest(http.MethodGet, queryURL.String(), nil, readToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
@@ -261,10 +277,15 @@ func (c *Client) ListProjects() ([]Project, error) {
 	return projects, nil
 }
 
-func (c *Client) CreateReadToken(projectID, name string) (string, error) {
+type readTokenCreateResult struct {
+	ID    string
+	Token string
+}
+
+func (c *Client) createReadToken(projectID, name string) (readTokenCreateResult, error) {
 	payload, err := json.Marshal(map[string]any{"name": name})
 	if err != nil {
-		return "", fmt.Errorf("failed to encode read token payload: %w", err)
+		return readTokenCreateResult{}, fmt.Errorf("failed to encode read token payload: %w", err)
 	}
 
 	body, err := c.execRequest(
@@ -274,21 +295,48 @@ func (c *Client) CreateReadToken(projectID, name string) (string, error) {
 		c.APIKey,
 	)
 	if err != nil {
-		return "", err
+		return readTokenCreateResult{}, err
 	}
 
 	var response struct {
+		ID    string `json:"id"`
 		Token string `json:"token"`
 	}
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", fmt.Errorf("failed to decode read token response: %w", err)
+		return readTokenCreateResult{}, fmt.Errorf("failed to decode read token response: %w", err)
 	}
 
 	if strings.TrimSpace(response.Token) == "" {
-		return "", fmt.Errorf("read token not returned by Logfire")
+		return readTokenCreateResult{}, fmt.Errorf("read token not returned by Logfire")
 	}
 
-	return strings.TrimSpace(response.Token), nil
+	return readTokenCreateResult{
+		ID:    strings.TrimSpace(response.ID),
+		Token: strings.TrimSpace(response.Token),
+	}, nil
+}
+
+func (c *Client) CreateReadToken(projectID, name string) (string, error) {
+	created, err := c.createReadToken(projectID, name)
+	if err != nil {
+		return "", err
+	}
+	return created.Token, nil
+}
+
+func (c *Client) DeleteReadToken(projectID, readTokenID string) error {
+	if strings.TrimSpace(readTokenID) == "" {
+		return nil
+	}
+
+	path := fmt.Sprintf(
+		"%s/api/v1/projects/%s/read-tokens/%s/",
+		c.APIBaseURL,
+		strings.TrimSpace(projectID),
+		strings.TrimSpace(readTokenID),
+	)
+	_, err := c.execRequest(http.MethodDelete, path, nil, c.APIKey)
+	return err
 }
 
 func (c *Client) UpsertAlertChannel(label, webhookURL, _ string) (*AlertChannel, string, error) {
