@@ -44,14 +44,10 @@ func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
 }
 
 func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
-	newCanvasButton := q.Text("New Canvas")
-	saveCanvasButton := q.Text("Create canvas")
-	canvasNameInput := q.TestID("canvas-name-input")
-
-	steps.session.Click(newCanvasButton)
-	steps.session.FillIn(canvasNameInput, canvasName)
-	steps.session.Click(saveCanvasButton)
-	steps.session.Sleep(500) // wait for canvas to be created
+	steps.session.Visit("/" + steps.session.OrgID.String() + "/canvases/new")
+	steps.session.FillIn(q.TestID("canvas-name-input"), canvasName)
+	steps.session.Click(q.TestID("create-canvas-button"))
+	steps.session.Sleep(500)
 }
 
 func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
