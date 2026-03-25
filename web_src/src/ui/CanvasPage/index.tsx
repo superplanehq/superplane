@@ -559,7 +559,7 @@ function CanvasPage(props: CanvasPageProps) {
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1440,8 +1440,8 @@ function Sidebar({
   editingNodeData?: NodeEditData | null;
   onSaveConfiguration?: (configuration: Record<string, any>, nodeName: string) => void;
   onEdit?: (nodeId: string) => void;
-  currentTab?: "latest" | "settings";
-  onTabChange?: (tab: "latest" | "settings") => void;
+  currentTab?: "latest" | "settings" | "docs";
+  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
@@ -1501,6 +1501,31 @@ function Sidebar({
     }
     return getAutocompleteExampleObj(state.componentSidebar.selectedNodeId);
   }, [state.componentSidebar.selectedNodeId, getAutocompleteExampleObj]);
+
+  const componentDocsData = useMemo(() => {
+    const blockName = editingNodeData?.blockName;
+    if (!blockName) return null;
+
+    const matchedComponent = components?.find((c) => c.name === blockName);
+    if (matchedComponent) {
+      return {
+        description: matchedComponent.description,
+        examplePayload: matchedComponent.exampleOutput,
+        payloadLabel: "Example Output" as const,
+      };
+    }
+
+    const matchedTrigger = triggers?.find((t) => t.name === blockName);
+    if (matchedTrigger) {
+      return {
+        description: matchedTrigger.description,
+        examplePayload: matchedTrigger.exampleData,
+        payloadLabel: "Example Data" as const,
+      };
+    }
+
+    return null;
+  }, [editingNodeData?.blockName, components, triggers]);
 
   if (!sidebarData) {
     return null;
@@ -1599,6 +1624,9 @@ function Sidebar({
       canCreateIntegrations={canCreateIntegrations}
       canUpdateIntegrations={canUpdateIntegrations}
       autocompleteExampleObj={autocompleteExampleObj}
+      componentDescription={componentDocsData?.description}
+      componentExamplePayload={componentDocsData?.examplePayload}
+      componentPayloadLabel={componentDocsData?.payloadLabel}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
@@ -1612,6 +1640,7 @@ function Sidebar({
       executionChainRequestId={focusRequest?.requestId}
       onExecutionChainHandled={onExecutionChainHandled}
       hideRunsTab={isAnnotationNode}
+      hideDocsTab={isAnnotationNode}
       hideNodeId={isAnnotationNode}
       readOnly={readOnly}
     />
@@ -1933,7 +1962,7 @@ function CanvasContent({
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
-  setCurrentTab?: (tab: "latest" | "settings") => void;
+  setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   onUndo?: () => void;
   canUndo?: boolean;
   organizationId?: string;
