@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -133,9 +132,9 @@ func (c *CreateSnapshot) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	dropletID, err := strconv.Atoi(spec.Droplet)
+	dropletID, err := parseDropletID(spec.Droplet)
 	if err != nil {
-		return fmt.Errorf("invalid droplet ID %q: must be a number", spec.Droplet)
+		return fmt.Errorf("invalid droplet ID %q: %w", spec.Droplet, err)
 	}
 	action, err := client.CreateDropletSnapshot(dropletID, spec.Name)
 	if err != nil {

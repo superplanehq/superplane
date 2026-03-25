@@ -19,6 +19,23 @@ import (
 func Test__ListNodeExecutions(t *testing.T) {
 	r := support.Setup(t)
 
+	t.Run("invalid canvas id -> error", func(t *testing.T) {
+		_, err := ListNodeExecutions(
+			context.Background(),
+			r.Registry,
+			"invalid-uuid",
+			"some-node",
+			[]pb.CanvasNodeExecution_State{},
+			[]pb.CanvasNodeExecution_Result{},
+			0,
+			nil,
+		)
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+	})
+
 	t.Run("node does not exist -> 404 error", func(t *testing.T) {
 		//
 		// Create a canvas with a node
