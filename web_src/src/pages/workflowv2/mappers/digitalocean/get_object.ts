@@ -1,19 +1,68 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
+  EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
+  OutputPayload,
+  StateFunction,
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { GetObjectConfiguration, GetObjectOutput } from "./types";
+import { defaultStateFunction } from "../stateRegistry";
+
+const GET_OBJECT_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  found: {
+    icon: "file",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-green-100",
+    badgeColor: "bg-emerald-500",
+    label: "Found",
+  },
+  notFound: {
+    icon: "circle-x",
+    textColor: "text-gray-800",
+    backgroundColor: "bg-gray-100",
+    badgeColor: "bg-gray-500",
+    label: "Not Found",
+  },
+};
+
+const getObjectStateFunction: StateFunction = (execution: ExecutionInfo) => {
+  const defaultState = defaultStateFunction(execution);
+  if (defaultState !== "success") {
+    return defaultState;
+  }
+
+  const outputs = execution.outputs as
+    | { found?: OutputPayload[]; notFound?: OutputPayload[]; default?: OutputPayload[] }
+    | undefined;
+
+  if (outputs?.found?.length) {
+    return "found";
+  }
+
+  if (outputs?.notFound?.length) {
+    return "notFound";
+  }
+
+  return "success";
+};
+
+export const GET_OBJECT_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: GET_OBJECT_STATE_MAP,
+  getState: getObjectStateFunction,
+};
 
 export const getObjectMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -40,11 +89,11 @@ export const getObjectMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as
-      | { found?: { data: GetObjectOutput }[]; not_found?: { data: GetObjectOutput }[] }
+      | { found?: { data: GetObjectOutput }[]; notFound?: { data: GetObjectOutput }[] }
       | undefined;
 
     const result = outputs?.found?.[0]?.data;
-    const notFound = outputs?.not_found?.[0]?.data;
+    const notFound = outputs?.notFound?.[0]?.data;
 
     if (notFound) {
       details["File Path"] = notFound.filePath || "-";

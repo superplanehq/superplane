@@ -24,7 +24,7 @@ func parseBucket(bucket string) (region, name string, err error) {
 
 const (
 	channelFound    = "found"
-	channelNotFound = "not_found"
+	channelNotFound = "notFound"
 )
 
 type GetObject struct{}
