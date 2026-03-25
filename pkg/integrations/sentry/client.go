@@ -494,6 +494,24 @@ func (c *Client) ListIssues() ([]Issue, error) {
 	return issues, nil
 }
 
+func (c *Client) ListReleases() ([]Release, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/releases/", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	releases := []Release{}
+	if err := json.Unmarshal(responseBody, &releases); err != nil {
+		return nil, err
+	}
+
+	return releases, nil
+}
+
 func (c *Client) GetIssue(issueID string) (*Issue, error) {
 	responseBody, err := c.doJSON(
 		http.MethodGet,
