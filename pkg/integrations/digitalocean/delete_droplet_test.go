@@ -153,6 +153,31 @@ func Test__DeleteDroplet__Execute(t *testing.T) {
 		assert.Len(t, executionState.Payloads, 1)
 	})
 
+	t.Run("droplet ID out of int64 range (2^63) in scientific notation string -> returns error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "test-token",
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{
+			KVs: map[string]string{},
+		}
+
+		// 2^63, which is out of range for signed int64 and would overflow int on 64-bit platforms.
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"droplet": "9.223372036854776e+18",
+			},
+			HTTP:           &contexts.HTTPContext{},
+			Integration:    integrationCtx,
+			ExecutionState: executionState,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "too large")
+		assert.False(t, executionState.Passed)
+	})
+
 	t.Run("invalid droplet ID format -> returns error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
