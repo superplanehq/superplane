@@ -197,6 +197,10 @@ func (s *ownerSetupSteps) visitLoginPage() {
 }
 
 func (s *ownerSetupSteps) fillInEmailAndPassword(email, password string) {
+	// With magic code enabled, toggle to password form first,
+	// then fill in the fields that belong to it.
+	s.session.Click(q.Text("Sign in with password instead"))
+	s.session.Sleep(300)
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.FillIn(q.Locator(`input[type="password"]`), password)
 }

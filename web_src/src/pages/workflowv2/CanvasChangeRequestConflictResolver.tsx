@@ -716,7 +716,7 @@ export function CanvasChangeRequestConflictResolver({
             <div className="space-y-1">
               <Button variant="ghost" size="sm" className="px-1" onClick={onBack}>
                 <ArrowLeft className="h-4 w-4" />
-                Back to Versioning
+                Back
               </Button>
               <p className="text-sm font-semibold text-slate-900">Resolve Change Request Conflicts</p>
               <p className="text-xs text-slate-600">

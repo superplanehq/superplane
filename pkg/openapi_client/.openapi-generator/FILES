@@ -3,6 +3,7 @@
 .travis.yml
 README.md
 api/openapi.yaml
+api_agent.go
 api_blueprint.go
 api_canvas.go
 api_canvas_change_request.go
@@ -24,6 +25,9 @@ api_widget.go
 client.go
 configuration.go
 docs/ActOnCanvasChangeRequestRequestAction.md
+docs/AgentAPI.md
+docs/AgentsGenerateAgentChatTokenRequest.md
+docs/AgentsGenerateAgentChatTokenResponse.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
 docs/BlueprintAPI.md
@@ -260,6 +264,8 @@ docs/WidgetsListWidgetsResponse.md
 docs/WidgetsWidget.md
 git_push.sh
 model_act_on_canvas_change_request_request_action.go
+model_agents_generate_agent_chat_token_request.go
+model_agents_generate_agent_chat_token_response.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_blueprints_blueprint.go
@@ -477,6 +483,7 @@ model_widgets_describe_widget_response.go
 model_widgets_list_widgets_response.go
 model_widgets_widget.go
 response.go
+test/api_agent_test.go
 test/api_blueprint_test.go
 test/api_canvas_change_request_test.go
 test/api_canvas_event_test.go

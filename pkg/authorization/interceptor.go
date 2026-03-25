@@ -2,16 +2,24 @@ package authorization
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
+	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -25,15 +33,50 @@ const OrganizationContextKey contextKey = "organization"
 const DomainTypeContextKey contextKey = "domainType"
 const DomainIdContextKey contextKey = "domainId"
 
+/*
+ * Resolve the resource ID being referenced by a request.
+ * This is used when scoped-tokens are used for authentication / authorization.
+ */
+type ResourceResolver func(req any) []string
+
 type AuthorizationRule struct {
-	Resource   string
-	Action     string
-	DomainType string
+	Resource         string
+	Action           string
+	DomainType       string
+	ResourceResolver ResourceResolver
 }
 
 type AuthorizationInterceptor struct {
 	authService Authorization
 	rules       map[string]AuthorizationRule
+}
+
+/*
+ * Default resource resolver for requests that have an `GetId()` method.
+ */
+func defaultResourceResolver(req any) []string {
+	if request, ok := req.(interface{ GetId() string }); ok {
+		resourceID := strings.TrimSpace(request.GetId())
+		if resourceID != "" {
+			return []string{resourceID}
+		}
+	}
+
+	return nil
+}
+
+/*
+ * Resource resolver for requests that have a `GetCanvasId()` method.
+ */
+func canvasResourceResolver(req any) []string {
+	if request, ok := req.(interface{ GetCanvasId() string }); ok {
+		resourceID := strings.TrimSpace(request.GetCanvasId())
+		if resourceID != "" {
+			return []string{resourceID}
+		}
+	}
+
+	return nil
 }
 
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
@@ -101,44 +144,186 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbBlueprints.Blueprints_UpdateBlueprint_FullMethodName:   {Resource: "blueprints", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbBlueprints.Blueprints_DeleteBlueprint_FullMethodName:   {Resource: "blueprints", Action: "delete", DomainType: models.DomainTypeOrganization},
 
+		// Discovery rules
+		pbTriggers.Triggers_ListTriggers_FullMethodName:             {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbTriggers.Triggers_DescribeTrigger_FullMethodName:          {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbComponents.Components_ListComponents_FullMethodName:       {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbComponents.Components_DescribeComponent_FullMethodName:    {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbIntegrations.Integrations_ListIntegrations_FullMethodName: {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
+
+		// Agent rules
+		pbAgents.Agents_GenerateAgentChatToken_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+
 		// Canvases rules
-		pbCanvases.Canvases_ListCanvases_FullMethodName:              {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_DescribeCanvas_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_CreateCanvas_FullMethodName:              {Resource: "canvases", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_UpdateCanvas_FullMethodName:              {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_CreateCanvasVersion_FullMethodName:       {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListCanvasVersions_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_DescribeCanvasVersion_FullMethodName:     {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName:       {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_CreateCanvasChangeRequest_FullMethodName: {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListCanvasChangeRequests_FullMethodName:  {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ListCanvases_FullMethodName: {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_CreateCanvas_FullMethodName: {Resource: "canvases", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DescribeCanvas_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: defaultResourceResolver,
+		},
+		pbCanvases.Canvases_UpdateCanvas_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: defaultResourceResolver,
+		},
+		pbCanvases.Canvases_CreateCanvasVersion_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListCanvasVersions_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_DescribeCanvasVersion_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_CreateCanvasChangeRequest_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListCanvasChangeRequests_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
 		pbCanvases.Canvases_DescribeCanvasChangeRequest_FullMethodName: {
-			Resource:   "canvases",
-			Action:     "read",
-			DomainType: models.DomainTypeOrganization,
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName: {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
 		pbCanvases.Canvases_ResolveCanvasChangeRequest_FullMethodName: {
-			Resource:   "canvases",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_DeleteCanvas_FullMethodName:              {Resource: "canvases", Action: "delete", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListNodeExecutions_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListNodeQueueItems_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_DeleteNodeQueueItem_FullMethodName:       {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_UpdateNodePause_FullMethodName:           {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListCanvasEvents_FullMethodName:          {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListEventExecutions_FullMethodName:       {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListChildExecutions_FullMethodName:       {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListCanvasMemories_FullMethodName:        {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_DeleteCanvasMemory_FullMethodName:        {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_CancelExecution_FullMethodName:           {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ResolveExecutionErrors_FullMethodName:    {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_InvokeNodeExecutionAction_FullMethodName: {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName:   {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_ListNodeEvents_FullMethodName:            {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbCanvases.Canvases_EmitNodeEvent_FullMethodName:             {Resource: "canvases", Action: "update", DomainType: models.DomainTypeOrganization},
+		pbCanvases.Canvases_DeleteCanvas_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "delete",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: defaultResourceResolver,
+		},
+		pbCanvases.Canvases_ListNodeExecutions_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListNodeQueueItems_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_DeleteNodeQueueItem_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_UpdateNodePause_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListCanvasEvents_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListEventExecutions_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListChildExecutions_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListCanvasMemories_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_DeleteCanvasMemory_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_CancelExecution_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ResolveExecutionErrors_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_InvokeNodeExecutionAction_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListNodeEvents_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_EmitNodeEvent_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
 
 		// Service Accounts rules
 		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},
@@ -187,6 +372,9 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.NotFound, "organization not found")
 		}
 
+		//
+		// Verify if the user has the required RBAC permission.
+		//
 		allowed, err := a.authService.CheckOrganizationPermission(userID, org.ID.String(), rule.Resource, rule.Action)
 		if err != nil {
 			return nil, err
@@ -197,9 +385,91 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
+		//
+		// If a scoped-token was used,
+		// verify that the scoped-token has the required permission.
+		//
+		if !hasRequiredScopedTokenPermission(ctx, req, rule) {
+			log.Warnf(
+				"Scoped token for user %s is missing required permission %s:%s",
+				userID,
+				rule.Resource,
+				rule.Action,
+			)
+			return nil, status.Error(codes.NotFound, "Not found")
+		}
+
 		newContext := context.WithValue(ctx, OrganizationContextKey, organizationID)
 		newContext = context.WithValue(newContext, DomainTypeContextKey, models.DomainTypeOrganization)
 		newContext = context.WithValue(newContext, DomainIdContextKey, organizationID)
 		return handler(newContext, req)
 	}
+}
+
+func hasRequiredScopedTokenPermission(ctx context.Context, req any, rule AuthorizationRule) bool {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return true
+	}
+
+	scopesValue := firstMetadataValue(md, "x-token-scopes")
+	if scopesValue == "" {
+		return true
+	}
+
+	permissions, err := metadataScopedTokenPermissions(md)
+	if err != nil || len(permissions) == 0 {
+		return false
+	}
+
+	for _, permission := range permissions {
+		if permission.ResourceType != rule.Resource || permission.Action != rule.Action {
+			continue
+		}
+
+		if len(permission.Resources) == 0 {
+			return true
+		}
+
+		resourceResolver := rule.ResourceResolver
+		if resourceResolver == nil {
+			resourceResolver = defaultResourceResolver
+		}
+
+		resourceIDs := resourceResolver(req)
+		if len(resourceIDs) == 0 {
+			continue
+		}
+
+		for _, resourceID := range resourceIDs {
+			if slices.Contains(permission.Resources, resourceID) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func metadataScopedTokenPermissions(md metadata.MD) ([]jwt.Permission, error) {
+	value := firstMetadataValue(md, "x-token-scopes")
+	if value == "" {
+		return nil, nil
+	}
+
+	var scopes []string
+	if err := json.Unmarshal([]byte(value), &scopes); err != nil {
+		return nil, err
+	}
+
+	return jwt.PermissionsFromScopes(scopes), nil
+}
+
+func firstMetadataValue(md metadata.MD, key string) string {
+	values := md.Get(key)
+	if len(values) == 0 {
+		return ""
+	}
+
+	return values[0]
 }
