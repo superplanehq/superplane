@@ -1,6 +1,7 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
+import { Button } from "@/ui/button";
 import { FieldRendererProps } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
@@ -413,6 +414,16 @@ export const ConfigurationFieldRenderer = ({
                 <span className="text-red-500 text-xs ml-2">Required</span>
               )}
           </Label>
+          {isTogglable && isEnabled && (
+            <Button
+              type="button"
+              variant="linkSubdued"
+              onClick={() => onChange(null)}
+              aria-label={`Clear ${field.label || field.name}`}
+            >
+              Clear
+            </Button>
+          )}
         </div>
 
         {/* Display validation errors */}

@@ -743,7 +743,8 @@ func optionalConfig(integration core.IntegrationContext, name string) string {
 }
 
 func normalizeBaseURL(raw string) string {
-	if strings.TrimSpace(raw) == "" {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
 		return DefaultBaseURL
 	}
 

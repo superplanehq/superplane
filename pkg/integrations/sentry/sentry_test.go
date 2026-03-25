@@ -452,6 +452,40 @@ func Test__Sentry__Sync(t *testing.T) {
 	})
 }
 
+func Test__Sentry__NormalizeBaseURL(t *testing.T) {
+	t.Run("trims leading and trailing whitespace before scheme normalization", func(t *testing.T) {
+		assert.Equal(t, "https://sentry.io", normalizeBaseURL("  https://sentry.io/  "))
+	})
+
+	t.Run("adds https after trimming whitespace when scheme is missing", func(t *testing.T) {
+		assert.Equal(t, "https://washington-x2.sentry.io", normalizeBaseURL("  washington-x2.sentry.io/  "))
+	})
+
+	t.Run("uses default base URL when value is only whitespace", func(t *testing.T) {
+		assert.Equal(t, DefaultBaseURL, normalizeBaseURL("   "))
+	})
+}
+
+func Test__Sentry__NewClient_TrimsBaseURLWhitespace(t *testing.T) {
+	client, err := NewClient(
+		&contexts.HTTPContext{},
+		&contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "  https://washington-x2.sentry.io/  ",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "washington-x2",
+				},
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://washington-x2.sentry.io", client.baseURL)
+}
+
 func Test__Sentry__HandleWebhook(t *testing.T) {
 	impl := &Sentry{}
 	integrationCtx := &contexts.IntegrationContext{
