@@ -51,7 +51,6 @@ type Spec struct {
 	User             string                `json:"username" mapstructure:"username"`
 	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
-	Command          string                `json:"command" mapstructure:"command"` // legacy
 	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
@@ -64,9 +63,6 @@ type ExecutionMetadata struct {
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"user" mapstructure:"user"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
-	Command          string                `json:"command" mapstructure:"command"` // full command to execute (legacy fallback)
-	LastCommand      string                `json:"lastCommand" mapstructure:"lastCommand"`
-	CombinedCommand  string                `json:"combinedCommand" mapstructure:"combinedCommand"`
 	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
@@ -86,7 +82,7 @@ type ConnectionRetryState struct {
 func (c *SSHCommand) Name() string  { return "ssh" }
 func (c *SSHCommand) Label() string { return "SSH Command" }
 func (c *SSHCommand) Description() string {
-	return "Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)."
+	return "Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)."
 }
 func (c *SSHCommand) Documentation() string {
 	return `Run one or more commands on a remote host via SSH.
@@ -330,7 +326,6 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(config, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
-	spec.Commands = normalizeCommands(spec.Commands, spec.Command)
 
 	if spec.Host == "" {
 		return errors.New("host is required")
@@ -386,7 +381,9 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	spec.Commands = normalizeCommands(spec.Commands, spec.Command)
+	if strings.TrimSpace(spec.Commands) == "" {
+		return errors.New("commands is required")
+	}
 	for _, variable := range spec.Environment {
 		if variable.Name == "" {
 			return errors.New("environment variable name is required")
@@ -396,16 +393,11 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	combinedCommand, lastCommand := buildCombinedCommands(spec.Commands)
-
 	metadata := ExecutionMetadata{
 		Host:             spec.Host,
 		Port:             spec.Port,
 		User:             spec.User,
 		Commands:         spec.Commands,
-		Command:          combinedCommand,
-		LastCommand:      lastCommand,
-		CombinedCommand:  combinedCommand,
 		WorkingDirectory: spec.WorkingDirectory,
 		Environment:      spec.Environment,
 		Timeout:          spec.Timeout,
@@ -478,9 +470,9 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
-	commandToExecute := ctx.execMetadata.CombinedCommand
-	if strings.TrimSpace(commandToExecute) == "" {
-		commandToExecute = ctx.execMetadata.Command
+	commandToExecute, _ := buildCombinedCommands(ctx.execMetadata.Commands)
+	if commandToExecute == "" {
+		return errors.New("commands is required")
 	}
 
 	command := c.buildRemoteCommand(
@@ -618,13 +610,6 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 	}
 
 	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
-}
-
-func normalizeCommands(commands string, legacyCommand string) string {
-	if strings.TrimSpace(commands) != "" {
-		return commands
-	}
-	return legacyCommand
 }
 
 func buildCombinedCommands(commands string) (combined string, last string) {
