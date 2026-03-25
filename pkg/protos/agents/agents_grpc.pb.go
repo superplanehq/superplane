@@ -19,14 +19,22 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agents_GenerateAgentChatToken_FullMethodName = "/Superplane.Agents.Agents/GenerateAgentChatToken"
+	Agents_ListAgents_FullMethodName        = "/Superplane.Agents.Agents/ListAgents"
+	Agents_CreateAgent_FullMethodName       = "/Superplane.Agents.Agents/CreateAgent"
+	Agents_DescribeAgent_FullMethodName     = "/Superplane.Agents.Agents/DescribeAgent"
+	Agents_ListAgentMessages_FullMethodName = "/Superplane.Agents.Agents/ListAgentMessages"
+	Agents_ResumeAgent_FullMethodName       = "/Superplane.Agents.Agents/ResumeAgent"
 )
 
 // AgentsClient is the client API for Agents service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AgentsClient interface {
-	GenerateAgentChatToken(ctx context.Context, in *GenerateAgentChatTokenRequest, opts ...grpc.CallOption) (*GenerateAgentChatTokenResponse, error)
+	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
+	CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error)
+	DescribeAgent(ctx context.Context, in *DescribeAgentRequest, opts ...grpc.CallOption) (*DescribeAgentResponse, error)
+	ListAgentMessages(ctx context.Context, in *ListAgentMessagesRequest, opts ...grpc.CallOption) (*ListAgentMessagesResponse, error)
+	ResumeAgent(ctx context.Context, in *ResumeAgentRequest, opts ...grpc.CallOption) (*ResumeAgentResponse, error)
 }
 
 type agentsClient struct {
@@ -37,10 +45,50 @@ func NewAgentsClient(cc grpc.ClientConnInterface) AgentsClient {
 	return &agentsClient{cc}
 }
 
-func (c *agentsClient) GenerateAgentChatToken(ctx context.Context, in *GenerateAgentChatTokenRequest, opts ...grpc.CallOption) (*GenerateAgentChatTokenResponse, error) {
+func (c *agentsClient) ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GenerateAgentChatTokenResponse)
-	err := c.cc.Invoke(ctx, Agents_GenerateAgentChatToken_FullMethodName, in, out, cOpts...)
+	out := new(ListAgentsResponse)
+	err := c.cc.Invoke(ctx, Agents_ListAgents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentsClient) CreateAgent(ctx context.Context, in *CreateAgentRequest, opts ...grpc.CallOption) (*CreateAgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateAgentResponse)
+	err := c.cc.Invoke(ctx, Agents_CreateAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentsClient) DescribeAgent(ctx context.Context, in *DescribeAgentRequest, opts ...grpc.CallOption) (*DescribeAgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeAgentResponse)
+	err := c.cc.Invoke(ctx, Agents_DescribeAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentsClient) ListAgentMessages(ctx context.Context, in *ListAgentMessagesRequest, opts ...grpc.CallOption) (*ListAgentMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentMessagesResponse)
+	err := c.cc.Invoke(ctx, Agents_ListAgentMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentsClient) ResumeAgent(ctx context.Context, in *ResumeAgentRequest, opts ...grpc.CallOption) (*ResumeAgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResumeAgentResponse)
+	err := c.cc.Invoke(ctx, Agents_ResumeAgent_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +99,11 @@ func (c *agentsClient) GenerateAgentChatToken(ctx context.Context, in *GenerateA
 // All implementations should embed UnimplementedAgentsServer
 // for forward compatibility.
 type AgentsServer interface {
-	GenerateAgentChatToken(context.Context, *GenerateAgentChatTokenRequest) (*GenerateAgentChatTokenResponse, error)
+	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
+	CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error)
+	DescribeAgent(context.Context, *DescribeAgentRequest) (*DescribeAgentResponse, error)
+	ListAgentMessages(context.Context, *ListAgentMessagesRequest) (*ListAgentMessagesResponse, error)
+	ResumeAgent(context.Context, *ResumeAgentRequest) (*ResumeAgentResponse, error)
 }
 
 // UnimplementedAgentsServer should be embedded to have
@@ -61,8 +113,20 @@ type AgentsServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAgentsServer struct{}
 
-func (UnimplementedAgentsServer) GenerateAgentChatToken(context.Context, *GenerateAgentChatTokenRequest) (*GenerateAgentChatTokenResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method GenerateAgentChatToken not implemented")
+func (UnimplementedAgentsServer) ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgents not implemented")
+}
+func (UnimplementedAgentsServer) CreateAgent(context.Context, *CreateAgentRequest) (*CreateAgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAgent not implemented")
+}
+func (UnimplementedAgentsServer) DescribeAgent(context.Context, *DescribeAgentRequest) (*DescribeAgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeAgent not implemented")
+}
+func (UnimplementedAgentsServer) ListAgentMessages(context.Context, *ListAgentMessagesRequest) (*ListAgentMessagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentMessages not implemented")
+}
+func (UnimplementedAgentsServer) ResumeAgent(context.Context, *ResumeAgentRequest) (*ResumeAgentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeAgent not implemented")
 }
 func (UnimplementedAgentsServer) testEmbeddedByValue() {}
 
@@ -84,20 +148,92 @@ func RegisterAgentsServer(s grpc.ServiceRegistrar, srv AgentsServer) {
 	s.RegisterService(&Agents_ServiceDesc, srv)
 }
 
-func _Agents_GenerateAgentChatToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GenerateAgentChatTokenRequest)
+func _Agents_ListAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AgentsServer).GenerateAgentChatToken(ctx, in)
+		return srv.(AgentsServer).ListAgents(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Agents_GenerateAgentChatToken_FullMethodName,
+		FullMethod: Agents_ListAgents_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AgentsServer).GenerateAgentChatToken(ctx, req.(*GenerateAgentChatTokenRequest))
+		return srv.(AgentsServer).ListAgents(ctx, req.(*ListAgentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agents_CreateAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).CreateAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_CreateAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).CreateAgent(ctx, req.(*CreateAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agents_DescribeAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).DescribeAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_DescribeAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).DescribeAgent(ctx, req.(*DescribeAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agents_ListAgentMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).ListAgentMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_ListAgentMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).ListAgentMessages(ctx, req.(*ListAgentMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agents_ResumeAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).ResumeAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_ResumeAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).ResumeAgent(ctx, req.(*ResumeAgentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -110,8 +246,24 @@ var Agents_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*AgentsServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "GenerateAgentChatToken",
-			Handler:    _Agents_GenerateAgentChatToken_Handler,
+			MethodName: "ListAgents",
+			Handler:    _Agents_ListAgents_Handler,
+		},
+		{
+			MethodName: "CreateAgent",
+			Handler:    _Agents_CreateAgent_Handler,
+		},
+		{
+			MethodName: "DescribeAgent",
+			Handler:    _Agents_DescribeAgent_Handler,
+		},
+		{
+			MethodName: "ListAgentMessages",
+			Handler:    _Agents_ListAgentMessages_Handler,
+		},
+		{
+			MethodName: "ResumeAgent",
+			Handler:    _Agents_ResumeAgent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

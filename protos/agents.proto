@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane.Agents;
 
+import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
@@ -24,23 +25,120 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Agents {
-  rpc GenerateAgentChatToken(GenerateAgentChatTokenRequest) returns (GenerateAgentChatTokenResponse) {
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse) {
     option (google.api.http) = {
-      post: "/api/v1/agents/chat/tokens"
+      get: "/api/v1/agents"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List agent sessions for the authenticated user";
+      description: "Returns a list of agent sessions for the authenticated user";
+      tags: "Agent";
+    };
+  }
+
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Generates a new token for an agent chat";
-      description: "Mints a short-lived scoped token for agent chat on a canvas";
+      summary: "Creates a new agent session";
+      description: "Create a new agent session. The response includes the URL and token for initiating the session";
+      tags: "Agent";
+    };
+  }
+
+  rpc DescribeAgent(DescribeAgentRequest) returns (DescribeAgentResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/agents/{agent_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describes an agent session for the authenticated user";
+      description: "Describes an agent session for the authenticated user";
+      tags: "Agent";
+    };
+  }
+
+  rpc ListAgentMessages(ListAgentMessagesRequest) returns (ListAgentMessagesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/agents/{agent_id}/messages"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List the messages in an agent session";
+      description: "List the messages in an agent session";
+      tags: "Agent";
+    };
+  }
+
+  rpc ResumeAgent(ResumeAgentRequest) returns (ResumeAgentResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/{agent_id}/resume"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Resume an agent session";
+      description: "Resumes an agent session. The response includes the URL and token for resuming the session";
       tags: "Agent";
     };
   }
 }
 
-message GenerateAgentChatTokenRequest {
+message ListAgentsRequest {
   string canvas_id = 1;
 }
 
-message GenerateAgentChatTokenResponse {
+message ListAgentsResponse {
+  repeated AgentInfo agents = 1;
+}
+
+message DescribeAgentRequest {
+  string canvas_id = 1;
+  string agent_id = 2;
+}
+
+message DescribeAgentResponse {
+  AgentInfo agent = 1;
+}
+
+message ListAgentMessagesRequest {
+  string canvas_id = 1;
+  string agent_id = 2;
+}
+
+message ListAgentMessagesResponse {
+  repeated AgentMessage messages = 1;
+}
+
+message AgentMessage {
+  string id = 1;
+  string role = 2;
+  string content = 3;
+  string tool_call_id = 4;
+  string tool_status = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message CreateAgentRequest {
+  string canvas_id = 1;
+}
+
+message CreateAgentResponse {
   string token = 1;
+  string url = 2;
+}
+
+message ResumeAgentRequest {
+  string canvas_id = 1;
+  string agent_id = 2;
+}
+
+message ResumeAgentResponse {
+  string token = 1;
+  string url = 2;
+}
+
+message AgentInfo {
+  string id = 1;
+  string initial_message = 2;
+  google.protobuf.Timestamp created_at = 3;
 }

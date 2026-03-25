@@ -17,36 +17,37 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
 
 // AgentAPIService AgentAPI service
 type AgentAPIService service
 
-type ApiAgentsGenerateAgentChatTokenRequest struct {
+type ApiAgentsCreateAgentRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	body       *AgentsGenerateAgentChatTokenRequest
+	body       *AgentsCreateAgentRequest
 }
 
-func (r ApiAgentsGenerateAgentChatTokenRequest) Body(body AgentsGenerateAgentChatTokenRequest) ApiAgentsGenerateAgentChatTokenRequest {
+func (r ApiAgentsCreateAgentRequest) Body(body AgentsCreateAgentRequest) ApiAgentsCreateAgentRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAgentsGenerateAgentChatTokenRequest) Execute() (*AgentsGenerateAgentChatTokenResponse, *http.Response, error) {
-	return r.ApiService.AgentsGenerateAgentChatTokenExecute(r)
+func (r ApiAgentsCreateAgentRequest) Execute() (*AgentsCreateAgentResponse, *http.Response, error) {
+	return r.ApiService.AgentsCreateAgentExecute(r)
 }
 
 /*
-AgentsGenerateAgentChatToken Generates a new token for an agent chat
+AgentsCreateAgent Creates a new agent session
 
-Mints a short-lived scoped token for agent chat on a canvas
+Create a new agent session. The response includes the URL and token for initiating the session
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiAgentsGenerateAgentChatTokenRequest
+	@return ApiAgentsCreateAgentRequest
 */
-func (a *AgentAPIService) AgentsGenerateAgentChatToken(ctx context.Context) ApiAgentsGenerateAgentChatTokenRequest {
-	return ApiAgentsGenerateAgentChatTokenRequest{
+func (a *AgentAPIService) AgentsCreateAgent(ctx context.Context) ApiAgentsCreateAgentRequest {
+	return ApiAgentsCreateAgentRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -54,21 +55,503 @@ func (a *AgentAPIService) AgentsGenerateAgentChatToken(ctx context.Context) ApiA
 
 // Execute executes the request
 //
-//	@return AgentsGenerateAgentChatTokenResponse
-func (a *AgentAPIService) AgentsGenerateAgentChatTokenExecute(r ApiAgentsGenerateAgentChatTokenRequest) (*AgentsGenerateAgentChatTokenResponse, *http.Response, error) {
+//	@return AgentsCreateAgentResponse
+func (a *AgentAPIService) AgentsCreateAgentExecute(r ApiAgentsCreateAgentRequest) (*AgentsCreateAgentResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsGenerateAgentChatTokenResponse
+		localVarReturnValue *AgentsCreateAgentResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsGenerateAgentChatToken")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsCreateAgent")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chat/tokens"
+	localVarPath := localBasePath + "/api/v1/agents"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAgentsDescribeAgentRequest struct {
+	ctx        context.Context
+	ApiService *AgentAPIService
+	agentId    string
+	canvasId   *string
+}
+
+func (r ApiAgentsDescribeAgentRequest) CanvasId(canvasId string) ApiAgentsDescribeAgentRequest {
+	r.canvasId = &canvasId
+	return r
+}
+
+func (r ApiAgentsDescribeAgentRequest) Execute() (*AgentsDescribeAgentResponse, *http.Response, error) {
+	return r.ApiService.AgentsDescribeAgentExecute(r)
+}
+
+/*
+AgentsDescribeAgent Describes an agent session for the authenticated user
+
+Describes an agent session for the authenticated user
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param agentId
+	@return ApiAgentsDescribeAgentRequest
+*/
+func (a *AgentAPIService) AgentsDescribeAgent(ctx context.Context, agentId string) ApiAgentsDescribeAgentRequest {
+	return ApiAgentsDescribeAgentRequest{
+		ApiService: a,
+		ctx:        ctx,
+		agentId:    agentId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return AgentsDescribeAgentResponse
+func (a *AgentAPIService) AgentsDescribeAgentExecute(r ApiAgentsDescribeAgentRequest) (*AgentsDescribeAgentResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *AgentsDescribeAgentResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsDescribeAgent")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/agents/{agentId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"agentId"+"}", url.PathEscape(parameterValueToString(r.agentId, "agentId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.canvasId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "canvasId", r.canvasId, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAgentsListAgentMessagesRequest struct {
+	ctx        context.Context
+	ApiService *AgentAPIService
+	agentId    string
+	canvasId   *string
+}
+
+func (r ApiAgentsListAgentMessagesRequest) CanvasId(canvasId string) ApiAgentsListAgentMessagesRequest {
+	r.canvasId = &canvasId
+	return r
+}
+
+func (r ApiAgentsListAgentMessagesRequest) Execute() (*AgentsListAgentMessagesResponse, *http.Response, error) {
+	return r.ApiService.AgentsListAgentMessagesExecute(r)
+}
+
+/*
+AgentsListAgentMessages List the messages in an agent session
+
+List the messages in an agent session
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param agentId
+	@return ApiAgentsListAgentMessagesRequest
+*/
+func (a *AgentAPIService) AgentsListAgentMessages(ctx context.Context, agentId string) ApiAgentsListAgentMessagesRequest {
+	return ApiAgentsListAgentMessagesRequest{
+		ApiService: a,
+		ctx:        ctx,
+		agentId:    agentId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return AgentsListAgentMessagesResponse
+func (a *AgentAPIService) AgentsListAgentMessagesExecute(r ApiAgentsListAgentMessagesRequest) (*AgentsListAgentMessagesResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *AgentsListAgentMessagesResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsListAgentMessages")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/agents/{agentId}/messages"
+	localVarPath = strings.Replace(localVarPath, "{"+"agentId"+"}", url.PathEscape(parameterValueToString(r.agentId, "agentId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.canvasId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "canvasId", r.canvasId, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAgentsListAgentsRequest struct {
+	ctx        context.Context
+	ApiService *AgentAPIService
+	canvasId   *string
+}
+
+func (r ApiAgentsListAgentsRequest) CanvasId(canvasId string) ApiAgentsListAgentsRequest {
+	r.canvasId = &canvasId
+	return r
+}
+
+func (r ApiAgentsListAgentsRequest) Execute() (*AgentsListAgentsResponse, *http.Response, error) {
+	return r.ApiService.AgentsListAgentsExecute(r)
+}
+
+/*
+AgentsListAgents List agent sessions for the authenticated user
+
+Returns a list of agent sessions for the authenticated user
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@return ApiAgentsListAgentsRequest
+*/
+func (a *AgentAPIService) AgentsListAgents(ctx context.Context) ApiAgentsListAgentsRequest {
+	return ApiAgentsListAgentsRequest{
+		ApiService: a,
+		ctx:        ctx,
+	}
+}
+
+// Execute executes the request
+//
+//	@return AgentsListAgentsResponse
+func (a *AgentAPIService) AgentsListAgentsExecute(r ApiAgentsListAgentsRequest) (*AgentsListAgentsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *AgentsListAgentsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsListAgents")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/agents"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.canvasId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "canvasId", r.canvasId, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAgentsResumeAgentRequest struct {
+	ctx        context.Context
+	ApiService *AgentAPIService
+	agentId    string
+	body       *AgentsResumeAgentBody
+}
+
+func (r ApiAgentsResumeAgentRequest) Body(body AgentsResumeAgentBody) ApiAgentsResumeAgentRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiAgentsResumeAgentRequest) Execute() (*AgentsResumeAgentResponse, *http.Response, error) {
+	return r.ApiService.AgentsResumeAgentExecute(r)
+}
+
+/*
+AgentsResumeAgent Resume an agent session
+
+Resumes an agent session. The response includes the URL and token for resuming the session
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param agentId
+	@return ApiAgentsResumeAgentRequest
+*/
+func (a *AgentAPIService) AgentsResumeAgent(ctx context.Context, agentId string) ApiAgentsResumeAgentRequest {
+	return ApiAgentsResumeAgentRequest{
+		ApiService: a,
+		ctx:        ctx,
+		agentId:    agentId,
+	}
+}
+
+// Execute executes the request
+//
+//	@return AgentsResumeAgentResponse
+func (a *AgentAPIService) AgentsResumeAgentExecute(r ApiAgentsResumeAgentRequest) (*AgentsResumeAgentResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *AgentsResumeAgentResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsResumeAgent")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/agents/{agentId}/resume"
+	localVarPath = strings.Replace(localVarPath, "{"+"agentId"+"}", url.PathEscape(parameterValueToString(r.agentId, "agentId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

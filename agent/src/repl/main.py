@@ -132,17 +132,20 @@ def _parse_stream_event(raw_line: bytes) -> dict[str, Any] | None:
 
 
 def _stream_repl_answer(
-    web_url: str,
+    stream_url: str,
     payload: CanvasQuestionRequest,
     model: str,
     token: str | None = None,
 ) -> str:
     started_at = time.perf_counter()
+    resolved_stream_url = stream_url.strip()
+    if model == "test" and "/agents/" not in resolved_stream_url:
+        resolved_stream_url = f"{resolved_stream_url.rstrip('/')}/agents/test-agent/stream"
     request_payload = payload.model_dump(mode="json")
     request_payload["model"] = model
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
-        url=f"{web_url.rstrip('/')}/v1/agent/chat/stream",
+        url=resolved_stream_url,
         data=request_body,
         method="POST",
         headers={
@@ -277,15 +280,15 @@ def _stream_repl_answer(
     return "".join(chunks).strip()
 
 
-def _create_agent_chat_session(
+def _create_agent_session(
     base_url: str,
     api_token: str,
     org_id: str,
     canvas_id: str,
-) -> str:
+) -> tuple[str, str]:
     request_body = json.dumps({"canvas_id": canvas_id}).encode("utf-8")
     request = Request(
-        url=f"{base_url.rstrip('/')}/api/v1/agents/chat/tokens",
+        url=f"{base_url.rstrip('/')}/api/v1/agents",
         data=request_body,
         method="POST",
         headers={
@@ -308,7 +311,7 @@ def _create_agent_chat_session(
         details = f" HTTP {error.code}"
         if response_text:
             details += f": {response_text}"
-        raise RuntimeError(f"Failed to create agent chat session.{details}") from error
+        raise RuntimeError(f"Failed to create agent session.{details}") from error
     except URLError as error:
         raise RuntimeError(
             "Failed to reach SuperPlane. "
@@ -316,10 +319,13 @@ def _create_agent_chat_session(
         ) from error
 
     token = payload.get("token") if isinstance(payload, dict) else None
+    stream_url = payload.get("url") if isinstance(payload, dict) else None
     if not isinstance(token, str) or not token.strip():
-        raise RuntimeError("Agent chat session response did not include a token.")
+        raise RuntimeError("Agent session response did not include a token.")
+    if not isinstance(stream_url, str) or not stream_url.strip():
+        raise RuntimeError("Agent session response did not include a stream URL.")
 
-    return token.strip()
+    return token.strip(), stream_url.strip()
 
 
 def main() -> None:
@@ -425,6 +431,7 @@ def main() -> None:
         )
 
     token: str | None = None
+    stream_url = web_url
     canvas_id = canvas_id_arg
     if args.model != "test":
         canvas_id = require_canvas_id(canvas_id_arg)
@@ -433,7 +440,7 @@ def main() -> None:
             raise ValueError("Missing required argument: --token")
         base_url = require_setting(args.base_url, "SUPERPLANE_BASE_URL")
         org_id = require_setting(args.org_id, "SUPERPLANE_ORG_ID")
-        token = _create_agent_chat_session(
+        token, stream_url = _create_agent_session(
             base_url=base_url,
             api_token=api_token,
             org_id=org_id,
@@ -460,7 +467,7 @@ def main() -> None:
                     continue
                 payload = CanvasQuestionRequest(question=question, canvas_id=canvas_id)
                 _stream_repl_answer(
-                    web_url=web_url,
+                    stream_url=stream_url,
                     payload=payload,
                     model=args.model,
                     token=token,
@@ -473,7 +480,7 @@ def main() -> None:
     payload = CanvasQuestionRequest(question=args.question, canvas_id=canvas_id)
     try:
         _stream_repl_answer(
-            web_url=web_url,
+            stream_url=stream_url,
             payload=payload,
             model=args.model,
             token=token,

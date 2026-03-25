@@ -18,6 +18,7 @@
 __version__ = "1.0.0"
 
 # import apis into sdk package
+from superplaneapi.api.agent_api import AgentApi
 from superplaneapi.api.blueprint_api import BlueprintApi
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_change_request_api import CanvasChangeRequestApi
@@ -50,6 +51,15 @@ from superplaneapi.exceptions import ApiException
 
 # import models into sdk package
 from superplaneapi.models.act_on_canvas_change_request_request_action import ActOnCanvasChangeRequestRequestAction
+from superplaneapi.models.agents_agent_info import AgentsAgentInfo
+from superplaneapi.models.agents_agent_message import AgentsAgentMessage
+from superplaneapi.models.agents_create_agent_request import AgentsCreateAgentRequest
+from superplaneapi.models.agents_create_agent_response import AgentsCreateAgentResponse
+from superplaneapi.models.agents_describe_agent_response import AgentsDescribeAgentResponse
+from superplaneapi.models.agents_list_agent_messages_response import AgentsListAgentMessagesResponse
+from superplaneapi.models.agents_list_agents_response import AgentsListAgentsResponse
+from superplaneapi.models.agents_resume_agent_body import AgentsResumeAgentBody
+from superplaneapi.models.agents_resume_agent_response import AgentsResumeAgentResponse
 from superplaneapi.models.authorization_domain_type import AuthorizationDomainType
 from superplaneapi.models.authorization_permission import AuthorizationPermission
 from superplaneapi.models.blueprints_blueprint import BlueprintsBlueprint

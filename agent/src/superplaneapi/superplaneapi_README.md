@@ -45,16 +45,16 @@ configuration = superplaneapi.Configuration(
 # Enter a context with an instance of the API client
 with superplaneapi.ApiClient(configuration) as api_client:
     # Create an instance of the API class
-    api_instance = superplaneapi.BlueprintApi(api_client)
-    body = superplaneapi.BlueprintsCreateBlueprintRequest() # BlueprintsCreateBlueprintRequest | 
+    api_instance = superplaneapi.AgentApi(api_client)
+    body = superplaneapi.AgentsCreateAgentRequest() # AgentsCreateAgentRequest | 
 
     try:
-        # Create blueprint
-        api_response = api_instance.blueprints_create_blueprint(body)
-        print("The response of BlueprintApi->blueprints_create_blueprint:\n")
+        # Creates a new agent session
+        api_response = api_instance.agents_create_agent(body)
+        print("The response of AgentApi->agents_create_agent:\n")
         pprint(api_response)
     except ApiException as e:
-        print("Exception when calling BlueprintApi->blueprints_create_blueprint: %s\n" % e)
+        print("Exception when calling AgentApi->agents_create_agent: %s\n" % e)
 
 ```
 
@@ -64,6 +64,11 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*AgentApi* | [**agents_create_agent**](superplaneapi/docs/AgentApi.md#agents_create_agent) | **POST** /api/v1/agents | Creates a new agent session
+*AgentApi* | [**agents_describe_agent**](superplaneapi/docs/AgentApi.md#agents_describe_agent) | **GET** /api/v1/agents/{agentId} | Describes an agent session for the authenticated user
+*AgentApi* | [**agents_list_agent_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_messages) | **GET** /api/v1/agents/{agentId}/messages | List the messages in an agent session
+*AgentApi* | [**agents_list_agents**](superplaneapi/docs/AgentApi.md#agents_list_agents) | **GET** /api/v1/agents | List agent sessions for the authenticated user
+*AgentApi* | [**agents_resume_agent**](superplaneapi/docs/AgentApi.md#agents_resume_agent) | **POST** /api/v1/agents/{agentId}/resume | Resume an agent session
 *BlueprintApi* | [**blueprints_create_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_create_blueprint) | **POST** /api/v1/blueprints | Create blueprint
 *BlueprintApi* | [**blueprints_delete_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_delete_blueprint) | **DELETE** /api/v1/blueprints/{id} | Delete blueprint
 *BlueprintApi* | [**blueprints_describe_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_describe_blueprint) | **GET** /api/v1/blueprints/{id} | Describe blueprint
@@ -167,6 +172,15 @@ Class | Method | HTTP request | Description
 ## Documentation For Models
 
  - [ActOnCanvasChangeRequestRequestAction](superplaneapi/docs/ActOnCanvasChangeRequestRequestAction.md)
+ - [AgentsAgentInfo](superplaneapi/docs/AgentsAgentInfo.md)
+ - [AgentsAgentMessage](superplaneapi/docs/AgentsAgentMessage.md)
+ - [AgentsCreateAgentRequest](superplaneapi/docs/AgentsCreateAgentRequest.md)
+ - [AgentsCreateAgentResponse](superplaneapi/docs/AgentsCreateAgentResponse.md)
+ - [AgentsDescribeAgentResponse](superplaneapi/docs/AgentsDescribeAgentResponse.md)
+ - [AgentsListAgentMessagesResponse](superplaneapi/docs/AgentsListAgentMessagesResponse.md)
+ - [AgentsListAgentsResponse](superplaneapi/docs/AgentsListAgentsResponse.md)
+ - [AgentsResumeAgentBody](superplaneapi/docs/AgentsResumeAgentBody.md)
+ - [AgentsResumeAgentResponse](superplaneapi/docs/AgentsResumeAgentResponse.md)
  - [AuthorizationDomainType](superplaneapi/docs/AuthorizationDomainType.md)
  - [AuthorizationPermission](superplaneapi/docs/AuthorizationPermission.md)
  - [BlueprintsBlueprint](superplaneapi/docs/BlueprintsBlueprint.md)

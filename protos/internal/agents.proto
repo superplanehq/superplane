@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package Superplane.Internal.Agents;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/private/agents";
+
+//
+// The internal gRPC service exposed by the Agent Service.
+// This is used by SuperPlane for /api/v1/agents/* endpoints.
+// See: protos/agents.proto
+//
+service Agents {
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  rpc DescribeAgent(DescribeAgentRequest) returns (DescribeAgentResponse);
+  rpc ListAgentMessages(ListAgentMessagesRequest) returns (ListAgentMessagesResponse);
+}
+
+message ListAgentsRequest {
+  string org_id = 1;
+  string canvas_id = 2;
+  string user_id = 3;
+}
+
+message ListAgentsResponse {
+  repeated AgentInfo agents = 1;
+}
+
+message DescribeAgentRequest {
+  string org_id = 1;
+  string canvas_id = 2;
+  string agent_id = 3;
+  string user_id = 4;
+}
+
+message DescribeAgentResponse {
+  AgentInfo agent = 1;
+}
+
+message ListAgentMessagesRequest {
+  string org_id = 1;
+  string canvas_id = 2;
+  string agent_id = 3;
+  string user_id = 4;
+}
+
+message ListAgentMessagesResponse {
+  repeated AgentMessage messages = 1;
+}
+
+message AgentMessage {
+  string id = 1;
+  string role = 2;
+  string content = 3;
+  string tool_call_id = 4;
+  string tool_status = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message CreateAgentRequest {
+  string org_id = 1;
+  string canvas_id = 2;
+  string user_id = 3;
+}
+
+message CreateAgentResponse {
+  AgentInfo agent = 1;
+}
+
+message AgentInfo {
+  string id = 1;
+  string initial_message = 2;
+  google.protobuf.Timestamp created_at = 3;
+}

@@ -21,6 +21,7 @@ type ScopedTokenClaims struct {
 	TokenType string             `json:"token_type"`
 	OrgID     string             `json:"org_id"`
 	Purpose   string             `json:"purpose"`
+	AgentID   string             `json:"agent_id,omitempty"`
 	Scopes    []string           `json:"scopes"`
 }
 
@@ -61,6 +62,7 @@ func (s *Signer) GenerateScopedToken(claims ScopedTokenClaims, duration time.Dur
 		TokenType: ScopedTokenType,
 		OrgID:     orgID,
 		Purpose:   purpose,
+		AgentID:   strings.TrimSpace(claims.AgentID),
 		Scopes:    scopes,
 	}
 
@@ -121,6 +123,7 @@ func (s *Signer) ValidateScopedToken(tokenString string) (*ScopedTokenClaims, er
 	claims.Audience = strings.TrimSpace(claims.Audience)
 	claims.OrgID = orgID
 	claims.Purpose = purpose
+	claims.AgentID = strings.TrimSpace(claims.AgentID)
 	claims.Scopes = scopes
 
 	return claims, nil

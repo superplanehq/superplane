@@ -30,7 +30,7 @@ def test_stream_repl_answer_reads_sse_response_end_to_end(
 
     payload = CanvasQuestionRequest(question="hello from repl")
     answer = _stream_repl_answer(
-        web_url=f"http://127.0.0.1:{port}",
+        stream_url=f"http://127.0.0.1:{port}",
         payload=payload,
         model="test",
     )
@@ -80,14 +80,14 @@ def test_main_non_test_mode_mints_agent_chat_session(
         )
 
     def fake_stream_repl_answer(
-        web_url: str,
+        stream_url: str,
         payload: CanvasQuestionRequest,
         model: str,
         token: str | None = None,
     ) -> str:
         stream_calls.append(
             {
-                "web_url": web_url,
+                "stream_url": stream_url,
                 "canvas_id": payload.canvas_id,
                 "model": model,
                 "token": token,
@@ -95,12 +95,12 @@ def test_main_non_test_mode_mints_agent_chat_session(
         )
         return "ok"
 
-    def fake_create_agent_chat_session(
+    def fake_create_agent_session(
         base_url: str,
         api_token: str,
         org_id: str,
         canvas_id: str,
-    ) -> str:
+    ) -> tuple[str, str]:
         session_calls.append(
             {
                 "base_url": base_url,
@@ -109,10 +109,10 @@ def test_main_non_test_mode_mints_agent_chat_session(
                 "canvas_id": canvas_id,
             }
         )
-        return "session-token-123"
+        return "session-token-123", "http://agent:8090/agents/agent-123/stream"
 
     monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
-    monkeypatch.setattr(repl_main, "_create_agent_chat_session", fake_create_agent_chat_session)
+    monkeypatch.setattr(repl_main, "_create_agent_session", fake_create_agent_session)
     monkeypatch.setattr(repl_main, "_stream_repl_answer", fake_stream_repl_answer)
 
     repl_main.main()
@@ -127,7 +127,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
     ]
     assert stream_calls == [
         {
-            "web_url": "http://127.0.0.1:8090",
+            "stream_url": "http://agent:8090/agents/agent-123/stream",
             "canvas_id": "canvas-123",
             "model": "anthropic:claude-sonnet-4-6",
             "token": "session-token-123",

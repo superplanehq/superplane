@@ -3,9 +3,21 @@
 import type { Client, Options as Options2, TDataShape } from "./client";
 import { client } from "./client.gen";
 import type {
-  AgentsGenerateAgentChatTokenData,
-  AgentsGenerateAgentChatTokenErrors,
-  AgentsGenerateAgentChatTokenResponses,
+  AgentsCreateAgentData,
+  AgentsCreateAgentErrors,
+  AgentsCreateAgentResponses,
+  AgentsDescribeAgentData,
+  AgentsDescribeAgentErrors,
+  AgentsDescribeAgentResponses,
+  AgentsListAgentMessagesData,
+  AgentsListAgentMessagesErrors,
+  AgentsListAgentMessagesResponses,
+  AgentsListAgentsData,
+  AgentsListAgentsErrors,
+  AgentsListAgentsResponses,
+  AgentsResumeAgentData,
+  AgentsResumeAgentErrors,
+  AgentsResumeAgentResponses,
   BlueprintsCreateBlueprintData,
   BlueprintsCreateBlueprintErrors,
   BlueprintsCreateBlueprintResponses,
@@ -320,19 +332,71 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 /**
- * Generates a new token for an agent chat
+ * List agent sessions for the authenticated user
  *
- * Mints a short-lived scoped token for agent chat on a canvas
+ * Returns a list of agent sessions for the authenticated user
  */
-export const agentsGenerateAgentChatToken = <ThrowOnError extends boolean = true>(
-  options: Options<AgentsGenerateAgentChatTokenData, ThrowOnError>,
+export const agentsListAgents = <ThrowOnError extends boolean = true>(
+  options?: Options<AgentsListAgentsData, ThrowOnError>,
 ) =>
-  (options.client ?? client).post<
-    AgentsGenerateAgentChatTokenResponses,
-    AgentsGenerateAgentChatTokenErrors,
-    ThrowOnError
-  >({
-    url: "/api/v1/agents/chat/tokens",
+  (options?.client ?? client).get<AgentsListAgentsResponses, AgentsListAgentsErrors, ThrowOnError>({
+    url: "/api/v1/agents",
+    ...options,
+  });
+
+/**
+ * Creates a new agent session
+ *
+ * Create a new agent session. The response includes the URL and token for initiating the session
+ */
+export const agentsCreateAgent = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsCreateAgentData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<AgentsCreateAgentResponses, AgentsCreateAgentErrors, ThrowOnError>({
+    url: "/api/v1/agents",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Describes an agent session for the authenticated user
+ *
+ * Describes an agent session for the authenticated user
+ */
+export const agentsDescribeAgent = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsDescribeAgentData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<AgentsDescribeAgentResponses, AgentsDescribeAgentErrors, ThrowOnError>({
+    url: "/api/v1/agents/{agentId}",
+    ...options,
+  });
+
+/**
+ * List the messages in an agent session
+ *
+ * List the messages in an agent session
+ */
+export const agentsListAgentMessages = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsListAgentMessagesData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<AgentsListAgentMessagesResponses, AgentsListAgentMessagesErrors, ThrowOnError>({
+    url: "/api/v1/agents/{agentId}/messages",
+    ...options,
+  });
+
+/**
+ * Resume an agent session
+ *
+ * Resumes an agent session. The response includes the URL and token for resuming the session
+ */
+export const agentsResumeAgent = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsResumeAgentData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<AgentsResumeAgentResponses, AgentsResumeAgentErrors, ThrowOnError>({
+    url: "/api/v1/agents/{agentId}/resume",
     ...options,
     headers: {
       "Content-Type": "application/json",

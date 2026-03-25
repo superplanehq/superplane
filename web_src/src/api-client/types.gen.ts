@@ -12,12 +12,49 @@ export type ActOnCanvasChangeRequestRequestAction =
   | "ACTION_PUBLISH"
   | "ACTION_UNAPPROVE";
 
-export type AgentsGenerateAgentChatTokenRequest = {
+export type AgentsAgentInfo = {
+  id?: string;
+  initialMessage?: string;
+  createdAt?: string;
+};
+
+export type AgentsAgentMessage = {
+  id?: string;
+  role?: string;
+  content?: string;
+  toolCallId?: string;
+  toolStatus?: string;
+  createdAt?: string;
+};
+
+export type AgentsCreateAgentRequest = {
   canvasId?: string;
 };
 
-export type AgentsGenerateAgentChatTokenResponse = {
+export type AgentsCreateAgentResponse = {
   token?: string;
+  url?: string;
+};
+
+export type AgentsDescribeAgentResponse = {
+  agent?: AgentsAgentInfo;
+};
+
+export type AgentsListAgentMessagesResponse = {
+  messages?: Array<AgentsAgentMessage>;
+};
+
+export type AgentsListAgentsResponse = {
+  agents?: Array<AgentsAgentInfo>;
+};
+
+export type AgentsResumeAgentBody = {
+  canvasId?: string;
+};
+
+export type AgentsResumeAgentResponse = {
+  token?: string;
+  url?: string;
 };
 
 /**
@@ -1376,32 +1413,142 @@ export type ProtobufAny = {
  */
 export type ProtobufNullValue = "NULL_VALUE";
 
-export type AgentsGenerateAgentChatTokenData = {
-  body: AgentsGenerateAgentChatTokenRequest;
+export type AgentsListAgentsData = {
+  body?: never;
   path?: never;
-  query?: never;
-  url: "/api/v1/agents/chat/tokens";
+  query?: {
+    canvasId?: string;
+  };
+  url: "/api/v1/agents";
 };
 
-export type AgentsGenerateAgentChatTokenErrors = {
+export type AgentsListAgentsErrors = {
   /**
    * An unexpected error response.
    */
   default: GooglerpcStatus;
 };
 
-export type AgentsGenerateAgentChatTokenError =
-  AgentsGenerateAgentChatTokenErrors[keyof AgentsGenerateAgentChatTokenErrors];
+export type AgentsListAgentsError = AgentsListAgentsErrors[keyof AgentsListAgentsErrors];
 
-export type AgentsGenerateAgentChatTokenResponses = {
+export type AgentsListAgentsResponses = {
   /**
    * A successful response.
    */
-  200: AgentsGenerateAgentChatTokenResponse;
+  200: AgentsListAgentsResponse;
 };
 
-export type AgentsGenerateAgentChatTokenResponse2 =
-  AgentsGenerateAgentChatTokenResponses[keyof AgentsGenerateAgentChatTokenResponses];
+export type AgentsListAgentsResponse2 = AgentsListAgentsResponses[keyof AgentsListAgentsResponses];
+
+export type AgentsCreateAgentData = {
+  body: AgentsCreateAgentRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/agents";
+};
+
+export type AgentsCreateAgentErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsCreateAgentError = AgentsCreateAgentErrors[keyof AgentsCreateAgentErrors];
+
+export type AgentsCreateAgentResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsCreateAgentResponse;
+};
+
+export type AgentsCreateAgentResponse2 = AgentsCreateAgentResponses[keyof AgentsCreateAgentResponses];
+
+export type AgentsDescribeAgentData = {
+  body?: never;
+  path: {
+    agentId: string;
+  };
+  query?: {
+    canvasId?: string;
+  };
+  url: "/api/v1/agents/{agentId}";
+};
+
+export type AgentsDescribeAgentErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsDescribeAgentError = AgentsDescribeAgentErrors[keyof AgentsDescribeAgentErrors];
+
+export type AgentsDescribeAgentResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsDescribeAgentResponse;
+};
+
+export type AgentsDescribeAgentResponse2 = AgentsDescribeAgentResponses[keyof AgentsDescribeAgentResponses];
+
+export type AgentsListAgentMessagesData = {
+  body?: never;
+  path: {
+    agentId: string;
+  };
+  query?: {
+    canvasId?: string;
+  };
+  url: "/api/v1/agents/{agentId}/messages";
+};
+
+export type AgentsListAgentMessagesErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsListAgentMessagesError = AgentsListAgentMessagesErrors[keyof AgentsListAgentMessagesErrors];
+
+export type AgentsListAgentMessagesResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsListAgentMessagesResponse;
+};
+
+export type AgentsListAgentMessagesResponse2 = AgentsListAgentMessagesResponses[keyof AgentsListAgentMessagesResponses];
+
+export type AgentsResumeAgentData = {
+  body: AgentsResumeAgentBody;
+  path: {
+    agentId: string;
+  };
+  query?: never;
+  url: "/api/v1/agents/{agentId}/resume";
+};
+
+export type AgentsResumeAgentErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsResumeAgentError = AgentsResumeAgentErrors[keyof AgentsResumeAgentErrors];
+
+export type AgentsResumeAgentResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsResumeAgentResponse;
+};
+
+export type AgentsResumeAgentResponse2 = AgentsResumeAgentResponses[keyof AgentsResumeAgentResponses];
 
 export type BlueprintsListBlueprintsData = {
   body?: never;

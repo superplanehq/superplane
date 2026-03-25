@@ -17,6 +17,7 @@ from pydantic_ai.messages import (
     FinalResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    ModelMessagesTypeAdapter,
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
@@ -25,9 +26,12 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
+from pydantic_core import to_json
 
 from ai.agent import AgentDeps, build_agent
-from ai.jwt import JwtValidator
+from ai.internal_agents_grpc import InternalAgentServer
+from ai.jwt import JwtClaims, JwtValidator
+from ai.session_store import AgentNotFoundError, SessionStore, StoredAgent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
@@ -40,13 +44,62 @@ class WebServerConfig:
 
 class ReplStreamRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
-    canvas_id: str | None = Field(default=None, min_length=1, max_length=200)
     model: str = Field(
         default=(os.getenv("AI_MODEL", "test").strip() or "test"),
         min_length=1,
         max_length=200,
     )
     base_url: str | None = None
+
+
+class PersistedRunRecorder:
+    def __init__(self, store: SessionStore, agent_id: str, user_prompt: str) -> None:
+        self._store = store
+        self._agent_id = agent_id
+        self._assistant_message_id: str | None = None
+        self._tool_message_id_by_call_id: dict[str, str] = {}
+        self._store.set_initial_message_if_missing(agent_id, user_prompt)
+        self._store.create_message(agent_id, role="user", content=user_prompt)
+
+    def append_assistant_content(self, chunk: str) -> None:
+        if not chunk:
+            return
+
+        if self._assistant_message_id is None:
+            message = self._store.create_message(self._agent_id, role="assistant", content=chunk)
+            self._assistant_message_id = message.id
+            return
+
+        self._store.append_message_content(self._assistant_message_id, chunk)
+
+    def set_assistant_content(self, content: str) -> None:
+        if self._assistant_message_id is None:
+            message = self._store.create_message(self._agent_id, role="assistant", content=content)
+            self._assistant_message_id = message.id
+            return
+
+        self._store.update_message(self._assistant_message_id, content=content)
+
+    def tool_started(self, tool_name: str, tool_call_id: str) -> None:
+        label = _format_tool_label(tool_name)
+        message = self._store.create_message(
+            self._agent_id,
+            role="tool",
+            content=f"{label}...",
+            tool_call_id=tool_call_id,
+            tool_status="running",
+        )
+        self._tool_message_id_by_call_id[tool_call_id] = message.id
+
+    def tool_finished(self, tool_name: str, tool_call_id: str, elapsed_ms: float | None) -> None:
+        message_id = self._tool_message_id_by_call_id.get(tool_call_id)
+        if message_id is None:
+            self.tool_started(tool_name, tool_call_id)
+            message_id = self._tool_message_id_by_call_id[tool_call_id]
+
+        label = _format_tool_label(tool_name)
+        content = f"{label} ({elapsed_ms:.1f}ms)" if elapsed_ms is not None else label
+        self._store.update_message(message_id, content=content, tool_status="completed")
 
 
 def _debug_enabled() -> bool:
@@ -117,18 +170,55 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
-    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+def _format_tool_label(tool_name: str) -> str:
+    normalized = tool_name.strip().lower()
+    label_by_tool = {
+        "get_canvas_shape": "Reading canvas structure",
+        "get_canvas_details": "Reading canvas details",
+        "list_available_blocks": "Listing available components",
+    }
+    if normalized in label_by_tool:
+        return label_by_tool[normalized]
+
+    words = normalized.replace("_", " ").replace("-", " ").strip()
+    if not words:
+        return "Running tool"
+    return words[:1].upper() + words[1:]
+
+
+def _load_message_history(store: SessionStore, agent_id: str) -> Any:
+    history_json = store.load_message_history_json(agent_id)
+    if history_json is None:
+        return None
+    return ModelMessagesTypeAdapter.validate_json(history_json)
+
+
+def _save_message_history(store: SessionStore, agent_id: str, messages: Any) -> None:
+    history_json = to_json(messages).decode("utf-8")
+    store.save_message_history_json(agent_id, history_json)
+
+
+def _resolve_agent_context(agent_id: str, request: Request) -> tuple[JwtClaims, StoredAgent]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
     claims = jwt_validator.decode(api_token)
-    canvas_id = jwt_validator.validate_canvas(payload.canvas_id, claims)
-    organization_id = claims.org_id
+    validated_agent_id = jwt_validator.validate_agent_id(agent_id, claims)
+    store: SessionStore = request.app.state.session_store
+    agent = store.get_agent(validated_agent_id)
+    if agent.org_id != claims.org_id or agent.user_id != claims.subject:
+        raise ValueError("Scoped token does not allow the requested agent.")
+    jwt_validator.validate_canvas(agent.canvas_id, claims)
+    return claims, agent
+
+
+def _build_deps(payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str) -> AgentDeps:
+    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+    api_token = _resolve_required_bearer_token(request)
     client = SuperplaneClient(
         SuperplaneClientConfig(
             base_url=base_url,
             api_token=api_token,
-            organization_id=organization_id,
+            organization_id=claims.org_id,
         )
     )
     _debug_log(
@@ -136,7 +226,7 @@ def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
         model=payload.model,
         canvas_id=canvas_id,
         base_url=base_url,
-        organization_id=organization_id,
+        organization_id=claims.org_id,
         has_token=bool(api_token),
     )
     return AgentDeps(
@@ -145,33 +235,65 @@ def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
     )
 
 
-async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
+async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
+    async for event in agent.run_stream_events(**kwargs):
+        yield event
+
+
+async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
-    resolved_canvas_id: str | None = None
+    store: SessionStore = request.app.state.session_store
+    claims: JwtClaims | None = None
+    if payload.model == "test" and _resolve_bearer_token(request) is None:
+        try:
+            stored_agent = store.get_agent(agent_id)
+        except AgentNotFoundError:
+            stored_agent = store.create_agent(
+                org_id="test-org",
+                user_id="test-user",
+                canvas_id="test-canvas",
+                agent_id=agent_id,
+            )
+    else:
+        claims, stored_agent = _resolve_agent_context(agent_id, request)
+
+    recorder = PersistedRunRecorder(store, stored_agent.id, payload.question)
+    message_history = _load_message_history(store, stored_agent.id)
+
+    resolved_canvas_id = stored_agent.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
-        deps = _build_deps(payload, request)
-        resolved_canvas_id = deps.canvas_id
+        if claims is None:
+            raise ValueError("Agent claims are missing.")
+        deps = _build_deps(payload, request, claims, resolved_canvas_id)
 
     _debug_log(
         "starting agent run",
+        agent_id=stored_agent.id,
         model=payload.model,
         canvas_id=resolved_canvas_id,
         question_preview=payload.question[:120],
+        has_history=message_history is not None,
     )
     yield {
         "type": "run_started",
+        "agent_id": stored_agent.id,
         "model": payload.model,
         "canvas_id": resolved_canvas_id,
     }
 
+    run_kwargs: dict[str, Any] = {"user_prompt": payload.question}
+    if message_history is not None:
+        run_kwargs["message_history"] = message_history
+
     if payload.model == "test":
-        _debug_log("using test model run path", canvas_id=resolved_canvas_id)
+        _debug_log("using test model run path", canvas_id=resolved_canvas_id, agent_id=stored_agent.id)
         test_agent: Agent[None, str] = Agent(model=TestModel(), output_type=str)
-        async for event in test_agent.run_stream_events(user_prompt=payload.question):
+        async for event in _run_stream_events(test_agent, **run_kwargs):
             if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
                 chunk = event.delta.content_delta
                 if chunk:
+                    recorder.append_assistant_content(chunk)
                     yield {
                         "type": "model_delta",
                         "content": chunk,
@@ -179,10 +301,15 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
                 continue
 
             if isinstance(event, AgentRunResultEvent):
+                result = event.result
+                _save_message_history(store, stored_agent.id, result.all_messages())
+                output = _to_jsonable(result.output)
+                if isinstance(output, str) and output:
+                    recorder.set_assistant_content(output)
                 yield {
                     "type": "final_answer",
-                    "output": _to_jsonable(event.result.output),
-                    "usage": _to_jsonable(event.result.usage()),
+                    "output": output,
+                    "usage": _to_jsonable(result.usage()),
                 }
 
         yield {
@@ -195,8 +322,11 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
     agent = build_agent(model=payload.model)
     if deps is None:
         raise ValueError("Agent dependencies are missing.")
+
+    run_kwargs["deps"] = deps
     _debug_log(
         "running non-test agent",
+        agent_id=stored_agent.id,
         model=payload.model,
         canvas_id=resolved_canvas_id,
     )
@@ -220,6 +350,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         delta = answer[already_streamed:]
         streamed_answer_length_by_call_id[call_id] = len(answer)
         streamed_any_answer_delta = True
+        recorder.append_assistant_content(delta)
         return {
             "type": "model_delta",
             "content": delta,
@@ -232,7 +363,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         return normalized in output_tool_name_hints
 
     tool_started_at_by_call_id: dict[str, float] = {}
-    async for event in agent.run_stream_events(user_prompt=payload.question, deps=deps):
+    async for event in _run_stream_events(agent, **run_kwargs):
         if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
             tool_call_id = event.part.tool_call_id
             if tool_call_id and likely_output_tool_name(event.part.tool_name):
@@ -249,8 +380,6 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
             if tool_call_id is None:
                 continue
 
-            # Some models stream output-tool JSON args incrementally.
-            # Surface answer deltas as they become parseable.
             if output_tool_call_id is None and likely_output_tool_name(event.delta.tool_name_delta):
                 output_tool_call_id = tool_call_id
             if output_tool_call_id != tool_call_id:
@@ -279,6 +408,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         if isinstance(event, FunctionToolCallEvent):
             tool_call_id = event.part.tool_call_id or event.part.tool_name
             tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
+            recorder.tool_started(event.part.tool_name, tool_call_id)
             yield {
                 "type": "tool_started",
                 "tool_name": event.part.tool_name,
@@ -291,6 +421,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
             tool_call_id = event.result.tool_call_id or event.result.tool_name
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
+            recorder.tool_finished(event.result.tool_name, tool_call_id, elapsed_ms)
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
@@ -302,6 +433,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
             chunk = event.delta.content_delta
             if chunk:
+                recorder.append_assistant_content(chunk)
                 yield {
                     "type": "model_delta",
                     "content": chunk,
@@ -310,16 +442,20 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
+            _save_message_history(store, stored_agent.id, result.all_messages())
             output = _to_jsonable(result.output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
                 if isinstance(answer, str) and answer:
+                    recorder.set_assistant_content(answer)
                     for chunk in _iter_text_chunks(answer):
                         yield {
                             "type": "model_delta",
                             "content": chunk,
                         }
                         await asyncio.sleep(0.01)
+            elif isinstance(output, str) and output:
+                recorder.set_assistant_content(output)
             yield {
                 "type": "final_answer",
                 "output": output,
@@ -347,28 +483,42 @@ def _create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.post("/v1/agent/chat/stream")
-    async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+    @app.on_event("startup")
+    async def startup() -> None:
+        store = SessionStore()
+        app.state.session_store = store
+        grpc_server = InternalAgentServer.from_env(store)
+        grpc_server.start()
+        app.state.internal_agent_server = grpc_server
+
+    @app.on_event("shutdown")
+    async def shutdown() -> None:
+        grpc_server: InternalAgentServer | None = getattr(app.state, "internal_agent_server", None)
+        if grpc_server is not None:
+            grpc_server.stop()
+
+    @app.post("/agents/{agent_id}/stream")
+    async def stream_repl(agent_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
         _debug_log(
             "incoming stream request",
+            agent_id=agent_id,
             model=payload.model,
-            canvas_id=payload.canvas_id,
             has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
             has_token=bool(_resolve_bearer_token(request)),
         )
 
         async def event_generator() -> AsyncIterator[str]:
             try:
-                async for event in _stream_agent_run(payload, request):
+                async for event in _stream_agent_run(agent_id, payload, request):
                     if await request.is_disconnected():
-                        _debug_log("client disconnected")
+                        _debug_log("client disconnected", agent_id=agent_id)
                         break
                     yield _encode_sse_event(event)
             except Exception as error:
-                _debug_log("stream failed", error=str(error))
+                _debug_log("stream failed", agent_id=agent_id, error=str(error))
                 yield _encode_sse_event(
                     {
                         "type": "run_failed",
@@ -390,7 +540,6 @@ def _create_app() -> FastAPI:
 
 
 def create_app() -> FastAPI:
-    """Public app factory for uvicorn --factory usage."""
     return _create_app()
 
 

@@ -64,16 +64,46 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents/chat/tokens": {
-      "post": {
-        "summary": "Generates a new token for an agent chat",
-        "description": "Mints a short-lived scoped token for agent chat on a canvas",
-        "operationId": "Agents_GenerateAgentChatToken",
+    "/api/v1/agents": {
+      "get": {
+        "summary": "List agent sessions for the authenticated user",
+        "description": "Returns a list of agent sessions for the authenticated user",
+        "operationId": "Agents_ListAgents",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsGenerateAgentChatTokenResponse"
+              "$ref": "#/definitions/AgentsListAgentsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new agent session",
+        "description": "Create a new agent session. The response includes the URL and token for initiating the session",
+        "operationId": "Agents_CreateAgent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsCreateAgentResponse"
             }
           },
           "default": {
@@ -89,7 +119,123 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AgentsGenerateAgentChatTokenRequest"
+              "$ref": "#/definitions/AgentsCreateAgentRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}": {
+      "get": {
+        "summary": "Describes an agent session for the authenticated user",
+        "description": "Describes an agent session for the authenticated user",
+        "operationId": "Agents_DescribeAgent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsDescribeAgentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}/messages": {
+      "get": {
+        "summary": "List the messages in an agent session",
+        "description": "List the messages in an agent session",
+        "operationId": "Agents_ListAgentMessages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsListAgentMessagesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/{agentId}/resume": {
+      "post": {
+        "summary": "Resume an agent session",
+        "description": "Resumes an agent session. The response includes the URL and token for resuming the session",
+        "operationId": "Agents_ResumeAgent",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsResumeAgentResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "agentId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AgentsResumeAgentBody"
             }
           }
         ],
@@ -3944,7 +4090,46 @@
       ],
       "default": "ACTION_UNSPECIFIED"
     },
-    "AgentsGenerateAgentChatTokenRequest": {
+    "AgentsAgentInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "initialMessage": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "AgentsAgentMessage": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "toolCallId": {
+          "type": "string"
+        },
+        "toolStatus": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "AgentsCreateAgentRequest": {
       "type": "object",
       "properties": {
         "canvasId": {
@@ -3952,10 +4137,64 @@
         }
       }
     },
-    "AgentsGenerateAgentChatTokenResponse": {
+    "AgentsCreateAgentResponse": {
       "type": "object",
       "properties": {
         "token": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsDescribeAgentResponse": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "$ref": "#/definitions/AgentsAgentInfo"
+        }
+      }
+    },
+    "AgentsListAgentMessagesResponse": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AgentsAgentMessage"
+          }
+        }
+      }
+    },
+    "AgentsListAgentsResponse": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AgentsAgentInfo"
+          }
+        }
+      }
+    },
+    "AgentsResumeAgentBody": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsResumeAgentResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "url": {
           "type": "string"
         }
       }
