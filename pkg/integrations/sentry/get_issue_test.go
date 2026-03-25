@@ -13,35 +13,66 @@ import (
 
 func Test__GetIssue__Setup(t *testing.T) {
 	component := &GetIssue{}
-	metadata := &contexts.MetadataContext{}
 
-	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{
-			"issueId": "123",
-		},
-		Metadata: metadata,
-		Integration: &contexts.IntegrationContext{
+	t.Run("stores issue metadata for a concrete issue id", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+
+		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"baseUrl":   "https://sentry.io",
-				"userToken": "user-token",
+				"issueId": "123",
 			},
-			Metadata: Metadata{
-				Organization: &OrganizationSummary{
-					Slug: "example",
+			Metadata: metadata,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
+				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
 				},
 			},
-		},
-		HTTP: &contexts.HTTPContext{
-			Responses: []*http.Response{
-				sentryMockResponse(http.StatusOK, `{"id":"123","shortId":"EXAMPLE-1","title":"RuntimeError: Database timeout"}`),
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					sentryMockResponse(http.StatusOK, `{"id":"123","shortId":"EXAMPLE-1","title":"RuntimeError: Database timeout"}`),
+				},
 			},
-		},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, GetIssueNodeMetadata{
+			IssueTitle: "EXAMPLE-1 · Database timeout",
+		}, metadata.Metadata)
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, GetIssueNodeMetadata{
-		IssueTitle: "EXAMPLE-1 · Database timeout",
-	}, metadata.Metadata)
+	t.Run("skips setup-time API validation for expressions", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		httpCtx := &contexts.HTTPContext{}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"issueId": "$['On Issue Event'].data.data.issue.id",
+			},
+			Metadata: metadata,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
+				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
+				},
+			},
+			HTTP: httpCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, GetIssueNodeMetadata{}, metadata.Metadata)
+		assert.Empty(t, httpCtx.Requests)
+	})
 }
 
 func Test__GetIssue__Configuration(t *testing.T) {

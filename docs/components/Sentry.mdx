@@ -120,7 +120,7 @@ The Create Deploy component marks a deploy against an existing Sentry release.
 ### Configuration
 
 - **Project**: Optional Sentry project to associate with the deploy
-- **Release Version**: The existing Sentry release version to deploy
+- **Release**: Select the existing Sentry release to deploy
 - **Environment**: The target environment, such as staging or production
 - **Name**: Optional deploy name
 - **Deploy URL**: Optional URL for the deployment
@@ -166,7 +166,7 @@ The Create Release component registers a new release in Sentry for a selected pr
 - **Version**: The release version identifier
 - **Ref**: Optional commit or tag reference for the release
 - **Release URL**: Optional URL for the release, build, or changelog
-- **Released At**: Optional date/time when the release went live
+- **Released At**: Optional date/time when the release went live. Defaults to the current time if left empty.
 - **Commits**: Optional commit metadata to associate with the release
 - **Refs**: Optional repository head/previous commit refs for release comparison
 
