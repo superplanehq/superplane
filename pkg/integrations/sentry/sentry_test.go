@@ -544,6 +544,46 @@ func Test__Sentry__ListResources(t *testing.T) {
 		require.Len(t, httpContext.Requests, 1)
 		assert.Equal(t, "https://sentry.io/api/0/organizations/example/issues/?query=&limit=100", httpContext.Requests[0].URL.String())
 	})
+
+	t.Run("lists assignees for the selected issue project", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `{"id":"123","shortId":"EXAMPLE-1","title":"RuntimeError: API error","project":{"id":"10","slug":"backend","name":"Backend"}}`),
+				sentryMockResponse(http.StatusOK, `[{"id":"7","name":"Alice Jones","email":"alice@example.com","user":{"id":"7","name":"Alice Jones","email":"alice@example.com","username":"alice"}}]`),
+				sentryMockResponse(http.StatusOK, `[{"id":"42","slug":"platform","name":"Platform"}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeAssignee, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"issueId": "123",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeAssignee, ID: "user:7", Name: "User · Alice Jones"},
+			{Type: ResourceTypeAssignee, ID: "team:42", Name: "Team · Platform"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/issues/123/", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/members/", httpContext.Requests[1].URL.String())
+		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/teams/", httpContext.Requests[2].URL.String())
+	})
 }
 
 func Test__Sentry__Configuration(t *testing.T) {

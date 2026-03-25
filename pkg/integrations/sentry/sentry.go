@@ -22,9 +22,10 @@ import (
 const (
 	DefaultBaseURL = "https://sentry.io"
 
-	ResourceTypeProject = "project"
-	ResourceTypeTeam    = "team"
-	ResourceTypeIssue   = "issue"
+	ResourceTypeProject  = "project"
+	ResourceTypeTeam     = "team"
+	ResourceTypeIssue    = "issue"
+	ResourceTypeAssignee = "assignee"
 
 	SentryPersonalTokensURL          = "https://sentry.io/settings/account/api/auth-tokens/"
 	SentryInternalIntegrationsDocURL = "https://docs.sentry.io/product/integrations/integration-platform/internal-integration/"
@@ -587,6 +588,46 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 				Type: ResourceTypeIssue,
 				ID:   issue.ID,
 				Name: displayIssueLabel(issue.ShortID, issue.Title),
+			})
+		}
+
+		return resources, nil
+
+	case ResourceTypeAssignee:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		issueID := strings.TrimSpace(ctx.Parameters["issueId"])
+		if issueID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		issue, err := client.GetIssue(issueID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve issue for assignee lookup: %w", err)
+		}
+
+		projectSlug := ""
+		if issue.Project != nil {
+			projectSlug = strings.TrimSpace(issue.Project.Slug)
+		}
+		if projectSlug == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		assignees, err := client.ListProjectAssignees(projectSlug)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list assignees: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(assignees))
+		for _, assignee := range assignees {
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeAssignee,
+				ID:   assignee.ID,
+				Name: assignee.Name,
 			})
 		}
 

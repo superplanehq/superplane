@@ -15,7 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status, priority, assignee, or visibility flags" />
 </CardGrid>
 
 ## Instructions
@@ -111,11 +111,20 @@ The Update Issue component updates an existing issue in Sentry.
 
 - **Resolve issues automatically** after a remediation workflow succeeds
 - **Reopen issues** when a related deployment regresses
+- **Route ownership** by assigning issues to a user or team
+- **Escalate triage** by changing issue priority
+- **Mark issues reviewed** after automation handles the first response
+- **Manage visibility and subscriptions** for follow-up workflows
 
 ### Configuration
 
 - **Issue**: Select the Sentry issue to update
-- **Status**: New issue status
+- **Status**: Optional new issue status
+- **Priority**: Optional issue priority
+- **Assigned To**: Optional assignee from the selected issue's Sentry project
+- **Seen**: Optional reviewed flag for the connected user
+- **Public**: Optional issue sharing visibility
+- **Subscribed**: Optional workflow subscription for the connected user
 
 ### Output
 

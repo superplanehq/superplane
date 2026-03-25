@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -86,10 +87,48 @@ type Team struct {
 	Name string `json:"name" mapstructure:"name"`
 }
 
+type ProjectMember struct {
+	ID    string `json:"id" mapstructure:"id"`
+	Name  string `json:"name" mapstructure:"name"`
+	Email string `json:"email" mapstructure:"email"`
+	User  *struct {
+		ID       string `json:"id" mapstructure:"id"`
+		Name     string `json:"name" mapstructure:"name"`
+		Username string `json:"username" mapstructure:"username"`
+		Email    string `json:"email" mapstructure:"email"`
+	} `json:"user" mapstructure:"user"`
+}
+
+type AssigneeResource struct {
+	ID   string
+	Name string
+}
+
 type Issue struct {
-	ID      string `json:"id" mapstructure:"id"`
-	ShortID string `json:"shortId" mapstructure:"shortId"`
-	Title   string `json:"title" mapstructure:"title"`
+	ID            string         `json:"id" mapstructure:"id"`
+	ShortID       string         `json:"shortId" mapstructure:"shortId"`
+	Title         string         `json:"title" mapstructure:"title"`
+	Status        string         `json:"status" mapstructure:"status"`
+	Priority      string         `json:"priority" mapstructure:"priority"`
+	HasSeen       bool           `json:"hasSeen" mapstructure:"hasSeen"`
+	IsPublic      bool           `json:"isPublic" mapstructure:"isPublic"`
+	IsSubscribed  bool           `json:"isSubscribed" mapstructure:"isSubscribed"`
+	StatusDetails any            `json:"statusDetails" mapstructure:"statusDetails"`
+	AssignedTo    *IssueAssignee `json:"assignedTo" mapstructure:"assignedTo"`
+	Project       *IssueProject  `json:"project" mapstructure:"project"`
+}
+
+type IssueAssignee struct {
+	Type  string `json:"type" mapstructure:"type"`
+	ID    string `json:"id" mapstructure:"id"`
+	Name  string `json:"name" mapstructure:"name"`
+	Email string `json:"email" mapstructure:"email"`
+}
+
+type IssueProject struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
+	Slug string `json:"slug" mapstructure:"slug"`
 }
 
 type AuthIdentity struct {
@@ -132,7 +171,12 @@ type UpdateSentryAppRequest struct {
 }
 
 type UpdateIssueRequest struct {
-	Status string `json:"status,omitempty"`
+	Status       string `json:"status,omitempty"`
+	AssignedTo   string `json:"assignedTo,omitempty"`
+	Priority     string `json:"priority,omitempty"`
+	HasSeen      *bool  `json:"hasSeen,omitempty"`
+	IsPublic     *bool  `json:"isPublic,omitempty"`
+	IsSubscribed *bool  `json:"isSubscribed,omitempty"`
 }
 
 func (c *Client) ListOrganizations() ([]Organization, error) {
@@ -223,6 +267,123 @@ func (c *Client) ListTeams() ([]TeamSummary, error) {
 	return result, nil
 }
 
+func (c *Client) ListProjectMembers(projectSlug string) ([]ProjectMember, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/projects/%s/%s/members/", c.orgSlug, projectSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	members := []ProjectMember{}
+	if err := json.Unmarshal(responseBody, &members); err != nil {
+		return nil, err
+	}
+
+	return members, nil
+}
+
+func (c *Client) ListProjectTeams(projectSlug string) ([]Team, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/projects/%s/%s/teams/", c.orgSlug, projectSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	teams := []Team{}
+	if err := json.Unmarshal(responseBody, &teams); err != nil {
+		return nil, err
+	}
+
+	return teams, nil
+}
+
+func (c *Client) ListProjectAssignees(projectSlug string) ([]AssigneeResource, error) {
+	members, err := c.ListProjectMembers(projectSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	teams, err := c.ListProjectTeams(projectSlug)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]AssigneeResource, 0, len(members)+len(teams))
+	for _, member := range members {
+		value := ""
+		label := ""
+
+		if member.User != nil {
+			userID := strings.TrimSpace(member.User.ID)
+			switch {
+			case userID != "":
+				value = "user:" + userID
+			case strings.TrimSpace(member.User.Username) != "":
+				value = strings.TrimSpace(member.User.Username)
+			case strings.TrimSpace(member.User.Email) != "":
+				value = strings.TrimSpace(member.User.Email)
+			}
+
+			switch {
+			case strings.TrimSpace(member.User.Name) != "":
+				label = strings.TrimSpace(member.User.Name)
+			case strings.TrimSpace(member.User.Email) != "":
+				label = strings.TrimSpace(member.User.Email)
+			case strings.TrimSpace(member.User.Username) != "":
+				label = strings.TrimSpace(member.User.Username)
+			}
+		}
+
+		if value == "" {
+			switch {
+			case strings.TrimSpace(member.ID) != "":
+				value = "user:" + strings.TrimSpace(member.ID)
+			case strings.TrimSpace(member.Email) != "":
+				value = strings.TrimSpace(member.Email)
+			}
+		}
+
+		if label == "" {
+			switch {
+			case strings.TrimSpace(member.Name) != "":
+				label = strings.TrimSpace(member.Name)
+			case strings.TrimSpace(member.Email) != "":
+				label = strings.TrimSpace(member.Email)
+			}
+		}
+
+		if value == "" || label == "" {
+			continue
+		}
+
+		resources = append(resources, AssigneeResource{
+			ID:   value,
+			Name: "User · " + label,
+		})
+	}
+
+	for _, team := range teams {
+		teamID := strings.TrimSpace(team.ID)
+		teamName := strings.TrimSpace(team.Name)
+		if teamID == "" || teamName == "" {
+			continue
+		}
+
+		resources = append(resources, AssigneeResource{
+			ID:   "team:" + teamID,
+			Name: "Team · " + teamName,
+		})
+	}
+
+	return resources, nil
+}
+
 func (c *Client) ListIssues() ([]Issue, error) {
 	responseBody, err := c.doJSON(
 		http.MethodGet,
@@ -287,22 +448,17 @@ func (c *Client) UpdateSentryApp(appSlug string, request UpdateSentryAppRequest)
 	return &app, nil
 }
 
-func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (map[string]any, error) {
-	responseBody, err := c.doJSON(
+func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (*Issue, error) {
+	_, err := c.doJSON(
 		http.MethodPut,
-		fmt.Sprintf("/api/0/organizations/%s/issues/%s/", c.orgSlug, issueID),
+		fmt.Sprintf("/api/0/organizations/%s/issues/?id=%s", c.orgSlug, url.QueryEscape(issueID)),
 		request,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	result := map[string]any{}
-	if err := json.Unmarshal(responseBody, &result); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return c.GetIssue(issueID)
 }
 
 func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {

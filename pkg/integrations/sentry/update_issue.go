@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -14,12 +15,18 @@ import (
 type UpdateIssue struct{}
 
 type UpdateIssueNodeMetadata struct {
-	IssueTitle string `json:"issueTitle,omitempty" mapstructure:"issueTitle"`
+	IssueTitle    string `json:"issueTitle,omitempty" mapstructure:"issueTitle"`
+	AssigneeLabel string `json:"assigneeLabel,omitempty" mapstructure:"assigneeLabel"`
 }
 
 type UpdateIssueConfiguration struct {
-	IssueID string `json:"issueId" mapstructure:"issueId"`
-	Status  string `json:"status" mapstructure:"status"`
+	IssueID      string `json:"issueId" mapstructure:"issueId"`
+	Status       string `json:"status" mapstructure:"status"`
+	Priority     string `json:"priority" mapstructure:"priority"`
+	AssignedTo   string `json:"assignedTo" mapstructure:"assignedTo"`
+	HasSeen      *bool  `json:"hasSeen,omitempty" mapstructure:"hasSeen"`
+	IsPublic     *bool  `json:"isPublic,omitempty" mapstructure:"isPublic"`
+	IsSubscribed *bool  `json:"isSubscribed,omitempty" mapstructure:"isSubscribed"`
 }
 
 func (c *UpdateIssue) Name() string {
@@ -31,7 +38,7 @@ func (c *UpdateIssue) Label() string {
 }
 
 func (c *UpdateIssue) Description() string {
-	return "Update a Sentry issue status"
+	return "Update a Sentry issue status, priority, assignee, or visibility flags"
 }
 
 func (c *UpdateIssue) Documentation() string {
@@ -41,11 +48,20 @@ func (c *UpdateIssue) Documentation() string {
 
 - **Resolve issues automatically** after a remediation workflow succeeds
 - **Reopen issues** when a related deployment regresses
+- **Route ownership** by assigning issues to a user or team
+- **Escalate triage** by changing issue priority
+- **Mark issues reviewed** after automation handles the first response
+- **Manage visibility and subscriptions** for follow-up workflows
 
 ## Configuration
 
 - **Issue**: Select the Sentry issue to update
-- **Status**: New issue status
+- **Status**: Optional new issue status
+- **Priority**: Optional issue priority
+- **Assigned To**: Optional assignee from the selected issue's Sentry project
+- **Seen**: Optional reviewed flag for the connected user
+- **Public**: Optional issue sharing visibility
+- **Subscribed**: Optional workflow subscription for the connected user
 
 ## Output
 
@@ -82,8 +98,8 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 			Name:        "status",
 			Label:       "Status",
 			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Description: "The new issue status",
+			Required:    false,
+			Description: "Optional new issue status",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -95,21 +111,78 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "priority",
+			Label:       "Priority",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Optional new issue priority",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "High", Value: "high"},
+						{Label: "Medium", Value: "medium"},
+						{Label: "Low", Value: "low"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "assignedTo",
+			Label:       "Assigned To",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Optional assignee from the issue's Sentry project",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeAssignee,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "issueId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "issueId",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "hasSeen",
+			Label:       "Seen",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optionally mark the issue as seen for the connected user",
+		},
+		{
+			Name:        "isPublic",
+			Label:       "Public",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optionally make the issue public or private",
+		},
+		{
+			Name:        "isSubscribed",
+			Label:       "Subscribed",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optionally subscribe or unsubscribe the connected user",
+		},
 	}
 }
 
 func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
-	config := UpdateIssueConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+	config, err := decodeUpdateIssueConfiguration(ctx.Configuration)
+	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
+	normalizeUpdateIssueConfiguration(&config)
 
-	if config.IssueID == "" {
-		return errors.New("issueId is required")
-	}
-
-	if config.Status == "" {
-		return errors.New("status is required")
+	if err := validateUpdateIssueConfiguration(config); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -122,9 +195,53 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to retrieve sentry issue: %w", err)
 	}
 
-	return ctx.Metadata.Set(UpdateIssueNodeMetadata{
+	nodeMetadata := UpdateIssueNodeMetadata{
 		IssueTitle: displayIssueLabel(issue.ShortID, issue.Title),
-	})
+	}
+
+	if config.AssignedTo != "" && issue.Project != nil && strings.TrimSpace(issue.Project.Slug) != "" {
+		assignees, err := client.ListProjectAssignees(issue.Project.Slug)
+		if err != nil {
+			return fmt.Errorf("failed to list sentry issue assignees: %w", err)
+		}
+
+		for _, assignee := range assignees {
+			if assignee.ID == config.AssignedTo {
+				nodeMetadata.AssigneeLabel = assignee.Name
+				break
+			}
+		}
+	}
+
+	return ctx.Metadata.Set(nodeMetadata)
+}
+
+func validateUpdateIssueConfiguration(config UpdateIssueConfiguration) error {
+	if config.IssueID == "" {
+		return errors.New("issueId is required")
+	}
+
+	if config.Status == "" &&
+		config.Priority == "" &&
+		config.AssignedTo == "" &&
+		config.HasSeen == nil &&
+		config.IsPublic == nil &&
+		config.IsSubscribed == nil {
+		return errors.New("at least one field to update must be provided")
+	}
+
+	return nil
+}
+
+func normalizeUpdateIssueConfiguration(config *UpdateIssueConfiguration) {
+	if config == nil {
+		return
+	}
+
+	config.IssueID = strings.TrimSpace(config.IssueID)
+	config.Status = strings.TrimSpace(config.Status)
+	config.Priority = strings.TrimSpace(config.Priority)
+	config.AssignedTo = strings.TrimSpace(config.AssignedTo)
 }
 
 func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -132,9 +249,14 @@ func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 }
 
 func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
-	config := UpdateIssueConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+	config, err := decodeUpdateIssueConfiguration(ctx.Configuration)
+	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+	normalizeUpdateIssueConfiguration(&config)
+
+	if err := validateUpdateIssueConfiguration(config); err != nil {
+		return err
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -143,7 +265,12 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	issue, err := client.UpdateIssue(config.IssueID, UpdateIssueRequest{
-		Status: config.Status,
+		Status:       config.Status,
+		Priority:     config.Priority,
+		AssignedTo:   config.AssignedTo,
+		HasSeen:      config.HasSeen,
+		IsPublic:     config.IsPublic,
+		IsSubscribed: config.IsSubscribed,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update sentry issue: %w", err)
@@ -170,4 +297,23 @@ func (c *UpdateIssue) Cancel(ctx core.ExecutionContext) error {
 
 func (c *UpdateIssue) Cleanup(ctx core.SetupContext) error {
 	return nil
+}
+
+func decodeUpdateIssueConfiguration(input any) (UpdateIssueConfiguration, error) {
+	config := UpdateIssueConfiguration{}
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &config,
+		TagName:          "mapstructure",
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return UpdateIssueConfiguration{}, err
+	}
+
+	if err := decoder.Decode(input); err != nil {
+		return UpdateIssueConfiguration{}, err
+	}
+
+	return config, nil
 }

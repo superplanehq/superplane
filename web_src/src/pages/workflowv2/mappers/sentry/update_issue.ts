@@ -17,10 +17,16 @@ import type {
 interface UpdateIssueConfiguration {
   issueId?: string;
   status?: string;
+  priority?: string;
+  assignedTo?: string;
+  hasSeen?: boolean;
+  isPublic?: boolean;
+  isSubscribed?: boolean;
 }
 
 interface UpdateIssueNodeMetadata {
   issueTitle?: string;
+  assigneeLabel?: string;
 }
 
 interface SentryIssue {
@@ -28,6 +34,10 @@ interface SentryIssue {
   shortId?: string;
   title?: string;
   status?: string;
+  priority?: string;
+  hasSeen?: boolean;
+  isPublic?: boolean;
+  isSubscribed?: boolean;
   project?: {
     name?: string;
     slug?: string;
@@ -73,12 +83,22 @@ export const updateIssueMapper: ComponentBaseMapper = {
     addFormattedTimestamp(details, "Started At", context.execution.createdAt);
     addFormattedTimestamp(details, "Last Updated At", context.execution.updatedAt);
 
-    addDetail(details, "Issue ID", issue?.id);
-    addDetail(details, "Short ID", issue?.shortId);
-    addDetail(details, "Title", issue?.title);
-    addDetail(details, "Status", issue?.status);
-    addDetail(details, "Project", getProjectLabel(issue));
-    addDetail(details, "Assigned To", issue?.assignedTo?.name);
+    const orderedDetails: Array<[string, string | undefined]> = [
+      ["Title", issue?.title],
+      ["Short ID", issue?.shortId],
+      ["Status", issue?.status],
+      ["Priority", issue?.priority],
+      ["Assigned To", issue?.assignedTo?.name],
+      ["Project", getProjectLabel(issue)],
+    ];
+
+    for (const [label, value] of orderedDetails) {
+      if (Object.keys(details).length >= 6) {
+        break;
+      }
+
+      addDetail(details, label, value);
+    }
 
     return details;
   },
@@ -122,5 +142,33 @@ function buildMetadata(node: NodeInfo) {
     metadata.push({ icon: "check-circle-2", label: configuration.status });
   }
 
-  return metadata;
+  if (configuration?.assignedTo) {
+    metadata.push({ icon: "user", label: nodeMetadata?.assigneeLabel || configuration.assignedTo });
+  }
+
+  if (configuration?.priority) {
+    metadata.push({ icon: "flag", label: configuration.priority });
+  }
+
+  if (configuration?.hasSeen !== undefined) {
+    metadata.push({ icon: "eye", label: `Seen: ${formatBoolean(configuration.hasSeen)}` });
+  }
+
+  if (configuration?.isPublic !== undefined) {
+    metadata.push({ icon: "globe", label: `Public: ${formatBoolean(configuration.isPublic)}` });
+  }
+
+  if (configuration?.isSubscribed !== undefined) {
+    metadata.push({ icon: "bell", label: `Subscribed: ${formatBoolean(configuration.isSubscribed)}` });
+  }
+
+  return metadata.slice(0, 3);
+}
+
+function formatBoolean(value: boolean | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value ? "Yes" : "No";
 }
