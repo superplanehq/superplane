@@ -64,7 +64,7 @@ type ExecutionMetadata struct {
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"user" mapstructure:"user"`
 	Commands         string                `json:"commands" mapstructure:"commands"`
-	Command          string                `json:"command" mapstructure:"command"` // last command
+	Command          string                `json:"command" mapstructure:"command"` // full command to execute (legacy fallback)
 	LastCommand      string                `json:"lastCommand" mapstructure:"lastCommand"`
 	CombinedCommand  string                `json:"combinedCommand" mapstructure:"combinedCommand"`
 	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
@@ -403,7 +403,7 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		Port:             spec.Port,
 		User:             spec.User,
 		Commands:         spec.Commands,
-		Command:          lastCommand,
+		Command:          combinedCommand,
 		LastCommand:      lastCommand,
 		CombinedCommand:  combinedCommand,
 		WorkingDirectory: spec.WorkingDirectory,
