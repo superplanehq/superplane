@@ -20,12 +20,21 @@ function CommandRow({ label, command }: { label: string; command: string }) {
   );
 }
 
-function InstallConnectSection({ organizationId }: { organizationId?: string }) {
+function InstallConnectSection({
+  organizationId,
+  connectCommand,
+  generating,
+  onGenerateConnect,
+}: {
+  organizationId?: string;
+  connectCommand: string | null;
+  generating: boolean;
+  onGenerateConnect: () => void;
+}) {
   const [isInstallOpen, setIsInstallOpen] = useState(false);
 
   const platform = detectPlatform();
   const installCommand = getInstallCommand(platform);
-  const { connectCommand, generating, handleGenerateConnect } = useConnectCommand(organizationId);
 
   return (
     <div className="border-t border-gray-200 dark:border-gray-700">
@@ -76,7 +85,7 @@ function InstallConnectSection({ organizationId }: { organizationId?: string }) 
                   </div>
                   <button
                     type="button"
-                    onClick={handleGenerateConnect}
+                    onClick={onGenerateConnect}
                     disabled={generating || !organizationId}
                     className="inline-flex items-center gap-1.5 font-sans text-[12px] font-medium text-gray-900 bg-gray-100 hover:bg-white px-3 py-1.5 rounded-md transition-colors disabled:opacity-50"
                   >
@@ -109,6 +118,7 @@ interface CliCommandsPopoverProps {
 }
 
 export function CliCommandsPopover({ canvasId, organizationId }: CliCommandsPopoverProps) {
+  const { connectCommand, generating, handleGenerateConnect } = useConnectCommand(organizationId);
   const commands: { label: string; command: string }[] = [];
 
   if (canvasId) {
@@ -154,7 +164,12 @@ export function CliCommandsPopover({ canvasId, organizationId }: CliCommandsPopo
           )}
         </div>
 
-        <InstallConnectSection organizationId={organizationId} />
+        <InstallConnectSection
+          organizationId={organizationId}
+          connectCommand={connectCommand}
+          generating={generating}
+          onGenerateConnect={handleGenerateConnect}
+        />
 
         <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-2.5">
           <a
