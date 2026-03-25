@@ -144,7 +144,7 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;

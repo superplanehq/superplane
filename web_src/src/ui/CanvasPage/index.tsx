@@ -319,7 +319,7 @@ export interface CanvasPageProps {
     configuration: Record<string, any>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -969,12 +969,14 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
-        if (props.configurationSaveMode !== "auto") {
-          state.componentSidebar.close();
-        }
+      if (!editingNodeData || !props.onNodeConfigurationSave) {
+        return;
       }
+      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      if (props.configurationSaveMode !== "auto") {
+        state.componentSidebar.close();
+      }
+      return result;
     },
     [editingNodeData, props, state.componentSidebar],
   );
@@ -1453,7 +1455,7 @@ function Sidebar({
     configuration: Record<string, any>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
   onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings" | "docs";
