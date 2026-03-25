@@ -80,8 +80,7 @@ export const updateIssueMapper: ComponentBaseMapper = {
     const issue = outputs?.default?.[0]?.data as SentryIssue | undefined;
     const details: Record<string, string> = {};
 
-    addFormattedTimestamp(details, "Started At", context.execution.createdAt);
-    addFormattedTimestamp(details, "Last Updated At", context.execution.updatedAt);
+    addFormattedTimestamp(details, "Triggered At", context.execution.createdAt);
 
     const orderedDetails: Array<[string, string | undefined]> = [
       ["Title", issue?.title],
