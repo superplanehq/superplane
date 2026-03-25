@@ -46,7 +46,7 @@ func parseDropletID(raw string) (int, error) {
 		return 0, fmt.Errorf("must be an integer")
 	}
 
-	if f > float64(^uint(0)>>1) {
+	if f >= float64((^uint(0)>>1)+1) {
 		return 0, fmt.Errorf("is too large")
 	}
 
