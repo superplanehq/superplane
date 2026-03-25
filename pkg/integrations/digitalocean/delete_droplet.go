@@ -76,7 +76,7 @@ func (d *DeleteDroplet) Configuration() []configuration.Field {
 			Label:       "Droplet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The droplet to delete",
+			Description: "The droplet ID to delete",
 			Placeholder: "Select droplet",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
