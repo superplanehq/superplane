@@ -75,6 +75,20 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 		assert.Contains(t, err.Error(), "commands")
 	})
 
+	t.Run("whitespace only commands", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithKey,
+				"commands":       "  \n  ",
+				"timeout":        60,
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "commands")
+	})
+
 	t.Run("ssh_key auth without secret ref", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -209,15 +223,13 @@ func TestSSHCommand_BuildRemoteCommand(t *testing.T) {
 }
 
 func TestBuildCombinedCommands(t *testing.T) {
-	t.Run("joins non-empty lines with && and returns last", func(t *testing.T) {
-		combined, last := buildCombinedCommands("echo 1\n\n  echo 2  \n")
+	t.Run("joins non-empty lines with &&", func(t *testing.T) {
+		combined := buildCombinedCommands("echo 1\n\n  echo 2  \n")
 		assert.Equal(t, "echo 1 && echo 2", combined)
-		assert.Equal(t, "echo 2", last)
 	})
 
-	t.Run("empty input yields empty strings", func(t *testing.T) {
-		combined, last := buildCombinedCommands("\n \n")
+	t.Run("empty input yields empty string", func(t *testing.T) {
+		combined := buildCombinedCommands("\n \n")
 		assert.Equal(t, "", combined)
-		assert.Equal(t, "", last)
 	})
 }

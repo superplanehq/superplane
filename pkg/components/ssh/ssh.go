@@ -333,7 +333,7 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.User == "" {
 		return errors.New("username is required")
 	}
-	if spec.Commands == "" {
+	if strings.TrimSpace(spec.Commands) == "" {
 		return errors.New("commands is required")
 	}
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
@@ -470,7 +470,7 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
-	commandToExecute, _ := buildCombinedCommands(ctx.execMetadata.Commands)
+	commandToExecute := buildCombinedCommands(ctx.execMetadata.Commands)
 	if commandToExecute == "" {
 		return errors.New("commands is required")
 	}
@@ -612,7 +612,7 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
 }
 
-func buildCombinedCommands(commands string) (combined string, last string) {
+func buildCombinedCommands(commands string) string {
 	lines := strings.Split(commands, "\n")
 	parts := make([]string, 0, len(lines))
 	for _, line := range lines {
@@ -623,9 +623,9 @@ func buildCombinedCommands(commands string) (combined string, last string) {
 		parts = append(parts, l)
 	}
 	if len(parts) == 0 {
-		return "", ""
+		return ""
 	}
-	return strings.Join(parts, " && "), parts[len(parts)-1]
+	return strings.Join(parts, " && ")
 }
 
 func shellQuote(value string) string {
