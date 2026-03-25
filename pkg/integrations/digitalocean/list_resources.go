@@ -32,6 +32,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listVPCs(ctx)
 	case "alert_policy":
 		return listAlertPolicies(ctx)
+	case "spaces_bucket":
+		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
 	default:
@@ -299,6 +301,58 @@ func listAlertPolicies(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 			Name: policy.Description,
 			ID:   policy.UUID,
 		})
+	}
+
+	return resources, nil
+}
+
+var allSpacesRegions = []string{
+	"nyc1",
+	"nyc2",
+	"nyc3",
+	"sfo2",
+	"sfo3",
+	"ams3",
+	"sgp1",
+	"fra1",
+	"blr1",
+	"syd1",
+	"lon1",
+	"tor1",
+	"atl1",
+	"ric1",
+}
+
+func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	resources := make([]core.IntegrationResource, 0)
+	var firstErr error
+
+	for _, region := range allSpacesRegions {
+		client, err := NewSpacesClient(ctx.HTTP, ctx.Integration, region)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create spaces client: %w", err)
+		}
+
+		buckets, err := client.ListBuckets()
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("region %s: %w", region, err)
+			}
+
+			continue
+		}
+
+		for _, name := range buckets {
+			resources = append(resources, core.IntegrationResource{
+				Type: "spaces_bucket",
+				Name: fmt.Sprintf("%s (%s)", name, region),
+				ID:   fmt.Sprintf("%s/%s", region, name),
+			})
+		}
+	}
+
+	if firstErr != nil {
+		return nil, fmt.Errorf("error listing spaces buckets: %w", firstErr)
 	}
 
 	return resources, nil

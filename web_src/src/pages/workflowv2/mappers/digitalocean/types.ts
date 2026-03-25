@@ -130,6 +130,25 @@ export interface GetDropletMetricsOutput {
   avgPublicInboundBandwidthMbps?: number;
 }
 
+export interface GetObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+  includeBody?: boolean;
+}
+
+export interface GetObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  endpoint?: string;
+  contentType?: string;
+  size?: string;
+  lastModified?: string;
+  eTag?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+  body?: string;
+}
+
 export interface AppNodeMetadata {
   appId?: string;
   appName?: string;
