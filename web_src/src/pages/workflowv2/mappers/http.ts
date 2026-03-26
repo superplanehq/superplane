@@ -78,11 +78,7 @@ const HTTP_EVENT_STATE_MAP: EventStateMap = {
 const httpStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
+  if (isHTTPExecutionError(execution)) {
     return "error";
   }
 
@@ -115,6 +111,22 @@ interface Output {
   status?: number | null;
 }
 
+function isHTTPExecutionError(execution: ExecutionInfo): boolean {
+  if (!execution.resultMessage) {
+    return false;
+  }
+
+  if (execution.resultReason === "RESULT_REASON_ERROR") {
+    return true;
+  }
+
+  if (execution.result !== "RESULT_FAILED") {
+    return false;
+  }
+
+  return execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED";
+}
+
 interface Metadata {
   retry: {
     strategy: string;
@@ -131,14 +143,24 @@ interface Metadata {
 function getHTTPResponseStatusString(
   outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
 ): string | null {
-  if (outputs?.success?.length) {
-    const response = outputs.success?.[0]?.data as Output | undefined;
-    return response?.status?.toString() ?? null;
+  const success = outputs?.success;
+  if (success && success.length > 0) {
+    const response = success[0]?.data as Output | undefined;
+    const status = response?.status;
+    if (status === undefined || status === null) {
+      return null;
+    }
+    return String(status);
   }
 
-  if (outputs?.failure?.length) {
-    const response = outputs.failure?.[0]?.data as Output | undefined;
-    return response?.status?.toString() ?? null;
+  const failure = outputs?.failure;
+  if (failure && failure.length > 0) {
+    const response = failure[0]?.data as Output | undefined;
+    const status = response?.status;
+    if (status === undefined || status === null) {
+      return null;
+    }
+    return String(status);
   }
 
   return null;
@@ -252,24 +274,13 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
     contentType &&
     (configuration.method === "POST" || configuration.method === "PUT" || configuration.method === "PATCH")
   ) {
-    let bodyLabel = "";
-
-    switch (contentType) {
-      case "application/json":
-        bodyLabel = "JSON body";
-        break;
-      case "application/xml":
-        bodyLabel = "XML body";
-        break;
-      case "text/plain":
-        bodyLabel = "Text body";
-        break;
-      case "application/x-www-form-urlencoded":
-        bodyLabel = "Form data";
-        break;
-      default:
-        bodyLabel = "Request body";
-    }
+    const bodyLabel =
+      {
+        "application/json": "JSON body",
+        "application/xml": "XML body",
+        "text/plain": "Text body",
+        "application/x-www-form-urlencoded": "Form data",
+      }[contentType] ?? "Request body";
 
     metadata.push({
       icon: "code",
@@ -297,7 +308,7 @@ type HTTPConfiguration = {
   contentType: "application/json" | "application/xml" | "text/plain" | "application/x-www-form-urlencoded";
   headers: Array<{ name: string; value: string }>;
   queryParams: Array<{ key: string; value: string }>;
-  json?: any;
+  json?: unknown;
   formData?: Array<{ key: string; value: string }>;
   text?: string;
   xml?: string;
@@ -448,7 +459,7 @@ function getHTTPEventSections(
   stateFunction: (execution: ExecutionInfo) => EventState,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const generateEventSubtitle = (): string | React.ReactNode => {
