@@ -47,6 +47,35 @@ func Test__GetAlert__Setup(t *testing.T) {
 	}, metadata.Metadata)
 }
 
+func Test__GetAlert__Setup__SkipsAPIWhenAlertIDIsExpression(t *testing.T) {
+	component := &GetAlert{}
+	metadata := &contexts.MetadataContext{}
+	httpCtx := &contexts.HTTPContext{}
+
+	err := component.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"project": "backend",
+			"alertId": "{{ steps.trigger.output.alertId }}",
+		},
+		Metadata: metadata,
+		Integration: &contexts.IntegrationContext{
+			Metadata: Metadata{
+				Projects: []ProjectSummary{
+					{ID: "1", Slug: "backend", Name: "Backend"},
+				},
+			},
+		},
+		HTTP: httpCtx,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, GetAlertNodeMetadata{
+		Project:   &ProjectSummary{ID: "1", Slug: "backend", Name: "Backend"},
+		AlertName: "",
+	}, metadata.Metadata)
+	assert.Empty(t, httpCtx.Requests)
+}
+
 func Test__GetAlert__Configuration(t *testing.T) {
 	component := &GetAlert{}
 	fields := component.Configuration()
