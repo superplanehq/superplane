@@ -17,7 +17,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create Deploy" href="#create-deploy" description="Mark a deploy against an existing Sentry release" />
   <LinkCard title="Create Release" href="#create-release" description="Register a new release in Sentry after a deploy or build step" />
+  <LinkCard title="Get Alert" href="#get-alert" description="Retrieve a Sentry metric alert rule with its thresholds, projects, and actions" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Sentry issue with tags, frequency, assignee, and recent events" />
+  <LinkCard title="List Alerts" href="#list-alerts" description="List Sentry metric alert rules for the connected organization or a selected project" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status, priority, assignee, or visibility flags" />
 </CardGrid>
 
@@ -208,6 +210,74 @@ Returns the created Sentry release object, including version, associated project
 }
 ```
 
+<a id="get-alert"></a>
+
+## Get Alert
+
+The Get Alert component retrieves a Sentry metric alert rule and returns its full configuration.
+
+### Use Cases
+
+- **Conditional logic**: inspect alert thresholds and projects before taking action
+- **Alert enrichment**: include alert configuration in downstream notifications or tickets
+- **Auditing**: fetch a specific metric alert rule for verification or reporting
+
+### Configuration
+
+- **Project**: Optional project to narrow alert selection
+- **Alert Rule**: The metric alert rule to retrieve
+
+### Output
+
+Returns the selected metric alert rule, including projects, query, thresholds, triggers, and action details.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "aggregate": "count()",
+    "createdBy": {
+      "email": "washington@example.com",
+      "name": "Washington"
+    },
+    "dataset": "events",
+    "dateCreated": "2026-03-25T10:00:00Z",
+    "dateModified": "2026-03-25T10:05:00Z",
+    "environment": "production",
+    "eventTypes": [
+      "error"
+    ],
+    "id": "177412243058",
+    "name": "High error rate in production",
+    "owner": "team:42",
+    "projects": [
+      "backend"
+    ],
+    "query": "event.type:error environment:production",
+    "timeWindow": 60,
+    "triggers": [
+      {
+        "actions": [
+          {
+            "id": "394280",
+            "inputChannelId": "#alerts",
+            "targetIdentifier": "30489048931789",
+            "targetType": "specific",
+            "type": "slack"
+          }
+        ],
+        "alertThreshold": 100,
+        "id": "294385908",
+        "label": "critical"
+      }
+    ]
+  },
+  "timestamp": "2026-03-25T10:05:00Z",
+  "type": "sentry.alertRule"
+}
+```
+
 <a id="get-issue"></a>
 
 ## Get Issue
@@ -292,6 +362,73 @@ Returns the Sentry issue object including:
   },
   "timestamp": "2026-03-24T13:03:56Z",
   "type": "sentry.issue"
+}
+```
+
+<a id="list-alerts"></a>
+
+## List Alerts
+
+The List Alerts component lists Sentry metric alert rules for the connected organization.
+
+### Use Cases
+
+- **Alert audits**: review metric alert coverage for an organization or project
+- **Conditional workflows**: branch based on whether matching alert rules already exist
+- **Reporting**: feed alert rule inventories into downstream notification or documentation steps
+
+### Configuration
+
+- **Project**: Optional Sentry project to filter alert rules
+
+### Output
+
+Returns an object containing the list of matching metric alert rules and their configuration details.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alerts": [
+      {
+        "aggregate": "count()",
+        "dataset": "events",
+        "dateCreated": "2026-03-25T10:00:00Z",
+        "dateModified": "2026-03-25T10:05:00Z",
+        "environment": "production",
+        "eventTypes": [
+          "error"
+        ],
+        "id": "177412243058",
+        "name": "High error rate in production",
+        "owner": "team:42",
+        "projects": [
+          "backend"
+        ],
+        "query": "event.type:error environment:production",
+        "timeWindow": 60,
+        "triggers": [
+          {
+            "actions": [
+              {
+                "id": "394280",
+                "inputChannelId": "#alerts",
+                "targetIdentifier": "30489048931789",
+                "targetType": "specific",
+                "type": "slack"
+              }
+            ],
+            "alertThreshold": 100,
+            "id": "294385908",
+            "label": "critical"
+          }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-03-25T10:05:00Z",
+  "type": "sentry.alertRules"
 }
 ```
 

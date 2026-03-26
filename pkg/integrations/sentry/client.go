@@ -222,6 +222,58 @@ type UpdateIssueRequest struct {
 	IsSubscribed *bool  `json:"isSubscribed,omitempty"`
 }
 
+type MetricAlertRule struct {
+	ID               string                    `json:"id" mapstructure:"id"`
+	Name             string                    `json:"name" mapstructure:"name"`
+	OrganizationID   string                    `json:"organizationId" mapstructure:"organizationId"`
+	QueryType        int                       `json:"queryType" mapstructure:"queryType"`
+	Dataset          string                    `json:"dataset" mapstructure:"dataset"`
+	Query            string                    `json:"query" mapstructure:"query"`
+	Aggregate        string                    `json:"aggregate" mapstructure:"aggregate"`
+	ThresholdType    int                       `json:"thresholdType" mapstructure:"thresholdType"`
+	ResolveThreshold any                       `json:"resolveThreshold" mapstructure:"resolveThreshold"`
+	TimeWindow       float64                   `json:"timeWindow" mapstructure:"timeWindow"`
+	Environment      any                       `json:"environment" mapstructure:"environment"`
+	Projects         []string                  `json:"projects" mapstructure:"projects"`
+	Owner            *string                   `json:"owner" mapstructure:"owner"`
+	OriginalRuleID   any                       `json:"originalAlertRuleId" mapstructure:"originalAlertRuleId"`
+	ComparisonDelta  any                       `json:"comparisonDelta" mapstructure:"comparisonDelta"`
+	DateModified     string                    `json:"dateModified" mapstructure:"dateModified"`
+	DateCreated      string                    `json:"dateCreated" mapstructure:"dateCreated"`
+	CreatedBy        *MetricAlertRuleCreatedBy `json:"createdBy" mapstructure:"createdBy"`
+	EventTypes       []string                  `json:"eventTypes" mapstructure:"eventTypes"`
+	Triggers         []MetricAlertTrigger      `json:"triggers" mapstructure:"triggers"`
+}
+
+type MetricAlertTrigger struct {
+	ID               string              `json:"id" mapstructure:"id"`
+	AlertRuleID      string              `json:"alertRuleId" mapstructure:"alertRuleId"`
+	Label            string              `json:"label" mapstructure:"label"`
+	ThresholdType    int                 `json:"thresholdType" mapstructure:"thresholdType"`
+	AlertThreshold   any                 `json:"alertThreshold" mapstructure:"alertThreshold"`
+	ResolveThreshold any                 `json:"resolveThreshold" mapstructure:"resolveThreshold"`
+	DateCreated      string              `json:"dateCreated" mapstructure:"dateCreated"`
+	Actions          []MetricAlertAction `json:"actions" mapstructure:"actions"`
+}
+
+type MetricAlertAction struct {
+	ID                 string  `json:"id" mapstructure:"id"`
+	AlertRuleTriggerID string  `json:"alertRuleTriggerId" mapstructure:"alertRuleTriggerId"`
+	Type               string  `json:"type" mapstructure:"type"`
+	TargetType         string  `json:"targetType" mapstructure:"targetType"`
+	TargetIdentifier   string  `json:"targetIdentifier" mapstructure:"targetIdentifier"`
+	InputChannelID     *string `json:"inputChannelId" mapstructure:"inputChannelId"`
+	IntegrationID      *string `json:"integrationId" mapstructure:"integrationId"`
+	SentryAppID        any     `json:"sentryAppId" mapstructure:"sentryAppId"`
+	DateCreated        string  `json:"dateCreated" mapstructure:"dateCreated"`
+}
+
+type MetricAlertRuleCreatedBy struct {
+	ID    any    `json:"id" mapstructure:"id"`
+	Name  string `json:"name" mapstructure:"name"`
+	Email string `json:"email" mapstructure:"email"`
+}
+
 type Release struct {
 	ID           int              `json:"id" mapstructure:"id"`
 	Version      string           `json:"version" mapstructure:"version"`
@@ -618,6 +670,50 @@ func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (*Issue
 	return c.GetIssue(issueID)
 }
 
+func (c *Client) ListAlertRules() ([]MetricAlertRule, error) {
+	alertRules := []MetricAlertRule{}
+	path := fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug)
+
+	for {
+		responseBody, headers, err := c.doJSONResponse(http.MethodGet, path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		page := []MetricAlertRule{}
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, err
+		}
+
+		alertRules = append(alertRules, page...)
+
+		nextPath := nextCursorPath(headers.Get("Link"))
+		if nextPath == "" {
+			return alertRules, nil
+		}
+
+		path = nextPath
+	}
+}
+
+func (c *Client) GetAlertRule(alertRuleID string) (*MetricAlertRule, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/alert-rules/%s/", c.orgSlug, url.PathEscape(alertRuleID)),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	alertRule := MetricAlertRule{}
+	if err := json.Unmarshal(responseBody, &alertRule); err != nil {
+		return nil, err
+	}
+
+	return &alertRule, nil
+}
+
 func (c *Client) CreateRelease(request CreateReleaseRequest) (*Release, error) {
 	responseBody, err := c.doJSON(
 		http.MethodPost,
@@ -660,18 +756,23 @@ func (c *Client) CreateDeploy(version string, request CreateDeployRequest) (*Dep
 }
 
 func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
+	responseBody, _, err := c.doJSONResponse(method, path, payload)
+	return responseBody, err
+}
+
+func (c *Client) doJSONResponse(method, path string, payload any) ([]byte, http.Header, error) {
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		body = bytes.NewReader(encoded)
 	}
 
 	req, err := http.NewRequest(method, c.baseURL+path, body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.userToken)
@@ -682,18 +783,57 @@ func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
 
 	resp, err := c.httpContext.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, &apiError{StatusCode: resp.StatusCode, Body: string(responseBody)}
+		return nil, nil, &apiError{StatusCode: resp.StatusCode, Body: string(responseBody)}
 	}
 
-	return responseBody, nil
+	return responseBody, resp.Header, nil
+}
+
+func nextCursorPath(linkHeader string) string {
+	for _, section := range strings.Split(linkHeader, ",") {
+		section = strings.TrimSpace(section)
+		if section == "" || !strings.Contains(section, `rel="next"`) || !strings.Contains(section, `results="true"`) {
+			continue
+		}
+
+		start := strings.Index(section, "<")
+		end := strings.Index(section, ">")
+		if start == -1 || end == -1 || end <= start+1 {
+			continue
+		}
+
+		nextURL, err := url.Parse(section[start+1 : end])
+		if err != nil {
+			continue
+		}
+
+		if nextURL.RawPath != "" {
+			if nextURL.RawQuery == "" {
+				return nextURL.RawPath
+			}
+			return nextURL.RawPath + "?" + nextURL.RawQuery
+		}
+
+		if nextURL.Path == "" {
+			continue
+		}
+
+		if nextURL.RawQuery == "" {
+			return nextURL.Path
+		}
+
+		return nextURL.Path + "?" + nextURL.RawQuery
+	}
+
+	return ""
 }
