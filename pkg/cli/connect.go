@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -35,9 +36,11 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("failed to describe organization %s: %w", me.GetOrganizationId(), err)
 	}
 
+	orgName := *organizationResponse.Organization.Metadata.Name
+
 	_, err = UpsertContext(ConfigContext{
 		URL:          baseURL,
-		Organization: *organizationResponse.Organization.Metadata.Name,
+		Organization: orgName,
 		APIToken:     apiToken,
 	})
 
@@ -45,7 +48,17 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	return nil
+	if ctx.Renderer.IsText() {
+		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+			_, _ = fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, baseURL)
+			return nil
+		})
+	}
+
+	return ctx.Renderer.Render(map[string]any{
+		"organization": orgName,
+		"url":          baseURL,
+	})
 }
 
 var connectCmd = &cobra.Command{
