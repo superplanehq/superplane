@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, CircleX, Loader2, Play } from "lucide-react";
+import React, { useCallback, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Loader2, Play } from "lucide-react";
 import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
@@ -7,154 +7,258 @@ import type {
   ComponentsNode,
 } from "@/api-client";
 import { cn, resolveIcon } from "@/lib/utils";
-import { formatTimeAgo } from "@/utils/date";
-import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { getState, getTriggerRenderer } from "./mappers";
-import { buildEventInfo, buildExecutionInfo, mapTriggerEventToSidebarEvent } from "./utils";
+import {
+  type RunsStatusFilter,
+  computeDuration,
+  computeRunsCounts,
+  filterRunEvents,
+  findNode,
+  formatRunTimestamp,
+  getAggregateStatus,
+  getStatusBadgeProps,
+  resolveExecutionDisplayStatus,
+  resolveNodeIconSlug,
+} from "./canvasRunsUtils";
+import { getTriggerRenderer } from "./mappers";
+import { buildEventInfo, buildTriggerSidebarEvent } from "./utils";
 
-function resolveNodeIconSlug(
-  node: ComponentsNode | undefined,
-  componentIconMap: Record<string, string>,
-): string | undefined {
-  const name = node?.component?.name || node?.trigger?.name;
-  if (!name) return undefined;
-  return componentIconMap[name];
-}
-
-export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
-
-export function getExecutionStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]) {
-  const node = nodes.find((n) => n.id === execution.nodeId);
-  const componentName = node?.component?.name || "";
-  const stateResolver = getState(componentName);
-  return stateResolver(buildExecutionInfo(execution));
-}
-
-export function getAggregateStatus(executions: CanvasesCanvasNodeExecution[], _nodes: ComponentsNode[]) {
-  if (executions.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
-    return "running";
-  }
-  if (executions.some((e) => e.result === "RESULT_FAILED")) {
-    return "error";
-  }
-  if (executions.some((e) => e.result === "RESULT_CANCELLED")) {
-    return "cancelled";
-  }
-  if (executions.every((e) => e.result === "RESULT_PASSED")) {
-    return "completed";
-  }
-  if (executions.every((e) => e.state === "STATE_FINISHED")) {
-    return "completed";
-  }
-  return "queued";
-}
-
-function formatDurationMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) {
-    const s = ms / 1000;
-    return s % 1 === 0 ? `${s}s` : `${s.toFixed(1)}s`;
-  }
-  const m = ms / 60000;
-  if (m % 1 === 0) return `${m}m`;
-  if (m < 10) return `${m.toFixed(1)}m`;
-  return `${Math.round(m)}m`;
-}
-
-export function computeDuration(execution: CanvasesCanvasNodeExecution): string | null {
-  if (execution.state !== "STATE_FINISHED" || !execution.createdAt || !execution.updatedAt) {
-    return null;
-  }
-  const ms = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-  return formatDurationMs(ms);
-}
-
-export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {
-  const componentState = getExecutionStatus(execution, nodes);
-  if (componentState && componentState !== "neutral") return componentState;
-
-  if (execution.state === "STATE_PENDING") return "pending";
-  if (execution.state === "STATE_STARTED") return "running";
-  if (execution.result === "RESULT_CANCELLED") return "cancelled";
-  if (execution.result === "RESULT_FAILED") return "failed";
-  if (execution.result === "RESULT_PASSED") return "success";
-  return "unknown";
-}
-
-export function formatRunTimestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-
-  if (diffHours < 24) {
-    return formatTimeAgo(date);
-  }
-
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${weekdays[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}, ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-const STATUS_TO_EVENT_STATE: Record<string, EventState> = {
-  completed: "success",
-  success: "success",
-  triggered: "triggered",
-  finished: "success",
-  passed: "success",
-  approved: "success",
-  opened: "success",
-  true: "success",
-  waiting: "queued",
-  queued: "queued",
-  pending: "queued",
-  running: "running",
-  failed: "failed",
-  error: "error",
-  rejected: "error",
-  false: "error",
-  timeout: "failed",
-  cancelled: "cancelled",
-  "pushed through": "running",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  completed: "Completed",
-  success: "Success",
-  triggered: "Triggered",
-  finished: "Finished",
-  waiting: "Waiting",
-  approved: "Approved",
-  rejected: "Rejected",
-  "pushed through": "Pushed Through",
-  opened: "Opened",
-  true: "True",
-  false: "False",
-  passed: "Passed",
-  timeout: "Timeout",
-  queued: "Queued",
-  failed: "Failed",
-  running: "Running",
-  pending: "Pending",
-  cancelled: "Cancelled",
-  error: "Error",
-};
-
-export function StatusBadge({ status }: { status: string }) {
-  const eventState = STATUS_TO_EVENT_STATE[status] || "neutral";
-  const style = DEFAULT_EVENT_STATE_MAP[eventState];
-  const label = STATUS_LABELS[status] || status || "Unknown";
-
+function StatusBadge({ status }: { status: string }) {
+  const { badgeColor, label } = getStatusBadgeProps(status);
   return (
     <div
-      className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${style.badgeColor}`}
+      className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${badgeColor}`}
     >
       <span>{label}</span>
     </div>
+  );
+}
+
+function NodeIcon({
+  iconSrc,
+  iconSlug,
+  alt,
+  size = 14,
+  className = "text-gray-500",
+}: {
+  iconSrc: string | undefined;
+  iconSlug: string | undefined;
+  alt: string;
+  size?: number;
+  className?: string;
+}) {
+  if (iconSrc) {
+    return <img src={iconSrc} alt={alt} className={`h-${size / 4} w-${size / 4} object-contain`} />;
+  }
+  return React.createElement(resolveIcon(iconSlug || "box"), { size, className });
+}
+
+function handleKeyboardActivation(e: React.KeyboardEvent, handler: () => void) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    handler();
+  }
+}
+
+function resolveExecutionRowData(
+  execution: CanvasesCanvasNodeExecution,
+  node: ComponentsNode | undefined,
+  componentIconMap: Record<string, string>,
+  nodes: ComponentsNode[],
+) {
+  return {
+    nodeName: node?.name || execution.nodeId || "Unknown",
+    iconSrc: getHeaderIconSrc(node?.component?.name || node?.trigger?.name),
+    iconSlug: resolveNodeIconSlug(node, componentIconMap),
+    status: resolveExecutionDisplayStatus(execution, nodes),
+    duration: computeDuration(execution),
+    errorMessage: execution.result === "RESULT_FAILED" ? execution.resultMessage : undefined,
+    timestamp: execution.createdAt ? formatRunTimestamp(execution.createdAt) : undefined,
+  };
+}
+
+function ExecutionRow({
+  execution,
+  node,
+  componentIconMap,
+  nodes,
+  onSelect,
+}: {
+  execution: CanvasesCanvasNodeExecution;
+  node: ComponentsNode | undefined;
+  componentIconMap: Record<string, string>;
+  nodes: ComponentsNode[];
+  onSelect?: () => void;
+}) {
+  const { nodeName, iconSrc, iconSlug, status, duration, errorMessage, timestamp } = resolveExecutionRowData(
+    execution,
+    node,
+    componentIconMap,
+    nodes,
+  );
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
+        onSelect && "cursor-pointer hover:bg-gray-100 transition-colors",
+      )}
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={onSelect ? (e) => handleKeyboardActivation(e, onSelect) : undefined}
+    >
+      <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+        <NodeIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={nodeName} size={13} className="text-gray-400" />
+      </div>
+      <div className="flex flex-1 items-center gap-2 min-w-0">
+        <span className="text-xs text-gray-700 truncate">{nodeName}</span>
+        <StatusBadge status={status} />
+        {duration && <span className="text-xs text-gray-500 tabular-nums">{duration}</span>}
+      </div>
+      {errorMessage && <span className="text-xs text-red-600 truncate max-w-[300px]">{errorMessage}</span>}
+      {timestamp && <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">{timestamp}</span>}
+    </div>
+  );
+}
+
+function QueueItemRow({
+  item,
+  node,
+  componentIconMap,
+  onNodeSelect,
+}: {
+  item: CanvasesCanvasNodeQueueItem;
+  node: ComponentsNode | undefined;
+  componentIconMap: Record<string, string>;
+  onNodeSelect?: (nodeId: string) => void;
+}) {
+  const nodeName = node?.name || item.nodeId || "Unknown";
+  const iconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
+  const iconSlug = resolveNodeIconSlug(node, componentIconMap);
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
+        onNodeSelect && "cursor-pointer hover:bg-gray-100 transition-colors",
+      )}
+      role={onNodeSelect ? "button" : undefined}
+      tabIndex={onNodeSelect ? 0 : undefined}
+      onClick={() => {
+        if (onNodeSelect && item.nodeId) onNodeSelect(item.nodeId);
+      }}
+      onKeyDown={(e) => {
+        if (onNodeSelect && item.nodeId) handleKeyboardActivation(e, () => onNodeSelect(item.nodeId!));
+      }}
+    >
+      <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+        <NodeIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={nodeName} size={13} className="text-gray-400" />
+      </div>
+      <div className="flex flex-1 items-center gap-2 min-w-0">
+        <span className="text-xs text-gray-700 truncate">{nodeName}</span>
+        <StatusBadge status="queued" />
+      </div>
+      <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+        {item.createdAt ? formatRunTimestamp(item.createdAt) : ""}
+      </span>
+    </div>
+  );
+}
+
+function RunRowHeader({
+  event,
+  triggerNode,
+  componentIconMap,
+  executions,
+  queueItemCount,
+  isExpanded,
+  onToggle,
+}: {
+  event: CanvasesCanvasEventWithExecutions;
+  triggerNode: ComponentsNode | undefined;
+  componentIconMap: Record<string, string>;
+  executions: CanvasesCanvasNodeExecution[];
+  queueItemCount: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
+  const eventInfo = buildEventInfo(event);
+  const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
+  const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, []) : "queued";
+  const totalSteps = executions.length + queueItemCount;
+
+  const errorAckLabel = useMemo(() => {
+    const failedExecs = executions.filter((e) => e.result === "RESULT_FAILED");
+    if (failedExecs.length === 0) return null;
+    return failedExecs.every((e) => e.resultReason === "RESULT_REASON_ERROR_RESOLVED") ? "acknowledged" : "new";
+  }, [executions]);
+
+  const totalDuration = useMemo(() => {
+    if (!event.createdAt || executions.length === 0) return null;
+    if (!executions.every((e) => e.state === "STATE_FINISHED")) return null;
+    const startMs = new Date(event.createdAt).getTime();
+    let latestEndMs = startMs;
+    for (const exec of executions) {
+      if (exec.updatedAt) {
+        const endMs = new Date(exec.updatedAt).getTime();
+        if (endMs > latestEndMs) latestEndMs = endMs;
+      }
+    }
+    if (latestEndMs <= startMs) return null;
+    return computeDuration({
+      createdAt: event.createdAt,
+      updatedAt: new Date(latestEndMs).toISOString(),
+      state: "STATE_FINISHED",
+    } as CanvasesCanvasNodeExecution);
+  }, [event.createdAt, executions]);
+
+  const triggerIconSrc = getHeaderIconSrc(triggerNode?.trigger?.name);
+  const triggerIconSlug = resolveNodeIconSlug(triggerNode, componentIconMap);
+  const triggerName = triggerNode?.name || triggerNode?.trigger?.name || "Trigger";
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="flex w-full items-center gap-3 px-4 py-1.5 text-left hover:bg-gray-50 transition-colors min-h-8"
+      aria-expanded={isExpanded}
+    >
+      <div className="text-gray-400">
+        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+      </div>
+      <div className="flex flex-1 items-center gap-2 min-w-0">
+        <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+          <NodeIcon iconSrc={triggerIconSrc} iconSlug={triggerIconSlug || "bolt"} alt={triggerName} />
+        </div>
+        <span className="text-xs text-gray-600 truncate flex-shrink-0">{triggerName}</span>
+        <span className="text-gray-300">·</span>
+        <span className="font-mono text-[10px] text-gray-400">#{event.id?.slice(0, 4)}</span>
+        <span className="text-xs font-medium text-gray-900 truncate">{title}</span>
+        <StatusBadge status={aggregateStatus} />
+        {errorAckLabel && (
+          <span
+            className={cn(
+              "text-[10px] font-medium rounded px-1.5 py-0.5",
+              errorAckLabel === "new" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500",
+            )}
+          >
+            {errorAckLabel === "new" ? "New" : "Acknowledged"}
+          </span>
+        )}
+        {totalSteps > 0 && (
+          <span className="text-xs text-gray-400 whitespace-nowrap">
+            {totalSteps} {totalSteps === 1 ? "step" : "steps"}
+            {totalDuration && <span className="ml-1">· {totalDuration}</span>}
+          </span>
+        )}
+      </div>
+      <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
+        {event.createdAt ? formatRunTimestamp(event.createdAt) : ""}
+      </span>
+    </button>
   );
 }
 
@@ -182,301 +286,65 @@ export function RunRow({
     triggerEvent?: SidebarEvent;
   }) => void;
 }) {
-  const executions = event.executions || [];
-  const triggerNode = nodes.find((n) => n.id === event.nodeId);
-  const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
-  const eventInfo = buildEventInfo(event);
-  const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
+  const executions = useMemo(() => event.executions || [], [event.executions]);
+  const triggerNode = useMemo(() => nodes.find((n) => n.id === event.nodeId), [nodes, event.nodeId]);
+  const triggerSidebarEvent = useMemo(() => buildTriggerSidebarEvent(event, triggerNode), [event, triggerNode]);
 
-  const triggerSidebarEvent = useMemo(() => {
-    if (!triggerNode || !event.id) return undefined;
-    return mapTriggerEventToSidebarEvent(
-      {
-        id: event.id,
-        canvasId: event.canvasId,
-        nodeId: event.nodeId,
-        channel: event.channel,
-        data: event.data,
-        createdAt: event.createdAt,
-        customName: event.customName,
-      },
-      triggerNode,
-    );
-  }, [event, triggerNode]);
-
-  const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
-  const totalSteps = executions.length + queueItems.length;
-
-  const errorAckLabel = useMemo(() => {
-    const failedExecs = executions.filter((e) => e.result === "RESULT_FAILED");
-    if (failedExecs.length === 0) return null;
-    const allAcknowledged = failedExecs.every((e) => e.resultReason === "RESULT_REASON_ERROR_RESOLVED");
-    return allAcknowledged ? "acknowledged" : "new";
-  }, [executions]);
-
-  const totalDuration = useMemo(() => {
-    if (!event.createdAt || executions.length === 0) return null;
-    const isAllFinished = executions.every((e) => e.state === "STATE_FINISHED");
-    if (!isAllFinished) return null;
-    const startMs = new Date(event.createdAt).getTime();
-    let latestEndMs = startMs;
-    for (const exec of executions) {
-      if (exec.updatedAt) {
-        const endMs = new Date(exec.updatedAt).getTime();
-        if (endMs > latestEndMs) latestEndMs = endMs;
+  const makeExecutionSelectHandler = useCallback(
+    (execution: CanvasesCanvasNodeExecution) => {
+      if (onExecutionSelect && execution.id && event.id && execution.nodeId) {
+        return () =>
+          onExecutionSelect({
+            nodeId: execution.nodeId!,
+            eventId: event.id!,
+            executionId: execution.id!,
+            triggerEvent: triggerSidebarEvent,
+          });
       }
-    }
-    const diffMs = latestEndMs - startMs;
-    if (diffMs <= 0) return null;
-    return computeDuration({
-      createdAt: event.createdAt,
-      updatedAt: new Date(latestEndMs).toISOString(),
-      state: "STATE_FINISHED",
-    } as CanvasesCanvasNodeExecution);
-  }, [event.createdAt, executions, queueItems.length]);
-
-  const triggerIconSrc = getHeaderIconSrc(triggerNode?.trigger?.name);
-  const triggerIconSlug = resolveNodeIconSlug(triggerNode, componentIconMap);
-  const triggerName = triggerNode?.name || triggerNode?.trigger?.name || "Trigger";
+      if (onNodeSelect && execution.nodeId) {
+        return () => onNodeSelect(execution.nodeId!);
+      }
+      return undefined;
+    },
+    [onExecutionSelect, onNodeSelect, event.id, triggerSidebarEvent],
+  );
 
   return (
     <div className="border-b border-gray-200 last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-1.5 text-left hover:bg-gray-50 transition-colors min-h-8"
-        aria-expanded={isExpanded}
-      >
-        <div className="text-gray-400">
-          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-        </div>
-        <div className="flex flex-1 items-center gap-2 min-w-0">
-          <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-            {triggerIconSrc ? (
-              <img src={triggerIconSrc} alt={triggerName} className="h-4 w-4 object-contain" />
-            ) : (
-              React.createElement(resolveIcon(triggerIconSlug || "bolt"), {
-                size: 14,
-                className: "text-gray-500",
-              })
-            )}
-          </div>
-          <span className="text-xs text-gray-600 truncate flex-shrink-0">{triggerName}</span>
-          <span className="text-gray-300">·</span>
-          <span className="font-mono text-[10px] text-gray-400">#{event.id?.slice(0, 4)}</span>
-          <span className="text-xs font-medium text-gray-900 truncate">{title}</span>
-          <StatusBadge status={aggregateStatus} />
-          {errorAckLabel && (
-            <span
-              className={cn(
-                "text-[10px] font-medium rounded px-1.5 py-0.5",
-                errorAckLabel === "new" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500",
-              )}
-            >
-              {errorAckLabel === "new" ? "New" : "Acknowledged"}
-            </span>
-          )}
-          {totalSteps > 0 && (
-            <span className="text-xs text-gray-400 whitespace-nowrap">
-              {totalSteps} {totalSteps === 1 ? "step" : "steps"}
-              {totalDuration && <span className="ml-1">· {totalDuration}</span>}
-            </span>
-          )}
-        </div>
-        <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
-          {event.createdAt ? formatRunTimestamp(event.createdAt) : ""}
-        </span>
-      </button>
-
+      <RunRowHeader
+        event={event}
+        triggerNode={triggerNode}
+        componentIconMap={componentIconMap}
+        executions={executions}
+        queueItemCount={queueItems.length}
+        isExpanded={isExpanded}
+        onToggle={onToggle}
+      />
       {isExpanded && (executions.length > 0 || queueItems.length > 0) && (
         <div className="bg-gray-50">
-          {executions.map((execution) => {
-            const baseNodeId = execution.nodeId?.includes(":") ? execution.nodeId.split(":")[0] : execution.nodeId;
-            const node = nodes.find((n) => n.id === execution.nodeId) || nodes.find((n) => n.id === baseNodeId);
-            const nodeName = node?.name || execution.nodeId || "Unknown";
-            const componentIconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
-            const componentIconSlug = resolveNodeIconSlug(node, componentIconMap);
-            const status = resolveExecutionDisplayStatus(execution, nodes);
-            const duration = computeDuration(execution);
-            const hasError = execution.result === "RESULT_FAILED" && execution.resultMessage;
-
-            return (
-              <div
-                key={execution.id}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
-                  (onNodeSelect || onExecutionSelect) && "cursor-pointer hover:bg-gray-100 transition-colors",
-                )}
-                role={onNodeSelect || onExecutionSelect ? "button" : undefined}
-                tabIndex={onNodeSelect || onExecutionSelect ? 0 : undefined}
-                onClick={() => {
-                  if (onExecutionSelect && execution.id && event.id && execution.nodeId) {
-                    onExecutionSelect({
-                      nodeId: execution.nodeId,
-                      eventId: event.id,
-                      executionId: execution.id,
-                      triggerEvent: triggerSidebarEvent,
-                    });
-                  } else if (onNodeSelect && execution.nodeId) {
-                    onNodeSelect(execution.nodeId);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    if (onExecutionSelect && execution.id && event.id && execution.nodeId) {
-                      onExecutionSelect({
-                        nodeId: execution.nodeId,
-                        eventId: event.id,
-                        executionId: execution.id,
-                        triggerEvent: triggerSidebarEvent,
-                      });
-                    } else if (onNodeSelect && execution.nodeId) {
-                      onNodeSelect(execution.nodeId);
-                    }
-                  }
-                }}
-              >
-                <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                  {componentIconSrc ? (
-                    <img src={componentIconSrc} alt={nodeName} className="h-3.5 w-3.5 object-contain" />
-                  ) : (
-                    React.createElement(resolveIcon(componentIconSlug || "box"), {
-                      size: 13,
-                      className: "text-gray-400",
-                    })
-                  )}
-                </div>
-                <div className="flex flex-1 items-center gap-2 min-w-0">
-                  <span className="text-xs text-gray-700 truncate">{nodeName}</span>
-                  <StatusBadge status={status} />
-                  {duration && <span className="text-xs text-gray-500 tabular-nums">{duration}</span>}
-                </div>
-                {hasError && (
-                  <span className="text-xs text-red-600 truncate max-w-[300px]">{execution.resultMessage}</span>
-                )}
-                <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
-                  {execution.createdAt ? formatRunTimestamp(execution.createdAt) : ""}
-                </span>
-              </div>
-            );
-          })}
-          {queueItems.map((item) => {
-            const qBaseNodeId = item.nodeId?.includes(":") ? item.nodeId.split(":")[0] : item.nodeId;
-            const node = nodes.find((n) => n.id === item.nodeId) || nodes.find((n) => n.id === qBaseNodeId);
-            const nodeName = node?.name || item.nodeId || "Unknown";
-            const queueIconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
-            const queueIconSlug = resolveNodeIconSlug(node, componentIconMap);
-
-            return (
-              <div
-                key={`q-${item.id}`}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
-                  onNodeSelect && "cursor-pointer hover:bg-gray-100 transition-colors",
-                )}
-                role={onNodeSelect ? "button" : undefined}
-                tabIndex={onNodeSelect ? 0 : undefined}
-                onClick={() => {
-                  if (onNodeSelect && item.nodeId) {
-                    onNodeSelect(item.nodeId);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if ((e.key === "Enter" || e.key === " ") && onNodeSelect && item.nodeId) {
-                    e.preventDefault();
-                    onNodeSelect(item.nodeId);
-                  }
-                }}
-              >
-                <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                  {queueIconSrc ? (
-                    <img src={queueIconSrc} alt={nodeName} className="h-3.5 w-3.5 object-contain" />
-                  ) : (
-                    React.createElement(resolveIcon(queueIconSlug || "box"), {
-                      size: 13,
-                      className: "text-gray-400",
-                    })
-                  )}
-                </div>
-                <div className="flex flex-1 items-center gap-2 min-w-0">
-                  <span className="text-xs text-gray-700 truncate">{nodeName}</span>
-                  <StatusBadge status="queued" />
-                </div>
-                <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
-                  {item.createdAt ? formatRunTimestamp(item.createdAt) : ""}
-                </span>
-              </div>
-            );
-          })}
+          {executions.map((execution) => (
+            <ExecutionRow
+              key={execution.id}
+              execution={execution}
+              node={findNode(nodes, execution.nodeId)}
+              componentIconMap={componentIconMap}
+              nodes={nodes}
+              onSelect={makeExecutionSelectHandler(execution)}
+            />
+          ))}
+          {queueItems.map((item) => (
+            <QueueItemRow
+              key={`q-${item.id}`}
+              item={item}
+              node={findNode(nodes, item.nodeId)}
+              componentIconMap={componentIconMap}
+              onNodeSelect={onNodeSelect}
+            />
+          ))}
         </div>
       )}
     </div>
   );
-}
-
-export function filterRunEvents(
-  events: CanvasesCanvasEventWithExecutions[],
-  nodes: ComponentsNode[],
-  statusFilter: RunsStatusFilter,
-  searchQuery: string,
-) {
-  return events.filter((event) => {
-    const executions = event.executions || [];
-
-    if (statusFilter !== "all") {
-      const aggregate = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
-      if (statusFilter === "completed" && aggregate !== "completed" && aggregate !== "cancelled") return false;
-      if (statusFilter === "errors" && aggregate !== "error") return false;
-      if (statusFilter === "running" && aggregate !== "running") return false;
-      if (statusFilter === "queued" && aggregate !== "queued") return false;
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.trim().toLowerCase();
-      const triggerNode = nodes.find((n) => n.id === event.nodeId);
-      const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
-      const eventInfo = buildEventInfo(event);
-      const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "" };
-
-      const searchableText = [
-        event.id,
-        title,
-        triggerNode?.name,
-        ...executions.map((e) => {
-          const node = nodes.find((n) => n.id === e.nodeId);
-          return [node?.name, node?.id, e.resultMessage].filter(Boolean).join(" ");
-        }),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      if (!searchableText.includes(query)) return false;
-    }
-
-    return true;
-  });
-}
-
-export function computeRunsCounts(events: CanvasesCanvasEventWithExecutions[], nodes: ComponentsNode[]) {
-  let completed = 0;
-  let errors = 0;
-  let running = 0;
-  let queued = 0;
-  for (const event of events) {
-    const executions = event.executions || [];
-    if (executions.length === 0) {
-      queued++;
-      continue;
-    }
-    const aggregate = getAggregateStatus(executions, nodes);
-    if (aggregate === "completed" || aggregate === "cancelled") completed++;
-    else if (aggregate === "error") errors++;
-    else if (aggregate === "running") running++;
-    else if (aggregate === "queued") queued++;
-  }
-  return { completed, errors, running, queued, total: events.length };
 }
 
 export function RunsConsoleContent({
@@ -659,201 +527,6 @@ export function RunsConsoleContent({
                 </button>
               </div>
             )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function countUnacknowledgedErrors(events: CanvasesCanvasEventWithExecutions[]): number {
-  let count = 0;
-  for (const event of events) {
-    for (const exec of event.executions || []) {
-      if (exec.result === "RESULT_FAILED" && exec.resultReason !== "RESULT_REASON_ERROR_RESOLVED") {
-        count++;
-      }
-    }
-  }
-  return count;
-}
-
-export function ErrorsConsoleContent({
-  events,
-  nodes,
-  componentIconMap = {},
-  searchQuery,
-  onNodeSelect,
-  onExecutionSelect,
-  onAcknowledgeErrors,
-}: {
-  events: CanvasesCanvasEventWithExecutions[];
-  nodes: ComponentsNode[];
-  componentIconMap?: Record<string, string>;
-  searchQuery: string;
-  onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
-  onAcknowledgeErrors?: (executionIds: string[]) => void;
-}) {
-  const errorItems = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const items: {
-      execution: CanvasesCanvasNodeExecution;
-      event: CanvasesCanvasEventWithExecutions;
-      node: ComponentsNode | undefined;
-      triggerNode: ComponentsNode | undefined;
-    }[] = [];
-
-    for (const event of events) {
-      const triggerNode = nodes.find((n) => n.id === event.nodeId);
-      for (const exec of event.executions || []) {
-        if (exec.result !== "RESULT_FAILED") continue;
-        if (exec.resultReason === "RESULT_REASON_ERROR_RESOLVED") continue;
-
-        const baseNodeId = exec.nodeId?.includes(":") ? exec.nodeId.split(":")[0] : exec.nodeId;
-        const node = nodes.find((n) => n.id === exec.nodeId) || nodes.find((n) => n.id === baseNodeId);
-
-        if (query) {
-          const searchable = [node?.name, exec.nodeId, exec.resultMessage, event.id]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          if (!searchable.includes(query)) continue;
-        }
-
-        items.push({ execution: exec, event, node, triggerNode });
-      }
-    }
-    return items;
-  }, [events, nodes, searchQuery]);
-
-  const allErrorIds = useMemo(() => errorItems.map((item) => item.execution.id!).filter(Boolean), [errorItems]);
-
-  return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-200">
-        <span className="text-[11px] font-medium text-gray-600">
-          {errorItems.length} unacknowledged {errorItems.length === 1 ? "error" : "errors"}
-        </span>
-        {onAcknowledgeErrors && allErrorIds.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onAcknowledgeErrors(allErrorIds)}
-            className="ml-auto rounded-md px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
-          >
-            Acknowledge all
-          </button>
-        )}
-      </div>
-      <div className="flex-1 overflow-auto">
-        {errorItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-            <CircleX className="h-6 w-6 text-gray-300 mb-2" />
-            <p className="text-[13px] font-medium text-gray-600">No unacknowledged errors</p>
-            <p className="mt-0.5 text-xs text-gray-400">All errors have been acknowledged.</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {errorItems.map((item) => {
-              const nodeName = item.node?.name || item.execution.nodeId || "Unknown";
-              const iconSrc = getHeaderIconSrc(item.node?.component?.name || item.node?.trigger?.name);
-              const iconSlug = resolveNodeIconSlug(item.node, componentIconMap);
-
-              const triggerSidebarEvent =
-                item.triggerNode && item.event.id
-                  ? mapTriggerEventToSidebarEvent(
-                      {
-                        id: item.event.id,
-                        canvasId: item.event.canvasId,
-                        nodeId: item.event.nodeId,
-                        channel: item.event.channel,
-                        data: item.event.data,
-                        createdAt: item.event.createdAt,
-                        customName: item.event.customName,
-                      },
-                      item.triggerNode,
-                    )
-                  : undefined;
-
-              return (
-                <div
-                  key={item.execution.id}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-1.5 min-h-8",
-                    (onNodeSelect || onExecutionSelect) && "cursor-pointer hover:bg-gray-50 transition-colors",
-                  )}
-                  role={onNodeSelect || onExecutionSelect ? "button" : undefined}
-                  tabIndex={onNodeSelect || onExecutionSelect ? 0 : undefined}
-                  onClick={() => {
-                    if (onExecutionSelect && item.execution.id && item.event.id && item.execution.nodeId) {
-                      onExecutionSelect({
-                        nodeId: item.execution.nodeId,
-                        eventId: item.event.id,
-                        executionId: item.execution.id,
-                        triggerEvent: triggerSidebarEvent,
-                      });
-                    } else if (onNodeSelect && item.execution.nodeId) {
-                      onNodeSelect(item.execution.nodeId);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      if (onExecutionSelect && item.execution.id && item.event.id && item.execution.nodeId) {
-                        onExecutionSelect({
-                          nodeId: item.execution.nodeId,
-                          eventId: item.event.id,
-                          executionId: item.execution.id,
-                          triggerEvent: triggerSidebarEvent,
-                        });
-                      } else if (onNodeSelect && item.execution.nodeId) {
-                        onNodeSelect(item.execution.nodeId);
-                      }
-                    }
-                  }}
-                >
-                  <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
-                    {iconSrc ? (
-                      <img src={iconSrc} alt={nodeName} className="h-4 w-4 object-contain" />
-                    ) : (
-                      React.createElement(resolveIcon(iconSlug || "box"), {
-                        size: 14,
-                        className: "text-gray-500",
-                      })
-                    )}
-                  </div>
-                  <div className="flex flex-1 items-center gap-2 min-w-0">
-                    <span className="text-xs text-gray-700 truncate">{nodeName}</span>
-                    <StatusBadge status="error" />
-                    {item.execution.resultMessage && (
-                      <span className="text-xs text-red-600 truncate max-w-[300px]">
-                        {item.execution.resultMessage}
-                      </span>
-                    )}
-                  </div>
-                  {onAcknowledgeErrors && item.execution.id && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAcknowledgeErrors([item.execution.id!]);
-                      }}
-                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors whitespace-nowrap"
-                    >
-                      Acknowledge
-                    </button>
-                  )}
-                  <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
-                    {item.execution.createdAt ? formatRunTimestamp(item.execution.createdAt) : ""}
-                  </span>
-                </div>
-              );
-            })}
           </div>
         )}
       </div>

@@ -74,7 +74,7 @@ import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/CanvasRunsView";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -2181,8 +2181,10 @@ function CanvasContent({
   const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
 
   useEffect(() => {
-    localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
-  }, [isLogSidebarOpen]);
+    if (showBottomStatusControls) {
+      localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
+    }
+  }, [isLogSidebarOpen, showBottomStatusControls]);
 
   useEffect(() => {
     localStorage.setItem(CONSOLE_HEIGHT_STORAGE_KEY, String(logSidebarHeight));

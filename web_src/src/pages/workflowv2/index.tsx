@@ -5696,7 +5696,7 @@ export function WorkflowPageV2() {
           blueprints={blueprints}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
-          runsTotalCount={runsEventsData.totalCount}
+          runsTotalCount={isViewingLiveVersion ? runsEventsData.totalCount : 0}
           runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
           runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
           onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}

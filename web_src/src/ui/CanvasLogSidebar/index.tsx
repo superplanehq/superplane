@@ -5,7 +5,9 @@ import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, Co
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
-import { countUnacknowledgedErrors, ErrorsConsoleContent, RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
+import { ErrorsConsoleContent } from "@/pages/workflowv2/ErrorsConsoleContent";
+import { RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export type ConsoleTab = "runs" | "errors" | "warnings";
