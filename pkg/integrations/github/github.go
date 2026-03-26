@@ -43,7 +43,7 @@ type GitHub struct {
 }
 
 type Configuration struct {
-	Organization string `json:"organization"`
+	Organization string `mapstructure:"organization" json:"organization"`
 }
 
 type Metadata struct {
@@ -397,6 +397,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext, metadata Meta
 			),
 			http.StatusSeeOther,
 		)
+		return
 	}
 
 	installationID := ctx.Request.URL.Query().Get("installation_id")
