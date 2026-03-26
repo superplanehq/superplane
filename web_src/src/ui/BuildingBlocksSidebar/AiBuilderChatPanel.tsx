@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { AiBuilderMessage, AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
-import { ArrowUp } from "lucide-react";
+import { AiAgentSession, AiBuilderMessage, AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { ArrowLeft, ArrowUp, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -10,6 +10,10 @@ import remarkGfm from "remark-gfm";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
+  agentSessions: AiAgentSession[];
+  currentAgentId: string | null;
+  isLoadingAgentSessions: boolean;
+  isLoadingAgentMessages: boolean;
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
@@ -23,11 +27,17 @@ type AiBuilderChatPanelProps = {
   canvasId?: string;
   aiInput: string;
   onAiInputChange: (value: string) => void;
+  onSelectAgent: (agentId: string) => void;
+  onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 export function AiBuilderChatPanel({
+  agentSessions,
+  currentAgentId,
+  isLoadingAgentSessions,
+  isLoadingAgentMessages,
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
@@ -41,11 +51,14 @@ export function AiBuilderChatPanel({
   canvasId,
   aiInput,
   onAiInputChange,
+  onSelectAgent,
+  onStartNewSession,
   onSendPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
   const maxAiInputHeight = 160;
+  const isNewChatView = currentAgentId === null;
 
   useEffect(() => {
     const container = aiMessagesContainerRef.current;
@@ -68,41 +81,235 @@ export function AiBuilderChatPanel({
   return (
     <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
       <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-        <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
-          <AiMessages messages={aiMessages} />
-
-          {isGeneratingResponse ? (
-            <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
-          ) : null}
-
-          {pendingProposal && (
-            <ProposalsList
+        {isNewChatView ? (
+          <>
+            <InputForm
+              aiInputRef={aiInputRef}
+              aiInput={aiInput}
+              onAiInputChange={onAiInputChange}
+              onSendPrompt={onSendPrompt}
               disabled={disabled}
+              canvasId={canvasId}
+              isGeneratingResponse={isGeneratingResponse}
+              maxAiInputHeight={maxAiInputHeight}
+            />
+
+            <ConversationContent
+              aiMessagesContainerRef={aiMessagesContainerRef}
+              isLoadingAgentMessages={isLoadingAgentMessages}
+              aiMessages={aiMessages}
+              isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
-              applyShortcutHint={applyShortcutHint}
               pendingProposalSummaries={pendingProposalSummaries}
+              applyShortcutHint={applyShortcutHint}
               onApplyProposal={onApplyProposal}
               onDiscardProposal={onDiscardProposal}
               isApplyingProposal={isApplyingProposal}
               aiError={aiError}
+              disabled={disabled}
             />
-          )}
 
-          {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
-        </div>
+            <ConversationList
+              agentSessions={agentSessions}
+              currentAgentId={currentAgentId}
+              isLoadingAgentSessions={isLoadingAgentSessions}
+              isGeneratingResponse={isGeneratingResponse}
+              onSelectAgent={onSelectAgent}
+              onStartNewSession={onStartNewSession}
+              title="Previous chats"
+              className="mt-auto border-t border-b-0 border-border px-2 py-2 space-y-2"
+            />
+          </>
+        ) : (
+          <>
+            <ConversationList
+              agentSessions={agentSessions}
+              currentAgentId={currentAgentId}
+              isLoadingAgentSessions={isLoadingAgentSessions}
+              isGeneratingResponse={isGeneratingResponse}
+              onSelectAgent={onSelectAgent}
+              onStartNewSession={onStartNewSession}
+            />
 
-        <InputForm
-          aiInputRef={aiInputRef}
-          aiInput={aiInput}
-          onAiInputChange={onAiInputChange}
-          onSendPrompt={onSendPrompt}
-          disabled={disabled}
-          canvasId={canvasId}
-          isGeneratingResponse={isGeneratingResponse}
-          maxAiInputHeight={maxAiInputHeight}
-        />
+            <ConversationContent
+              aiMessagesContainerRef={aiMessagesContainerRef}
+              isLoadingAgentMessages={isLoadingAgentMessages}
+              aiMessages={aiMessages}
+              isGeneratingResponse={isGeneratingResponse}
+              pendingProposal={pendingProposal}
+              pendingProposalSummaries={pendingProposalSummaries}
+              applyShortcutHint={applyShortcutHint}
+              onApplyProposal={onApplyProposal}
+              onDiscardProposal={onDiscardProposal}
+              isApplyingProposal={isApplyingProposal}
+              aiError={aiError}
+              disabled={disabled}
+            />
+
+            <InputForm
+              aiInputRef={aiInputRef}
+              aiInput={aiInput}
+              onAiInputChange={onAiInputChange}
+              onSendPrompt={onSendPrompt}
+              disabled={disabled}
+              canvasId={canvasId}
+              isGeneratingResponse={isGeneratingResponse}
+              maxAiInputHeight={maxAiInputHeight}
+            />
+          </>
+        )}
       </div>
     </TabsContent>
+  );
+}
+
+type ConversationListProps = {
+  agentSessions: AiAgentSession[];
+  currentAgentId: string | null;
+  isLoadingAgentSessions: boolean;
+  isGeneratingResponse: boolean;
+  onSelectAgent: (agentId: string) => void;
+  onStartNewSession: () => void;
+  title?: string;
+  className?: string;
+};
+
+function ConversationList({
+  agentSessions,
+  currentAgentId,
+  isLoadingAgentSessions,
+  isGeneratingResponse,
+  onSelectAgent,
+  onStartNewSession,
+  title,
+  className,
+}: ConversationListProps) {
+  const visibleSessions = currentAgentId
+    ? agentSessions.filter((session) => session.id === currentAgentId)
+    : agentSessions;
+
+  return (
+    <div className={cn("border-b border-border px-2 py-2 space-y-2", className)}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {currentAgentId ? (
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={onStartNewSession}
+              disabled={isGeneratingResponse}
+              aria-label="Back to new chat"
+              title="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+            {title ?? (currentAgentId ? "Conversation" : "Conversations")}
+          </p>
+        </div>
+        {!currentAgentId ? (
+          <Button
+            size="icon-xs"
+            variant="secondary"
+            onClick={onStartNewSession}
+            disabled={isGeneratingResponse}
+            aria-label="Start new chat"
+            title="New chat"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="max-h-28 overflow-y-auto space-y-1">
+        {isLoadingAgentSessions ? (
+          <div className="text-xs text-gray-500 px-1 py-1">Loading conversations...</div>
+        ) : null}
+        {!isLoadingAgentSessions && agentSessions.length === 0 ? (
+          <div className="text-xs text-gray-500 px-1 py-1">No conversations yet.</div>
+        ) : null}
+
+        {visibleSessions.map((session) => {
+          const isSelected = session.id === currentAgentId;
+          return (
+            <button
+              key={session.id}
+              type="button"
+              onClick={() => onSelectAgent(session.id)}
+              disabled={isGeneratingResponse}
+              className={cn(
+                "w-full rounded-md border px-2 py-2 text-left transition-colors",
+                isSelected
+                  ? "border-blue-300 bg-blue-50 text-blue-950"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+              )}
+            >
+              <div className="truncate text-sm font-medium">{session.title}</div>
+              {session.createdAt ? (
+                <div className="text-[11px] text-slate-500">{formatSessionDate(session.createdAt)}</div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type ConversationContentProps = {
+  aiMessagesContainerRef: React.RefObject<HTMLDivElement | null>;
+  isLoadingAgentMessages: boolean;
+  aiMessages: AiBuilderMessage[];
+  isGeneratingResponse: boolean;
+  pendingProposal: AiBuilderProposal | null;
+  pendingProposalSummaries: string[];
+  applyShortcutHint: string;
+  onApplyProposal: () => void;
+  onDiscardProposal: () => void;
+  isApplyingProposal: boolean;
+  aiError: string | null;
+  disabled: boolean;
+};
+
+function ConversationContent({
+  aiMessagesContainerRef,
+  isLoadingAgentMessages,
+  aiMessages,
+  isGeneratingResponse,
+  pendingProposal,
+  pendingProposalSummaries,
+  applyShortcutHint,
+  onApplyProposal,
+  onDiscardProposal,
+  isApplyingProposal,
+  aiError,
+  disabled,
+}: ConversationContentProps) {
+  return (
+    <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
+      {isLoadingAgentMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
+      <AiMessages messages={aiMessages} />
+
+      {isGeneratingResponse ? (
+        <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
+      ) : null}
+
+      {pendingProposal ? (
+        <ProposalsList
+          disabled={disabled}
+          pendingProposal={pendingProposal}
+          applyShortcutHint={applyShortcutHint}
+          pendingProposalSummaries={pendingProposalSummaries}
+          onApplyProposal={onApplyProposal}
+          onDiscardProposal={onDiscardProposal}
+          isApplyingProposal={isApplyingProposal}
+          aiError={aiError}
+        />
+      ) : null}
+
+      {!pendingProposal && aiError ? <p className="text-xs text-red-700 px-1">{aiError}</p> : null}
+    </div>
   );
 }
 
@@ -114,6 +321,20 @@ function AiMessages({ messages }: { messages: AiBuilderMessage[] }) {
       ))}
     </>
   );
+}
+
+function formatSessionDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function AiMessage({ message }: { message: AiBuilderMessage }) {

@@ -1,10 +1,12 @@
 import argparse
 import socket
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
 from ai.models import CanvasQuestionRequest
+import ai.repl_web as repl_web
 from ai.web import WebServer, WebServerConfig
 import repl.main as repl_main
 from repl.main import _parse_stream_event, _resolve_stream_url, _stream_repl_answer
@@ -14,6 +16,15 @@ def _next_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
+
+
+@pytest.fixture(autouse=True)
+def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(repl_web, "SessionStore", MagicMock(return_value=MagicMock()))
+    fake_grpc_server = MagicMock()
+    fake_grpc_server.start.return_value = None
+    fake_grpc_server.stop.return_value = None
+    monkeypatch.setattr(repl_web.InternalAgentServer, "from_env", MagicMock(return_value=fake_grpc_server))
 
 
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
@@ -38,7 +49,7 @@ def test_stream_repl_answer_reads_sse_response_end_to_end(
 
     payload = CanvasQuestionRequest(question="hello from repl")
     answer = _stream_repl_answer(
-        web_url=f"http://127.0.0.1:{port}",
+        stream_url=f"http://127.0.0.1:{port}",
         payload=payload,
         model="test",
     )
@@ -88,14 +99,14 @@ def test_main_non_test_mode_mints_agent_chat_session(
         )
 
     def fake_stream_repl_answer(
-        web_url: str,
+        stream_url: str,
         payload: CanvasQuestionRequest,
         model: str,
         token: str | None = None,
     ) -> str:
         stream_calls.append(
             {
-                "web_url": web_url,
+                "stream_url": stream_url,
                 "canvas_id": payload.canvas_id,
                 "model": model,
                 "token": token,
