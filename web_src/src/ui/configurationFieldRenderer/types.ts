@@ -13,7 +13,7 @@ export interface FieldRendererProps {
   allValues?: Record<string, unknown>;
   domainId?: string;
   domainType?: AuthorizationDomainType;
-  appInstallationId?: string;
+  integrationId?: string;
   organizationId?: string;
   hasError?: boolean;
   validationErrors?: ValidationError[] | Set<string>;
