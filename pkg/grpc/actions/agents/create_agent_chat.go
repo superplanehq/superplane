@@ -2,6 +2,7 @@ package agents
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,7 +15,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func GenerateAgentChatToken(authService authorization.Authorization, jwtSigner *jwt.Signer, userID string, organizationID string, canvasID string) (*pb.GenerateAgentChatTokenResponse, error) {
+func CreateAgentChat(
+	authService authorization.Authorization,
+	jwtSigner *jwt.Signer,
+	agentURL string,
+	userID string,
+	organizationID string,
+	canvasID string,
+) (*pb.CreateAgentChatResponse, error) {
 	org, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "invalid organization")
@@ -51,7 +59,10 @@ func GenerateAgentChatToken(authService authorization.Authorization, jwtSigner *
 		return nil, status.Error(codes.Internal, "failed to mint agent chat session")
 	}
 
-	return &pb.GenerateAgentChatTokenResponse{Token: token}, nil
+	return &pb.CreateAgentChatResponse{
+		Token: token,
+		Url:   fmt.Sprintf("%s/v1/agent/chat/stream", agentURL),
+	}, nil
 }
 
 func allowedAgentChatPermissions(authService authorization.Authorization, userID, orgID, canvasID string) ([]jwt.Permission, error) {

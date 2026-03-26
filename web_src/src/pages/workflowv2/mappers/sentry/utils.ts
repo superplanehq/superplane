@@ -76,14 +76,25 @@ export function addFormattedTimestamp(details: Record<string, string>, label: st
   details[label] = new Date(value).toLocaleString();
 }
 
-export function addOrderedDetails(details: Record<string, string>, entries: Array<{ label: string; value?: string }>) {
-  entries.forEach(({ label, value }) => {
-    if (!value) {
-      return;
+export interface OrderedDetail {
+  label: string;
+  value?: string;
+  isTimestamp?: boolean;
+}
+
+export function addOrderedDetails(details: Record<string, string>, orderedDetails: OrderedDetail[], maxItems = 6) {
+  for (const detail of orderedDetails) {
+    if (Object.keys(details).length >= maxItems) {
+      break;
     }
 
-    details[label] = value;
-  });
+    if (detail.isTimestamp) {
+      addFormattedTimestamp(details, detail.label, detail.value);
+      continue;
+    }
+
+    addDetail(details, detail.label, detail.value);
+  }
 }
 
 export function getProjectLabel(issue?: { project?: { name?: string; slug?: string } }) {

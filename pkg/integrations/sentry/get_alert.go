@@ -209,8 +209,3 @@ func decodeGetAlertConfiguration(input any) (GetAlertConfiguration, error) {
 	config.AlertID = strings.TrimSpace(config.AlertID)
 	return config, nil
 }
-
-func isExpressionValue(value string) bool {
-	trimmed := strings.TrimSpace(value)
-	return strings.Contains(trimmed, "{{") && strings.Contains(trimmed, "}}")
-}

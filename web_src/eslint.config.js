@@ -37,6 +37,14 @@ export default tseslint.config({ ignores: ['dist'] }, {
     complexity: ["warn", { max: 15 }],
     "eqeqeq": ["warn", "always", { "null": "ignore" }],
     "max-depth": ["warn", 4],
+    "max-lines": [
+      "warn",
+      {
+        "max": 500,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ],
     "max-lines-per-function": [
       "warn",
       {
