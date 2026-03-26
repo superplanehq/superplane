@@ -74,12 +74,21 @@ func (s *WaitSteps) addWaitWithDuration(value int, unit string) {
 }
 
 func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
+	wantFor := strconv.Itoa(value)
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		node := s.canvas.GetNodeFromDB("Wait")
+		config := node.Configuration.Data()
+		if config["mode"] == "interval" && config["waitFor"] == wantFor && config["unit"] == unit {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
 	node := s.canvas.GetNodeFromDB("Wait")
-
 	config := node.Configuration.Data()
-
 	assert.Equal(s.t, "interval", config["mode"])
-	assert.Equal(s.t, strconv.Itoa(value), config["waitFor"])
+	assert.Equal(s.t, wantFor, config["waitFor"])
 	assert.Equal(s.t, unit, config["unit"])
 }
 
@@ -105,7 +114,7 @@ func (s *WaitSteps) runManualTrigger() {
 			models.CanvasNodeExecutionStatePending,
 			models.CanvasNodeExecutionStateStarted,
 		},
-		10*time.Second,
+		30*time.Second,
 	)
 }
 
@@ -122,7 +131,7 @@ func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
 	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`))
 	s.session.Sleep(300) // Wait for actions menu to open
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 
 func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {

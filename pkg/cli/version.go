@@ -61,6 +61,46 @@ func StartUpdateCheck() {
 	}()
 }
 
+func ShouldStartUpdateCheck(args []string) bool {
+	if isDevBuild() {
+		return false
+	}
+
+	if len(args) == 0 {
+		return false
+	}
+
+	skipValue := false
+	for _, arg := range args {
+		if skipValue {
+			skipValue = false
+			continue
+		}
+
+		switch arg {
+		case "", "--":
+			continue
+		case "--config", "--output", "-o":
+			skipValue = true
+			continue
+		case "-h", "--help", "help", "--version", "version", "completion":
+			return false
+		}
+
+		if strings.HasPrefix(arg, "--config=") || strings.HasPrefix(arg, "--output=") || strings.HasPrefix(arg, "-o=") {
+			continue
+		}
+
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
 // PrintUpdateNotice prints an upgrade notice to stderr if a newer version
 // is available. It waits at most 1 second for the background check to finish.
 func PrintUpdateNotice() {

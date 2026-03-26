@@ -35,6 +35,11 @@ export function IntegrationInstructions({ description, onContinue, className = "
               h3: ({ children }) => <h3 className="text-sm font-semibold mt-2 mb-1">{children}</h3>,
               h4: ({ children }) => <h4 className="text-sm font-medium mt-2 mb-1">{children}</h4>,
               p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              blockquote: ({ children }) => (
+                <blockquote className="mb-2 rounded-md border border-orange-950/15 bg-orange-50/80 p-3 text-sm last:mb-0 dark:border-blue-700/40 dark:bg-blue-950/40">
+                  {children}
+                </blockquote>
+              ),
               ul: ({ children }) => <ul className="list-disc ml-5 space-y-1 mb-2">{children}</ul>,
               ol: ({ children }) => <ol className="list-decimal ml-5 space-y-1 mb-2">{children}</ol>,
               li: ({ children }) => <li>{children}</li>,
