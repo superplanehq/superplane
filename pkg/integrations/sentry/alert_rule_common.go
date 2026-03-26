@@ -217,20 +217,34 @@ func normalizeAlertEventTypes(values []string) []string {
 	return result
 }
 
+// trimAlertEventTypeSelections trims and deduplicates user-provided event types for update flows.
+// It returns nil when the configuration omits or clears the list, so callers preserve the existing rule.
+func trimAlertEventTypeSelections(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" || slices.Contains(result, value) {
+			continue
+		}
+		result = append(result, value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+
+	return result
+}
+
 func parseAlertThresholdType(value string) int {
 	if strings.EqualFold(strings.TrimSpace(value), alertThresholdTypeBelow) {
 		return 1
 	}
 
 	return 0
-}
-
-func formatAlertThresholdType(value int) string {
-	if value == 1 {
-		return alertThresholdTypeBelow
-	}
-
-	return alertThresholdTypeAbove
 }
 
 func buildAlertTriggerInput(
