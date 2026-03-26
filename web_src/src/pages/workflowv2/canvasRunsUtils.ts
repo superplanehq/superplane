@@ -275,6 +275,10 @@ export function mergeQueueItemsWithEvents(
 
   if (orphanEvents.length === 0) return { queueItemsByEventId: map, allEvents: events };
 
+  for (const [eventId, { items }] of Object.entries(orphansByEvent)) {
+    map[eventId] = items;
+  }
+
   const merged = [...orphanEvents, ...events];
   merged.sort((a, b) => {
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
