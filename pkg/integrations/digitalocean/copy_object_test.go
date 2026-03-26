@@ -121,19 +121,23 @@ func Test__CopyObject__Setup(t *testing.T) {
 func Test__CopyObject__Execute(t *testing.T) {
 	component := &CopyObject{}
 
-	copyResponse := &http.Response{
-		StatusCode: http.StatusOK,
-		Header:     http.Header{},
-		Body: io.NopCloser(strings.NewReader(`<?xml version="1.0" encoding="UTF-8"?>
+	copyResponseBody := `<?xml version="1.0" encoding="UTF-8"?>
 <CopyObjectResult>
   <ETag>"a1b2c3d4ef567890a1b2c3d4ef567890"</ETag>
   <LastModified>2026-03-25T09:00:00.000Z</LastModified>
-</CopyObjectResult>`)),
+</CopyObjectResult>`
+
+	newCopyResponse := func() *http.Response {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{},
+			Body:       io.NopCloser(strings.NewReader(copyResponseBody)),
+		}
 	}
 
 	t.Run("successful copy emits output with moved=false", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{copyResponse},
+			Responses: []*http.Response{newCopyResponse()},
 		}
 		executionState := &contexts.ExecutionStateContext{}
 
@@ -165,7 +169,7 @@ func Test__CopyObject__Execute(t *testing.T) {
 	t.Run("copy with deleteSource=true emits output with moved=true", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				copyResponse,
+				newCopyResponse(),
 				{
 					StatusCode: http.StatusNoContent,
 					Header:     http.Header{},
@@ -198,6 +202,7 @@ func Test__CopyObject__Execute(t *testing.T) {
 		payload, ok := wrapped["data"].(map[string]any)
 		require.True(t, ok)
 
+		assert.Equal(t, "a1b2c3d4ef567890a1b2c3d4ef567890", payload["eTag"])
 		assert.Equal(t, true, payload["moved"])
 	})
 
@@ -227,7 +232,7 @@ func Test__CopyObject__Execute(t *testing.T) {
 	t.Run("delete source error after successful copy returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				copyResponse,
+				newCopyResponse(),
 				{
 					StatusCode: http.StatusForbidden,
 					Header:     http.Header{},
