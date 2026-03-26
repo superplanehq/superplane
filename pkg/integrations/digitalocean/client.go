@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -1347,6 +1349,12 @@ func NewSpacesClient(httpCtx core.HTTPContext, ctx core.IntegrationContext, regi
 // If bucket is empty, a region-level request is made (e.g. ListBuckets).
 // queryString is already encoded, e.g. "" or "tagging=".
 func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string) (*http.Response, error) {
+	return c.execSpacesRequestFull(method, bucket, key, queryString, nil, nil)
+}
+
+// execSpacesRequestFull signs and executes an HTTP request to the Spaces S3-compatible API
+// with optional body and extra headers (e.g. Content-Type, x-amz-acl, x-amz-tagging).
+func (c *SpacesClient) execSpacesRequestFull(method, bucket, key, queryString string, body []byte, extraHeaders map[string]string) (*http.Response, error) {
 	var host, endpoint string
 	if bucket == "" {
 		host = fmt.Sprintf("%s.digitaloceanspaces.com", c.Region)
@@ -1364,7 +1372,13 @@ func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string
 	dateStamp := now.Format("20060102")
 	amzDate := now.Format("20060102T150405Z")
 
-	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	var payloadHash string
+	if len(body) > 0 {
+		h := sha256.Sum256(body)
+		payloadHash = fmt.Sprintf("%x", h)
+	} else {
+		payloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	}
 
 	canonicalHeaders := fmt.Sprintf("host:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
 		host, payloadHash, amzDate)
@@ -1410,7 +1424,12 @@ func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string
 		c.AccessKey, credentialScope, signedHeaders, signature,
 	)
 
-	req, err := http.NewRequest(method, endpoint, nil)
+	var bodyReader io.Reader
+	if len(body) > 0 {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, endpoint, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
 	}
@@ -1419,6 +1438,14 @@ func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string
 	req.Header.Set("x-amz-date", amzDate)
 	req.Header.Set("x-amz-content-sha256", payloadHash)
 	req.Header.Set("Authorization", authHeader)
+
+	if len(body) > 0 {
+		req.Header.Set("Content-Length", strconv.Itoa(len(body)))
+	}
+
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -1611,6 +1638,211 @@ func isReadableContentType(contentType string) bool {
 		}
 	}
 	return false
+}
+
+// PutObject uploads an object to a Spaces bucket.
+// It returns the ETag of the uploaded object.
+func (c *SpacesClient) PutObject(bucket, key, body, contentType, acl string, metadata, tags map[string]string) (string, error) {
+	extraHeaders := map[string]string{}
+
+	if contentType != "" {
+		extraHeaders["Content-Type"] = contentType
+	}
+
+	if acl != "" {
+		extraHeaders["x-amz-acl"] = acl
+	}
+
+	if len(tags) > 0 {
+		parts := make([]string, 0, len(tags))
+		for k, v := range tags {
+			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v))
+		}
+		extraHeaders["x-amz-tagging"] = strings.Join(parts, "&")
+	}
+
+	for k, v := range metadata {
+		extraHeaders["x-amz-meta-"+k] = v
+	}
+
+	res, err := c.execSpacesRequestFull(http.MethodPut, bucket, key, "", []byte(body), extraHeaders)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	return strings.Trim(res.Header.Get("ETag"), `"`), nil
+}
+
+// contentTypeFromPath detects the MIME type from a file path extension.
+// Falls back to application/octet-stream for unknown or missing extensions.
+func contentTypeFromPath(filePath string) string {
+	if strings.Contains(filePath, "{{") {
+		return "application/octet-stream"
+	}
+
+	ext := strings.ToLower(path.Ext(filePath))
+	switch ext {
+	case ".json":
+		return "application/json"
+	case ".csv":
+		return "text/csv"
+	case ".txt":
+		return "text/plain"
+	case ".yaml", ".yml":
+		return "application/yaml"
+	case ".xml":
+		return "application/xml"
+	case ".html", ".htm":
+		return "text/html"
+	case ".md":
+		return "text/markdown"
+	case ".toml":
+		return "application/toml"
+	case ".js":
+		return "application/javascript"
+	case ".css":
+		return "text/css"
+	case ".pdf":
+		return "application/pdf"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".svg":
+		return "image/svg+xml"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+// CopyObject copies an object from one location to another within Spaces.
+// The x-amz-copy-source header is included in the signed headers as required by AWS SigV4.
+func (c *SpacesClient) CopyObject(sourceBucket, sourceKey, destBucket, destKey, acl string) (string, error) {
+	host := fmt.Sprintf("%s.%s.digitaloceanspaces.com", destBucket, c.Region)
+	endpoint := fmt.Sprintf("https://%s/%s", host, destKey)
+
+	now := time.Now().UTC()
+	dateStamp := now.Format("20060102")
+	amzDate := now.Format("20060102T150405Z")
+
+	// Empty body for CopyObject
+	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	copySource := "/" + sourceBucket + "/" + sourceKey
+
+	// Canonical headers must be sorted alphabetically
+	canonicalHeaders := fmt.Sprintf(
+		"host:%s\nx-amz-content-sha256:%s\nx-amz-copy-source:%s\nx-amz-date:%s\n",
+		host, payloadHash, copySource, amzDate,
+	)
+	signedHeaders := "host;x-amz-content-sha256;x-amz-copy-source;x-amz-date"
+
+	keyPath := "/" + destKey
+
+	canonicalRequest := strings.Join([]string{
+		http.MethodPut,
+		keyPath,
+		"",
+		canonicalHeaders,
+		signedHeaders,
+		payloadHash,
+	}, "\n")
+
+	credentialScope := fmt.Sprintf("%s/%s/s3/aws4_request", dateStamp, c.Region)
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalRequest))),
+	}, "\n")
+
+	signingKey := hmacSHA256(
+		hmacSHA256(
+			hmacSHA256(
+				hmacSHA256([]byte("AWS4"+c.SecretKey), dateStamp),
+				c.Region,
+			),
+			"s3",
+		),
+		"aws4_request",
+	)
+
+	signature := fmt.Sprintf("%x", hmacSHA256(signingKey, stringToSign))
+	authHeader := fmt.Sprintf(
+		"AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s",
+		c.AccessKey, credentialScope, signedHeaders, signature,
+	)
+
+	req, err := http.NewRequest(http.MethodPut, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Host", host)
+	req.Header.Set("x-amz-date", amzDate)
+	req.Header.Set("x-amz-content-sha256", payloadHash)
+	req.Header.Set("x-amz-copy-source", copySource)
+	req.Header.Set("Authorization", authHeader)
+
+	if acl != "" {
+		req.Header.Set("x-amz-acl", acl)
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, _ := io.ReadAll(res.Body)
+
+	var result struct {
+		ETag string `xml:"ETag"`
+	}
+	if err := xml.Unmarshal(bodyBytes, &result); err == nil {
+		return strings.Trim(result.ETag, `"`), nil
+	}
+
+	return "", nil
+}
+
+// DeleteObject removes an object from a Spaces bucket.
+// The Spaces API always returns 204 No Content, even if the object does not exist.
+func (c *SpacesClient) DeleteObject(bucket, key string) error {
+	res, err := c.execSpacesRequest(http.MethodDelete, bucket, key, "")
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
+// toStringMap converts map[string]any to map[string]string.
+func toStringMap(m map[string]any) map[string]string {
+	result := make(map[string]string, len(m))
+	for k, v := range m {
+		result[k] = fmt.Sprintf("%v", v)
+	}
+	return result
 }
 
 // hmacSHA256 computes HMAC-SHA256 of data with key.
