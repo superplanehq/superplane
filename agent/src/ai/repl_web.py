@@ -60,7 +60,7 @@ class PersistedRunRecorder:
         self._store = store
         self._chat_id = chat_id
         self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
-        self._current_response_message_id: str | None = None
+        self._current_response_message_id: int | None = None
         self._current_response: ModelResponse | None = None
         self._store.set_initial_chat_message_if_missing(chat_id, user_prompt)
         self._store.create_agent_chat_model_message(

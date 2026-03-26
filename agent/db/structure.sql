@@ -28,13 +28,25 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.agent_chat_messages (
-    id text NOT NULL,
+    id bigint NOT NULL,
     chat_id text NOT NULL,
     message jsonb NOT NULL,
-    sort_index bigint NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT agent_chat_messages_sort_index_check CHECK ((sort_index > 0))
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: agent_chat_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.agent_chat_messages ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.agent_chat_messages_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
 );
 
 
@@ -64,14 +76,6 @@ CREATE TABLE public.schema_migrations (
 
 
 --
--- Name: agent_chat_messages agent_chat_messages_chat_id_sort_index_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.agent_chat_messages
-    ADD CONSTRAINT agent_chat_messages_chat_id_sort_index_key UNIQUE (chat_id, sort_index);
-
-
---
 -- Name: agent_chat_messages agent_chat_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -96,10 +100,10 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: idx_agent_chat_messages_chat_sort; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_agent_chat_messages_chat_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_agent_chat_messages_chat_sort ON public.agent_chat_messages USING btree (chat_id, sort_index);
+CREATE INDEX idx_agent_chat_messages_chat_id ON public.agent_chat_messages USING btree (chat_id, id);
 
 
 --

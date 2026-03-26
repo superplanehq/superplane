@@ -92,10 +92,9 @@ class StoredAgentChat:
 
 @dataclass(frozen=True)
 class StoredAgentChatMessageRecord:
-    id: str
+    id: int
     chat_id: str
     message: dict[str, Any]
-    sort_index: int
     created_at: datetime
     updated_at: datetime
 
@@ -263,7 +262,7 @@ class SessionStore:
                 SELECT *
                 FROM agent_chat_messages
                 WHERE chat_id = %s
-                ORDER BY sort_index ASC
+                ORDER BY id ASC
                 """,
                 (chat_id,),
             )
@@ -296,44 +295,34 @@ class SessionStore:
 
             cur.execute(
                 """
-                SELECT COALESCE(MAX(sort_index), 0) AS max_sort_index
-                FROM agent_chat_messages
-                WHERE chat_id = %s
-                """,
-                (chat_id,),
-            )
-            row = cur.fetchone()
-            next_sort_index = int(row["max_sort_index"]) + 1 if row is not None else 1
-
-            record = StoredAgentChatMessageRecord(
-                id=str(uuid.uuid4()),
-                chat_id=chat_id,
-                message=serialized_message,
-                sort_index=next_sort_index,
-                created_at=created_at,
-                updated_at=now,
-            )
-
-            cur.execute(
-                """
                 INSERT INTO agent_chat_messages (
-                    id, chat_id, message, sort_index, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    chat_id, message, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s)
+                RETURNING id
                 """,
                 (
-                    record.id,
-                    record.chat_id,
-                    Jsonb(record.message),
-                    record.sort_index,
-                    record.created_at,
-                    record.updated_at,
+                    chat_id,
+                    Jsonb(serialized_message),
+                    created_at,
+                    now,
                 ),
+            )
+            row = cur.fetchone()
+            if row is None:
+                raise ValueError("Failed to insert agent chat message.")
+
+            record = StoredAgentChatMessageRecord(
+                id=int(row["id"]),
+                chat_id=chat_id,
+                message=serialized_message,
+                created_at=created_at,
+                updated_at=now,
             )
             cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
 
         return record
 
-    def update_agent_chat_model_message(self, message_id: str, message: ModelMessage) -> None:
+    def update_agent_chat_model_message(self, message_id: int, message: ModelMessage) -> None:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
         created_at = _message_timestamp(message)
@@ -365,26 +354,32 @@ class SessionStore:
                 raise AgentChatNotFoundError(chat_id)
 
             cur.execute(
-                "DELETE FROM agent_chat_messages WHERE chat_id = %s AND sort_index > %s",
-                (chat_id, preserved_message_count),
+                """
+                DELETE FROM agent_chat_messages
+                WHERE chat_id = %s
+                  AND id NOT IN (
+                      SELECT id
+                      FROM agent_chat_messages
+                      WHERE chat_id = %s
+                      ORDER BY id ASC
+                      LIMIT %s
+                  )
+                """,
+                (chat_id, chat_id, preserved_message_count),
             )
 
-            sort_index = preserved_message_count
             for message in messages:
-                sort_index += 1
                 serialized_message = _serialize_model_message(message)
                 created_at = _message_timestamp(message)
                 cur.execute(
                     """
                     INSERT INTO agent_chat_messages (
-                        id, chat_id, message, sort_index, created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                        chat_id, message, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s)
                     """,
                     (
-                        str(uuid.uuid4()),
                         chat_id,
                         Jsonb(serialized_message),
-                        sort_index,
                         created_at,
                         now,
                     ),
@@ -493,10 +488,9 @@ class SessionStore:
             raise ValueError("Stored agent chat message payload must be a JSON object.")
 
         return StoredAgentChatMessageRecord(
-            id=str(row["id"]),
+            id=int(row["id"]),
             chat_id=str(row["chat_id"]),
             message=payload,
-            sort_index=int(row["sort_index"]),
             created_at=_from_db_time(row["created_at"]),
             updated_at=_from_db_time(row["updated_at"]),
         )
