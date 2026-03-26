@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
-	"github.com/superplanehq/superplane/pkg/agentservice"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -153,12 +152,7 @@ func RunServer(
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
-	agentService, err := agentservice.NewServiceFromEnv()
-	if err != nil {
-		log.Fatalf("failed to initialize agent service: %v", err)
-	}
-
-	agentsService := NewAgentsService(authService, agentService, jwtSigner)
+	agentsService := NewAgentsService(authService, jwtSigner)
 	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
 
 	reflection.Register(grpcServer)

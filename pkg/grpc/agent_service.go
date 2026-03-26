@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/agentservice"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -14,16 +13,14 @@ import (
 )
 
 type AgentsService struct {
-	authService  authorization.Authorization
-	agentService agentservice.Service
-	jwtSigner    *jwt.Signer
+	authService authorization.Authorization
+	jwtSigner   *jwt.Signer
 }
 
-func NewAgentsService(authService authorization.Authorization, agentService agentservice.Service, jwtSigner *jwt.Signer) *AgentsService {
+func NewAgentsService(authService authorization.Authorization, jwtSigner *jwt.Signer) *AgentsService {
 	return &AgentsService{
-		authService:  authService,
-		agentService: agentService,
-		jwtSigner:    jwtSigner,
+		authService: authService,
+		jwtSigner:   jwtSigner,
 	}
 }
 

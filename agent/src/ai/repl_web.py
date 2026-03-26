@@ -275,17 +275,16 @@ def _save_new_messages(store: SessionStore, chat_id: str, preserved_message_coun
     store.replace_agent_chat_messages_after(chat_id, preserved_message_count, list(validated_messages))
 
 
-def _resolve_agent_context(agent_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
+def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
     claims = jwt_validator.decode(api_token)
-    validated_agent_id = jwt_validator.validate_agent_id(agent_id, claims)
     store: SessionStore = request.app.state.session_store
-    agent = store.get_agent_chat(validated_agent_id)
-    if agent.org_id != claims.org_id or agent.user_id != claims.subject:
+    chat = store.get_agent_chat(chat_id)
+    if chat.org_id != claims.org_id or chat.user_id != claims.subject:
         raise ValueError("Scoped token does not allow the requested agent.")
-    jwt_validator.validate_canvas(agent.canvas_id, claims)
-    return claims, agent
+    jwt_validator.validate_canvas(chat.canvas_id, claims)
+    return claims, chat
 
 
 def _build_deps(payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str) -> AgentDeps:
@@ -317,27 +316,26 @@ async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
         yield event
 
 
-async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
+async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
     store: SessionStore = request.app.state.session_store
     claims: JwtClaims | None = None
     if payload.model == "test" and _resolve_bearer_token(request) is None:
         try:
-            stored_agent = store.get_agent_chat(agent_id)
+            chat = store.get_agent_chat(chat_id)
         except AgentChatNotFoundError:
-            stored_agent = store.create_agent_chat(
+            chat = store.create_agent_chat(
                 org_id="test-org",
                 user_id="test-user",
                 canvas_id="test-canvas",
-                chat_id=agent_id,
+                chat_id=chat_id,
             )
     else:
-        claims, stored_agent = _resolve_agent_context(agent_id, request)
+        claims, chat = _resolve_agent_context(chat_id, request)
 
-    recorder = PersistedRunRecorder(store, stored_agent.id, payload.question)
-    message_history = _load_message_history(store, stored_agent.id)
-
-    resolved_canvas_id = stored_agent.canvas_id
+    recorder = PersistedRunRecorder(store, chat.id, payload.question)
+    message_history = _load_message_history(store, chat.id)
+    resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
         if claims is None:
@@ -346,7 +344,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
 
     _debug_log(
         "starting agent run",
-        agent_id=stored_agent.id,
+        chat_id=chat.id,
         model=payload.model,
         canvas_id=resolved_canvas_id,
         question_preview=payload.question[:120],
@@ -354,7 +352,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
     )
     yield {
         "type": "run_started",
-        "agent_id": stored_agent.id,
+        "chat_id": chat.id,
         "model": payload.model,
         "canvas_id": resolved_canvas_id,
     }
@@ -364,7 +362,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
         run_kwargs["message_history"] = message_history
 
     if payload.model == "test":
-        _debug_log("using test model run path", canvas_id=resolved_canvas_id, agent_id=stored_agent.id)
+        _debug_log("using test model run path", canvas_id=resolved_canvas_id, chat_id=chat.id)
         test_agent: Agent[None, str] = Agent(model=TestModel(), output_type=str)
         async for event in _run_stream_events(test_agent, **run_kwargs):
             if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
@@ -379,7 +377,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
 
             if isinstance(event, AgentRunResultEvent):
                 result = event.result
-                _save_new_messages(store, stored_agent.id, recorder.history_count_before_run, result.new_messages())
+                _save_new_messages(store, chat.id, recorder.history_count_before_run, result.new_messages())
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
@@ -403,7 +401,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
     run_kwargs["deps"] = deps
     _debug_log(
         "running non-test agent",
-        agent_id=stored_agent.id,
+        chat_id=chat.id,
         model=payload.model,
         canvas_id=resolved_canvas_id,
     )
@@ -521,7 +519,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
-            _save_new_messages(store, stored_agent.id, recorder.history_count_before_run, result.new_messages())
+            _save_new_messages(store, chat.id, recorder.history_count_before_run, result.new_messages())
             output = _to_jsonable(result.output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
@@ -583,7 +581,7 @@ def _create_app() -> FastAPI:
 
         _debug_log(
             "incoming stream request",
-            agent_id=chat_id,
+            chat_id=chat_id,
             model=payload.model,
             has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
             has_token=bool(_resolve_bearer_token(request)),
@@ -593,11 +591,11 @@ def _create_app() -> FastAPI:
             try:
                 async for event in _stream_agent_run(chat_id, payload, request):
                     if await request.is_disconnected():
-                        _debug_log("client disconnected", agent_id=chat_id)
+                        _debug_log("client disconnected", chat_id=chat_id)
                         break
                     yield _encode_sse_event(event)
             except Exception as error:
-                _debug_log("stream failed", agent_id=chat_id, error=str(error))
+                _debug_log("stream failed", chat_id=chat_id, error=str(error))
                 yield _encode_sse_event(
                     {
                         "type": "run_failed",

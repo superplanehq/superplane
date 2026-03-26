@@ -11,7 +11,6 @@ class JwtClaims:
     subject: str
     org_id: str
     purpose: str
-    agent_id: str | None
     scopes: list[str]
 
 class JwtValidator:
@@ -71,15 +70,8 @@ class JwtValidator:
             subject=subject.strip(),
             org_id=org_id.strip(),
             purpose=purpose.strip(),
-            agent_id=self._parse_optional_string(payload.get("agent_id")),
             scopes=self._parse_scopes(scopes),
         )
-
-    def _parse_optional_string(self, value: object) -> str | None:
-        if not isinstance(value, str):
-            return None
-        normalized = value.strip()
-        return normalized or None
 
     def _parse_scopes(self, raw: list[object]) -> list[str]:
         scopes: list[str] = []
@@ -129,14 +121,3 @@ class JwtValidator:
 
         return canvas_id
 
-    def validate_agent_id(self, requested_agent_id: str, claims: JwtClaims) -> str:
-        agent_id = normalize_optional(requested_agent_id)
-        if agent_id is None:
-            raise ValueError("Missing required path field: agent_id")
-
-        if claims.agent_id is None:
-            raise ValueError("Scoped token does not allow the requested agent.")
-        if claims.agent_id != agent_id:
-            raise ValueError("Scoped token does not allow the requested agent.")
-
-        return agent_id
