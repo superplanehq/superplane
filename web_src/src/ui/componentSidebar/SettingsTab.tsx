@@ -49,6 +49,8 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
+  configurationSaveMode?: "manual" | "auto";
 }
 
 export function SettingsTab({
@@ -73,9 +75,11 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
+  const showManualSaveFooter = configurationSaveMode !== "auto" && !isReadOnly;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -86,6 +90,7 @@ export function SettingsTab({
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const skipAutosaveAfterSyncRef = useRef(true);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
@@ -219,6 +224,7 @@ export function SettingsTab({
       newConfig = { ...defaultValuesWithoutToggles, ...configuration };
     }
 
+    skipAutosaveAfterSyncRef.current = true;
     setNodeConfiguration(filterVisibleFields(newConfig));
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
@@ -252,7 +258,7 @@ export function SettingsTab({
 
   const shouldShowConfiguration = true;
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (isReadOnly || savingRef.current) {
       return;
     }
@@ -268,10 +274,43 @@ export function SettingsTab({
         setIsSaving(false);
       }
     }
-  };
+  }, [isReadOnly, validateNow, onSave, nodeConfiguration, currentNodeName, selectedIntegration]);
+
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  useEffect(() => {
+    if (configurationSaveMode !== "auto" || isReadOnly) {
+      return;
+    }
+    if (skipAutosaveAfterSyncRef.current) {
+      skipAutosaveAfterSyncRef.current = false;
+      return;
+    }
+    if (hasNodeNameError) {
+      return;
+    }
+    if (integrationName && integrationsOfType.length > 0 && !selectedIntegration?.id) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void handleSaveRef.current();
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    configurationSaveMode,
+    isReadOnly,
+    nodeConfiguration,
+    currentNodeName,
+    selectedIntegration,
+    hasNodeNameError,
+    integrationName,
+    integrationsOfType.length,
+  ]);
 
   return (
-    <div className="p-4 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
+    <div className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`} style={{ maxHeight: "80vh" }}>
       <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
@@ -515,18 +554,20 @@ export function SettingsTab({
         )}
       </div>
 
-      <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <LoadingButton
-          data-testid="save-node-button"
-          variant="default"
-          onClick={handleSave}
-          disabled={isReadOnly}
-          loading={isSaving}
-          loadingText="Saving..."
-        >
-          Save
-        </LoadingButton>
-      </div>
+      {showManualSaveFooter ? (
+        <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <LoadingButton
+            data-testid="save-node-button"
+            variant="default"
+            onClick={handleSave}
+            disabled={isReadOnly}
+            loading={isSaving}
+            loadingText="Saving..."
+          >
+            Save
+          </LoadingButton>
+        </div>
+      ) : null}
     </div>
   );
 }
