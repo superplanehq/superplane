@@ -175,18 +175,24 @@ function buildCanvasUsage(data: OrganizationsDescribeUsageResponse | null | unde
 
 function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
   const level = data?.usage?.eventBucketLevel ?? 0;
+  const displayedLevel = Math.max(0, Math.ceil(level));
   const capacity = data?.usage?.eventBucketCapacity;
   const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
+  const nextDecreaseAt = data?.usage?.nextEventBucketDecreaseAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited ? "∞" : `${formatNumber(level)} / ${formatNumber(capacity ?? 0)}`;
-  const subtitle = lastUpdatedAt
-    ? `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`
-    : "Rolling event usage for the current 30-day window.";
+  const value = isUnlimited ? "∞" : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
+
+  let subtitle = "Rolling event usage for the current 30-day window.";
+  if (nextDecreaseAt) {
+    subtitle = `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
+  } else if (lastUpdatedAt) {
+    subtitle = `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
+  }
 
   return {
     value,
     subtitle,
-    progress: isUnlimited ? null : percentage(level, capacity),
+    progress: isUnlimited ? null : percentage(displayedLevel, capacity),
   };
 }
 
