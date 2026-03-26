@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { AiBuilderMessage, AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { AiAgentSession, AiBuilderMessage, AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
 import { ArrowUp } from "lucide-react";
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
@@ -10,6 +10,10 @@ import remarkGfm from "remark-gfm";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
+  agentSessions: AiAgentSession[];
+  currentAgentId: string | null;
+  isLoadingAgentSessions: boolean;
+  isLoadingAgentMessages: boolean;
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
@@ -23,11 +27,17 @@ type AiBuilderChatPanelProps = {
   canvasId?: string;
   aiInput: string;
   onAiInputChange: (value: string) => void;
+  onSelectAgent: (agentId: string) => void;
+  onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 export function AiBuilderChatPanel({
+  agentSessions,
+  currentAgentId,
+  isLoadingAgentSessions,
+  isLoadingAgentMessages,
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
@@ -41,6 +51,8 @@ export function AiBuilderChatPanel({
   canvasId,
   aiInput,
   onAiInputChange,
+  onSelectAgent,
+  onStartNewSession,
   onSendPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
@@ -68,7 +80,22 @@ export function AiBuilderChatPanel({
   return (
     <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
       <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
+        <ConversationList
+          agentSessions={agentSessions}
+          currentAgentId={currentAgentId}
+          isLoadingAgentSessions={isLoadingAgentSessions}
+          isGeneratingResponse={isGeneratingResponse}
+          onSelectAgent={onSelectAgent}
+          onStartNewSession={onStartNewSession}
+        />
+
         <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
+          {isLoadingAgentMessages ? (
+            <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div>
+          ) : null}
+          {!isLoadingAgentMessages && !currentAgentId && aiMessages.length === 0 ? (
+            <div className="text-xs text-gray-500 px-1 py-1">Select a conversation or start a new chat.</div>
+          ) : null}
           <AiMessages messages={aiMessages} />
 
           {isGeneratingResponse ? (
@@ -106,6 +133,72 @@ export function AiBuilderChatPanel({
   );
 }
 
+type ConversationListProps = {
+  agentSessions: AiAgentSession[];
+  currentAgentId: string | null;
+  isLoadingAgentSessions: boolean;
+  isGeneratingResponse: boolean;
+  onSelectAgent: (agentId: string) => void;
+  onStartNewSession: () => void;
+};
+
+function ConversationList({
+  agentSessions,
+  currentAgentId,
+  isLoadingAgentSessions,
+  isGeneratingResponse,
+  onSelectAgent,
+  onStartNewSession,
+}: ConversationListProps) {
+  return (
+    <div className="border-b border-border px-2 py-2 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">Conversations</p>
+        <Button
+          size="sm"
+          variant={currentAgentId === null ? "default" : "outline"}
+          onClick={onStartNewSession}
+          disabled={isGeneratingResponse}
+        >
+          New chat
+        </Button>
+      </div>
+
+      <div className="max-h-28 overflow-y-auto space-y-1">
+        {isLoadingAgentSessions ? (
+          <div className="text-xs text-gray-500 px-1 py-1">Loading conversations...</div>
+        ) : null}
+        {!isLoadingAgentSessions && agentSessions.length === 0 ? (
+          <div className="text-xs text-gray-500 px-1 py-1">No conversations yet.</div>
+        ) : null}
+
+        {agentSessions.map((session) => {
+          const isSelected = session.id === currentAgentId;
+          return (
+            <button
+              key={session.id}
+              type="button"
+              onClick={() => onSelectAgent(session.id)}
+              disabled={isGeneratingResponse}
+              className={cn(
+                "w-full rounded-md border px-2 py-2 text-left transition-colors",
+                isSelected
+                  ? "border-blue-300 bg-blue-50 text-blue-950"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+              )}
+            >
+              <div className="truncate text-sm font-medium">{session.title}</div>
+              {session.createdAt ? (
+                <div className="text-[11px] text-slate-500">{formatSessionDate(session.createdAt)}</div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AiMessages({ messages }: { messages: AiBuilderMessage[] }) {
   return (
     <>
@@ -114,6 +207,20 @@ function AiMessages({ messages }: { messages: AiBuilderMessage[] }) {
       ))}
     </>
   );
+}
+
+function formatSessionDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function AiMessage({ message }: { message: AiBuilderMessage }) {

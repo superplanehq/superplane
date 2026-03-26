@@ -1,5 +1,18 @@
 import type { Dispatch, SetStateAction } from "react";
-import { agentsCreateAgentChat } from "@/api-client";
+import {
+  agentsCreateAgentChat,
+  agentsListAgentChatMessages,
+  agentsListAgentChats,
+  agentsResumeAgentChat,
+} from "@/api-client";
+import type {
+  AgentsAgentChatInfo,
+  AgentsAgentChatMessage,
+  AgentsCreateAgentChatResponse,
+  AgentsListAgentChatMessagesResponse,
+  AgentsListAgentChatsResponse,
+  AgentsResumeAgentChatResponse,
+} from "@/api-client";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AiCanvasOperation } from "./index";
 
@@ -17,21 +30,34 @@ export type AiBuilderProposal = {
   operations: AiCanvasOperation[];
 };
 
-type AgentChatStreamEvent = {
-  type?: string;
-  [key: string]: unknown;
+export type AiAgentSession = {
+  id: string;
+  title: string;
+  initialMessage?: string;
+  createdAt?: string;
 };
 
-const AI_HISTORY_RECENT_TURNS = 8;
-const AI_HISTORY_OLDER_TURNS = 6;
-const AI_HISTORY_MAX_MESSAGE_CHARS = 320;
 const AI_MAX_STORED_MESSAGES = 50;
 const TEST_MODEL_SENTINEL = "success (no tool calls)";
 const TEST_MODE_HINT =
   "Agent is running in test mode. Set AI_MODEL in agent/.env to a real model and configure agent credentials to get canvas-aware answers.";
 const GENERIC_FAILURE_MESSAGE = "I couldn't generate changes right now. Please try again.";
+const UNTITLED_AGENT_SESSION = "Untitled conversation";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type JsonObject = Record<string, unknown>;
+
+type AgentChatStreamEvent =
+  | { type: "run_started"; model?: string }
+  | { type: "model_delta"; content?: string }
+  | { type: "tool_started"; tool_name?: string; tool_call_id?: string }
+  | { type: "tool_finished"; tool_name?: string; tool_call_id?: string; elapsed_ms?: number }
+  | { type: "final_answer"; output?: unknown }
+  | { type: "run_failed"; error?: string }
+  | { type: "run_completed" }
+  | { type: "done" }
+  | { type: "raw_data"; content: string };
+
+function isRecord(value: unknown): value is JsonObject {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -152,40 +178,6 @@ function normalizeAiProposal(value: unknown): AiBuilderProposal | null {
   };
 }
 
-function compactMessageContent(content: string): string {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= AI_HISTORY_MAX_MESSAGE_CHARS) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, AI_HISTORY_MAX_MESSAGE_CHARS)}...`;
-}
-
-function formatConversationTurns(messages: AiBuilderMessage[]): string[] {
-  return messages
-    .filter((message) => message.role === "user" || message.role === "assistant")
-    .map((message) => `${message.role}: ${compactMessageContent(message.content)}`)
-    .filter((line) => line.length > 0);
-}
-
-function buildPromptWithConversationContext(messages: AiBuilderMessage[], prompt: string): string {
-  const turns = formatConversationTurns(messages);
-  if (turns.length === 0) {
-    return prompt;
-  }
-
-  const recentTurns = turns.slice(-AI_HISTORY_RECENT_TURNS);
-  const olderTurns = turns.slice(0, -AI_HISTORY_RECENT_TURNS).slice(-AI_HISTORY_OLDER_TURNS);
-  const contextSections = [
-    "Conversation context (use this for continuity and intent resolution):",
-    ...(olderTurns.length > 0 ? [`Earlier turns summary:\n${olderTurns.join("\n")}`] : []),
-    `Recent turns:\n${recentTurns.join("\n")}`,
-    `Current user request:\n${prompt}`,
-  ];
-
-  return contextSections.join("\n\n");
-}
-
 export function pushAiMessages(
   previous: AiBuilderMessage[],
   next: AiBuilderMessage | AiBuilderMessage[],
@@ -264,8 +256,9 @@ function parseSseChunk(rawChunk: string): AgentChatStreamEvent[] {
 
     try {
       const parsed = JSON.parse(merged);
-      if (parsed && typeof parsed === "object") {
-        events.push(parsed as AgentChatStreamEvent);
+      const normalized = normalizeStreamEvent(parsed);
+      if (normalized) {
+        events.push(normalized);
       }
     } catch {
       events.push({ type: "raw_data", content: merged });
@@ -273,6 +266,181 @@ function parseSseChunk(rawChunk: string): AgentChatStreamEvent[] {
   }
 
   return events;
+}
+
+function parseAgentChatIdFromUrl(url: string): string | null {
+  const match = url.match(/\/agents\/chats\/([^/]+)\/stream\/?$/);
+  if (!match || !match[1]) {
+    return null;
+  }
+
+  return match[1];
+}
+
+function normalizePersistedMessage(message: AgentsAgentChatMessage): AiBuilderMessage | null {
+  const id = typeof message.id === "string" ? message.id : "";
+  const role = message.role;
+  const content = typeof message.content === "string" ? message.content : "";
+  const toolCallId = typeof message.toolCallId === "string" ? message.toolCallId : undefined;
+  const toolStatus =
+    message.toolStatus === "running" || message.toolStatus === "completed" ? message.toolStatus : undefined;
+
+  if (!id || (role !== "user" && role !== "assistant" && role !== "tool")) {
+    return null;
+  }
+
+  return {
+    id,
+    role,
+    content,
+    toolCallId,
+    toolStatus,
+  };
+}
+
+function normalizeAgentSession(agent: AgentsAgentChatInfo): AiAgentSession | null {
+  const id = typeof agent.id === "string" ? agent.id.trim() : "";
+  if (!id) {
+    return null;
+  }
+
+  const initialMessage = typeof agent.initialMessage === "string" ? agent.initialMessage.trim() : "";
+  const createdAt =
+    typeof agent.createdAt === "string" && agent.createdAt.trim().length > 0 ? agent.createdAt : undefined;
+
+  return {
+    id,
+    title: initialMessage || UNTITLED_AGENT_SESSION,
+    initialMessage: initialMessage || undefined,
+    createdAt,
+  };
+}
+
+function normalizeAgentSessions(payload: AgentsListAgentChatsResponse | undefined): AiAgentSession[] {
+  return (payload?.chats ?? [])
+    .map((agent) => normalizeAgentSession(agent))
+    .filter((agent): agent is AiAgentSession => Boolean(agent));
+}
+
+function normalizePersistedMessages(payload: AgentsListAgentChatMessagesResponse | undefined): AiBuilderMessage[] {
+  return trimAiMessages(
+    (payload?.messages ?? [])
+      .map((message) => normalizePersistedMessage(message))
+      .filter((message): message is AiBuilderMessage => Boolean(message)),
+  );
+}
+
+function normalizeStreamEvent(value: unknown): AgentChatStreamEvent | null {
+  if (!isRecord(value) || typeof value.type !== "string") {
+    return null;
+  }
+
+  switch (value.type) {
+    case "run_started":
+      return {
+        type: "run_started",
+        model: typeof value.model === "string" ? value.model : undefined,
+      };
+    case "model_delta":
+      return {
+        type: "model_delta",
+        content: typeof value.content === "string" ? value.content : undefined,
+      };
+    case "tool_started":
+      return {
+        type: "tool_started",
+        tool_name: typeof value.tool_name === "string" ? value.tool_name : undefined,
+        tool_call_id: typeof value.tool_call_id === "string" ? value.tool_call_id : undefined,
+      };
+    case "tool_finished":
+      return {
+        type: "tool_finished",
+        tool_name: typeof value.tool_name === "string" ? value.tool_name : undefined,
+        tool_call_id: typeof value.tool_call_id === "string" ? value.tool_call_id : undefined,
+        elapsed_ms: typeof value.elapsed_ms === "number" ? value.elapsed_ms : undefined,
+      };
+    case "final_answer":
+      return {
+        type: "final_answer",
+        output: value.output,
+      };
+    case "run_failed":
+      return {
+        type: "run_failed",
+        error: typeof value.error === "string" ? value.error : undefined,
+      };
+    case "run_completed":
+      return { type: "run_completed" };
+    case "done":
+      return { type: "done" };
+    default:
+      return null;
+  }
+}
+
+function requireAgentSessionPayload(payload: AgentsCreateAgentChatResponse | AgentsResumeAgentChatResponse): {
+  token: string;
+  url: string;
+} {
+  const token = typeof payload.token === "string" ? payload.token.trim() : "";
+  const url = typeof payload.url === "string" ? payload.url.trim() : "";
+
+  if (!token || !url) {
+    throw new Error("Invalid agent session response");
+  }
+
+  return { token, url };
+}
+
+export async function loadAgentSessions({
+  canvasId,
+  organizationId,
+}: {
+  canvasId?: string;
+  organizationId?: string;
+}): Promise<AiAgentSession[]> {
+  if (!canvasId || !organizationId) {
+    return [];
+  }
+
+  const listResponse = await agentsListAgentChats(
+    withOrganizationHeader({
+      organizationId,
+      query: {
+        canvasId,
+      },
+    }),
+  );
+
+  return normalizeAgentSessions(listResponse.data);
+}
+
+export async function loadAgentConversation({
+  agentId,
+  canvasId,
+  organizationId,
+}: {
+  agentId?: string | null;
+  canvasId?: string;
+  organizationId?: string;
+}): Promise<AiBuilderMessage[]> {
+  if (!canvasId || !organizationId || !agentId) {
+    return [];
+  }
+
+  const messagesResponse = await agentsListAgentChatMessages(
+    withOrganizationHeader({
+      organizationId,
+      path: {
+        chatId: agentId,
+      },
+      query: {
+        canvasId,
+      },
+    }),
+  );
+
+  return normalizePersistedMessages(messagesResponse.data);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -284,10 +452,11 @@ function sleep(ms: number): Promise<void> {
 type SendAgentChatPromptArgs = {
   value?: string;
   aiInput: string;
-  aiMessages: AiBuilderMessage[];
+  currentAgentId: string | null;
   canvasId?: string;
   organizationId?: string;
   isGeneratingResponse: boolean;
+  setCurrentAgentId: Dispatch<SetStateAction<string | null>>;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   setAiInput: Dispatch<SetStateAction<string>>;
   setAiError: Dispatch<SetStateAction<string | null>>;
@@ -299,10 +468,11 @@ type SendAgentChatPromptArgs = {
 export async function sendAgentChatPrompt({
   value,
   aiInput,
-  aiMessages,
+  currentAgentId,
   canvasId,
   organizationId,
   isGeneratingResponse,
+  setCurrentAgentId,
   setAiMessages,
   setAiInput,
   setAiError,
@@ -317,6 +487,7 @@ export async function sendAgentChatPrompt({
 
   if (nextPrompt.toLowerCase() === "/clear") {
     setAiMessages([]);
+    setCurrentAgentId(null);
     setPendingProposal(null);
     setAiError(null);
     setAiInput("");
@@ -325,8 +496,6 @@ export async function sendAgentChatPrompt({
     });
     return;
   }
-
-  const contextualPrompt = buildPromptWithConversationContext(aiMessages, nextPrompt);
 
   const userMessage: AiBuilderMessage = {
     id: `user-${Date.now()}`,
@@ -352,30 +521,44 @@ export async function sendAgentChatPrompt({
     );
     setPendingProposal(null);
 
-    const chatResponse = await agentsCreateAgentChat(
-      withOrganizationHeader({
-        organizationId,
-        body: {
-          canvasId,
-        },
-      }),
-    );
+    const sessionResponse = currentAgentId
+      ? await agentsResumeAgentChat(
+          withOrganizationHeader({
+            organizationId,
+            path: {
+              chatId: currentAgentId,
+            },
+            body: {
+              canvasId,
+            },
+          }),
+        )
+      : await agentsCreateAgentChat(
+          withOrganizationHeader({
+            organizationId,
+            body: {
+              canvasId,
+            },
+          }),
+        );
 
-    const { url, token } = chatResponse.data;
-    if (!url || !token) {
+    const tokenPayload = requireAgentSessionPayload(sessionResponse.data);
+
+    const resolvedAgentId = currentAgentId || parseAgentChatIdFromUrl(tokenPayload.url);
+    if (!resolvedAgentId) {
       throw new Error("Invalid agent session response");
     }
+    setCurrentAgentId(resolvedAgentId);
 
-    const response = await fetch(url, {
+    const response = await fetch(tokenPayload.url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${tokenPayload.token}`,
       },
       body: JSON.stringify({
-        question: contextualPrompt,
-        canvas_id: canvasId,
+        question: nextPrompt,
       }),
     });
 
@@ -500,8 +683,8 @@ export async function sendAgentChatPrompt({
 
       if (event.type === "final_answer") {
         const output = event.output;
-        if (output && typeof output === "object") {
-          const proposal = normalizeAiProposal((output as { proposal?: unknown }).proposal);
+        if (isRecord(output)) {
+          const proposal = normalizeAiProposal(output.proposal);
           if (proposal) {
             setPendingProposal(proposal);
           } else {
@@ -523,13 +706,8 @@ export async function sendAgentChatPrompt({
           return;
         }
 
-        if (
-          !streamedAnyAnswer &&
-          output &&
-          typeof output === "object" &&
-          typeof (output as { answer?: unknown }).answer === "string"
-        ) {
-          appendAssistantContent((output as { answer: string }).answer);
+        if (!streamedAnyAnswer && isRecord(output) && typeof output.answer === "string") {
+          appendAssistantContent(output.answer);
         }
         return;
       }

@@ -23,9 +23,18 @@ import { BuildingBlockPreview } from "./BuildingBlockPreview";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
-import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import {
+  AiAgentSession,
+  AiBuilderMessage,
+  AiBuilderProposal,
+  loadAgentConversation,
+  loadAgentSessions,
+  pushAiMessages,
+  sendAgentChatPrompt,
+} from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
+
+const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface BuildingBlock {
   name: string;
@@ -131,7 +140,6 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
-  const persistedAiState = loadAiBuilderState<AiCanvasOperation>(canvasId);
 
   if (!isOpen) {
     const addNoteButton = (
@@ -206,15 +214,17 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "ai">(persistedAiState?.activeTab || "components");
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
   const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>(persistedAiState?.messages || []);
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [agentSessions, setAgentSessions] = useState<AiAgentSession[]>([]);
+  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
+  const [isLoadingAgentSessions, setIsLoadingAgentSessions] = useState(false);
+  const [isLoadingAgentMessages, setIsLoadingAgentMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
-    persistedAiState?.pendingProposal || null,
-  );
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
   const applyShortcutHint = useMemo(() => {
     if (typeof navigator === "undefined") {
       return "Ctrl+Enter";
@@ -223,17 +233,17 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
       await sendAgentChatPrompt({
         value,
         aiInput,
-        aiMessages,
         canvasId,
         organizationId,
+        currentAgentId,
         isGeneratingResponse,
+        setCurrentAgentId,
         setAiMessages,
         setAiInput,
         setAiError,
@@ -242,8 +252,24 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, aiMessages, canvasId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, currentAgentId, isGeneratingResponse, organizationId],
   );
+
+  const handleStartNewAgentSession = useCallback(() => {
+    setCurrentAgentId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
+    setAiError(null);
+    requestAnimationFrame(() => {
+      aiInputRef.current?.focus();
+    });
+  }, []);
+
+  const handleSelectAgentSession = useCallback((agentId: string) => {
+    setCurrentAgentId(agentId);
+    setPendingProposal(null);
+    setAiError(null);
+  }, []);
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
@@ -361,21 +387,124 @@ export function BuildingBlocksSidebar({
   }, [showAiBuilderTab, activeTab]);
 
   useEffect(() => {
-    const nextPersistedState = loadAiBuilderState<AiCanvasOperation>(canvasId);
-    setActiveTab(nextPersistedState?.activeTab || "components");
-    setAiMessages(nextPersistedState?.messages || []);
-    setPendingProposal(nextPersistedState?.pendingProposal || null);
+    setActiveTab("components");
+    setCurrentAgentId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
     setAiError(null);
     setAiInput("");
   }, [canvasId]);
 
   useEffect(() => {
-    saveAiBuilderState<AiCanvasOperation>(canvasId, {
-      activeTab,
-      messages: aiMessages,
-      pendingProposal,
-    });
-  }, [activeTab, aiMessages, canvasId, pendingProposal]);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(AI_BUILDER_STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId) {
+      setAgentSessions([]);
+      setCurrentAgentId(null);
+      setAiMessages([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingAgentSessions(true);
+      try {
+        const sessions = await loadAgentSessions({
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setAgentSessions(sessions);
+        setCurrentAgentId((previousAgentId) => {
+          if (previousAgentId && sessions.some((session) => session.id === previousAgentId)) {
+            return previousAgentId;
+          }
+
+          return null;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load agent sessions:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingAgentSessions(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, currentAgentId, organizationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId || !currentAgentId) {
+      if (!currentAgentId) {
+        setAiMessages([]);
+        setPendingProposal(null);
+      }
+      setIsLoadingAgentMessages(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingAgentMessages(true);
+      try {
+        const messages = await loadAgentConversation({
+          agentId: currentAgentId,
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setAiMessages(messages);
+        setPendingProposal(null);
+        setAiError(null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load agent conversation:", error);
+          setAiError(error instanceof Error ? error.message : "Failed to load agent conversation.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingAgentMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, currentAgentId, organizationId]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -644,6 +773,10 @@ export function BuildingBlocksSidebar({
 
         {showAiBuilderTab && (
           <AiBuilderChatPanel
+            agentSessions={agentSessions}
+            currentAgentId={currentAgentId}
+            isLoadingAgentSessions={isLoadingAgentSessions}
+            isLoadingAgentMessages={isLoadingAgentMessages}
             aiMessages={aiMessages}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
@@ -657,6 +790,8 @@ export function BuildingBlocksSidebar({
             canvasId={canvasId}
             aiInput={aiInput}
             onAiInputChange={setAiInput}
+            onSelectAgent={handleSelectAgentSession}
+            onStartNewSession={handleStartNewAgentSession}
             onSendPrompt={() => void handleSendPrompt()}
             aiInputRef={aiInputRef}
           />
