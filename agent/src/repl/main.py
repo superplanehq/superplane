@@ -131,6 +131,13 @@ def _parse_stream_event(raw_line: bytes) -> dict[str, Any] | None:
     return parsed
 
 
+def _resolve_stream_url(web_url: str) -> str:
+    normalized = web_url.rstrip("/")
+    if normalized.endswith("/v1/agent/chat/stream"):
+        return normalized
+    return f"{normalized}/v1/agent/chat/stream"
+
+
 def _stream_repl_answer(
     web_url: str,
     payload: CanvasQuestionRequest,
@@ -142,7 +149,7 @@ def _stream_repl_answer(
     request_payload["model"] = model
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
-        url=f"{web_url.rstrip('/')}/v1/agent/chat/stream",
+        url=_resolve_stream_url(web_url),
         data=request_body,
         method="POST",
         headers={
@@ -277,15 +284,15 @@ def _stream_repl_answer(
     return "".join(chunks).strip()
 
 
-def _create_agent_chat_session(
+def _create_agent_chat(
     base_url: str,
     api_token: str,
     org_id: str,
     canvas_id: str,
-) -> str:
+) -> tuple[str, str]:
     request_body = json.dumps({"canvas_id": canvas_id}).encode("utf-8")
     request = Request(
-        url=f"{base_url.rstrip('/')}/api/v1/agents/chat/tokens",
+        url=f"{base_url.rstrip('/')}/api/v1/agents/chats",
         data=request_body,
         method="POST",
         headers={
@@ -319,7 +326,11 @@ def _create_agent_chat_session(
     if not isinstance(token, str) or not token.strip():
         raise RuntimeError("Agent chat session response did not include a token.")
 
-    return token.strip()
+    url = payload.get("url") if isinstance(payload, dict) else None
+    if not isinstance(url, str) or not url.strip():
+        raise RuntimeError("Agent chat session response did not include a URL.")
+
+    return token.strip(), url.strip()
 
 
 def main() -> None:
@@ -408,7 +419,12 @@ def main() -> None:
 
     web_url = normalize_optional_setting(args.repl_web_url)
     server: WebServer | None = None
-    should_start_server = args.start_repl_web or args.start_test_repl_web or web_url is None
+    should_use_local_repl_web = args.model == "test"
+    should_start_server = (
+        args.start_repl_web
+        or args.start_test_repl_web
+        or (should_use_local_repl_web and web_url is None)
+    )
     if should_start_server:
         server = WebServer(
             WebServerConfig(
@@ -419,21 +435,22 @@ def main() -> None:
         server.start()
         web_url = server.base_url
         print(f"REPL web app started at {web_url}")
-    if web_url is None:
-        raise ValueError(
-            "Missing REPL web URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
-        )
 
     token: str | None = None
     canvas_id = canvas_id_arg
-    if args.model != "test":
+    if should_use_local_repl_web:
+        if web_url is None:
+            raise ValueError(
+                "Missing REPL web URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
+            )
+    else:
         canvas_id = require_canvas_id(canvas_id_arg)
         api_token = normalize_optional_setting(args.token)
         if api_token is None:
             raise ValueError("Missing required argument: --token")
         base_url = require_setting(args.base_url, "SUPERPLANE_BASE_URL")
         org_id = require_setting(args.org_id, "SUPERPLANE_ORG_ID")
-        token = _create_agent_chat_session(
+        token, web_url = _create_agent_chat(
             base_url=base_url,
             api_token=api_token,
             org_id=org_id,
