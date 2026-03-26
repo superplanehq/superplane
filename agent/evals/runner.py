@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import evals.evaluators as evals
+import time
 
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset
@@ -119,16 +120,32 @@ async def runner() -> None:
         canvas_id=env["canvas_id"],
     )
     agent = build_agent(env["model"])
-    run_usages: list[RunUsage] = []
+    # Keyed by case ``inputs`` string so usage matches when cases run concurrently.
+    # Duplicate prompts across cases are not supported (detected under a lock).
+    run_usages: dict[str, RunUsage] = {}
+    usage_lock = asyncio.Lock()
 
     async def task(question: str) -> CanvasAnswer:
         payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
         result = await agent.run(build_prompt(payload), deps=deps)
-        run_usages.append(result.usage())
+        async with usage_lock:
+            if question in run_usages:
+                raise RuntimeError(
+                    "Duplicate eval case inputs are not supported for usage correlation "
+                    f"(collision on {question[:120]!r}…)"
+                )
+            run_usages[question] = result.usage()
         return result.output
 
-    report = await dataset.evaluate(task, progress=True, max_concurrency=1)
-    ReportBuilder(report, model=env["model"], run_usages=run_usages).render()
+    wall_start = time.perf_counter()
+    report = await dataset.evaluate(task, progress=True)
+    evaluate_wall_seconds = time.perf_counter() - wall_start
+    ReportBuilder(
+        report,
+        model=env["model"],
+        run_usages=run_usages,
+        evaluate_wall_seconds=evaluate_wall_seconds,
+    ).render()
 
 def main() -> None:
     asyncio.run(runner())

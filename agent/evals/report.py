@@ -23,11 +23,13 @@ class ReportBuilder:
         report: EvaluationReport,
         *,
         model: str,
-        run_usages: list[RunUsage],
+        run_usages: dict[str, RunUsage],
+        evaluate_wall_seconds: float,
     ) -> None:
         self.report = report
         self.model = model
         self.run_usages = run_usages
+        self.evaluate_wall_seconds = evaluate_wall_seconds
         self.console = Console()
 
     def render(self) -> None:
@@ -36,11 +38,11 @@ class ReportBuilder:
         output_dir.mkdir(parents=True, exist_ok=True)
         if len(self.run_usages) != len(self.report.cases):
             raise RuntimeError(
-                f"usage/case count mismatch: {len(self.run_usages)} usages vs "
-                f"{len(self.report.cases)} report cases"
+                f"usage/case count mismatch: {len(self.run_usages)} usage keys vs "
+                f"{len(self.report.cases)} report cases (duplicate inputs or missing usage?)"
             )
 
-        total_duration = 0.0
+        task_time_sum_seconds = 0.0
         case_count_with_duration = 0
         total_assertions = 0
         passed_assertions = 0
@@ -68,7 +70,13 @@ class ReportBuilder:
             with filename.open("w", encoding="utf-8") as file:
                 json.dump(serialized_output, file, indent=2, default=str)
 
-            run_usage = self.run_usages[i]
+            question = self._inputs_key(case_result, case_index=i)
+            try:
+                run_usage = self.run_usages[question]
+            except KeyError as error:
+                raise RuntimeError(
+                    f"No usage for case {case_name!r}; inputs not found in run_usages keys"
+                ) from error
             usage_json = to_jsonable(run_usage)
             usage_by_case.append({"name": case_name, "usage": usage_json})
 
@@ -99,7 +107,7 @@ class ReportBuilder:
                 if bool(getattr(assertion, "value", False))
             )
             if duration_seconds is not None:
-                total_duration += duration_seconds
+                task_time_sum_seconds += duration_seconds
                 case_count_with_duration += 1
 
             if i < len(self.report.cases) - 1:
@@ -110,7 +118,7 @@ class ReportBuilder:
         self.console.print()
 
         total_usage = RunUsage()
-        for usage in self.run_usages:
+        for usage in self.run_usages.values():
             total_usage = total_usage + usage
 
         summary_path = output_dir / "usage_summary.json"
@@ -119,6 +127,15 @@ class ReportBuilder:
             "model": self.model,
             "cases": usage_by_case,
             "total": to_jsonable(total_usage),
+            "durations": {
+                "task_time_sum_seconds": round(task_time_sum_seconds, 3),
+                "wall_time_seconds": round(self.evaluate_wall_seconds, 3),
+                "note": (
+                    "task_time_sum is pydantic-evals per-case task time added up "
+                    "(overlaps when cases run in parallel). wall_time is perf_counter "
+                    "around dataset.evaluate only (excludes report I/O)."
+                ),
+            },
             "estimated_cost_usd": self._cost_summary_json(
                 pricing_match=pricing_match,
                 per_case=cost_per_case,
@@ -128,7 +145,13 @@ class ReportBuilder:
         with summary_path.open("w", encoding="utf-8") as summary_file:
             json.dump(summary_payload, summary_file, indent=2)
 
-        self.console.print(f"duration: {total_duration:.1f}s")
+        self.console.print(
+            f"task time (sum of case durations): {task_time_sum_seconds:.1f}s "
+            f"({case_count_with_duration} cases)"
+        )
+        self.console.print(
+            f"wall time (dataset.evaluate): {self.evaluate_wall_seconds:.1f}s"
+        )
         self.console.print(f"results: {passed_assertions}/{total_assertions}")
         self.console.print(f"usage (total): {self._format_usage_line(total_usage)}")
         if total_cost_usd is not None:
@@ -143,6 +166,17 @@ class ReportBuilder:
                 f"{pricing_reference_url()} to price manually)"
             )
         self.console.print(f"usage summary: {display_summary}")
+
+    def _inputs_key(self, case_result: Any, *, case_index: int) -> str:
+        raw = getattr(case_result, "inputs", getattr(case_result, "input", None))
+        if raw is None:
+            raise RuntimeError(f"case {case_index} has no inputs; cannot correlate usage")
+        if not isinstance(raw, str):
+            raise RuntimeError(
+                f"case {case_index}: usage correlation requires str inputs, "
+                f"got {type(raw).__name__}"
+            )
+        return raw
 
     def _serialize_output(self, output: Any) -> Any:
         if hasattr(output, "model_dump"):
