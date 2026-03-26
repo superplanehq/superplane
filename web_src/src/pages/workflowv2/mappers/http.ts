@@ -96,9 +96,9 @@ const httpStateFunction = (execution: ExecutionInfo): EventState => {
 
   if (execution.state === "STATE_FINISHED") {
     const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
-    if (outputs?.success) {
+    if (outputs?.success?.length) {
       return "success";
-    } else if (outputs?.failure) {
+    } else if (outputs?.failure?.length) {
       return "failed";
     }
   }
@@ -128,6 +128,22 @@ interface Metadata {
   };
 }
 
+function getHTTPResponseStatusString(
+  outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
+): string | null {
+  if (outputs?.success?.length) {
+    const response = outputs.success?.[0]?.data as Output | undefined;
+    return response?.status?.toString() ?? null;
+  }
+
+  if (outputs?.failure?.length) {
+    const response = outputs.failure?.[0]?.data as Output | undefined;
+    return response?.status?.toString() ?? null;
+  }
+
+  return null;
+}
+
 export const httpMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
@@ -155,11 +171,7 @@ export const httpMapper: ComponentBaseMapper = {
     const metadata = context.execution.metadata as Metadata | undefined;
     const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
 
-    const responseStatus =
-      (outputs?.success?.[0]?.data as Output | undefined)?.status ??
-      (outputs?.failure?.[0]?.data as Output | undefined)?.status ??
-      null;
-    const responseStatusString = responseStatus?.toString() ?? "";
+    const responseStatusString = getHTTPResponseStatusString(outputs) ?? "";
     if (responseStatusString) {
       details["Response"] = responseStatusString;
     }
@@ -199,14 +211,7 @@ export const httpMapper: ComponentBaseMapper = {
     // For success/failed states, show response code and time
     if (state === "success" || state === "failed") {
       const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
-      let responseCode: string | null = null;
-      if (outputs?.success) {
-        const response = outputs.success?.[0]?.data as Output | undefined;
-        responseCode = response?.status?.toString() ?? null;
-      } else if (outputs?.failure) {
-        const response = outputs.failure?.[0]?.data as Output | undefined;
-        responseCode = response?.status?.toString() ?? null;
-      }
+      const responseCode = getHTTPResponseStatusString(outputs);
 
       if (responseCode && context.execution.updatedAt) {
         return renderWithTimeAgo(`Response: ${responseCode}`, new Date(context.execution.updatedAt));
@@ -473,13 +478,7 @@ function getHTTPEventSections(
         responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;
       } else {
         const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
-        if (outputs?.success) {
-          const response = outputs.success?.[0]?.data as Output | undefined;
-          responseCode = response?.status?.toString() ?? null;
-        } else if (outputs?.failure) {
-          const response = outputs.failure?.[0]?.data as Output | undefined;
-          responseCode = response?.status?.toString() ?? null;
-        }
+        responseCode = getHTTPResponseStatusString(outputs);
       }
 
       if (responseCode && execution.updatedAt) {

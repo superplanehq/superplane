@@ -117,6 +117,23 @@ describe("httpMapper.getExecutionDetails", () => {
     expect(httpMapper.getExecutionDetails(ctx)).toEqual({});
   });
 
+  it("falls through to failure when success is present but empty", () => {
+    const node = buildNode();
+    const ctx: ExecutionDetailsContext = {
+      nodes: [node],
+      node,
+      execution: buildExecution({
+        outputs: {
+          success: [],
+          failure: [{ type: "json", timestamp: new Date().toISOString(), data: { status: 500 } }],
+        },
+        result: "RESULT_FAILED",
+      }),
+    };
+
+    expect(httpMapper.getExecutionDetails(ctx)).toEqual({ Response: "500" });
+  });
+
   it("includes Response when status is a number", () => {
     const node = buildNode();
     const ctx: ExecutionDetailsContext = {
@@ -159,5 +176,22 @@ describe("httpMapper.subtitle", () => {
     };
 
     expect(httpMapper.subtitle(ctx)).toBe("Response: 201");
+  });
+
+  it("falls through to failure when success is present but empty", () => {
+    const node = buildNode();
+    const ctx: SubtitleContext = {
+      node,
+      execution: buildExecution({
+        outputs: {
+          success: [],
+          failure: [{ type: "json", timestamp: new Date().toISOString(), data: { status: 500 } }],
+        },
+        result: "RESULT_FAILED",
+        updatedAt: undefined,
+      }),
+    };
+
+    expect(httpMapper.subtitle(ctx)).toBe("Response: 500");
   });
 });
