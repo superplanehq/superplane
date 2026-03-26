@@ -3,6 +3,7 @@ package sentry
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,8 +26,23 @@ type apiError struct {
 	Body       string
 }
 
+const releaseScope = "project:releases"
+
 func (e *apiError) Error() string {
 	return fmt.Sprintf("sentry API returned status %d: %s", e.StatusCode, e.Body)
+}
+
+func wrapReleaseScopeError(err error) error {
+	var sentryAPIError *apiError
+	if errors.As(err, &sentryAPIError) && sentryAPIError.StatusCode == http.StatusForbidden {
+		return fmt.Errorf(
+			"Sentry release APIs require the personal token to include `%s`: %w",
+			releaseScope,
+			err,
+		)
+	}
+
+	return err
 }
 
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
@@ -108,14 +124,41 @@ type Issue struct {
 	ID            string         `json:"id" mapstructure:"id"`
 	ShortID       string         `json:"shortId" mapstructure:"shortId"`
 	Title         string         `json:"title" mapstructure:"title"`
+	Count         string         `json:"count" mapstructure:"count"`
 	Status        string         `json:"status" mapstructure:"status"`
 	Priority      string         `json:"priority" mapstructure:"priority"`
 	HasSeen       bool           `json:"hasSeen" mapstructure:"hasSeen"`
 	IsPublic      bool           `json:"isPublic" mapstructure:"isPublic"`
 	IsSubscribed  bool           `json:"isSubscribed" mapstructure:"isSubscribed"`
 	StatusDetails any            `json:"statusDetails" mapstructure:"statusDetails"`
+	NumComments   int            `json:"numComments" mapstructure:"numComments"`
+	UserCount     int            `json:"userCount" mapstructure:"userCount"`
+	Permalink     string         `json:"permalink" mapstructure:"permalink"`
+	WebURL        string         `json:"web_url" mapstructure:"web_url"`
+	Metadata      map[string]any `json:"metadata" mapstructure:"metadata"`
+	Tags          []IssueTag     `json:"tags" mapstructure:"tags"`
+	Stats         map[string]any `json:"stats" mapstructure:"stats"`
+	Events        []IssueEvent   `json:"events,omitempty" mapstructure:"events"`
 	AssignedTo    *IssueAssignee `json:"assignedTo" mapstructure:"assignedTo"`
 	Project       *IssueProject  `json:"project" mapstructure:"project"`
+}
+
+type IssueTag struct {
+	Key   string `json:"key" mapstructure:"key"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
+type IssueEvent struct {
+	ID          string         `json:"id" mapstructure:"id"`
+	EventID     string         `json:"eventID" mapstructure:"eventID"`
+	Title       string         `json:"title" mapstructure:"title"`
+	Message     string         `json:"message" mapstructure:"message"`
+	DateCreated string         `json:"dateCreated" mapstructure:"dateCreated"`
+	Platform    string         `json:"platform" mapstructure:"platform"`
+	Location    string         `json:"location" mapstructure:"location"`
+	Culprit     string         `json:"culprit" mapstructure:"culprit"`
+	Tags        []IssueTag     `json:"tags" mapstructure:"tags"`
+	User        map[string]any `json:"user" mapstructure:"user"`
 }
 
 type IssueAssignee struct {
@@ -264,6 +307,71 @@ type MetricAlertActionInput struct {
 	IntegrationID    *string `json:"integrationId,omitempty"`
 	SentryAppID      *string `json:"sentryAppId,omitempty"`
 	Priority         *string `json:"priority,omitempty"`
+}
+
+type Release struct {
+	ID           int              `json:"id" mapstructure:"id"`
+	Version      string           `json:"version" mapstructure:"version"`
+	ShortVersion string           `json:"shortVersion" mapstructure:"shortVersion"`
+	Ref          string           `json:"ref" mapstructure:"ref"`
+	URL          string           `json:"url" mapstructure:"url"`
+	DateCreated  string           `json:"dateCreated" mapstructure:"dateCreated"`
+	DateReleased string           `json:"dateReleased" mapstructure:"dateReleased"`
+	CommitCount  int              `json:"commitCount" mapstructure:"commitCount"`
+	DeployCount  int              `json:"deployCount" mapstructure:"deployCount"`
+	NewGroups    int              `json:"newGroups" mapstructure:"newGroups"`
+	Projects     []ReleaseProject `json:"projects" mapstructure:"projects"`
+	LastDeploy   *Deploy          `json:"lastDeploy,omitempty" mapstructure:"lastDeploy"`
+}
+
+type ReleaseProject struct {
+	Name string `json:"name" mapstructure:"name"`
+	Slug string `json:"slug" mapstructure:"slug"`
+}
+
+type ReleaseCommit struct {
+	ID          string `json:"id" mapstructure:"id"`
+	Repository  string `json:"repository,omitempty" mapstructure:"repository"`
+	Message     string `json:"message,omitempty" mapstructure:"message"`
+	AuthorName  string `json:"author_name,omitempty" mapstructure:"author_name"`
+	AuthorEmail string `json:"author_email,omitempty" mapstructure:"author_email"`
+	Timestamp   string `json:"timestamp,omitempty" mapstructure:"timestamp"`
+}
+
+type ReleaseRef struct {
+	Repository     string `json:"repository" mapstructure:"repository"`
+	Commit         string `json:"commit" mapstructure:"commit"`
+	PreviousCommit string `json:"previousCommit,omitempty" mapstructure:"previousCommit"`
+}
+
+type CreateReleaseRequest struct {
+	Version      string          `json:"version"`
+	Projects     []string        `json:"projects"`
+	Ref          string          `json:"ref,omitempty"`
+	URL          string          `json:"url,omitempty"`
+	DateReleased string          `json:"dateReleased,omitempty"`
+	Commits      []ReleaseCommit `json:"commits,omitempty"`
+	Refs         []ReleaseRef    `json:"refs,omitempty"`
+}
+
+type Deploy struct {
+	ID             string   `json:"id" mapstructure:"id"`
+	Environment    string   `json:"environment" mapstructure:"environment"`
+	Name           string   `json:"name" mapstructure:"name"`
+	URL            string   `json:"url" mapstructure:"url"`
+	DateStarted    string   `json:"dateStarted" mapstructure:"dateStarted"`
+	DateFinished   string   `json:"dateFinished" mapstructure:"dateFinished"`
+	ReleaseVersion string   `json:"releaseVersion,omitempty" mapstructure:"releaseVersion"`
+	Projects       []string `json:"projects,omitempty" mapstructure:"projects"`
+}
+
+type CreateDeployRequest struct {
+	Environment  string   `json:"environment"`
+	Name         string   `json:"name,omitempty"`
+	URL          string   `json:"url,omitempty"`
+	Projects     []string `json:"projects,omitempty"`
+	DateStarted  string   `json:"dateStarted,omitempty"`
+	DateFinished string   `json:"dateFinished,omitempty"`
 }
 
 func (c *Client) ListOrganizations() ([]Organization, error) {
@@ -489,6 +597,37 @@ func (c *Client) ListIssues() ([]Issue, error) {
 	return issues, nil
 }
 
+func (c *Client) ListReleases() ([]Release, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/releases/", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return nil, wrapReleaseScopeError(err)
+	}
+
+	releases := []Release{}
+	if err := json.Unmarshal(responseBody, &releases); err != nil {
+		return nil, err
+	}
+
+	return releases, nil
+}
+
+func (c *Client) ValidateReleaseAccess() error {
+	_, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/releases/?per_page=1", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return wrapReleaseScopeError(err)
+	}
+
+	return nil
+}
+
 func (c *Client) GetIssue(issueID string) (*Issue, error) {
 	responseBody, err := c.doJSON(
 		http.MethodGet,
@@ -505,6 +644,24 @@ func (c *Client) GetIssue(issueID string) (*Issue, error) {
 	}
 
 	return &issue, nil
+}
+
+func (c *Client) ListIssueEvents(issueID string) ([]IssueEvent, error) {
+	responseBody, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/issues/%s/events/?limit=10", c.orgSlug, url.PathEscape(issueID)),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	events := []IssueEvent{}
+	if err := json.Unmarshal(responseBody, &events); err != nil {
+		return nil, err
+	}
+
+	return events, nil
 }
 
 func (c *Client) ListSentryApps(orgSlug string) ([]SentryApp, error) {
@@ -549,21 +706,29 @@ func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (*Issue
 }
 
 func (c *Client) ListAlertRules() ([]MetricAlertRule, error) {
-	responseBody, err := c.doJSON(
-		http.MethodGet,
-		fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug),
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	alertRules := []MetricAlertRule{}
-	if err := json.Unmarshal(responseBody, &alertRules); err != nil {
-		return nil, err
-	}
+	path := fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug)
 
-	return alertRules, nil
+	for {
+		responseBody, headers, err := c.doJSONResponse(http.MethodGet, path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		page := []MetricAlertRule{}
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, err
+		}
+
+		alertRules = append(alertRules, page...)
+
+		nextPath := nextCursorPath(headers.Get("Link"))
+		if nextPath == "" {
+			return alertRules, nil
+		}
+
+		path = nextPath
+	}
 }
 
 func (c *Client) GetAlertRule(alertRuleID string) (*MetricAlertRule, error) {
@@ -629,19 +794,65 @@ func (c *Client) DeleteAlertRule(alertRuleID string) error {
 	return err
 }
 
+func (c *Client) CreateRelease(request CreateReleaseRequest) (*Release, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPost,
+		fmt.Sprintf("/api/0/organizations/%s/releases/", c.orgSlug),
+		request,
+	)
+	if err != nil {
+		return nil, wrapReleaseScopeError(err)
+	}
+
+	release := Release{}
+	if err := json.Unmarshal(responseBody, &release); err != nil {
+		return nil, err
+	}
+
+	return &release, nil
+}
+
+func (c *Client) CreateDeploy(version string, request CreateDeployRequest) (*Deploy, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPost,
+		fmt.Sprintf("/api/0/organizations/%s/releases/%s/deploys/", c.orgSlug, url.PathEscape(version)),
+		request,
+	)
+	if err != nil {
+		return nil, wrapReleaseScopeError(err)
+	}
+
+	deploy := Deploy{}
+	if err := json.Unmarshal(responseBody, &deploy); err != nil {
+		return nil, err
+	}
+
+	deploy.ReleaseVersion = version
+	if len(request.Projects) > 0 {
+		deploy.Projects = append([]string(nil), request.Projects...)
+	}
+
+	return &deploy, nil
+}
+
 func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
+	responseBody, _, err := c.doJSONResponse(method, path, payload)
+	return responseBody, err
+}
+
+func (c *Client) doJSONResponse(method, path string, payload any) ([]byte, http.Header, error) {
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		body = bytes.NewReader(encoded)
 	}
 
 	req, err := http.NewRequest(method, c.baseURL+path, body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.userToken)
@@ -652,18 +863,57 @@ func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
 
 	resp, err := c.httpContext.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, &apiError{StatusCode: resp.StatusCode, Body: string(responseBody)}
+		return nil, nil, &apiError{StatusCode: resp.StatusCode, Body: string(responseBody)}
 	}
 
-	return responseBody, nil
+	return responseBody, resp.Header, nil
+}
+
+func nextCursorPath(linkHeader string) string {
+	for _, section := range strings.Split(linkHeader, ",") {
+		section = strings.TrimSpace(section)
+		if section == "" || !strings.Contains(section, `rel="next"`) || !strings.Contains(section, `results="true"`) {
+			continue
+		}
+
+		start := strings.Index(section, "<")
+		end := strings.Index(section, ">")
+		if start == -1 || end == -1 || end <= start+1 {
+			continue
+		}
+
+		nextURL, err := url.Parse(section[start+1 : end])
+		if err != nil {
+			continue
+		}
+
+		if nextURL.RawPath != "" {
+			if nextURL.RawQuery == "" {
+				return nextURL.RawPath
+			}
+			return nextURL.RawPath + "?" + nextURL.RawQuery
+		}
+
+		if nextURL.Path == "" {
+			continue
+		}
+
+		if nextURL.RawQuery == "" {
+			return nextURL.Path
+		}
+
+		return nextURL.Path + "?" + nextURL.RawQuery
+	}
+
+	return ""
 }

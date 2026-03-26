@@ -45,7 +45,6 @@ export type SentryAlertRuleTrigger = {
   alertThreshold?: number;
 };
 
-/** Shape of metric alert rule payloads used by Create/Update Alert mappers */
 export type SentryAlertRule = {
   name?: string;
   environment?: string | null;
@@ -55,7 +54,6 @@ export type SentryAlertRule = {
   triggers?: SentryAlertRuleTrigger[];
 };
 
-/** Node metadata persisted for alert-rule components (create/update/delete/get) */
 export type AlertRuleNodeMetadata = {
   project?: {
     name?: string;
@@ -200,17 +198,27 @@ export function addFormattedTimestamp(details: Record<string, string>, label: st
   details[label] = new Date(value).toLocaleString();
 }
 
-export function addOrderedDetails(details: Record<string, string>, entries: Array<{ label: string; value?: string }>) {
-  entries.forEach(({ label, value }) => {
-    if (!value) {
-      return;
-    }
-
-    details[label] = value;
-  });
+export interface OrderedDetail {
+  label: string;
+  value?: string;
+  isTimestamp?: boolean;
 }
 
-/** Project label for Sentry issue payloads (nested project object) */
+export function addOrderedDetails(details: Record<string, string>, orderedDetails: OrderedDetail[], maxItems = 6) {
+  for (const detail of orderedDetails) {
+    if (Object.keys(details).length >= maxItems) {
+      break;
+    }
+
+    if (detail.isTimestamp) {
+      addFormattedTimestamp(details, detail.label, detail.value);
+      continue;
+    }
+
+    addDetail(details, detail.label, detail.value);
+  }
+}
+
 export function getProjectLabel(issue?: { project?: { name?: string; slug?: string } }) {
   return issue?.project?.name || issue?.project?.slug;
 }

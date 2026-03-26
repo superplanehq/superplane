@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -632,9 +634,18 @@ func Test__Sentry__ListResources(t *testing.T) {
 			},
 		}
 
+		firstPage := sentryMockResponse(
+			http.StatusOK,
+			`[{"id":"7","name":"High error rate","projects":["backend"]},{"id":"8","name":"Latency alert","projects":["frontend"]}]`,
+		)
+		firstPage.Header.Set(
+			"Link",
+			`<https://sentry.io/api/0/organizations/example/alert-rules/?cursor=page2>; rel="next"; results="true"; cursor="page2"`,
+		)
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				sentryMockResponse(http.StatusOK, `[{"id":"7","name":"High error rate","projects":["backend"]},{"id":"8","name":"Latency alert","projects":["frontend"]},{"id":"9","name":"Cross-project issue count","projects":["backend","frontend"]}]`),
+				firstPage,
+				sentryMockResponse(http.StatusOK, `[{"id":"9","name":"Cross-project issue count","projects":["backend","frontend"]}]`),
 			},
 		}
 
@@ -651,8 +662,73 @@ func Test__Sentry__ListResources(t *testing.T) {
 			{Type: ResourceTypeAlert, ID: "7", Name: "High error rate · backend"},
 			{Type: ResourceTypeAlert, ID: "9", Name: "Cross-project issue count"},
 		}, resources)
-		require.Len(t, httpContext.Requests, 1)
+		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://sentry.io/api/0/organizations/example/alert-rules/", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/alert-rules/?cursor=page2", httpContext.Requests[1].URL.String())
+	})
+
+	t.Run("lists releases for the selected project", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"version":"2026.03.25","projects":[{"slug":"backend","name":"Backend"}]},{"version":"2026.03.24","projects":[{"slug":"frontend","name":"Frontend"}]},{"version":"2026.03.23","projects":[{"slug":"backend","name":"Backend"},{"slug":"frontend","name":"Frontend"}]}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeRelease, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"project": "backend",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeRelease, ID: "2026.03.25", Name: "2026.03.25"},
+			{Type: ResourceTypeRelease, ID: "2026.03.23", Name: "2026.03.23"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/releases/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("surfaces release scope guidance when listing releases is forbidden", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusForbidden, `{"detail":"You do not have permission to perform this action."}`),
+			},
+		}
+
+		_, err := impl.ListResources(ResourceTypeRelease, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), releaseScope)
 	})
 
 	t.Run("lists alert notification targets for users", func(t *testing.T) {
@@ -779,7 +855,7 @@ func Test__Sentry__Configuration(t *testing.T) {
 	assert.Equal(t, "userToken", fields[1].Name)
 	assert.Equal(t, "User Token", fields[1].Label)
 	assert.Equal(t, "integrationName", fields[2].Name)
-	assert.Equal(t, "Personal auth token from Sentry.", fields[1].Description)
+	assert.Equal(t, "Personal auth token from Sentry. Include `project:releases` if you use release actions.", fields[1].Description)
 }
 
 func Test__Sentry__Instructions(t *testing.T) {
@@ -790,8 +866,23 @@ func Test__Sentry__Instructions(t *testing.T) {
 	assert.Contains(t, instructions, SentryPersonalTokensURL)
 	assert.Contains(t, instructions, "User Token")
 	assert.Contains(t, instructions, "Token Permissions")
+	assert.Contains(t, instructions, "project:releases")
 	assert.Contains(t, instructions, "Issue & Event -> `Read & Write`")
 	assert.Contains(t, instructions, "Settings → Integrations → Custom Integrations")
+}
+
+func Test__nextCursorPath__NoTrailingQuestionWhenQueryEmpty(t *testing.T) {
+	// Percent-encoded path so url.Parse sets RawPath; empty query must not yield a trailing "?".
+	link := `<https://sentry.io/api/0/organizations/example/alert-rules/foo%20bar>; rel="next"; results="true"`
+	parsed, err := url.Parse(strings.Trim(link, "<>"))
+	require.NoError(t, err)
+	if parsed.RawPath == "" {
+		t.Skip("url.Parse did not populate RawPath in this environment; skipping RawPath regression check")
+	}
+
+	got := nextCursorPath(link)
+	require.NotEmpty(t, got, "nextCursorPath returned empty for %q", link)
+	require.False(t, strings.HasSuffix(got, "?"), "nextCursorPath must not end with '?', got %q", got)
 }
 
 func computeWebhookSignature(secret string, body []byte) string {

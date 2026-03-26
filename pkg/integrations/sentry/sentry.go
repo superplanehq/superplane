@@ -28,6 +28,7 @@ const (
 	ResourceTypeAssignee    = "assignee"
 	ResourceTypeAlert       = "alert"
 	ResourceTypeAlertTarget = "alert-target"
+	ResourceTypeRelease     = "release"
 
 	SentryPersonalTokensURL = "https://sentry.io/settings/account/api/auth-tokens/"
 )
@@ -37,7 +38,7 @@ const (
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry. Copy the token.
 
    > **Token Permissions:**  
-   > ` + "`Project -> Read`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
+   > ` + "`Project -> Read`" + ` · ` + "`Releases -> Read & Write (project:releases)`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
 
 2. In Sentry, go to **Settings → Integrations → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it ` + "`%s`" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
@@ -151,7 +152,7 @@ func (s *Sentry) Instructions() string {
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry with the permissions below. Copy the token.
 
    > **Token Permissions:**  
-   > ` + "Project -> `Read`" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
+   > ` + "Project -> `Read`" + ` · ` + "Releases -> `Read & Write` (`project:releases`)" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
 
 2. In Sentry, go to **Settings → Integrations → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it ` + "(e.g. `SuperPlane`)" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
@@ -175,7 +176,7 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Label:       "User Token",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Personal auth token from Sentry.",
+			Description: "Personal auth token from Sentry. Include `project:releases` if you use release actions.",
 			Required:    true,
 		},
 		{
@@ -202,6 +203,11 @@ func (s *Sentry) Components() []core.Component {
 		&CreateAlert{},
 		&UpdateAlert{},
 		&DeleteAlert{},
+		&ListAlerts{},
+		&GetAlert{},
+		&GetIssue{},
+		&CreateRelease{},
+		&CreateDeploy{},
 		&UpdateIssue{},
 	}
 }
@@ -676,7 +682,6 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 		if targetType == "" {
 			return []core.IntegrationResource{}, nil
 		}
-
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create sentry client: %w", err)
@@ -773,6 +778,39 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 		}
 
 		return []core.IntegrationResource{}, nil
+
+	case ResourceTypeRelease:
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		projectSlug := strings.TrimSpace(ctx.Parameters["project"])
+
+		releases, err := client.ListReleases()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list releases: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(releases))
+		for _, release := range releases {
+			if projectSlug != "" && !releaseContainsProject(release, projectSlug) {
+				continue
+			}
+
+			version := strings.TrimSpace(release.Version)
+			if version == "" {
+				continue
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: ResourceTypeRelease,
+				ID:   version,
+				Name: version,
+			})
+		}
+
+		return resources, nil
 	}
 
 	return []core.IntegrationResource{}, nil
@@ -1021,6 +1059,10 @@ func displayIssueLabel(shortID, title string) string {
 	}
 }
 
+func isExpressionValue(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.Contains(value, "{{") || strings.Contains(value, "$[")
+}
 func alertRuleContainsProject(alertRule MetricAlertRule, projectSlug string) bool {
 	projectSlug = strings.TrimSpace(projectSlug)
 	if projectSlug == "" {
@@ -1048,6 +1090,16 @@ func displayAlertRuleLabel(alertRule MetricAlertRule) string {
 	return name
 }
 
+func releaseContainsProject(release Release, projectSlug string) bool {
+	projectSlug = strings.TrimSpace(projectSlug)
+	if projectSlug == "" {
+		return true
+	}
+
+	return slices.ContainsFunc(release.Projects, func(project ReleaseProject) bool {
+		return strings.TrimSpace(project.Slug) == projectSlug
+	})
+}
 func missingCredentialsMessage(config Configuration) string {
 	missing := make([]string, 0, 2)
 	if strings.TrimSpace(config.UserToken) == "" {
