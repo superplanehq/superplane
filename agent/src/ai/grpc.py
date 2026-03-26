@@ -30,13 +30,13 @@ class AgentsServicer:
         )
 
     def ListAgentChats(self, request, context):  # noqa: N802
-        raise NotImplementedError("not implemented")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "not implemented")
 
     def DescribeAgentChat(self, request, context):  # noqa: N802
-        raise NotImplementedError("not implemented")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "not implemented")
 
     def ListAgentChatMessages(self, request, context):  # noqa: N802
-        raise NotImplementedError("not implemented")
+        context.abort(grpc.StatusCode.UNIMPLEMENTED, "not implemented")
 
 
 def add_agents_servicer_to_server(servicer: AgentsServicer, server: grpc.Server) -> None:
