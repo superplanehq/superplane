@@ -229,6 +229,39 @@ func Test__CopyObject__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to copy object")
 	})
 
+	t.Run("copy returns 200 with <Error> XML and deleteSource=true does not delete source", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Header:     http.Header{},
+					Body:       io.NopCloser(strings.NewReader(`<?xml version="1.0"?><Error><Code>AccessDenied</Code><Message>Denied</Message></Error>`)),
+				},
+			},
+		}
+		executionState := &contexts.ExecutionStateContext{}
+
+		config := map[string]any{
+			"sourceBucket":        "fra1/my-space",
+			"sourceFilePath":      "reports/daily.csv",
+			"destinationBucket":   "fra1/my-archive",
+			"destinationFilePath": "archive/2026/daily.csv",
+			"deleteSource":        true,
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  config,
+			HTTP:           httpContext,
+			ExecutionState: executionState,
+			Integration:    spacesIntegration,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to copy object")
+		assert.Len(t, httpContext.Requests, 1)
+		assert.False(t, executionState.Passed)
+	})
+
 	t.Run("delete source error after successful copy returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

@@ -1776,16 +1776,38 @@ func (c *SpacesClient) CopyObject(sourceBucket, sourceKey, destBucket, destKey, 
 		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
 	}
 
-	bodyBytes, _ := io.ReadAll(res.Body)
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading copy object response: %w", err)
+	}
+
+	// The S3 CopyObject API can return HTTP 200 with an <Error> XML body.
+	var apiError struct {
+		Code      string `xml:"Code"`
+		Message   string `xml:"Message"`
+		RequestID string `xml:"RequestId"`
+		HostID    string `xml:"HostId"`
+	}
+	if err := xml.Unmarshal(bodyBytes, &apiError); err == nil && strings.TrimSpace(apiError.Code) != "" {
+		if strings.TrimSpace(apiError.Message) != "" {
+			return "", fmt.Errorf("copy object failed: %s: %s", apiError.Code, apiError.Message)
+		}
+		return "", fmt.Errorf("copy object failed: %s", apiError.Code)
+	}
 
 	var result struct {
 		ETag string `xml:"ETag"`
 	}
-	if err := xml.Unmarshal(bodyBytes, &result); err == nil {
-		return strings.Trim(result.ETag, `"`), nil
+	if err := xml.Unmarshal(bodyBytes, &result); err != nil {
+		return "", fmt.Errorf("error parsing copy object response: %w: %s", err, string(bodyBytes))
 	}
 
-	return "", nil
+	eTag := strings.TrimSpace(strings.Trim(result.ETag, `"`))
+	if eTag == "" {
+		return "", fmt.Errorf("copy object response missing ETag: %s", string(bodyBytes))
+	}
+
+	return eTag, nil
 }
 
 // DeleteObject removes an object from a Spaces bucket.
