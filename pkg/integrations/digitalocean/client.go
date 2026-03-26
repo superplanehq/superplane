@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1380,9 +1381,40 @@ func (c *SpacesClient) execSpacesRequestFull(method, bucket, key, queryString st
 		payloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 	}
 
-	canonicalHeaders := fmt.Sprintf("host:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
-		host, payloadHash, amzDate)
-	signedHeaders := "host;x-amz-content-sha256;x-amz-date"
+	// SigV4 requires that any headers included in the request (especially x-amz-*)
+	// that are part of the signature be present in both CanonicalHeaders and SignedHeaders.
+	// We sign all headers we set on the request to avoid SignatureDoesNotMatch errors.
+	headersToSign := map[string]string{
+		"host":                 host,
+		"x-amz-content-sha256": payloadHash,
+		"x-amz-date":           amzDate,
+	}
+	for k, v := range extraHeaders {
+		lower := strings.ToLower(strings.TrimSpace(k))
+		if lower == "" {
+			continue
+		}
+		// Per SigV4 canonicalization rules, leading/trailing spaces are trimmed and
+		// sequential spaces are collapsed to a single space.
+		cleanValue := strings.Join(strings.Fields(v), " ")
+		headersToSign[lower] = cleanValue
+	}
+
+	headerKeys := make([]string, 0, len(headersToSign))
+	for k := range headersToSign {
+		headerKeys = append(headerKeys, k)
+	}
+	sort.Strings(headerKeys)
+
+	var canonicalHeadersBuilder strings.Builder
+	for _, k := range headerKeys {
+		canonicalHeadersBuilder.WriteString(k)
+		canonicalHeadersBuilder.WriteString(":")
+		canonicalHeadersBuilder.WriteString(headersToSign[k])
+		canonicalHeadersBuilder.WriteString("\n")
+	}
+	canonicalHeaders := canonicalHeadersBuilder.String()
+	signedHeaders := strings.Join(headerKeys, ";")
 
 	path := "/"
 	if key != "" {
@@ -1434,17 +1466,15 @@ func (c *SpacesClient) execSpacesRequestFull(method, bucket, key, queryString st
 		return nil, fmt.Errorf("error building request: %v", err)
 	}
 
-	req.Header.Set("Host", host)
-	req.Header.Set("x-amz-date", amzDate)
-	req.Header.Set("x-amz-content-sha256", payloadHash)
+	// Set all headers that were signed.
+	// (Go will canonicalize the header names on the wire; signing used lowercase names.)
+	for k, v := range headersToSign {
+		req.Header.Set(k, v)
+	}
 	req.Header.Set("Authorization", authHeader)
 
 	if len(body) > 0 {
 		req.Header.Set("Content-Length", strconv.Itoa(len(body)))
-	}
-
-	for k, v := range extraHeaders {
-		req.Header.Set(k, v)
 	}
 
 	res, err := c.http.Do(req)
