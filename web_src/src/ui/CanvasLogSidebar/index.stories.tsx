@@ -1,14 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  CanvasLogSidebar,
-  type LogCounts,
-  type LogEntry,
-  type LogScopeFilter,
-  type LogTypeFilter,
-  type LogRunItem,
-} from "./index";
+import { CanvasLogSidebar, type LogCounts, type LogEntry, type LogRunItem } from "./index";
 import { Button } from "@/components/ui/button";
 
 const meta = {
@@ -114,10 +107,7 @@ function getCounts(entries: LogEntry[]): LogCounts {
 export const Default: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(true);
-    const [scope, setScope] = useState<LogScopeFilter>("all");
-    const [filter, setFilter] = useState<LogTypeFilter>(new Set());
     const [searchValue, setSearchValue] = useState("");
-    const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set(["log-4"]));
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const [stickToBottom, setStickToBottom] = useState(true);
 
@@ -125,49 +115,12 @@ export const Default: Story = {
 
     const filteredEntries = useMemo(() => {
       const query = searchValue.trim().toLowerCase();
-      const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
-      // Show all if filter is empty or contains all three types
-      const showAll = filter.size === 0 || filter.size === 3;
-
-      return sampleEntries.reduce<LogEntry[]>((acc, entry) => {
-        if (scope !== "all" && entry.source !== scope) {
-          return acc;
-        }
-
-        if (entry.type === "run") {
-          const runItems = entry.runItems || [];
-          const filteredRunItems = runItems.filter((item) => {
-            const typeMatch = showAll || filter.has(item.type);
-            const searchMatch =
-              matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : undefined);
-            return typeMatch && searchMatch;
-          });
-          const entrySearchMatch =
-            matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : undefined);
-
-          const typeMatch = showAll ? true : filteredRunItems.length > 0;
-          const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
-
-          if (typeMatch && searchMatch) {
-            acc.push({ ...entry, runItems: filteredRunItems });
-          }
-          return acc;
-        }
-
-        if (!showAll && !filter.has(entry.type)) {
-          return acc;
-        }
-
-        const entrySearchMatch =
-          matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : undefined);
-        if (!entrySearchMatch) {
-          return acc;
-        }
-
-        acc.push(entry);
-        return acc;
-      }, []);
-    }, [filter, scope, searchValue]);
+      if (!query) return sampleEntries;
+      const matchesSearch = (value?: string) => (value || "").toLowerCase().includes(query);
+      return sampleEntries.filter(
+        (entry) => matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : ""),
+      );
+    }, [searchValue]);
 
     useEffect(() => {
       const wrapper = wrapperRef.current;
@@ -223,26 +176,10 @@ export const Default: Story = {
         <CanvasLogSidebar
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
-          filter={filter}
-          onFilterChange={setFilter}
-          scope={scope}
-          onScopeChange={setScope}
           searchValue={searchValue}
           onSearchChange={setSearchValue}
           entries={filteredEntries}
           counts={counts}
-          expandedRuns={expandedRuns}
-          onToggleRun={(runId) =>
-            setExpandedRuns((prev) => {
-              const next = new Set(prev);
-              if (next.has(runId)) {
-                next.delete(runId);
-              } else {
-                next.add(runId);
-              }
-              return next;
-            })
-          }
         />
       </div>
     );
@@ -252,8 +189,6 @@ export const Default: Story = {
 export const Empty: Story = {
   render: () => {
     const [isOpen, setIsOpen] = useState(true);
-    const [scope, setScope] = useState<LogScopeFilter>("all");
-    const [filter, setFilter] = useState<LogTypeFilter>(new Set());
     const [searchValue, setSearchValue] = useState("");
 
     return (
@@ -261,16 +196,10 @@ export const Empty: Story = {
         <CanvasLogSidebar
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
-          filter={filter}
-          onFilterChange={setFilter}
-          scope={scope}
-          onScopeChange={setScope}
           searchValue={searchValue}
           onSearchChange={setSearchValue}
           entries={[]}
           counts={{ total: 0, error: 0, warning: 0, success: 0 }}
-          expandedRuns={new Set()}
-          onToggleRun={() => {}}
         />
       </div>
     );
