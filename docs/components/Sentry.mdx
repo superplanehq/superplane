@@ -2,7 +2,7 @@
 title: "Sentry"
 ---
 
-React to issue events and update issues in Sentry
+React to issue events and manage issues and metric alerts in Sentry
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -15,6 +15,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Alert" href="#create-alert" description="Create a Sentry metric alert rule with thresholds, conditions, and notification targets" />
+  <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Sentry metric alert rule" />
+  <LinkCard title="Update Alert" href="#update-alert" description="Update a Sentry metric alert rule with new thresholds, conditions, or notification targets" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status, priority, assignee, or visibility flags" />
 </CardGrid>
 
@@ -99,6 +102,193 @@ This trigger uses the webhook URL configured on your Sentry internal integration
   },
   "resource": "issue",
   "timestamp": "2022-04-04T18:17:18.320000Z"
+}
+```
+
+<a id="create-alert"></a>
+
+## Create Alert
+
+The Create Alert component creates a Sentry metric alert rule for a selected project.
+
+### Use Cases
+
+- **Coverage automation**: create alert rules automatically after provisioning a service
+- **Policy enforcement**: ensure critical projects always have baseline metric alerts
+- **Release safety**: create release-specific alert rules after deploy workflows
+
+### Configuration
+
+- **Project**: Sentry project that owns the metric alert rule
+- **Name**: Alert rule name shown in Sentry
+- **Aggregate**: Metric expression such as `count()`
+- **Query**: Optional event search query to narrow the alert
+- **Time Window**: Evaluation window in minutes
+- **Threshold Type**: Whether the threshold fires above or below the configured value
+- **Environment**: Optional environment filter
+- **Event Types**: Event types included in the alert evaluation
+- **Critical / Warning**: Thresholds and notification targets for each trigger level
+
+### Output
+
+Returns the created Sentry metric alert rule, including triggers, actions, and project association.
+
+### Example Output
+
+```json
+{
+  "aggregate": "count()",
+  "dataset": "events",
+  "dateCreated": "2026-03-26T09:15:00Z",
+  "dateModified": "2026-03-26T09:15:00Z",
+  "environment": "production",
+  "eventTypes": [
+    "default",
+    "error"
+  ],
+  "id": "19436",
+  "name": "SuperPlane metric alert example",
+  "organizationId": "4511070267441152",
+  "owner": null,
+  "projects": [
+    "go-gin"
+  ],
+  "query": "environment:production",
+  "queryType": 0,
+  "resolveThreshold": null,
+  "thresholdType": 0,
+  "timeWindow": 60,
+  "triggers": [
+    {
+      "actions": [
+        {
+          "alertRuleTriggerId": "28750",
+          "dateCreated": "2026-03-26T09:15:00Z",
+          "id": "26870",
+          "inputChannelId": null,
+          "integrationId": null,
+          "priority": null,
+          "sentryAppId": null,
+          "targetIdentifier": "4346509",
+          "targetType": "user",
+          "type": "email"
+        }
+      ],
+      "alertRuleId": "19436",
+      "alertThreshold": 5,
+      "dateCreated": "2026-03-26T09:15:00Z",
+      "id": "28750",
+      "label": "critical",
+      "resolveThreshold": 2,
+      "thresholdType": 0
+    }
+  ]
+}
+```
+
+<a id="delete-alert"></a>
+
+## Delete Alert
+
+The Delete Alert component deletes an existing Sentry metric alert rule.
+
+### Use Cases
+
+- **Alert cleanup**: remove obsolete rules after a service is retired
+- **Policy rotation**: delete temporary alert rules after a rollout is complete
+- **CRUD completion**: pair with alert listing and update workflows
+
+### Configuration
+
+- **Project**: Optional project to narrow alert rule selection
+- **Alert Rule**: Metric alert rule to delete
+
+### Output
+
+Returns the deleted alert ID and name so downstream steps can record the removal.
+
+### Example Output
+
+```json
+{
+  "deleted": true,
+  "id": "19436",
+  "name": "SuperPlane metric alert example"
+}
+```
+
+<a id="update-alert"></a>
+
+## Update Alert
+
+The Update Alert component updates an existing Sentry metric alert rule.
+
+### Use Cases
+
+- **Threshold tuning**: adjust thresholds after an incident review
+- **Ownership updates**: redirect alert notifications to a different user or team
+- **Environment changes**: tighten or loosen alert conditions for a new rollout
+
+### Configuration
+
+- **Alert Rule**: Existing Sentry alert rule to update
+- **Project**: Optional replacement project if the rule should move
+- **Name / Aggregate / Query / Time Window / Threshold Type / Environment / Event Types**: Optional overrides for the existing rule
+- **Critical / Warning**: Optional updates to trigger thresholds and notification targets
+
+### Output
+
+Returns the updated Sentry metric alert rule after the change is applied.
+
+### Example Output
+
+```json
+{
+  "aggregate": "count()",
+  "dataset": "events",
+  "dateCreated": "2026-03-26T09:15:00Z",
+  "dateModified": "2026-03-26T09:25:00Z",
+  "environment": "production",
+  "eventTypes": [
+    "error"
+  ],
+  "id": "19436",
+  "name": "SuperPlane metric alert example",
+  "organizationId": "4511070267441152",
+  "owner": null,
+  "projects": [
+    "go-gin"
+  ],
+  "query": "environment:production level:error",
+  "queryType": 0,
+  "resolveThreshold": null,
+  "thresholdType": 0,
+  "timeWindow": 30,
+  "triggers": [
+    {
+      "actions": [
+        {
+          "alertRuleTriggerId": "28750",
+          "dateCreated": "2026-03-26T09:15:00Z",
+          "id": "26870",
+          "inputChannelId": null,
+          "integrationId": null,
+          "priority": null,
+          "sentryAppId": null,
+          "targetIdentifier": "4346509",
+          "targetType": "user",
+          "type": "email"
+        }
+      ],
+      "alertRuleId": "19436",
+      "alertThreshold": 10,
+      "dateCreated": "2026-03-26T09:15:00Z",
+      "id": "28750",
+      "label": "critical",
+      "resolveThreshold": 3,
+      "thresholdType": 0
+    }
+  ]
 }
 ```
 
