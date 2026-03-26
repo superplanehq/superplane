@@ -110,7 +110,10 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
+
+		if versioningContext.versioningEnabled {
 		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		}
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
 		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
