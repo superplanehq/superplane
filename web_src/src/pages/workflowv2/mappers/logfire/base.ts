@@ -34,15 +34,26 @@ export const baseMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
+    const configuration = context.execution.configuration as QueryLogfireNodeConfiguration | undefined;
+    const nodeMetadata = context.node.metadata as QueryLogfireNodeMetadata | undefined;
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
 
-    if (payload?.timestamp) {
-      details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
+    const projectName = nodeMetadata?.project?.name?.trim() || configuration?.projectId;
+    if (projectName) {
+      details["Project"] = projectName;
     }
 
-    if (payload?.type) {
-      details["Event Type"] = payload.type;
+    if (configuration?.sql) {
+      const normalized = configuration.sql.trim().replace(/\s+/g, " ");
+      details["SQL"] = normalized.length > 120 ? normalized.slice(0, 120) + "..." : normalized;
+    }
+
+    details["Rows Returned"] = String(countRows(payload?.data));
+
+    const executedAt = context.execution.updatedAt || context.execution.createdAt;
+    if (executedAt) {
+      details["Executed At"] = new Date(executedAt).toLocaleString();
     }
 
     return details;
@@ -57,6 +68,7 @@ export const baseMapper: ComponentBaseMapper = {
 type QueryLogfireNodeConfiguration = {
   sql?: string;
   projectId?: string;
+  timeWindow?: string;
   minTimestamp?: string;
   maxTimestamp?: string;
   limit?: number;
@@ -67,56 +79,54 @@ type QueryLogfireNodeMetadata = {
   project?: { id?: string; name?: string };
 };
 
+function countRows(data: unknown): number {
+  if (!data || typeof data !== "object") return 0;
+
+  const record = data as Record<string, unknown>;
+
+  if (Array.isArray(record.rows)) return record.rows.length;
+
+  const columns = Object.values(record);
+  for (const col of columns) {
+    if (Array.isArray(col)) return col.length;
+    if (col && typeof col === "object" && Array.isArray((col as Record<string, unknown>).values)) {
+      return ((col as Record<string, unknown>).values as unknown[]).length;
+    }
+  }
+
+  return 0;
+}
+
 function truncateText(value: string, maxLength: number): string {
   const trimmed = value.trim();
   if (trimmed.length <= maxLength) return trimmed;
   return trimmed.slice(0, maxLength) + "...";
 }
 
-function formatTimestampForMetadata(value?: string): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  const d = new Date(trimmed);
-  if (Number.isNaN(d.getTime())) return trimmed;
+const timeWindowLabels: Record<string, string> = {
+  "5m": "Last 5 min",
+  "15m": "Last 15 min",
+  "1h": "Last 1 hour",
+  "6h": "Last 6 hours",
+  "24h": "Last 24 hours",
+  "7d": "Last 7 days",
+};
 
-  return d.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+function buildTimeWindowMetadata(configuration?: QueryLogfireNodeConfiguration): MetadataItem[] {
+  const tw = configuration?.timeWindow?.trim();
+  if (!tw || tw === "none") return [];
 
-function buildTimeWindowMetadata(minTs?: string, maxTs?: string): MetadataItem[] {
-  if (minTs && maxTs) {
-    return [
-      {
-        icon: "clock",
-        label: `Window: ${minTs} -> ${maxTs}`,
-      },
-    ];
+  if (tw === "custom") {
+    const parts: string[] = [];
+    if (configuration?.minTimestamp?.trim()) parts.push(`from ${configuration.minTimestamp.trim()}`);
+    if (configuration?.maxTimestamp?.trim()) parts.push(`to ${configuration.maxTimestamp.trim()}`);
+    if (parts.length === 0) return [];
+    return [{ icon: "clock", label: `Window: ${parts.join(" ")}` }];
   }
 
-  if (minTs) {
-    return [
-      {
-        icon: "clock",
-        label: `From: ${minTs}`,
-      },
-    ];
-  }
-
-  if (maxTs) {
-    return [
-      {
-        icon: "clock",
-        label: `Until: ${maxTs}`,
-      },
-    ];
-  }
-
-  return [];
+  const label = timeWindowLabels[tw];
+  if (!label) return [];
+  return [{ icon: "clock", label }];
 }
 
 function buildProjectMetadata(projectId?: string, nodeMetadata?: QueryLogfireNodeMetadata): MetadataItem[] {
@@ -169,13 +179,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as QueryLogfireNodeConfiguration | undefined;
   const nodeMetadata = node.metadata as QueryLogfireNodeMetadata | undefined;
 
-  const minTs = formatTimestampForMetadata(configuration?.minTimestamp);
-  const maxTs = formatTimestampForMetadata(configuration?.maxTimestamp);
-
   const metadata: MetadataItem[] = [
-    ...buildTimeWindowMetadata(minTs, maxTs),
     ...buildProjectMetadata(configuration?.projectId, nodeMetadata),
     ...buildQueryMetadata(configuration),
+    ...buildTimeWindowMetadata(configuration),
   ];
 
   return metadata.slice(0, 3);

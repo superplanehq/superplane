@@ -205,12 +205,25 @@ func (t *OnAlertReceived) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 	if payload == nil {
 		payload = map[string]any{}
 	}
+
+	originalEventType, _ := payload["eventType"].(string)
+
 	for key, value := range normalizeSlackAlertPayload(payload) {
 		payload[key] = value
 	}
 	copyStringField(payload, "alert_id", "alertId")
 	copyStringField(payload, "alert_name", "alertName")
 	copyStringField(payload, "event_type", "eventType")
+
+	if strings.TrimSpace(originalEventType) != "" {
+		payload["eventType"] = originalEventType
+	}
+
+	delete(payload, "text")
+	if data, ok := payload["data"].(map[string]any); ok {
+		delete(data, "text")
+	}
+
 	if err := ctx.Events.Emit("logfire.alert.received", payload); err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to emit alert event: %w", err)
 	}
