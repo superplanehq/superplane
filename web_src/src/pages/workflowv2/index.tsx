@@ -5680,6 +5680,7 @@ export function WorkflowPageV2() {
           onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
           runsEvents={isViewingLiveVersion ? canvasEventsResponse?.events || [] : []}
           runsNodes={canvas?.spec?.nodes || []}
+          runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           focusRequest={focusRequest}

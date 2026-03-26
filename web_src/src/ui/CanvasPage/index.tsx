@@ -40,6 +40,7 @@ import {
   ConfigurationField,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -354,6 +355,7 @@ export interface CanvasPageProps {
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsNodes?: ComponentsNode[];
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
@@ -1288,6 +1290,7 @@ function CanvasPage(props: CanvasPageProps) {
                 onResolveExecutionErrors={props.onResolveExecutionErrors}
                 runsEvents={props.runsEvents}
                 runsNodes={props.runsNodes}
+                runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
                 onRunNodeSelect={props.onRunNodeSelect}
                 onRunExecutionSelect={props.onRunExecutionSelect}
                 title={props.title}
@@ -1961,6 +1964,7 @@ function CanvasContent({
   onResolveExecutionErrors,
   runsEvents,
   runsNodes,
+  runsNodeQueueItemsMap,
   onRunNodeSelect,
   onRunExecutionSelect,
   title,
@@ -2063,6 +2067,7 @@ function CanvasContent({
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsNodes?: ComponentsNode[];
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
   title?: string;
@@ -3187,6 +3192,7 @@ function CanvasContent({
           onTabChange={setConsoleTab}
           runsEvents={runsEvents}
           runsNodes={runsNodes}
+          runsNodeQueueItemsMap={runsNodeQueueItemsMap}
           onRunNodeSelect={onRunNodeSelect}
           onRunExecutionSelect={onRunExecutionSelect}
         />

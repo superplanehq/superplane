@@ -1,12 +1,33 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, CircleCheck, CircleDot, CircleX, Clock, Loader2, Play, Ban } from "lucide-react";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import {
+  ChevronDown,
+  ChevronRight,
+  CircleCheck,
+  CircleDashed,
+  CircleDot,
+  CircleX,
+  Clock,
+  Loader2,
+  Play,
+  Ban,
+  Zap,
+  ThumbsUp,
+  ThumbsDown,
+  FastForward,
+  DoorOpen,
+} from "lucide-react";
+import type {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+  ComponentsNode,
+} from "@/api-client";
 import { cn } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
 import { getState, getTriggerRenderer } from "./mappers";
 import { buildEventInfo, buildExecutionInfo } from "./utils";
 
-export type RunsStatusFilter = "all" | "passed" | "failed" | "running";
+export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
 
 export function getExecutionStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]) {
   const node = nodes.find((n) => n.id === execution.nodeId);
@@ -26,15 +47,18 @@ export function getAggregateStatus(executions: CanvasesCanvasNodeExecution[], no
     return "running";
   }
   if (states.some((s) => s.result === "RESULT_FAILED")) {
-    return "failed";
+    return "error";
   }
   if (states.some((s) => s.result === "RESULT_CANCELLED")) {
     return "cancelled";
   }
   if (states.every((s) => s.result === "RESULT_PASSED")) {
-    return "passed";
+    return "completed";
   }
-  return "unknown";
+  if (states.every((s) => s.state === "STATE_FINISHED")) {
+    return "completed";
+  }
+  return "queued";
 }
 
 export function computeDuration(execution: CanvasesCanvasNodeExecution): string | null {
@@ -48,12 +72,15 @@ export function computeDuration(execution: CanvasesCanvasNodeExecution): string 
 }
 
 export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {
+  const componentState = getExecutionStatus(execution, nodes);
+  if (componentState && componentState !== "neutral") return componentState;
+
   if (execution.state === "STATE_PENDING") return "pending";
   if (execution.state === "STATE_STARTED") return "running";
   if (execution.result === "RESULT_CANCELLED") return "cancelled";
   if (execution.result === "RESULT_FAILED") return "failed";
-  if (execution.result === "RESULT_PASSED") return "passed";
-  return getExecutionStatus(execution, nodes) || "unknown";
+  if (execution.result === "RESULT_PASSED") return "success";
+  return "unknown";
 }
 
 export function formatRunTimestamp(value: string): string {
@@ -75,10 +102,75 @@ export function formatRunTimestamp(value: string): string {
 
 export function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+    completed: {
+      label: "Completed",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <CircleCheck className="h-3 w-3" />,
+    },
+    success: {
+      label: "Success",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <CircleCheck className="h-3 w-3" />,
+    },
+    triggered: {
+      label: "Triggered",
+      className: "bg-violet-50 text-violet-700 border-violet-200",
+      icon: <Zap className="h-3 w-3" />,
+    },
+    finished: {
+      label: "Finished",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <CircleCheck className="h-3 w-3" />,
+    },
+    waiting: {
+      label: "Waiting",
+      className: "bg-amber-50 text-amber-700 border-amber-200",
+      icon: <Clock className="h-3 w-3" />,
+    },
+    approved: {
+      label: "Approved",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <ThumbsUp className="h-3 w-3" />,
+    },
+    rejected: {
+      label: "Rejected",
+      className: "bg-red-50 text-red-700 border-red-200",
+      icon: <ThumbsDown className="h-3 w-3" />,
+    },
+    "pushed through": {
+      label: "Pushed Through",
+      className: "bg-blue-50 text-blue-700 border-blue-200",
+      icon: <FastForward className="h-3 w-3" />,
+    },
+    opened: {
+      label: "Opened",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <DoorOpen className="h-3 w-3" />,
+    },
+    true: {
+      label: "True",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <CircleCheck className="h-3 w-3" />,
+    },
+    false: {
+      label: "False",
+      className: "bg-red-50 text-red-700 border-red-200",
+      icon: <CircleX className="h-3 w-3" />,
+    },
     passed: {
       label: "Passed",
       className: "bg-emerald-50 text-emerald-700 border-emerald-200",
       icon: <CircleCheck className="h-3 w-3" />,
+    },
+    timeout: {
+      label: "Timeout",
+      className: "bg-gray-50 text-gray-500 border-gray-200",
+      icon: <Clock className="h-3 w-3" />,
+    },
+    queued: {
+      label: "Queued",
+      className: "bg-amber-50 text-amber-700 border-amber-200",
+      icon: <CircleDashed className="h-3 w-3" />,
     },
     failed: {
       label: "Failed",
@@ -129,6 +221,7 @@ export function StatusBadge({ status }: { status: string }) {
 export function RunRow({
   event,
   nodes,
+  queueItems = [],
   isExpanded,
   onToggle,
   onNodeSelect,
@@ -136,6 +229,7 @@ export function RunRow({
 }: {
   event: CanvasesCanvasEventWithExecutions;
   nodes: ComponentsNode[];
+  queueItems?: CanvasesCanvasNodeQueueItem[];
   isExpanded: boolean;
   onToggle: () => void;
   onNodeSelect?: (nodeId: string) => void;
@@ -147,7 +241,8 @@ export function RunRow({
   const eventInfo = buildEventInfo(event);
   const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
 
-  const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, nodes) : "unknown";
+  const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
+  const totalSteps = executions.length + queueItems.length;
 
   return (
     <div className="border-b border-gray-200 last:border-b-0">
@@ -164,9 +259,9 @@ export function RunRow({
           <span className="font-mono text-xs text-gray-500">#{event.id?.slice(0, 4)}</span>
           <span className="text-xs font-medium text-gray-900 truncate">{title}</span>
           <StatusBadge status={aggregateStatus} />
-          {executions.length > 0 && (
+          {totalSteps > 0 && (
             <span className="text-xs text-gray-400">
-              {executions.length} {executions.length === 1 ? "step" : "steps"}
+              {totalSteps} {totalSteps === 1 ? "step" : "steps"}
             </span>
           )}
         </div>
@@ -175,7 +270,7 @@ export function RunRow({
         </span>
       </button>
 
-      {isExpanded && executions.length > 0 && (
+      {isExpanded && (executions.length > 0 || queueItems.length > 0) && (
         <div className="bg-gray-50">
           {executions.map((execution) => {
             const node = nodes.find((n) => n.id === execution.nodeId);
@@ -233,6 +328,41 @@ export function RunRow({
               </div>
             );
           })}
+          {queueItems.map((item) => {
+            const node = nodes.find((n) => n.id === item.nodeId);
+            const nodeName = node?.name || node?.id || item.nodeId || "Unknown";
+
+            return (
+              <div
+                key={`q-${item.id}`}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
+                  onNodeSelect && "cursor-pointer hover:bg-gray-100 transition-colors",
+                )}
+                role={onNodeSelect ? "button" : undefined}
+                tabIndex={onNodeSelect ? 0 : undefined}
+                onClick={() => {
+                  if (onNodeSelect && item.nodeId) {
+                    onNodeSelect(item.nodeId);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && onNodeSelect && item.nodeId) {
+                    e.preventDefault();
+                    onNodeSelect(item.nodeId);
+                  }
+                }}
+              >
+                <div className="flex flex-1 items-center gap-2 min-w-0">
+                  <span className="text-xs text-gray-700 truncate">{nodeName}</span>
+                  <StatusBadge status="queued" />
+                </div>
+                <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+                  {item.createdAt ? formatRunTimestamp(item.createdAt) : ""}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -249,10 +379,11 @@ export function filterRunEvents(
     const executions = event.executions || [];
 
     if (statusFilter !== "all") {
-      const aggregate = executions.length > 0 ? getAggregateStatus(executions, nodes) : "unknown";
-      if (statusFilter === "passed" && aggregate !== "passed") return false;
-      if (statusFilter === "failed" && aggregate !== "failed" && aggregate !== "cancelled") return false;
+      const aggregate = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
+      if (statusFilter === "completed" && aggregate !== "completed") return false;
+      if (statusFilter === "errors" && aggregate !== "error" && aggregate !== "cancelled") return false;
       if (statusFilter === "running" && aggregate !== "running") return false;
+      if (statusFilter === "queued" && aggregate !== "queued") return false;
     }
 
     if (searchQuery.trim()) {
@@ -283,30 +414,37 @@ export function filterRunEvents(
 }
 
 export function computeRunsCounts(events: CanvasesCanvasEventWithExecutions[], nodes: ComponentsNode[]) {
-  let passed = 0;
-  let failed = 0;
+  let completed = 0;
+  let errors = 0;
   let running = 0;
+  let queued = 0;
   for (const event of events) {
     const executions = event.executions || [];
-    if (executions.length === 0) continue;
+    if (executions.length === 0) {
+      queued++;
+      continue;
+    }
     const aggregate = getAggregateStatus(executions, nodes);
-    if (aggregate === "passed") passed++;
-    else if (aggregate === "failed" || aggregate === "cancelled") failed++;
+    if (aggregate === "completed") completed++;
+    else if (aggregate === "error" || aggregate === "cancelled") errors++;
     else if (aggregate === "running") running++;
+    else if (aggregate === "queued") queued++;
   }
-  return { passed, failed, running, total: events.length };
+  return { completed, errors, running, queued, total: events.length };
 }
 
 export function RunsConsoleContent({
   events,
   nodes,
   searchQuery,
+  nodeQueueItemsMap = {},
   onNodeSelect,
   onExecutionSelect,
 }: {
   events: CanvasesCanvasEventWithExecutions[];
   nodes: ComponentsNode[];
   searchQuery: string;
+  nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onNodeSelect?: (nodeId: string) => void;
   onExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
 }) {
@@ -325,18 +463,70 @@ export function RunsConsoleContent({
     });
   };
 
+  const { queueItemsByEventId, orphanQueueEvents } = useMemo(() => {
+    const map: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
+    const orphansByEvent: Record<
+      string,
+      { event: CanvasesCanvasNodeQueueItem["rootEvent"]; items: CanvasesCanvasNodeQueueItem[] }
+    > = {};
+    const eventIds = new Set(events.map((e) => e.id));
+
+    for (const items of Object.values(nodeQueueItemsMap)) {
+      for (const item of items) {
+        const eventId = item.rootEvent?.id;
+        if (!eventId) continue;
+
+        if (eventIds.has(eventId)) {
+          if (!map[eventId]) map[eventId] = [];
+          map[eventId].push(item);
+        } else {
+          if (!orphansByEvent[eventId]) {
+            orphansByEvent[eventId] = { event: item.rootEvent, items: [] };
+          }
+          orphansByEvent[eventId].items.push(item);
+        }
+      }
+    }
+
+    const orphanEvents: CanvasesCanvasEventWithExecutions[] = Object.entries(orphansByEvent).map(
+      ([eventId, { event: rootEvent, items }]) => ({
+        id: eventId,
+        canvasId: items[0]?.canvasId,
+        nodeId: rootEvent?.nodeId,
+        channel: rootEvent?.channel,
+        data: rootEvent?.data as Record<string, unknown> | undefined,
+        createdAt: rootEvent?.createdAt,
+        executions: [],
+      }),
+    );
+
+    return { queueItemsByEventId: map, orphanQueueEvents: orphanEvents };
+  }, [nodeQueueItemsMap, events]);
+
+  const allEvents = useMemo(() => {
+    if (orphanQueueEvents.length === 0) return events;
+    const merged = [...orphanQueueEvents, ...events];
+    merged.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+    return merged;
+  }, [events, orphanQueueEvents]);
+
   const filteredEvents = useMemo(
-    () => filterRunEvents(events, nodes, statusFilter, searchQuery),
-    [events, nodes, statusFilter, searchQuery],
+    () => filterRunEvents(allEvents, nodes, statusFilter, searchQuery),
+    [allEvents, nodes, statusFilter, searchQuery],
   );
 
-  const counts = useMemo(() => computeRunsCounts(events, nodes), [events, nodes]);
+  const counts = useMemo(() => computeRunsCounts(allEvents, nodes), [allEvents, nodes]);
 
   const filterButtons: { key: RunsStatusFilter; label: string; count?: number }[] = [
     { key: "all", label: "All", count: counts.total },
-    { key: "passed", label: "Passed", count: counts.passed },
-    { key: "failed", label: "Failed", count: counts.failed },
+    { key: "completed", label: "Completed", count: counts.completed },
+    { key: "errors", label: "Errors", count: counts.errors },
     { key: "running", label: "Running", count: counts.running },
+    { key: "queued", label: "Queued", count: counts.queued },
   ];
 
   return (
@@ -362,7 +552,7 @@ export function RunsConsoleContent({
         ))}
       </div>
       <div className="flex-1 overflow-auto">
-        {events.length === 0 ? (
+        {allEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
             <Play className="h-6 w-6 text-gray-300 mb-2" />
             <p className="text-[13px] font-medium text-gray-600">No runs yet</p>
@@ -379,6 +569,7 @@ export function RunsConsoleContent({
                 key={event.id}
                 event={event}
                 nodes={nodes}
+                queueItems={queueItemsByEventId[event.id || ""] || []}
                 isExpanded={expandedRuns.has(event.id || "")}
                 onToggle={() => toggleRun(event.id || "")}
                 onNodeSelect={onNodeSelect}

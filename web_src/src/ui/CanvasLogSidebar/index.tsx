@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 
-import type { CanvasesCanvasEventWithExecutions, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
@@ -74,6 +74,7 @@ export interface CanvasLogSidebarProps {
   onTabChange?: (tab: ConsoleTab) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsNodes?: ComponentsNode[];
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
 }
@@ -116,6 +117,7 @@ export function CanvasLogSidebar({
   onTabChange,
   runsEvents = [],
   runsNodes = [],
+  runsNodeQueueItemsMap = {},
   onRunNodeSelect,
   onRunExecutionSelect,
 }: CanvasLogSidebarProps) {
@@ -416,6 +418,7 @@ export function CanvasLogSidebar({
             events={runsEvents}
             nodes={runsNodes}
             searchQuery={searchValue}
+            nodeQueueItemsMap={runsNodeQueueItemsMap}
             onNodeSelect={onRunNodeSelect}
             onExecutionSelect={onRunExecutionSelect}
           />

@@ -78,6 +78,10 @@ export function useCanvasWebsocket(
 
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.events(),
+              });
+
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
                   queryKey: canvasKeys.eventExecution(canvasId, execution.rootEvent.id),
