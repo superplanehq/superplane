@@ -1030,7 +1030,7 @@ export const ComponentSidebar = ({
                         domainId={domainId ?? ""}
                         domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={domainId ?? ""}
-                        appInstallationId={configureIntegration.metadata?.id}
+                        integrationId={configureIntegration.metadata?.id}
                       />
                     );
                   })

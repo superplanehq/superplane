@@ -12,9 +12,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
+  allValues = {},
   domainId,
   domainType,
-  appInstallationId,
+  integrationId,
   organizationId,
   autocompleteExampleObj,
   allowExpressions = false,
@@ -243,6 +244,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     () => ({ ...schemaDefaults, ...((value as Record<string, unknown>) ?? {}) }),
     [schemaDefaults, value],
   );
+  const nestedAllValues = React.useMemo(() => ({ ...allValues, ...objValue }), [allValues, objValue]);
 
   // When value is missing or empty object, push schema defaults to parent so required-object
   // validation (e.g. "schedule is required") sees a non-empty value and doesn't flag the field.
@@ -270,10 +272,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
             const newValue: Record<string, unknown> = { ...objValue, [schemaField.name!]: val };
             onChange(newValue);
           }}
-          allValues={objValue}
+          allValues={nestedAllValues}
           domainId={domainId}
           domainType={domainType}
-          appInstallationId={appInstallationId}
+          integrationId={integrationId}
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
         />
