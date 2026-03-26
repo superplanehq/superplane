@@ -360,8 +360,13 @@ def _create_app() -> FastAPI:
         if grpc_server is not None:
             grpc_server.stop()
 
-    @app.post("/v1/agent/chat/stream")
-    async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+    @app.post("/agents/chats/{chat_id}/stream")
+    async def stream_repl(
+        chat_id: str,
+        payload: ReplStreamRequest,
+        request: Request,
+    ) -> StreamingResponse:
+        _ = chat_id
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 

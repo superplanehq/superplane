@@ -1,5 +1,6 @@
 import os
 import threading
+import uuid
 
 from concurrent import futures
 from dataclasses import dataclass
@@ -20,7 +21,13 @@ class AgentsServicer:
         pass
 
     def CreateAgentChat(self, request, context):  # noqa: N802
-        raise NotImplementedError("not implemented")
+        #
+        # TODO: just return a random UUID for now.
+        # We should update this to create an agent chat record, and returns its ID.
+        #
+        return agents_pb2.CreateAgentChatResponse(
+            chat=agents_pb2.ChatInfo(id=uuid.uuid4().hex)
+        )
 
     def ListAgentChats(self, request, context):  # noqa: N802
         raise NotImplementedError("not implemented")

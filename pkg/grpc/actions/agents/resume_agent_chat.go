@@ -19,7 +19,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func ResumeAgentChat(ctx context.Context, authService authorization.Authorization, jwtSigner *jwt.Signer, agentURL string, orgID string, userID string, canvasID string, chatID string) (*pb.ResumeAgentChatResponse, error) {
+func ResumeAgentChat(
+	ctx context.Context,
+	authService authorization.Authorization,
+	jwtSigner *jwt.Signer,
+	agentInternalURL string,
+	agentPublicURL string,
+	orgID string,
+	userID string,
+	canvasID string,
+	chatID string,
+) (*pb.ResumeAgentChatResponse, error) {
 	org, err := uuid.Parse(orgID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "invalid organization")
@@ -39,7 +49,7 @@ func ResumeAgentChat(ctx context.Context, authService authorization.Authorizatio
 		return nil, status.Error(codes.Internal, "failed to load canvas")
 	}
 
-	conn, err := grpc.NewClient(agentURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(agentInternalURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
 	}
@@ -75,6 +85,6 @@ func ResumeAgentChat(ctx context.Context, authService authorization.Authorizatio
 
 	return &pb.ResumeAgentChatResponse{
 		Token: token,
-		Url:   BuildAgentChatStreamURL(agentURL, chatID),
+		Url:   BuildAgentChatStreamURL(agentPublicURL, chatID),
 	}, nil
 }

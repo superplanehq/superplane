@@ -25,9 +25,14 @@ func NewAgentsService(authService authorization.Authorization, jwtSigner *jwt.Si
 }
 
 func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
-	agentURL := config.AgentHTTPURL()
-	if agentURL == "" {
+	agentPublicURL := config.AgentHTTPURL()
+	if agentPublicURL == "" {
 		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
+	}
+
+	agentInternalURL := config.AgentGRPCURL()
+	if agentInternalURL == "" {
+		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
@@ -37,9 +42,11 @@ func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgent
 	}
 
 	return agents.CreateAgentChat(
+		ctx,
 		s.authService,
 		s.jwtSigner,
-		agentURL,
+		agentInternalURL,
+		agentPublicURL,
 		userID,
 		organizationID,
 		req.CanvasId,
@@ -47,9 +54,14 @@ func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgent
 }
 
 func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgentChatRequest) (*pb.ResumeAgentChatResponse, error) {
-	agentURL := config.AgentHTTPURL()
-	if agentURL == "" {
+	agentPublicURL := config.AgentHTTPURL()
+	if agentPublicURL == "" {
 		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
+	}
+
+	agentInternalURL := config.AgentGRPCURL()
+	if agentInternalURL == "" {
+		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
@@ -63,7 +75,17 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
 	}
 
-	return agents.ResumeAgentChat(ctx, s.authService, s.jwtSigner, agentURL, organizationID, userID, req.CanvasId, req.ChatId)
+	return agents.ResumeAgentChat(
+		ctx,
+		s.authService,
+		s.jwtSigner,
+		agentInternalURL,
+		agentPublicURL,
+		organizationID,
+		userID,
+		req.CanvasId,
+		req.ChatId,
+	)
 }
 
 func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
