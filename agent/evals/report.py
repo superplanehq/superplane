@@ -45,7 +45,12 @@ class ReportBuilder:
             self.console.print(f"{case_name} {self._format_duration(case_result)}")
             self.console.print(f"  input: {case_input}")
             self.console.print(f"  output: {display_filename}")
-            self.console.print(f"  assertions: {self._format_assertions_inline(case_result)}")
+            self.console.print("  assertions:")
+            assertion_lines = self._format_assertion_lines(case_result)
+            if not assertion_lines:
+                self.console.print("    - none")
+            for assertion_line in assertion_lines:
+                self.console.print(f"    - {assertion_line}")
 
             total_assertions += len(assertion_values)
             passed_assertions += sum(1 for assertion in assertion_values if bool(getattr(assertion, "value", False)))
@@ -93,12 +98,6 @@ class ReportBuilder:
                 line = f"{line} - {reason}"
             lines.append(line)
         return lines
-
-    def _format_assertions_inline(self, case_result: Any) -> str:
-        assertion_lines = self._format_assertion_lines(case_result)
-        if not assertion_lines:
-            return "-"
-        return "; ".join(assertion_lines)
 
     def _duration_seconds(self, case_result: Any) -> float | None:
         duration = getattr(case_result, "task_duration", None)
