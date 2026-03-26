@@ -4,6 +4,7 @@ import asyncio
 import os
 import evals.evaluators as evals
 
+from pydantic_ai.usage import RunUsage
 from pydantic_evals import Case, Dataset
 
 from ai.agent import AgentDeps, build_agent, build_prompt
@@ -118,14 +119,16 @@ async def runner() -> None:
         canvas_id=env["canvas_id"],
     )
     agent = build_agent(env["model"])
+    run_usages: list[RunUsage] = []
 
     async def task(question: str) -> CanvasAnswer:
         payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
         result = await agent.run(build_prompt(payload), deps=deps)
+        run_usages.append(result.usage())
         return result.output
 
-    report = await dataset.evaluate(task, progress=True)
-    ReportBuilder(report).render()
+    report = await dataset.evaluate(task, progress=True, max_concurrency=1)
+    ReportBuilder(report, model=env["model"], run_usages=run_usages).render()
 
 def main() -> None:
     asyncio.run(runner())
