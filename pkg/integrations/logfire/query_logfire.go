@@ -13,6 +13,15 @@ import (
 
 type QueryLogfire struct{}
 
+type ProjectMetadata struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
+}
+
+type QueryLogfireNodeMetadata struct {
+	Project *ProjectMetadata `json:"project,omitempty" mapstructure:"project"`
+}
+
 type QueryLogfireConfiguration struct {
 	SQL          string `json:"sql" mapstructure:"sql"`
 	ProjectID    string `json:"projectId" mapstructure:"projectId"`
@@ -168,30 +177,57 @@ func (c *QueryLogfire) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("limit must be greater than or equal to 0")
 	}
 
+	if config.ProjectID == "" {
+		return fmt.Errorf("project is required")
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create Logfire client: %w", err)
 	}
 
-	if config.ProjectID != "" {
-		projects, err := client.ListProjects()
+	projects, err := client.ListProjects()
+	if err != nil {
+		return fmt.Errorf("failed to list Logfire projects: %w", err)
+	}
+
+	var matchedProject *Project
+	for i := range projects {
+		if strings.TrimSpace(projects[i].ID) == config.ProjectID {
+			matchedProject = &projects[i]
+			break
+		}
+	}
+	if matchedProject == nil {
+		return fmt.Errorf("invalid Logfire project selection %q", config.ProjectID)
+	}
+
+	// Check if we already have a valid read token for this project.
+	existingToken := findSecretValue(ctx.Integration, readTokenSecretNameForProject(config.ProjectID))
+	if existingToken == "" {
+		// Also check the legacy secret name for backward compatibility.
+		existingToken = findSecretValue(ctx.Integration, readTokenSecretName)
+	}
+
+	if existingToken == "" || client.validateReadToken(existingToken) != nil {
+		token, err := client.ProvisionReadToken(config.ProjectID)
 		if err != nil {
-			return fmt.Errorf("failed to list Logfire projects: %w", err)
+			return fmt.Errorf("failed to provision read token: %w", err)
 		}
 
-		projectExists := false
-		for i := range projects {
-			if strings.TrimSpace(projects[i].ID) == config.ProjectID {
-				projectExists = true
-				break
-			}
+		if err := ctx.Integration.SetSecret(readTokenSecretNameForProject(config.ProjectID), []byte(token)); err != nil {
+			return fmt.Errorf("failed to store read token: %w", err)
 		}
-		if !projectExists {
-			return fmt.Errorf("invalid Logfire project selection %q", config.ProjectID)
+	} else if findSecretValue(ctx.Integration, readTokenSecretNameForProject(config.ProjectID)) == "" {
+		// Migrate legacy token to per-project secret.
+		if err := ctx.Integration.SetSecret(readTokenSecretNameForProject(config.ProjectID), []byte(existingToken)); err != nil {
+			return fmt.Errorf("failed to store read token: %w", err)
 		}
 	}
 
-	return nil
+	return ctx.Metadata.Set(QueryLogfireNodeMetadata{
+		Project: &ProjectMetadata{ID: matchedProject.ID, Name: matchedProject.ProjectName},
+	})
 }
 
 func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
@@ -209,7 +245,15 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create Logfire client: %w", err)
 	}
 
-	response, err := client.ExecuteQuery(QueryRequest{
+	readToken := findSecretValue(ctx.Integration, readTokenSecretNameForProject(config.ProjectID))
+	if readToken == "" {
+		readToken = findSecretValue(ctx.Integration, readTokenSecretName)
+	}
+	if readToken == "" {
+		return fmt.Errorf("no read token available for project %q - please re-save the component to provision one", config.ProjectID)
+	}
+
+	response, err := client.ExecuteQueryWithToken(readToken, QueryRequest{
 		SQL:          config.SQL,
 		MinTimestamp: config.MinTimestamp,
 		MaxTimestamp: config.MaxTimestamp,

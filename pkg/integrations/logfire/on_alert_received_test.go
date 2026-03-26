@@ -2,7 +2,9 @@ package logfire
 
 import (
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,10 +23,27 @@ func TestOnAlertReceived_Setup_RequestsStableWebhookConfiguration(t *testing.T) 
 	t.Parallel()
 
 	trigger := &OnAlertReceived{}
-	integrationCtx := &contexts.IntegrationContext{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiKey": "lf_api_us_123"},
+	}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"proj_123","organization_name":"acme","project_name":"backend"}]`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"alt_456","name":"Latency spike"}]`)),
+			},
+		},
+	}
+	metadataCtx := &contexts.MetadataContext{}
 
 	err := trigger.Setup(core.TriggerContext{
 		Integration: integrationCtx,
+		HTTP:        httpCtx,
+		Metadata:    metadataCtx,
 		Configuration: map[string]any{
 			"projectId": "proj_123",
 			"alertId":   "alt_456",
@@ -39,6 +58,107 @@ func TestOnAlertReceived_Setup_RequestsStableWebhookConfiguration(t *testing.T) 
 	assert.Equal(t, onAlertReceivedResource, requestedConfig.Resource)
 	assert.Equal(t, "proj_123", requestedConfig.ProjectID)
 	assert.Equal(t, "alt_456", requestedConfig.AlertID)
+
+	metadata, ok := metadataCtx.Get().(OnAlertReceivedNodeMetadata)
+	require.True(t, ok)
+	require.NotNil(t, metadata.Project)
+	assert.Equal(t, "backend", metadata.Project.Name)
+	require.NotNil(t, metadata.Alert)
+	assert.Equal(t, "Latency spike", metadata.Alert.Name)
+}
+
+func TestOnAlertReceived_Setup_MissingProjectId(t *testing.T) {
+	t.Parallel()
+
+	trigger := &OnAlertReceived{}
+	err := trigger.Setup(core.TriggerContext{
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "lf_api_us_123"},
+		},
+		HTTP:     &contexts.HTTPContext{},
+		Metadata: &contexts.MetadataContext{},
+		Configuration: map[string]any{
+			"projectId": "",
+			"alertId":   "alt_456",
+		},
+	})
+	require.ErrorContains(t, err, "project is required")
+}
+
+func TestOnAlertReceived_Setup_MissingAlertId(t *testing.T) {
+	t.Parallel()
+
+	trigger := &OnAlertReceived{}
+	err := trigger.Setup(core.TriggerContext{
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "lf_api_us_123"},
+		},
+		HTTP:     &contexts.HTTPContext{},
+		Metadata: &contexts.MetadataContext{},
+		Configuration: map[string]any{
+			"projectId": "proj_123",
+			"alertId":   "",
+		},
+	})
+	require.ErrorContains(t, err, "alert is required")
+}
+
+func TestOnAlertReceived_Setup_InvalidProject(t *testing.T) {
+	t.Parallel()
+
+	trigger := &OnAlertReceived{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"proj_other","organization_name":"acme","project_name":"other"}]`)),
+			},
+		},
+	}
+
+	err := trigger.Setup(core.TriggerContext{
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "lf_api_us_123"},
+		},
+		HTTP:     httpCtx,
+		Metadata: &contexts.MetadataContext{},
+		Configuration: map[string]any{
+			"projectId": "proj_123",
+			"alertId":   "alt_456",
+		},
+	})
+	require.ErrorContains(t, err, "invalid Logfire project selection")
+}
+
+func TestOnAlertReceived_Setup_InvalidAlert(t *testing.T) {
+	t.Parallel()
+
+	trigger := &OnAlertReceived{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"proj_123","organization_name":"acme","project_name":"backend"}]`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"alt_other","name":"Other alert"}]`)),
+			},
+		},
+	}
+
+	err := trigger.Setup(core.TriggerContext{
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "lf_api_us_123"},
+		},
+		HTTP:     httpCtx,
+		Metadata: &contexts.MetadataContext{},
+		Configuration: map[string]any{
+			"projectId": "proj_123",
+			"alertId":   "alt_456",
+		},
+	})
+	require.ErrorContains(t, err, "invalid Logfire alert selection")
 }
 
 func TestOnAlertReceived_HandleWebhook(t *testing.T) {

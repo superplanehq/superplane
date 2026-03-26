@@ -60,16 +60,23 @@ export const onAlertReceivedTriggerRenderer: TriggerRenderer = {
       alertId?: string;
     };
 
+    type LogfireOnAlertReceivedNodeMetadata = {
+      project?: { id?: string; name?: string };
+      alert?: { id?: string; name?: string };
+    };
+
     const configuration = node.configuration as LogfireOnAlertReceivedConfiguration | undefined;
-    const projectId = configuration?.projectId?.trim();
-    const alertId = configuration?.alertId?.trim();
+    const nodeMetadata = node.metadata as LogfireOnAlertReceivedNodeMetadata | undefined;
+
+    const projectLabel = nodeMetadata?.project?.name?.trim() || configuration?.projectId?.trim();
+    const alertLabel = nodeMetadata?.alert?.name?.trim() || configuration?.alertId?.trim();
 
     const metadata: MetadataItem[] = [];
-    if (projectId) {
-      metadata.push({ icon: "folder", label: `Project: ${projectId}` });
+    if (projectLabel) {
+      metadata.push({ icon: "folder", label: `Project: ${projectLabel}` });
     }
-    if (alertId) {
-      metadata.push({ icon: "bell", label: `Alert: ${alertId}` });
+    if (alertLabel) {
+      metadata.push({ icon: "bell", label: `Alert: ${alertLabel}` });
     }
 
     const props: TriggerProps = {

@@ -13,6 +13,16 @@ import (
 
 type OnAlertReceived struct{}
 
+type AlertMetadata struct {
+	ID   string `json:"id" mapstructure:"id"`
+	Name string `json:"name" mapstructure:"name"`
+}
+
+type OnAlertReceivedNodeMetadata struct {
+	Project *ProjectMetadata `json:"project,omitempty" mapstructure:"project"`
+	Alert   *AlertMetadata   `json:"alert,omitempty" mapstructure:"alert"`
+}
+
 type onAlertReceivedConfiguration struct {
 	ProjectID string `json:"projectId" mapstructure:"projectId"`
 	AlertID   string `json:"alertId" mapstructure:"alertId"`
@@ -119,6 +129,57 @@ func (t *OnAlertReceived) Setup(ctx core.TriggerContext) error {
 
 	config.ProjectID = strings.TrimSpace(config.ProjectID)
 	config.AlertID = strings.TrimSpace(config.AlertID)
+
+	if config.ProjectID == "" {
+		return fmt.Errorf("project is required")
+	}
+	if config.AlertID == "" {
+		return fmt.Errorf("alert is required")
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create Logfire client: %w", err)
+	}
+
+	projects, err := client.ListProjects()
+	if err != nil {
+		return fmt.Errorf("failed to list Logfire projects: %w", err)
+	}
+
+	var matchedProject *Project
+	for i := range projects {
+		if strings.TrimSpace(projects[i].ID) == config.ProjectID {
+			matchedProject = &projects[i]
+			break
+		}
+	}
+	if matchedProject == nil {
+		return fmt.Errorf("invalid Logfire project selection %q", config.ProjectID)
+	}
+
+	alerts, err := client.ListAlerts(config.ProjectID)
+	if err != nil {
+		return fmt.Errorf("failed to list Logfire alerts: %w", err)
+	}
+
+	var matchedAlert *Alert
+	for i := range alerts {
+		if strings.TrimSpace(alerts[i].ID) == config.AlertID {
+			matchedAlert = &alerts[i]
+			break
+		}
+	}
+	if matchedAlert == nil {
+		return fmt.Errorf("invalid Logfire alert selection %q", config.AlertID)
+	}
+
+	if err := ctx.Metadata.Set(OnAlertReceivedNodeMetadata{
+		Project: &ProjectMetadata{ID: matchedProject.ID, Name: matchedProject.ProjectName},
+		Alert:   &AlertMetadata{ID: matchedAlert.ID, Name: matchedAlert.Name},
+	}); err != nil {
+		return fmt.Errorf("failed to set node metadata: %w", err)
+	}
 
 	return ctx.Integration.RequestWebhook(onAlertReceivedWebhookConfiguration{
 		EventType: onAlertReceivedEventType,
