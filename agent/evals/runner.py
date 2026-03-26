@@ -8,14 +8,16 @@ from pydantic_evals import Case, Dataset
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from evals.evaluators import NoDollarDataAsRoot, WorkflowShape
+from evals.evaluators import BracketSelectorsMatchCanvasNames, NoDollarDataAsRoot, WorkflowShape
 from evals.report import ReportBuilder
 
 dataset = Dataset(
     cases=[
         Case(
             name="manual_run_then_two_noops",
-            inputs="Build me a basic workflow that starts with a manual run and runs two noop actions",
+            inputs=(
+                "Build me a basic workflow that starts with a manual run and runs two noop actions"
+            ),
             evaluators=[
                 WorkflowShape(
                   nodes=["start", "noop", "noop"],
@@ -26,7 +28,10 @@ dataset = Dataset(
 
         Case(
             name="github_and_slack",
-            inputs="Listen to pull-request comments and send a slack message when a comment is made",
+            inputs=(
+                "Listen to pull-request comments and send a slack message when "
+                "a comment is made"
+            ),
             evaluators=[
                 WorkflowShape(
                   nodes=["github.onPRComment", "slack.sendTextMessage"],
@@ -49,8 +54,33 @@ dataset = Dataset(
             ],
         ),
         Case(
+            name="pr_comment_filter_slack_message_chain",
+            inputs=(
+                "When a GitHub PR receives a comment, run the filter component then Slack "
+                "send text message; the Slack message body should contain the name of the PR and the time the filter node was executed"
+            ),
+            evaluators=[
+                WorkflowShape(
+                    nodes=["github.onPRComment", "filter", "slack.sendTextMessage"],
+                    edges=[
+                        ("github.onPRComment", "filter"),
+                        ("filter", "slack.sendTextMessage"),
+                    ],
+                ),
+                BracketSelectorsMatchCanvasNames(
+                    scan_scope="all",
+                    require_at_least_one_selector=True,
+                    target_block_name="slack.sendTextMessage",
+                ),
+            ],
+        ),
+        Case(
             name="ephemeral_pr_preview_machines",
-            inputs="Build a workflow that creates ephemeral preview machines for pull requests. On PR open, create infra and post the preview URL to the PR. On PR close or after 48 hours, tear it down.",
+            inputs=(
+                "Build a workflow that creates ephemeral preview machines for pull requests. "
+                "On PR open, create infra and post the preview URL to the PR. "
+                "On PR close or after 48 hours, tear it down."
+            ),
             evaluators=[
                 WorkflowShape(
                   nodes=[
