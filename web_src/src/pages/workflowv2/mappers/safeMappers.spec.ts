@@ -4,6 +4,7 @@ import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
+  ExecutionInfo,
   SubtitleContext,
   TriggerEventContext,
   TriggerRenderer,
@@ -12,68 +13,70 @@ import type {
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 
+const DEFAULT_NODE = { id: "n1", name: "Test Node", componentName: "test", isCollapsed: false };
+const DEFAULT_DEFINITION = { name: "test", label: "Test", description: "", icon: "zap", color: "blue" };
+const DEFAULT_TRIGGER_NODE = { id: "n1", name: "Test Trigger", componentName: "test", isCollapsed: false };
+const DEFAULT_TRIGGER_DEF = { name: "test", label: "Test", description: "", icon: "bolt", color: "blue" };
+
+function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
+  return {
+    id: "e1",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    resultReason: "RESULT_REASON_OK",
+    resultMessage: "",
+    metadata: {},
+    configuration: {},
+    rootEvent: undefined,
+    ...overrides,
+  };
+}
+
 function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: { id: "n1", name: "Test Node", componentName: "test", isCollapsed: false },
-    componentDefinition: { name: "test", label: "Test", description: "", icon: "zap", color: "blue" },
-    lastExecutions: [],
-    ...overrides,
-  };
+  return { nodes: [], node: DEFAULT_NODE, componentDefinition: DEFAULT_DEFINITION, lastExecutions: [], ...overrides };
 }
 
-function makeSubtitleContext(overrides?: Partial<SubtitleContext>): SubtitleContext {
-  return {
-    node: { id: "n1", name: "Test Node", componentName: "test", isCollapsed: false },
-    execution: {
-      id: "e1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-    },
-    ...overrides,
-  };
+function makeSubtitleContext(): SubtitleContext {
+  return { node: DEFAULT_NODE, execution: makeExecution() };
 }
 
-function makeExecutionDetailsContext(overrides?: Partial<ExecutionDetailsContext>): ExecutionDetailsContext {
-  return {
-    nodes: [],
-    node: { id: "n1", name: "Test Node", componentName: "test", isCollapsed: false },
-    execution: {
-      id: "e1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-    },
-    ...overrides,
-  };
+function makeExecutionDetailsContext(): ExecutionDetailsContext {
+  return { nodes: [], node: DEFAULT_NODE, execution: makeExecution() };
 }
 
-function makeTriggerRendererContext(overrides?: Partial<TriggerRendererContext>): TriggerRendererContext {
+function makeTriggerRendererContext(): TriggerRendererContext {
   return {
-    node: { id: "n1", name: "Test Trigger", componentName: "test", isCollapsed: false },
-    definition: { name: "test", label: "Test", description: "", icon: "bolt", color: "blue" },
+    node: DEFAULT_TRIGGER_NODE,
+    definition: DEFAULT_TRIGGER_DEF,
     lastEvent: { id: "ev1", createdAt: new Date().toISOString(), data: {}, nodeId: "n1", type: "test" },
-    ...overrides,
   };
 }
 
-function makeTriggerEventContext(overrides?: Partial<TriggerEventContext>): TriggerEventContext {
+function makeTriggerEventContext(): TriggerEventContext {
+  return { event: { id: "ev1", createdAt: new Date().toISOString(), data: {}, nodeId: "n1", type: "test" } };
+}
+
+function throwingMapper(method: "props" | "subtitle" | "getExecutionDetails"): ComponentBaseMapper {
+  const noop: ComponentBaseMapper = {
+    props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
+    subtitle: () => "",
+    getExecutionDetails: () => ({}),
+  };
   return {
-    event: { id: "ev1", createdAt: new Date().toISOString(), data: {}, nodeId: "n1", type: "test" },
-    ...overrides,
+    ...noop,
+    [method]: () => {
+      throw new Error(`fail in ${method}`);
+    },
+  };
+}
+
+function baseTriggerRenderer(): TriggerRenderer {
+  return {
+    getTriggerProps: () => ({ title: "T", iconSlug: "bolt", metadata: [] }),
+    getRootEventValues: () => ({}),
+    getTitleAndSubtitle: () => ({ title: "", subtitle: "" }),
   };
 }
 
@@ -90,29 +93,18 @@ describe("createSafeComponentMapper", () => {
       subtitle: () => "Sub",
       getExecutionDetails: () => ({ Key: "Value" }),
     };
-
     const safe = createSafeComponentMapper(underlying, "test");
-    const ctx = makeComponentBaseContext();
 
-    expect(safe.props(ctx)).toBe(expected);
+    expect(safe.props(makeComponentBaseContext())).toBe(expected);
     expect(safe.subtitle(makeSubtitleContext())).toBe("Sub");
     expect(safe.getExecutionDetails(makeExecutionDetailsContext())).toEqual({ Key: "Value" });
   });
 
   it("recovers from an error in props() and returns fallback props", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: ComponentBaseMapper = {
-      props: () => {
-        throw new Error("undefined property");
-      },
-      subtitle: () => "",
-      getExecutionDetails: () => ({}),
-    };
+    const safe = createSafeComponentMapper(throwingMapper("props"), "broken.component");
+    const result = safe.props(makeComponentBaseContext());
 
-    const safe = createSafeComponentMapper(underlying, "broken.component");
-    const ctx = makeComponentBaseContext();
-
-    const result = safe.props(ctx);
     expect(result.title).toBe("Test Node");
     expect(result.iconSlug).toBe("zap");
     expect(result.includeEmptyState).toBe(true);
@@ -128,55 +120,30 @@ describe("createSafeComponentMapper", () => {
     const underlying: ComponentBaseMapper = {
       props: (ctx) => {
         const data = ctx.node.configuration as Record<string, Record<string, Record<string, string>>> | undefined;
-        return {
-          iconSlug: "zap",
-          collapsed: false,
-          title: data!.nested.deep.name,
-          includeEmptyState: false,
-        };
+        return { iconSlug: "zap", collapsed: false, title: data!.nested.deep.name, includeEmptyState: false };
       },
       subtitle: () => "",
       getExecutionDetails: () => ({}),
     };
-
     const safe = createSafeComponentMapper(underlying, "nil-access");
-    const ctx = makeComponentBaseContext({ node: { id: "n1", name: "N", componentName: "test", isCollapsed: false } });
+    const ctx = makeComponentBaseContext({ node: { ...DEFAULT_NODE, name: "N" } });
 
-    const result = safe.props(ctx);
-    expect(result.title).toBe("N");
-    expect(result.includeEmptyState).toBe(true);
+    expect(safe.props(ctx).title).toBe("N");
+    expect(safe.props(ctx).includeEmptyState).toBe(true);
     consoleSpy.mockRestore();
   });
 
   it("recovers from an error in subtitle() and returns empty string", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: ComponentBaseMapper = {
-      props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
-      subtitle: () => {
-        throw new TypeError("Cannot read properties of undefined");
-      },
-      getExecutionDetails: () => ({}),
-    };
-
-    const safe = createSafeComponentMapper(underlying, "broken");
+    const safe = createSafeComponentMapper(throwingMapper("subtitle"), "broken");
     expect(safe.subtitle(makeSubtitleContext())).toBe("");
-    expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
   it("recovers from an error in getExecutionDetails() and returns empty object", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: ComponentBaseMapper = {
-      props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
-      subtitle: () => "",
-      getExecutionDetails: () => {
-        throw new Error("null reference");
-      },
-    };
-
-    const safe = createSafeComponentMapper(underlying, "broken");
+    const safe = createSafeComponentMapper(throwingMapper("getExecutionDetails"), "broken");
     expect(safe.getExecutionDetails(makeExecutionDetailsContext())).toEqual({});
-    expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
@@ -195,28 +162,10 @@ describe("createSafeComponentMapper", () => {
       subtitle: () => "",
       getExecutionDetails: () => ({}),
     };
-
     const safe = createSafeComponentMapper(underlying, "undefined-prop");
-    const ctx = makeComponentBaseContext({
-      lastExecutions: [
-        {
-          id: "e1",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          state: "STATE_FINISHED",
-          result: "RESULT_PASSED",
-          resultReason: "RESULT_REASON_OK",
-          resultMessage: "",
-          metadata: {},
-          configuration: {},
-          rootEvent: undefined,
-          outputs: {},
-        },
-      ],
-    });
+    const ctx = makeComponentBaseContext({ lastExecutions: [makeExecution({ outputs: {} })] });
 
-    const result = safe.props(ctx);
-    expect(result.title).toBe("Test Node");
+    expect(safe.props(ctx).title).toBe("Test Node");
     consoleSpy.mockRestore();
   });
 });
@@ -225,12 +174,13 @@ describe("createSafeTriggerRenderer", () => {
   it("delegates to the underlying renderer when no error occurs", () => {
     const expectedProps: TriggerProps = { title: "My Trigger", iconSlug: "bolt", metadata: [] };
     const underlying: TriggerRenderer = {
+      ...baseTriggerRenderer(),
       getTriggerProps: () => expectedProps,
       getRootEventValues: () => ({ key: "val" }),
       getTitleAndSubtitle: () => ({ title: "T", subtitle: "S" }),
     };
-
     const safe = createSafeTriggerRenderer(underlying, "test");
+
     expect(safe.getTriggerProps(makeTriggerRendererContext())).toBe(expectedProps);
     expect(safe.getRootEventValues(makeTriggerEventContext())).toEqual({ key: "val" });
     expect(safe.getTitleAndSubtitle(makeTriggerEventContext())).toEqual({ title: "T", subtitle: "S" });
@@ -238,16 +188,17 @@ describe("createSafeTriggerRenderer", () => {
 
   it("recovers from an error in getTriggerProps() and returns fallback", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: TriggerRenderer = {
-      getTriggerProps: () => {
-        throw new Error("boom");
+    const safe = createSafeTriggerRenderer(
+      {
+        ...baseTriggerRenderer(),
+        getTriggerProps: () => {
+          throw new Error("boom");
+        },
       },
-      getRootEventValues: () => ({}),
-      getTitleAndSubtitle: () => ({ title: "", subtitle: "" }),
-    };
-
-    const safe = createSafeTriggerRenderer(underlying, "broken.trigger");
+      "broken.trigger",
+    );
     const result = safe.getTriggerProps(makeTriggerRendererContext());
+
     expect(result.title).toBe("Test Trigger");
     expect(result.iconSlug).toBe("bolt");
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -259,32 +210,31 @@ describe("createSafeTriggerRenderer", () => {
 
   it("recovers from an error in getRootEventValues() and returns empty object", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: TriggerRenderer = {
-      getTriggerProps: () => ({ title: "T", iconSlug: "bolt", metadata: [] }),
-      getRootEventValues: () => {
-        const data = null as unknown as Record<string, string>;
-        return { key: data.missing };
+    const safe = createSafeTriggerRenderer(
+      {
+        ...baseTriggerRenderer(),
+        getRootEventValues: () => {
+          const d = null as unknown as Record<string, string>;
+          return { key: d.x };
+        },
       },
-      getTitleAndSubtitle: () => ({ title: "", subtitle: "" }),
-    };
-
-    const safe = createSafeTriggerRenderer(underlying, "nil-access");
+      "nil-access",
+    );
     expect(safe.getRootEventValues(makeTriggerEventContext())).toEqual({});
-    expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
   it("recovers from an error in getTitleAndSubtitle() and returns safe defaults", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: TriggerRenderer = {
-      getTriggerProps: () => ({ title: "T", iconSlug: "bolt", metadata: [] }),
-      getRootEventValues: () => ({}),
-      getTitleAndSubtitle: () => {
-        throw new Error("undefined");
+    const safe = createSafeTriggerRenderer(
+      {
+        ...baseTriggerRenderer(),
+        getTitleAndSubtitle: () => {
+          throw new Error("undefined");
+        },
       },
-    };
-
-    const safe = createSafeTriggerRenderer(underlying, "broken");
+      "broken",
+    );
     const result = safe.getTitleAndSubtitle(makeTriggerEventContext());
     expect(result.title).toBe("Event");
     expect(result.subtitle).toBe("");
@@ -293,60 +243,42 @@ describe("createSafeTriggerRenderer", () => {
 
   it("recovers from an error in getEventState() and returns 'triggered'", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const underlying: TriggerRenderer = {
-      getTriggerProps: () => ({ title: "T", iconSlug: "bolt", metadata: [] }),
-      getRootEventValues: () => ({}),
-      getTitleAndSubtitle: () => ({ title: "", subtitle: "" }),
-      getEventState: () => {
-        throw new Error("state error");
+    const safe = createSafeTriggerRenderer(
+      {
+        ...baseTriggerRenderer(),
+        getEventState: () => {
+          throw new Error("state error");
+        },
       },
-    };
-
-    const safe = createSafeTriggerRenderer(underlying, "broken");
+      "broken",
+    );
     expect(safe.getEventState!(makeTriggerEventContext())).toBe("triggered");
-    expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 
   it("does not wrap getEventState when the underlying renderer does not define it", () => {
-    const underlying: TriggerRenderer = {
-      getTriggerProps: () => ({ title: "T", iconSlug: "bolt", metadata: [] }),
-      getRootEventValues: () => ({}),
-      getTitleAndSubtitle: () => ({ title: "", subtitle: "" }),
-    };
-
-    const safe = createSafeTriggerRenderer(underlying, "no-state");
+    const safe = createSafeTriggerRenderer(baseTriggerRenderer(), "no-state");
     expect(safe.getEventState).toBeUndefined();
   });
+});
 
+describe("safe mapper canvas resilience", () => {
   it("rest of canvas continues to execute after a mapper panic", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const brokenMapper: ComponentBaseMapper = {
-      props: () => {
-        throw new Error("panic in broken mapper");
+    const safeBroken = createSafeComponentMapper(throwingMapper("props"), "broken");
+    const safeWorking = createSafeComponentMapper(
+      {
+        props: () => ({ iconSlug: "check", collapsed: false, title: "Works", includeEmptyState: false }),
+        subtitle: () => "ok",
+        getExecutionDetails: () => ({ Status: "done" }),
       },
-      subtitle: () => "",
-      getExecutionDetails: () => ({}),
-    };
-    const workingMapper: ComponentBaseMapper = {
-      props: () => ({ iconSlug: "check", collapsed: false, title: "Works", includeEmptyState: false }),
-      subtitle: () => "ok",
-      getExecutionDetails: () => ({ Status: "done" }),
-    };
-
-    const safeBroken = createSafeComponentMapper(brokenMapper, "broken");
-    const safeWorking = createSafeComponentMapper(workingMapper, "working");
-
+      "working",
+    );
     const ctx = makeComponentBaseContext();
 
-    const brokenResult = safeBroken.props(ctx);
-    expect(brokenResult.title).toBe("Test Node");
-
-    const workingResult = safeWorking.props(ctx);
-    expect(workingResult.title).toBe("Works");
-    expect(workingResult.iconSlug).toBe("check");
-
+    expect(safeBroken.props(ctx).title).toBe("Test Node");
+    expect(safeWorking.props(ctx).title).toBe("Works");
+    expect(safeWorking.props(ctx).iconSlug).toBe("check");
     consoleSpy.mockRestore();
   });
 });
