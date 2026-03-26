@@ -17,3 +17,4 @@ CLAUDE.local.md
 .env
 .idea/
 .agents/
+.worktrees/
