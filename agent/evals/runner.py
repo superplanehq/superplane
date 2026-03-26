@@ -8,7 +8,7 @@ from pydantic_evals import Case, Dataset
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from evals.evaluators import BracketSelectorsMatchCanvasNames, NoDollarDataAsRoot, WorkflowShape
+from evals.evaluators import BracketSelectorsMatchCanvasNames, CanvasHasNode, CanvasHasTrigger, CanvasTotalNodeCount, NoDollarDataAsRoot, WorkflowShape
 from evals.report import ReportBuilder
 
 dataset = Dataset(
@@ -19,10 +19,9 @@ dataset = Dataset(
                 "Build me a basic workflow that starts with a manual run and runs two noop actions"
             ),
             evaluators=[
-                WorkflowShape(
-                  nodes=["start", "noop", "noop"],
-                  edges=[("start", "noop"), ("noop", "noop")],
-                )
+              CanvasHasTrigger("start"),
+              CanvasHasNode("noop", count=2),
+              CanvasTotalNodeCount(count=3),
             ],
         ),
 
@@ -33,10 +32,9 @@ dataset = Dataset(
                 "a comment is made"
             ),
             evaluators=[
-                WorkflowShape(
-                  nodes=["github.onPRComment", "slack.sendTextMessage"],
-                  edges=[("github.onPRComment", "slack.sendTextMessage")],
-                )
+                CanvasHasTrigger("github.onPRComment"),
+                CanvasHasNode("slack.sendTextMessage", count=1),
+                CanvasTotalNodeCount(count=2),
             ],
         ),
         Case(
@@ -46,10 +44,9 @@ dataset = Dataset(
                 "that includes the issue title"
             ),
             evaluators=[
-                WorkflowShape(
-                    nodes=["github.onIssue", "discord.sendTextMessage"],
-                    edges=[("github.onIssue", "discord.sendTextMessage")],
-                ),
+                CanvasHasTrigger("github.onIssue"),
+                CanvasHasNode("discord.sendTextMessage"),
+                CanvasTotalNodeCount(count=2),
                 NoDollarDataAsRoot(),
             ],
         ),
@@ -60,13 +57,10 @@ dataset = Dataset(
                 "send text message; the Slack message body should contain the name of the PR and the time the filter node was executed"
             ),
             evaluators=[
-                WorkflowShape(
-                    nodes=["github.onPRComment", "filter", "slack.sendTextMessage"],
-                    edges=[
-                        ("github.onPRComment", "filter"),
-                        ("filter", "slack.sendTextMessage"),
-                    ],
-                ),
+                CanvasHasTrigger("github.onPRComment"),
+                CanvasHasNode("filter"),
+                CanvasHasNode("slack.sendTextMessage"),
+                CanvasTotalNodeCount(count=3),
                 BracketSelectorsMatchCanvasNames(
                     scan_scope="all",
                     require_at_least_one_selector=True,

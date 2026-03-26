@@ -13,6 +13,53 @@ _BRACKET_DOUBLE_QUOTED = re.compile(r'\$\[\s*"([^"]*)"\s*\]')
 _FORBIDDEN_DOLLAR_DATA = "$.data."
 
 @dataclass
+class CanvasHasTrigger(Evaluator):
+  trigger: str
+
+  def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
+    wf = process_operations(ctx.output.proposal.operations)
+    
+    if self.trigger in wf.nodes:
+      return EvaluationReason(value=True, reason=f"Trigger {self.trigger} found in workflow")
+    else:
+      return EvaluationReason(value=False, reason=f"Trigger {self.trigger} not found in workflow")
+
+@dataclass
+class CanvasHasNode(Evaluator):
+  node: str
+  count: int = 1
+
+  def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
+    wf = process_operations(ctx.output.proposal.operations)
+    count = wf.nodes.count(self.node)
+
+    if count == self.count:
+      return EvaluationReason(value=True, reason=f"Node {self.node} found in workflow {count} times")
+    elif count > self.count:
+      return EvaluationReason(value=False, reason=f"Node {self.node} found in workflow {count} times, expected {self.count} times")
+    elif count == 0:
+      return EvaluationReason(value=False, reason=f"Node {self.node} not found in workflow")
+    else:
+      return EvaluationReason(value=False, reason=f"Node {self.node} found in workflow {count} times, expected {self.count} times")
+
+@dataclass
+class CanvasTotalNodeCount(Evaluator):
+  count: int
+
+  def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
+    wf = process_operations(ctx.output.proposal.operations)
+    count = len(wf.nodes)
+
+    if count == self.count:
+      return EvaluationReason(value=True, reason=f"Workflow has {count} nodes, expected {self.count} nodes")
+    elif count > self.count:
+      return EvaluationReason(value=False, reason=f"Workflow has {count} nodes, expected {self.count} nodes")
+    elif count == 0:
+      return EvaluationReason(value=False, reason=f"Workflow has no nodes")
+    else:
+      return EvaluationReason(value=False, reason=f"Workflow has {count} nodes, expected {self.count} nodes")
+
+@dataclass
 class WorkflowShape(Evaluator):
   nodes: list[str]
   edges: list[tuple[str, str]]
