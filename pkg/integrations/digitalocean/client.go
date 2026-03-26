@@ -1723,6 +1723,23 @@ func contentTypeFromPath(filePath string) string {
 	}
 }
 
+// DeleteObject removes an object from a Spaces bucket.
+// The Spaces API always returns 204 No Content, even if the object does not exist.
+func (c *SpacesClient) DeleteObject(bucket, key string) error {
+	res, err := c.execSpacesRequest(http.MethodDelete, bucket, key, "")
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
 // toStringMap converts map[string]any to map[string]string.
 func toStringMap(m map[string]any) map[string]string {
 	result := make(map[string]string, len(m))

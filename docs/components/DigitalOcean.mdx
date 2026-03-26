@@ -21,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
+  <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
@@ -727,6 +728,52 @@ Returns information about the deleted load balancer:
   },
   "timestamp": "2026-03-13T10:05:30.000000000Z",
   "type": "digitalocean.loadbalancer.deleted"
+}
+```
+
+<a id="delete-object"></a>
+
+## Delete Object
+
+The Delete Object component permanently removes an object from a DigitalOcean Spaces bucket.
+
+### Prerequisites
+
+Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcean integration settings.
+
+### Configuration
+
+- **Bucket**: The Spaces bucket containing the object. The dropdown lists all buckets — the region is determined automatically.
+- **File Path**: The full path to the object within the bucket (e.g. reports/daily.csv). Supports expressions to reference a path from an upstream component.
+
+### Output
+
+- **bucket**: The bucket name
+- **filePath**: The path of the deleted object
+- **deleted**: Always `true` on success
+
+### Notes
+
+- This operation is **permanent** and cannot be undone
+- The operation succeeds even if the object does not exist (idempotent)
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or processed files after a workflow completes
+- **Rotation**: Delete old reports or artifacts as part of a file rotation policy
+- **Pipeline teardown**: Remove objects created during a pipeline run
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-company-assets",
+    "deleted": true,
+    "filePath": "reports/daily.csv"
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.deleted"
 }
 ```
 

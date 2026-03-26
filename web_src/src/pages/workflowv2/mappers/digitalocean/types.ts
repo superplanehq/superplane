@@ -149,6 +149,17 @@ export interface GetObjectOutput {
   body?: string;
 }
 
+export interface DeleteObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+}
+
+export interface DeleteObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  deleted?: boolean;
+}
+
 export interface PutObjectConfiguration {
   bucket?: string;
   filePath?: string;
