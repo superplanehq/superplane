@@ -620,6 +620,9 @@ func nextCursorPath(linkHeader string) string {
 		}
 
 		if nextURL.RawPath != "" {
+			if nextURL.RawQuery == "" {
+				return nextURL.RawPath
+			}
 			return nextURL.RawPath + "?" + nextURL.RawQuery
 		}
 
