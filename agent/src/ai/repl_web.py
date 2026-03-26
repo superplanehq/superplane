@@ -27,6 +27,7 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
+from ai.grpc import InternalAgentServer
 from ai.jwt import JwtValidator
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
@@ -347,8 +348,25 @@ def _create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.post("/v1/agent/chat/stream")
-    async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+    @app.on_event("startup")
+    async def startup() -> None:
+        grpc_server = InternalAgentServer.from_env()
+        grpc_server.start()
+        app.state.grpc_server = grpc_server
+
+    @app.on_event("shutdown")
+    async def shutdown() -> None:
+        grpc_server: InternalAgentServer | None = getattr(app.state, "grpc_server", None)
+        if grpc_server is not None:
+            grpc_server.stop()
+
+    @app.post("/agents/chats/{chat_id}/stream")
+    async def stream_repl(
+        chat_id: str,
+        payload: ReplStreamRequest,
+        request: Request,
+    ) -> StreamingResponse:
+        _ = chat_id
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
