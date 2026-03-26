@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -163,6 +164,8 @@ func Test__DescribeUsage(t *testing.T) {
 	})
 
 	t.Run("returns existing usage data", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Second)
+
 		service := &fakeUsageService{
 			enabled: true,
 			describeLimitsResponse: &pb.DescribeOrganizationLimitsResponse{
@@ -180,7 +183,8 @@ func Test__DescribeUsage(t *testing.T) {
 					Canvases:                            4,
 					EventBucketLevel:                    42,
 					EventBucketCapacity:                 1000,
-					EventBucketLastUpdatedAtUnixSeconds: 1_710_000_000,
+					EventBucketLastUpdatedAtUnixSeconds: now.Unix(),
+					NextEventBucketLeakAtUnixSeconds:    now.Add(24 * time.Hour).Unix(),
 				},
 			},
 		}
@@ -194,6 +198,8 @@ func Test__DescribeUsage(t *testing.T) {
 		require.NotNil(t, response.Usage)
 		assert.Equal(t, int32(4), response.Usage.Canvases)
 		assert.Equal(t, 42.0, response.Usage.EventBucketLevel)
+		require.NotNil(t, response.Usage.NextEventBucketDecreaseAt)
+		assert.WithinDuration(t, now.Add(24*time.Hour), response.Usage.NextEventBucketDecreaseAt.AsTime(), time.Second)
 		assert.Empty(t, service.setupAccountCalls)
 		assert.Empty(t, service.setupOrganizationCalls)
 
@@ -205,6 +211,8 @@ func Test__DescribeUsage(t *testing.T) {
 	})
 
 	t.Run("sets up remote organization when not configured", func(t *testing.T) {
+		now := time.Now().UTC().Truncate(time.Second)
+
 		service := &fakeUsageService{
 			enabled:             true,
 			describeLimitsError: status.Error(codes.NotFound, "organization not configured"),
@@ -226,7 +234,8 @@ func Test__DescribeUsage(t *testing.T) {
 					Canvases:                            1,
 					EventBucketLevel:                    2,
 					EventBucketCapacity:                 12,
-					EventBucketLastUpdatedAtUnixSeconds: 1_710_000_100,
+					EventBucketLastUpdatedAtUnixSeconds: now.Unix(),
+					NextEventBucketLeakAtUnixSeconds:    now.Add(24 * time.Hour).Unix(),
 				},
 			},
 		}
@@ -243,5 +252,7 @@ func Test__DescribeUsage(t *testing.T) {
 		assert.Equal(t, int32(12), response.Limits.MaxCanvases)
 		require.NotNil(t, response.Usage)
 		assert.Equal(t, int32(1), response.Usage.Canvases)
+		require.NotNil(t, response.Usage.NextEventBucketDecreaseAt)
+		assert.WithinDuration(t, now.Add(24*time.Hour), response.Usage.NextEventBucketDecreaseAt.AsTime(), time.Second)
 	})
 }

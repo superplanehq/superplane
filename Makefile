@@ -168,7 +168,7 @@ dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
 dev.agent.console:
-	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)" --repl-web-url http://127.0.0.1:8090
+	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)"
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
@@ -326,8 +326,10 @@ openapi.python.client.gen:
 # Image and CLI build
 #
 
+CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+
 cli.build:
-	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/cli cmd/cli/main.go'
+	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64

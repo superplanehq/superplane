@@ -347,7 +347,7 @@ export const agentsListAgentChats = <ThrowOnError extends boolean = true>(
 /**
  * Creates a new agent chat
  *
- * Create a new agent chat. The response includes the URL and token for initiating the chat
+ * Create a new agent chat. The response includes the URL and token for initiating the chat stream
  */
 export const agentsCreateAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsCreateAgentChatData, ThrowOnError>,

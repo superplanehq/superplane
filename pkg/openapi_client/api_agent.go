@@ -41,7 +41,7 @@ func (r ApiAgentsCreateAgentChatRequest) Execute() (*AgentsCreateAgentChatRespon
 /*
 AgentsCreateAgentChat Creates a new agent chat
 
-Create a new agent chat. The response includes the URL and token for initiating the chat
+Create a new agent chat. The response includes the URL and token for initiating the chat stream
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 	@return ApiAgentsCreateAgentChatRequest

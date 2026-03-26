@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -122,17 +121,4 @@ func timestampOrNil(ts *timestamppb.Timestamp) *timestamppb.Timestamp {
 	}
 
 	return timestamppb.New(ts.AsTime())
-}
-
-func RequireAgentPublicURL(publicURL string) (string, error) {
-	normalized := strings.TrimSpace(publicURL)
-	if normalized == "" {
-		return "", status.Error(codes.Internal, "agent public url is not configured")
-	}
-
-	if !strings.HasPrefix(normalized, "http://") && !strings.HasPrefix(normalized, "https://") {
-		return "", status.Error(codes.Internal, fmt.Sprintf("invalid agent public url: %s", normalized))
-	}
-
-	return normalized, nil
 }

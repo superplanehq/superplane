@@ -64,7 +64,7 @@ class AgentApi:
     ) -> AgentsCreateAgentChatResponse:
         """Creates a new agent chat
 
-        Create a new agent chat. The response includes the URL and token for initiating the chat
+        Create a new agent chat. The response includes the URL and token for initiating the chat stream
 
         :param body: (required)
         :type body: AgentsCreateAgentChatRequest
@@ -131,7 +131,7 @@ class AgentApi:
     ) -> ApiResponse[AgentsCreateAgentChatResponse]:
         """Creates a new agent chat
 
-        Create a new agent chat. The response includes the URL and token for initiating the chat
+        Create a new agent chat. The response includes the URL and token for initiating the chat stream
 
         :param body: (required)
         :type body: AgentsCreateAgentChatRequest
@@ -198,7 +198,7 @@ class AgentApi:
     ) -> RESTResponseType:
         """Creates a new agent chat
 
-        Create a new agent chat. The response includes the URL and token for initiating the chat
+        Create a new agent chat. The response includes the URL and token for initiating the chat stream
 
         :param body: (required)
         :type body: AgentsCreateAgentChatRequest

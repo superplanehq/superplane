@@ -22,6 +22,6 @@ func AgentGRPCURL() string {
 	return os.Getenv("AGENT_GRPC_URL")
 }
 
-func AgentPublicURL() string {
-	return os.Getenv("AGENT_PUBLIC_URL")
+func AgentHTTPURL() string {
+	return os.Getenv("AGENT_HTTP_URL")
 }

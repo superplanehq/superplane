@@ -692,13 +692,13 @@ const file_agents_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xac\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb4\n" +
 	"\n" +
 	"\x06Agents\x12\xf5\x01\n" +
 	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x8d\x01\x92An\n" +
-	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/agents/chats\x12\x88\x02\n" +
-	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\x9d\x01\x92A{\n" +
-	"\x05Agent\x12\x18Creates a new agent chat\x1aXCreate a new agent chat. The response includes the URL and token for initiating the chat\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/agents/chats\x12\x89\x02\n" +
+	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/agents/chats\x12\x90\x02\n" +
+	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\xa5\x01\x92A\x82\x01\n" +
+	"\x05Agent\x12\x18Creates a new agent chat\x1a_Create a new agent chat. The response includes the URL and token for initiating the chat stream\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/agents/chats\x12\x89\x02\n" +
 	"\x11DescribeAgentChat\x12+.Superplane.Agents.DescribeAgentChatRequest\x1a,.Superplane.Agents.DescribeAgentChatResponse\"\x98\x01\x92Ao\n" +
 	"\x05Agent\x122Describes an agent chat for the authenticated user\x1a2Describes an agent chat for the authenticated user\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1/agents/chats/{chat_id}\x12\xfe\x01\n" +
 	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x81\x01\x92AO\n" +

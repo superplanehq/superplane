@@ -12,7 +12,6 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/agentservice"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -159,7 +158,7 @@ func RunServer(
 		log.Fatalf("failed to initialize agent service: %v", err)
 	}
 
-	agentsService := NewAgentsService(agentService, jwtSigner, config.AgentPublicURL())
+	agentsService := NewAgentsService(authService, agentService, jwtSigner)
 	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
 
 	reflection.Register(grpcServer)

@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/agentservice"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
@@ -14,21 +15,21 @@ import (
 )
 
 type AgentsService struct {
+	authService  authorization.Authorization
 	agentService agentservice.Service
 	jwtSigner    *jwt.Signer
-	publicURL    string
 }
 
-func NewAgentsService(agentService agentservice.Service, jwtSigner *jwt.Signer, publicURL string) *AgentsService {
+func NewAgentsService(authService authorization.Authorization, agentService agentservice.Service, jwtSigner *jwt.Signer) *AgentsService {
 	return &AgentsService{
+		authService:  authService,
 		agentService: agentService,
 		jwtSigner:    jwtSigner,
-		publicURL:    publicURL,
 	}
 }
 
 func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
-	organizationID, userID, err := agentContextFromRequest(ctx)
+	organizationID, userID, err := s.getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -57,41 +58,23 @@ func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentCha
 }
 
 func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
-	organizationID, userID, err := agentContextFromRequest(ctx)
+	organizationID, userID, err := s.getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	publicURL, err := agents.RequireAgentPublicURL(s.publicURL)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := s.agentService.CreateAgentChat(ctx, &internalpb.CreateAgentChatRequest{
-		OrgId:    organizationID,
-		CanvasId: req.CanvasId,
-		UserId:   userID,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if response.GetChat() == nil {
-		return nil, status.Error(codes.Internal, "agent service did not return a chat")
-	}
-
-	return agents.MintCreateAgentChatStreamResponse(
+	return agents.CreateAgentChat(
+		s.authService,
 		s.jwtSigner,
-		publicURL,
+		config.AgentHTTPURL(),
 		userID,
 		organizationID,
 		req.CanvasId,
-		response.Chat.Id,
 	)
 }
 
 func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
-	organizationID, userID, err := agentContextFromRequest(ctx)
+	organizationID, userID, err := s.getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +100,7 @@ func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeA
 }
 
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
-	organizationID, userID, err := agentContextFromRequest(ctx)
+	organizationID, userID, err := s.getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -138,12 +121,7 @@ func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListA
 }
 
 func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgentChatRequest) (*pb.ResumeAgentChatResponse, error) {
-	organizationID, userID, err := agentContextFromRequest(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	publicURL, err := agents.RequireAgentPublicURL(s.publicURL)
+	organizationID, userID, err := s.getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -154,6 +132,7 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 		UserId:   userID,
 		ChatId:   req.ChatId,
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +143,7 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 
 	return agents.MintResumeAgentChatStreamResponse(
 		s.jwtSigner,
-		publicURL,
+		config.AgentHTTPURL(),
 		userID,
 		organizationID,
 		req.CanvasId,
@@ -172,7 +151,7 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 	)
 }
 
-func agentContextFromRequest(ctx context.Context) (string, string, error) {
+func (s *AgentsService) getUserFromContext(ctx context.Context) (string, string, error) {
 	organizationID, ok := ctx.Value(authorization.OrganizationContextKey).(string)
 	if !ok || organizationID == "" {
 		return "", "", status.Error(codes.Internal, "organization context is missing")

@@ -84,7 +84,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
             server=False,
             test_repl_web_host="127.0.0.1",
             test_repl_web_port=8090,
-            repl_web_url="http://127.0.0.1:8090",
+            repl_web_url=None,
             start_repl_web=False,
             start_test_repl_web=False,
             model="anthropic:claude-sonnet-4-6",
@@ -106,7 +106,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
         )
         return "ok"
 
-    def fake_create_agent_session(
+    def fake_create_agent_chat(
         base_url: str,
         api_token: str,
         org_id: str,
@@ -120,10 +120,10 @@ def test_main_non_test_mode_mints_agent_chat_session(
                 "canvas_id": canvas_id,
             }
         )
-        return "session-token-123", "http://agent:8090/agents/chats/agent-123/stream"
+        return "session-token-123", "http://agent:8090/v1/agent/chat/stream"
 
     monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
-    monkeypatch.setattr(repl_main, "_create_agent_session", fake_create_agent_session)
+    monkeypatch.setattr(repl_main, "_create_agent_chat", fake_create_agent_chat)
     monkeypatch.setattr(repl_main, "_stream_repl_answer", fake_stream_repl_answer)
 
     repl_main.main()
@@ -138,7 +138,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
     ]
     assert stream_calls == [
         {
-            "stream_url": "http://agent:8090/agents/chats/agent-123/stream",
+            "web_url": "http://agent:8090/v1/agent/chat/stream",
             "canvas_id": "canvas-123",
             "model": "anthropic:claude-sonnet-4-6",
             "token": "session-token-123",

@@ -15,8 +15,6 @@ import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLim
 import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
 import { showErrorToast, showSuccessToast } from "@/utils/toast";
 import { integrationKeys, useUpdateIntegration } from "@/hooks/useIntegrations";
-import { organizationsUpdateIntegration } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -44,7 +42,7 @@ export interface IntegrationCreateDialogProps {
   onReset?: () => void;
   defaultName?: string;
   integrationHomeHref?: string;
-  onCreated?: (integrationId: string) => void;
+  onCreated?: (integrationId: string, instanceName: string) => void;
   /** If set, instructions are truncated at this heading (e.g. "## Webhook integration") so only the part before is shown in the create step. */
   instructionsEndBeforeHeading?: string;
   /** If set, only these configuration field names are shown in the initial create step; the rest are shown in the webhook completion step. */
@@ -184,7 +182,7 @@ export function IntegrationCreateDialog({
       }
       handleClose();
       if (integration?.metadata?.id) {
-        onCreated?.(integration.metadata.id);
+        onCreated?.(integration.metadata.id, nextName);
       }
     } catch (error) {
       setCreateError(error);
@@ -210,11 +208,11 @@ export function IntegrationCreateDialog({
         configuration: { ...pendingWebhookSetup.config, ...configuration },
       });
       handleClose();
-      onCreated?.(pendingWebhookSetup.id);
+      onCreated?.(pendingWebhookSetup.id, integrationName);
     } catch {
       showErrorToast("Failed to complete setup");
     }
-  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated]);
+  }, [pendingWebhookSetup, configuration, updateIntegrationMutation, handleClose, onCreated, integrationName]);
 
   const handleBrowserActionContinue = useCallback(async () => {
     if (!createIntegrationBrowserAction) return;
@@ -239,24 +237,10 @@ export function IntegrationCreateDialog({
       window.open(url, "_blank");
     }
 
-    // Trigger a resync so the backend transitions from pending to ready
     if (createdIntegrationId) {
-      try {
-        await organizationsUpdateIntegration(
-          withOrganizationHeader({
-            path: { id: organizationId, integrationId: createdIntegrationId },
-            body: { configuration: { ...configuration, installed: "true" } },
-          }),
-        );
-        await queryClient.invalidateQueries({
-          queryKey: integrationKeys.connected(organizationId),
-        });
-      } catch {
-        // Resync is best-effort; the integration will be resynced eventually
-      }
       setBrowserActionCompleted(true);
     }
-  }, [createIntegrationBrowserAction, createdIntegrationId, configuration, organizationId, queryClient]);
+  }, [createIntegrationBrowserAction, createdIntegrationId]);
 
   if (!integrationDefinition) return null;
 
@@ -361,21 +345,23 @@ export function IntegrationCreateDialog({
                   />
                 ))}
             </>
-          ) : browserActionCompleted ? null : (
+          ) : (
             <>
-              <div>
-                <Label className="text-gray-800 dark:text-gray-100 mb-2">
-                  Integration Name
-                  <span className="text-gray-800 ml-1">*</span>
-                </Label>
-                <Input
-                  type="text"
-                  value={integrationName}
-                  onChange={(e) => setIntegrationName(e.target.value)}
-                  placeholder="e.g., my-app-integration"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
-              </div>
+              {!browserActionCompleted && (
+                <div>
+                  <Label className="text-gray-800 dark:text-gray-100 mb-2">
+                    Integration Name
+                    <span className="text-gray-800 ml-1">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    value={integrationName}
+                    onChange={(e) => setIntegrationName(e.target.value)}
+                    placeholder="e.g., my-app-integration"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">A unique name for this integration</p>
+                </div>
+              )}
               {configurationFields.length > 0 && (
                 <div className="space-y-4">
                   {configurationFields.map((field: ConfigurationField) => {
@@ -422,42 +408,28 @@ export function IntegrationCreateDialog({
             </>
           ) : createIntegrationBrowserAction ? (
             <>
-              {browserActionCompleted ? (
-                <Button
-                  color="blue"
-                  onClick={() => {
-                    if (createdIntegrationId) {
-                      onCreated?.(createdIntegrationId);
-                    }
+              <LoadingButton
+                color="blue"
+                onClick={async () => {
+                  try {
+                    await updateIntegrationMutation.mutateAsync({
+                      configuration: { ...configuration, installed: "true" },
+                    });
+                    await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
+                    if (createdIntegrationId) onCreated?.(createdIntegrationId, integrationName);
                     handleClose();
-                  }}
-                >
-                  Done
-                </Button>
-              ) : (
-                <>
-                  <LoadingButton
-                    color="blue"
-                    onClick={async () => {
-                      try {
-                        await updateIntegrationMutation.mutateAsync({ configuration: { ...configuration } });
-                        await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
-                        if (createdIntegrationId) onCreated?.(createdIntegrationId);
-                        handleClose();
-                      } catch {
-                        showErrorToast("Failed to sync integration");
-                      }
-                    }}
-                    loading={updateIntegrationMutation.isPending}
-                    loadingText="Saving..."
-                  >
-                    Save
-                  </LoadingButton>
-                  <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
-                    Cancel
-                  </Button>
-                </>
-              )}
+                  } catch {
+                    showErrorToast("Failed to sync integration");
+                  }
+                }}
+                loading={updateIntegrationMutation.isPending}
+                loadingText="Saving..."
+              >
+                Save
+              </LoadingButton>
+              <Button variant="outline" onClick={handleClose} disabled={updateIntegrationMutation.isPending}>
+                Cancel
+              </Button>
             </>
           ) : (
             <>

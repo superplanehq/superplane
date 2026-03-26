@@ -69,6 +69,7 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
@@ -132,6 +133,7 @@ services:
       DB_SSLMODE: ${DB_SSLMODE:-disable}
       APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
+      JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
     command: >-
       bash -lc "uv run uvicorn ai.web:create_app
       --factory
