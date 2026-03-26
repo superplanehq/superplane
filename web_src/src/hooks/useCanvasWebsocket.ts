@@ -61,6 +61,11 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
+
+            queryClient.invalidateQueries({
+              queryKey: canvasKeys.infiniteEvents(canvasId),
+            });
+
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
             onWorkflowEvent?.(workflowEvent, data.event);
           }
