@@ -3,69 +3,933 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SuperPlane API Documentation</title>
+  <title>SuperPlane API</title>
   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.css" />
   <style>
-    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
-    *, *:before, *:after { box-sizing: inherit; }
-    body { margin: 0; background: #fafafa; }
-    .topbar { display: none; }
-    .header {
-      background-color: #222;
-      color: white;
-      padding: 10px 20px;
+    :root {
+      color-scheme: light;
+      --bg: #f3f5ef;
+      --panel: rgba(255, 255, 255, 0.9);
+      --panel-strong: #ffffff;
+      --line: rgba(25, 36, 25, 0.12);
+      --line-strong: rgba(25, 36, 25, 0.18);
+      --text: #182411;
+      --muted: #5c6d55;
+      --accent: #165a4a;
+      --accent-soft: #d9eee7;
+      --accent-strong: #0b3f33;
+      --warning: #9a6500;
+      --shadow: 0 24px 60px rgba(23, 32, 24, 0.12);
+      --radius-lg: 24px;
+      --radius-md: 18px;
+      --radius-sm: 12px;
+    }
+
+    html {
+      box-sizing: border-box;
+      overflow-y: scroll;
+      background: linear-gradient(180deg, #edf3e3 0%, #f7f8f4 22%, #f3f5ef 100%);
+    }
+
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(100, 169, 122, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(46, 130, 110, 0.12), transparent 24%),
+        linear-gradient(180deg, #edf3e3 0%, #f7f8f4 22%, #f3f5ef 100%);
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    .swagger-ui .topbar {
+      display: none;
+    }
+
+    .page {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: 28px 20px 56px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 32px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(244, 249, 244, 0.92)),
+        linear-gradient(135deg, #ffffff, #eef4ee);
+      box-shadow: var(--shadow);
+    }
+
+    .hero:before,
+    .hero:after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+
+    .hero:before {
+      width: 280px;
+      height: 280px;
+      top: -96px;
+      right: -64px;
+      background: radial-gradient(circle, rgba(76, 151, 124, 0.22), rgba(76, 151, 124, 0));
+    }
+
+    .hero:after {
+      width: 240px;
+      height: 240px;
+      bottom: -120px;
+      left: -32px;
+      background: radial-gradient(circle, rgba(20, 92, 74, 0.12), rgba(20, 92, 74, 0));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
+      gap: 24px;
+      align-items: start;
+      margin-top: 18px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2.3rem, 4vw, 4rem);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+      max-width: 720px;
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.65;
+    }
+
+    .hero-points {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .hero-points li {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .button-link,
+    .ghost-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+    }
+
+    .button-link {
+      color: #fff;
+      background: linear-gradient(135deg, #165a4a, #1f7561);
+      box-shadow: 0 14px 28px rgba(22, 90, 74, 0.22);
+    }
+
+    .ghost-link {
+      color: var(--accent-strong);
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 255, 255, 0.74);
+    }
+
+    .button-link:hover,
+    .ghost-link:hover {
+      transform: translateY(-1px);
+    }
+
+    .summary-card,
+    .panel,
+    .swagger-shell {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .summary-card {
+      padding: 22px;
+    }
+
+    .summary-card h2,
+    .panel h2,
+    .swagger-shell h2 {
+      margin: 0;
+      font-size: 1.1rem;
+      line-height: 1.2;
+    }
+
+    .summary-card p,
+    .panel p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    .summary-card dl {
+      display: grid;
+      gap: 14px;
+      margin: 18px 0 0;
+    }
+
+    .summary-card dt {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent-strong);
+    }
+
+    .summary-card dd {
+      margin: 4px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 24px;
+    }
+
+    .panel {
+      padding: 24px;
+    }
+
+    .panel ol,
+    .panel ul {
+      margin: 16px 0 0;
+      padding-left: 20px;
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    .panel li + li {
+      margin-top: 10px;
+    }
+
+    .tutorial-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .auth-controls {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent-strong);
+    }
+
+    .token-input,
+    .snippet,
+    .status {
+      width: 100%;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line-strong);
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .token-input {
+      min-height: 48px;
+      padding: 0 14px;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    .token-input:focus {
+      outline: 2px solid rgba(22, 90, 74, 0.18);
+      outline-offset: 1px;
+      border-color: rgba(22, 90, 74, 0.42);
+    }
+
+    .auth-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .auth-buttons button {
+      min-height: 42px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 600;
+      transition: transform 140ms ease, opacity 140ms ease;
+    }
+
+    .auth-buttons button:hover {
+      transform: translateY(-1px);
+    }
+
+    .auth-buttons .primary {
+      color: #fff;
+      background: linear-gradient(135deg, #165a4a, #1f7561);
+    }
+
+    .auth-buttons .secondary {
+      color: var(--accent-strong);
+      background: var(--accent-soft);
+    }
+
+    .auth-buttons .ghost {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line-strong);
+    }
+
+    .status {
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .status strong {
+      color: var(--text);
+    }
+
+    .status.warning {
+      border-color: rgba(154, 101, 0, 0.22);
+      background: rgba(255, 245, 220, 0.9);
+      color: #6f5300;
+    }
+
+    .snippet {
+      margin-top: 16px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text);
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      white-space: pre;
+    }
+
+    .swagger-shell {
+      margin-top: 28px;
+      padding: 20px;
+    }
+
+    .swagger-header {
       display: flex;
       justify-content: space-between;
+      gap: 16px;
       align-items: center;
+      margin-bottom: 16px;
     }
-    .header h1 {
+
+    .swagger-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    #swagger-ui {
+      overflow: hidden;
+      border-radius: 20px;
+      background: var(--panel-strong);
+    }
+
+    .swagger-ui .info {
       margin: 0;
-      font-size: 24px;
+      padding: 8px 0 0;
     }
-    .header-links a {
-      color: white;
-      margin-left: 15px;
-      text-decoration: none;
+
+    .swagger-ui .scheme-container {
+      box-shadow: none;
+      padding: 20px 0;
+      background: transparent;
     }
-    .header-links a:hover {
-      text-decoration: underline;
+
+    .swagger-ui .opblock-tag {
+      border-bottom-color: rgba(25, 36, 25, 0.08);
+    }
+
+    .swagger-ui .information-container {
+      padding-bottom: 18px;
+    }
+
+    code,
+    .inline-code {
+      padding: 0.12em 0.36em;
+      border-radius: 8px;
+      background: rgba(17, 24, 16, 0.07);
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    @media (max-width: 1120px) {
+      .hero-grid,
+      .section-grid,
+      .tutorial-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-points {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        padding: 16px 14px 40px;
+      }
+
+      .hero,
+      .panel,
+      .summary-card,
+      .swagger-shell {
+        padding: 20px;
+      }
+
+      .swagger-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>SuperPlane API Documentation</h1>
-    <div class="header-links">
-      <a href="./superplane.swagger.json" target="_blank">Download API JSON</a>
-      <a href="https://github.com/superplanehq/superplane" target="_blank">GitHub</a>
-    </div>
-  </div>
-  <div id="swagger-ui"></div>
+  <main class="page">
+    <section class="hero">
+      <span class="eyebrow">SuperPlane Public API</span>
+      <div class="hero-grid">
+        <div>
+          <h1>Automate canvases, executions, and organization operations without the UI.</h1>
+          <p>
+            The SuperPlane API lets teams provision canvases, update configuration as code, trigger runs,
+            inspect execution state, manage service accounts, and automate organization settings from scripts,
+            CI/CD jobs, and internal tooling.
+          </p>
+          <ul class="hero-points">
+            <li>Canvas lifecycle: create, update, delete, version, duplicate, and inspect canvases programmatically.</li>
+            <li>Execution control: list events, inspect outputs, invoke actions, resolve failures, and cancel runs.</li>
+            <li>Organization automation: manage integrations, invite flows, service accounts, users, roles, and groups.</li>
+            <li>Configuration-as-code ready: pair the API with GitOps workflows and the SuperPlane CLI.</li>
+          </ul>
+          <div class="hero-actions">
+            <a class="button-link" href="#reference">Explore API Reference</a>
+            <a class="ghost-link" id="download-json-link" href="#" target="_blank" rel="noreferrer">Download OpenAPI JSON</a>
+            <a class="ghost-link" href="https://github.com/superplanehq/superplane" target="_blank" rel="noreferrer">GitHub</a>
+          </div>
+        </div>
+        <aside class="summary-card">
+          <h2>Authentication</h2>
+          <p>SuperPlane uses bearer token authentication for API requests.</p>
+          <dl>
+            <div>
+              <dt>Header</dt>
+              <dd><span class="inline-code">Authorization: Bearer &lt;token&gt;</span></dd>
+            </div>
+            <div>
+              <dt>Token sources</dt>
+              <dd>Personal API tokens from <span class="inline-code">Settings &gt; Profile</span> or org-scoped tokens from <span class="inline-code">Settings &gt; Service accounts</span>.</dd>
+            </div>
+            <div>
+              <dt>CLI behavior</dt>
+              <dd>The SuperPlane CLI uses the same bearer header, so requests in these docs match what the CLI sends.</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <article class="panel">
+        <h2>Quickstart</h2>
+        <p>Use these steps to make authenticated requests directly from the browser docs.</p>
+        <ol>
+          <li>Create a token from <span class="inline-code">Settings &gt; Profile</span> or <span class="inline-code">Settings &gt; Service accounts</span>.</li>
+          <li>Paste the token into the bearer token field on this page and apply it.</li>
+          <li>Open any operation below, click <span class="inline-code">Try it out</span>, and send the request.</li>
+        </ol>
+        <div class="snippet">curl -X GET \
+  "$API_BASE/api/v1/me" \
+  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
+  -H "Accept: application/json"</div>
+      </article>
+
+      <article class="panel">
+        <h2>Use a Personal Token</h2>
+        <p>Personal tokens are useful for local scripts, prototyping, and developer workflows tied to a human user.</p>
+        <ol>
+          <li>In the SuperPlane UI, go to <span class="inline-code">Settings &gt; Profile</span>.</li>
+          <li>Select <span class="inline-code">Generate Token</span> or <span class="inline-code">Regenerate Token</span>.</li>
+          <li>Copy the token immediately. It is shown only once.</li>
+        </ol>
+        <p>Regenerating a personal token invalidates the previous one.</p>
+      </article>
+
+      <article class="panel">
+        <h2>Use a Service Account Token</h2>
+        <p>Service accounts are the right choice for CI/CD, shared automation, and machine-to-machine access.</p>
+        <ol>
+          <li>In the SuperPlane UI, go to <span class="inline-code">Settings &gt; Service accounts</span>.</li>
+          <li>Create a service account and assign it a role.</li>
+          <li>Generate or regenerate its API token and copy it immediately. It is shown only once.</li>
+        </ol>
+        <p>Service account tokens are organization-scoped and should be preferred for production automation.</p>
+      </article>
+    </section>
+
+    <section class="tutorial-grid">
+      <article class="panel">
+        <h2>Authenticate This Page</h2>
+        <p>Paste a raw API token below. The page stores it locally in your browser and sends it as a bearer token for Swagger requests.</p>
+        <div class="auth-controls">
+          <div class="field">
+            <label for="bearer-token">Bearer token</label>
+            <input id="bearer-token" class="token-input" type="password" autocomplete="off" placeholder="sp_..." />
+          </div>
+          <div class="auth-buttons">
+            <button class="primary" id="apply-token" type="button">Apply token</button>
+            <button class="secondary" id="toggle-token" type="button">Show token</button>
+            <button class="ghost" id="clear-token" type="button">Clear token</button>
+          </div>
+          <div class="status warning" id="auth-status">
+            No token configured. Public or unauthenticated endpoints can still be explored, but most API calls will require a token.
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <h2>Starter Requests</h2>
+        <p>These endpoints are a good entry point for building automation around canvases and organization management.</p>
+        <ul>
+          <li><span class="inline-code">GET /api/v1/me</span> to verify authentication and inspect the current user.</li>
+          <li><span class="inline-code">GET /api/v1/canvases</span> to list canvases available to the token.</li>
+          <li><span class="inline-code">POST /api/v1/canvases</span> to provision a new canvas.</li>
+          <li><span class="inline-code">GET /api/v1/service-accounts</span> to list automation identities in the organization.</li>
+          <li><span class="inline-code">GET /api/v1/organizations/{id}/integrations</span> to inspect configured connections without exposing secrets.</li>
+        </ul>
+        <div class="snippet">curl -X GET \
+  "$API_BASE/api/v1/canvases" \
+  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
+  -H "Accept: application/json"</div>
+      </article>
+    </section>
+
+    <section class="swagger-shell" id="reference">
+      <div class="swagger-header">
+        <div>
+          <h2>API Reference</h2>
+          <p>The reference below is generated from the live OpenAPI document, then normalized here for clearer tagging and bearer token support.</p>
+        </div>
+        <a class="ghost-link" id="open-json-link" href="#" target="_blank" rel="noreferrer">Open raw JSON</a>
+      </div>
+      <div id="swagger-ui"></div>
+    </section>
+  </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-bundle.js" charset="UTF-8"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
   <script>
-    window.onload = function() {
-      const ui = SwaggerUIBundle({
-        url: "./docs/superplane.swagger.json",
-        dom_id: '#swagger-ui',
-        deepLinking: true,
-        presets: [
-          SwaggerUIBundle.presets.apis,
-          SwaggerUIStandalonePreset
-        ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
-        ],
-        layout: "StandaloneLayout",
-        docExpansion: "list",
-        defaultModelsExpandDepth: 1,
-        defaultModelExpandDepth: 1,
-        displayRequestDuration: true,
-        filter: true
+    (function() {
+      const TOKEN_STORAGE_KEY = "superplane.swagger.bearerToken";
+      const docsPath = window.location.pathname.replace(/\/$/, "");
+      const specUrl = window.location.origin + docsPath + "/superplane.swagger.json";
+
+      const tagMetadata = {
+        Agent: {
+          name: "Agents",
+          description: "Manage SuperPlane agents and their lifecycle.",
+          order: 110
+        },
+        Blueprint: {
+          name: "Blueprints",
+          description: "Inspect and manage reusable blueprint resources.",
+          order: 100
+        },
+        Canvas: {
+          name: "Canvases",
+          description: "Create, update, delete, and inspect canvases and canvas-level state.",
+          order: 10
+        },
+        CanvasChangeRequest: {
+          name: "Canvas change requests",
+          description: "Review, approve, reject, and resolve canvas change requests.",
+          order: 30
+        },
+        CanvasEvent: {
+          name: "Canvas events",
+          description: "List emitted canvas events and inspect their related executions.",
+          order: 25
+        },
+        CanvasNode: {
+          name: "Canvas nodes",
+          description: "Inspect node-level metadata, queues, actions, and runtime information.",
+          order: 20
+        },
+        CanvasNodeExecution: {
+          name: "Executions",
+          description: "Control execution state, outputs, retries, actions, and cancellation.",
+          order: 40
+        },
+        CanvasVersion: {
+          name: "Canvas versions",
+          description: "Manage versioned canvas definitions for configuration-as-code workflows.",
+          order: 15
+        },
+        Component: {
+          name: "Components",
+          description: "Discover component definitions and supported actions.",
+          order: 90
+        },
+        Groups: {
+          name: "Groups",
+          description: "Manage organization groups for access control and policy assignment.",
+          order: 70
+        },
+        Integration: {
+          name: "Integrations",
+          description: "Discover available integration definitions and organization connections.",
+          order: 60
+        },
+        Me: {
+          name: "Profile",
+          description: "Inspect the authenticated user and manage personal API tokens.",
+          order: 50
+        },
+        Organization: {
+          name: "Organizations",
+          description: "Manage organization settings, invitations, integrations, usage, and related configuration.",
+          order: 55
+        },
+        Organizations: {
+          name: "Organizations",
+          description: "Manage organization settings, invitations, integrations, usage, and related configuration.",
+          order: 55
+        },
+        Roles: {
+          name: "Roles",
+          description: "Manage roles and permissions within the organization.",
+          order: 80
+        },
+        Secret: {
+          name: "Secrets",
+          description: "Manage secrets and sensitive configuration without returning raw secret values.",
+          order: 65
+        },
+        Secrets: {
+          name: "Secrets",
+          description: "Manage secrets and sensitive configuration without returning raw secret values.",
+          order: 65
+        },
+        ServiceAccounts: {
+          name: "Service accounts",
+          description: "Create automation identities, assign roles, and rotate API tokens.",
+          order: 58
+        },
+        Trigger: {
+          name: "Triggers",
+          description: "Discover trigger definitions that can start or feed canvas executions.",
+          order: 92
+        },
+        Users: {
+          name: "Users",
+          description: "List and manage users and user-specific permissions.",
+          order: 75
+        },
+        Widget: {
+          name: "Widgets",
+          description: "Inspect widget definitions available to canvases and related UI flows.",
+          order: 95
+        }
+      };
+
+      const tokenInput = document.getElementById("bearer-token");
+      const applyTokenButton = document.getElementById("apply-token");
+      const toggleTokenButton = document.getElementById("toggle-token");
+      const clearTokenButton = document.getElementById("clear-token");
+      const authStatus = document.getElementById("auth-status");
+      const downloadJsonLink = document.getElementById("download-json-link");
+      const openJsonLink = document.getElementById("open-json-link");
+
+      downloadJsonLink.href = specUrl;
+      openJsonLink.href = specUrl;
+
+      function getStoredToken() {
+        return window.localStorage.getItem(TOKEN_STORAGE_KEY) || "";
+      }
+
+      function setStoredToken(token) {
+        if (token) {
+          window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+          return;
+        }
+        window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+      }
+
+      function updateAuthStatus(token) {
+        if (!token) {
+          authStatus.classList.add("warning");
+          authStatus.innerHTML = "No token configured. Public or unauthenticated endpoints can still be explored, but most API calls will require a token.";
+          return;
+        }
+
+        authStatus.classList.remove("warning");
+        authStatus.innerHTML = "<strong>Token applied.</strong> Requests from Swagger UI will include <span class=\"inline-code\">Authorization: Bearer &lt;token&gt;</span>.";
+      }
+
+      function setTokenField(token) {
+        tokenInput.value = token;
+        updateAuthStatus(token);
+      }
+
+      function normalizeTag(tag) {
+        const metadata = tagMetadata[tag];
+        if (!metadata) {
+          return {
+            name: tag,
+            description: "",
+            order: 999
+          };
+        }
+        return metadata;
+      }
+
+      function unique(values) {
+        return Array.from(new Set(values));
+      }
+
+      function buildCuratedTags(spec) {
+        const usedTags = new Set();
+
+        Object.values(spec.paths || {}).forEach(function(methods) {
+          Object.values(methods || {}).forEach(function(operation) {
+            (operation.tags || []).forEach(function(tag) {
+              usedTags.add(normalizeTag(tag).name);
+            });
+          });
+        });
+
+        return Array.from(usedTags)
+          .map(function(name) {
+            const metadata = Object.values(tagMetadata).find(function(item) {
+              return item.name === name;
+            }) || { name: name, description: "", order: 999 };
+
+            return {
+              name: name,
+              description: metadata.description,
+              order: metadata.order
+            };
+          })
+          .sort(function(a, b) {
+            if (a.order !== b.order) {
+              return a.order - b.order;
+            }
+            return a.name.localeCompare(b.name);
+          })
+          .map(function(tag) {
+            return {
+              name: tag.name,
+              description: tag.description
+            };
+          });
+      }
+
+      function transformSpec(rawSpec) {
+        const spec = JSON.parse(JSON.stringify(rawSpec));
+
+        spec.info = Object.assign({}, spec.info || {}, {
+          title: "SuperPlane API",
+          description: "Programmatic access to canvases, executions, organization configuration, service accounts, integrations, and related SuperPlane resources."
+        });
+
+        spec.securityDefinitions = Object.assign({}, spec.securityDefinitions || {}, {
+          BearerToken: {
+            type: "apiKey",
+            name: "Authorization",
+            in: "header",
+            description: "Paste a raw SuperPlane API token. Swagger UI sends it as Authorization: Bearer <token>."
+          }
+        });
+
+        Object.values(spec.paths || {}).forEach(function(methods) {
+          Object.values(methods || {}).forEach(function(operation) {
+            const rawTags = operation.tags || [];
+            operation.tags = unique(rawTags.map(function(tag) {
+              return normalizeTag(tag).name;
+            }));
+          });
+        });
+
+        spec.tags = buildCuratedTags(spec);
+        return spec;
+      }
+
+      let ui;
+
+      function applyTokenToSwaggerUI(token) {
+        if (!ui || !ui.preauthorizeApiKey) {
+          return;
+        }
+
+        if (token) {
+          ui.preauthorizeApiKey("BearerToken", "Bearer " + token);
+        }
+      }
+
+      function readTokenFromField() {
+        return tokenInput.value.trim();
+      }
+
+      function persistAndApplyToken() {
+        const token = readTokenFromField();
+        setStoredToken(token);
+        updateAuthStatus(token);
+        applyTokenToSwaggerUI(token);
+      }
+
+      applyTokenButton.addEventListener("click", persistAndApplyToken);
+
+      toggleTokenButton.addEventListener("click", function() {
+        const isHidden = tokenInput.getAttribute("type") === "password";
+        tokenInput.setAttribute("type", isHidden ? "text" : "password");
+        toggleTokenButton.textContent = isHidden ? "Hide token" : "Show token";
       });
-      window.ui = ui;
-    };
+
+      clearTokenButton.addEventListener("click", function() {
+        tokenInput.setAttribute("type", "password");
+        toggleTokenButton.textContent = "Show token";
+        setStoredToken("");
+        setTokenField("");
+      });
+
+      setTokenField(getStoredToken());
+
+      window.onload = function() {
+        fetch(specUrl)
+          .then(function(response) {
+            if (!response.ok) {
+              throw new Error("Failed to load OpenAPI spec");
+            }
+            return response.json();
+          })
+          .then(function(rawSpec) {
+            const spec = transformSpec(rawSpec);
+
+            ui = SwaggerUIBundle({
+              spec: spec,
+              dom_id: "#swagger-ui",
+              deepLinking: true,
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+              ],
+              plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+              ],
+              layout: "BaseLayout",
+              docExpansion: "list",
+              defaultModelsExpandDepth: 1,
+              defaultModelExpandDepth: 1,
+              displayRequestDuration: true,
+              filter: true,
+              persistAuthorization: true,
+              tagsSorter: function(a, b) {
+                const orderA = (spec.tags || []).findIndex(function(tag) { return tag.name === a; });
+                const orderB = (spec.tags || []).findIndex(function(tag) { return tag.name === b; });
+                return orderA - orderB;
+              },
+              operationsSorter: function(a, b) {
+                const methodOrder = { get: 0, post: 1, put: 2, patch: 3, delete: 4 };
+                if (a.get("path") !== b.get("path")) {
+                  return a.get("path").localeCompare(b.get("path"));
+                }
+                return (methodOrder[a.get("method")] || 99) - (methodOrder[b.get("method")] || 99);
+              },
+              requestInterceptor: function(request) {
+                const token = getStoredToken();
+                if (token) {
+                  request.headers = request.headers || {};
+                  request.headers.Authorization = "Bearer " + token;
+                }
+                return request;
+              }
+            });
+
+            applyTokenToSwaggerUI(getStoredToken());
+            window.ui = ui;
+          })
+          .catch(function(error) {
+            authStatus.classList.add("warning");
+            authStatus.innerHTML = "Failed to load the OpenAPI document. " + error.message;
+          });
+      };
+    })();
   </script>
 </body>
 </html>
