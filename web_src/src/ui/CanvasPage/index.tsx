@@ -20,9 +20,9 @@ import {
   Group,
   Loader2,
   Map as MapIcon,
+  Play,
   ScanLine,
   ScanText,
-  ScrollText,
   Copy,
   LayoutGrid,
   Trash2,
@@ -38,7 +38,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 
 import {
   ConfigurationField,
+  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -70,8 +72,15 @@ import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
-import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
+import {
+  CanvasLogSidebar,
+  type ConsoleTab,
+  type LogEntry,
+  type LogScopeFilter,
+  type LogTypeFilter,
+} from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/CanvasRunsView";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -344,7 +353,22 @@ export interface CanvasPageProps {
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
-  onResolveExecutionErrors?: (executionIds: string[]) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
+  runsNodes?: ComponentsNode[];
+  runsComponentIconMap?: Record<string, string>;
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
@@ -1274,7 +1298,17 @@ function CanvasPage(props: CanvasPageProps) {
                 focusRequest={props.focusRequest}
                 onExecutionChainHandled={props.onExecutionChainHandled}
                 initialFocusNodeId={props.initialFocusNodeId}
-                onResolveExecutionErrors={props.onResolveExecutionErrors}
+                runsEvents={props.runsEvents}
+                runsTotalCount={props.runsTotalCount}
+                runsHasNextPage={props.runsHasNextPage}
+                runsIsFetchingNextPage={props.runsIsFetchingNextPage}
+                onRunsLoadMore={props.onRunsLoadMore}
+                runsNodes={props.runsNodes}
+                runsComponentIconMap={props.runsComponentIconMap}
+                runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
                 title={props.title}
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
@@ -1943,7 +1977,17 @@ function CanvasContent({
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
-  onResolveExecutionErrors,
+  runsEvents,
+  runsTotalCount,
+  runsHasNextPage,
+  runsIsFetchingNextPage,
+  onRunsLoadMore,
+  runsNodes,
+  runsComponentIconMap,
+  runsNodeQueueItemsMap,
+  onRunNodeSelect,
+  onRunExecutionSelect,
+  onAcknowledgeErrors,
   title,
   missingIntegrations,
   onConnectIntegration,
@@ -2041,7 +2085,22 @@ function CanvasContent({
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
-  onResolveExecutionErrors?: (executionIds: string[]) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
+  runsNodes?: ComponentsNode[];
+  runsComponentIconMap?: Record<string, string>;
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
   title?: string;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
@@ -2113,6 +2172,7 @@ function CanvasContent({
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
+  const [consoleTab, setConsoleTab] = useState<ConsoleTab>("runs");
   const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
   const [logSearch, setLogSearch] = useState("");
@@ -2120,6 +2180,20 @@ function CanvasContent({
   const [logSidebarHeight, setLogSidebarHeight] = useState(320);
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
+
+  const runsCountInfo = useMemo(() => {
+    const events = runsEvents || [];
+    let running = 0;
+    for (const event of events) {
+      const execs = event.executions || [];
+      if (execs.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
+        running++;
+      }
+    }
+    return { total: runsTotalCount || events.length, running };
+  }, [runsEvents, runsTotalCount]);
+
+  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(runsEvents || []), [runsEvents]);
 
   useEffect(() => {
     if (!showBottomStatusControls) {
@@ -2743,12 +2817,8 @@ function CanvasContent({
     }, []);
   }, [logEntries, logFilter, logScope, logSearch]);
 
-  const handleLogButtonClick = useCallback((filterType: "all" | "error" | "warning") => {
-    if (filterType === "all") {
-      setLogFilter(new Set());
-    } else {
-      setLogFilter(new Set([filterType]));
-    }
+  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
+    setConsoleTab(tab);
     setIsLogSidebarOpen(true);
   }, []);
 
@@ -2985,27 +3055,51 @@ function CanvasContent({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("all")}
+                          className={cn(
+                            "h-8 items-center text-xs font-medium",
+                            runsCountInfo.running > 0 && "text-blue-600",
+                          )}
+                          onClick={() => handleLogButtonClick("runs")}
                         >
-                          <ScrollText className="h-3 w-3" />
+                          {runsCountInfo.running > 0 ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Play className="h-3 w-3" />
+                          )}
+                          <span
+                            className={cn(
+                              "tabular-nums",
+                              runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800",
+                            )}
+                          >
+                            {runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total}
+                          </span>
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>All Logs</TooltipContent>
+                      <TooltipContent>
+                        {runsCountInfo.running > 0 ? `${runsCountInfo.running} running` : `${runsCountInfo.total} runs`}
+                      </TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("error")}
+                          className={cn(
+                            "h-8 items-center text-xs font-medium",
+                            unacknowledgedErrorCount > 0 && "text-red-500",
+                          )}
+                          onClick={() => handleLogButtonClick("errors")}
                         >
-                          <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                          <CircleX
+                            className={unacknowledgedErrorCount > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"}
+                          />
                           <span
-                            className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                            className={
+                              unacknowledgedErrorCount > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"
+                            }
                           >
-                            {logCounts.error}
+                            {unacknowledgedErrorCount}
                           </span>
                         </Button>
                       </TooltipTrigger>
@@ -3017,7 +3111,7 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("warning")}
+                          onClick={() => handleLogButtonClick("warnings")}
                         >
                           <TriangleAlert
                             className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
@@ -3152,7 +3246,6 @@ function CanvasContent({
           onClose={() => setIsLogSidebarOpen(false)}
           filter={logFilter}
           onFilterChange={setLogFilter}
-          onResolveErrors={onResolveExecutionErrors}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
           scope={logScope}
@@ -3163,6 +3256,19 @@ function CanvasContent({
           counts={logCounts}
           expandedRuns={expandedRuns}
           onToggleRun={handleRunToggle}
+          activeTab={consoleTab}
+          onTabChange={setConsoleTab}
+          runsEvents={runsEvents}
+          runsTotalCount={runsTotalCount}
+          runsHasNextPage={runsHasNextPage}
+          runsIsFetchingNextPage={runsIsFetchingNextPage}
+          onRunsLoadMore={onRunsLoadMore}
+          runsNodes={runsNodes}
+          runsComponentIconMap={runsComponentIconMap}
+          runsNodeQueueItemsMap={runsNodeQueueItemsMap}
+          onRunNodeSelect={onRunNodeSelect}
+          onRunExecutionSelect={onRunExecutionSelect}
+          onAcknowledgeErrors={onAcknowledgeErrors}
         />
       ) : null}
     </div>
