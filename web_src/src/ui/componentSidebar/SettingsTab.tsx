@@ -284,6 +284,37 @@ export function SettingsTab({
 
   const shouldShowConfiguration = true;
 
+  const updateAutosaveBaseline = useCallback((snapshot: string) => {
+    autosaveBaselineSnapshotRef.current = snapshot;
+    pendingAutosaveSnapshotRef.current = null;
+  }, []);
+
+  const queuePendingAutosave = useCallback(
+    (snapshot: string) => {
+      if (configurationSaveMode === "auto") {
+        pendingAutosaveSnapshotRef.current = snapshot;
+      }
+    },
+    [configurationSaveMode],
+  );
+
+  const flushPendingAutosave = useCallback(() => {
+    if (configurationSaveMode !== "auto") {
+      return;
+    }
+
+    const pendingSnapshot = pendingAutosaveSnapshotRef.current;
+    if (!pendingSnapshot || pendingSnapshot === autosaveBaselineSnapshotRef.current) {
+      pendingAutosaveSnapshotRef.current = null;
+      return;
+    }
+
+    pendingAutosaveSnapshotRef.current = null;
+    window.setTimeout(() => {
+      void handleSaveRef.current();
+    }, 0);
+  }, [configurationSaveMode]);
+
   const handleSave = useCallback(async () => {
     if (isReadOnly) {
       return;
@@ -300,16 +331,13 @@ export function SettingsTab({
     }
 
     if (savingRef.current) {
-      if (configurationSaveMode === "auto") {
-        pendingAutosaveSnapshotRef.current = snapshot;
-      }
+      queuePendingAutosave(snapshot);
       return;
     }
 
     const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
     if (!(result instanceof Promise)) {
-      autosaveBaselineSnapshotRef.current = snapshot;
-      pendingAutosaveSnapshotRef.current = null;
+      updateAutosaveBaseline(snapshot);
       return;
     }
 
@@ -317,25 +345,24 @@ export function SettingsTab({
     setIsSaving(true);
     try {
       await result;
-      autosaveBaselineSnapshotRef.current = snapshot;
-      pendingAutosaveSnapshotRef.current = null;
+      updateAutosaveBaseline(snapshot);
     } finally {
       savingRef.current = false;
       setIsSaving(false);
-
-      if (configurationSaveMode === "auto") {
-        const pendingSnapshot = pendingAutosaveSnapshotRef.current;
-        if (pendingSnapshot && pendingSnapshot !== autosaveBaselineSnapshotRef.current) {
-          pendingAutosaveSnapshotRef.current = null;
-          window.setTimeout(() => {
-            void handleSaveRef.current();
-          }, 0);
-        } else {
-          pendingAutosaveSnapshotRef.current = null;
-        }
-      }
+      flushPendingAutosave();
     }
-  }, [isReadOnly, validateNow, onSave, nodeConfiguration, currentNodeName, selectedIntegration, configurationSaveMode]);
+  }, [
+    isReadOnly,
+    validateNow,
+    currentNodeName,
+    selectedIntegration,
+    configurationSaveMode,
+    nodeConfiguration,
+    onSave,
+    queuePendingAutosave,
+    updateAutosaveBaseline,
+    flushPendingAutosave,
+  ]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
