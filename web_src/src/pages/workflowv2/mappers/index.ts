@@ -182,6 +182,11 @@ import {
   eventStateRegistry as claudeEventStateRegistry,
 } from "./claude/index";
 import {
+  componentMappers as logfireComponentMappers,
+  triggerRenderers as logfireTriggerRenderers,
+  eventStateRegistry as logfireEventStateRegistry,
+} from "./logfire/index";
+import {
   componentMappers as perplexityComponentMappers,
   triggerRenderers as perplexityTriggerRenderers,
   eventStateRegistry as perplexityEventStateRegistry,
@@ -300,6 +305,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   openai: openaiComponentMappers,
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
+  logfire: logfireComponentMappers,
   perplexity: perplexityComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
@@ -343,6 +349,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   openai: openaiTriggerRenderers,
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
+  logfire: logfireTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
@@ -384,6 +391,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   openai: openaiEventStateRegistry,
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
+  logfire: logfireEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
