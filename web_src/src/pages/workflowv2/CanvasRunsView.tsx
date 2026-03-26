@@ -18,6 +18,7 @@ import {
   formatRunTimestamp,
   getAggregateStatus,
   getStatusBadgeProps,
+  mergeQueueItemsWithEvents,
   resolveExecutionDisplayStatus,
   resolveNodeIconSlug,
 } from "./canvasRunsUtils";
@@ -49,7 +50,7 @@ function NodeIcon({
   className?: string;
 }) {
   if (iconSrc) {
-    return <img src={iconSrc} alt={alt} className={`h-${size / 4} w-${size / 4} object-contain`} />;
+    return <img src={iconSrc} alt={alt} style={{ width: size, height: size }} className="object-contain" />;
   }
   return React.createElement(resolveIcon(iconSlug || "box"), { size, className });
 }
@@ -347,6 +348,78 @@ export function RunRow({
   );
 }
 
+function RunsFilterBar({
+  statusFilter,
+  onFilterChange,
+  counts,
+}: {
+  statusFilter: RunsStatusFilter;
+  onFilterChange: (f: RunsStatusFilter) => void;
+  counts: { all: number; completed: number; errors: number; running: number; queued: number };
+}) {
+  const buttons: { key: RunsStatusFilter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: counts.all },
+    { key: "completed", label: "Completed", count: counts.completed },
+    { key: "errors", label: "Errors", count: counts.errors },
+    { key: "running", label: "Running", count: counts.running },
+    { key: "queued", label: "Queued", count: counts.queued },
+  ];
+  return (
+    <div className="flex items-center gap-1 px-4 py-1.5 border-b border-gray-200">
+      {buttons.map((btn) => (
+        <button
+          key={btn.key}
+          type="button"
+          onClick={() => onFilterChange(btn.key)}
+          className={cn(
+            "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
+            statusFilter === btn.key ? "bg-slate-900 text-white" : "text-gray-600 hover:bg-gray-100",
+          )}
+        >
+          {btn.label}
+          {btn.count > 0 && (
+            <span className={cn("ml-1 tabular-nums", statusFilter === btn.key ? "text-white/70" : "text-gray-400")}>
+              {btn.count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LoadMoreButton({
+  isFetchingNextPage,
+  onLoadMore,
+  loadedCount,
+  totalCount,
+}: {
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
+  loadedCount: number;
+  totalCount: number;
+}) {
+  return (
+    <div className="px-4 py-2 text-center border-t border-gray-200">
+      <button
+        type="button"
+        onClick={onLoadMore}
+        disabled={isFetchingNextPage}
+        className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
+      >
+        {isFetchingNextPage ? (
+          <span className="inline-flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Loading...
+          </span>
+        ) : (
+          `Load more (${loadedCount} of ${totalCount})`
+        )}
+      </button>
+    </div>
+  );
+}
+
 export function RunsConsoleContent({
   events,
   totalCount,
@@ -380,68 +453,19 @@ export function RunsConsoleContent({
   const [statusFilter, setStatusFilter] = useState<RunsStatusFilter>("all");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
 
-  const toggleRun = (runId: string) => {
+  const toggleRun = useCallback((runId: string) => {
     setExpandedRuns((prev) => {
       const next = new Set(prev);
-      if (next.has(runId)) {
-        next.delete(runId);
-      } else {
-        next.add(runId);
-      }
+      if (next.has(runId)) next.delete(runId);
+      else next.add(runId);
       return next;
     });
-  };
+  }, []);
 
-  const { queueItemsByEventId, orphanQueueEvents } = useMemo(() => {
-    const map: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
-    const orphansByEvent: Record<
-      string,
-      { event: CanvasesCanvasNodeQueueItem["rootEvent"]; items: CanvasesCanvasNodeQueueItem[] }
-    > = {};
-    const eventIds = new Set(events.map((e) => e.id));
-
-    for (const items of Object.values(nodeQueueItemsMap)) {
-      for (const item of items) {
-        const eventId = item.rootEvent?.id;
-        if (!eventId) continue;
-
-        if (eventIds.has(eventId)) {
-          if (!map[eventId]) map[eventId] = [];
-          map[eventId].push(item);
-        } else {
-          if (!orphansByEvent[eventId]) {
-            orphansByEvent[eventId] = { event: item.rootEvent, items: [] };
-          }
-          orphansByEvent[eventId].items.push(item);
-        }
-      }
-    }
-
-    const orphanEvents: CanvasesCanvasEventWithExecutions[] = Object.entries(orphansByEvent).map(
-      ([eventId, { event: rootEvent, items }]) => ({
-        id: eventId,
-        canvasId: items[0]?.canvasId,
-        nodeId: rootEvent?.nodeId,
-        channel: rootEvent?.channel,
-        data: rootEvent?.data as Record<string, unknown> | undefined,
-        createdAt: rootEvent?.createdAt,
-        executions: [],
-      }),
-    );
-
-    return { queueItemsByEventId: map, orphanQueueEvents: orphanEvents };
-  }, [nodeQueueItemsMap, events]);
-
-  const allEvents = useMemo(() => {
-    if (orphanQueueEvents.length === 0) return events;
-    const merged = [...orphanQueueEvents, ...events];
-    merged.sort((a, b) => {
-      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return tb - ta;
-    });
-    return merged;
-  }, [events, orphanQueueEvents]);
+  const { queueItemsByEventId, allEvents } = useMemo(
+    () => mergeQueueItemsWithEvents(events, nodeQueueItemsMap),
+    [events, nodeQueueItemsMap],
+  );
 
   const filteredEvents = useMemo(
     () => filterRunEvents(allEvents, nodes, statusFilter, searchQuery),
@@ -449,39 +473,15 @@ export function RunsConsoleContent({
   );
 
   const counts = useMemo(() => computeRunsCounts(allEvents, nodes), [allEvents, nodes]);
-
   const allCount = totalCount != null && totalCount > 0 ? totalCount : counts.total;
-
-  const filterButtons: { key: RunsStatusFilter; label: string; count?: number }[] = [
-    { key: "all", label: "All", count: allCount },
-    { key: "completed", label: "Completed", count: counts.completed },
-    { key: "errors", label: "Errors", count: counts.errors },
-    { key: "running", label: "Running", count: counts.running },
-    { key: "queued", label: "Queued", count: counts.queued },
-  ];
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex items-center gap-1 px-4 py-1.5 border-b border-gray-200">
-        {filterButtons.map((btn) => (
-          <button
-            key={btn.key}
-            type="button"
-            onClick={() => setStatusFilter(btn.key)}
-            className={cn(
-              "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
-              statusFilter === btn.key ? "bg-slate-900 text-white" : "text-gray-600 hover:bg-gray-100",
-            )}
-          >
-            {btn.label}
-            {btn.count !== undefined && btn.count > 0 && (
-              <span className={cn("ml-1 tabular-nums", statusFilter === btn.key ? "text-white/70" : "text-gray-400")}>
-                {btn.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
+      <RunsFilterBar
+        statusFilter={statusFilter}
+        onFilterChange={setStatusFilter}
+        counts={{ all: allCount, completed: counts.completed, errors: counts.errors, running: counts.running, queued: counts.queued }}
+      />
       <div className="flex-1 overflow-auto">
         {allEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
@@ -509,23 +509,12 @@ export function RunsConsoleContent({
               />
             ))}
             {hasNextPage && statusFilter === "all" && !searchQuery.trim() && (
-              <div className="px-4 py-2 text-center border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={onLoadMore}
-                  disabled={isFetchingNextPage}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
-                >
-                  {isFetchingNextPage ? (
-                    <span className="inline-flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Loading...
-                    </span>
-                  ) : (
-                    `Load more (${allEvents.length} of ${allCount})`
-                  )}
-                </button>
-              </div>
+              <LoadMoreButton
+                isFetchingNextPage={isFetchingNextPage}
+                onLoadMore={onLoadMore}
+                loadedCount={allEvents.length}
+                totalCount={allCount}
+              />
             )}
           </div>
         )}

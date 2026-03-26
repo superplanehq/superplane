@@ -1,4 +1,9 @@
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
+  ComponentsNode,
+} from "@/api-client";
 import { formatTimeAgo } from "@/utils/date";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "./mappers";
@@ -232,4 +237,49 @@ export function findNode(nodes: ComponentsNode[], nodeId: string | undefined): C
   if (!nodeId) return undefined;
   const baseNodeId = nodeId.includes(":") ? nodeId.split(":")[0] : nodeId;
   return nodes.find((n) => n.id === nodeId) || nodes.find((n) => n.id === baseNodeId);
+}
+
+export function mergeQueueItemsWithEvents(
+  events: CanvasesCanvasEventWithExecutions[],
+  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
+): { queueItemsByEventId: Record<string, CanvasesCanvasNodeQueueItem[]>; allEvents: CanvasesCanvasEventWithExecutions[] } {
+  const map: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
+  const orphansByEvent: Record<string, { event: CanvasesCanvasNodeQueueItem["rootEvent"]; items: CanvasesCanvasNodeQueueItem[] }> = {};
+  const eventIds = new Set(events.map((e) => e.id));
+
+  for (const items of Object.values(nodeQueueItemsMap)) {
+    for (const item of items) {
+      const eventId = item.rootEvent?.id;
+      if (!eventId) continue;
+      if (eventIds.has(eventId)) {
+        if (!map[eventId]) map[eventId] = [];
+        map[eventId].push(item);
+      } else {
+        if (!orphansByEvent[eventId]) orphansByEvent[eventId] = { event: item.rootEvent, items: [] };
+        orphansByEvent[eventId].items.push(item);
+      }
+    }
+  }
+
+  const orphanEvents: CanvasesCanvasEventWithExecutions[] = Object.entries(orphansByEvent).map(
+    ([eventId, { event: rootEvent, items }]) => ({
+      id: eventId,
+      canvasId: items[0]?.canvasId,
+      nodeId: rootEvent?.nodeId,
+      channel: rootEvent?.channel,
+      data: rootEvent?.data as Record<string, unknown> | undefined,
+      createdAt: rootEvent?.createdAt,
+      executions: [],
+    }),
+  );
+
+  if (orphanEvents.length === 0) return { queueItemsByEventId: map, allEvents: events };
+
+  const merged = [...orphanEvents, ...events];
+  merged.sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return tb - ta;
+  });
+  return { queueItemsByEventId: map, allEvents: merged };
 }
