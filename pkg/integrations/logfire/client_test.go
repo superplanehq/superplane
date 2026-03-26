@@ -63,7 +63,7 @@ func TestClient_ExecuteQueryWithToken_SetsAuthAndQueryParams(t *testing.T) {
 	assert.Equal(t, "true", req.URL.Query().Get("row_oriented"))
 }
 
-func TestClient_CreateReadToken_EmptyTokenReturned(t *testing.T) {
+func TestClient_createReadToken_EmptyTokenReturned(t *testing.T) {
 	t.Parallel()
 
 	client := &Client{
@@ -76,7 +76,7 @@ func TestClient_CreateReadToken_EmptyTokenReturned(t *testing.T) {
 		},
 	}
 
-	_, err := client.CreateReadToken("project_1", defaultReadTokenName)
+	_, err := client.createReadToken("project_1", defaultReadTokenName)
 	require.ErrorContains(t, err, "read token not returned by Logfire")
 }
 

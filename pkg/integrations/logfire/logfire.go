@@ -86,7 +86,7 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 	config := Configuration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
+		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
 	if config.APIKey == "" {
@@ -95,7 +95,7 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return fmt.Errorf("error creating client: %w", err)
 	}
 
 	projects, err := client.ListProjects()
