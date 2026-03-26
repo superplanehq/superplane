@@ -137,7 +137,7 @@ func alertThresholdField(label, name string, required bool) configuration.Field 
 		Name:        name,
 		Label:       label,
 		Type:        configuration.FieldTypeObject,
-		Required:    false,
+		Required:    required,
 		Description: label + " configuration",
 		TypeOptions: &configuration.TypeOptions{
 			Object: &configuration.ObjectTypeOptions{
