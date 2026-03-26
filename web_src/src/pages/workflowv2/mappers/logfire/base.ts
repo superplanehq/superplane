@@ -63,6 +63,10 @@ type QueryLogfireNodeConfiguration = {
   rowOriented?: boolean;
 };
 
+type QueryLogfireNodeMetadata = {
+  project?: { id?: string; name?: string };
+};
+
 function truncateText(value: string, maxLength: number): string {
   const trimmed = value.trim();
   if (trimmed.length <= maxLength) return trimmed;
@@ -115,15 +119,15 @@ function buildTimeWindowMetadata(minTs?: string, maxTs?: string): MetadataItem[]
   return [];
 }
 
-function buildProjectMetadata(projectId?: string): MetadataItem[] {
-  const trimmed = projectId?.trim();
-  if (!trimmed) return [];
+function buildProjectMetadata(projectId?: string, nodeMetadata?: QueryLogfireNodeMetadata): MetadataItem[] {
+  const projectName = nodeMetadata?.project?.name?.trim();
+  const label = projectName || projectId?.trim();
+  if (!label) return [];
 
   return [
     {
       icon: "folder",
-      // Avoid cutting off the project id in the node metadata list.
-      label: `Project: ${truncateText(trimmed, 60)}`,
+      label: `Project: ${truncateText(label, 60)}`,
     },
   ];
 }
@@ -163,14 +167,14 @@ function buildQueryMetadata(configuration: QueryLogfireNodeConfiguration | undef
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as QueryLogfireNodeConfiguration | undefined;
+  const nodeMetadata = node.metadata as QueryLogfireNodeMetadata | undefined;
 
   const minTs = formatTimestampForMetadata(configuration?.minTimestamp);
   const maxTs = formatTimestampForMetadata(configuration?.maxTimestamp);
 
-  // Keep timestamps first to match the UX expectation.
   const metadata: MetadataItem[] = [
     ...buildTimeWindowMetadata(minTs, maxTs),
-    ...buildProjectMetadata(configuration?.projectId),
+    ...buildProjectMetadata(configuration?.projectId, nodeMetadata),
     ...buildQueryMetadata(configuration),
   ];
 

@@ -28,7 +28,6 @@ const (
 
 type Client struct {
 	APIKey     string
-	ReadToken  string
 	BaseURL    string
 	APIBaseURL string
 	http       core.HTTPContext
@@ -50,7 +49,7 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 	if err == nil {
 		trimmedBaseURL := strings.TrimSpace(string(configuredBaseURL))
 		if trimmedBaseURL != "" {
-			baseURL = trimmedBaseURL
+			baseURL = ensureScheme(trimmedBaseURL)
 			isBaseURLConfigured = true
 		}
 	}
@@ -68,17 +67,8 @@ func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, 
 		APIKey:     apiKey,
 		BaseURL:    strings.TrimRight(baseURL, "/"),
 		APIBaseURL: apiBaseURL,
-		ReadToken:  findSecretValue(ctx, readTokenSecretName),
 		http:       httpCtx,
 	}, nil
-}
-
-func (c *Client) ValidateCredentials() error {
-	if strings.TrimSpace(c.ReadToken) == "" {
-		return fmt.Errorf("logfire read token is required")
-	}
-
-	return c.validateReadToken(c.ReadToken)
 }
 
 func (c *Client) validateReadToken(readToken string) error {
@@ -95,50 +85,6 @@ func (c *Client) validateReadToken(readToken string) error {
 		return fmt.Errorf("invalid Logfire read token - please verify your token and try again")
 	}
 	return fmt.Errorf("could not connect to Logfire - please verify your read token and base URL, then try again: %w", err)
-}
-
-// FindFirstUsableReadToken tries to create a read token in each accessible project.
-// It returns the first project where creating a token succeeds and the token passes ValidateCredentials.
-// If none of the projects allow token creation, it fails with a clear permission error.
-func (c *Client) FindFirstUsableReadToken(tokenName string) (*IntegrationBootstrapResult, error) {
-	projects, err := c.ListProjects()
-	if err != nil {
-		return nil, fmt.Errorf("invalid Logfire API key - please verify your key and try again: %w", err)
-	}
-	if len(projects) == 0 {
-		return nil, fmt.Errorf("no Logfire projects available for this API key")
-	}
-
-	anyCreateSuccess := false
-	for i := range projects {
-		created, createErr := c.createReadToken(projects[i].ID, tokenName)
-		if createErr != nil {
-			continue
-		}
-
-		anyCreateSuccess = true
-
-		// Treat an unvalidated token as unusable and try the next project.
-		if err := c.validateReadToken(created.Token); err != nil {
-			// Remove token we created so repeated Sync does not accumulate orphans.
-			if strings.TrimSpace(created.ID) != "" {
-				_ = c.DeleteReadToken(projects[i].ID, created.ID)
-			}
-			continue
-		}
-
-		c.ReadToken = created.Token
-		return &IntegrationBootstrapResult{
-			Project:   projects[i],
-			ReadToken: created.Token,
-		}, nil
-	}
-
-	if !anyCreateSuccess {
-		return nil, fmt.Errorf("api key has no permission to create read tokens in any accessible project")
-	}
-
-	return nil, fmt.Errorf("failed to validate a Logfire read token in any accessible project")
 }
 
 func isUnauthorizedError(err error) bool {
@@ -174,11 +120,6 @@ type Project struct {
 	ProjectName      string `json:"project_name"`
 }
 
-type IntegrationBootstrapResult struct {
-	Project   Project
-	ReadToken string
-}
-
 type AlertChannel struct {
 	ID     string `json:"id"`
 	Label  string `json:"label"`
@@ -187,8 +128,12 @@ type AlertChannel struct {
 	} `json:"config,omitempty"`
 }
 
-func (c *Client) ExecuteQuery(request QueryRequest) (*QueryResponse, error) {
-	return c.executeQuery(c.ReadToken, request)
+func (c *Client) ExecuteQueryWithToken(readToken string, request QueryRequest) (*QueryResponse, error) {
+	return c.executeQuery(readToken, request)
+}
+
+func readTokenSecretNameForProject(projectID string) string {
+	return readTokenSecretName + ":" + strings.TrimSpace(projectID)
 }
 
 func (c *Client) executeQuery(readToken string, request QueryRequest) (*QueryResponse, error) {
@@ -321,6 +266,24 @@ func (c *Client) CreateReadToken(projectID, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return created.Token, nil
+}
+
+// ProvisionReadToken creates a read token for the given project and validates it.
+// If validation fails, the created token is cleaned up.
+func (c *Client) ProvisionReadToken(projectID string) (string, error) {
+	created, err := c.createReadToken(projectID, defaultReadTokenName)
+	if err != nil {
+		return "", fmt.Errorf("failed to create read token for project %s: %w", projectID, err)
+	}
+
+	if err := c.validateReadToken(created.Token); err != nil {
+		if strings.TrimSpace(created.ID) != "" {
+			_ = c.DeleteReadToken(projectID, created.ID)
+		}
+		return "", fmt.Errorf("created read token for project %s is not usable: %w", projectID, err)
+	}
+
 	return created.Token, nil
 }
 
@@ -607,6 +570,13 @@ func isChannelAlreadyExistsError(err error) bool {
 
 func isSuccessfulStatusCode(statusCode int) bool {
 	return statusCode == http.StatusOK || statusCode == http.StatusCreated || statusCode == http.StatusNoContent
+}
+
+func ensureScheme(rawURL string) string {
+	if strings.HasPrefix(rawURL, "http://") || strings.HasPrefix(rawURL, "https://") {
+		return rawURL
+	}
+	return "https://" + rawURL
 }
 
 func deriveAPIBaseURL(baseURL string) string {

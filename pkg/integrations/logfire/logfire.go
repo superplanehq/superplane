@@ -22,7 +22,6 @@ type Configuration struct {
 
 type Metadata struct {
 	ExternalOrganizationID string `json:"externalOrganizationId,omitempty"`
-	ExternalProjectID      string `json:"externalProjectId,omitempty"`
 	SupportsWebhookSetup   bool   `json:"supportsWebhookSetup"`
 	SupportsQueryAPI       bool   `json:"supportsQueryApi"`
 }
@@ -99,43 +98,24 @@ func (l *Logfire) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	var bootstrap *IntegrationBootstrapResult
-	if err := client.ValidateCredentials(); err == nil {
-		// Stored read token still works; do not create another on every sync.
-		bootstrap = nil
-	} else {
-		bootstrap, err = client.FindFirstUsableReadToken(defaultReadTokenName)
-		if err != nil {
-			return err
-		}
-	}
-
-	if bootstrap != nil {
-		if err := ctx.Integration.SetSecret(readTokenSecretName, []byte(bootstrap.ReadToken)); err != nil {
-			return fmt.Errorf("failed to store Logfire read token: %w", err)
-		}
+	projects, err := client.ListProjects()
+	if err != nil {
+		return fmt.Errorf("invalid Logfire API key - please verify your key and try again: %w", err)
 	}
 
 	metadata := Metadata{
-		SupportsWebhookSetup: false,
-		SupportsQueryAPI:     true,
+		SupportsQueryAPI: true,
 	}
 
 	decodedMetadata := Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &decodedMetadata); err == nil {
-		if decodedMetadata.ExternalOrganizationID != "" {
-			metadata.ExternalOrganizationID = decodedMetadata.ExternalOrganizationID
-		}
-		if decodedMetadata.ExternalProjectID != "" {
-			metadata.ExternalProjectID = decodedMetadata.ExternalProjectID
-		}
 		if decodedMetadata.SupportsWebhookSetup {
 			metadata.SupportsWebhookSetup = true
 		}
 	}
-	if bootstrap != nil {
-		metadata.ExternalOrganizationID = bootstrap.Project.OrganizationName
-		metadata.ExternalProjectID = bootstrap.Project.ID
+
+	if len(projects) > 0 {
+		metadata.ExternalOrganizationID = projects[0].OrganizationName
 	}
 
 	ctx.Integration.SetMetadata(metadata)
