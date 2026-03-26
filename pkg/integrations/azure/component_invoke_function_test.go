@@ -144,7 +144,7 @@ func TestInvokeFunction_Success(t *testing.T) {
 	defer server.Close()
 
 	functionURL := server.URL + "/api/my-function"
-	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, http.MethodPost, `{"input":"test"}`)
+	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, http.MethodPost, `{"input":"test"}`, "my-function-app.azurewebsites.net")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, output["statusCode"])
@@ -162,7 +162,7 @@ func TestInvokeFunction_NonJSONResponse(t *testing.T) {
 	defer server.Close()
 
 	functionURL := server.URL + "/api/my-function"
-	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, http.MethodGet, "")
+	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, http.MethodGet, "", "my-function-app.azurewebsites.net")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, output["statusCode"])
@@ -177,7 +177,7 @@ func TestInvokeFunction_ErrorStatusCode(t *testing.T) {
 	defer server.Close()
 
 	functionURL := server.URL + "/api/my-function"
-	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, http.MethodPost, "")
+	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, http.MethodPost, "", "my-function-app.azurewebsites.net")
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusInternalServerError, output["statusCode"])

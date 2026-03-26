@@ -48,8 +48,9 @@ function metadataList(context: ComponentBaseContext): MetadataItem[] {
 }
 
 function subtitle(context: SubtitleContext): string | React.ReactNode {
-  if (!context.execution.createdAt) return "";
-  return renderTimeAgo(new Date(context.execution.createdAt));
+  const timestamp = context.execution.updatedAt || context.execution.createdAt;
+  if (!timestamp) return "";
+  return renderTimeAgo(new Date(timestamp));
 }
 
 export const invokeFunctionMapper: ComponentBaseMapper = {

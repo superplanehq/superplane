@@ -231,7 +231,7 @@ func (c *InvokeFunctionComponent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("Invoking Azure Function: %s %s", method, functionURL)
-	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, method, config.Payload)
+	output, err := invokeFunction(context.Background(), provider.getClient(), functionURL, method, config.Payload, hostname)
 	if err != nil {
 		return fmt.Errorf("failed to invoke function: %w", err)
 	}
@@ -246,13 +246,25 @@ func (c *InvokeFunctionComponent) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func invokeFunction(ctx context.Context, client *armClient, functionURL, method, payload string) (map[string]any, error) {
+func invokeFunction(ctx context.Context, client *armClient, functionURL, method, payload, hostname string) (map[string]any, error) {
 	var bodyReader io.Reader
 	if payload != "" {
 		bodyReader = strings.NewReader(payload)
 	}
 
-	resp, err := client.doRequest(ctx, method, functionURL, bodyReader)
+	token, err := client.bearerTokenForScope(ctx, fmt.Sprintf("https://%s/.default", hostname))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get function app token: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, functionURL, bodyReader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
