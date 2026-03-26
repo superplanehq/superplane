@@ -515,8 +515,9 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     const approvalRecords = (executionMetadata?.records as ApprovalRecord[] | undefined) || [];
     const hasApprovedAnyRecord = hasCurrentUserApprovedAnyRecord(approvalRecords, currentUserId, currentUserEmail);
     const pendingUserRecordIndex = getPendingUserApprovalIndex(approvalRecords, currentUserId, currentUserEmail);
+    const isExecutionActive = execution?.state === "STATE_STARTED" || execution?.state === "STATE_PENDING";
     const interactiveApprovalIndex =
-      hasApprovedAnyRecord || execution?.state !== "STATE_STARTED"
+      hasApprovedAnyRecord || !isExecutionActive
         ? undefined
         : getInteractiveApprovalIndex(approvalRecords, {
             currentUserId,
@@ -530,7 +531,6 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     const labelMaps = { rolesByName, groupsByName };
     const approvals = approvalRecords.map((record: ApprovalRecord) => {
       const isPending = record.state === "pending";
-      const isExecutionActive = execution?.state === "STATE_STARTED";
       const approveIndex =
         record.type === "anyone" && pendingUserRecordIndex !== undefined ? pendingUserRecordIndex : record.index;
       const canAct =

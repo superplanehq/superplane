@@ -144,7 +144,7 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
@@ -156,6 +156,7 @@ interface ComponentSidebarProps {
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
+  configurationSaveMode?: "manual" | "auto";
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
@@ -240,6 +241,7 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
+  configurationSaveMode = "manual",
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
@@ -803,6 +805,7 @@ export const ComponentSidebar = ({
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
+                  configurationSaveMode={configurationSaveMode}
                 />
               </TabsContent>
             )}

@@ -49,6 +49,25 @@ interface SettingsTabProps {
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+  /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
+  configurationSaveMode?: "manual" | "auto";
+}
+
+function buildAutosaveSnapshot(
+  configuration: Record<string, unknown>,
+  nodeName: string,
+  integrationRef?: ComponentsIntegrationRef,
+): string {
+  return JSON.stringify({
+    configuration,
+    nodeName,
+    integrationRef: integrationRef
+      ? {
+          id: integrationRef.id || "",
+          name: integrationRef.name || "",
+        }
+      : null,
+  });
 }
 
 export function SettingsTab({
@@ -73,9 +92,11 @@ export function SettingsTab({
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  configurationSaveMode = "manual",
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
+  const showManualSaveFooter = configurationSaveMode !== "auto" && !isReadOnly;
   const allowIntegrations = canReadIntegrations ?? true;
   const allowCreateIntegrations = canCreateIntegrations ?? true;
   const allowUpdateIntegrations = canUpdateIntegrations ?? true;
@@ -86,6 +107,8 @@ export function SettingsTab({
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
+  const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
@@ -219,7 +242,10 @@ export function SettingsTab({
       newConfig = { ...defaultValuesWithoutToggles, ...configuration };
     }
 
-    setNodeConfiguration(filterVisibleFields(newConfig));
+    const filteredConfig = filterVisibleFields(newConfig);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef);
+    pendingAutosaveSnapshotRef.current = null;
+    setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
@@ -230,6 +256,7 @@ export function SettingsTab({
   useEffect(() => {
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
+        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
         setSelectedIntegration(undefined);
       }
       return;
@@ -244,34 +271,136 @@ export function SettingsTab({
     }
 
     const firstIntegration = integrationsOfType[0];
+    const nextIntegration = {
+      id: firstIntegration.metadata?.id,
+      name: firstIntegration.metadata?.name,
+    };
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, nextIntegration);
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration]);
+  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
 
-  const handleSave = async () => {
-    if (isReadOnly || savingRef.current) {
+  const updateAutosaveBaseline = useCallback((snapshot: string) => {
+    autosaveBaselineSnapshotRef.current = snapshot;
+    pendingAutosaveSnapshotRef.current = null;
+  }, []);
+
+  const queuePendingAutosave = useCallback(
+    (snapshot: string) => {
+      if (configurationSaveMode === "auto") {
+        pendingAutosaveSnapshotRef.current = snapshot;
+      }
+    },
+    [configurationSaveMode],
+  );
+
+  const flushPendingAutosave = useCallback(() => {
+    if (configurationSaveMode !== "auto") {
       return;
     }
-    validateNow();
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
-    if (result instanceof Promise) {
-      savingRef.current = true;
-      setIsSaving(true);
-      try {
-        await result;
-      } finally {
-        savingRef.current = false;
-        setIsSaving(false);
-      }
+
+    const pendingSnapshot = pendingAutosaveSnapshotRef.current;
+    if (!pendingSnapshot || pendingSnapshot === autosaveBaselineSnapshotRef.current) {
+      pendingAutosaveSnapshotRef.current = null;
+      return;
     }
-  };
+
+    pendingAutosaveSnapshotRef.current = null;
+    window.setTimeout(() => {
+      void handleSaveRef.current();
+    }, 0);
+  }, [configurationSaveMode]);
+
+  const handleSave = useCallback(async () => {
+    if (isReadOnly) {
+      return;
+    }
+
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
+      pendingAutosaveSnapshotRef.current = null;
+      return;
+    }
+
+    if (!validateNow() || currentNodeName.trim() === "") {
+      return;
+    }
+
+    if (savingRef.current) {
+      queuePendingAutosave(snapshot);
+      return;
+    }
+
+    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    if (!(result instanceof Promise)) {
+      updateAutosaveBaseline(snapshot);
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      await result;
+      updateAutosaveBaseline(snapshot);
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+      flushPendingAutosave();
+    }
+  }, [
+    isReadOnly,
+    validateNow,
+    currentNodeName,
+    selectedIntegration,
+    configurationSaveMode,
+    nodeConfiguration,
+    onSave,
+    queuePendingAutosave,
+    updateAutosaveBaseline,
+    flushPendingAutosave,
+  ]);
+
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  useEffect(() => {
+    if (configurationSaveMode !== "auto" || isReadOnly) {
+      return;
+    }
+    if (
+      buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration) ===
+      autosaveBaselineSnapshotRef.current
+    ) {
+      return;
+    }
+    if (hasNodeNameError) {
+      return;
+    }
+    if (integrationName && integrationsOfType.length > 0 && !selectedIntegration?.id) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void handleSaveRef.current();
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    configurationSaveMode,
+    isReadOnly,
+    nodeConfiguration,
+    currentNodeName,
+    selectedIntegration,
+    hasNodeNameError,
+    integrationName,
+    integrationsOfType.length,
+  ]);
 
   return (
-    <div className="p-4 overflow-y-auto pb-20" style={{ maxHeight: "80vh" }}>
+    <div className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`} style={{ maxHeight: "80vh" }}>
       <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
@@ -471,11 +600,13 @@ export function SettingsTab({
                   field={field}
                   value={nodeConfiguration[fieldName]}
                   onChange={(value) => {
-                    const newConfig = {
-                      ...nodeConfiguration,
-                      [fieldName]: value,
-                    };
-                    setNodeConfiguration(filterVisibleFields(newConfig));
+                    setNodeConfiguration((previousConfiguration) => {
+                      const newConfig = {
+                        ...previousConfiguration,
+                        [fieldName]: value,
+                      };
+                      return filterVisibleFields(newConfig);
+                    });
                   }}
                   allValues={nodeConfiguration}
                   domainId={domainId}
@@ -515,18 +646,20 @@ export function SettingsTab({
         )}
       </div>
 
-      <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <LoadingButton
-          data-testid="save-node-button"
-          variant="default"
-          onClick={handleSave}
-          disabled={isReadOnly}
-          loading={isSaving}
-          loadingText="Saving..."
-        >
-          Save
-        </LoadingButton>
-      </div>
+      {showManualSaveFooter ? (
+        <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <LoadingButton
+            data-testid="save-node-button"
+            variant="default"
+            onClick={handleSave}
+            disabled={isReadOnly}
+            loading={isSaving}
+            loadingText="Saving..."
+          >
+            Save
+          </LoadingButton>
+        </div>
+      ) : null}
     </div>
   );
 }
