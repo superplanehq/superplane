@@ -157,10 +157,10 @@ export const httpMapper: ComponentBaseMapper = {
 
     if (outputs?.success) {
       const response = outputs.success[0].data as Output;
-      details["Response"] = response.status.toString();
+      if (response.status !== undefined) details["Response"] = response.status.toString();
     } else if (outputs?.failure) {
       const response = outputs.failure[0].data as Output;
-      details["Response"] = response.status.toString();
+      if (response.status !== undefined) details["Response"] = response.status.toString();
     }
 
     if (metadata?.retry) {
@@ -201,10 +201,10 @@ export const httpMapper: ComponentBaseMapper = {
       let responseCode: string | null = null;
       if (outputs?.success) {
         const response = outputs.success[0].data as Output;
-        responseCode = response.status.toString();
+        responseCode = response.status?.toString() ?? null;
       } else if (outputs?.failure) {
         const response = outputs.failure[0].data as Output;
-        responseCode = response.status.toString();
+        responseCode = response.status?.toString() ?? null;
       }
 
       if (responseCode && context.execution.updatedAt) {
@@ -469,10 +469,10 @@ function getHTTPEventSections(
         const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
         if (outputs?.success) {
           const response = outputs.success[0].data as Output;
-          responseCode = response.status.toString();
+          responseCode = response.status?.toString() ?? null;
         } else if (outputs?.failure) {
           const response = outputs.failure[0].data as Output;
-          responseCode = response.status.toString();
+          responseCode = response.status?.toString() ?? null;
         }
       }
 
