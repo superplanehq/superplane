@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
