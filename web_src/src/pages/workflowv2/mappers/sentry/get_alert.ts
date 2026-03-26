@@ -33,6 +33,10 @@ interface SentryAlertRule {
   query?: string;
   environment?: string | null;
   owner?: string;
+  createdBy?: {
+    name?: string;
+    email?: string;
+  };
   projects?: string[];
   triggers?: Array<{
     label?: string;
@@ -77,11 +81,12 @@ export const getAlertMapper: ComponentBaseMapper = {
     addOrderedDetails(details, [
       { label: "Name", value: alertRule?.name },
       { label: "Project", value: alertRule?.projects?.[0] },
+      { label: "Created By", value: formatCreatedBy(alertRule) },
       { label: "Environment", value: normalizeNullable(alertRule?.environment) },
       { label: "Aggregate", value: alertRule?.aggregate },
       { label: "Owner", value: alertRule?.owner },
       { label: "Query", value: alertRule?.query },
-      { label: "Triggers", value: summarizeTriggers(alertRule) },
+      { label: "Trigger Labels", value: summarizeTriggers(alertRule) },
     ]);
 
     return details;
@@ -143,4 +148,8 @@ function summarizeTriggers(alertRule: SentryAlertRule | undefined) {
     .map((trigger) => trigger.label)
     .filter(Boolean)
     .join(", ");
+}
+
+function formatCreatedBy(alertRule: SentryAlertRule | undefined) {
+  return alertRule?.createdBy?.name || alertRule?.createdBy?.email;
 }
