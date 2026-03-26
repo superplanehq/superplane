@@ -2,6 +2,7 @@ package openrouter
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -149,17 +150,22 @@ func (c *GetCurrentKeyDetails) Cleanup(ctx core.SetupContext) error {
 func (c *GetCurrentKeyDetails) ExampleOutput() map[string]any {
 	limit := 100.0
 	remaining := 75.0
+	payload := CurrentKeyDetailsPayload{
+		Label:              "My API Key",
+		Limit:              &limit,
+		Usage:              25.0,
+		UsageDaily:         5.0,
+		UsageWeekly:        20.0,
+		UsageMonthly:       25.0,
+		LimitRemaining:     &remaining,
+		IsFreeTier:         false,
+		IsManagementKey:    false,
+		IncludeByokInLimit: false,
+	}
+
 	return map[string]any{
-		"type":               CurrentKeyDetailsPayloadType,
-		"label":              "My API Key",
-		"limit":              limit,
-		"usage":              25.0,
-		"usageDaily":         5.0,
-		"usageWeekly":        20.0,
-		"usageMonthly":       25.0,
-		"limitRemaining":     remaining,
-		"isFreeTier":         false,
-		"isManagementKey":    false,
-		"includeByokInLimit": false,
+		"type":      CurrentKeyDetailsPayloadType,
+		"data":      payload,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
 }

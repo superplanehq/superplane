@@ -26,9 +26,12 @@ func TestGetRemainingCredits_ExampleOutput(t *testing.T) {
 	out := c.ExampleOutput()
 	require.NotNil(t, out)
 	require.Equal(t, RemainingCreditsPayloadType, out["type"])
-	require.Equal(t, 100.0, out["totalCredits"])
-	require.Equal(t, 25.5, out["totalUsage"])
-	require.Equal(t, 74.5, out["remaining"])
+	require.NotEmpty(t, out["timestamp"])
+	data, ok := out["data"].(RemainingCreditsPayload)
+	require.True(t, ok)
+	require.Equal(t, 100.0, data.TotalCredits)
+	require.Equal(t, 25.5, data.TotalUsage)
+	require.Equal(t, 74.5, data.Remaining)
 }
 
 func TestGetRemainingCredits_Execute(t *testing.T) {

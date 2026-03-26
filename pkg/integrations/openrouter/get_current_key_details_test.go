@@ -26,11 +26,16 @@ func TestGetCurrentKeyDetails_ExampleOutput(t *testing.T) {
 	out := c.ExampleOutput()
 	require.NotNil(t, out)
 	require.Equal(t, CurrentKeyDetailsPayloadType, out["type"])
-	require.Equal(t, "My API Key", out["label"])
-	require.Equal(t, 100.0, out["limit"])
-	require.Equal(t, 25.0, out["usage"])
-	require.Equal(t, 75.0, out["limitRemaining"])
-	require.Equal(t, false, out["isFreeTier"])
+	require.NotEmpty(t, out["timestamp"])
+	data, ok := out["data"].(CurrentKeyDetailsPayload)
+	require.True(t, ok)
+	require.Equal(t, "My API Key", data.Label)
+	require.NotNil(t, data.Limit)
+	require.Equal(t, 100.0, *data.Limit)
+	require.Equal(t, 25.0, data.Usage)
+	require.NotNil(t, data.LimitRemaining)
+	require.Equal(t, 75.0, *data.LimitRemaining)
+	require.Equal(t, false, data.IsFreeTier)
 }
 
 func TestGetCurrentKeyDetails_Execute(t *testing.T) {

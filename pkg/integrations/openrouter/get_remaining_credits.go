@@ -2,6 +2,7 @@ package openrouter
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -126,10 +127,15 @@ func (c *GetRemainingCredits) Cleanup(ctx core.SetupContext) error {
 }
 
 func (c *GetRemainingCredits) ExampleOutput() map[string]any {
+	payload := RemainingCreditsPayload{
+		TotalCredits: 100.0,
+		TotalUsage:   25.5,
+		Remaining:    74.5,
+	}
+
 	return map[string]any{
-		"type":         RemainingCreditsPayloadType,
-		"totalCredits": 100.0,
-		"totalUsage":   25.5,
-		"remaining":    74.5,
+		"type":      RemainingCreditsPayloadType,
+		"data":      payload,
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
 }
