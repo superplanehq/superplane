@@ -111,3 +111,44 @@ func Test__UpdateAlert__Execute(t *testing.T) {
 	assert.True(t, executionState.Passed)
 	assert.Equal(t, "sentry.alertRule", executionState.Type)
 }
+
+func Test__UpdateAlert__Execute__PreservesEventTypesWhenOmitted(t *testing.T) {
+	component := &UpdateAlert{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			sentryMockResponse(http.StatusOK, `{"id":"7","name":"Only error types","aggregate":"count()","query":"","thresholdType":0,"timeWindow":60.0,"environment":"","projects":["backend"],"eventTypes":["error"],"triggers":[{"id":"1","label":"critical","alertThreshold":5.0,"actions":[{"id":"a1","type":"email","targetType":"user","targetIdentifier":"1","inputChannelId":null,"integrationId":null,"sentryAppId":null,"priority":null}]}]}`),
+			sentryMockResponse(http.StatusOK, `{"id":"7","name":"Only error types","aggregate":"count()","query":"new","thresholdType":0,"timeWindow":60.0,"environment":"","projects":["backend"],"eventTypes":["error"],"triggers":[{"id":"1","label":"critical","alertThreshold":5.0,"actions":[{"id":"a1","type":"email","targetType":"user","targetIdentifier":"1","inputChannelId":null,"integrationId":null,"sentryAppId":null,"priority":null}]}]}`),
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"alertId": "7",
+			"query":   "new",
+			"critical": map[string]any{
+				"threshold": 5.0,
+				"notification": map[string]any{
+					"targetType":       "user",
+					"targetIdentifier": "1",
+				},
+			},
+		},
+		HTTP: httpCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "user-token"},
+			Metadata:      Metadata{Organization: &OrganizationSummary{Slug: "example"}},
+		},
+		ExecutionState: executionState,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 2)
+
+	body, err := io.ReadAll(httpCtx.Requests[1].Body)
+	require.NoError(t, err)
+
+	var request CreateOrUpdateMetricAlertRuleRequest
+	require.NoError(t, json.Unmarshal(body, &request))
+	assert.Equal(t, []string{"error"}, request.EventTypes)
+}
