@@ -167,6 +167,10 @@ export interface CreateAppConfiguration {
   envVars?: string[];
 }
 
+export interface GetAppConfiguration {
+  app: string;
+}
+
 export interface DeleteAppConfiguration {
   app: string;
 }
