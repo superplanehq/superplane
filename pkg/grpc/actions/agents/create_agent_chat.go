@@ -2,7 +2,7 @@ package agents
 
 import (
 	"errors"
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,7 +61,7 @@ func CreateAgentChat(
 
 	return &pb.CreateAgentChatResponse{
 		Token: token,
-		Url:   fmt.Sprintf("%s/v1/agent/chat/stream", agentURL),
+		Url:   BuildAgentChatStreamURL(agentURL, uuid.NewString()),
 	}, nil
 }
 
@@ -90,4 +90,8 @@ func allowedAgentChatPermissions(authService authorization.Authorization, userID
 	}
 
 	return permissions, nil
+}
+
+func BuildAgentChatStreamURL(publicURL string, chatID string) string {
+	return strings.TrimRight(publicURL, "/") + "/agents/chats/" + chatID + "/stream"
 }

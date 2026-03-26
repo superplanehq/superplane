@@ -27,6 +27,7 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
+from ai.grpc import InternalAgentServer
 from ai.jwt import JwtValidator
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
@@ -346,6 +347,18 @@ def _create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.on_event("startup")
+    async def startup() -> None:
+        grpc_server = InternalAgentServer.from_env()
+        grpc_server.start()
+        app.state.grpc_server = grpc_server
+
+    @app.on_event("shutdown")
+    async def shutdown() -> None:
+        grpc_server: InternalAgentServer | None = getattr(app.state, "grpc_server", None)
+        if grpc_server is not None:
+            grpc_server.stop()
 
     @app.post("/v1/agent/chat/stream")
     async def stream_repl(payload: ReplStreamRequest, request: Request) -> StreamingResponse:
