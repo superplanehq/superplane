@@ -21,10 +21,11 @@ var _ MappedNullable = &OrganizationsOrganizationUsage{}
 
 // OrganizationsOrganizationUsage struct for OrganizationsOrganizationUsage
 type OrganizationsOrganizationUsage struct {
-	Canvases                 *int32     `json:"canvases,omitempty"`
-	EventBucketLevel         *float64   `json:"eventBucketLevel,omitempty"`
-	EventBucketCapacity      *float64   `json:"eventBucketCapacity,omitempty"`
-	EventBucketLastUpdatedAt *time.Time `json:"eventBucketLastUpdatedAt,omitempty"`
+	Canvases                  *int32     `json:"canvases,omitempty"`
+	EventBucketLevel          *float64   `json:"eventBucketLevel,omitempty"`
+	EventBucketCapacity       *float64   `json:"eventBucketCapacity,omitempty"`
+	EventBucketLastUpdatedAt  *time.Time `json:"eventBucketLastUpdatedAt,omitempty"`
+	NextEventBucketDecreaseAt *time.Time `json:"nextEventBucketDecreaseAt,omitempty"`
 }
 
 // NewOrganizationsOrganizationUsage instantiates a new OrganizationsOrganizationUsage object
@@ -172,6 +173,38 @@ func (o *OrganizationsOrganizationUsage) SetEventBucketLastUpdatedAt(v time.Time
 	o.EventBucketLastUpdatedAt = &v
 }
 
+// GetNextEventBucketDecreaseAt returns the NextEventBucketDecreaseAt field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationUsage) GetNextEventBucketDecreaseAt() time.Time {
+	if o == nil || IsNil(o.NextEventBucketDecreaseAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.NextEventBucketDecreaseAt
+}
+
+// GetNextEventBucketDecreaseAtOk returns a tuple with the NextEventBucketDecreaseAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationUsage) GetNextEventBucketDecreaseAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.NextEventBucketDecreaseAt) {
+		return nil, false
+	}
+	return o.NextEventBucketDecreaseAt, true
+}
+
+// HasNextEventBucketDecreaseAt returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationUsage) HasNextEventBucketDecreaseAt() bool {
+	if o != nil && !IsNil(o.NextEventBucketDecreaseAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetNextEventBucketDecreaseAt gets a reference to the given time.Time and assigns it to the NextEventBucketDecreaseAt field.
+func (o *OrganizationsOrganizationUsage) SetNextEventBucketDecreaseAt(v time.Time) {
+	o.NextEventBucketDecreaseAt = &v
+}
+
 func (o OrganizationsOrganizationUsage) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -193,6 +226,9 @@ func (o OrganizationsOrganizationUsage) ToMap() (map[string]interface{}, error) 
 	}
 	if !IsNil(o.EventBucketLastUpdatedAt) {
 		toSerialize["eventBucketLastUpdatedAt"] = o.EventBucketLastUpdatedAt
+	}
+	if !IsNil(o.NextEventBucketDecreaseAt) {
+		toSerialize["nextEventBucketDecreaseAt"] = o.NextEventBucketDecreaseAt
 	}
 	return toSerialize, nil
 }
