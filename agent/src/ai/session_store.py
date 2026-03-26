@@ -1,365 +1,502 @@
 import os
-import sqlite3
-import threading
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    RetryPromptPart,
+    TextPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
 
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def _to_db_time(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat()
+def _from_db_time(value: datetime | str) -> datetime:
+    if isinstance(value, datetime):
+        return value.astimezone(UTC)
+    return datetime.fromisoformat(value).astimezone(UTC)
 
 
-def _from_db_time(value: str) -> datetime:
-    return datetime.fromisoformat(value)
+def _format_tool_label(tool_name: str) -> str:
+    normalized = tool_name.strip().lower()
+    label_by_tool = {
+        "get_canvas_shape": "Reading canvas structure",
+        "get_canvas_details": "Reading canvas details",
+        "list_available_blocks": "Listing available components",
+    }
+    if normalized in label_by_tool:
+        return label_by_tool[normalized]
+
+    words = normalized.replace("_", " ").replace("-", " ").strip()
+    if not words:
+        return "Running tool"
+    return words[:1].upper() + words[1:]
+
+
+def _user_content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+
+    text_parts: list[str] = []
+    for part in content:
+        if isinstance(part, str):
+            text_parts.append(part)
+    return "\n".join(part for part in text_parts if part)
+
+
+def _message_timestamp(message: ModelMessage) -> datetime:
+    timestamp = getattr(message, "timestamp", None)
+    if isinstance(timestamp, datetime):
+        return timestamp.astimezone(UTC)
+    return _utcnow()
+
+
+def _serialize_model_message(message: ModelMessage) -> dict[str, Any]:
+    payload = ModelMessagesTypeAdapter.dump_python([message], mode="json")
+    if not payload or not isinstance(payload[0], dict):
+        raise ValueError("Failed to serialize model message.")
+    return payload[0]
+
+
+def _deserialize_model_message(payload: Any) -> ModelMessage:
+    messages = ModelMessagesTypeAdapter.validate_python([payload])
+    if not messages:
+        raise ValueError("Failed to deserialize model message.")
+    return messages[0]
 
 
 @dataclass(frozen=True)
-class StoredAgent:
+class StoredAgentChat:
     id: str
     org_id: str
     user_id: str
     canvas_id: str
     initial_message: str | None
-    message_history_json: str | None
     created_at: datetime
     updated_at: datetime
 
 
 @dataclass(frozen=True)
-class StoredAgentMessage:
+class StoredAgentChatMessageRecord:
     id: str
-    agent_id: str
-    role: str
-    content: str
-    tool_call_id: str | None
-    tool_status: str | None
+    chat_id: str
+    message: dict[str, Any]
     sort_index: int
     created_at: datetime
     updated_at: datetime
 
 
-class AgentNotFoundError(Exception):
+@dataclass(frozen=True)
+class StoredAgentChatMessage:
+    id: str
+    chat_id: str
+    role: str
+    content: str
+    tool_call_id: str | None
+    tool_status: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class SessionStoreConfig:
+    host: str
+    port: int
+    dbname: str
+    user: str
+    password: str
+    sslmode: str
+    application_name: str
+
+    @classmethod
+    def from_env(cls) -> "SessionStoreConfig":
+        host = (os.getenv("DB_HOST") or "db").strip()
+        port = int((os.getenv("DB_PORT") or "5432").strip())
+        dbname = (os.getenv("DB_NAME") or "").strip()
+        user = (os.getenv("DB_USERNAME") or "").strip()
+        password = (os.getenv("DB_PASSWORD") or "").strip()
+        sslmode = (os.getenv("DB_SSLMODE") or "disable").strip() or "disable"
+        application_name = (os.getenv("APPLICATION_NAME") or "superplane-agent").strip() or "superplane-agent"
+
+        missing_fields = [
+            name
+            for name, value in (
+                ("DB_NAME", dbname),
+                ("DB_USERNAME", user),
+                ("DB_PASSWORD", password),
+            )
+            if not value
+        ]
+        if missing_fields:
+            joined = ", ".join(missing_fields)
+            raise ValueError(f"Missing required agent database settings: {joined}")
+
+        return cls(
+            host=host,
+            port=port,
+            dbname=dbname,
+            user=user,
+            password=password,
+            sslmode=sslmode,
+            application_name=application_name,
+        )
+
+
+class AgentChatNotFoundError(Exception):
     pass
 
 
 class SessionStore:
-    def __init__(self, db_path: str | None = None) -> None:
-        configured_path = (db_path or os.getenv("AGENT_DB_PATH") or "/app/tmp/agent.sqlite3").strip()
-        self._db_path = Path(configured_path)
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._schema_lock = threading.Lock()
-        self._ensure_schema()
+    def __init__(self, config: SessionStoreConfig | None = None) -> None:
+        self._config = config or SessionStoreConfig.from_env()
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _connect(self) -> psycopg.Connection[Any]:
+        return psycopg.connect(
+            host=self._config.host,
+            port=self._config.port,
+            dbname=self._config.dbname,
+            user=self._config.user,
+            password=self._config.password,
+            sslmode=self._config.sslmode,
+            application_name=self._config.application_name,
+            row_factory=dict_row,
+        )
 
-    def _ensure_schema(self) -> None:
-        with self._schema_lock:
-            with self._connect() as conn:
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS agents (
-                        id TEXT PRIMARY KEY,
-                        org_id TEXT NOT NULL,
-                        user_id TEXT NOT NULL,
-                        canvas_id TEXT NOT NULL,
-                        initial_message TEXT,
-                        message_history_json TEXT,
-                        created_at TEXT NOT NULL,
-                        updated_at TEXT NOT NULL
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_agents_owner_canvas_created
-                    ON agents (org_id, user_id, canvas_id, created_at DESC)
-                    """
-                )
-                conn.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS agent_messages (
-                        id TEXT PRIMARY KEY,
-                        agent_id TEXT NOT NULL,
-                        role TEXT NOT NULL,
-                        content TEXT NOT NULL,
-                        tool_call_id TEXT,
-                        tool_status TEXT,
-                        sort_index INTEGER NOT NULL,
-                        created_at TEXT NOT NULL,
-                        updated_at TEXT NOT NULL,
-                        FOREIGN KEY(agent_id) REFERENCES agents(id) ON DELETE CASCADE,
-                        UNIQUE(agent_id, sort_index)
-                    )
-                    """
-                )
-                conn.execute(
-                    """
-                    CREATE INDEX IF NOT EXISTS idx_agent_messages_agent_sort
-                    ON agent_messages (agent_id, sort_index)
-                    """
-                )
-                conn.commit()
-
-    def create_agent(self, org_id: str, user_id: str, canvas_id: str, agent_id: str | None = None) -> StoredAgent:
+    def create_agent_chat(self, org_id: str, user_id: str, canvas_id: str, chat_id: str | None = None) -> StoredAgentChat:
         now = _utcnow()
-        agent = StoredAgent(
-            id=agent_id or str(uuid.uuid4()),
+        chat = StoredAgentChat(
+            id=chat_id or str(uuid.uuid4()),
             org_id=org_id,
             user_id=user_id,
             canvas_id=canvas_id,
             initial_message=None,
-            message_history_json=None,
             created_at=now,
             updated_at=now,
         )
 
-        with self._connect() as conn:
-            conn.execute(
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
                 """
-                INSERT INTO agents (
-                    id, org_id, user_id, canvas_id, initial_message, message_history_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO agent_chats (
+                    id, org_id, user_id, canvas_id, initial_message, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    agent.id,
-                    agent.org_id,
-                    agent.user_id,
-                    agent.canvas_id,
-                    agent.initial_message,
-                    agent.message_history_json,
-                    _to_db_time(agent.created_at),
-                    _to_db_time(agent.updated_at),
+                    chat.id,
+                    chat.org_id,
+                    chat.user_id,
+                    chat.canvas_id,
+                    chat.initial_message,
+                    chat.created_at,
+                    chat.updated_at,
                 ),
             )
-            conn.commit()
 
-        return agent
+        return chat
 
-    def list_agents(self, org_id: str, user_id: str, canvas_id: str) -> list[StoredAgent]:
-        with self._connect() as conn:
-            rows = conn.execute(
+    def list_agent_chats(self, org_id: str, user_id: str, canvas_id: str) -> list[StoredAgentChat]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
                 """
                 SELECT *
-                FROM agents
-                WHERE org_id = ? AND user_id = ? AND canvas_id = ?
+                FROM agent_chats
+                WHERE org_id = %s AND user_id = %s AND canvas_id = %s
                 ORDER BY created_at DESC
                 """,
                 (org_id, user_id, canvas_id),
-            ).fetchall()
+            )
+            rows = cur.fetchall()
 
-        return [self._row_to_agent(row) for row in rows]
+        return [self._row_to_agent_chat(row) for row in rows]
 
-    def describe_agent(self, org_id: str, user_id: str, canvas_id: str, agent_id: str) -> StoredAgent:
-        agent = self.get_agent(agent_id)
-        if agent.org_id != org_id or agent.user_id != user_id or agent.canvas_id != canvas_id:
-            raise AgentNotFoundError(agent_id)
+    def describe_agent_chat(self, org_id: str, user_id: str, canvas_id: str, chat_id: str) -> StoredAgentChat:
+        chat = self.get_agent_chat(chat_id)
+        if chat.org_id != org_id or chat.user_id != user_id or chat.canvas_id != canvas_id:
+            raise AgentChatNotFoundError(chat_id)
 
-        return agent
+        return chat
 
-    def get_agent(self, agent_id: str) -> StoredAgent:
-        with self._connect() as conn:
-            row = conn.execute(
+    def get_agent_chat(self, chat_id: str) -> StoredAgentChat:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
                 """
                 SELECT *
-                FROM agents
-                WHERE id = ?
+                FROM agent_chats
+                WHERE id = %s
                 LIMIT 1
                 """,
-                (agent_id,),
-            ).fetchone()
+                (chat_id,),
+            )
+            row = cur.fetchone()
 
         if row is None:
-            raise AgentNotFoundError(agent_id)
+            raise AgentChatNotFoundError(chat_id)
 
-        return self._row_to_agent(row)
+        return self._row_to_agent_chat(row)
 
-    def list_messages(self, org_id: str, user_id: str, canvas_id: str, agent_id: str) -> list[StoredAgentMessage]:
-        self.describe_agent(org_id, user_id, canvas_id, agent_id)
+    def count_chat_model_messages(self, chat_id: str) -> int:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS message_count FROM agent_chat_messages WHERE chat_id = %s",
+                (chat_id,),
+            )
+            row = cur.fetchone()
+        return int(row["message_count"]) if row is not None else 0
 
-        with self._connect() as conn:
-            rows = conn.execute(
+    def list_agent_chat_message_records(self, chat_id: str) -> list[StoredAgentChatMessageRecord]:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
                 """
                 SELECT *
-                FROM agent_messages
-                WHERE agent_id = ?
+                FROM agent_chat_messages
+                WHERE chat_id = %s
                 ORDER BY sort_index ASC
                 """,
-                (agent_id,),
-            ).fetchall()
-
-        return [self._row_to_message(row) for row in rows]
-
-    def load_message_history_json(self, agent_id: str) -> str | None:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT message_history_json FROM agents WHERE id = ? LIMIT 1",
-                (agent_id,),
-            ).fetchone()
-
-        if row is None:
-            raise AgentNotFoundError(agent_id)
-        value = row["message_history_json"]
-        return value if isinstance(value, str) and value else None
-
-    def save_message_history_json(self, agent_id: str, history_json: str) -> None:
-        now = _to_db_time(_utcnow())
-        with self._connect() as conn:
-            conn.execute(
-                """
-                UPDATE agents
-                SET message_history_json = ?, updated_at = ?
-                WHERE id = ?
-                """,
-                (history_json, now, agent_id),
+                (chat_id,),
             )
-            conn.commit()
+            rows = cur.fetchall()
 
-    def create_message(
-        self,
-        agent_id: str,
-        role: str,
-        content: str,
-        tool_call_id: str | None = None,
-        tool_status: str | None = None,
-    ) -> StoredAgentMessage:
+        return [self._row_to_message_record(row) for row in rows]
+
+    def list_agent_chat_messages(self, org_id: str, user_id: str, canvas_id: str, chat_id: str) -> list[StoredAgentChatMessage]:
+        self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
+        records = self.list_agent_chat_message_records(chat_id)
+
+        flattened: list[StoredAgentChatMessage] = []
+        for record in records:
+            flattened.extend(self._flatten_message_record(record))
+        return flattened
+
+    def load_agent_chat_message_history(self, chat_id: str) -> list[ModelMessage]:
+        records = self.list_agent_chat_message_records(chat_id)
+        return [_deserialize_model_message(record.message) for record in records]
+
+    def create_agent_chat_model_message(self, chat_id: str, message: ModelMessage) -> StoredAgentChatMessageRecord:
         now = _utcnow()
-        message = StoredAgentMessage(
-            id=str(uuid.uuid4()),
-            agent_id=agent_id,
-            role=role,
-            content=content,
-            tool_call_id=tool_call_id,
-            tool_status=tool_status,
-            sort_index=self._next_sort_index(agent_id),
-            created_at=now,
-            updated_at=now,
-        )
+        serialized_message = _serialize_model_message(message)
+        created_at = _message_timestamp(message)
 
-        with self._connect() as conn:
-            conn.execute(
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
+            if cur.fetchone() is None:
+                raise AgentChatNotFoundError(chat_id)
+
+            cur.execute(
                 """
-                INSERT INTO agent_messages (
-                    id, agent_id, role, content, tool_call_id, tool_status, sort_index, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                SELECT COALESCE(MAX(sort_index), 0) AS max_sort_index
+                FROM agent_chat_messages
+                WHERE chat_id = %s
+                """,
+                (chat_id,),
+            )
+            row = cur.fetchone()
+            next_sort_index = int(row["max_sort_index"]) + 1 if row is not None else 1
+
+            record = StoredAgentChatMessageRecord(
+                id=str(uuid.uuid4()),
+                chat_id=chat_id,
+                message=serialized_message,
+                sort_index=next_sort_index,
+                created_at=created_at,
+                updated_at=now,
+            )
+
+            cur.execute(
+                """
+                INSERT INTO agent_chat_messages (
+                    id, chat_id, message, sort_index, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    message.id,
-                    message.agent_id,
-                    message.role,
-                    message.content,
-                    message.tool_call_id,
-                    message.tool_status,
-                    message.sort_index,
-                    _to_db_time(message.created_at),
-                    _to_db_time(message.updated_at),
+                    record.id,
+                    record.chat_id,
+                    Jsonb(record.message),
+                    record.sort_index,
+                    record.created_at,
+                    record.updated_at,
                 ),
             )
-            conn.execute("UPDATE agents SET updated_at = ? WHERE id = ?", (_to_db_time(now), agent_id))
-            conn.commit()
+            cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
 
-        return message
+        return record
 
-    def append_message_content(self, message_id: str, content_delta: str) -> None:
-        if not content_delta:
-            return
+    def update_agent_chat_model_message(self, message_id: str, message: ModelMessage) -> None:
+        now = _utcnow()
+        serialized_message = _serialize_model_message(message)
+        created_at = _message_timestamp(message)
 
-        now = _to_db_time(_utcnow())
-        with self._connect() as conn:
-            conn.execute(
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
                 """
-                UPDATE agent_messages
-                SET content = content || ?, updated_at = ?
-                WHERE id = ?
+                UPDATE agent_chat_messages
+                SET message = %s, created_at = %s, updated_at = %s
+                WHERE id = %s
+                RETURNING chat_id
                 """,
-                (content_delta, now, message_id),
+                (Jsonb(serialized_message), created_at, now, message_id),
             )
-            conn.commit()
+            row = cur.fetchone()
+            if row is not None:
+                cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, row["chat_id"]))
 
-    def update_message(
+    def replace_agent_chat_messages_after(
         self,
-        message_id: str,
-        *,
-        content: str | None = None,
-        tool_status: str | None = None,
+        chat_id: str,
+        preserved_message_count: int,
+        messages: list[ModelMessage],
     ) -> None:
-        assignments: list[str] = []
-        values: list[str] = []
-        if content is not None:
-            assignments.append("content = ?")
-            values.append(content)
-        if tool_status is not None:
-            assignments.append("tool_status = ?")
-            values.append(tool_status)
-        if not assignments:
-            return
+        now = _utcnow()
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
+            if cur.fetchone() is None:
+                raise AgentChatNotFoundError(chat_id)
 
-        assignments.append("updated_at = ?")
-        values.append(_to_db_time(_utcnow()))
-        values.append(message_id)
-
-        with self._connect() as conn:
-            conn.execute(
-                f"UPDATE agent_messages SET {', '.join(assignments)} WHERE id = ?",
-                values,
+            cur.execute(
+                "DELETE FROM agent_chat_messages WHERE chat_id = %s AND sort_index > %s",
+                (chat_id, preserved_message_count),
             )
-            conn.commit()
 
-    def set_initial_message_if_missing(self, agent_id: str, initial_message: str) -> None:
+            sort_index = preserved_message_count
+            for message in messages:
+                sort_index += 1
+                serialized_message = _serialize_model_message(message)
+                created_at = _message_timestamp(message)
+                cur.execute(
+                    """
+                    INSERT INTO agent_chat_messages (
+                        id, chat_id, message, sort_index, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        chat_id,
+                        Jsonb(serialized_message),
+                        sort_index,
+                        created_at,
+                        now,
+                    ),
+                )
+
+            cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
+
+    def set_initial_chat_message_if_missing(self, chat_id: str, initial_message: str) -> None:
         if not initial_message.strip():
             return
 
-        now = _to_db_time(_utcnow())
-        with self._connect() as conn:
-            conn.execute(
+        now = _utcnow()
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
                 """
-                UPDATE agents
-                SET initial_message = COALESCE(NULLIF(initial_message, ''), ?), updated_at = ?
-                WHERE id = ?
+                UPDATE agent_chats
+                SET initial_message = COALESCE(NULLIF(initial_message, ''), %s), updated_at = %s
+                WHERE id = %s
                 """,
-                (initial_message.strip(), now, agent_id),
+                (initial_message.strip(), now, chat_id),
             )
-            conn.commit()
 
-    def _next_sort_index(self, agent_id: str) -> int:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT COALESCE(MAX(sort_index), 0) AS max_sort_index FROM agent_messages WHERE agent_id = ?",
-                (agent_id,),
-            ).fetchone()
+    def _flatten_message_record(self, record: StoredAgentChatMessageRecord) -> list[StoredAgentChatMessage]:
+        model_message = _deserialize_model_message(record.message)
+        flattened: list[StoredAgentChatMessage] = []
 
-        max_sort_index = row["max_sort_index"]
-        return int(max_sort_index) + 1
+        if isinstance(model_message, ModelRequest):
+            for index, part in enumerate(model_message.parts):
+                if isinstance(part, UserPromptPart):
+                    content = _user_content_to_text(part.content)
+                    if not content:
+                        continue
+                    flattened.append(
+                        StoredAgentChatMessage(
+                            id=f"{record.id}:{index}",
+                            chat_id=record.chat_id,
+                            role="user",
+                            content=content,
+                            tool_call_id=None,
+                            tool_status=None,
+                            created_at=record.created_at,
+                        )
+                    )
+                    continue
 
-    def _row_to_agent(self, row: sqlite3.Row) -> StoredAgent:
-        return StoredAgent(
+                if isinstance(part, ToolReturnPart):
+                    flattened.append(
+                        StoredAgentChatMessage(
+                            id=f"{record.id}:{index}",
+                            chat_id=record.chat_id,
+                            role="tool",
+                            content=_format_tool_label(part.tool_name),
+                            tool_call_id=part.tool_call_id,
+                            tool_status="completed",
+                            created_at=record.created_at,
+                        )
+                    )
+                    continue
+
+                if isinstance(part, RetryPromptPart) and part.tool_name:
+                    flattened.append(
+                        StoredAgentChatMessage(
+                            id=f"{record.id}:{index}",
+                            chat_id=record.chat_id,
+                            role="tool",
+                            content=_format_tool_label(part.tool_name),
+                            tool_call_id=part.tool_call_id,
+                            tool_status="completed",
+                            created_at=record.created_at,
+                        )
+                    )
+
+            return flattened
+
+        if isinstance(model_message, ModelResponse):
+            assistant_parts = [part.content for part in model_message.parts if isinstance(part, TextPart) and part.content]
+            if assistant_parts:
+                flattened.append(
+                    StoredAgentChatMessage(
+                        id=record.id,
+                        chat_id=record.chat_id,
+                        role="assistant",
+                        content="".join(assistant_parts),
+                        tool_call_id=None,
+                        tool_status=None,
+                        created_at=record.created_at,
+                    )
+                )
+
+        return flattened
+
+    def _row_to_agent_chat(self, row: dict[str, Any]) -> StoredAgentChat:
+        return StoredAgentChat(
             id=str(row["id"]),
             org_id=str(row["org_id"]),
             user_id=str(row["user_id"]),
             canvas_id=str(row["canvas_id"]),
             initial_message=str(row["initial_message"]) if row["initial_message"] is not None else None,
-            message_history_json=str(row["message_history_json"]) if row["message_history_json"] is not None else None,
-            created_at=_from_db_time(str(row["created_at"])),
-            updated_at=_from_db_time(str(row["updated_at"])),
+            created_at=_from_db_time(row["created_at"]),
+            updated_at=_from_db_time(row["updated_at"]),
         )
 
-    def _row_to_message(self, row: sqlite3.Row) -> StoredAgentMessage:
-        return StoredAgentMessage(
+    def _row_to_message_record(self, row: dict[str, Any]) -> StoredAgentChatMessageRecord:
+        payload = row["message"]
+        if not isinstance(payload, dict):
+            raise ValueError("Stored agent chat message payload must be a JSON object.")
+
+        return StoredAgentChatMessageRecord(
             id=str(row["id"]),
-            agent_id=str(row["agent_id"]),
-            role=str(row["role"]),
-            content=str(row["content"]),
-            tool_call_id=str(row["tool_call_id"]) if row["tool_call_id"] is not None else None,
-            tool_status=str(row["tool_status"]) if row["tool_status"] is not None else None,
+            chat_id=str(row["chat_id"]),
+            message=payload,
             sort_index=int(row["sort_index"]),
-            created_at=_from_db_time(str(row["created_at"])),
-            updated_at=_from_db_time(str(row["updated_at"])),
+            created_at=_from_db_time(row["created_at"]),
+            updated_at=_from_db_time(row["updated_at"]),
         )

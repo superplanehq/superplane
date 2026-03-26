@@ -18,18 +18,23 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.agents_agent_message import AgentsAgentMessage
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsListAgentMessagesResponse(BaseModel):
+class AgentsAgentChatMessage(BaseModel):
     """
-    AgentsListAgentMessagesResponse
+    AgentsAgentChatMessage
     """ # noqa: E501
-    messages: Optional[List[AgentsAgentMessage]] = None
-    __properties: ClassVar[List[str]] = ["messages"]
+    id: Optional[StrictStr] = None
+    role: Optional[StrictStr] = None
+    content: Optional[StrictStr] = None
+    tool_call_id: Optional[StrictStr] = Field(default=None, alias="toolCallId")
+    tool_status: Optional[StrictStr] = Field(default=None, alias="toolStatus")
+    created_at: Optional[datetime] = Field(default=None, alias="createdAt")
+    __properties: ClassVar[List[str]] = ["id", "role", "content", "toolCallId", "toolStatus", "createdAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +54,7 @@ class AgentsListAgentMessagesResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsListAgentMessagesResponse from a JSON string"""
+        """Create an instance of AgentsAgentChatMessage from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,18 +75,11 @@ class AgentsListAgentMessagesResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in messages (list)
-        _items = []
-        if self.messages:
-            for _item_messages in self.messages:
-                if _item_messages:
-                    _items.append(_item_messages.to_dict())
-            _dict['messages'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsListAgentMessagesResponse from a dict"""
+        """Create an instance of AgentsAgentChatMessage from a dict"""
         if obj is None:
             return None
 
@@ -89,7 +87,12 @@ class AgentsListAgentMessagesResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "messages": [AgentsAgentMessage.from_dict(_item) for _item in obj["messages"]] if obj.get("messages") is not None else None
+            "id": obj.get("id"),
+            "role": obj.get("role"),
+            "content": obj.get("content"),
+            "toolCallId": obj.get("toolCallId"),
+            "toolStatus": obj.get("toolStatus"),
+            "createdAt": obj.get("createdAt")
         })
         return _obj
 

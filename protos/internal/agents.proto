@@ -12,45 +12,45 @@ option go_package = "github.com/superplanehq/superplane/pkg/protos/private/agent
 // See: protos/agents.proto
 //
 service Agents {
-  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
-  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
-  rpc DescribeAgent(DescribeAgentRequest) returns (DescribeAgentResponse);
-  rpc ListAgentMessages(ListAgentMessagesRequest) returns (ListAgentMessagesResponse);
+  rpc CreateAgentChat(CreateAgentChatRequest) returns (CreateAgentChatResponse);
+  rpc ListAgentChats(ListAgentChatsRequest) returns (ListAgentChatsResponse);
+  rpc DescribeAgentChat(DescribeAgentChatRequest) returns (DescribeAgentChatResponse);
+  rpc ListAgentChatMessages(ListAgentChatMessagesRequest) returns (ListAgentChatMessagesResponse);
 }
 
-message ListAgentsRequest {
+message ListAgentChatsRequest {
   string org_id = 1;
   string canvas_id = 2;
   string user_id = 3;
 }
 
-message ListAgentsResponse {
-  repeated AgentInfo agents = 1;
+message ListAgentChatsResponse {
+  repeated ChatInfo chats = 1;
 }
 
-message DescribeAgentRequest {
+message DescribeAgentChatRequest {
   string org_id = 1;
   string canvas_id = 2;
-  string agent_id = 3;
-  string user_id = 4;
+  string user_id = 3;
+  string chat_id = 4;
 }
 
-message DescribeAgentResponse {
-  AgentInfo agent = 1;
+message DescribeAgentChatResponse {
+  ChatInfo chat = 1;
 }
 
-message ListAgentMessagesRequest {
+message ListAgentChatMessagesRequest {
   string org_id = 1;
   string canvas_id = 2;
-  string agent_id = 3;
-  string user_id = 4;
+  string user_id = 3;
+  string chat_id = 4;
 }
 
-message ListAgentMessagesResponse {
-  repeated AgentMessage messages = 1;
+message ListAgentChatMessagesResponse {
+  repeated AgentChatMessage messages = 1;
 }
 
-message AgentMessage {
+message AgentChatMessage {
   string id = 1;
   string role = 2;
   string content = 3;
@@ -59,17 +59,17 @@ message AgentMessage {
   google.protobuf.Timestamp created_at = 6;
 }
 
-message CreateAgentRequest {
+message CreateAgentChatRequest {
   string org_id = 1;
   string canvas_id = 2;
   string user_id = 3;
 }
 
-message CreateAgentResponse {
-  AgentInfo agent = 1;
+message CreateAgentChatResponse {
+  ChatInfo chat = 1;
 }
 
-message AgentInfo {
+message ChatInfo {
   string id = 1;
   string initial_message = 2;
   google.protobuf.Timestamp created_at = 3;

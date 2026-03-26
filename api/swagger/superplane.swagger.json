@@ -64,16 +64,16 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents": {
+    "/api/v1/agents/chats": {
       "get": {
-        "summary": "List agent sessions for the authenticated user",
-        "description": "Returns a list of agent sessions for the authenticated user",
-        "operationId": "Agents_ListAgents",
+        "summary": "List agent chats for the authenticated user",
+        "description": "Returns a list of agent chats for the authenticated user",
+        "operationId": "Agents_ListAgentChats",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsListAgentsResponse"
+              "$ref": "#/definitions/AgentsListAgentChatsResponse"
             }
           },
           "default": {
@@ -96,14 +96,14 @@
         ]
       },
       "post": {
-        "summary": "Creates a new agent session",
-        "description": "Create a new agent session. The response includes the URL and token for initiating the session",
-        "operationId": "Agents_CreateAgent",
+        "summary": "Creates a new agent chat",
+        "description": "Create a new agent chat. The response includes the URL and token for initiating the chat",
+        "operationId": "Agents_CreateAgentChat",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsCreateAgentResponse"
+              "$ref": "#/definitions/AgentsCreateAgentChatResponse"
             }
           },
           "default": {
@@ -119,7 +119,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AgentsCreateAgentRequest"
+              "$ref": "#/definitions/AgentsCreateAgentChatRequest"
             }
           }
         ],
@@ -128,16 +128,16 @@
         ]
       }
     },
-    "/api/v1/agents/{agentId}": {
+    "/api/v1/agents/chats/{chatId}": {
       "get": {
-        "summary": "Describes an agent session for the authenticated user",
-        "description": "Describes an agent session for the authenticated user",
-        "operationId": "Agents_DescribeAgent",
+        "summary": "Describes an agent chat for the authenticated user",
+        "description": "Describes an agent chat for the authenticated user",
+        "operationId": "Agents_DescribeAgentChat",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsDescribeAgentResponse"
+              "$ref": "#/definitions/AgentsDescribeAgentChatResponse"
             }
           },
           "default": {
@@ -149,7 +149,7 @@
         },
         "parameters": [
           {
-            "name": "agentId",
+            "name": "chatId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -166,16 +166,16 @@
         ]
       }
     },
-    "/api/v1/agents/{agentId}/messages": {
+    "/api/v1/agents/chats/{chatId}/messages": {
       "get": {
-        "summary": "List the messages in an agent session",
-        "description": "List the messages in an agent session",
-        "operationId": "Agents_ListAgentMessages",
+        "summary": "List the messages in an agent chat",
+        "description": "List the messages in an agent chat",
+        "operationId": "Agents_ListAgentChatMessages",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsListAgentMessagesResponse"
+              "$ref": "#/definitions/AgentsListAgentChatMessagesResponse"
             }
           },
           "default": {
@@ -187,7 +187,7 @@
         },
         "parameters": [
           {
-            "name": "agentId",
+            "name": "chatId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -204,16 +204,16 @@
         ]
       }
     },
-    "/api/v1/agents/{agentId}/resume": {
+    "/api/v1/agents/chats/{chatId}/resume": {
       "post": {
-        "summary": "Resume an agent session",
-        "description": "Resumes an agent session. The response includes the URL and token for resuming the session",
-        "operationId": "Agents_ResumeAgent",
+        "summary": "Resume an agent chat",
+        "description": "Resumes an agent chat. The response includes the URL and token for resuming the chat",
+        "operationId": "Agents_ResumeAgentChat",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsResumeAgentResponse"
+              "$ref": "#/definitions/AgentsResumeAgentChatResponse"
             }
           },
           "default": {
@@ -225,7 +225,7 @@
         },
         "parameters": [
           {
-            "name": "agentId",
+            "name": "chatId",
             "in": "path",
             "required": true,
             "type": "string"
@@ -235,7 +235,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AgentsResumeAgentBody"
+              "$ref": "#/definitions/AgentsResumeAgentChatBody"
             }
           }
         ],
@@ -4090,7 +4090,7 @@
       ],
       "default": "ACTION_UNSPECIFIED"
     },
-    "AgentsAgentInfo": {
+    "AgentsAgentChatInfo": {
       "type": "object",
       "properties": {
         "id": {
@@ -4105,7 +4105,7 @@
         }
       }
     },
-    "AgentsAgentMessage": {
+    "AgentsAgentChatMessage": {
       "type": "object",
       "properties": {
         "id": {
@@ -4129,7 +4129,7 @@
         }
       }
     },
-    "AgentsCreateAgentRequest": {
+    "AgentsCreateAgentChatRequest": {
       "type": "object",
       "properties": {
         "canvasId": {
@@ -4137,7 +4137,7 @@
         }
       }
     },
-    "AgentsCreateAgentResponse": {
+    "AgentsCreateAgentChatResponse": {
       "type": "object",
       "properties": {
         "token": {
@@ -4148,39 +4148,39 @@
         }
       }
     },
-    "AgentsDescribeAgentResponse": {
+    "AgentsDescribeAgentChatResponse": {
       "type": "object",
       "properties": {
-        "agent": {
-          "$ref": "#/definitions/AgentsAgentInfo"
+        "chat": {
+          "$ref": "#/definitions/AgentsAgentChatInfo"
         }
       }
     },
-    "AgentsListAgentMessagesResponse": {
+    "AgentsListAgentChatMessagesResponse": {
       "type": "object",
       "properties": {
         "messages": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/AgentsAgentMessage"
+            "$ref": "#/definitions/AgentsAgentChatMessage"
           }
         }
       }
     },
-    "AgentsListAgentsResponse": {
+    "AgentsListAgentChatsResponse": {
       "type": "object",
       "properties": {
-        "agents": {
+        "chats": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/AgentsAgentInfo"
+            "$ref": "#/definitions/AgentsAgentChatInfo"
           }
         }
       }
     },
-    "AgentsResumeAgentBody": {
+    "AgentsResumeAgentChatBody": {
       "type": "object",
       "properties": {
         "canvasId": {
@@ -4188,7 +4188,7 @@
         }
       }
     },
-    "AgentsResumeAgentResponse": {
+    "AgentsResumeAgentChatResponse": {
       "type": "object",
       "properties": {
         "token": {

@@ -46,15 +46,15 @@ configuration = superplaneapi.Configuration(
 with superplaneapi.ApiClient(configuration) as api_client:
     # Create an instance of the API class
     api_instance = superplaneapi.AgentApi(api_client)
-    body = superplaneapi.AgentsCreateAgentRequest() # AgentsCreateAgentRequest | 
+    body = superplaneapi.AgentsCreateAgentChatRequest() # AgentsCreateAgentChatRequest | 
 
     try:
-        # Creates a new agent session
-        api_response = api_instance.agents_create_agent(body)
-        print("The response of AgentApi->agents_create_agent:\n")
+        # Creates a new agent chat
+        api_response = api_instance.agents_create_agent_chat(body)
+        print("The response of AgentApi->agents_create_agent_chat:\n")
         pprint(api_response)
     except ApiException as e:
-        print("Exception when calling AgentApi->agents_create_agent: %s\n" % e)
+        print("Exception when calling AgentApi->agents_create_agent_chat: %s\n" % e)
 
 ```
 
@@ -64,11 +64,11 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
-*AgentApi* | [**agents_create_agent**](superplaneapi/docs/AgentApi.md#agents_create_agent) | **POST** /api/v1/agents | Creates a new agent session
-*AgentApi* | [**agents_describe_agent**](superplaneapi/docs/AgentApi.md#agents_describe_agent) | **GET** /api/v1/agents/{agentId} | Describes an agent session for the authenticated user
-*AgentApi* | [**agents_list_agent_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_messages) | **GET** /api/v1/agents/{agentId}/messages | List the messages in an agent session
-*AgentApi* | [**agents_list_agents**](superplaneapi/docs/AgentApi.md#agents_list_agents) | **GET** /api/v1/agents | List agent sessions for the authenticated user
-*AgentApi* | [**agents_resume_agent**](superplaneapi/docs/AgentApi.md#agents_resume_agent) | **POST** /api/v1/agents/{agentId}/resume | Resume an agent session
+*AgentApi* | [**agents_create_agent_chat**](superplaneapi/docs/AgentApi.md#agents_create_agent_chat) | **POST** /api/v1/agents/chats | Creates a new agent chat
+*AgentApi* | [**agents_describe_agent_chat**](superplaneapi/docs/AgentApi.md#agents_describe_agent_chat) | **GET** /api/v1/agents/chats/{chatId} | Describes an agent chat for the authenticated user
+*AgentApi* | [**agents_list_agent_chat_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_chat_messages) | **GET** /api/v1/agents/chats/{chatId}/messages | List the messages in an agent chat
+*AgentApi* | [**agents_list_agent_chats**](superplaneapi/docs/AgentApi.md#agents_list_agent_chats) | **GET** /api/v1/agents/chats | List agent chats for the authenticated user
+*AgentApi* | [**agents_resume_agent_chat**](superplaneapi/docs/AgentApi.md#agents_resume_agent_chat) | **POST** /api/v1/agents/chats/{chatId}/resume | Resume an agent chat
 *BlueprintApi* | [**blueprints_create_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_create_blueprint) | **POST** /api/v1/blueprints | Create blueprint
 *BlueprintApi* | [**blueprints_delete_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_delete_blueprint) | **DELETE** /api/v1/blueprints/{id} | Delete blueprint
 *BlueprintApi* | [**blueprints_describe_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_describe_blueprint) | **GET** /api/v1/blueprints/{id} | Describe blueprint
@@ -172,15 +172,15 @@ Class | Method | HTTP request | Description
 ## Documentation For Models
 
  - [ActOnCanvasChangeRequestRequestAction](superplaneapi/docs/ActOnCanvasChangeRequestRequestAction.md)
- - [AgentsAgentInfo](superplaneapi/docs/AgentsAgentInfo.md)
- - [AgentsAgentMessage](superplaneapi/docs/AgentsAgentMessage.md)
- - [AgentsCreateAgentRequest](superplaneapi/docs/AgentsCreateAgentRequest.md)
- - [AgentsCreateAgentResponse](superplaneapi/docs/AgentsCreateAgentResponse.md)
- - [AgentsDescribeAgentResponse](superplaneapi/docs/AgentsDescribeAgentResponse.md)
- - [AgentsListAgentMessagesResponse](superplaneapi/docs/AgentsListAgentMessagesResponse.md)
- - [AgentsListAgentsResponse](superplaneapi/docs/AgentsListAgentsResponse.md)
- - [AgentsResumeAgentBody](superplaneapi/docs/AgentsResumeAgentBody.md)
- - [AgentsResumeAgentResponse](superplaneapi/docs/AgentsResumeAgentResponse.md)
+ - [AgentsAgentChatInfo](superplaneapi/docs/AgentsAgentChatInfo.md)
+ - [AgentsAgentChatMessage](superplaneapi/docs/AgentsAgentChatMessage.md)
+ - [AgentsCreateAgentChatRequest](superplaneapi/docs/AgentsCreateAgentChatRequest.md)
+ - [AgentsCreateAgentChatResponse](superplaneapi/docs/AgentsCreateAgentChatResponse.md)
+ - [AgentsDescribeAgentChatResponse](superplaneapi/docs/AgentsDescribeAgentChatResponse.md)
+ - [AgentsListAgentChatMessagesResponse](superplaneapi/docs/AgentsListAgentChatMessagesResponse.md)
+ - [AgentsListAgentChatsResponse](superplaneapi/docs/AgentsListAgentChatsResponse.md)
+ - [AgentsResumeAgentChatBody](superplaneapi/docs/AgentsResumeAgentChatBody.md)
+ - [AgentsResumeAgentChatResponse](superplaneapi/docs/AgentsResumeAgentChatResponse.md)
  - [AuthorizationDomainType](superplaneapi/docs/AuthorizationDomainType.md)
  - [AuthorizationPermission](superplaneapi/docs/AuthorizationPermission.md)
  - [BlueprintsBlueprint](superplaneapi/docs/BlueprintsBlueprint.md)

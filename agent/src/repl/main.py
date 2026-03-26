@@ -139,8 +139,8 @@ def _stream_repl_answer(
 ) -> str:
     started_at = time.perf_counter()
     resolved_stream_url = stream_url.strip()
-    if model == "test" and "/agents/" not in resolved_stream_url:
-        resolved_stream_url = f"{resolved_stream_url.rstrip('/')}/agents/test-agent/stream"
+    if model == "test" and "/agents/chats/" not in resolved_stream_url:
+        resolved_stream_url = f"{resolved_stream_url.rstrip('/')}/agents/chats/test-agent/stream"
     request_payload = payload.model_dump(mode="json")
     request_payload["model"] = model
     request_body = json.dumps(request_payload).encode("utf-8")
@@ -288,7 +288,7 @@ def _create_agent_session(
 ) -> tuple[str, str]:
     request_body = json.dumps({"canvas_id": canvas_id}).encode("utf-8")
     request = Request(
-        url=f"{base_url.rstrip('/')}/api/v1/agents",
+        url=f"{base_url.rstrip('/')}/api/v1/agents/chats",
         data=request_body,
         method="POST",
         headers={
@@ -311,7 +311,7 @@ def _create_agent_session(
         details = f" HTTP {error.code}"
         if response_text:
             details += f": {response_text}"
-        raise RuntimeError(f"Failed to create agent session.{details}") from error
+        raise RuntimeError(f"Failed to create agent chat.{details}") from error
     except URLError as error:
         raise RuntimeError(
             "Failed to reach SuperPlane. "

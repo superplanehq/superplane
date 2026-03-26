@@ -23,31 +23,31 @@ import (
 // AgentAPIService AgentAPI service
 type AgentAPIService service
 
-type ApiAgentsCreateAgentRequest struct {
+type ApiAgentsCreateAgentChatRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	body       *AgentsCreateAgentRequest
+	body       *AgentsCreateAgentChatRequest
 }
 
-func (r ApiAgentsCreateAgentRequest) Body(body AgentsCreateAgentRequest) ApiAgentsCreateAgentRequest {
+func (r ApiAgentsCreateAgentChatRequest) Body(body AgentsCreateAgentChatRequest) ApiAgentsCreateAgentChatRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAgentsCreateAgentRequest) Execute() (*AgentsCreateAgentResponse, *http.Response, error) {
-	return r.ApiService.AgentsCreateAgentExecute(r)
+func (r ApiAgentsCreateAgentChatRequest) Execute() (*AgentsCreateAgentChatResponse, *http.Response, error) {
+	return r.ApiService.AgentsCreateAgentChatExecute(r)
 }
 
 /*
-AgentsCreateAgent Creates a new agent session
+AgentsCreateAgentChat Creates a new agent chat
 
-Create a new agent session. The response includes the URL and token for initiating the session
+Create a new agent chat. The response includes the URL and token for initiating the chat
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiAgentsCreateAgentRequest
+	@return ApiAgentsCreateAgentChatRequest
 */
-func (a *AgentAPIService) AgentsCreateAgent(ctx context.Context) ApiAgentsCreateAgentRequest {
-	return ApiAgentsCreateAgentRequest{
+func (a *AgentAPIService) AgentsCreateAgentChat(ctx context.Context) ApiAgentsCreateAgentChatRequest {
+	return ApiAgentsCreateAgentChatRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -55,21 +55,21 @@ func (a *AgentAPIService) AgentsCreateAgent(ctx context.Context) ApiAgentsCreate
 
 // Execute executes the request
 //
-//	@return AgentsCreateAgentResponse
-func (a *AgentAPIService) AgentsCreateAgentExecute(r ApiAgentsCreateAgentRequest) (*AgentsCreateAgentResponse, *http.Response, error) {
+//	@return AgentsCreateAgentChatResponse
+func (a *AgentAPIService) AgentsCreateAgentChatExecute(r ApiAgentsCreateAgentChatRequest) (*AgentsCreateAgentChatResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsCreateAgentResponse
+		localVarReturnValue *AgentsCreateAgentChatResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsCreateAgent")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsCreateAgentChat")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents"
+	localVarPath := localBasePath + "/api/v1/agents/chats"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -142,57 +142,57 @@ func (a *AgentAPIService) AgentsCreateAgentExecute(r ApiAgentsCreateAgentRequest
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAgentsDescribeAgentRequest struct {
+type ApiAgentsDescribeAgentChatRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	agentId    string
+	chatId     string
 	canvasId   *string
 }
 
-func (r ApiAgentsDescribeAgentRequest) CanvasId(canvasId string) ApiAgentsDescribeAgentRequest {
+func (r ApiAgentsDescribeAgentChatRequest) CanvasId(canvasId string) ApiAgentsDescribeAgentChatRequest {
 	r.canvasId = &canvasId
 	return r
 }
 
-func (r ApiAgentsDescribeAgentRequest) Execute() (*AgentsDescribeAgentResponse, *http.Response, error) {
-	return r.ApiService.AgentsDescribeAgentExecute(r)
+func (r ApiAgentsDescribeAgentChatRequest) Execute() (*AgentsDescribeAgentChatResponse, *http.Response, error) {
+	return r.ApiService.AgentsDescribeAgentChatExecute(r)
 }
 
 /*
-AgentsDescribeAgent Describes an agent session for the authenticated user
+AgentsDescribeAgentChat Describes an agent chat for the authenticated user
 
-Describes an agent session for the authenticated user
+Describes an agent chat for the authenticated user
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param agentId
-	@return ApiAgentsDescribeAgentRequest
+	@param chatId
+	@return ApiAgentsDescribeAgentChatRequest
 */
-func (a *AgentAPIService) AgentsDescribeAgent(ctx context.Context, agentId string) ApiAgentsDescribeAgentRequest {
-	return ApiAgentsDescribeAgentRequest{
+func (a *AgentAPIService) AgentsDescribeAgentChat(ctx context.Context, chatId string) ApiAgentsDescribeAgentChatRequest {
+	return ApiAgentsDescribeAgentChatRequest{
 		ApiService: a,
 		ctx:        ctx,
-		agentId:    agentId,
+		chatId:     chatId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return AgentsDescribeAgentResponse
-func (a *AgentAPIService) AgentsDescribeAgentExecute(r ApiAgentsDescribeAgentRequest) (*AgentsDescribeAgentResponse, *http.Response, error) {
+//	@return AgentsDescribeAgentChatResponse
+func (a *AgentAPIService) AgentsDescribeAgentChatExecute(r ApiAgentsDescribeAgentChatRequest) (*AgentsDescribeAgentChatResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsDescribeAgentResponse
+		localVarReturnValue *AgentsDescribeAgentChatResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsDescribeAgent")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsDescribeAgentChat")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/{agentId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"agentId"+"}", url.PathEscape(parameterValueToString(r.agentId, "agentId")), -1)
+	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -263,57 +263,57 @@ func (a *AgentAPIService) AgentsDescribeAgentExecute(r ApiAgentsDescribeAgentReq
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAgentsListAgentMessagesRequest struct {
+type ApiAgentsListAgentChatMessagesRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	agentId    string
+	chatId     string
 	canvasId   *string
 }
 
-func (r ApiAgentsListAgentMessagesRequest) CanvasId(canvasId string) ApiAgentsListAgentMessagesRequest {
+func (r ApiAgentsListAgentChatMessagesRequest) CanvasId(canvasId string) ApiAgentsListAgentChatMessagesRequest {
 	r.canvasId = &canvasId
 	return r
 }
 
-func (r ApiAgentsListAgentMessagesRequest) Execute() (*AgentsListAgentMessagesResponse, *http.Response, error) {
-	return r.ApiService.AgentsListAgentMessagesExecute(r)
+func (r ApiAgentsListAgentChatMessagesRequest) Execute() (*AgentsListAgentChatMessagesResponse, *http.Response, error) {
+	return r.ApiService.AgentsListAgentChatMessagesExecute(r)
 }
 
 /*
-AgentsListAgentMessages List the messages in an agent session
+AgentsListAgentChatMessages List the messages in an agent chat
 
-List the messages in an agent session
+List the messages in an agent chat
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param agentId
-	@return ApiAgentsListAgentMessagesRequest
+	@param chatId
+	@return ApiAgentsListAgentChatMessagesRequest
 */
-func (a *AgentAPIService) AgentsListAgentMessages(ctx context.Context, agentId string) ApiAgentsListAgentMessagesRequest {
-	return ApiAgentsListAgentMessagesRequest{
+func (a *AgentAPIService) AgentsListAgentChatMessages(ctx context.Context, chatId string) ApiAgentsListAgentChatMessagesRequest {
+	return ApiAgentsListAgentChatMessagesRequest{
 		ApiService: a,
 		ctx:        ctx,
-		agentId:    agentId,
+		chatId:     chatId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return AgentsListAgentMessagesResponse
-func (a *AgentAPIService) AgentsListAgentMessagesExecute(r ApiAgentsListAgentMessagesRequest) (*AgentsListAgentMessagesResponse, *http.Response, error) {
+//	@return AgentsListAgentChatMessagesResponse
+func (a *AgentAPIService) AgentsListAgentChatMessagesExecute(r ApiAgentsListAgentChatMessagesRequest) (*AgentsListAgentChatMessagesResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsListAgentMessagesResponse
+		localVarReturnValue *AgentsListAgentChatMessagesResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsListAgentMessages")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsListAgentChatMessages")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/{agentId}/messages"
-	localVarPath = strings.Replace(localVarPath, "{"+"agentId"+"}", url.PathEscape(parameterValueToString(r.agentId, "agentId")), -1)
+	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}/messages"
+	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -384,31 +384,31 @@ func (a *AgentAPIService) AgentsListAgentMessagesExecute(r ApiAgentsListAgentMes
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAgentsListAgentsRequest struct {
+type ApiAgentsListAgentChatsRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
 	canvasId   *string
 }
 
-func (r ApiAgentsListAgentsRequest) CanvasId(canvasId string) ApiAgentsListAgentsRequest {
+func (r ApiAgentsListAgentChatsRequest) CanvasId(canvasId string) ApiAgentsListAgentChatsRequest {
 	r.canvasId = &canvasId
 	return r
 }
 
-func (r ApiAgentsListAgentsRequest) Execute() (*AgentsListAgentsResponse, *http.Response, error) {
-	return r.ApiService.AgentsListAgentsExecute(r)
+func (r ApiAgentsListAgentChatsRequest) Execute() (*AgentsListAgentChatsResponse, *http.Response, error) {
+	return r.ApiService.AgentsListAgentChatsExecute(r)
 }
 
 /*
-AgentsListAgents List agent sessions for the authenticated user
+AgentsListAgentChats List agent chats for the authenticated user
 
-Returns a list of agent sessions for the authenticated user
+Returns a list of agent chats for the authenticated user
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiAgentsListAgentsRequest
+	@return ApiAgentsListAgentChatsRequest
 */
-func (a *AgentAPIService) AgentsListAgents(ctx context.Context) ApiAgentsListAgentsRequest {
-	return ApiAgentsListAgentsRequest{
+func (a *AgentAPIService) AgentsListAgentChats(ctx context.Context) ApiAgentsListAgentChatsRequest {
+	return ApiAgentsListAgentChatsRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -416,21 +416,21 @@ func (a *AgentAPIService) AgentsListAgents(ctx context.Context) ApiAgentsListAge
 
 // Execute executes the request
 //
-//	@return AgentsListAgentsResponse
-func (a *AgentAPIService) AgentsListAgentsExecute(r ApiAgentsListAgentsRequest) (*AgentsListAgentsResponse, *http.Response, error) {
+//	@return AgentsListAgentChatsResponse
+func (a *AgentAPIService) AgentsListAgentChatsExecute(r ApiAgentsListAgentChatsRequest) (*AgentsListAgentChatsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsListAgentsResponse
+		localVarReturnValue *AgentsListAgentChatsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsListAgents")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsListAgentChats")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents"
+	localVarPath := localBasePath + "/api/v1/agents/chats"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -501,57 +501,57 @@ func (a *AgentAPIService) AgentsListAgentsExecute(r ApiAgentsListAgentsRequest) 
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAgentsResumeAgentRequest struct {
+type ApiAgentsResumeAgentChatRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	agentId    string
-	body       *AgentsResumeAgentBody
+	chatId     string
+	body       *AgentsResumeAgentChatBody
 }
 
-func (r ApiAgentsResumeAgentRequest) Body(body AgentsResumeAgentBody) ApiAgentsResumeAgentRequest {
+func (r ApiAgentsResumeAgentChatRequest) Body(body AgentsResumeAgentChatBody) ApiAgentsResumeAgentChatRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAgentsResumeAgentRequest) Execute() (*AgentsResumeAgentResponse, *http.Response, error) {
-	return r.ApiService.AgentsResumeAgentExecute(r)
+func (r ApiAgentsResumeAgentChatRequest) Execute() (*AgentsResumeAgentChatResponse, *http.Response, error) {
+	return r.ApiService.AgentsResumeAgentChatExecute(r)
 }
 
 /*
-AgentsResumeAgent Resume an agent session
+AgentsResumeAgentChat Resume an agent chat
 
-Resumes an agent session. The response includes the URL and token for resuming the session
+Resumes an agent chat. The response includes the URL and token for resuming the chat
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param agentId
-	@return ApiAgentsResumeAgentRequest
+	@param chatId
+	@return ApiAgentsResumeAgentChatRequest
 */
-func (a *AgentAPIService) AgentsResumeAgent(ctx context.Context, agentId string) ApiAgentsResumeAgentRequest {
-	return ApiAgentsResumeAgentRequest{
+func (a *AgentAPIService) AgentsResumeAgentChat(ctx context.Context, chatId string) ApiAgentsResumeAgentChatRequest {
+	return ApiAgentsResumeAgentChatRequest{
 		ApiService: a,
 		ctx:        ctx,
-		agentId:    agentId,
+		chatId:     chatId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return AgentsResumeAgentResponse
-func (a *AgentAPIService) AgentsResumeAgentExecute(r ApiAgentsResumeAgentRequest) (*AgentsResumeAgentResponse, *http.Response, error) {
+//	@return AgentsResumeAgentChatResponse
+func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentChatRequest) (*AgentsResumeAgentChatResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsResumeAgentResponse
+		localVarReturnValue *AgentsResumeAgentChatResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsResumeAgent")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsResumeAgentChat")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/{agentId}/resume"
-	localVarPath = strings.Replace(localVarPath, "{"+"agentId"+"}", url.PathEscape(parameterValueToString(r.agentId, "agentId")), -1)
+	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}/resume"
+	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

@@ -18,20 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.agents_agent_chat_info import AgentsAgentChatInfo
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsAgentInfo(BaseModel):
+class AgentsDescribeAgentChatResponse(BaseModel):
     """
-    AgentsAgentInfo
+    AgentsDescribeAgentChatResponse
     """ # noqa: E501
-    id: Optional[StrictStr] = None
-    initial_message: Optional[StrictStr] = Field(default=None, alias="initialMessage")
-    created_at: Optional[datetime] = Field(default=None, alias="createdAt")
-    __properties: ClassVar[List[str]] = ["id", "initialMessage", "createdAt"]
+    chat: Optional[AgentsAgentChatInfo] = None
+    __properties: ClassVar[List[str]] = ["chat"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +49,7 @@ class AgentsAgentInfo(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsAgentInfo from a JSON string"""
+        """Create an instance of AgentsDescribeAgentChatResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -72,11 +70,14 @@ class AgentsAgentInfo(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of chat
+        if self.chat:
+            _dict['chat'] = self.chat.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsAgentInfo from a dict"""
+        """Create an instance of AgentsDescribeAgentChatResponse from a dict"""
         if obj is None:
             return None
 
@@ -84,9 +85,7 @@ class AgentsAgentInfo(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "id": obj.get("id"),
-            "initialMessage": obj.get("initialMessage"),
-            "createdAt": obj.get("createdAt")
+            "chat": AgentsAgentChatInfo.from_dict(obj["chat"]) if obj.get("chat") is not None else None
         })
         return _obj
 

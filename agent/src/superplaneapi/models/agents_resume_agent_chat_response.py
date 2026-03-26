@@ -18,18 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.agents_agent_info import AgentsAgentInfo
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsListAgentsResponse(BaseModel):
+class AgentsResumeAgentChatResponse(BaseModel):
     """
-    AgentsListAgentsResponse
+    AgentsResumeAgentChatResponse
     """ # noqa: E501
-    agents: Optional[List[AgentsAgentInfo]] = None
-    __properties: ClassVar[List[str]] = ["agents"]
+    token: Optional[StrictStr] = None
+    url: Optional[StrictStr] = None
+    __properties: ClassVar[List[str]] = ["token", "url"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class AgentsListAgentsResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsListAgentsResponse from a JSON string"""
+        """Create an instance of AgentsResumeAgentChatResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,18 +70,11 @@ class AgentsListAgentsResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in agents (list)
-        _items = []
-        if self.agents:
-            for _item_agents in self.agents:
-                if _item_agents:
-                    _items.append(_item_agents.to_dict())
-            _dict['agents'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsListAgentsResponse from a dict"""
+        """Create an instance of AgentsResumeAgentChatResponse from a dict"""
         if obj is None:
             return None
 
@@ -89,7 +82,8 @@ class AgentsListAgentsResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "agents": [AgentsAgentInfo.from_dict(_item) for _item in obj["agents"]] if obj.get("agents") is not None else None
+            "token": obj.get("token"),
+            "url": obj.get("url")
         })
         return _obj
 

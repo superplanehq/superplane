@@ -15,46 +15,46 @@ import (
 
 const streamTokenLifetime = 15 * time.Minute
 
-func MintAgentStreamResponse(
+func MintCreateAgentChatStreamResponse(
 	jwtSigner *jwt.Signer,
 	publicURL string,
 	userID string,
 	orgID string,
 	canvasID string,
 	agentID string,
-) (*pb.CreateAgentResponse, error) {
+) (*pb.CreateAgentChatResponse, error) {
 	token, err := mintAgentStreamToken(jwtSigner, userID, orgID, canvasID, agentID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.CreateAgentResponse{
+	return &pb.CreateAgentChatResponse{
 		Token: token,
-		Url:   buildAgentStreamURL(publicURL, agentID),
+		Url:   buildAgentChatStreamURL(publicURL, agentID),
 	}, nil
 }
 
-func MintResumeAgentStreamResponse(
+func MintResumeAgentChatStreamResponse(
 	jwtSigner *jwt.Signer,
 	publicURL string,
 	userID string,
 	orgID string,
 	canvasID string,
 	agentID string,
-) (*pb.ResumeAgentResponse, error) {
+) (*pb.ResumeAgentChatResponse, error) {
 	token, err := mintAgentStreamToken(jwtSigner, userID, orgID, canvasID, agentID)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.ResumeAgentResponse{
+	return &pb.ResumeAgentChatResponse{
 		Token: token,
-		Url:   buildAgentStreamURL(publicURL, agentID),
+		Url:   buildAgentChatStreamURL(publicURL, agentID),
 	}, nil
 }
 
-func buildAgentStreamURL(publicURL string, agentID string) string {
-	return strings.TrimRight(publicURL, "/") + "/agents/" + agentID + "/stream"
+func buildAgentChatStreamURL(publicURL string, agentID string) string {
+	return strings.TrimRight(publicURL, "/") + "/agents/chats/" + agentID + "/stream"
 }
 
 func mintAgentStreamToken(
@@ -84,26 +84,26 @@ func mintAgentStreamToken(
 	return token, nil
 }
 
-func SerializeAgentInfo(agent *internalpb.AgentInfo) (*pb.AgentInfo, error) {
+func SerializeAgentChatInfo(agent *internalpb.ChatInfo) (*pb.AgentChatInfo, error) {
 	if agent == nil {
-		return nil, status.Error(codes.Internal, "missing agent")
+		return nil, status.Error(codes.Internal, "missing agent chat")
 	}
 
-	return &pb.AgentInfo{
+	return &pb.AgentChatInfo{
 		Id:             agent.Id,
 		InitialMessage: agent.InitialMessage,
 		CreatedAt:      timestampOrNil(agent.CreatedAt),
 	}, nil
 }
 
-func SerializeAgentMessages(messages []*internalpb.AgentMessage) []*pb.AgentMessage {
-	serialized := make([]*pb.AgentMessage, 0, len(messages))
+func SerializeAgentChatMessages(messages []*internalpb.AgentChatMessage) []*pb.AgentChatMessage {
+	serialized := make([]*pb.AgentChatMessage, 0, len(messages))
 	for _, message := range messages {
 		if message == nil {
 			continue
 		}
 
-		serialized = append(serialized, &pb.AgentMessage{
+		serialized = append(serialized, &pb.AgentChatMessage{
 			Id:         message.Id,
 			Role:       message.Role,
 			Content:    message.Content,

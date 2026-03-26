@@ -22,7 +22,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type ListAgentsRequest struct {
+type ListAgentChatsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         string                 `protobuf:"bytes,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	CanvasId      string                 `protobuf:"bytes,2,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
@@ -31,20 +31,20 @@ type ListAgentsRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListAgentsRequest) Reset() {
-	*x = ListAgentsRequest{}
+func (x *ListAgentChatsRequest) Reset() {
+	*x = ListAgentChatsRequest{}
 	mi := &file_internal_agents_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListAgentsRequest) String() string {
+func (x *ListAgentChatsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListAgentsRequest) ProtoMessage() {}
+func (*ListAgentChatsRequest) ProtoMessage() {}
 
-func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
+func (x *ListAgentChatsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,53 +56,53 @@ func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListAgentsRequest.ProtoReflect.Descriptor instead.
-func (*ListAgentsRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListAgentChatsRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentChatsRequest) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ListAgentsRequest) GetOrgId() string {
+func (x *ListAgentChatsRequest) GetOrgId() string {
 	if x != nil {
 		return x.OrgId
 	}
 	return ""
 }
 
-func (x *ListAgentsRequest) GetCanvasId() string {
+func (x *ListAgentChatsRequest) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-func (x *ListAgentsRequest) GetUserId() string {
+func (x *ListAgentChatsRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-type ListAgentsResponse struct {
+type ListAgentChatsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Agents        []*AgentInfo           `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	Chats         []*ChatInfo            `protobuf:"bytes,1,rep,name=chats,proto3" json:"chats,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListAgentsResponse) Reset() {
-	*x = ListAgentsResponse{}
+func (x *ListAgentChatsResponse) Reset() {
+	*x = ListAgentChatsResponse{}
 	mi := &file_internal_agents_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListAgentsResponse) String() string {
+func (x *ListAgentChatsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListAgentsResponse) ProtoMessage() {}
+func (*ListAgentChatsResponse) ProtoMessage() {}
 
-func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
+func (x *ListAgentChatsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -114,42 +114,42 @@ func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListAgentsResponse.ProtoReflect.Descriptor instead.
-func (*ListAgentsResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListAgentChatsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentChatsResponse) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *ListAgentsResponse) GetAgents() []*AgentInfo {
+func (x *ListAgentChatsResponse) GetChats() []*ChatInfo {
 	if x != nil {
-		return x.Agents
+		return x.Chats
 	}
 	return nil
 }
 
-type DescribeAgentRequest struct {
+type DescribeAgentChatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         string                 `protobuf:"bytes,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	CanvasId      string                 `protobuf:"bytes,2,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	AgentId       string                 `protobuf:"bytes,3,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	UserId        string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ChatId        string                 `protobuf:"bytes,4,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DescribeAgentRequest) Reset() {
-	*x = DescribeAgentRequest{}
+func (x *DescribeAgentChatRequest) Reset() {
+	*x = DescribeAgentChatRequest{}
 	mi := &file_internal_agents_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DescribeAgentRequest) String() string {
+func (x *DescribeAgentChatRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DescribeAgentRequest) ProtoMessage() {}
+func (*DescribeAgentChatRequest) ProtoMessage() {}
 
-func (x *DescribeAgentRequest) ProtoReflect() protoreflect.Message {
+func (x *DescribeAgentChatRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -161,60 +161,60 @@ func (x *DescribeAgentRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DescribeAgentRequest.ProtoReflect.Descriptor instead.
-func (*DescribeAgentRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use DescribeAgentChatRequest.ProtoReflect.Descriptor instead.
+func (*DescribeAgentChatRequest) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *DescribeAgentRequest) GetOrgId() string {
+func (x *DescribeAgentChatRequest) GetOrgId() string {
 	if x != nil {
 		return x.OrgId
 	}
 	return ""
 }
 
-func (x *DescribeAgentRequest) GetCanvasId() string {
+func (x *DescribeAgentChatRequest) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-func (x *DescribeAgentRequest) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
-}
-
-func (x *DescribeAgentRequest) GetUserId() string {
+func (x *DescribeAgentChatRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-type DescribeAgentResponse struct {
+func (x *DescribeAgentChatRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type DescribeAgentChatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Agent         *AgentInfo             `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	Chat          *ChatInfo              `protobuf:"bytes,1,opt,name=chat,proto3" json:"chat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *DescribeAgentResponse) Reset() {
-	*x = DescribeAgentResponse{}
+func (x *DescribeAgentChatResponse) Reset() {
+	*x = DescribeAgentChatResponse{}
 	mi := &file_internal_agents_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *DescribeAgentResponse) String() string {
+func (x *DescribeAgentChatResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*DescribeAgentResponse) ProtoMessage() {}
+func (*DescribeAgentChatResponse) ProtoMessage() {}
 
-func (x *DescribeAgentResponse) ProtoReflect() protoreflect.Message {
+func (x *DescribeAgentChatResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -226,42 +226,42 @@ func (x *DescribeAgentResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use DescribeAgentResponse.ProtoReflect.Descriptor instead.
-func (*DescribeAgentResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use DescribeAgentChatResponse.ProtoReflect.Descriptor instead.
+func (*DescribeAgentChatResponse) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DescribeAgentResponse) GetAgent() *AgentInfo {
+func (x *DescribeAgentChatResponse) GetChat() *ChatInfo {
 	if x != nil {
-		return x.Agent
+		return x.Chat
 	}
 	return nil
 }
 
-type ListAgentMessagesRequest struct {
+type ListAgentChatMessagesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         string                 `protobuf:"bytes,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	CanvasId      string                 `protobuf:"bytes,2,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	AgentId       string                 `protobuf:"bytes,3,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	UserId        string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ChatId        string                 `protobuf:"bytes,4,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListAgentMessagesRequest) Reset() {
-	*x = ListAgentMessagesRequest{}
+func (x *ListAgentChatMessagesRequest) Reset() {
+	*x = ListAgentChatMessagesRequest{}
 	mi := &file_internal_agents_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListAgentMessagesRequest) String() string {
+func (x *ListAgentChatMessagesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListAgentMessagesRequest) ProtoMessage() {}
+func (*ListAgentChatMessagesRequest) ProtoMessage() {}
 
-func (x *ListAgentMessagesRequest) ProtoReflect() protoreflect.Message {
+func (x *ListAgentChatMessagesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -273,60 +273,60 @@ func (x *ListAgentMessagesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListAgentMessagesRequest.ProtoReflect.Descriptor instead.
-func (*ListAgentMessagesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListAgentChatMessagesRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentChatMessagesRequest) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ListAgentMessagesRequest) GetOrgId() string {
+func (x *ListAgentChatMessagesRequest) GetOrgId() string {
 	if x != nil {
 		return x.OrgId
 	}
 	return ""
 }
 
-func (x *ListAgentMessagesRequest) GetCanvasId() string {
+func (x *ListAgentChatMessagesRequest) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-func (x *ListAgentMessagesRequest) GetAgentId() string {
-	if x != nil {
-		return x.AgentId
-	}
-	return ""
-}
-
-func (x *ListAgentMessagesRequest) GetUserId() string {
+func (x *ListAgentChatMessagesRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-type ListAgentMessagesResponse struct {
+func (x *ListAgentChatMessagesRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type ListAgentChatMessagesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Messages      []*AgentMessage        `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	Messages      []*AgentChatMessage    `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ListAgentMessagesResponse) Reset() {
-	*x = ListAgentMessagesResponse{}
+func (x *ListAgentChatMessagesResponse) Reset() {
+	*x = ListAgentChatMessagesResponse{}
 	mi := &file_internal_agents_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ListAgentMessagesResponse) String() string {
+func (x *ListAgentChatMessagesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ListAgentMessagesResponse) ProtoMessage() {}
+func (*ListAgentChatMessagesResponse) ProtoMessage() {}
 
-func (x *ListAgentMessagesResponse) ProtoReflect() protoreflect.Message {
+func (x *ListAgentChatMessagesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -338,19 +338,19 @@ func (x *ListAgentMessagesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ListAgentMessagesResponse.ProtoReflect.Descriptor instead.
-func (*ListAgentMessagesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListAgentChatMessagesResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentChatMessagesResponse) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ListAgentMessagesResponse) GetMessages() []*AgentMessage {
+func (x *ListAgentChatMessagesResponse) GetMessages() []*AgentChatMessage {
 	if x != nil {
 		return x.Messages
 	}
 	return nil
 }
 
-type AgentMessage struct {
+type AgentChatMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
@@ -362,20 +362,20 @@ type AgentMessage struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *AgentMessage) Reset() {
-	*x = AgentMessage{}
+func (x *AgentChatMessage) Reset() {
+	*x = AgentChatMessage{}
 	mi := &file_internal_agents_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AgentMessage) String() string {
+func (x *AgentChatMessage) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AgentMessage) ProtoMessage() {}
+func (*AgentChatMessage) ProtoMessage() {}
 
-func (x *AgentMessage) ProtoReflect() protoreflect.Message {
+func (x *AgentChatMessage) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -387,54 +387,54 @@ func (x *AgentMessage) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AgentMessage.ProtoReflect.Descriptor instead.
-func (*AgentMessage) Descriptor() ([]byte, []int) {
+// Deprecated: Use AgentChatMessage.ProtoReflect.Descriptor instead.
+func (*AgentChatMessage) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *AgentMessage) GetId() string {
+func (x *AgentChatMessage) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *AgentMessage) GetRole() string {
+func (x *AgentChatMessage) GetRole() string {
 	if x != nil {
 		return x.Role
 	}
 	return ""
 }
 
-func (x *AgentMessage) GetContent() string {
+func (x *AgentChatMessage) GetContent() string {
 	if x != nil {
 		return x.Content
 	}
 	return ""
 }
 
-func (x *AgentMessage) GetToolCallId() string {
+func (x *AgentChatMessage) GetToolCallId() string {
 	if x != nil {
 		return x.ToolCallId
 	}
 	return ""
 }
 
-func (x *AgentMessage) GetToolStatus() string {
+func (x *AgentChatMessage) GetToolStatus() string {
 	if x != nil {
 		return x.ToolStatus
 	}
 	return ""
 }
 
-func (x *AgentMessage) GetCreatedAt() *timestamp.Timestamp {
+func (x *AgentChatMessage) GetCreatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
 	return nil
 }
 
-type CreateAgentRequest struct {
+type CreateAgentChatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         string                 `protobuf:"bytes,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	CanvasId      string                 `protobuf:"bytes,2,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
@@ -443,20 +443,20 @@ type CreateAgentRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateAgentRequest) Reset() {
-	*x = CreateAgentRequest{}
+func (x *CreateAgentChatRequest) Reset() {
+	*x = CreateAgentChatRequest{}
 	mi := &file_internal_agents_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateAgentRequest) String() string {
+func (x *CreateAgentChatRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateAgentRequest) ProtoMessage() {}
+func (*CreateAgentChatRequest) ProtoMessage() {}
 
-func (x *CreateAgentRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateAgentChatRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -468,53 +468,53 @@ func (x *CreateAgentRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateAgentRequest.ProtoReflect.Descriptor instead.
-func (*CreateAgentRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateAgentChatRequest.ProtoReflect.Descriptor instead.
+func (*CreateAgentChatRequest) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *CreateAgentRequest) GetOrgId() string {
+func (x *CreateAgentChatRequest) GetOrgId() string {
 	if x != nil {
 		return x.OrgId
 	}
 	return ""
 }
 
-func (x *CreateAgentRequest) GetCanvasId() string {
+func (x *CreateAgentChatRequest) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-func (x *CreateAgentRequest) GetUserId() string {
+func (x *CreateAgentChatRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-type CreateAgentResponse struct {
+type CreateAgentChatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Agent         *AgentInfo             `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	Chat          *ChatInfo              `protobuf:"bytes,1,opt,name=chat,proto3" json:"chat,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CreateAgentResponse) Reset() {
-	*x = CreateAgentResponse{}
+func (x *CreateAgentChatResponse) Reset() {
+	*x = CreateAgentChatResponse{}
 	mi := &file_internal_agents_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateAgentResponse) String() string {
+func (x *CreateAgentChatResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateAgentResponse) ProtoMessage() {}
+func (*CreateAgentChatResponse) ProtoMessage() {}
 
-func (x *CreateAgentResponse) ProtoReflect() protoreflect.Message {
+func (x *CreateAgentChatResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -526,19 +526,19 @@ func (x *CreateAgentResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateAgentResponse.ProtoReflect.Descriptor instead.
-func (*CreateAgentResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateAgentChatResponse.ProtoReflect.Descriptor instead.
+func (*CreateAgentChatResponse) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *CreateAgentResponse) GetAgent() *AgentInfo {
+func (x *CreateAgentChatResponse) GetChat() *ChatInfo {
 	if x != nil {
-		return x.Agent
+		return x.Chat
 	}
 	return nil
 }
 
-type AgentInfo struct {
+type ChatInfo struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	InitialMessage string                 `protobuf:"bytes,2,opt,name=initial_message,json=initialMessage,proto3" json:"initial_message,omitempty"`
@@ -547,20 +547,20 @@ type AgentInfo struct {
 	sizeCache      protoimpl.SizeCache
 }
 
-func (x *AgentInfo) Reset() {
-	*x = AgentInfo{}
+func (x *ChatInfo) Reset() {
+	*x = ChatInfo{}
 	mi := &file_internal_agents_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *AgentInfo) String() string {
+func (x *ChatInfo) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*AgentInfo) ProtoMessage() {}
+func (*ChatInfo) ProtoMessage() {}
 
-func (x *AgentInfo) ProtoReflect() protoreflect.Message {
+func (x *ChatInfo) ProtoReflect() protoreflect.Message {
 	mi := &file_internal_agents_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -572,26 +572,26 @@ func (x *AgentInfo) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use AgentInfo.ProtoReflect.Descriptor instead.
-func (*AgentInfo) Descriptor() ([]byte, []int) {
+// Deprecated: Use ChatInfo.ProtoReflect.Descriptor instead.
+func (*ChatInfo) Descriptor() ([]byte, []int) {
 	return file_internal_agents_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *AgentInfo) GetId() string {
+func (x *ChatInfo) GetId() string {
 	if x != nil {
 		return x.Id
 	}
 	return ""
 }
 
-func (x *AgentInfo) GetInitialMessage() string {
+func (x *ChatInfo) GetInitialMessage() string {
 	if x != nil {
 		return x.InitialMessage
 	}
 	return ""
 }
 
-func (x *AgentInfo) GetCreatedAt() *timestamp.Timestamp {
+func (x *ChatInfo) GetCreatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
@@ -602,28 +602,28 @@ var File_internal_agents_proto protoreflect.FileDescriptor
 
 const file_internal_agents_proto_rawDesc = "" +
 	"\n" +
-	"\x15internal/agents.proto\x12\x1aSuperplane.Internal.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\"`\n" +
-	"\x11ListAgentsRequest\x12\x15\n" +
+	"\x15internal/agents.proto\x12\x1aSuperplane.Internal.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\"d\n" +
+	"\x15ListAgentChatsRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\"S\n" +
-	"\x12ListAgentsResponse\x12=\n" +
-	"\x06agents\x18\x01 \x03(\v2%.Superplane.Internal.Agents.AgentInfoR\x06agents\"~\n" +
-	"\x14DescribeAgentRequest\x12\x15\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\"T\n" +
+	"\x16ListAgentChatsResponse\x12:\n" +
+	"\x05chats\x18\x01 \x03(\v2$.Superplane.Internal.Agents.ChatInfoR\x05chats\"\x80\x01\n" +
+	"\x18DescribeAgentChatRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1b\n" +
-	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x19\n" +
-	"\bagent_id\x18\x03 \x01(\tR\aagentId\x12\x17\n" +
-	"\auser_id\x18\x04 \x01(\tR\x06userId\"T\n" +
-	"\x15DescribeAgentResponse\x12;\n" +
-	"\x05agent\x18\x01 \x01(\v2%.Superplane.Internal.Agents.AgentInfoR\x05agent\"\x82\x01\n" +
-	"\x18ListAgentMessagesRequest\x12\x15\n" +
+	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x17\n" +
+	"\achat_id\x18\x04 \x01(\tR\x06chatId\"U\n" +
+	"\x19DescribeAgentChatResponse\x128\n" +
+	"\x04chat\x18\x01 \x01(\v2$.Superplane.Internal.Agents.ChatInfoR\x04chat\"\x84\x01\n" +
+	"\x1cListAgentChatMessagesRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1b\n" +
-	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x19\n" +
-	"\bagent_id\x18\x03 \x01(\tR\aagentId\x12\x17\n" +
-	"\auser_id\x18\x04 \x01(\tR\x06userId\"a\n" +
-	"\x19ListAgentMessagesResponse\x12D\n" +
-	"\bmessages\x18\x01 \x03(\v2(.Superplane.Internal.Agents.AgentMessageR\bmessages\"\xca\x01\n" +
-	"\fAgentMessage\x12\x0e\n" +
+	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x17\n" +
+	"\achat_id\x18\x04 \x01(\tR\x06chatId\"i\n" +
+	"\x1dListAgentChatMessagesResponse\x12H\n" +
+	"\bmessages\x18\x01 \x03(\v2,.Superplane.Internal.Agents.AgentChatMessageR\bmessages\"\xce\x01\n" +
+	"\x10AgentChatMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12\x18\n" +
 	"\acontent\x18\x03 \x01(\tR\acontent\x12 \n" +
@@ -632,24 +632,23 @@ const file_internal_agents_proto_rawDesc = "" +
 	"\vtool_status\x18\x05 \x01(\tR\n" +
 	"toolStatus\x129\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"a\n" +
-	"\x12CreateAgentRequest\x12\x15\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"e\n" +
+	"\x16CreateAgentChatRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\"R\n" +
-	"\x13CreateAgentResponse\x12;\n" +
-	"\x05agent\x18\x01 \x01(\v2%.Superplane.Internal.Agents.AgentInfoR\x05agent\"\x7f\n" +
-	"\tAgentInfo\x12\x0e\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\"S\n" +
+	"\x17CreateAgentChatResponse\x128\n" +
+	"\x04chat\x18\x01 \x01(\v2$.Superplane.Internal.Agents.ChatInfoR\x04chat\"~\n" +
+	"\bChatInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xde\x03\n" +
-	"\x06Agents\x12n\n" +
-	"\vCreateAgent\x12..Superplane.Internal.Agents.CreateAgentRequest\x1a/.Superplane.Internal.Agents.CreateAgentResponse\x12k\n" +
-	"\n" +
-	"ListAgents\x12-.Superplane.Internal.Agents.ListAgentsRequest\x1a..Superplane.Internal.Agents.ListAgentsResponse\x12t\n" +
-	"\rDescribeAgent\x120.Superplane.Internal.Agents.DescribeAgentRequest\x1a1.Superplane.Internal.Agents.DescribeAgentResponse\x12\x80\x01\n" +
-	"\x11ListAgentMessages\x124.Superplane.Internal.Agents.ListAgentMessagesRequest\x1a5.Superplane.Internal.Agents.ListAgentMessagesResponseB>Z<github.com/superplanehq/superplane/pkg/protos/private/agentsb\x06proto3"
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\x8f\x04\n" +
+	"\x06Agents\x12z\n" +
+	"\x0fCreateAgentChat\x122.Superplane.Internal.Agents.CreateAgentChatRequest\x1a3.Superplane.Internal.Agents.CreateAgentChatResponse\x12w\n" +
+	"\x0eListAgentChats\x121.Superplane.Internal.Agents.ListAgentChatsRequest\x1a2.Superplane.Internal.Agents.ListAgentChatsResponse\x12\x80\x01\n" +
+	"\x11DescribeAgentChat\x124.Superplane.Internal.Agents.DescribeAgentChatRequest\x1a5.Superplane.Internal.Agents.DescribeAgentChatResponse\x12\x8c\x01\n" +
+	"\x15ListAgentChatMessages\x128.Superplane.Internal.Agents.ListAgentChatMessagesRequest\x1a9.Superplane.Internal.Agents.ListAgentChatMessagesResponseB>Z<github.com/superplanehq/superplane/pkg/protos/private/agentsb\x06proto3"
 
 var (
 	file_internal_agents_proto_rawDescOnce sync.Once
@@ -665,33 +664,33 @@ func file_internal_agents_proto_rawDescGZIP() []byte {
 
 var file_internal_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_internal_agents_proto_goTypes = []any{
-	(*ListAgentsRequest)(nil),         // 0: Superplane.Internal.Agents.ListAgentsRequest
-	(*ListAgentsResponse)(nil),        // 1: Superplane.Internal.Agents.ListAgentsResponse
-	(*DescribeAgentRequest)(nil),      // 2: Superplane.Internal.Agents.DescribeAgentRequest
-	(*DescribeAgentResponse)(nil),     // 3: Superplane.Internal.Agents.DescribeAgentResponse
-	(*ListAgentMessagesRequest)(nil),  // 4: Superplane.Internal.Agents.ListAgentMessagesRequest
-	(*ListAgentMessagesResponse)(nil), // 5: Superplane.Internal.Agents.ListAgentMessagesResponse
-	(*AgentMessage)(nil),              // 6: Superplane.Internal.Agents.AgentMessage
-	(*CreateAgentRequest)(nil),        // 7: Superplane.Internal.Agents.CreateAgentRequest
-	(*CreateAgentResponse)(nil),       // 8: Superplane.Internal.Agents.CreateAgentResponse
-	(*AgentInfo)(nil),                 // 9: Superplane.Internal.Agents.AgentInfo
-	(*timestamp.Timestamp)(nil),       // 10: google.protobuf.Timestamp
+	(*ListAgentChatsRequest)(nil),         // 0: Superplane.Internal.Agents.ListAgentChatsRequest
+	(*ListAgentChatsResponse)(nil),        // 1: Superplane.Internal.Agents.ListAgentChatsResponse
+	(*DescribeAgentChatRequest)(nil),      // 2: Superplane.Internal.Agents.DescribeAgentChatRequest
+	(*DescribeAgentChatResponse)(nil),     // 3: Superplane.Internal.Agents.DescribeAgentChatResponse
+	(*ListAgentChatMessagesRequest)(nil),  // 4: Superplane.Internal.Agents.ListAgentChatMessagesRequest
+	(*ListAgentChatMessagesResponse)(nil), // 5: Superplane.Internal.Agents.ListAgentChatMessagesResponse
+	(*AgentChatMessage)(nil),              // 6: Superplane.Internal.Agents.AgentChatMessage
+	(*CreateAgentChatRequest)(nil),        // 7: Superplane.Internal.Agents.CreateAgentChatRequest
+	(*CreateAgentChatResponse)(nil),       // 8: Superplane.Internal.Agents.CreateAgentChatResponse
+	(*ChatInfo)(nil),                      // 9: Superplane.Internal.Agents.ChatInfo
+	(*timestamp.Timestamp)(nil),           // 10: google.protobuf.Timestamp
 }
 var file_internal_agents_proto_depIdxs = []int32{
-	9,  // 0: Superplane.Internal.Agents.ListAgentsResponse.agents:type_name -> Superplane.Internal.Agents.AgentInfo
-	9,  // 1: Superplane.Internal.Agents.DescribeAgentResponse.agent:type_name -> Superplane.Internal.Agents.AgentInfo
-	6,  // 2: Superplane.Internal.Agents.ListAgentMessagesResponse.messages:type_name -> Superplane.Internal.Agents.AgentMessage
-	10, // 3: Superplane.Internal.Agents.AgentMessage.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 4: Superplane.Internal.Agents.CreateAgentResponse.agent:type_name -> Superplane.Internal.Agents.AgentInfo
-	10, // 5: Superplane.Internal.Agents.AgentInfo.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 6: Superplane.Internal.Agents.Agents.CreateAgent:input_type -> Superplane.Internal.Agents.CreateAgentRequest
-	0,  // 7: Superplane.Internal.Agents.Agents.ListAgents:input_type -> Superplane.Internal.Agents.ListAgentsRequest
-	2,  // 8: Superplane.Internal.Agents.Agents.DescribeAgent:input_type -> Superplane.Internal.Agents.DescribeAgentRequest
-	4,  // 9: Superplane.Internal.Agents.Agents.ListAgentMessages:input_type -> Superplane.Internal.Agents.ListAgentMessagesRequest
-	8,  // 10: Superplane.Internal.Agents.Agents.CreateAgent:output_type -> Superplane.Internal.Agents.CreateAgentResponse
-	1,  // 11: Superplane.Internal.Agents.Agents.ListAgents:output_type -> Superplane.Internal.Agents.ListAgentsResponse
-	3,  // 12: Superplane.Internal.Agents.Agents.DescribeAgent:output_type -> Superplane.Internal.Agents.DescribeAgentResponse
-	5,  // 13: Superplane.Internal.Agents.Agents.ListAgentMessages:output_type -> Superplane.Internal.Agents.ListAgentMessagesResponse
+	9,  // 0: Superplane.Internal.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Internal.Agents.ChatInfo
+	9,  // 1: Superplane.Internal.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Internal.Agents.ChatInfo
+	6,  // 2: Superplane.Internal.Agents.ListAgentChatMessagesResponse.messages:type_name -> Superplane.Internal.Agents.AgentChatMessage
+	10, // 3: Superplane.Internal.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	9,  // 4: Superplane.Internal.Agents.CreateAgentChatResponse.chat:type_name -> Superplane.Internal.Agents.ChatInfo
+	10, // 5: Superplane.Internal.Agents.ChatInfo.created_at:type_name -> google.protobuf.Timestamp
+	7,  // 6: Superplane.Internal.Agents.Agents.CreateAgentChat:input_type -> Superplane.Internal.Agents.CreateAgentChatRequest
+	0,  // 7: Superplane.Internal.Agents.Agents.ListAgentChats:input_type -> Superplane.Internal.Agents.ListAgentChatsRequest
+	2,  // 8: Superplane.Internal.Agents.Agents.DescribeAgentChat:input_type -> Superplane.Internal.Agents.DescribeAgentChatRequest
+	4,  // 9: Superplane.Internal.Agents.Agents.ListAgentChatMessages:input_type -> Superplane.Internal.Agents.ListAgentChatMessagesRequest
+	8,  // 10: Superplane.Internal.Agents.Agents.CreateAgentChat:output_type -> Superplane.Internal.Agents.CreateAgentChatResponse
+	1,  // 11: Superplane.Internal.Agents.Agents.ListAgentChats:output_type -> Superplane.Internal.Agents.ListAgentChatsResponse
+	3,  // 12: Superplane.Internal.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Internal.Agents.DescribeAgentChatResponse
+	5,  // 13: Superplane.Internal.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Internal.Agents.ListAgentChatMessagesResponse
 	10, // [10:14] is the sub-list for method output_type
 	6,  // [6:10] is the sub-list for method input_type
 	6,  // [6:6] is the sub-list for extension type_name

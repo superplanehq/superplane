@@ -18,18 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.agents_agent_info import AgentsAgentInfo
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsDescribeAgentResponse(BaseModel):
+class AgentsCreateAgentChatResponse(BaseModel):
     """
-    AgentsDescribeAgentResponse
+    AgentsCreateAgentChatResponse
     """ # noqa: E501
-    agent: Optional[AgentsAgentInfo] = None
-    __properties: ClassVar[List[str]] = ["agent"]
+    token: Optional[StrictStr] = None
+    url: Optional[StrictStr] = None
+    __properties: ClassVar[List[str]] = ["token", "url"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class AgentsDescribeAgentResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsDescribeAgentResponse from a JSON string"""
+        """Create an instance of AgentsCreateAgentChatResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,14 +70,11 @@ class AgentsDescribeAgentResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of agent
-        if self.agent:
-            _dict['agent'] = self.agent.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsDescribeAgentResponse from a dict"""
+        """Create an instance of AgentsCreateAgentChatResponse from a dict"""
         if obj is None:
             return None
 
@@ -85,7 +82,8 @@ class AgentsDescribeAgentResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "agent": AgentsAgentInfo.from_dict(obj["agent"]) if obj.get("agent") is not None else None
+            "token": obj.get("token"),
+            "url": obj.get("url")
         })
         return _obj
 

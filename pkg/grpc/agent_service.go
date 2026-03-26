@@ -27,13 +27,13 @@ func NewAgentsService(agentService agentservice.Service, jwtSigner *jwt.Signer, 
 	}
 }
 
-func (s *AgentsService) ListAgents(ctx context.Context, req *pb.ListAgentsRequest) (*pb.ListAgentsResponse, error) {
+func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
 	organizationID, userID, err := agentContextFromRequest(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.agentService.ListAgents(ctx, &internalpb.ListAgentsRequest{
+	response, err := s.agentService.ListAgentChats(ctx, &internalpb.ListAgentChatsRequest{
 		OrgId:    organizationID,
 		CanvasId: req.CanvasId,
 		UserId:   userID,
@@ -42,21 +42,21 @@ func (s *AgentsService) ListAgents(ctx context.Context, req *pb.ListAgentsReques
 		return nil, err
 	}
 
-	serialized := make([]*pb.AgentInfo, 0, len(response.Agents))
-	for _, agent := range response.Agents {
-		info, serializeErr := agents.SerializeAgentInfo(agent)
+	serialized := make([]*pb.AgentChatInfo, 0, len(response.Chats))
+	for _, chat := range response.Chats {
+		info, serializeErr := agents.SerializeAgentChatInfo(chat)
 		if serializeErr != nil {
 			return nil, serializeErr
 		}
 		serialized = append(serialized, info)
 	}
 
-	return &pb.ListAgentsResponse{
-		Agents: serialized,
+	return &pb.ListAgentChatsResponse{
+		Chats: serialized,
 	}, nil
 }
 
-func (s *AgentsService) CreateAgent(ctx context.Context, req *pb.CreateAgentRequest) (*pb.CreateAgentResponse, error) {
+func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
 	organizationID, userID, err := agentContextFromRequest(ctx)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (s *AgentsService) CreateAgent(ctx context.Context, req *pb.CreateAgentRequ
 		return nil, err
 	}
 
-	response, err := s.agentService.CreateAgent(ctx, &internalpb.CreateAgentRequest{
+	response, err := s.agentService.CreateAgentChat(ctx, &internalpb.CreateAgentChatRequest{
 		OrgId:    organizationID,
 		CanvasId: req.CanvasId,
 		UserId:   userID,
@@ -76,68 +76,68 @@ func (s *AgentsService) CreateAgent(ctx context.Context, req *pb.CreateAgentRequ
 		return nil, err
 	}
 
-	if response.GetAgent() == nil {
-		return nil, status.Error(codes.Internal, "agent service did not return an agent")
+	if response.GetChat() == nil {
+		return nil, status.Error(codes.Internal, "agent service did not return a chat")
 	}
 
-	return agents.MintAgentStreamResponse(
+	return agents.MintCreateAgentChatStreamResponse(
 		s.jwtSigner,
 		publicURL,
 		userID,
 		organizationID,
 		req.CanvasId,
-		response.Agent.Id,
+		response.Chat.Id,
 	)
 }
 
-func (s *AgentsService) DescribeAgent(ctx context.Context, req *pb.DescribeAgentRequest) (*pb.DescribeAgentResponse, error) {
+func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
 	organizationID, userID, err := agentContextFromRequest(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.agentService.DescribeAgent(ctx, &internalpb.DescribeAgentRequest{
+	response, err := s.agentService.DescribeAgentChat(ctx, &internalpb.DescribeAgentChatRequest{
 		OrgId:    organizationID,
 		CanvasId: req.CanvasId,
-		AgentId:  req.AgentId,
 		UserId:   userID,
+		ChatId:   req.ChatId,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	info, err := agents.SerializeAgentInfo(response.Agent)
+	info, err := agents.SerializeAgentChatInfo(response.Chat)
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.DescribeAgentResponse{
-		Agent: info,
+	return &pb.DescribeAgentChatResponse{
+		Chat: info,
 	}, nil
 }
 
-func (s *AgentsService) ListAgentMessages(ctx context.Context, req *pb.ListAgentMessagesRequest) (*pb.ListAgentMessagesResponse, error) {
+func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
 	organizationID, userID, err := agentContextFromRequest(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.agentService.ListAgentMessages(ctx, &internalpb.ListAgentMessagesRequest{
+	response, err := s.agentService.ListAgentChatMessages(ctx, &internalpb.ListAgentChatMessagesRequest{
 		OrgId:    organizationID,
 		CanvasId: req.CanvasId,
-		AgentId:  req.AgentId,
 		UserId:   userID,
+		ChatId:   req.ChatId,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &pb.ListAgentMessagesResponse{
-		Messages: agents.SerializeAgentMessages(response.Messages),
+	return &pb.ListAgentChatMessagesResponse{
+		Messages: agents.SerializeAgentChatMessages(response.Messages),
 	}, nil
 }
 
-func (s *AgentsService) ResumeAgent(ctx context.Context, req *pb.ResumeAgentRequest) (*pb.ResumeAgentResponse, error) {
+func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgentChatRequest) (*pb.ResumeAgentChatResponse, error) {
 	organizationID, userID, err := agentContextFromRequest(ctx)
 	if err != nil {
 		return nil, err
@@ -148,27 +148,27 @@ func (s *AgentsService) ResumeAgent(ctx context.Context, req *pb.ResumeAgentRequ
 		return nil, err
 	}
 
-	response, err := s.agentService.DescribeAgent(ctx, &internalpb.DescribeAgentRequest{
+	response, err := s.agentService.DescribeAgentChat(ctx, &internalpb.DescribeAgentChatRequest{
 		OrgId:    organizationID,
 		CanvasId: req.CanvasId,
-		AgentId:  req.AgentId,
 		UserId:   userID,
+		ChatId:   req.ChatId,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	if response.GetAgent() == nil {
-		return nil, status.Error(codes.Internal, "agent service did not return an agent")
+	if response.GetChat() == nil {
+		return nil, status.Error(codes.Internal, "agent service did not return a chat")
 	}
 
-	return agents.MintResumeAgentStreamResponse(
+	return agents.MintResumeAgentChatStreamResponse(
 		s.jwtSigner,
 		publicURL,
 		userID,
 		organizationID,
 		req.CanvasId,
-		response.GetAgent().GetId(),
+		response.GetChat().GetId(),
 	)
 }
 

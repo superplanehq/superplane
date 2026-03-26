@@ -19,13 +19,13 @@ from typing_extensions import Annotated
 
 from pydantic import StrictStr
 from typing import Optional
-from superplaneapi.models.agents_create_agent_request import AgentsCreateAgentRequest
-from superplaneapi.models.agents_create_agent_response import AgentsCreateAgentResponse
-from superplaneapi.models.agents_describe_agent_response import AgentsDescribeAgentResponse
-from superplaneapi.models.agents_list_agent_messages_response import AgentsListAgentMessagesResponse
-from superplaneapi.models.agents_list_agents_response import AgentsListAgentsResponse
-from superplaneapi.models.agents_resume_agent_body import AgentsResumeAgentBody
-from superplaneapi.models.agents_resume_agent_response import AgentsResumeAgentResponse
+from superplaneapi.models.agents_create_agent_chat_request import AgentsCreateAgentChatRequest
+from superplaneapi.models.agents_create_agent_chat_response import AgentsCreateAgentChatResponse
+from superplaneapi.models.agents_describe_agent_chat_response import AgentsDescribeAgentChatResponse
+from superplaneapi.models.agents_list_agent_chat_messages_response import AgentsListAgentChatMessagesResponse
+from superplaneapi.models.agents_list_agent_chats_response import AgentsListAgentChatsResponse
+from superplaneapi.models.agents_resume_agent_chat_body import AgentsResumeAgentChatBody
+from superplaneapi.models.agents_resume_agent_chat_response import AgentsResumeAgentChatResponse
 
 from superplaneapi.api_client import ApiClient, RequestSerialized
 from superplaneapi.api_response import ApiResponse
@@ -46,9 +46,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_create_agent(
+    def agents_create_agent_chat(
         self,
-        body: AgentsCreateAgentRequest,
+        body: AgentsCreateAgentChatRequest,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -61,13 +61,13 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> AgentsCreateAgentResponse:
-        """Creates a new agent session
+    ) -> AgentsCreateAgentChatResponse:
+        """Creates a new agent chat
 
-        Create a new agent session. The response includes the URL and token for initiating the session
+        Create a new agent chat. The response includes the URL and token for initiating the chat
 
         :param body: (required)
-        :type body: AgentsCreateAgentRequest
+        :type body: AgentsCreateAgentChatRequest
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -90,7 +90,7 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_create_agent_serialize(
+        _param = self._agents_create_agent_chat_serialize(
             body=body,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -99,7 +99,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsCreateAgentResponse",
+            '200': "AgentsCreateAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -113,9 +113,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_create_agent_with_http_info(
+    def agents_create_agent_chat_with_http_info(
         self,
-        body: AgentsCreateAgentRequest,
+        body: AgentsCreateAgentChatRequest,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -128,13 +128,13 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[AgentsCreateAgentResponse]:
-        """Creates a new agent session
+    ) -> ApiResponse[AgentsCreateAgentChatResponse]:
+        """Creates a new agent chat
 
-        Create a new agent session. The response includes the URL and token for initiating the session
+        Create a new agent chat. The response includes the URL and token for initiating the chat
 
         :param body: (required)
-        :type body: AgentsCreateAgentRequest
+        :type body: AgentsCreateAgentChatRequest
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -157,7 +157,7 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_create_agent_serialize(
+        _param = self._agents_create_agent_chat_serialize(
             body=body,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -166,7 +166,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsCreateAgentResponse",
+            '200': "AgentsCreateAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -180,9 +180,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_create_agent_without_preload_content(
+    def agents_create_agent_chat_without_preload_content(
         self,
-        body: AgentsCreateAgentRequest,
+        body: AgentsCreateAgentChatRequest,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -196,12 +196,12 @@ class AgentApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> RESTResponseType:
-        """Creates a new agent session
+        """Creates a new agent chat
 
-        Create a new agent session. The response includes the URL and token for initiating the session
+        Create a new agent chat. The response includes the URL and token for initiating the chat
 
         :param body: (required)
-        :type body: AgentsCreateAgentRequest
+        :type body: AgentsCreateAgentChatRequest
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -224,7 +224,7 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_create_agent_serialize(
+        _param = self._agents_create_agent_chat_serialize(
             body=body,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -233,7 +233,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsCreateAgentResponse",
+            '200': "AgentsCreateAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -242,7 +242,7 @@ class AgentApi:
         return response_data.response
 
 
-    def _agents_create_agent_serialize(
+    def _agents_create_agent_chat_serialize(
         self,
         body,
         _request_auth,
@@ -302,7 +302,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/agents',
+            resource_path='/api/v1/agents/chats',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -319,9 +319,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_describe_agent(
+    def agents_describe_agent_chat(
         self,
-        agent_id: StrictStr,
+        chat_id: StrictStr,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
             None,
@@ -335,13 +335,13 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> AgentsDescribeAgentResponse:
-        """Describes an agent session for the authenticated user
+    ) -> AgentsDescribeAgentChatResponse:
+        """Describes an agent chat for the authenticated user
 
-        Describes an agent session for the authenticated user
+        Describes an agent chat for the authenticated user
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param canvas_id:
         :type canvas_id: str
         :param _request_timeout: timeout setting for this request. If one
@@ -366,8 +366,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_describe_agent_serialize(
-            agent_id=agent_id,
+        _param = self._agents_describe_agent_chat_serialize(
+            chat_id=chat_id,
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -376,7 +376,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsDescribeAgentResponse",
+            '200': "AgentsDescribeAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -390,9 +390,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_describe_agent_with_http_info(
+    def agents_describe_agent_chat_with_http_info(
         self,
-        agent_id: StrictStr,
+        chat_id: StrictStr,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
             None,
@@ -406,13 +406,13 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[AgentsDescribeAgentResponse]:
-        """Describes an agent session for the authenticated user
+    ) -> ApiResponse[AgentsDescribeAgentChatResponse]:
+        """Describes an agent chat for the authenticated user
 
-        Describes an agent session for the authenticated user
+        Describes an agent chat for the authenticated user
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param canvas_id:
         :type canvas_id: str
         :param _request_timeout: timeout setting for this request. If one
@@ -437,8 +437,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_describe_agent_serialize(
-            agent_id=agent_id,
+        _param = self._agents_describe_agent_chat_serialize(
+            chat_id=chat_id,
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -447,7 +447,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsDescribeAgentResponse",
+            '200': "AgentsDescribeAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -461,9 +461,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_describe_agent_without_preload_content(
+    def agents_describe_agent_chat_without_preload_content(
         self,
-        agent_id: StrictStr,
+        chat_id: StrictStr,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
             None,
@@ -478,12 +478,12 @@ class AgentApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> RESTResponseType:
-        """Describes an agent session for the authenticated user
+        """Describes an agent chat for the authenticated user
 
-        Describes an agent session for the authenticated user
+        Describes an agent chat for the authenticated user
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param canvas_id:
         :type canvas_id: str
         :param _request_timeout: timeout setting for this request. If one
@@ -508,8 +508,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_describe_agent_serialize(
-            agent_id=agent_id,
+        _param = self._agents_describe_agent_chat_serialize(
+            chat_id=chat_id,
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -518,7 +518,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsDescribeAgentResponse",
+            '200': "AgentsDescribeAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -527,9 +527,9 @@ class AgentApi:
         return response_data.response
 
 
-    def _agents_describe_agent_serialize(
+    def _agents_describe_agent_chat_serialize(
         self,
-        agent_id,
+        chat_id,
         canvas_id,
         _request_auth,
         _content_type,
@@ -552,8 +552,8 @@ class AgentApi:
         _body_params: Optional[bytes] = None
 
         # process the path parameters
-        if agent_id is not None:
-            _path_params['agentId'] = agent_id
+        if chat_id is not None:
+            _path_params['chatId'] = chat_id
         # process the query parameters
         if canvas_id is not None:
             
@@ -579,7 +579,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/agents/{agentId}',
+            resource_path='/api/v1/agents/chats/{chatId}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -596,9 +596,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_list_agent_messages(
+    def agents_list_agent_chat_messages(
         self,
-        agent_id: StrictStr,
+        chat_id: StrictStr,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
             None,
@@ -612,13 +612,13 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> AgentsListAgentMessagesResponse:
-        """List the messages in an agent session
+    ) -> AgentsListAgentChatMessagesResponse:
+        """List the messages in an agent chat
 
-        List the messages in an agent session
+        List the messages in an agent chat
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param canvas_id:
         :type canvas_id: str
         :param _request_timeout: timeout setting for this request. If one
@@ -643,8 +643,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_list_agent_messages_serialize(
-            agent_id=agent_id,
+        _param = self._agents_list_agent_chat_messages_serialize(
+            chat_id=chat_id,
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -653,7 +653,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsListAgentMessagesResponse",
+            '200': "AgentsListAgentChatMessagesResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -667,9 +667,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_list_agent_messages_with_http_info(
+    def agents_list_agent_chat_messages_with_http_info(
         self,
-        agent_id: StrictStr,
+        chat_id: StrictStr,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
             None,
@@ -683,13 +683,13 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[AgentsListAgentMessagesResponse]:
-        """List the messages in an agent session
+    ) -> ApiResponse[AgentsListAgentChatMessagesResponse]:
+        """List the messages in an agent chat
 
-        List the messages in an agent session
+        List the messages in an agent chat
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param canvas_id:
         :type canvas_id: str
         :param _request_timeout: timeout setting for this request. If one
@@ -714,8 +714,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_list_agent_messages_serialize(
-            agent_id=agent_id,
+        _param = self._agents_list_agent_chat_messages_serialize(
+            chat_id=chat_id,
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -724,7 +724,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsListAgentMessagesResponse",
+            '200': "AgentsListAgentChatMessagesResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -738,9 +738,9 @@ class AgentApi:
 
 
     @validate_call
-    def agents_list_agent_messages_without_preload_content(
+    def agents_list_agent_chat_messages_without_preload_content(
         self,
-        agent_id: StrictStr,
+        chat_id: StrictStr,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
             None,
@@ -755,12 +755,12 @@ class AgentApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> RESTResponseType:
-        """List the messages in an agent session
+        """List the messages in an agent chat
 
-        List the messages in an agent session
+        List the messages in an agent chat
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param canvas_id:
         :type canvas_id: str
         :param _request_timeout: timeout setting for this request. If one
@@ -785,8 +785,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_list_agent_messages_serialize(
-            agent_id=agent_id,
+        _param = self._agents_list_agent_chat_messages_serialize(
+            chat_id=chat_id,
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -795,7 +795,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsListAgentMessagesResponse",
+            '200': "AgentsListAgentChatMessagesResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -804,9 +804,9 @@ class AgentApi:
         return response_data.response
 
 
-    def _agents_list_agent_messages_serialize(
+    def _agents_list_agent_chat_messages_serialize(
         self,
-        agent_id,
+        chat_id,
         canvas_id,
         _request_auth,
         _content_type,
@@ -829,8 +829,8 @@ class AgentApi:
         _body_params: Optional[bytes] = None
 
         # process the path parameters
-        if agent_id is not None:
-            _path_params['agentId'] = agent_id
+        if chat_id is not None:
+            _path_params['chatId'] = chat_id
         # process the query parameters
         if canvas_id is not None:
             
@@ -856,7 +856,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/agents/{agentId}/messages',
+            resource_path='/api/v1/agents/chats/{chatId}/messages',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -873,7 +873,7 @@ class AgentApi:
 
 
     @validate_call
-    def agents_list_agents(
+    def agents_list_agent_chats(
         self,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
@@ -888,10 +888,10 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> AgentsListAgentsResponse:
-        """List agent sessions for the authenticated user
+    ) -> AgentsListAgentChatsResponse:
+        """List agent chats for the authenticated user
 
-        Returns a list of agent sessions for the authenticated user
+        Returns a list of agent chats for the authenticated user
 
         :param canvas_id:
         :type canvas_id: str
@@ -917,7 +917,7 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_list_agents_serialize(
+        _param = self._agents_list_agent_chats_serialize(
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -926,7 +926,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsListAgentsResponse",
+            '200': "AgentsListAgentChatsResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -940,7 +940,7 @@ class AgentApi:
 
 
     @validate_call
-    def agents_list_agents_with_http_info(
+    def agents_list_agent_chats_with_http_info(
         self,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
@@ -955,10 +955,10 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[AgentsListAgentsResponse]:
-        """List agent sessions for the authenticated user
+    ) -> ApiResponse[AgentsListAgentChatsResponse]:
+        """List agent chats for the authenticated user
 
-        Returns a list of agent sessions for the authenticated user
+        Returns a list of agent chats for the authenticated user
 
         :param canvas_id:
         :type canvas_id: str
@@ -984,7 +984,7 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_list_agents_serialize(
+        _param = self._agents_list_agent_chats_serialize(
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -993,7 +993,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsListAgentsResponse",
+            '200': "AgentsListAgentChatsResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -1007,7 +1007,7 @@ class AgentApi:
 
 
     @validate_call
-    def agents_list_agents_without_preload_content(
+    def agents_list_agent_chats_without_preload_content(
         self,
         canvas_id: Optional[StrictStr] = None,
         _request_timeout: Union[
@@ -1023,9 +1023,9 @@ class AgentApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> RESTResponseType:
-        """List agent sessions for the authenticated user
+        """List agent chats for the authenticated user
 
-        Returns a list of agent sessions for the authenticated user
+        Returns a list of agent chats for the authenticated user
 
         :param canvas_id:
         :type canvas_id: str
@@ -1051,7 +1051,7 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_list_agents_serialize(
+        _param = self._agents_list_agent_chats_serialize(
             canvas_id=canvas_id,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -1060,7 +1060,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsListAgentsResponse",
+            '200': "AgentsListAgentChatsResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -1069,7 +1069,7 @@ class AgentApi:
         return response_data.response
 
 
-    def _agents_list_agents_serialize(
+    def _agents_list_agent_chats_serialize(
         self,
         canvas_id,
         _request_auth,
@@ -1118,7 +1118,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/agents',
+            resource_path='/api/v1/agents/chats',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1135,10 +1135,10 @@ class AgentApi:
 
 
     @validate_call
-    def agents_resume_agent(
+    def agents_resume_agent_chat(
         self,
-        agent_id: StrictStr,
-        body: AgentsResumeAgentBody,
+        chat_id: StrictStr,
+        body: AgentsResumeAgentChatBody,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -1151,15 +1151,15 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> AgentsResumeAgentResponse:
-        """Resume an agent session
+    ) -> AgentsResumeAgentChatResponse:
+        """Resume an agent chat
 
-        Resumes an agent session. The response includes the URL and token for resuming the session
+        Resumes an agent chat. The response includes the URL and token for resuming the chat
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param body: (required)
-        :type body: AgentsResumeAgentBody
+        :type body: AgentsResumeAgentChatBody
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -1182,8 +1182,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_resume_agent_serialize(
-            agent_id=agent_id,
+        _param = self._agents_resume_agent_chat_serialize(
+            chat_id=chat_id,
             body=body,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -1192,7 +1192,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsResumeAgentResponse",
+            '200': "AgentsResumeAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -1206,10 +1206,10 @@ class AgentApi:
 
 
     @validate_call
-    def agents_resume_agent_with_http_info(
+    def agents_resume_agent_chat_with_http_info(
         self,
-        agent_id: StrictStr,
-        body: AgentsResumeAgentBody,
+        chat_id: StrictStr,
+        body: AgentsResumeAgentChatBody,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -1222,15 +1222,15 @@ class AgentApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[AgentsResumeAgentResponse]:
-        """Resume an agent session
+    ) -> ApiResponse[AgentsResumeAgentChatResponse]:
+        """Resume an agent chat
 
-        Resumes an agent session. The response includes the URL and token for resuming the session
+        Resumes an agent chat. The response includes the URL and token for resuming the chat
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param body: (required)
-        :type body: AgentsResumeAgentBody
+        :type body: AgentsResumeAgentChatBody
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -1253,8 +1253,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_resume_agent_serialize(
-            agent_id=agent_id,
+        _param = self._agents_resume_agent_chat_serialize(
+            chat_id=chat_id,
             body=body,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -1263,7 +1263,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsResumeAgentResponse",
+            '200': "AgentsResumeAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -1277,10 +1277,10 @@ class AgentApi:
 
 
     @validate_call
-    def agents_resume_agent_without_preload_content(
+    def agents_resume_agent_chat_without_preload_content(
         self,
-        agent_id: StrictStr,
-        body: AgentsResumeAgentBody,
+        chat_id: StrictStr,
+        body: AgentsResumeAgentChatBody,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -1294,14 +1294,14 @@ class AgentApi:
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
     ) -> RESTResponseType:
-        """Resume an agent session
+        """Resume an agent chat
 
-        Resumes an agent session. The response includes the URL and token for resuming the session
+        Resumes an agent chat. The response includes the URL and token for resuming the chat
 
-        :param agent_id: (required)
-        :type agent_id: str
+        :param chat_id: (required)
+        :type chat_id: str
         :param body: (required)
-        :type body: AgentsResumeAgentBody
+        :type body: AgentsResumeAgentChatBody
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -1324,8 +1324,8 @@ class AgentApi:
         :return: Returns the result object.
         """ # noqa: E501
 
-        _param = self._agents_resume_agent_serialize(
-            agent_id=agent_id,
+        _param = self._agents_resume_agent_chat_serialize(
+            chat_id=chat_id,
             body=body,
             _request_auth=_request_auth,
             _content_type=_content_type,
@@ -1334,7 +1334,7 @@ class AgentApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "AgentsResumeAgentResponse",
+            '200': "AgentsResumeAgentChatResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -1343,9 +1343,9 @@ class AgentApi:
         return response_data.response
 
 
-    def _agents_resume_agent_serialize(
+    def _agents_resume_agent_chat_serialize(
         self,
-        agent_id,
+        chat_id,
         body,
         _request_auth,
         _content_type,
@@ -1368,8 +1368,8 @@ class AgentApi:
         _body_params: Optional[bytes] = None
 
         # process the path parameters
-        if agent_id is not None:
-            _path_params['agentId'] = agent_id
+        if chat_id is not None:
+            _path_params['chatId'] = chat_id
         # process the query parameters
         # process the header parameters
         # process the form parameters
@@ -1406,7 +1406,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/agents/{agentId}/resume',
+            resource_path='/api/v1/agents/chats/{chatId}/resume',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

@@ -18,18 +18,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsResumeAgentResponse(BaseModel):
+class AgentsResumeAgentChatBody(BaseModel):
     """
-    AgentsResumeAgentResponse
+    AgentsResumeAgentChatBody
     """ # noqa: E501
-    token: Optional[StrictStr] = None
-    url: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["token", "url"]
+    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
+    __properties: ClassVar[List[str]] = ["canvasId"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +48,7 @@ class AgentsResumeAgentResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsResumeAgentResponse from a JSON string"""
+        """Create an instance of AgentsResumeAgentChatBody from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -74,7 +73,7 @@ class AgentsResumeAgentResponse(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsResumeAgentResponse from a dict"""
+        """Create an instance of AgentsResumeAgentChatBody from a dict"""
         if obj is None:
             return None
 
@@ -82,8 +81,7 @@ class AgentsResumeAgentResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "token": obj.get("token"),
-            "url": obj.get("url")
+            "canvasId": obj.get("canvasId")
         })
         return _obj
 

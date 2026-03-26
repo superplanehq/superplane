@@ -18,23 +18,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsAgentMessage(BaseModel):
+class AgentsCreateAgentChatRequest(BaseModel):
     """
-    AgentsAgentMessage
+    AgentsCreateAgentChatRequest
     """ # noqa: E501
-    id: Optional[StrictStr] = None
-    role: Optional[StrictStr] = None
-    content: Optional[StrictStr] = None
-    tool_call_id: Optional[StrictStr] = Field(default=None, alias="toolCallId")
-    tool_status: Optional[StrictStr] = Field(default=None, alias="toolStatus")
-    created_at: Optional[datetime] = Field(default=None, alias="createdAt")
-    __properties: ClassVar[List[str]] = ["id", "role", "content", "toolCallId", "toolStatus", "createdAt"]
+    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
+    __properties: ClassVar[List[str]] = ["canvasId"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -54,7 +48,7 @@ class AgentsAgentMessage(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsAgentMessage from a JSON string"""
+        """Create an instance of AgentsCreateAgentChatRequest from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -79,7 +73,7 @@ class AgentsAgentMessage(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsAgentMessage from a dict"""
+        """Create an instance of AgentsCreateAgentChatRequest from a dict"""
         if obj is None:
             return None
 
@@ -87,12 +81,7 @@ class AgentsAgentMessage(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "id": obj.get("id"),
-            "role": obj.get("role"),
-            "content": obj.get("content"),
-            "toolCallId": obj.get("toolCallId"),
-            "toolStatus": obj.get("toolStatus"),
-            "createdAt": obj.get("createdAt")
+            "canvasId": obj.get("canvasId")
         })
         return _obj
 

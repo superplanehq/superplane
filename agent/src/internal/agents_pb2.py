@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15internal/agents.proto\x12\x1aSuperplane.Internal.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\"G\n\x11ListAgentsRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\"K\n\x12ListAgentsResponse\x12\x35\n\x06\x61gents\x18\x01 \x03(\x0b\x32%.Superplane.Internal.Agents.AgentInfo\"\\\n\x14\x44\x65scribeAgentRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x10\n\x08\x61gent_id\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\t\"M\n\x15\x44\x65scribeAgentResponse\x12\x34\n\x05\x61gent\x18\x01 \x01(\x0b\x32%.Superplane.Internal.Agents.AgentInfo\"`\n\x18ListAgentMessagesRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x10\n\x08\x61gent_id\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\t\"W\n\x19ListAgentMessagesResponse\x12:\n\x08messages\x18\x01 \x03(\x0b\x32(.Superplane.Internal.Agents.AgentMessage\"\x94\x01\n\x0c\x41gentMessage\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04role\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x14\n\x0ctool_call_id\x18\x04 \x01(\t\x12\x13\n\x0btool_status\x18\x05 \x01(\t\x12.\n\ncreated_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"H\n\x12\x43reateAgentRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\"K\n\x13\x43reateAgentResponse\x12\x34\n\x05\x61gent\x18\x01 \x01(\x0b\x32%.Superplane.Internal.Agents.AgentInfo\"`\n\tAgentInfo\x12\n\n\x02id\x18\x01 \x01(\t\x12\x17\n\x0finitial_message\x18\x02 \x01(\t\x12.\n\ncreated_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp2\xde\x03\n\x06\x41gents\x12n\n\x0b\x43reateAgent\x12..Superplane.Internal.Agents.CreateAgentRequest\x1a/.Superplane.Internal.Agents.CreateAgentResponse\x12k\n\nListAgents\x12-.Superplane.Internal.Agents.ListAgentsRequest\x1a..Superplane.Internal.Agents.ListAgentsResponse\x12t\n\rDescribeAgent\x12\x30.Superplane.Internal.Agents.DescribeAgentRequest\x1a\x31.Superplane.Internal.Agents.DescribeAgentResponse\x12\x80\x01\n\x11ListAgentMessages\x12\x34.Superplane.Internal.Agents.ListAgentMessagesRequest\x1a\x35.Superplane.Internal.Agents.ListAgentMessagesResponseB>Z<github.com/superplanehq/superplane/pkg/protos/private/agentsb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x15internal/agents.proto\x12\x1aSuperplane.Internal.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\"K\n\x15ListAgentChatsRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\"M\n\x16ListAgentChatsResponse\x12\x33\n\x05\x63hats\x18\x01 \x03(\x0b\x32$.Superplane.Internal.Agents.ChatInfo\"_\n\x18\x44\x65scribeAgentChatRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63hat_id\x18\x04 \x01(\t\"O\n\x19\x44\x65scribeAgentChatResponse\x12\x32\n\x04\x63hat\x18\x01 \x01(\x0b\x32$.Superplane.Internal.Agents.ChatInfo\"c\n\x1cListAgentChatMessagesRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\x12\x0f\n\x07\x63hat_id\x18\x04 \x01(\t\"_\n\x1dListAgentChatMessagesResponse\x12>\n\x08messages\x18\x01 \x03(\x0b\x32,.Superplane.Internal.Agents.AgentChatMessage\"\x98\x01\n\x10\x41gentChatMessage\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04role\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x14\n\x0ctool_call_id\x18\x04 \x01(\t\x12\x13\n\x0btool_status\x18\x05 \x01(\t\x12.\n\ncreated_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"L\n\x16\x43reateAgentChatRequest\x12\x0e\n\x06org_id\x18\x01 \x01(\t\x12\x11\n\tcanvas_id\x18\x02 \x01(\t\x12\x0f\n\x07user_id\x18\x03 \x01(\t\"M\n\x17\x43reateAgentChatResponse\x12\x32\n\x04\x63hat\x18\x01 \x01(\x0b\x32$.Superplane.Internal.Agents.ChatInfo\"_\n\x08\x43hatInfo\x12\n\n\x02id\x18\x01 \x01(\t\x12\x17\n\x0finitial_message\x18\x02 \x01(\t\x12.\n\ncreated_at\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp2\x8f\x04\n\x06\x41gents\x12z\n\x0f\x43reateAgentChat\x12\x32.Superplane.Internal.Agents.CreateAgentChatRequest\x1a\x33.Superplane.Internal.Agents.CreateAgentChatResponse\x12w\n\x0eListAgentChats\x12\x31.Superplane.Internal.Agents.ListAgentChatsRequest\x1a\x32.Superplane.Internal.Agents.ListAgentChatsResponse\x12\x80\x01\n\x11\x44\x65scribeAgentChat\x12\x34.Superplane.Internal.Agents.DescribeAgentChatRequest\x1a\x35.Superplane.Internal.Agents.DescribeAgentChatResponse\x12\x8c\x01\n\x15ListAgentChatMessages\x12\x38.Superplane.Internal.Agents.ListAgentChatMessagesRequest\x1a\x39.Superplane.Internal.Agents.ListAgentChatMessagesResponseB>Z<github.com/superplanehq/superplane/pkg/protos/private/agentsb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,26 +33,26 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'internal.agents_pb2', _glob
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'Z<github.com/superplanehq/superplane/pkg/protos/private/agents'
-  _globals['_LISTAGENTSREQUEST']._serialized_start=86
-  _globals['_LISTAGENTSREQUEST']._serialized_end=157
-  _globals['_LISTAGENTSRESPONSE']._serialized_start=159
-  _globals['_LISTAGENTSRESPONSE']._serialized_end=234
-  _globals['_DESCRIBEAGENTREQUEST']._serialized_start=236
-  _globals['_DESCRIBEAGENTREQUEST']._serialized_end=328
-  _globals['_DESCRIBEAGENTRESPONSE']._serialized_start=330
-  _globals['_DESCRIBEAGENTRESPONSE']._serialized_end=407
-  _globals['_LISTAGENTMESSAGESREQUEST']._serialized_start=409
-  _globals['_LISTAGENTMESSAGESREQUEST']._serialized_end=505
-  _globals['_LISTAGENTMESSAGESRESPONSE']._serialized_start=507
-  _globals['_LISTAGENTMESSAGESRESPONSE']._serialized_end=594
-  _globals['_AGENTMESSAGE']._serialized_start=597
-  _globals['_AGENTMESSAGE']._serialized_end=745
-  _globals['_CREATEAGENTREQUEST']._serialized_start=747
-  _globals['_CREATEAGENTREQUEST']._serialized_end=819
-  _globals['_CREATEAGENTRESPONSE']._serialized_start=821
-  _globals['_CREATEAGENTRESPONSE']._serialized_end=896
-  _globals['_AGENTINFO']._serialized_start=898
-  _globals['_AGENTINFO']._serialized_end=994
-  _globals['_AGENTS']._serialized_start=997
-  _globals['_AGENTS']._serialized_end=1475
+  _globals['_LISTAGENTCHATSREQUEST']._serialized_start=86
+  _globals['_LISTAGENTCHATSREQUEST']._serialized_end=161
+  _globals['_LISTAGENTCHATSRESPONSE']._serialized_start=163
+  _globals['_LISTAGENTCHATSRESPONSE']._serialized_end=240
+  _globals['_DESCRIBEAGENTCHATREQUEST']._serialized_start=242
+  _globals['_DESCRIBEAGENTCHATREQUEST']._serialized_end=337
+  _globals['_DESCRIBEAGENTCHATRESPONSE']._serialized_start=339
+  _globals['_DESCRIBEAGENTCHATRESPONSE']._serialized_end=418
+  _globals['_LISTAGENTCHATMESSAGESREQUEST']._serialized_start=420
+  _globals['_LISTAGENTCHATMESSAGESREQUEST']._serialized_end=519
+  _globals['_LISTAGENTCHATMESSAGESRESPONSE']._serialized_start=521
+  _globals['_LISTAGENTCHATMESSAGESRESPONSE']._serialized_end=616
+  _globals['_AGENTCHATMESSAGE']._serialized_start=619
+  _globals['_AGENTCHATMESSAGE']._serialized_end=771
+  _globals['_CREATEAGENTCHATREQUEST']._serialized_start=773
+  _globals['_CREATEAGENTCHATREQUEST']._serialized_end=849
+  _globals['_CREATEAGENTCHATRESPONSE']._serialized_start=851
+  _globals['_CREATEAGENTCHATRESPONSE']._serialized_end=928
+  _globals['_CHATINFO']._serialized_start=930
+  _globals['_CHATINFO']._serialized_end=1025
+  _globals['_AGENTS']._serialized_start=1028
+  _globals['_AGENTS']._serialized_end=1555
 # @@protoc_insertion_point(module_scope)

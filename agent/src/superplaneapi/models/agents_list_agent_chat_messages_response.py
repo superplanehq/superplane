@@ -18,17 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.agents_agent_chat_message import AgentsAgentChatMessage
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsCreateAgentRequest(BaseModel):
+class AgentsListAgentChatMessagesResponse(BaseModel):
     """
-    AgentsCreateAgentRequest
+    AgentsListAgentChatMessagesResponse
     """ # noqa: E501
-    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
-    __properties: ClassVar[List[str]] = ["canvasId"]
+    messages: Optional[List[AgentsAgentChatMessage]] = None
+    __properties: ClassVar[List[str]] = ["messages"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -48,7 +49,7 @@ class AgentsCreateAgentRequest(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsCreateAgentRequest from a JSON string"""
+        """Create an instance of AgentsListAgentChatMessagesResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -69,11 +70,18 @@ class AgentsCreateAgentRequest(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in messages (list)
+        _items = []
+        if self.messages:
+            for _item_messages in self.messages:
+                if _item_messages:
+                    _items.append(_item_messages.to_dict())
+            _dict['messages'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsCreateAgentRequest from a dict"""
+        """Create an instance of AgentsListAgentChatMessagesResponse from a dict"""
         if obj is None:
             return None
 
@@ -81,7 +89,7 @@ class AgentsCreateAgentRequest(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "canvasId": obj.get("canvasId")
+            "messages": [AgentsAgentChatMessage.from_dict(_item) for _item in obj["messages"]] if obj.get("messages") is not None else None
         })
         return _obj
 

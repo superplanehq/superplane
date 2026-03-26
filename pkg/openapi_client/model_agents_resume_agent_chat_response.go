@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the AgentsResumeAgentResponse type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AgentsResumeAgentResponse{}
+// checks if the AgentsResumeAgentChatResponse type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &AgentsResumeAgentChatResponse{}
 
-// AgentsResumeAgentResponse struct for AgentsResumeAgentResponse
-type AgentsResumeAgentResponse struct {
+// AgentsResumeAgentChatResponse struct for AgentsResumeAgentChatResponse
+type AgentsResumeAgentChatResponse struct {
 	Token *string `json:"token,omitempty"`
 	Url   *string `json:"url,omitempty"`
 }
 
-// NewAgentsResumeAgentResponse instantiates a new AgentsResumeAgentResponse object
+// NewAgentsResumeAgentChatResponse instantiates a new AgentsResumeAgentChatResponse object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAgentsResumeAgentResponse() *AgentsResumeAgentResponse {
-	this := AgentsResumeAgentResponse{}
+func NewAgentsResumeAgentChatResponse() *AgentsResumeAgentChatResponse {
+	this := AgentsResumeAgentChatResponse{}
 	return &this
 }
 
-// NewAgentsResumeAgentResponseWithDefaults instantiates a new AgentsResumeAgentResponse object
+// NewAgentsResumeAgentChatResponseWithDefaults instantiates a new AgentsResumeAgentChatResponse object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAgentsResumeAgentResponseWithDefaults() *AgentsResumeAgentResponse {
-	this := AgentsResumeAgentResponse{}
+func NewAgentsResumeAgentChatResponseWithDefaults() *AgentsResumeAgentChatResponse {
+	this := AgentsResumeAgentChatResponse{}
 	return &this
 }
 
 // GetToken returns the Token field value if set, zero value otherwise.
-func (o *AgentsResumeAgentResponse) GetToken() string {
+func (o *AgentsResumeAgentChatResponse) GetToken() string {
 	if o == nil || IsNil(o.Token) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *AgentsResumeAgentResponse) GetToken() string {
 
 // GetTokenOk returns a tuple with the Token field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AgentsResumeAgentResponse) GetTokenOk() (*string, bool) {
+func (o *AgentsResumeAgentChatResponse) GetTokenOk() (*string, bool) {
 	if o == nil || IsNil(o.Token) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *AgentsResumeAgentResponse) GetTokenOk() (*string, bool) {
 }
 
 // HasToken returns a boolean if a field has been set.
-func (o *AgentsResumeAgentResponse) HasToken() bool {
+func (o *AgentsResumeAgentChatResponse) HasToken() bool {
 	if o != nil && !IsNil(o.Token) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *AgentsResumeAgentResponse) HasToken() bool {
 }
 
 // SetToken gets a reference to the given string and assigns it to the Token field.
-func (o *AgentsResumeAgentResponse) SetToken(v string) {
+func (o *AgentsResumeAgentChatResponse) SetToken(v string) {
 	o.Token = &v
 }
 
 // GetUrl returns the Url field value if set, zero value otherwise.
-func (o *AgentsResumeAgentResponse) GetUrl() string {
+func (o *AgentsResumeAgentChatResponse) GetUrl() string {
 	if o == nil || IsNil(o.Url) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *AgentsResumeAgentResponse) GetUrl() string {
 
 // GetUrlOk returns a tuple with the Url field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AgentsResumeAgentResponse) GetUrlOk() (*string, bool) {
+func (o *AgentsResumeAgentChatResponse) GetUrlOk() (*string, bool) {
 	if o == nil || IsNil(o.Url) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *AgentsResumeAgentResponse) GetUrlOk() (*string, bool) {
 }
 
 // HasUrl returns a boolean if a field has been set.
-func (o *AgentsResumeAgentResponse) HasUrl() bool {
+func (o *AgentsResumeAgentChatResponse) HasUrl() bool {
 	if o != nil && !IsNil(o.Url) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *AgentsResumeAgentResponse) HasUrl() bool {
 }
 
 // SetUrl gets a reference to the given string and assigns it to the Url field.
-func (o *AgentsResumeAgentResponse) SetUrl(v string) {
+func (o *AgentsResumeAgentChatResponse) SetUrl(v string) {
 	o.Url = &v
 }
 
-func (o AgentsResumeAgentResponse) MarshalJSON() ([]byte, error) {
+func (o AgentsResumeAgentChatResponse) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o AgentsResumeAgentResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o AgentsResumeAgentResponse) ToMap() (map[string]interface{}, error) {
+func (o AgentsResumeAgentChatResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Token) {
 		toSerialize["token"] = o.Token
@@ -124,38 +124,38 @@ func (o AgentsResumeAgentResponse) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableAgentsResumeAgentResponse struct {
-	value *AgentsResumeAgentResponse
+type NullableAgentsResumeAgentChatResponse struct {
+	value *AgentsResumeAgentChatResponse
 	isSet bool
 }
 
-func (v NullableAgentsResumeAgentResponse) Get() *AgentsResumeAgentResponse {
+func (v NullableAgentsResumeAgentChatResponse) Get() *AgentsResumeAgentChatResponse {
 	return v.value
 }
 
-func (v *NullableAgentsResumeAgentResponse) Set(val *AgentsResumeAgentResponse) {
+func (v *NullableAgentsResumeAgentChatResponse) Set(val *AgentsResumeAgentChatResponse) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAgentsResumeAgentResponse) IsSet() bool {
+func (v NullableAgentsResumeAgentChatResponse) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAgentsResumeAgentResponse) Unset() {
+func (v *NullableAgentsResumeAgentChatResponse) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAgentsResumeAgentResponse(val *AgentsResumeAgentResponse) *NullableAgentsResumeAgentResponse {
-	return &NullableAgentsResumeAgentResponse{value: val, isSet: true}
+func NewNullableAgentsResumeAgentChatResponse(val *AgentsResumeAgentChatResponse) *NullableAgentsResumeAgentChatResponse {
+	return &NullableAgentsResumeAgentChatResponse{value: val, isSet: true}
 }
 
-func (v NullableAgentsResumeAgentResponse) MarshalJSON() ([]byte, error) {
+func (v NullableAgentsResumeAgentChatResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAgentsResumeAgentResponse) UnmarshalJSON(src []byte) error {
+func (v *NullableAgentsResumeAgentChatResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

@@ -1,12 +1,17 @@
 import type { Dispatch, SetStateAction } from "react";
-import { agentsCreateAgent, agentsListAgentMessages, agentsListAgents, agentsResumeAgent } from "@/api-client";
+import {
+  agentsCreateAgentChat,
+  agentsListAgentChatMessages,
+  agentsListAgentChats,
+  agentsResumeAgentChat,
+} from "@/api-client";
 import type {
-  AgentsAgentInfo,
-  AgentsAgentMessage,
-  AgentsCreateAgentResponse,
-  AgentsListAgentMessagesResponse,
-  AgentsListAgentsResponse,
-  AgentsResumeAgentResponse,
+  AgentsAgentChatInfo,
+  AgentsAgentChatMessage,
+  AgentsCreateAgentChatResponse,
+  AgentsListAgentChatMessagesResponse,
+  AgentsListAgentChatsResponse,
+  AgentsResumeAgentChatResponse,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AiCanvasOperation } from "./index";
@@ -263,8 +268,8 @@ function parseSseChunk(rawChunk: string): AgentChatStreamEvent[] {
   return events;
 }
 
-function parseAgentIdFromUrl(url: string): string | null {
-  const match = url.match(/\/agents\/([^/]+)\/stream\/?$/);
+function parseAgentChatIdFromUrl(url: string): string | null {
+  const match = url.match(/\/agents\/chats\/([^/]+)\/stream\/?$/);
   if (!match || !match[1]) {
     return null;
   }
@@ -272,7 +277,7 @@ function parseAgentIdFromUrl(url: string): string | null {
   return match[1];
 }
 
-function normalizePersistedMessage(message: AgentsAgentMessage): AiBuilderMessage | null {
+function normalizePersistedMessage(message: AgentsAgentChatMessage): AiBuilderMessage | null {
   const id = typeof message.id === "string" ? message.id : "";
   const role = message.role;
   const content = typeof message.content === "string" ? message.content : "";
@@ -293,7 +298,7 @@ function normalizePersistedMessage(message: AgentsAgentMessage): AiBuilderMessag
   };
 }
 
-function normalizeAgentSession(agent: AgentsAgentInfo): AiAgentSession | null {
+function normalizeAgentSession(agent: AgentsAgentChatInfo): AiAgentSession | null {
   const id = typeof agent.id === "string" ? agent.id.trim() : "";
   if (!id) {
     return null;
@@ -311,13 +316,13 @@ function normalizeAgentSession(agent: AgentsAgentInfo): AiAgentSession | null {
   };
 }
 
-function normalizeAgentSessions(payload: AgentsListAgentsResponse | undefined): AiAgentSession[] {
-  return (payload?.agents ?? [])
+function normalizeAgentSessions(payload: AgentsListAgentChatsResponse | undefined): AiAgentSession[] {
+  return (payload?.chats ?? [])
     .map((agent) => normalizeAgentSession(agent))
     .filter((agent): agent is AiAgentSession => Boolean(agent));
 }
 
-function normalizePersistedMessages(payload: AgentsListAgentMessagesResponse | undefined): AiBuilderMessage[] {
+function normalizePersistedMessages(payload: AgentsListAgentChatMessagesResponse | undefined): AiBuilderMessage[] {
   return trimAiMessages(
     (payload?.messages ?? [])
       .map((message) => normalizePersistedMessage(message))
@@ -373,7 +378,7 @@ function normalizeStreamEvent(value: unknown): AgentChatStreamEvent | null {
   }
 }
 
-function requireAgentSessionPayload(payload: AgentsCreateAgentResponse | AgentsResumeAgentResponse): {
+function requireAgentSessionPayload(payload: AgentsCreateAgentChatResponse | AgentsResumeAgentChatResponse): {
   token: string;
   url: string;
 } {
@@ -398,7 +403,7 @@ export async function loadAgentSessions({
     return [];
   }
 
-  const listResponse = await agentsListAgents(
+  const listResponse = await agentsListAgentChats(
     withOrganizationHeader({
       organizationId,
       query: {
@@ -423,11 +428,11 @@ export async function loadAgentConversation({
     return [];
   }
 
-  const messagesResponse = await agentsListAgentMessages(
+  const messagesResponse = await agentsListAgentChatMessages(
     withOrganizationHeader({
       organizationId,
       path: {
-        agentId,
+        chatId: agentId,
       },
       query: {
         canvasId,
@@ -517,18 +522,18 @@ export async function sendAgentChatPrompt({
     setPendingProposal(null);
 
     const sessionResponse = currentAgentId
-      ? await agentsResumeAgent(
+      ? await agentsResumeAgentChat(
           withOrganizationHeader({
             organizationId,
             path: {
-              agentId: currentAgentId,
+              chatId: currentAgentId,
             },
             body: {
               canvasId,
             },
           }),
         )
-      : await agentsCreateAgent(
+      : await agentsCreateAgentChat(
           withOrganizationHeader({
             organizationId,
             body: {
@@ -539,7 +544,7 @@ export async function sendAgentChatPrompt({
 
     const tokenPayload = requireAgentSessionPayload(sessionResponse.data);
 
-    const resolvedAgentId = currentAgentId || parseAgentIdFromUrl(tokenPayload.url);
+    const resolvedAgentId = currentAgentId || parseAgentChatIdFromUrl(tokenPayload.url);
     if (!resolvedAgentId) {
       throw new Error("Invalid agent session response");
     }

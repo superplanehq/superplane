@@ -15,33 +15,33 @@ import (
 	"encoding/json"
 )
 
-// checks if the AgentsCreateAgentRequest type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AgentsCreateAgentRequest{}
+// checks if the AgentsResumeAgentChatBody type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &AgentsResumeAgentChatBody{}
 
-// AgentsCreateAgentRequest struct for AgentsCreateAgentRequest
-type AgentsCreateAgentRequest struct {
+// AgentsResumeAgentChatBody struct for AgentsResumeAgentChatBody
+type AgentsResumeAgentChatBody struct {
 	CanvasId *string `json:"canvasId,omitempty"`
 }
 
-// NewAgentsCreateAgentRequest instantiates a new AgentsCreateAgentRequest object
+// NewAgentsResumeAgentChatBody instantiates a new AgentsResumeAgentChatBody object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAgentsCreateAgentRequest() *AgentsCreateAgentRequest {
-	this := AgentsCreateAgentRequest{}
+func NewAgentsResumeAgentChatBody() *AgentsResumeAgentChatBody {
+	this := AgentsResumeAgentChatBody{}
 	return &this
 }
 
-// NewAgentsCreateAgentRequestWithDefaults instantiates a new AgentsCreateAgentRequest object
+// NewAgentsResumeAgentChatBodyWithDefaults instantiates a new AgentsResumeAgentChatBody object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAgentsCreateAgentRequestWithDefaults() *AgentsCreateAgentRequest {
-	this := AgentsCreateAgentRequest{}
+func NewAgentsResumeAgentChatBodyWithDefaults() *AgentsResumeAgentChatBody {
+	this := AgentsResumeAgentChatBody{}
 	return &this
 }
 
 // GetCanvasId returns the CanvasId field value if set, zero value otherwise.
-func (o *AgentsCreateAgentRequest) GetCanvasId() string {
+func (o *AgentsResumeAgentChatBody) GetCanvasId() string {
 	if o == nil || IsNil(o.CanvasId) {
 		var ret string
 		return ret
@@ -51,7 +51,7 @@ func (o *AgentsCreateAgentRequest) GetCanvasId() string {
 
 // GetCanvasIdOk returns a tuple with the CanvasId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AgentsCreateAgentRequest) GetCanvasIdOk() (*string, bool) {
+func (o *AgentsResumeAgentChatBody) GetCanvasIdOk() (*string, bool) {
 	if o == nil || IsNil(o.CanvasId) {
 		return nil, false
 	}
@@ -59,7 +59,7 @@ func (o *AgentsCreateAgentRequest) GetCanvasIdOk() (*string, bool) {
 }
 
 // HasCanvasId returns a boolean if a field has been set.
-func (o *AgentsCreateAgentRequest) HasCanvasId() bool {
+func (o *AgentsResumeAgentChatBody) HasCanvasId() bool {
 	if o != nil && !IsNil(o.CanvasId) {
 		return true
 	}
@@ -68,11 +68,11 @@ func (o *AgentsCreateAgentRequest) HasCanvasId() bool {
 }
 
 // SetCanvasId gets a reference to the given string and assigns it to the CanvasId field.
-func (o *AgentsCreateAgentRequest) SetCanvasId(v string) {
+func (o *AgentsResumeAgentChatBody) SetCanvasId(v string) {
 	o.CanvasId = &v
 }
 
-func (o AgentsCreateAgentRequest) MarshalJSON() ([]byte, error) {
+func (o AgentsResumeAgentChatBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -80,7 +80,7 @@ func (o AgentsCreateAgentRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o AgentsCreateAgentRequest) ToMap() (map[string]interface{}, error) {
+func (o AgentsResumeAgentChatBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.CanvasId) {
 		toSerialize["canvasId"] = o.CanvasId
@@ -88,38 +88,38 @@ func (o AgentsCreateAgentRequest) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableAgentsCreateAgentRequest struct {
-	value *AgentsCreateAgentRequest
+type NullableAgentsResumeAgentChatBody struct {
+	value *AgentsResumeAgentChatBody
 	isSet bool
 }
 
-func (v NullableAgentsCreateAgentRequest) Get() *AgentsCreateAgentRequest {
+func (v NullableAgentsResumeAgentChatBody) Get() *AgentsResumeAgentChatBody {
 	return v.value
 }
 
-func (v *NullableAgentsCreateAgentRequest) Set(val *AgentsCreateAgentRequest) {
+func (v *NullableAgentsResumeAgentChatBody) Set(val *AgentsResumeAgentChatBody) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAgentsCreateAgentRequest) IsSet() bool {
+func (v NullableAgentsResumeAgentChatBody) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAgentsCreateAgentRequest) Unset() {
+func (v *NullableAgentsResumeAgentChatBody) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAgentsCreateAgentRequest(val *AgentsCreateAgentRequest) *NullableAgentsCreateAgentRequest {
-	return &NullableAgentsCreateAgentRequest{value: val, isSet: true}
+func NewNullableAgentsResumeAgentChatBody(val *AgentsResumeAgentChatBody) *NullableAgentsResumeAgentChatBody {
+	return &NullableAgentsResumeAgentChatBody{value: val, isSet: true}
 }
 
-func (v NullableAgentsCreateAgentRequest) MarshalJSON() ([]byte, error) {
+func (v NullableAgentsResumeAgentChatBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAgentsCreateAgentRequest) UnmarshalJSON(src []byte) error {
+func (v *NullableAgentsResumeAgentChatBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

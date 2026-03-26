@@ -85,7 +85,6 @@ services:
       AGENT_PUBLIC_URL: ${AGENT_PUBLIC_URL:-http://localhost:8090}
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
       VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
-      VITE_AGENT_URL: ${VITE_AGENT_URL:-http://localhost:8090}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
 
     ports:
@@ -123,8 +122,15 @@ services:
     environment:
       IN_DOCKER: "1"
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
-      AGENT_INTERNAL_GRPC_HOST: ${AGENT_INTERNAL_GRPC_HOST:-0.0.0.0}
-      AGENT_INTERNAL_GRPC_PORT: ${AGENT_INTERNAL_GRPC_PORT:-50061}
+      INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
+      INTERNAL_GRPC_PORT: ${INTERNAL_GRPC_PORT:-50061}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-agents_dev}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
     command: >-
       bash -lc "uv run uvicorn ai.web:create_app

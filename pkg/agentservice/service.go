@@ -18,10 +18,10 @@ var ErrAgentServiceDisabled = errors.New("agent service is disabled")
 
 type Service interface {
 	Enabled() bool
-	CreateAgent(ctx context.Context, req *pb.CreateAgentRequest) (*pb.CreateAgentResponse, error)
-	ListAgents(ctx context.Context, req *pb.ListAgentsRequest) (*pb.ListAgentsResponse, error)
-	DescribeAgent(ctx context.Context, req *pb.DescribeAgentRequest) (*pb.DescribeAgentResponse, error)
-	ListAgentMessages(ctx context.Context, req *pb.ListAgentMessagesRequest) (*pb.ListAgentMessagesResponse, error)
+	CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error)
+	ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error)
+	DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error)
+	ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error)
 }
 
 type disabledService struct{}
@@ -50,19 +50,19 @@ func (disabledService) Enabled() bool {
 	return false
 }
 
-func (disabledService) CreateAgent(context.Context, *pb.CreateAgentRequest) (*pb.CreateAgentResponse, error) {
+func (disabledService) CreateAgentChat(context.Context, *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
 	return nil, ErrAgentServiceDisabled
 }
 
-func (disabledService) ListAgents(context.Context, *pb.ListAgentsRequest) (*pb.ListAgentsResponse, error) {
+func (disabledService) ListAgentChats(context.Context, *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
 	return nil, ErrAgentServiceDisabled
 }
 
-func (disabledService) DescribeAgent(context.Context, *pb.DescribeAgentRequest) (*pb.DescribeAgentResponse, error) {
+func (disabledService) DescribeAgentChat(context.Context, *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
 	return nil, ErrAgentServiceDisabled
 }
 
-func (disabledService) ListAgentMessages(context.Context, *pb.ListAgentMessagesRequest) (*pb.ListAgentMessagesResponse, error) {
+func (disabledService) ListAgentChatMessages(context.Context, *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
 	return nil, ErrAgentServiceDisabled
 }
 
@@ -70,30 +70,30 @@ func (s *grpcService) Enabled() bool {
 	return true
 }
 
-func (s *grpcService) CreateAgent(ctx context.Context, req *pb.CreateAgentRequest) (*pb.CreateAgentResponse, error) {
+func (s *grpcService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
 	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	return s.client.CreateAgent(callCtx, req)
+	return s.client.CreateAgentChat(callCtx, req)
 }
 
-func (s *grpcService) ListAgents(ctx context.Context, req *pb.ListAgentsRequest) (*pb.ListAgentsResponse, error) {
+func (s *grpcService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
 	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	return s.client.ListAgents(callCtx, req)
+	return s.client.ListAgentChats(callCtx, req)
 }
 
-func (s *grpcService) DescribeAgent(ctx context.Context, req *pb.DescribeAgentRequest) (*pb.DescribeAgentResponse, error) {
+func (s *grpcService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
 	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	return s.client.DescribeAgent(callCtx, req)
+	return s.client.DescribeAgentChat(callCtx, req)
 }
 
-func (s *grpcService) ListAgentMessages(ctx context.Context, req *pb.ListAgentMessagesRequest) (*pb.ListAgentMessagesResponse, error) {
+func (s *grpcService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
 	callCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	return s.client.ListAgentMessages(callCtx, req)
+	return s.client.ListAgentChatMessages(callCtx, req)
 }

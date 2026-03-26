@@ -18,18 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.agents_agent_chat_info import AgentsAgentChatInfo
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsCreateAgentResponse(BaseModel):
+class AgentsListAgentChatsResponse(BaseModel):
     """
-    AgentsCreateAgentResponse
+    AgentsListAgentChatsResponse
     """ # noqa: E501
-    token: Optional[StrictStr] = None
-    url: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["token", "url"]
+    chats: Optional[List[AgentsAgentChatInfo]] = None
+    __properties: ClassVar[List[str]] = ["chats"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +49,7 @@ class AgentsCreateAgentResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsCreateAgentResponse from a JSON string"""
+        """Create an instance of AgentsListAgentChatsResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -70,11 +70,18 @@ class AgentsCreateAgentResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in chats (list)
+        _items = []
+        if self.chats:
+            for _item_chats in self.chats:
+                if _item_chats:
+                    _items.append(_item_chats.to_dict())
+            _dict['chats'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsCreateAgentResponse from a dict"""
+        """Create an instance of AgentsListAgentChatsResponse from a dict"""
         if obj is None:
             return None
 
@@ -82,8 +89,7 @@ class AgentsCreateAgentResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "token": obj.get("token"),
-            "url": obj.get("url")
+            "chats": [AgentsAgentChatInfo.from_dict(_item) for _item in obj["chats"]] if obj.get("chats") is not None else None
         })
         return _obj
 

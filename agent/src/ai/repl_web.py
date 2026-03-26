@@ -18,20 +18,23 @@ from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
     ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
+    TextPart,
     ToolCallPart,
     ToolCallPartDelta,
+    UserPromptPart,
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
-from pydantic_core import to_json
 
 from ai.agent import AgentDeps, build_agent
-from ai.internal_agents_grpc import InternalAgentServer
+from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
-from ai.session_store import AgentNotFoundError, SessionStore, StoredAgent
+from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
@@ -53,53 +56,128 @@ class ReplStreamRequest(BaseModel):
 
 
 class PersistedRunRecorder:
-    def __init__(self, store: SessionStore, agent_id: str, user_prompt: str) -> None:
+    def __init__(self, store: SessionStore, chat_id: str, user_prompt: str) -> None:
         self._store = store
-        self._agent_id = agent_id
-        self._assistant_message_id: str | None = None
-        self._tool_message_id_by_call_id: dict[str, str] = {}
-        self._store.set_initial_message_if_missing(agent_id, user_prompt)
-        self._store.create_message(agent_id, role="user", content=user_prompt)
+        self._chat_id = chat_id
+        self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
+        self._current_response_message_id: str | None = None
+        self._current_response: ModelResponse | None = None
+        self._store.set_initial_chat_message_if_missing(chat_id, user_prompt)
+        self._store.create_agent_chat_model_message(
+            chat_id,
+            ModelRequest(parts=[UserPromptPart(user_prompt)]),
+        )
+
+    @property
+    def history_count_before_run(self) -> int:
+        return self._history_count_before_run
+
+    def _persist_current_response(self) -> None:
+        if self._current_response is None:
+            return
+
+        if self._current_response_message_id is None:
+            record = self._store.create_agent_chat_model_message(self._chat_id, self._current_response)
+            self._current_response_message_id = record.id
+            return
+
+        self._store.update_agent_chat_model_message(self._current_response_message_id, self._current_response)
 
     def append_assistant_content(self, chunk: str) -> None:
         if not chunk:
             return
 
-        if self._assistant_message_id is None:
-            message = self._store.create_message(self._agent_id, role="assistant", content=chunk)
-            self._assistant_message_id = message.id
+        if self._current_response is None:
+            self._current_response = ModelResponse(parts=[TextPart(chunk)])
+            self._persist_current_response()
             return
 
-        self._store.append_message_content(self._assistant_message_id, chunk)
+        text_part_index = next(
+            (index for index, part in enumerate(self._current_response.parts) if isinstance(part, TextPart)),
+            None,
+        )
+        if text_part_index is None:
+            self._current_response.parts = [*self._current_response.parts, TextPart(chunk)]
+        else:
+            text_part = self._current_response.parts[text_part_index]
+            self._current_response.parts = [
+                *self._current_response.parts[:text_part_index],
+                TextPart(f"{text_part.content}{chunk}"),
+                *self._current_response.parts[text_part_index + 1 :],
+            ]
+
+        self._persist_current_response()
 
     def set_assistant_content(self, content: str) -> None:
-        if self._assistant_message_id is None:
-            message = self._store.create_message(self._agent_id, role="assistant", content=content)
-            self._assistant_message_id = message.id
+        self._current_response = ModelResponse(parts=[TextPart(content)])
+        self._persist_current_response()
+
+    def tool_started(self, part: ToolCallPart) -> None:
+        if self._current_response is None:
+            self._current_response = ModelResponse(parts=[part])
+            self._persist_current_response()
             return
 
-        self._store.update_message(self._assistant_message_id, content=content)
+        updated_parts = [
+            existing_part
+            for existing_part in self._current_response.parts
+            if not isinstance(existing_part, ToolCallPart) or existing_part.tool_call_id != part.tool_call_id
+        ]
+        updated_parts.append(part)
+        self._current_response.parts = updated_parts
+        self._persist_current_response()
 
-    def tool_started(self, tool_name: str, tool_call_id: str) -> None:
-        label = _format_tool_label(tool_name)
-        message = self._store.create_message(
-            self._agent_id,
-            role="tool",
-            content=f"{label}...",
-            tool_call_id=tool_call_id,
-            tool_status="running",
+    def tool_call_delta(self, tool_call_id: str, args_delta: str | dict[str, Any] | None, tool_name: str | None) -> None:
+        if self._current_response is None:
+            self._current_response = ModelResponse(parts=[])
+
+        updated = False
+        next_parts: list[Any] = []
+        for part in self._current_response.parts:
+            if not isinstance(part, ToolCallPart) or part.tool_call_id != tool_call_id:
+                next_parts.append(part)
+                continue
+
+            next_tool_name = tool_name or part.tool_name
+            next_args: str | dict[str, Any] | None = part.args
+            if isinstance(args_delta, dict):
+                next_args = args_delta
+            elif isinstance(args_delta, str):
+                if isinstance(next_args, str):
+                    next_args = f"{next_args}{args_delta}"
+                elif next_args is None:
+                    next_args = args_delta
+            next_parts.append(
+                ToolCallPart(
+                    tool_name=next_tool_name,
+                    args=next_args,
+                    tool_call_id=tool_call_id,
+                )
+            )
+            updated = True
+
+        if not updated:
+            next_parts.append(
+                ToolCallPart(
+                    tool_name=tool_name or "tool",
+                    args=args_delta if isinstance(args_delta, (str, dict)) else None,
+                    tool_call_id=tool_call_id,
+                )
+            )
+
+        self._current_response.parts = next_parts
+        self._persist_current_response()
+
+    def tool_finished(self, event: FunctionToolResultEvent) -> None:
+        parts: list[Any] = [event.result]
+        if event.content:
+            parts.append(UserPromptPart(event.content))
+        self._store.create_agent_chat_model_message(
+            self._chat_id,
+            ModelRequest(parts=parts),
         )
-        self._tool_message_id_by_call_id[tool_call_id] = message.id
-
-    def tool_finished(self, tool_name: str, tool_call_id: str, elapsed_ms: float | None) -> None:
-        message_id = self._tool_message_id_by_call_id.get(tool_call_id)
-        if message_id is None:
-            self.tool_started(tool_name, tool_call_id)
-            message_id = self._tool_message_id_by_call_id[tool_call_id]
-
-        label = _format_tool_label(tool_name)
-        content = f"{label} ({elapsed_ms:.1f}ms)" if elapsed_ms is not None else label
-        self._store.update_message(message_id, content=content, tool_status="completed")
+        self._current_response_message_id = None
+        self._current_response = None
 
 
 def _debug_enabled() -> bool:
@@ -186,25 +264,24 @@ def _format_tool_label(tool_name: str) -> str:
     return words[:1].upper() + words[1:]
 
 
-def _load_message_history(store: SessionStore, agent_id: str) -> Any:
-    history_json = store.load_message_history_json(agent_id)
-    if history_json is None:
+def _load_message_history(store: SessionStore, chat_id: str) -> Any:
+    history = store.load_agent_chat_message_history(chat_id)
+    if not history:
         return None
-    return ModelMessagesTypeAdapter.validate_json(history_json)
+    return ModelMessagesTypeAdapter.validate_python(history)
+
+def _save_new_messages(store: SessionStore, chat_id: str, preserved_message_count: int, messages: Any) -> None:
+    validated_messages = ModelMessagesTypeAdapter.validate_python(messages)
+    store.replace_agent_chat_messages_after(chat_id, preserved_message_count, list(validated_messages))
 
 
-def _save_message_history(store: SessionStore, agent_id: str, messages: Any) -> None:
-    history_json = to_json(messages).decode("utf-8")
-    store.save_message_history_json(agent_id, history_json)
-
-
-def _resolve_agent_context(agent_id: str, request: Request) -> tuple[JwtClaims, StoredAgent]:
+def _resolve_agent_context(agent_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
     claims = jwt_validator.decode(api_token)
     validated_agent_id = jwt_validator.validate_agent_id(agent_id, claims)
     store: SessionStore = request.app.state.session_store
-    agent = store.get_agent(validated_agent_id)
+    agent = store.get_agent_chat(validated_agent_id)
     if agent.org_id != claims.org_id or agent.user_id != claims.subject:
         raise ValueError("Scoped token does not allow the requested agent.")
     jwt_validator.validate_canvas(agent.canvas_id, claims)
@@ -246,13 +323,13 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
     claims: JwtClaims | None = None
     if payload.model == "test" and _resolve_bearer_token(request) is None:
         try:
-            stored_agent = store.get_agent(agent_id)
-        except AgentNotFoundError:
-            stored_agent = store.create_agent(
+            stored_agent = store.get_agent_chat(agent_id)
+        except AgentChatNotFoundError:
+            stored_agent = store.create_agent_chat(
                 org_id="test-org",
                 user_id="test-user",
                 canvas_id="test-canvas",
-                agent_id=agent_id,
+                chat_id=agent_id,
             )
     else:
         claims, stored_agent = _resolve_agent_context(agent_id, request)
@@ -302,7 +379,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
 
             if isinstance(event, AgentRunResultEvent):
                 result = event.result
-                _save_message_history(store, stored_agent.id, result.all_messages())
+                _save_new_messages(store, stored_agent.id, recorder.history_count_before_run, result.new_messages())
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
@@ -368,6 +445,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
             tool_call_id = event.part.tool_call_id
             if tool_call_id and likely_output_tool_name(event.part.tool_name):
                 output_tool_call_id = tool_call_id
+            recorder.tool_started(event.part)
             continue
 
         if isinstance(event, FinalResultEvent):
@@ -387,12 +465,14 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
 
             args_delta = event.delta.args_delta
             if isinstance(args_delta, dict):
+                recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
                 maybe_delta = emit_answer_delta_from_output_args(tool_call_id, args_delta)
                 if maybe_delta is not None:
                     yield maybe_delta
                 continue
 
             if isinstance(args_delta, str):
+                recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
                 buffer = output_args_buffer_by_call_id.get(tool_call_id, "")
                 buffer += args_delta
                 output_args_buffer_by_call_id[tool_call_id] = buffer
@@ -408,7 +488,6 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
         if isinstance(event, FunctionToolCallEvent):
             tool_call_id = event.part.tool_call_id or event.part.tool_name
             tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
-            recorder.tool_started(event.part.tool_name, tool_call_id)
             yield {
                 "type": "tool_started",
                 "tool_name": event.part.tool_name,
@@ -421,7 +500,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
             tool_call_id = event.result.tool_call_id or event.result.tool_name
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
-            recorder.tool_finished(event.result.tool_name, tool_call_id, elapsed_ms)
+            recorder.tool_finished(event)
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
@@ -442,7 +521,7 @@ async def _stream_agent_run(agent_id: str, payload: ReplStreamRequest, request: 
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
-            _save_message_history(store, stored_agent.id, result.all_messages())
+            _save_new_messages(store, stored_agent.id, recorder.history_count_before_run, result.new_messages())
             output = _to_jsonable(result.output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
@@ -497,14 +576,14 @@ def _create_app() -> FastAPI:
         if grpc_server is not None:
             grpc_server.stop()
 
-    @app.post("/agents/{agent_id}/stream")
-    async def stream_repl(agent_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+    @app.post("/agents/chats/{chat_id}/stream")
+    async def stream_repl(chat_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
         _debug_log(
             "incoming stream request",
-            agent_id=agent_id,
+            agent_id=chat_id,
             model=payload.model,
             has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
             has_token=bool(_resolve_bearer_token(request)),
@@ -512,13 +591,13 @@ def _create_app() -> FastAPI:
 
         async def event_generator() -> AsyncIterator[str]:
             try:
-                async for event in _stream_agent_run(agent_id, payload, request):
+                async for event in _stream_agent_run(chat_id, payload, request):
                     if await request.is_disconnected():
-                        _debug_log("client disconnected", agent_id=agent_id)
+                        _debug_log("client disconnected", agent_id=chat_id)
                         break
                     yield _encode_sse_event(event)
             except Exception as error:
-                _debug_log("stream failed", agent_id=agent_id, error=str(error))
+                _debug_log("stream failed", agent_id=chat_id, error=str(error))
                 yield _encode_sse_event(
                     {
                         "type": "run_failed",

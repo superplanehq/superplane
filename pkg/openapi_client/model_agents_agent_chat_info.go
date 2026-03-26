@@ -16,35 +16,35 @@ import (
 	"time"
 )
 
-// checks if the AgentsAgentInfo type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AgentsAgentInfo{}
+// checks if the AgentsAgentChatInfo type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &AgentsAgentChatInfo{}
 
-// AgentsAgentInfo struct for AgentsAgentInfo
-type AgentsAgentInfo struct {
+// AgentsAgentChatInfo struct for AgentsAgentChatInfo
+type AgentsAgentChatInfo struct {
 	Id             *string    `json:"id,omitempty"`
 	InitialMessage *string    `json:"initialMessage,omitempty"`
 	CreatedAt      *time.Time `json:"createdAt,omitempty"`
 }
 
-// NewAgentsAgentInfo instantiates a new AgentsAgentInfo object
+// NewAgentsAgentChatInfo instantiates a new AgentsAgentChatInfo object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAgentsAgentInfo() *AgentsAgentInfo {
-	this := AgentsAgentInfo{}
+func NewAgentsAgentChatInfo() *AgentsAgentChatInfo {
+	this := AgentsAgentChatInfo{}
 	return &this
 }
 
-// NewAgentsAgentInfoWithDefaults instantiates a new AgentsAgentInfo object
+// NewAgentsAgentChatInfoWithDefaults instantiates a new AgentsAgentChatInfo object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAgentsAgentInfoWithDefaults() *AgentsAgentInfo {
-	this := AgentsAgentInfo{}
+func NewAgentsAgentChatInfoWithDefaults() *AgentsAgentChatInfo {
+	this := AgentsAgentChatInfo{}
 	return &this
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
-func (o *AgentsAgentInfo) GetId() string {
+func (o *AgentsAgentChatInfo) GetId() string {
 	if o == nil || IsNil(o.Id) {
 		var ret string
 		return ret
@@ -54,7 +54,7 @@ func (o *AgentsAgentInfo) GetId() string {
 
 // GetIdOk returns a tuple with the Id field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AgentsAgentInfo) GetIdOk() (*string, bool) {
+func (o *AgentsAgentChatInfo) GetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.Id) {
 		return nil, false
 	}
@@ -62,7 +62,7 @@ func (o *AgentsAgentInfo) GetIdOk() (*string, bool) {
 }
 
 // HasId returns a boolean if a field has been set.
-func (o *AgentsAgentInfo) HasId() bool {
+func (o *AgentsAgentChatInfo) HasId() bool {
 	if o != nil && !IsNil(o.Id) {
 		return true
 	}
@@ -71,12 +71,12 @@ func (o *AgentsAgentInfo) HasId() bool {
 }
 
 // SetId gets a reference to the given string and assigns it to the Id field.
-func (o *AgentsAgentInfo) SetId(v string) {
+func (o *AgentsAgentChatInfo) SetId(v string) {
 	o.Id = &v
 }
 
 // GetInitialMessage returns the InitialMessage field value if set, zero value otherwise.
-func (o *AgentsAgentInfo) GetInitialMessage() string {
+func (o *AgentsAgentChatInfo) GetInitialMessage() string {
 	if o == nil || IsNil(o.InitialMessage) {
 		var ret string
 		return ret
@@ -86,7 +86,7 @@ func (o *AgentsAgentInfo) GetInitialMessage() string {
 
 // GetInitialMessageOk returns a tuple with the InitialMessage field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AgentsAgentInfo) GetInitialMessageOk() (*string, bool) {
+func (o *AgentsAgentChatInfo) GetInitialMessageOk() (*string, bool) {
 	if o == nil || IsNil(o.InitialMessage) {
 		return nil, false
 	}
@@ -94,7 +94,7 @@ func (o *AgentsAgentInfo) GetInitialMessageOk() (*string, bool) {
 }
 
 // HasInitialMessage returns a boolean if a field has been set.
-func (o *AgentsAgentInfo) HasInitialMessage() bool {
+func (o *AgentsAgentChatInfo) HasInitialMessage() bool {
 	if o != nil && !IsNil(o.InitialMessage) {
 		return true
 	}
@@ -103,12 +103,12 @@ func (o *AgentsAgentInfo) HasInitialMessage() bool {
 }
 
 // SetInitialMessage gets a reference to the given string and assigns it to the InitialMessage field.
-func (o *AgentsAgentInfo) SetInitialMessage(v string) {
+func (o *AgentsAgentChatInfo) SetInitialMessage(v string) {
 	o.InitialMessage = &v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *AgentsAgentInfo) GetCreatedAt() time.Time {
+func (o *AgentsAgentChatInfo) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
 		var ret time.Time
 		return ret
@@ -118,7 +118,7 @@ func (o *AgentsAgentInfo) GetCreatedAt() time.Time {
 
 // GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AgentsAgentInfo) GetCreatedAtOk() (*time.Time, bool) {
+func (o *AgentsAgentChatInfo) GetCreatedAtOk() (*time.Time, bool) {
 	if o == nil || IsNil(o.CreatedAt) {
 		return nil, false
 	}
@@ -126,7 +126,7 @@ func (o *AgentsAgentInfo) GetCreatedAtOk() (*time.Time, bool) {
 }
 
 // HasCreatedAt returns a boolean if a field has been set.
-func (o *AgentsAgentInfo) HasCreatedAt() bool {
+func (o *AgentsAgentChatInfo) HasCreatedAt() bool {
 	if o != nil && !IsNil(o.CreatedAt) {
 		return true
 	}
@@ -135,11 +135,11 @@ func (o *AgentsAgentInfo) HasCreatedAt() bool {
 }
 
 // SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
-func (o *AgentsAgentInfo) SetCreatedAt(v time.Time) {
+func (o *AgentsAgentChatInfo) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
-func (o AgentsAgentInfo) MarshalJSON() ([]byte, error) {
+func (o AgentsAgentChatInfo) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -147,7 +147,7 @@ func (o AgentsAgentInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o AgentsAgentInfo) ToMap() (map[string]interface{}, error) {
+func (o AgentsAgentChatInfo) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
@@ -161,38 +161,38 @@ func (o AgentsAgentInfo) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableAgentsAgentInfo struct {
-	value *AgentsAgentInfo
+type NullableAgentsAgentChatInfo struct {
+	value *AgentsAgentChatInfo
 	isSet bool
 }
 
-func (v NullableAgentsAgentInfo) Get() *AgentsAgentInfo {
+func (v NullableAgentsAgentChatInfo) Get() *AgentsAgentChatInfo {
 	return v.value
 }
 
-func (v *NullableAgentsAgentInfo) Set(val *AgentsAgentInfo) {
+func (v *NullableAgentsAgentChatInfo) Set(val *AgentsAgentChatInfo) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAgentsAgentInfo) IsSet() bool {
+func (v NullableAgentsAgentChatInfo) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAgentsAgentInfo) Unset() {
+func (v *NullableAgentsAgentChatInfo) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAgentsAgentInfo(val *AgentsAgentInfo) *NullableAgentsAgentInfo {
-	return &NullableAgentsAgentInfo{value: val, isSet: true}
+func NewNullableAgentsAgentChatInfo(val *AgentsAgentChatInfo) *NullableAgentsAgentChatInfo {
+	return &NullableAgentsAgentChatInfo{value: val, isSet: true}
 }
 
-func (v NullableAgentsAgentInfo) MarshalJSON() ([]byte, error) {
+func (v NullableAgentsAgentChatInfo) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAgentsAgentInfo) UnmarshalJSON(src []byte) error {
+func (v *NullableAgentsAgentChatInfo) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
