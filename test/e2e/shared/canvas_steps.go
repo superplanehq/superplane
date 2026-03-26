@@ -28,6 +28,82 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
+// WaitForCanvasSaveStatusSaved waits until the canvas is durably saved.
+// It avoids returning on the initial stale "saved" state by giving autosave
+// one debounce window to start, but still accepts saves that completed before
+// the waiter began observing.
+func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
+	saveButton := q.TestID("save-canvas-button").Run(s.session)
+	clickedManualSave := false
+	if isVisible, _ := saveButton.IsVisible(); isVisible {
+		s.session.Click(q.TestID("save-canvas-button"))
+		clickedManualSave = true
+	}
+
+	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
+	deadline := time.Now().Add(20 * time.Second)
+	initialStateCaptured := false
+	initialState := ""
+	initialSavedLabel := ""
+	seenFreshCycle := clickedManualSave
+	seenSaving := false
+	initialSavedStateStableUntil := time.Time{}
+	lastState := ""
+	for time.Now().Before(deadline) {
+		isVisible, _ := status.IsVisible()
+		if !isVisible {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		state, _ := status.GetAttribute("data-state")
+		if state != "" {
+			lastState = state
+		}
+		savedLabel, _ := status.GetAttribute("data-saved-label")
+
+		if !initialStateCaptured {
+			initialState = lastState
+			initialSavedLabel = savedLabel
+			initialStateCaptured = true
+			if initialState == "saved" {
+				initialSavedStateStableUntil = time.Now().Add(1 * time.Second)
+			}
+			if initialState != "saved" {
+				seenFreshCycle = true
+			}
+		}
+
+		if lastState == "saving" {
+			seenFreshCycle = true
+			seenSaving = true
+		}
+
+		if lastState != "" && lastState != "saved" {
+			seenFreshCycle = true
+		}
+
+		if initialState == "saved" && initialSavedLabel != "visible" && savedLabel == "visible" {
+			seenFreshCycle = true
+		}
+
+		if lastState == "saved" && seenFreshCycle && (seenSaving || initialState != "saved") {
+			return
+		}
+
+		if savedLabel == "visible" && seenFreshCycle && initialSavedLabel != "visible" {
+			return
+		}
+
+		if initialState == "saved" && !seenFreshCycle && !initialSavedStateStableUntil.IsZero() && time.Now().After(initialSavedStateStableUntil) {
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for canvas save status saved, last state=%q", lastState)
+}
+
 func (s *CanvasSteps) Create() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
 	s.session.FillIn(q.TestID("canvas-name-input"), s.CanvasName)
@@ -54,6 +130,15 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
+		if isVisible, _ := sidebar.IsVisible(); isVisible {
+			return
+		}
+
+		// Newer canvas UI keeps the component sidebar open after selecting a node.
+		// Deselecting the node reveals the floating Components button again.
+		s.ClickOnEmptyCanvasArea()
+		s.session.Sleep(150)
+
 		if isVisible, _ := sidebar.IsVisible(); isVisible {
 			return
 		}
@@ -104,8 +189,8 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(1000)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
@@ -124,8 +209,8 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	generatedName, err := loc.InputValue()
 	require.NoError(s.t, err)
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(1000)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 
 	return generatedName
 }
@@ -141,8 +226,8 @@ func (s *CanvasSteps) Save() {
 		return
 	}
 
-	// Auto-save may have already persisted the changes.
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -162,9 +247,8 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
@@ -175,8 +259,8 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -200,8 +284,8 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
@@ -214,8 +298,8 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.session.Sleep(300)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -246,8 +330,8 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {

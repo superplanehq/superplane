@@ -100,6 +100,7 @@ import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
@@ -463,6 +464,7 @@ export function WorkflowPageV2() {
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
+  const holdSavingDisplay = useMinSavingDisplayHold(updateCanvasVersionMutation.isPending);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -860,6 +862,8 @@ export function WorkflowPageV2() {
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [lastCanvasSaveError, setLastCanvasSaveError] = useState<string | null>(null);
 
   // Auto-save toggle state
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
@@ -869,8 +873,8 @@ export function WorkflowPageV2() {
     }
     return true;
   });
-  // Draft editing always auto-saves when versioning is enabled.
-  const canAutoSave = !isTemplate && hasEditableVersion && (showVersioningUI || isAutoSaveEnabled);
+  // Non-versioned canvases always auto-save. When versioning is enabled, auto-save follows `isAutoSaveEnabled`.
+  const canAutoSave = !isTemplate && hasEditableVersion && (isVersioningDisabled || isAutoSaveEnabled);
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY);
@@ -2445,6 +2449,7 @@ export function WorkflowPageV2() {
         : "Canvas changes saved";
 
       try {
+        setLastCanvasSaveError(null);
         const savingVersionID = activeCanvasVersionId || undefined;
         lastLocalCanvasSaveAtRef.current = Date.now();
         const updateResponse = await updateCanvasVersionMutation.mutateAsync({
@@ -2477,6 +2482,7 @@ export function WorkflowPageV2() {
         }
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
+        setLastSavedAt(new Date());
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
@@ -2484,7 +2490,9 @@ export function WorkflowPageV2() {
       } catch (error: any) {
         console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
-        showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        const displayMessage = getUsageLimitToastMessage(error, errorMessage);
+        setLastCanvasSaveError(displayMessage);
+        showErrorToast(displayMessage);
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-error-${Date.now()}`,
@@ -5343,7 +5351,8 @@ export function WorkflowPageV2() {
     : !hasEditableVersion
       ? "Enable edit mode to use auto-save."
       : undefined;
-  const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
+  const saveButtonHidden =
+    isVersioningDisabled || isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
   const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
   const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
@@ -5405,7 +5414,14 @@ export function WorkflowPageV2() {
     : hasEditableVersion
       ? "version-edit"
       : "version-live";
-  const headerSaveState = updateCanvasVersionMutation.isPending ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
+  const headerSaveState =
+    updateCanvasVersionMutation.isPending || holdSavingDisplay
+      ? "saving"
+      : lastCanvasSaveError
+        ? "error"
+        : hasUnsavedChanges
+          ? "unsaved"
+          : "saved";
   const unpublishedDraftChangeCount =
     !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
       ? pendingDraftDiffSummary.items.length
@@ -5539,6 +5555,7 @@ export function WorkflowPageV2() {
           getAutocompleteExampleObj={getAutocompleteExampleObj}
           getCustomField={getCustomField}
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
+          configurationSaveMode={isReadOnly ? "manual" : "auto"}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
           onGroupUpdate={!isReadOnly ? handleGroupUpdate : undefined}
@@ -5592,8 +5609,10 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
-          isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
-          onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+          isAutoSaveEnabled={!isVersioningDisabled && isAutoSaveEnabled && !isTemplate}
+          onToggleAutoSave={isTemplate || isVersioningDisabled ? undefined : handleToggleAutoSave}
+          lastSavedAt={lastSavedAt}
+          saveErrorMessage={lastCanvasSaveError}
           autoSaveDisabled={autoSaveDisabled}
           autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           headerMode={headerMode}

@@ -95,7 +95,7 @@ export interface CustomComponentBuilderPageProps {
     configuration: Record<string, any>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string | undefined> | string | undefined | void;
   organizationId?: string;
 
@@ -551,11 +551,15 @@ export function CustomComponentBuilderPage(props: CustomComponentBuilderPageProp
       if (templateNodeId && newNodeData) {
         // This is a template node being saved
         handleSaveNewNode(configuration, nodeName, appInstallationRef);
-      } else if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
-        // Close the component sidebar after saving
-        setIsNodeSidebarOpen(false);
+        return;
       }
+      if (!editingNodeData || !props.onNodeConfigurationSave) {
+        return;
+      }
+      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, appInstallationRef);
+      // Close the component sidebar after saving
+      setIsNodeSidebarOpen(false);
+      return result;
     },
     [templateNodeId, newNodeData, editingNodeData, props],
   );

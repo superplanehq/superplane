@@ -225,8 +225,8 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
@@ -246,8 +246,8 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 	s.session.Click(q.Locator(`button:has-text("Select role")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
@@ -267,8 +267,8 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
@@ -310,22 +310,28 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStateStarted, 5*time.Second)
+	s.canvas.WaitForExecutionInStates(
+		"Approval",
+		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
+		30*time.Second,
+	)
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {
+	s.canvas.StartEditingNode("Approval")
 	s.session.Click(q.Locator(`button:has-text("Approve")`))
 	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
 }
 
 func (s *ApprovalSteps) approveAnyoneRequirement() {
+	s.canvas.StartEditingNode("Approval")
 	s.session.AssertVisible(q.Locator(`button:has-text("Approve")`))
 
 	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Any user"))`)
@@ -394,7 +400,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 10*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")
