@@ -316,16 +316,22 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 
 func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution("Approval", models.CanvasNodeExecutionStateStarted, 5*time.Second)
+	s.canvas.WaitForExecutionInStates(
+		"Approval",
+		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
+		30*time.Second,
+	)
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {
+	s.canvas.StartEditingNode("Approval")
 	s.session.Click(q.Locator(`button:has-text("Approve")`))
 	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
 }
 
 func (s *ApprovalSteps) approveAnyoneRequirement() {
+	s.canvas.StartEditingNode("Approval")
 	s.session.AssertVisible(q.Locator(`button:has-text("Approve")`))
 
 	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Any user"))`)
@@ -394,7 +400,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 10*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")

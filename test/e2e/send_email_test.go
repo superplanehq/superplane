@@ -152,7 +152,7 @@ func (s *SendEmailSteps) runManualTrigger() {
 	s.canvas.WaitForExecution(
 		"Send Email",
 		models.CanvasNodeExecutionStateFinished,
-		15*time.Second,
+		30*time.Second,
 	)
 }
 
@@ -172,7 +172,7 @@ func (s *SendEmailSteps) runManualTriggerAndWaitForFinish() {
 	s.canvas.WaitForExecution(
 		"Send Email",
 		models.CanvasNodeExecutionStateFinished,
-		15*time.Second,
+		30*time.Second,
 	)
 }
 

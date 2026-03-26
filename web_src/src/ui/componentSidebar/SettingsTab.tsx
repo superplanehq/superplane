@@ -53,6 +53,23 @@ interface SettingsTabProps {
   configurationSaveMode?: "manual" | "auto";
 }
 
+function buildAutosaveSnapshot(
+  configuration: Record<string, unknown>,
+  nodeName: string,
+  integrationRef?: ComponentsIntegrationRef,
+): string {
+  return JSON.stringify({
+    configuration,
+    nodeName,
+    integrationRef: integrationRef
+      ? {
+          id: integrationRef.id || "",
+          name: integrationRef.name || "",
+        }
+      : null,
+  });
+}
+
 export function SettingsTab({
   nodeId: _nodeId,
   nodeName,
@@ -90,7 +107,8 @@ export function SettingsTab({
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
-  const skipAutosaveAfterSyncRef = useRef(true);
+  const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
+  const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
@@ -224,8 +242,10 @@ export function SettingsTab({
       newConfig = { ...defaultValuesWithoutToggles, ...configuration };
     }
 
-    skipAutosaveAfterSyncRef.current = true;
-    setNodeConfiguration(filterVisibleFields(newConfig));
+    const filteredConfig = filterVisibleFields(newConfig);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef);
+    pendingAutosaveSnapshotRef.current = null;
+    setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
@@ -236,6 +256,7 @@ export function SettingsTab({
   useEffect(() => {
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
+        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
         setSelectedIntegration(undefined);
       }
       return;
@@ -250,31 +271,71 @@ export function SettingsTab({
     }
 
     const firstIntegration = integrationsOfType[0];
+    const nextIntegration = {
+      id: firstIntegration.metadata?.id,
+      name: firstIntegration.metadata?.name,
+    };
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, nextIntegration);
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, selectedIntegration]);
+  }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
 
   const handleSave = useCallback(async () => {
-    if (isReadOnly || savingRef.current) {
+    if (isReadOnly) {
       return;
     }
-    validateNow();
+
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    if (configurationSaveMode === "auto" && snapshot === autosaveBaselineSnapshotRef.current) {
+      pendingAutosaveSnapshotRef.current = null;
+      return;
+    }
+
+    if (!validateNow() || currentNodeName.trim() === "") {
+      return;
+    }
+
+    if (savingRef.current) {
+      if (configurationSaveMode === "auto") {
+        pendingAutosaveSnapshotRef.current = snapshot;
+      }
+      return;
+    }
+
     const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
-    if (result instanceof Promise) {
-      savingRef.current = true;
-      setIsSaving(true);
-      try {
-        await result;
-      } finally {
-        savingRef.current = false;
-        setIsSaving(false);
+    if (!(result instanceof Promise)) {
+      autosaveBaselineSnapshotRef.current = snapshot;
+      pendingAutosaveSnapshotRef.current = null;
+      return;
+    }
+
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      await result;
+      autosaveBaselineSnapshotRef.current = snapshot;
+      pendingAutosaveSnapshotRef.current = null;
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
+
+      if (configurationSaveMode === "auto") {
+        const pendingSnapshot = pendingAutosaveSnapshotRef.current;
+        if (pendingSnapshot && pendingSnapshot !== autosaveBaselineSnapshotRef.current) {
+          pendingAutosaveSnapshotRef.current = null;
+          window.setTimeout(() => {
+            void handleSaveRef.current();
+          }, 0);
+        } else {
+          pendingAutosaveSnapshotRef.current = null;
+        }
       }
     }
-  }, [isReadOnly, validateNow, onSave, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isReadOnly, validateNow, onSave, nodeConfiguration, currentNodeName, selectedIntegration, configurationSaveMode]);
 
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
@@ -283,8 +344,10 @@ export function SettingsTab({
     if (configurationSaveMode !== "auto" || isReadOnly) {
       return;
     }
-    if (skipAutosaveAfterSyncRef.current) {
-      skipAutosaveAfterSyncRef.current = false;
+    if (
+      buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration) ===
+      autosaveBaselineSnapshotRef.current
+    ) {
       return;
     }
     if (hasNodeNameError) {
@@ -510,11 +573,13 @@ export function SettingsTab({
                   field={field}
                   value={nodeConfiguration[fieldName]}
                   onChange={(value) => {
-                    const newConfig = {
-                      ...nodeConfiguration,
-                      [fieldName]: value,
-                    };
-                    setNodeConfiguration(filterVisibleFields(newConfig));
+                    setNodeConfiguration((previousConfiguration) => {
+                      const newConfig = {
+                        ...previousConfiguration,
+                        [fieldName]: value,
+                      };
+                      return filterVisibleFields(newConfig);
+                    });
                   }}
                   allValues={nodeConfiguration}
                   domainId={domainId}
