@@ -70,6 +70,7 @@ services:
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
+      AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
@@ -116,27 +117,30 @@ services:
       context: agent
       dockerfile: Dockerfile
       target: dev
+    working_dir: /app/agent
     env_file:
       - agent/.env
     environment:
       IN_DOCKER: "1"
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
+      INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
+      INTERNAL_GRPC_PORT: ${INTERNAL_GRPC_PORT:-50061}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
     command: >-
-      bash -lc "uv run uvicorn ai.web:create_app
+      bash -lc "uv run python -m uvicorn ai.web:create_app
       --factory
       --host 0.0.0.0
       --port 8090
       --reload
-      --reload-dir /app/src
-      --reload-dir /app/evals"
+      --reload-dir /app/agent/src
+      --reload-dir /app/agent/evals"
     tty: true
     stdin_open: true
     ports:
       - ${AGENT_REPL_WEB_PORT:-8090}:8090
     volumes:
-      - ./agent:/app
+      - .:/app
       - uv-cache:/root/.cache/uv
     healthcheck:
       test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]

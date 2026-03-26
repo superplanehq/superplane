@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
 
-WORKDIR /app
+WORKDIR /app/agent
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends make bash \
