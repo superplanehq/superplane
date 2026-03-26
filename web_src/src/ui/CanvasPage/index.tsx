@@ -481,6 +481,8 @@ export interface CanvasPageProps {
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
+export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
+export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
 
 const EDGE_STYLE = {
   type: "custom",
@@ -2171,15 +2173,29 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
-  const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
+  const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem(CONSOLE_OPEN_STORAGE_KEY);
+    return saved !== null ? saved === "true" : false;
+  });
   const [consoleTab, setConsoleTab] = useState<ConsoleTab>("runs");
   const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
   const [logSearch, setLogSearch] = useState("");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
-  const [logSidebarHeight, setLogSidebarHeight] = useState(320);
+  const [logSidebarHeight, setLogSidebarHeight] = useState(() => {
+    const saved = localStorage.getItem(CONSOLE_HEIGHT_STORAGE_KEY);
+    return saved ? parseInt(saved, 10) : 320;
+  });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
+
+  useEffect(() => {
+    localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
+  }, [isLogSidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem(CONSOLE_HEIGHT_STORAGE_KEY, String(logSidebarHeight));
+  }, [logSidebarHeight]);
 
   const runsCountInfo = useMemo(() => {
     const events = runsEvents || [];
@@ -2936,12 +2952,14 @@ function CanvasContent({
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
             >
               {missingIntegrations && missingIntegrations.length > 0 && onConnectIntegration && (
-                <IntegrationStatusIndicator
-                  missingIntegrations={missingIntegrations}
-                  onConnect={onConnectIntegration}
-                  readOnly={isReadOnly}
-                  canCreateIntegrations={canCreateIntegrations}
-                />
+                <div style={isLogSidebarOpen ? { marginBottom: logSidebarHeight } : undefined}>
+                  <IntegrationStatusIndicator
+                    missingIntegrations={missingIntegrations}
+                    onConnect={onConnectIntegration}
+                    readOnly={isReadOnly}
+                    canCreateIntegrations={canCreateIntegrations}
+                  />
+                </div>
               )}
               <div className="flex items-center gap-3">
                 {showVersionControlTrigger ? (
@@ -3048,7 +3066,7 @@ function CanvasContent({
                     }}
                   />
                 </ZoomSlider>
-                {showBottomStatusControls ? (
+                {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
                     <Tooltip>
                       <TooltipTrigger asChild>
