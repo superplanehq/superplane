@@ -56,7 +56,6 @@ import {
   useCanvasChangeRequests,
   useTriggers,
   useCanvas,
-  useCanvasEvents,
   useInfiniteCanvasEvents,
   useCanvasMemoryEntries,
   useDeleteCanvasMemoryEntry,
@@ -748,7 +747,6 @@ export function WorkflowPageV2() {
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
-  const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
     const pages = infiniteEventsQuery.data?.pages || [];
@@ -756,6 +754,7 @@ export function WorkflowPageV2() {
     const totalCount = pages[0]?.totalCount || 0;
     return { events, totalCount };
   }, [infiniteEventsQuery.data]);
+  const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
   const componentIconMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const c of components) {

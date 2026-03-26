@@ -79,7 +79,7 @@ export function useCanvasWebsocket(
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
               queryClient.invalidateQueries({
-                queryKey: canvasKeys.events(),
+                queryKey: canvasKeys.infiniteEvents(canvasId),
               });
 
               if (execution.rootEvent?.id) {
@@ -98,7 +98,7 @@ export function useCanvasWebsocket(
             nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
 
             queryClient.invalidateQueries({
-              queryKey: canvasKeys.events(),
+              queryKey: canvasKeys.infiniteEvents(canvasId),
             });
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
@@ -110,7 +110,7 @@ export function useCanvasWebsocket(
             nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
 
             queryClient.invalidateQueries({
-              queryKey: canvasKeys.events(),
+              queryKey: canvasKeys.infiniteEvents(canvasId),
             });
 
             onNodeEvent?.(queueItem.nodeId!, data.event);

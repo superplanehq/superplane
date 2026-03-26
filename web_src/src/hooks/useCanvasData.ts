@@ -70,6 +70,7 @@ export const canvasKeys = {
     [...canvasKeys.nodeExecutions(), canvasId, nodeId, ...(states || [])] as const,
   events: () => [...canvasKeys.all, "events"] as const,
   eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
+  infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
@@ -715,7 +716,7 @@ export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
   const limit = 50;
 
   return useInfiniteQuery({
-    queryKey: [...canvasKeys.events(), canvasId, "infinite"],
+    queryKey: canvasKeys.infiniteEvents(canvasId),
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
       const response = await canvasesListCanvasEvents(
         withOrganizationHeader({
