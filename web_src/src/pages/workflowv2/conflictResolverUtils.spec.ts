@@ -5,7 +5,6 @@ import {
   cloneJSON,
   concatenateBothNodes,
   concatenateConflictBlockLines,
-  deepMergeObjects,
   isPlainObject,
   localResolutionLabel,
   normalizeForCompare,
@@ -14,40 +13,6 @@ import {
   pruneEdgesByNodes,
   upsertNode,
 } from "./conflictResolverUtils";
-
-describe("deepMergeObjects", () => {
-  it("merges disjoint keys from both objects", () => {
-    const result = deepMergeObjects({ a: 1 }, { b: 2 });
-    expect(result).toEqual({ a: 1, b: 2 });
-  });
-
-  it("uses incoming value for conflicting primitive keys", () => {
-    const result = deepMergeObjects({ a: "current" }, { a: "incoming" });
-    expect(result).toEqual({ a: "incoming" });
-  });
-
-  it("recursively merges nested objects", () => {
-    const current = { config: { timeout: 30, retries: 3 } };
-    const incoming = { config: { timeout: 60, verbose: true } };
-    const result = deepMergeObjects(current, incoming);
-    expect(result).toEqual({ config: { timeout: 60, retries: 3, verbose: true } });
-  });
-
-  it("returns incoming when current is not an object", () => {
-    expect(deepMergeObjects("string", { a: 1 })).toEqual({ a: 1 });
-    expect(deepMergeObjects(null, { a: 1 })).toEqual({ a: 1 });
-  });
-
-  it("returns incoming when incoming is not an object", () => {
-    expect(deepMergeObjects({ a: 1 }, "string")).toBe("string");
-    expect(deepMergeObjects({ a: 1 }, null)).toBe(null);
-  });
-
-  it("keeps current key when incoming does not have it", () => {
-    const result = deepMergeObjects({ a: 1, b: 2 }, { a: 10 });
-    expect(result).toEqual({ a: 10, b: 2 });
-  });
-});
 
 describe("concatenateConflictBlockLines", () => {
   it("returns incoming lines when current is empty", () => {

@@ -430,6 +430,7 @@ export function CanvasChangeRequestConflictResolver({
       return;
     }
 
+    const selectedNode = incomingNode || currentNode;
     if (!currentNode && !incomingNode) {
       setFinalNodes((current) => upsertNode(current, selectedNodeID, null));
       setResolvedNodeIDs((current) => new Set(current).add(selectedNodeID));
@@ -440,6 +441,14 @@ export function CanvasChangeRequestConflictResolver({
 
     const bothYAML = concatenateBothNodes(currentNode, incomingNode);
     setFinalDraftYAML(bothYAML);
+
+    if (!currentNode || !incomingNode) {
+      setFinalNodes((current) => upsertNode(current, selectedNodeID, selectedNode ? cloneJSON(selectedNode) : null));
+      setResolvedNodeIDs((current) => new Set(current).add(selectedNodeID));
+      setFinalDraftError("");
+      return;
+    }
+
     setFinalDraftError(
       "Both changes were written. The resulting YAML has duplicate keys and is invalid — please edit it manually before marking as resolved.",
     );

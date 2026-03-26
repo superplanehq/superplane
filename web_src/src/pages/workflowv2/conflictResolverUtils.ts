@@ -120,32 +120,6 @@ export function buildConflictMarkerYAML(
   return `${lines.join("\n").trimEnd()}\n`;
 }
 
-export function deepMergeObjects(current: unknown, incoming: unknown): unknown {
-  if (!isPlainObject(current) || !isPlainObject(incoming)) {
-    return incoming;
-  }
-
-  const merged: Record<string, unknown> = {};
-  const keys = new Set([...Object.keys(current), ...Object.keys(incoming)]);
-  keys.forEach((key) => {
-    const currentValue = current[key];
-    const incomingValue = incoming[key];
-
-    if (incomingValue === undefined) {
-      merged[key] = currentValue;
-      return;
-    }
-
-    if (currentValue === undefined) {
-      merged[key] = incomingValue;
-      return;
-    }
-
-    merged[key] = deepMergeObjects(currentValue, incomingValue);
-  });
-  return merged;
-}
-
 export function concatenateConflictBlockLines(currentLines: string[], incomingLines: string[]): string[] {
   if (currentLines.length === 0) {
     return incomingLines;
