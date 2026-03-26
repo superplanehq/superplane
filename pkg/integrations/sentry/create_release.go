@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -230,6 +229,15 @@ func (c *CreateRelease) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("project %q was not found in the connected Sentry organization", config.Project)
 	}
 
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create sentry client: %w", err)
+	}
+
+	if err := client.ValidateReleaseAccess(); err != nil {
+		return fmt.Errorf("failed to validate sentry release access: %w", err)
+	}
+
 	return ctx.Metadata.Set(CreateReleaseNodeMetadata{
 		Project: project,
 	})
@@ -255,13 +263,12 @@ func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {
 	}
 
 	release, err := client.CreateRelease(CreateReleaseRequest{
-		Version:      config.Version,
-		Projects:     []string{config.Project},
-		Ref:          config.Ref,
-		URL:          config.URL,
-		DateReleased: time.Now().UTC().Format(time.RFC3339),
-		Commits:      buildReleaseCommitPayload(config.Commits),
-		Refs:         buildReleaseRefPayload(config.Refs),
+		Version:  config.Version,
+		Projects: []string{config.Project},
+		Ref:      config.Ref,
+		URL:      config.URL,
+		Commits:  buildReleaseCommitPayload(config.Commits),
+		Refs:     buildReleaseRefPayload(config.Refs),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create sentry release: %w", err)

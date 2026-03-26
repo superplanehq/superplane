@@ -25,9 +25,21 @@ func Test__CreateDeploy__Setup(t *testing.T) {
 				"releaseVersion": "2026.03.25",
 				"environment":    "production",
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					sentryMockResponse(http.StatusOK, `[]`),
+				},
+			},
 			Metadata: metadata,
 			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
 				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
 					Projects: []ProjectSummary{
 						{ID: "1", Slug: "backend", Name: "Backend"},
 					},
@@ -49,11 +61,56 @@ func Test__CreateDeploy__Setup(t *testing.T) {
 				"releaseVersion": "2026.03.25",
 				"environment":    "production",
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					sentryMockResponse(http.StatusOK, `[]`),
+				},
+			},
 			Metadata: metadata,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
+				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
+				},
+			},
 		})
 
 		require.NoError(t, err)
 		assert.Equal(t, CreateDeployNodeMetadata{}, metadata.Metadata)
+	})
+
+	t.Run("fails with release scope guidance when token cannot access releases", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"releaseVersion": "2026.03.25",
+				"environment":    "production",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					sentryMockResponse(http.StatusForbidden, `{"detail":"You do not have permission to perform this action."}`),
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
+				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
+				},
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), releaseScope)
 	})
 }
 

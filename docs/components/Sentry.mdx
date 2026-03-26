@@ -27,7 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 1. Create a [personal auth token](https://sentry.io/settings/account/api/auth-tokens/) in Sentry with the permissions below. Copy the token.
 
    > **Token Permissions:**  
-   > Project -> `Read` · Team -> `Read` · Issue & Event -> `Read & Write` · Organization -> `Read & Write`
+   > Project -> `Read` · Releases -> `Read & Write` (`project:releases`) · Team -> `Read` · Issue & Event -> `Read & Write` · Organization -> `Read & Write`
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
    Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
@@ -166,7 +166,6 @@ The Create Release component registers a new release in Sentry for a selected pr
 - **Version**: The release version identifier
 - **Ref**: Optional commit or tag reference for the release
 - **Release URL**: Optional URL for the release, build, or changelog
-- **Released At**: Optional date/time when the release went live. Defaults to the current time if left empty.
 - **Commits**: Optional commit metadata to associate with the release
 - **Refs**: Optional repository head/previous commit refs for release comparison
 

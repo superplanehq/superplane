@@ -157,8 +157,18 @@ func (c *CreateDeploy) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
+	var metadata CreateDeployNodeMetadata
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create sentry client: %w", err)
+	}
+
 	if config.Project == "" {
-		return ctx.Metadata.Set(CreateDeployNodeMetadata{})
+		if err := client.ValidateReleaseAccess(); err != nil {
+			return fmt.Errorf("failed to validate sentry release access: %w", err)
+		}
+
+		return ctx.Metadata.Set(metadata)
 	}
 
 	project := findProject(ctx.Integration, config.Project)
@@ -166,9 +176,15 @@ func (c *CreateDeploy) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("project %q was not found in the connected Sentry organization", config.Project)
 	}
 
-	return ctx.Metadata.Set(CreateDeployNodeMetadata{
+	if err := client.ValidateReleaseAccess(); err != nil {
+		return fmt.Errorf("failed to validate sentry release access: %w", err)
+	}
+
+	metadata = CreateDeployNodeMetadata{
 		Project: project,
-	})
+	}
+
+	return ctx.Metadata.Set(metadata)
 }
 
 func (c *CreateDeploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

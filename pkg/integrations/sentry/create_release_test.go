@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,27 +15,74 @@ import (
 
 func Test__CreateRelease__Setup(t *testing.T) {
 	component := &CreateRelease{}
-	metadata := &contexts.MetadataContext{}
 
-	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{
-			"project": "backend",
-			"version": "2026.03.25",
-		},
-		Metadata: metadata,
-		Integration: &contexts.IntegrationContext{
-			Metadata: Metadata{
-				Projects: []ProjectSummary{
-					{ID: "1", Slug: "backend", Name: "Backend"},
+	t.Run("stores selected project metadata after validating release access", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"project": "backend",
+				"version": "2026.03.25",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					sentryMockResponse(http.StatusOK, `[]`),
 				},
 			},
-		},
+			Metadata: metadata,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
+				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
+					Projects: []ProjectSummary{
+						{ID: "1", Slug: "backend", Name: "Backend"},
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, CreateReleaseNodeMetadata{
+			Project: &ProjectSummary{ID: "1", Slug: "backend", Name: "Backend"},
+		}, metadata.Metadata)
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, CreateReleaseNodeMetadata{
-		Project: &ProjectSummary{ID: "1", Slug: "backend", Name: "Backend"},
-	}, metadata.Metadata)
+	t.Run("fails with release scope guidance when token cannot access releases", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"project": "backend",
+				"version": "2026.03.25",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					sentryMockResponse(http.StatusForbidden, `{"detail":"You do not have permission to perform this action."}`),
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseUrl":   "https://sentry.io",
+					"userToken": "user-token",
+				},
+				Metadata: Metadata{
+					Organization: &OrganizationSummary{
+						Slug: "example",
+					},
+					Projects: []ProjectSummary{
+						{ID: "1", Slug: "backend", Name: "Backend"},
+					},
+				},
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), releaseScope)
+	})
 }
 
 func Test__CreateRelease__Configuration(t *testing.T) {
@@ -58,7 +104,6 @@ func Test__CreateRelease__Execute(t *testing.T) {
 		},
 	}
 	executionState := &contexts.ExecutionStateContext{}
-	before := time.Now().UTC()
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
@@ -98,7 +143,6 @@ func Test__CreateRelease__Execute(t *testing.T) {
 		},
 		ExecutionState: executionState,
 	})
-	after := time.Now().UTC()
 
 	require.NoError(t, err)
 	assert.True(t, executionState.Passed)
@@ -114,12 +158,8 @@ func Test__CreateRelease__Execute(t *testing.T) {
 	assert.Equal(t, "2026.03.25", requestBody["version"])
 	assert.Equal(t, "abc123", requestBody["ref"])
 	assert.Equal(t, "https://example.com/releases/2026.03.25", requestBody["url"])
-	dateReleasedValue, ok := requestBody["dateReleased"].(string)
-	require.True(t, ok)
-	dateReleased, parseErr := time.Parse(time.RFC3339, dateReleasedValue)
-	require.NoError(t, parseErr)
-	assert.False(t, dateReleased.Before(before.Add(-time.Second)))
-	assert.False(t, dateReleased.After(after.Add(time.Second)))
+	_, hasDateReleased := requestBody["dateReleased"]
+	assert.False(t, hasDateReleased)
 	assert.Equal(t, []any{"backend"}, requestBody["projects"])
 	require.Len(t, requestBody["commits"], 1)
 	require.Len(t, requestBody["refs"], 1)

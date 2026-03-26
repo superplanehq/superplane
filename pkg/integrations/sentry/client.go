@@ -3,6 +3,7 @@ package sentry
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,8 +26,23 @@ type apiError struct {
 	Body       string
 }
 
+const releaseScope = "project:releases"
+
 func (e *apiError) Error() string {
 	return fmt.Sprintf("sentry API returned status %d: %s", e.StatusCode, e.Body)
+}
+
+func wrapReleaseScopeError(err error) error {
+	var sentryAPIError *apiError
+	if errors.As(err, &sentryAPIError) && sentryAPIError.StatusCode == http.StatusForbidden {
+		return fmt.Errorf(
+			"Sentry release APIs require the personal token to include `%s`: %w",
+			releaseScope,
+			err,
+		)
+	}
+
+	return err
 }
 
 func NewClient(httpContext core.HTTPContext, integration core.IntegrationContext) (*Client, error) {
@@ -501,7 +517,7 @@ func (c *Client) ListReleases() ([]Release, error) {
 		nil,
 	)
 	if err != nil {
-		return nil, err
+		return nil, wrapReleaseScopeError(err)
 	}
 
 	releases := []Release{}
@@ -510,6 +526,19 @@ func (c *Client) ListReleases() ([]Release, error) {
 	}
 
 	return releases, nil
+}
+
+func (c *Client) ValidateReleaseAccess() error {
+	_, err := c.doJSON(
+		http.MethodGet,
+		fmt.Sprintf("/api/0/organizations/%s/releases/?per_page=1", c.orgSlug),
+		nil,
+	)
+	if err != nil {
+		return wrapReleaseScopeError(err)
+	}
+
+	return nil
 }
 
 func (c *Client) GetIssue(issueID string) (*Issue, error) {
@@ -596,7 +625,7 @@ func (c *Client) CreateRelease(request CreateReleaseRequest) (*Release, error) {
 		request,
 	)
 	if err != nil {
-		return nil, err
+		return nil, wrapReleaseScopeError(err)
 	}
 
 	release := Release{}
@@ -614,7 +643,7 @@ func (c *Client) CreateDeploy(version string, request CreateDeployRequest) (*Dep
 		request,
 	)
 	if err != nil {
-		return nil, err
+		return nil, wrapReleaseScopeError(err)
 	}
 
 	deploy := Deploy{}

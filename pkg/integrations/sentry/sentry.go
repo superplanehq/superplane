@@ -36,7 +36,7 @@ const (
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry. Copy the token.
 
    > **Token Permissions:**  
-   > ` + "`Project -> Read`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
+   > ` + "`Project -> Read`" + ` · ` + "`Releases -> Read & Write (project:releases)`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
    Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
@@ -151,7 +151,7 @@ func (s *Sentry) Instructions() string {
 1. Create a [personal auth token](` + SentryPersonalTokensURL + `) in Sentry with the permissions below. Copy the token.
 
    > **Token Permissions:**  
-   > ` + "Project -> `Read`" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
+   > ` + "Project -> `Read`" + ` · ` + "Releases -> `Read & Write` (`project:releases`)" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
    Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
@@ -176,7 +176,7 @@ func (s *Sentry) Configuration() []configuration.Field {
 			Label:       "User Token",
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
-			Description: "Personal auth token from Sentry.",
+			Description: "Personal auth token from Sentry. Include `project:releases` if you use release actions.",
 			Required:    true,
 		},
 		{
