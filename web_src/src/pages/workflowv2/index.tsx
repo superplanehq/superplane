@@ -100,6 +100,7 @@ import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
@@ -463,6 +464,7 @@ export function WorkflowPageV2() {
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
+  const holdSavingDisplay = useMinSavingDisplayHold(updateCanvasVersionMutation.isPending);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -860,6 +862,10 @@ export function WorkflowPageV2() {
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [lastCanvasSaveError, setLastCanvasSaveError] = useState<string | null>(null);
+  const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
+  const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
   // Auto-save toggle state
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
@@ -869,8 +875,9 @@ export function WorkflowPageV2() {
     }
     return true;
   });
-  // Draft editing always auto-saves when versioning is enabled.
-  const canAutoSave = !isTemplate && hasEditableVersion && (showVersioningUI || isAutoSaveEnabled);
+  // Non-versioned canvases always auto-save. When versioning is enabled, auto-save follows `isAutoSaveEnabled`.
+  const canAutoSave = !isTemplate && hasEditableVersion && (isVersioningDisabled || isAutoSaveEnabled);
+  const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY);
@@ -954,6 +961,10 @@ export function WorkflowPageV2() {
   const canvasRef = useRef<CanvasesCanvas | null>(canvas ?? null);
   const lastLocalCanvasSaveAtRef = useRef<number>(0);
   const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
+  const clearQueuedAutoSaveFlags = useCallback(() => {
+    setIsPositionAutoSaveQueued(false);
+    setIsAnnotationAutoSaveQueued(false);
+  }, []);
   useEffect(() => {
     canvasRef.current = canvas ?? null;
   }, [canvas]);
@@ -1433,6 +1444,7 @@ export function WorkflowPageV2() {
     () =>
       debounce(
         async () => {
+          setIsPositionAutoSaveQueued(false);
           if (!organizationId || !canvasId) return;
 
           const positionUpdates = new Map(pendingPositionUpdatesRef.current);
@@ -1932,6 +1944,17 @@ export function WorkflowPageV2() {
     [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
   );
 
+  const invalidateCanvasVersionData = useCallback(
+    (targetCanvasId: string, targetVersionId?: string) => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(targetCanvasId) });
+      if (targetVersionId) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(targetCanvasId, targetVersionId) });
+      }
+    },
+    [queryClient],
+  );
+
   const handleCanvasLifecycleEvent = useCallback(
     (payload: { canvasId: string; versionId?: string }, eventName: string) => {
       if (eventName === "canvas_deleted") {
@@ -1951,14 +1974,13 @@ export function WorkflowPageV2() {
       }
 
       if (eventName === "canvas_version_updated") {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+        invalidateCanvasVersionData(canvasId);
         if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
           if (hasUnsavedChanges) {
             setRemoteCanvasUpdatePending(true);
             return;
           }
-          queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
+          invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
         }
         return;
       }
@@ -1972,13 +1994,9 @@ export function WorkflowPageV2() {
         return;
       }
 
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-      if (activeCanvasVersionId) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionDetail(canvasId, activeCanvasVersionId) });
-      }
+      invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
     },
-    [hasUnsavedChanges, queryClient, canvasId, activeCanvasVersionId],
+    [hasUnsavedChanges, invalidateCanvasVersionData, canvasId, activeCanvasVersionId],
   );
 
   const shouldApplyCanvasUpdate = useCallback(
@@ -2445,6 +2463,7 @@ export function WorkflowPageV2() {
         : "Canvas changes saved";
 
       try {
+        setLastCanvasSaveError(null);
         const savingVersionID = activeCanvasVersionId || undefined;
         lastLocalCanvasSaveAtRef.current = Date.now();
         const updateResponse = await updateCanvasVersionMutation.mutateAsync({
@@ -2477,6 +2496,7 @@ export function WorkflowPageV2() {
         }
         setHasUnsavedChanges(false);
         setHasNonPositionalUnsavedChanges(false);
+        setLastSavedAt(new Date());
 
         // Clear the snapshot since changes are now saved
         setInitialWorkflowSnapshot(null);
@@ -2484,7 +2504,9 @@ export function WorkflowPageV2() {
       } catch (error: any) {
         console.error("Failed to save canvas", error);
         const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
-        showErrorToast(getUsageLimitToastMessage(error, errorMessage));
+        const displayMessage = getUsageLimitToastMessage(error, errorMessage);
+        setLastCanvasSaveError(displayMessage);
+        showErrorToast(displayMessage);
         setLiveCanvasEntries((prev) => [
           buildCanvasStatusLogEntry({
             id: `canvas-save-error-${Date.now()}`,
@@ -2775,6 +2797,7 @@ export function WorkflowPageV2() {
     () =>
       debounce(
         async () => {
+          setIsAnnotationAutoSaveQueued(false);
           if (!organizationId || !canvasId) return;
 
           const annotationUpdates = new Map(pendingAnnotationUpdatesRef.current);
@@ -2849,6 +2872,14 @@ export function WorkflowPageV2() {
     }
   }, [canAutoSave]);
 
+  const clearPendingAutoSaveWork = useCallback(() => {
+    debouncedAutoSave.cancel();
+    debouncedAnnotationAutoSave.cancel();
+    pendingPositionUpdatesRef.current.clear();
+    pendingAnnotationUpdatesRef.current.clear();
+    clearQueuedAutoSaveFlags();
+  }, [clearQueuedAutoSaveFlags, debouncedAnnotationAutoSave, debouncedAutoSave]);
+
   const handleAnnotationUpdate = useCallback(
     (
       nodeId: string,
@@ -2912,6 +2943,7 @@ export function WorkflowPageV2() {
         if (canAutoSave) {
           const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
           pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...configurationUpdates });
+          setIsAnnotationAutoSaveQueued(true);
           debouncedAnnotationAutoSave();
         } else {
           markUnsavedChange("structural");
@@ -2925,6 +2957,7 @@ export function WorkflowPageV2() {
             x: x !== undefined ? x : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.x || 0,
             y: y !== undefined ? y : latestWorkflow?.spec?.nodes?.find((n) => n.id === nodeId)?.position?.y || 0,
           });
+          setIsPositionAutoSaveQueued(true);
           debouncedAutoSave();
         }
       } else if (hasPositionUpdate) {
@@ -2981,6 +3014,7 @@ export function WorkflowPageV2() {
       if (canAutoSave) {
         const existing = pendingAnnotationUpdatesRef.current.get(nodeId) || {};
         pendingAnnotationUpdatesRef.current.set(nodeId, { ...existing, ...updates });
+        setIsAnnotationAutoSaveQueued(true);
         debouncedAnnotationAutoSave();
       } else {
         markUnsavedChange("structural");
@@ -3791,7 +3825,7 @@ export function WorkflowPageV2() {
 
       if (canAutoSave) {
         pendingPositionUpdatesRef.current.set(nodeId, roundedPosition);
-
+        setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
       } else {
         saveWorkflowSnapshot(canvas);
@@ -3850,7 +3884,7 @@ export function WorkflowPageV2() {
         positionMap.forEach((position, nodeId) => {
           pendingPositionUpdatesRef.current.set(nodeId, position);
         });
-
+        setIsPositionAutoSaveQueued(true);
         debouncedAutoSave();
       } else {
         saveWorkflowSnapshot(canvas);
@@ -4526,10 +4560,7 @@ export function WorkflowPageV2() {
         return;
       }
 
-      debouncedAutoSave.cancel();
-      debouncedAnnotationAutoSave.cancel();
-      pendingPositionUpdatesRef.current.clear();
-      pendingAnnotationUpdatesRef.current.clear();
+      clearPendingAutoSaveWork();
 
       if (isCurrentLive) {
         setActiveCanvasVersion(null);
@@ -4616,12 +4647,11 @@ export function WorkflowPageV2() {
       liveCanvasVersionId,
       liveCanvasVersion?.spec,
       liveCanvas?.spec,
-      debouncedAutoSave,
-      debouncedAnnotationAutoSave,
       queryClient,
       setSearchParams,
       canvasChangeRequests,
       initializeFromWorkflow,
+      clearPendingAutoSaveWork,
     ],
   );
 
@@ -4773,10 +4803,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    debouncedAutoSave.cancel();
-    debouncedAnnotationAutoSave.cancel();
-    pendingPositionUpdatesRef.current.clear();
-    pendingAnnotationUpdatesRef.current.clear();
+    clearPendingAutoSaveWork();
 
     try {
       setIsResetDraftPending(true);
@@ -4831,11 +4858,10 @@ export function WorkflowPageV2() {
     isVersioningDisabled,
     hasEditableVersion,
     hasUnsavedChanges,
-    debouncedAutoSave,
-    debouncedAnnotationAutoSave,
     createCanvasVersionMutation,
     queryClient,
     setSearchParams,
+    clearPendingAutoSaveWork,
   ]);
 
   const getYamlExportPayload = useCallback(
@@ -5220,8 +5246,7 @@ export function WorkflowPageV2() {
       return;
     }
 
-    pendingPositionUpdatesRef.current.clear();
-    pendingAnnotationUpdatesRef.current.clear();
+    clearPendingAutoSaveWork();
     setHasUnsavedChanges(false);
     setHasNonPositionalUnsavedChanges(false);
     setInitialWorkflowSnapshot(null);
@@ -5343,9 +5368,20 @@ export function WorkflowPageV2() {
     : !hasEditableVersion
       ? "Enable edit mode to use auto-save."
       : undefined;
-  const saveButtonHidden = isTemplate || !canUpdateCanvas || !hasEditableVersion || !hasUnsavedChanges;
-  const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas;
-  const canUndo = !isTemplate && canUpdateCanvas && hasEditableVersion && initialWorkflowSnapshot !== null;
+  const saveButtonHidden =
+    isVersioningDisabled ||
+    isTemplate ||
+    !canUpdateCanvas ||
+    !hasEditableVersion ||
+    !hasUnsavedChanges ||
+    (canAutoSave && isAutoSaveQueued);
+  const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas && !(canAutoSave && isAutoSaveQueued);
+  const canUndo =
+    !isTemplate &&
+    canUpdateCanvas &&
+    hasEditableVersion &&
+    initialWorkflowSnapshot !== null &&
+    !(canAutoSave && isAutoSaveQueued);
   const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||
@@ -5405,7 +5441,14 @@ export function WorkflowPageV2() {
     : hasEditableVersion
       ? "version-edit"
       : "version-live";
-  const headerSaveState = updateCanvasVersionMutation.isPending ? "saving" : hasUnsavedChanges ? "unsaved" : "saved";
+  const headerSaveState =
+    updateCanvasVersionMutation.isPending || holdSavingDisplay || (canAutoSave && isAutoSaveQueued)
+      ? "saving"
+      : lastCanvasSaveError
+        ? "error"
+        : hasUnsavedChanges
+          ? "unsaved"
+          : "saved";
   const unpublishedDraftChangeCount =
     !suppressUnpublishedChangesBadge && !isVersioningDisabled && !!latestDraftVersion
       ? pendingDraftDiffSummary.items.length
@@ -5539,6 +5582,7 @@ export function WorkflowPageV2() {
           getAutocompleteExampleObj={getAutocompleteExampleObj}
           getCustomField={getCustomField}
           onNodeConfigurationSave={!isReadOnly ? handleNodeConfigurationSave : undefined}
+          configurationSaveMode={isReadOnly ? "manual" : "auto"}
           onAnnotationUpdate={!isReadOnly ? handleAnnotationUpdate : undefined}
           onAnnotationBlur={!isReadOnly ? handleAnnotationBlur : undefined}
           onGroupUpdate={!isReadOnly ? handleGroupUpdate : undefined}
@@ -5579,7 +5623,9 @@ export function WorkflowPageV2() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          unsavedMessage={hasUnsavedChanges ? "You have unsaved changes" : undefined}
+          unsavedMessage={
+            hasUnsavedChanges && !(canAutoSave && isAutoSaveQueued) ? "You have unsaved changes" : undefined
+          }
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
@@ -5592,8 +5638,10 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
-          isAutoSaveEnabled={isAutoSaveEnabled && !isTemplate}
-          onToggleAutoSave={isTemplate ? undefined : handleToggleAutoSave}
+          isAutoSaveEnabled={!isVersioningDisabled && isAutoSaveEnabled && !isTemplate}
+          onToggleAutoSave={isTemplate || isVersioningDisabled ? undefined : handleToggleAutoSave}
+          lastSavedAt={lastSavedAt}
+          saveErrorMessage={lastCanvasSaveError}
           autoSaveDisabled={autoSaveDisabled}
           autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           headerMode={headerMode}
