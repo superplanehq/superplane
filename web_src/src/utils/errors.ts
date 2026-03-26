@@ -5,39 +5,13 @@ import type { GooglerpcStatus } from "@/api-client/types.gen";
  * Handles the structure returned by @hey-api/client-fetch
  */
 export function getApiErrorMessage(error: unknown, fallback = "An error occurred"): string {
-  if (!error) {
-    return fallback;
-  }
-
-  if (typeof error === "string" && error.trim()) {
-    return error;
-  }
-
-  // Check if error has the structure { error: GooglerpcStatus }
-  if (typeof error === "object" && "error" in error) {
-    const errorObj = error.error;
-    if (errorObj && typeof errorObj === "object" && "message" in errorObj) {
-      const message = (errorObj as GooglerpcStatus).message;
-      if (typeof message === "string" && message.trim()) {
-        return message;
-      }
-    }
-  }
-
-  // Check if error itself is GooglerpcStatus
-  if (typeof error === "object" && "message" in error) {
-    const message = (error as GooglerpcStatus).message;
-    if (typeof message === "string" && message.trim()) {
-      return message;
-    }
-  }
-
-  // Check if error is a standard Error object
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallback;
+  return (
+    getNonEmptyString(error) ??
+    getStatusMessage(getNestedError(error)) ??
+    getStatusMessage(error) ??
+    getNonEmptyString(error instanceof Error ? error.message : null) ??
+    fallback
+  );
 }
 
 export async function getResponseErrorMessage(response: Response, fallback = "An error occurred"): Promise<string> {
@@ -79,4 +53,29 @@ export function getApiErrorCode(error: unknown): number | null {
   }
 
   return null;
+}
+
+function getNestedError(error: unknown): unknown {
+  if (!error || typeof error !== "object" || !("error" in error)) {
+    return null;
+  }
+
+  return error.error;
+}
+
+function getStatusMessage(error: unknown): string | null {
+  if (!error || typeof error !== "object" || !("message" in error)) {
+    return null;
+  }
+
+  return getNonEmptyString((error as GooglerpcStatus).message);
+}
+
+function getNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? value : null;
 }

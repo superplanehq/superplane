@@ -8,6 +8,12 @@
 - Documentation: Markdown files in docs/.
 - gRPC API implementation in in pkg/grpc/actions
 - Database models in pkg/models
+- Integration component implementations: pkg/integrations/<integration>/
+- Workflow v2 UI component mappers: web_src/src/pages/workflowv2/mappers/<integration>/
+
+## Pull Request Guidelines
+
+- PR titles must follow Conventional Commits and include a release-type prefix: `feat:`, `fix:`, `chore:`, or `docs:` (CI enforces this).
 
 ## Build, Test, and Development Commands
 

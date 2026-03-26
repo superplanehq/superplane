@@ -264,7 +264,11 @@ export interface CanvasPageProps {
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved";
+  saveState?: "saved" | "saving" | "unsaved" | "error";
+  lastSavedAt?: Date | string | null;
+  saveErrorMessage?: string | null;
+  /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
+  configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -315,7 +319,7 @@ export interface CanvasPageProps {
     configuration: Record<string, any>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -965,11 +969,14 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
-        // Close the component sidebar after saving
+      if (!editingNodeData || !props.onNodeConfigurationSave) {
+        return;
+      }
+      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      if (props.configurationSaveMode !== "auto") {
         state.componentSidebar.close();
       }
+      return result;
     },
     [editingNodeData, props, state.componentSidebar],
   );
@@ -1085,6 +1092,8 @@ function CanvasPage(props: CanvasPageProps) {
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           headerMode={props.headerMode}
           saveState={props.saveState}
+          lastSavedAt={props.lastSavedAt}
+          saveErrorMessage={props.saveErrorMessage}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1097,6 +1106,7 @@ function CanvasPage(props: CanvasPageProps) {
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
+          canvasId={props.canvasId}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1241,6 +1251,8 @@ function CanvasPage(props: CanvasPageProps) {
                 autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
+                lastSavedAt={props.lastSavedAt}
+                saveErrorMessage={props.saveErrorMessage}
                 onEnterEditMode={props.onEnterEditMode}
                 enterEditModeDisabled={props.enterEditModeDisabled}
                 enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1311,6 +1323,7 @@ function CanvasPage(props: CanvasPageProps) {
               onSidebarClose={handleSidebarClose}
               editingNodeData={editingNodeData}
               onSaveConfiguration={handleSaveConfiguration}
+              configurationSaveMode={props.configurationSaveMode}
               onEdit={handleNodeEdit}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
@@ -1386,6 +1399,7 @@ function Sidebar({
   onSidebarClose,
   editingNodeData,
   onSaveConfiguration,
+  configurationSaveMode = "manual",
   onEdit,
   currentTab,
   onTabChange,
@@ -1438,7 +1452,12 @@ function Sidebar({
   ) => { map: EventStateMap; state: EventState };
   onSidebarClose?: () => void;
   editingNodeData?: NodeEditData | null;
-  onSaveConfiguration?: (configuration: Record<string, any>, nodeName: string) => void;
+  onSaveConfiguration?: (
+    configuration: Record<string, any>,
+    nodeName: string,
+    integrationRef?: ComponentsIntegrationRef,
+  ) => void | Promise<void>;
+  configurationSaveMode?: "manual" | "auto";
   onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1605,6 +1624,7 @@ function Sidebar({
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
+      configurationSaveMode={configurationSaveMode}
       onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
@@ -1674,6 +1694,8 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip,
   headerMode,
   saveState,
+  lastSavedAt,
+  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1686,6 +1708,7 @@ function CanvasContentHeader({
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
+  canvasId,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1712,7 +1735,9 @@ function CanvasContentHeader({
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved";
+  saveState?: "saved" | "saving" | "unsaved" | "error";
+  lastSavedAt?: Date | string | null;
+  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1725,6 +1750,7 @@ function CanvasContentHeader({
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  canvasId?: string;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1782,6 +1808,8 @@ function CanvasContentHeader({
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       mode={headerMode}
       saveState={saveState}
+      lastSavedAt={lastSavedAt}
+      saveErrorMessage={saveErrorMessage}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -1794,6 +1822,7 @@ function CanvasContentHeader({
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
+      canvasId={canvasId}
     />
   );
 }
@@ -1892,6 +1921,8 @@ function CanvasContent({
   autoSaveDisabledTooltip,
   headerMode,
   saveState,
+  lastSavedAt,
+  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1986,7 +2017,9 @@ function CanvasContent({
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved";
+  saveState?: "saved" | "saving" | "unsaved" | "error";
+  lastSavedAt?: Date | string | null;
+  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -2764,6 +2797,8 @@ function CanvasContent({
           autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           mode={headerMode}
           saveState={saveState}
+          lastSavedAt={lastSavedAt}
+          saveErrorMessage={saveErrorMessage}
           onEnterEditMode={onEnterEditMode}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -2828,7 +2863,7 @@ function CanvasContent({
             <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
             <Panel
               position="bottom-left"
-              className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-2"
+              className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
             >
               {missingIntegrations && missingIntegrations.length > 0 && onConnectIntegration && (
                 <IntegrationStatusIndicator
@@ -2838,9 +2873,9 @@ function CanvasContent({
                   canCreateIntegrations={canCreateIntegrations}
                 />
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {showVersionControlTrigger ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center rounded-md p-0.5 h-8">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="relative inline-flex">
@@ -2944,7 +2979,7 @@ function CanvasContent({
                   />
                 </ZoomSlider>
                 {showBottomStatusControls ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
