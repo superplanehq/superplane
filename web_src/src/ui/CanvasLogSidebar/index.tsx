@@ -1,24 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  CircleCheck,
-  CircleX,
-  MoreHorizontal,
-  ScrollText,
-  Search,
-  TriangleAlert,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, CircleX, Play, Search, TriangleAlert, X } from "lucide-react";
 
+import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
+import { ErrorsConsoleContent } from "@/pages/workflowv2/ErrorsConsoleContent";
+import { RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
+export type ConsoleTab = "runs" | "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error" | "run";
 export type LogScope = "runs" | "canvas";
-export type LogScopeFilter = "all" | LogScope;
-export type LogTypeFilter = Set<"success" | "error" | "warning">;
 
 export interface LogRunItem {
   id: string;
@@ -51,22 +45,33 @@ export interface LogCounts {
 export interface CanvasLogSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  filter: LogTypeFilter;
-  onFilterChange: (filter: LogTypeFilter) => void;
-  onResolveErrors?: (executionIds: string[]) => void;
   height?: number;
   defaultHeight?: number;
   minHeight?: number;
   maxHeight?: number;
   onHeightChange?: (height: number) => void;
-  scope: LogScopeFilter;
-  onScopeChange: (scope: LogScopeFilter) => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
   entries: LogEntry[];
   counts: LogCounts;
-  expandedRuns: Set<string>;
-  onToggleRun: (runId: string) => void;
+  activeTab?: ConsoleTab;
+  onTabChange?: (tab: ConsoleTab) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
+  runsNodes?: ComponentsNode[];
+  runsComponentIconMap?: Record<string, string>;
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
 }
 
 function formatLogTimestamp(value: string) {
@@ -91,50 +96,56 @@ function formatLogTimestamp(value: string) {
 export function CanvasLogSidebar({
   isOpen,
   onClose,
-  filter,
-  onFilterChange,
   height,
   defaultHeight = 320,
   minHeight = 240,
   maxHeight = 820,
   onHeightChange,
-  onScopeChange,
   searchValue,
   onSearchChange,
   entries,
   counts,
-  expandedRuns,
-  onToggleRun,
-  onResolveErrors,
+  activeTab: controlledTab,
+  onTabChange,
+  runsEvents = [],
+  runsTotalCount,
+  runsHasNextPage,
+  runsIsFetchingNextPage,
+  onRunsLoadMore,
+  runsNodes = [],
+  runsComponentIconMap = {},
+  runsNodeQueueItemsMap = {},
+  onRunNodeSelect,
+  onRunExecutionSelect,
+  onAcknowledgeErrors,
 }: CanvasLogSidebarProps) {
+  const [internalTab, setInternalTab] = useState<ConsoleTab>("runs");
+  const activeTab = controlledTab ?? internalTab;
+  const setActiveTab = onTabChange ?? setInternalTab;
+
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
+  const [isResizing, setIsResizing] = useState(false);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
 
-  // Normalize filter: if all three types are selected, treat as empty set (show all)
-  const normalizedFilter = useMemo(() => {
-    if (filter.size === 3) {
-      return new Set<"success" | "error" | "warning">();
-    }
-    return filter;
-  }, [filter]);
+  const filteredEntries = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
 
-  const errorExecutionIds = useMemo(() => {
-    const ids = new Set<string>();
-    entries.forEach((entry) => {
-      if (entry.runItems?.length) {
-        entry.runItems.forEach((item) => {
-          if (item.type === "error") {
-            ids.add(item.id);
-          }
-        });
+    return entries.reduce<LogEntry[]>((acc, entry) => {
+      if (entry.type !== "warning") {
+        return acc;
       }
-    });
-    return Array.from(ids);
-  }, [entries]);
 
-  const canResolveErrors = Boolean(onResolveErrors) && errorExecutionIds.length > 0;
+      const entrySearchMatch =
+        matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
+      if (entrySearchMatch) {
+        acc.push(entry);
+      }
+      return acc;
+    }, []);
+  }, [entries, searchValue]);
 
   const sidebarHeight = height ?? internalHeight;
   const clampHeight = useCallback(
@@ -158,7 +169,6 @@ export function CanvasLogSidebar({
 
   useEffect(() => {
     if (!isOpen) {
-      onScopeChange("all");
       return;
     }
 
@@ -210,6 +220,8 @@ export function CanvasLogSidebar({
     (event: React.MouseEvent<HTMLDivElement>) => {
       dragStartRef.current = { y: event.clientY, height: sidebarHeight };
       document.body.style.userSelect = "none";
+      document.body.style.cursor = "ns-resize";
+      setIsResizing(true);
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!dragStartRef.current) return;
@@ -220,6 +232,8 @@ export function CanvasLogSidebar({
       const handleMouseUp = () => {
         dragStartRef.current = null;
         document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        setIsResizing(false);
         window.removeEventListener("mousemove", handleMouseMove);
         window.removeEventListener("mouseup", handleMouseUp);
       };
@@ -230,9 +244,14 @@ export function CanvasLogSidebar({
     [setSidebarHeight, sidebarHeight],
   );
 
+  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(runsEvents), [runsEvents]);
+
   if (!isOpen) {
     return null;
   }
+
+  const searchPlaceholder =
+    activeTab === "runs" ? "Search runs…" : activeTab === "errors" ? "Search errors…" : "Search warnings…";
 
   return (
     <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
@@ -240,28 +259,42 @@ export function CanvasLogSidebar({
         className="bg-white outline outline-slate-950/15 flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
-        <div className="h-0.5 cursor-row-resize rounded-t-lg transition-colors" onMouseDown={handleResizeStart} />
+        <div
+          onMouseDown={handleResizeStart}
+          className={cn(
+            "absolute left-0 right-0 top-0 h-4 cursor-ns-resize hover:bg-gray-100 transition-colors flex items-center justify-center group z-30",
+            isResizing && "bg-blue-50",
+          )}
+          style={{ marginTop: "-8px" }}
+        >
+          <div
+            className={cn(
+              "h-1 w-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors",
+              isResizing && "bg-blue-500",
+            )}
+          />
+        </div>
         <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
           <div className="flex items-center gap-4 -mb-2">
             <button
               type="button"
-              onClick={() => onFilterChange(new Set())}
+              onClick={() => setActiveTab("runs")}
               className={cn(
                 "flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
-                normalizedFilter.size === 0
+                activeTab === "runs"
                   ? "border-gray-800 text-gray-800"
                   : "border-transparent text-gray-500 hover:text-gray-800",
               )}
             >
-              <ScrollText className="h-4 w-4" />
-              All Logs
+              <Play className="h-4 w-4" />
+              Runs
             </button>
             <button
               type="button"
-              onClick={() => onFilterChange(new Set(["error"]))}
+              onClick={() => setActiveTab("errors")}
               className={cn(
                 "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
-                normalizedFilter.size === 1 && normalizedFilter.has("error")
+                activeTab === "errors"
                   ? "border-gray-800 text-gray-800"
                   : "border-transparent text-gray-500 hover:text-gray-800",
               )}
@@ -269,9 +302,9 @@ export function CanvasLogSidebar({
               <CircleX
                 className={cn(
                   "h-4 w-4",
-                  counts.error > 0
+                  unacknowledgedCount > 0
                     ? "text-red-500"
-                    : normalizedFilter.size === 1 && normalizedFilter.has("error")
+                    : activeTab === "errors"
                       ? "text-gray-800"
                       : "text-gray-500 group-hover:text-gray-800",
                 )}
@@ -279,22 +312,22 @@ export function CanvasLogSidebar({
               <span
                 className={cn(
                   "tabular-nums",
-                  counts.error > 0
+                  unacknowledgedCount > 0
                     ? "text-red-500"
-                    : normalizedFilter.size === 1 && normalizedFilter.has("error")
+                    : activeTab === "errors"
                       ? "text-gray-800"
                       : "text-gray-500 group-hover:text-gray-800",
                 )}
               >
-                {counts.error}
+                {unacknowledgedCount}
               </span>
             </button>
             <button
               type="button"
-              onClick={() => onFilterChange(new Set(["warning"]))}
+              onClick={() => setActiveTab("warnings")}
               className={cn(
                 "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
-                normalizedFilter.size === 1 && normalizedFilter.has("warning")
+                activeTab === "warnings"
                   ? "border-gray-800 text-gray-800"
                   : "border-transparent text-gray-500 hover:text-gray-800",
               )}
@@ -304,7 +337,7 @@ export function CanvasLogSidebar({
                   "h-4 w-4",
                   counts.warning > 0
                     ? "text-orange-500"
-                    : normalizedFilter.size === 1 && normalizedFilter.has("warning")
+                    : activeTab === "warnings"
                       ? "text-gray-800"
                       : "text-gray-500 group-hover:text-gray-800",
                 )}
@@ -314,7 +347,7 @@ export function CanvasLogSidebar({
                   "tabular-nums",
                   counts.warning > 0
                     ? "text-orange-500"
-                    : normalizedFilter.size === 1 && normalizedFilter.has("warning")
+                    : activeTab === "warnings"
                       ? "text-gray-800"
                       : "text-gray-500 group-hover:text-gray-800",
                 )}
@@ -324,21 +357,6 @@ export function CanvasLogSidebar({
             </button>
           </div>
           <div className="flex items-center gap-2">
-            {canResolveErrors ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (canResolveErrors) {
-                    onResolveErrors?.(errorExecutionIds);
-                  }
-                }}
-                className="h-6 px-2 text-[11px] font-medium"
-              >
-                Resolve all errors
-              </Button>
-            ) : null}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -355,120 +373,65 @@ export function CanvasLogSidebar({
               <Search className="h-4 w-4 -ml-1 text-gray-500" />
             </InputGroupAddon>
             <InputGroupInput
-              placeholder="Search through Logs…"
+              placeholder={searchPlaceholder}
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
               className="h-7 !text-[13px] border-0 shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0"
             />
           </InputGroup>
         </div>
-        <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
-          {entries.length === 0 ? (
-            <div className="px-4 py-1.5 text-[13px] text-gray-800">No logs found.</div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {[...entries].map((entry) => (
-                <LogEntryRow
-                  key={entry.id}
-                  entry={entry}
-                  isExpanded={expandedRuns.has(entry.id)}
-                  onToggleRun={onToggleRun}
-                  onResolveErrors={onResolveErrors}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+
+        {activeTab === "runs" ? (
+          <RunsConsoleContent
+            events={runsEvents}
+            totalCount={runsTotalCount}
+            hasNextPage={runsHasNextPage}
+            isFetchingNextPage={runsIsFetchingNextPage}
+            onLoadMore={onRunsLoadMore}
+            nodes={runsNodes}
+            componentIconMap={runsComponentIconMap}
+            searchQuery={searchValue}
+            nodeQueueItemsMap={runsNodeQueueItemsMap}
+            onNodeSelect={onRunNodeSelect}
+            onExecutionSelect={onRunExecutionSelect}
+          />
+        ) : activeTab === "errors" ? (
+          <ErrorsConsoleContent
+            events={runsEvents}
+            nodes={runsNodes}
+            componentIconMap={runsComponentIconMap}
+            searchQuery={searchValue}
+            onNodeSelect={onRunNodeSelect}
+            onExecutionSelect={onRunExecutionSelect}
+            onAcknowledgeErrors={onAcknowledgeErrors}
+          />
+        ) : (
+          <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
+            {filteredEntries.length === 0 ? (
+              <div className="px-4 py-1.5 text-[13px] text-gray-800">No warnings found.</div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {filteredEntries.map((entry) => (
+                  <LogEntryRow key={entry.id} entry={entry} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   );
 }
 
-function LogEntryRow({
-  entry,
-  isExpanded,
-  onToggleRun,
-  onResolveErrors,
-}: {
-  entry: LogEntry;
-  isExpanded: boolean;
-  onToggleRun: (runId: string) => void;
-  onResolveErrors?: (executionIds: string[]) => void;
-}) {
-  const icon = {
-    success: <CircleCheck className="h-4 w-4 text-emerald-500" />,
-    error: <CircleX className="h-4 w-4 text-red-500" />,
-    "resolved-error": <CircleX className="h-4 w-4 text-gray-400" />,
-    warning: <TriangleAlert className="h-4 w-4 text-amber-600" />,
-  } as const;
+function LogEntryRow({ entry }: { entry: LogEntry }) {
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
-
-  if (entry.type === "run") {
-    const runItems = entry.runItems || [];
-    const showChildren = isExpanded && runItems.length > 0;
-
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() => onToggleRun(entry.id)}
-          className="flex w-full items-center gap-3 px-4 py-1.5 text-sm text-gray-800 hover:bg-gray-50 min-h-8"
-          aria-expanded={isExpanded}
-        >
-          <div className="h-4 w-4 rounded-full text-xs font-mono text-gray-500 flex items-center justify-center border border-gray-400">
-            {runItems.length}
-          </div>
-          <div className="flex-1 min-w-0 text-left font-mono text-xs mt-0.5">{entry.title}</div>
-          <span className="ml-auto text-xs text-gray-500 tabular-nums whitespace-nowrap">
-            {formatLogTimestamp(entry.timestamp)}
-          </span>
-        </button>
-        {showChildren && (
-          <div>
-            {runItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-start gap-3 px-11 pr-4 py-1.5 text-sm text-gray-800 bg-gray-50 border-t border-gray-200 transition-colors min-h-8"
-              >
-                <div className="pt-0.5">
-                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-gray-500" /> : icon[item.type]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0 text-xs font-mono mt-0.5 flex items-center gap-2">
-                      <span>{item.title}</span>
-                      {item.type === "error" && onResolveErrors ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onResolveErrors([item.id])}
-                          className="h-6 mb-0.5 px-2 text-[11px] font-medium"
-                        >
-                          Resolve
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
-                      {formatLogTimestamp(item.timestamp)}
-                    </span>
-                  </div>
-                  {item.detail && <div className="mt-1 text-xs text-gray-800">{item.detail}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const hasDetail = Boolean(entry.detail);
 
   return (
     <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800">
-      <div className="pt-0.5">{icon[entry.type]}</div>
+      <div className="pt-0.5">
+        <TriangleAlert className="h-4 w-4 text-amber-600" />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           {hasDetail ? (
