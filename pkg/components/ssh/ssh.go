@@ -50,7 +50,7 @@ type Spec struct {
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"username" mapstructure:"username"`
 	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
-	Command          string                `json:"command" mapstructure:"command"`
+	Commands         string                `json:"commands" mapstructure:"commands"`
 	WorkingDirectory string                `json:"workingDirectory,omitempty" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
@@ -62,7 +62,7 @@ type ExecutionMetadata struct {
 	Host             string                `json:"host" mapstructure:"host"`
 	Port             int                   `json:"port" mapstructure:"port"`
 	User             string                `json:"user" mapstructure:"user"`
-	Command          string                `json:"command" mapstructure:"command"`
+	Commands         string                `json:"commands" mapstructure:"commands"`
 	WorkingDirectory string                `json:"workingDirectory" mapstructure:"workingDirectory"`
 	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
@@ -82,10 +82,10 @@ type ConnectionRetryState struct {
 func (c *SSHCommand) Name() string  { return "ssh" }
 func (c *SSHCommand) Label() string { return "SSH Command" }
 func (c *SSHCommand) Description() string {
-	return "Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)."
+	return "Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)."
 }
 func (c *SSHCommand) Documentation() string {
-	return `Run a single command on a remote host via SSH.
+	return `Run one or more commands on a remote host via SSH.
 
 ## Authentication
 
@@ -97,7 +97,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ## Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
-- **Command**: The command to run (supports expressions).
+- **Commands**: One or more commands to run, one per line (supports expressions). The output payload is based on the last command.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
@@ -215,11 +215,11 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "command",
-			Label:       "Command",
-			Type:        configuration.FieldTypeString,
-			Description: "Command to run on the remote host",
-			Placeholder: "e.g. ls -la /tmp",
+			Name:        "commands",
+			Label:       "Commands",
+			Type:        configuration.FieldTypeText,
+			Description: "One or more commands to run on the remote host, one per line",
+			Placeholder: "e.g. echo hello\nls -la /tmp",
 			Required:    true,
 		},
 		{
@@ -333,8 +333,8 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 	if spec.User == "" {
 		return errors.New("username is required")
 	}
-	if spec.Command == "" {
-		return errors.New("command is required")
+	if strings.TrimSpace(spec.Commands) == "" {
+		return errors.New("commands is required")
 	}
 	if spec.Port != 0 && (spec.Port < 1 || spec.Port > 65535) {
 		return fmt.Errorf("invalid port: %d", spec.Port)
@@ -381,6 +381,9 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
+	if strings.TrimSpace(spec.Commands) == "" {
+		return errors.New("commands is required")
+	}
 	for _, variable := range spec.Environment {
 		if variable.Name == "" {
 			return errors.New("environment variable name is required")
@@ -394,7 +397,7 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		Host:             spec.Host,
 		Port:             spec.Port,
 		User:             spec.User,
-		Command:          spec.Command,
+		Commands:         spec.Commands,
 		WorkingDirectory: spec.WorkingDirectory,
 		Environment:      spec.Environment,
 		Timeout:          spec.Timeout,
@@ -467,10 +470,15 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	}
 	defer client.Close()
 
+	commandToExecute := buildCombinedCommands(ctx.execMetadata.Commands)
+	if commandToExecute == "" {
+		return errors.New("commands is required")
+	}
+
 	command := c.buildRemoteCommand(
 		ctx.execMetadata.WorkingDirectory,
 		ctx.execMetadata.Environment,
-		ctx.execMetadata.Command,
+		commandToExecute,
 	)
 	result, err := client.ExecuteCommand(command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
 	if c.isConnectError(err) {
@@ -602,6 +610,22 @@ func (c *SSHCommand) buildRemoteCommand(workingDirectory string, environment []E
 	}
 
 	return fmt.Sprintf("env %s sh -lc %s", strings.Join(envAssignments, " "), shellQuote(finalCommand))
+}
+
+func buildCombinedCommands(commands string) string {
+	lines := strings.Split(commands, "\n")
+	parts := make([]string, 0, len(lines))
+	for _, line := range lines {
+		l := strings.TrimSpace(line)
+		if l == "" {
+			continue
+		}
+		parts = append(parts, l)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return strings.Join(parts, " && ")
 }
 
 func shellQuote(value string) string {

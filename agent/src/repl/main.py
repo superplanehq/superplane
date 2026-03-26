@@ -135,16 +135,11 @@ def _stream_repl_answer(
     web_url: str,
     payload: CanvasQuestionRequest,
     model: str,
-    base_url: str | None = None,
     token: str | None = None,
-    org_id: str | None = None,
 ) -> str:
     started_at = time.perf_counter()
     request_payload = payload.model_dump(mode="json")
     request_payload["model"] = model
-    request_payload["base_url"] = base_url
-    request_payload["token"] = token
-    request_payload["org_id"] = org_id
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
         url=f"{web_url.rstrip('/')}/v1/agent/chat/stream",
@@ -155,6 +150,8 @@ def _stream_repl_answer(
             "accept": "text/event-stream",
         },
     )
+    if token:
+        request.add_header("Authorization", f"Bearer {token}")
 
     chunks: list[str] = []
     run_failed_error: str | None = None
@@ -280,6 +277,51 @@ def _stream_repl_answer(
     return "".join(chunks).strip()
 
 
+def _create_agent_chat_session(
+    base_url: str,
+    api_token: str,
+    org_id: str,
+    canvas_id: str,
+) -> str:
+    request_body = json.dumps({"canvas_id": canvas_id}).encode("utf-8")
+    request = Request(
+        url=f"{base_url.rstrip('/')}/api/v1/agents/chat/tokens",
+        data=request_body,
+        method="POST",
+        headers={
+            "content-type": "application/json",
+            "accept": "application/json",
+            "authorization": f"Bearer {api_token}",
+            "x-organization-id": org_id,
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        response_text = ""
+        try:
+            response_text = error.read().decode("utf-8")
+        except Exception:
+            response_text = ""
+        details = f" HTTP {error.code}"
+        if response_text:
+            details += f": {response_text}"
+        raise RuntimeError(f"Failed to create agent chat session.{details}") from error
+    except URLError as error:
+        raise RuntimeError(
+            "Failed to reach SuperPlane. "
+            "Check SUPERPLANE_BASE_URL and make sure the app server is running."
+        ) from error
+
+    token = payload.get("token") if isinstance(payload, dict) else None
+    if not isinstance(token, str) or not token.strip():
+        raise RuntimeError("Agent chat session response did not include a token.")
+
+    return token.strip()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Canvas Q&A CLI.")
     parser.add_argument("--healthcheck", action="store_true", help="Return health status.")
@@ -294,7 +336,7 @@ def main() -> None:
         help="Canvas ID to inspect.",
     )
     parser.add_argument("--base-url", help="Superplane base URL.")
-    parser.add_argument("--token", help="Superplane API token.")
+    parser.add_argument("--token", help="SuperPlane API token.")
     parser.add_argument("--org-id", help="Superplane organization ID.")
     parser.add_argument(
         "--server",
@@ -382,15 +424,21 @@ def main() -> None:
             "Missing REPL web URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
         )
 
-    base_url: str | None = None
     token: str | None = None
-    org_id: str | None = None
     canvas_id = canvas_id_arg
     if args.model != "test":
-        base_url = require_setting(args.base_url, "SUPERPLANE_BASE_URL")
-        token = require_setting(args.token, "SUPERPLANE_API_TOKEN")
-        org_id = require_setting(args.org_id, "SUPERPLANE_ORG_ID")
         canvas_id = require_canvas_id(canvas_id_arg)
+        api_token = normalize_optional_setting(args.token)
+        if api_token is None:
+            raise ValueError("Missing required argument: --token")
+        base_url = require_setting(args.base_url, "SUPERPLANE_BASE_URL")
+        org_id = require_setting(args.org_id, "SUPERPLANE_ORG_ID")
+        token = _create_agent_chat_session(
+            base_url=base_url,
+            api_token=api_token,
+            org_id=org_id,
+            canvas_id=canvas_id,
+        )
 
     console_label = (
         "Canvas Q&A Console (test model)." if args.model == "test" else "Canvas Q&A Console."
@@ -415,9 +463,7 @@ def main() -> None:
                     web_url=web_url,
                     payload=payload,
                     model=args.model,
-                    base_url=base_url,
                     token=token,
-                    org_id=org_id,
                 )
         finally:
             if server is not None:
@@ -430,9 +476,7 @@ def main() -> None:
             web_url=web_url,
             payload=payload,
             model=args.model,
-            base_url=base_url,
             token=token,
-            org_id=org_id,
         )
     except Exception as error:
         raise SystemExit(f"Error: {error}") from error

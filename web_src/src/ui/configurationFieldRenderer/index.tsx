@@ -1,7 +1,7 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps, ValidationError } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
 import { TextFieldRenderer } from "./TextFieldRenderer";
@@ -34,8 +34,7 @@ import {
   parseDefaultValues,
   validateFieldForSubmission,
 } from "../../utils/components";
-import { ValidationError } from "./types";
-import { AuthorizationDomainType } from "@/api-client";
+import type { AuthorizationDomainType } from "@/api-client";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
@@ -49,6 +48,79 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   // New real-time validation props
   realtimeValidationErrors?: Array<{ field: string; message: string; type: string }>;
   enableRealtimeValidation?: boolean;
+}
+
+type ConfigurationField = FieldRendererProps["field"];
+
+function getInitialSelectValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
+  const selectOptions = field.typeOptions?.select?.options;
+  if (!selectOptions) {
+    return "";
+  }
+
+  if (parsedDefaultValue && selectOptions.some((opt) => opt.value === parsedDefaultValue)) {
+    return parsedDefaultValue;
+  }
+
+  return selectOptions.length > 0 ? selectOptions[0].value : "";
+}
+
+function getInitialListValue(parsedDefaultValue: unknown): unknown[] {
+  return Array.isArray(parsedDefaultValue) ? parsedDefaultValue : [];
+}
+
+function isArrayBackedTogglableField(field: ConfigurationField): boolean {
+  return (
+    field.type === "list" ||
+    field.type === "multi-select" ||
+    field.type === "days-of-week" ||
+    field.type === "any-predicate-list"
+  );
+}
+
+function getInitialObjectValue(parsedDefaultValue: unknown): Record<string, unknown> {
+  if (parsedDefaultValue && typeof parsedDefaultValue === "object" && !Array.isArray(parsedDefaultValue)) {
+    return parsedDefaultValue as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function getInitialPrimitiveToggleValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown | undefined {
+  if (field.type === "object") {
+    return getInitialObjectValue(parsedDefaultValue);
+  }
+
+  if (field.type === "number") {
+    return typeof parsedDefaultValue === "number" ? parsedDefaultValue : 0;
+  }
+
+  if (field.type === "boolean") {
+    return typeof parsedDefaultValue === "boolean" ? parsedDefaultValue : false;
+  }
+
+  return undefined;
+}
+
+function getInitialTogglableValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
+  if (field.type === "select") {
+    return getInitialSelectValue(field, parsedDefaultValue);
+  }
+
+  if (isArrayBackedTogglableField(field)) {
+    return getInitialListValue(parsedDefaultValue);
+  }
+
+  if (field.type === "integration-resource") {
+    return field.typeOptions?.resource?.multi ? getInitialListValue(parsedDefaultValue) : (parsedDefaultValue ?? "");
+  }
+
+  const primitiveValue = getInitialPrimitiveToggleValue(field, parsedDefaultValue);
+  if (primitiveValue !== undefined) {
+    return primitiveValue;
+  }
+
+  return parsedDefaultValue ?? "";
 }
 
 export const ConfigurationFieldRenderer = ({
@@ -85,40 +157,7 @@ export const ConfigurationFieldRenderer = ({
     (checked: boolean) => {
       if (!isTogglable) return;
 
-      if (checked) {
-        if (field.type === "select" && field.typeOptions?.select?.options) {
-          const selectOptions = field.typeOptions.select.options;
-          const initialValue =
-            parsedDefaultValue && selectOptions.some((opt) => opt.value === parsedDefaultValue)
-              ? parsedDefaultValue
-              : selectOptions.length > 0
-                ? selectOptions[0].value
-                : "";
-          onChange(initialValue);
-        } else if (
-          field.type === "list" ||
-          field.type === "multi-select" ||
-          field.type === "days-of-week" ||
-          field.type === "any-predicate-list" ||
-          (field.type === "integration-resource" && field.typeOptions?.resource?.multi)
-        ) {
-          onChange(Array.isArray(parsedDefaultValue) ? parsedDefaultValue : []);
-        } else if (field.type === "object") {
-          onChange(
-            parsedDefaultValue && typeof parsedDefaultValue === "object" && !Array.isArray(parsedDefaultValue)
-              ? parsedDefaultValue
-              : {},
-          );
-        } else if (field.type === "number") {
-          onChange(typeof parsedDefaultValue === "number" ? parsedDefaultValue : 0);
-        } else if (field.type === "boolean") {
-          onChange(typeof parsedDefaultValue === "boolean" ? parsedDefaultValue : false);
-        } else {
-          onChange(parsedDefaultValue ?? "");
-        }
-      } else {
-        onChange(null);
-      }
+      onChange(checked ? getInitialTogglableValue(field, parsedDefaultValue) : null);
     },
     [isTogglable, field, onChange, parsedDefaultValue],
   );
@@ -222,7 +261,7 @@ export const ConfigurationFieldRenderer = ({
     }
 
     return hasError;
-  }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation]);
+  }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation, hasError]);
 
   if (!isVisible) {
     return null;
