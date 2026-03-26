@@ -480,13 +480,7 @@ export function RunsConsoleContent({
       <RunsFilterBar
         statusFilter={statusFilter}
         onFilterChange={setStatusFilter}
-        counts={{
-          all: allCount,
-          completed: counts.completed,
-          errors: counts.errors,
-          running: counts.running,
-          queued: counts.queued,
-        }}
+        counts={{ all: allCount, completed: counts.completed, errors: counts.errors, running: counts.running, queued: counts.queued }}
       />
       <div className="flex-1 overflow-auto">
         {allEvents.length === 0 ? (

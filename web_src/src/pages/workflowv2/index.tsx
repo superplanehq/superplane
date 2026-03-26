@@ -750,7 +750,12 @@ export function WorkflowPageV2() {
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
     const pages = infiniteEventsQuery.data?.pages || [];
-    const events = pages.flatMap((page) => page?.events || []);
+    const seen = new Set<string>();
+    const events = pages.flatMap((page) => page?.events || []).filter((e) => {
+      if (!e.id || seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
     const totalCount = pages[0]?.totalCount || 0;
     return { events, totalCount };
   }, [infiniteEventsQuery.data]);
