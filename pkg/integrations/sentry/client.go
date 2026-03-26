@@ -265,6 +265,7 @@ type MetricAlertAction struct {
 	InputChannelID     *string `json:"inputChannelId" mapstructure:"inputChannelId"`
 	IntegrationID      *string `json:"integrationId" mapstructure:"integrationId"`
 	SentryAppID        any     `json:"sentryAppId" mapstructure:"sentryAppId"`
+	Priority           *string `json:"priority" mapstructure:"priority"`
 	DateCreated        string  `json:"dateCreated" mapstructure:"dateCreated"`
 }
 
@@ -272,6 +273,40 @@ type MetricAlertRuleCreatedBy struct {
 	ID    any    `json:"id" mapstructure:"id"`
 	Name  string `json:"name" mapstructure:"name"`
 	Email string `json:"email" mapstructure:"email"`
+}
+
+type CreateOrUpdateMetricAlertRuleRequest struct {
+	Name             string                    `json:"name"`
+	Aggregate        string                    `json:"aggregate"`
+	TimeWindow       int                       `json:"timeWindow"`
+	Projects         []string                  `json:"projects"`
+	Query            string                    `json:"query"`
+	ThresholdType    int                       `json:"thresholdType"`
+	Triggers         []MetricAlertTriggerInput `json:"triggers"`
+	Environment      string                    `json:"environment,omitempty"`
+	Dataset          string                    `json:"dataset,omitempty"`
+	QueryType        *int                      `json:"queryType,omitempty"`
+	EventTypes       []string                  `json:"eventTypes,omitempty"`
+	ComparisonDelta  *int                      `json:"comparisonDelta,omitempty"`
+	ResolveThreshold *float64                  `json:"resolveThreshold,omitempty"`
+	Owner            string                    `json:"owner,omitempty"`
+}
+
+type MetricAlertTriggerInput struct {
+	Label            string                   `json:"label"`
+	AlertThreshold   float64                  `json:"alertThreshold"`
+	ResolveThreshold *float64                 `json:"resolveThreshold,omitempty"`
+	Actions          []MetricAlertActionInput `json:"actions"`
+}
+
+type MetricAlertActionInput struct {
+	Type             string  `json:"type"`
+	TargetType       string  `json:"targetType"`
+	TargetIdentifier string  `json:"targetIdentifier"`
+	InputChannelID   *string `json:"inputChannelId,omitempty"`
+	IntegrationID    *string `json:"integrationId,omitempty"`
+	SentryAppID      *string `json:"sentryAppId,omitempty"`
+	Priority         *string `json:"priority,omitempty"`
 }
 
 type Release struct {
@@ -712,6 +747,51 @@ func (c *Client) GetAlertRule(alertRuleID string) (*MetricAlertRule, error) {
 	}
 
 	return &alertRule, nil
+}
+
+func (c *Client) CreateAlertRule(request CreateOrUpdateMetricAlertRuleRequest) (*MetricAlertRule, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPost,
+		fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug),
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	alertRule := MetricAlertRule{}
+	if err := json.Unmarshal(responseBody, &alertRule); err != nil {
+		return nil, err
+	}
+
+	return &alertRule, nil
+}
+
+func (c *Client) UpdateAlertRule(alertRuleID string, request CreateOrUpdateMetricAlertRuleRequest) (*MetricAlertRule, error) {
+	responseBody, err := c.doJSON(
+		http.MethodPut,
+		fmt.Sprintf("/api/0/organizations/%s/alert-rules/%s/", c.orgSlug, url.PathEscape(alertRuleID)),
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	alertRule := MetricAlertRule{}
+	if err := json.Unmarshal(responseBody, &alertRule); err != nil {
+		return nil, err
+	}
+
+	return &alertRule, nil
+}
+
+func (c *Client) DeleteAlertRule(alertRuleID string) error {
+	_, err := c.doJSON(
+		http.MethodDelete,
+		fmt.Sprintf("/api/0/organizations/%s/alert-rules/%s/", c.orgSlug, url.PathEscape(alertRuleID)),
+		nil,
+	)
+	return err
 }
 
 func (c *Client) CreateRelease(request CreateReleaseRequest) (*Release, error) {
