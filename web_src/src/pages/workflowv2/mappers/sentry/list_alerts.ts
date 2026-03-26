@@ -3,12 +3,11 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { addFormattedTimestamp, addOrderedDetails } from "./utils";
+import { addFormattedTimestamp, addOrderedDetails, buildEventSections } from "./utils";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -50,7 +49,9 @@ export const listAlertsMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? buildEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution
+        ? buildEventSections(context.nodes, lastExecution, componentName, getTriggerRenderer, getState)
+        : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -83,30 +84,6 @@ export const listAlertsMapper: ComponentBaseMapper = {
     return details;
   },
 };
-
-function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string) {
-  const rootEvent = execution.rootEvent;
-  const createdAt = execution.createdAt;
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
-  const rootComponentName = rootTriggerNode?.componentName;
-
-  if (!rootEvent || !createdAt || !rootComponentName) {
-    return undefined;
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootComponentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(createdAt),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(createdAt)),
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id || "",
-    },
-  ];
-}
 
 function buildMetadata(node: NodeInfo) {
   const configuration = node.configuration as ListAlertsConfiguration | undefined;

@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -691,6 +693,20 @@ func Test__Sentry__Instructions(t *testing.T) {
 	assert.Contains(t, instructions, "Token Permissions")
 	assert.Contains(t, instructions, "Issue & Event -> `Read & Write`")
 	assert.Contains(t, instructions, "Settings → Developer Settings → Custom Integrations")
+}
+
+func Test__nextCursorPath__NoTrailingQuestionWhenQueryEmpty(t *testing.T) {
+	// Percent-encoded path so url.Parse sets RawPath; empty query must not yield a trailing "?".
+	link := `<https://sentry.io/api/0/organizations/example/alert-rules/foo%20bar>; rel="next"; results="true"`
+	parsed, err := url.Parse(strings.Trim(link, "<>"))
+	require.NoError(t, err)
+	if parsed.RawPath == "" {
+		t.Skip("url.Parse did not populate RawPath in this environment; skipping RawPath regression check")
+	}
+
+	got := nextCursorPath(link)
+	require.NotEmpty(t, got, "nextCursorPath returned empty for %q", link)
+	require.False(t, strings.HasSuffix(got, "?"), "nextCursorPath must not end with '?', got %q", got)
 }
 
 func computeWebhookSignature(secret string, body []byte) string {
