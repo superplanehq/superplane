@@ -1009,6 +1009,7 @@ type OrganizationUsage struct {
 	EventBucketLevel                    float64                `protobuf:"fixed64,2,opt,name=event_bucket_level,json=eventBucketLevel,proto3" json:"event_bucket_level,omitempty"`
 	EventBucketCapacity                 float64                `protobuf:"fixed64,3,opt,name=event_bucket_capacity,json=eventBucketCapacity,proto3" json:"event_bucket_capacity,omitempty"`
 	EventBucketLastUpdatedAtUnixSeconds int64                  `protobuf:"varint,4,opt,name=event_bucket_last_updated_at_unix_seconds,json=eventBucketLastUpdatedAtUnixSeconds,proto3" json:"event_bucket_last_updated_at_unix_seconds,omitempty"`
+	NextEventBucketLeakAtUnixSeconds    int64                  `protobuf:"varint,5,opt,name=next_event_bucket_leak_at_unix_seconds,json=nextEventBucketLeakAtUnixSeconds,proto3" json:"next_event_bucket_leak_at_unix_seconds,omitempty"`
 	unknownFields                       protoimpl.UnknownFields
 	sizeCache                           protoimpl.SizeCache
 }
@@ -1067,6 +1068,13 @@ func (x *OrganizationUsage) GetEventBucketCapacity() float64 {
 func (x *OrganizationUsage) GetEventBucketLastUpdatedAtUnixSeconds() int64 {
 	if x != nil {
 		return x.EventBucketLastUpdatedAtUnixSeconds
+	}
+	return 0
+}
+
+func (x *OrganizationUsage) GetNextEventBucketLeakAtUnixSeconds() int64 {
+	if x != nil {
+		return x.NextEventBucketLeakAtUnixSeconds
 	}
 	return 0
 }
@@ -1299,12 +1307,13 @@ const file_usage_proto_rawDesc = "" +
 	"\rAccountLimits\x12+\n" +
 	"\x11max_organizations\x18\x01 \x01(\x05R\x10maxOrganizations\"4\n" +
 	"\fAccountState\x12$\n" +
-	"\rorganizations\x18\x01 \x01(\x05R\rorganizations\"\xe9\x01\n" +
+	"\rorganizations\x18\x01 \x01(\x05R\rorganizations\"\xbb\x02\n" +
 	"\x11OrganizationUsage\x12\x1a\n" +
 	"\bcanvases\x18\x01 \x01(\x05R\bcanvases\x12,\n" +
 	"\x12event_bucket_level\x18\x02 \x01(\x01R\x10eventBucketLevel\x122\n" +
 	"\x15event_bucket_capacity\x18\x03 \x01(\x01R\x13eventBucketCapacity\x12V\n" +
-	")event_bucket_last_updated_at_unix_seconds\x18\x04 \x01(\x03R#eventBucketLastUpdatedAtUnixSeconds\"i\n" +
+	")event_bucket_last_updated_at_unix_seconds\x18\x04 \x01(\x03R#eventBucketLastUpdatedAtUnixSeconds\x12P\n" +
+	"&next_event_bucket_leak_at_unix_seconds\x18\x05 \x01(\x03R nextEventBucketLeakAtUnixSeconds\"i\n" +
 	"\x11OrganizationState\x12\x1a\n" +
 	"\bcanvases\x18\x01 \x01(\x05R\bcanvases\x12\x14\n" +
 	"\x05users\x18\x02 \x01(\x05R\x05users\x12\"\n" +

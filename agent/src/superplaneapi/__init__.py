@@ -18,6 +18,7 @@
 __version__ = "1.0.0"
 
 # import apis into sdk package
+from superplaneapi.api.agent_api import AgentApi
 from superplaneapi.api.blueprint_api import BlueprintApi
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_change_request_api import CanvasChangeRequestApi
@@ -50,6 +51,8 @@ from superplaneapi.exceptions import ApiException
 
 # import models into sdk package
 from superplaneapi.models.act_on_canvas_change_request_request_action import ActOnCanvasChangeRequestRequestAction
+from superplaneapi.models.agents_generate_agent_chat_token_request import AgentsGenerateAgentChatTokenRequest
+from superplaneapi.models.agents_generate_agent_chat_token_response import AgentsGenerateAgentChatTokenResponse
 from superplaneapi.models.authorization_domain_type import AuthorizationDomainType
 from superplaneapi.models.authorization_permission import AuthorizationPermission
 from superplaneapi.models.blueprints_blueprint import BlueprintsBlueprint
