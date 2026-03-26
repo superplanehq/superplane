@@ -47,9 +47,8 @@ func (h *LogfireWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	projectIDB := strings.TrimSpace(configB.ProjectID)
 	alertIDB := strings.TrimSpace(configB.AlertID)
 
-	// Logfire alert-specific webhook configuration is required.
 	if projectIDA == "" || alertIDA == "" || projectIDB == "" || alertIDB == "" {
-		return false, nil
+		return false, fmt.Errorf("incomplete webhook configuration: projectId and alertId are required")
 	}
 
 	return matchEventResource &&
@@ -149,6 +148,7 @@ func (h *LogfireWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 func (h *LogfireWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	metadata := LogfireWebhookMetadata{}
 	if err := decodeAny(ctx.Webhook.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.WithError(err).Warn("failed to decode webhook metadata during cleanup")
 		return nil
 	}
 

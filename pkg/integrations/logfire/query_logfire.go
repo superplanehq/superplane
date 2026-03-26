@@ -221,6 +221,10 @@ func (c *QueryLogfire) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("limit must be greater than or equal to 0")
 	}
 
+	if config.Limit > 10000 {
+		return fmt.Errorf("limit must not exceed 10,000")
+	}
+
 	if config.ProjectID == "" {
 		return fmt.Errorf("project is required")
 	}
@@ -380,5 +384,20 @@ func (c *QueryLogfire) Cancel(ctx core.ExecutionContext) error {
 }
 
 func (c *QueryLogfire) Cleanup(ctx core.SetupContext) error {
+	var config QueryLogfireConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return nil
+	}
+
+	config = sanitizeQueryLogfireConfiguration(config)
+	if config.ProjectID == "" {
+		return nil
+	}
+
+	secretName := readTokenSecretNameForProject(config.ProjectID)
+	if findSecretValue(ctx.Integration, secretName) != "" {
+		_ = ctx.Integration.SetSecret(secretName, []byte{})
+	}
+
 	return nil
 }

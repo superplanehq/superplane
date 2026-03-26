@@ -261,14 +261,6 @@ func (c *Client) createReadToken(projectID, name string) (readTokenCreateResult,
 	}, nil
 }
 
-func (c *Client) CreateReadToken(projectID, name string) (string, error) {
-	created, err := c.createReadToken(projectID, name)
-	if err != nil {
-		return "", err
-	}
-	return created.Token, nil
-}
-
 // ProvisionReadToken creates a read token for the given project and validates it.
 // If validation fails, the created token is cleaned up.
 func (c *Client) ProvisionReadToken(projectID string) (string, error) {
@@ -480,22 +472,20 @@ func (c *Client) GetAlertChannelIDs(projectID, alertID string) ([]string, error)
 
 	var ids []string
 	for _, key := range []string{"channel_ids", "channelIds", "channels"} {
-		if v, ok := raw[key]; ok {
-			switch typed := v.(type) {
-			case []any:
-				for _, item := range typed {
-					if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
-						ids = append(ids, s)
-					}
-				}
-			case []string:
-				for _, s := range typed {
-					if strings.TrimSpace(s) != "" {
-						ids = append(ids, s)
-					}
+		v, ok := raw[key]
+		if !ok {
+			continue
+		}
+
+		if typed, ok := v.([]any); ok {
+			for _, item := range typed {
+				if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+					ids = append(ids, s)
 				}
 			}
 		}
+
+		break
 	}
 
 	return ids, nil

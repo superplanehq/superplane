@@ -145,31 +145,7 @@ function buildProjectMetadata(projectId?: string, nodeMetadata?: QueryLogfireNod
 function buildQueryMetadata(configuration: QueryLogfireNodeConfiguration | undefined): MetadataItem[] {
   const sql = configuration?.sql?.trim();
   if (sql) {
-    return [
-      {
-        icon: "code",
-        label: `SQL: ${truncateText(sql.replace(/\s+/g, " "), 60)}`,
-      },
-    ];
-  }
-
-  const limit = configuration?.limit;
-  if (typeof limit === "number" && limit > 0) {
-    return [
-      {
-        icon: "funnel",
-        label: `Limit: ${limit}`,
-      },
-    ];
-  }
-
-  if (configuration?.rowOriented) {
-    return [
-      {
-        icon: "list",
-        label: "Row JSON",
-      },
-    ];
+    return [{ icon: "code", label: `SQL: ${truncateText(sql.replace(/\s+/g, " "), 60)}` }];
   }
 
   return [];
@@ -189,6 +165,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  if (!execution.rootEvent) return [];
+
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
@@ -197,11 +175,11 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt),
       eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: execution.rootEvent.id,
     },
   ];
 }

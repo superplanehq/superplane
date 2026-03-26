@@ -219,9 +219,11 @@ func (t *OnAlertReceived) HandleWebhook(ctx core.WebhookRequestContext) (int, *c
 		payload["eventType"] = originalEventType
 	}
 
-	delete(payload, "text")
-	if data, ok := payload["data"].(map[string]any); ok {
-		delete(data, "text")
+	if isSlackFormatPayload(payload) {
+		delete(payload, "text")
+		if data, ok := payload["data"].(map[string]any); ok {
+			delete(data, "text")
+		}
 	}
 
 	if err := ctx.Events.Emit("logfire.alert.received", payload); err != nil {
@@ -242,10 +244,37 @@ func (t *OnAlertReceived) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
+func isSlackFormatPayload(payload map[string]any) bool {
+	raw := payload
+	if data, ok := payload["data"].(map[string]any); ok && data != nil {
+		raw = data
+	}
+
+	text, _ := raw["text"].(string)
+	if text == "" {
+		return false
+	}
+
+	if strings.Contains(text, "<") && strings.Contains(text, ">") {
+		return true
+	}
+
+	for _, emoji := range []string{":no_entry:", ":warning:", ":white_check_mark:"} {
+		if strings.Contains(text, emoji) {
+			return true
+		}
+	}
+
+	if _, ok := raw["attachments"]; ok {
+		return true
+	}
+
+	return false
+}
+
 func normalizeSlackAlertPayload(payload map[string]any) map[string]any {
 	out := map[string]any{
 		"eventType": "alert",
-		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	raw := payload
 	if data, ok := payload["data"].(map[string]any); ok && data != nil {
