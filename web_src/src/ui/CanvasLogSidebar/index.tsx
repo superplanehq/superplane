@@ -132,6 +132,7 @@ export function CanvasLogSidebar({
   const setActiveTab = onTabChange ?? setInternalTab;
 
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
+  const [isResizing, setIsResizing] = useState(false);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
@@ -227,6 +228,8 @@ export function CanvasLogSidebar({
     (event: React.MouseEvent<HTMLDivElement>) => {
       dragStartRef.current = { y: event.clientY, height: sidebarHeight };
       document.body.style.userSelect = "none";
+      document.body.style.cursor = "ns-resize";
+      setIsResizing(true);
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!dragStartRef.current) return;
@@ -237,6 +240,8 @@ export function CanvasLogSidebar({
       const handleMouseUp = () => {
         dragStartRef.current = null;
         document.body.style.userSelect = "";
+        document.body.style.cursor = "";
+        setIsResizing(false);
         window.removeEventListener("mousemove", handleMouseMove);
         window.removeEventListener("mouseup", handleMouseUp);
       };
@@ -262,7 +267,21 @@ export function CanvasLogSidebar({
         className="bg-white outline outline-slate-950/15 flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
-        <div className="h-0.5 cursor-row-resize rounded-t-lg transition-colors" onMouseDown={handleResizeStart} />
+        <div
+          onMouseDown={handleResizeStart}
+          className={cn(
+            "absolute left-0 right-0 top-0 h-4 cursor-ns-resize hover:bg-gray-100 transition-colors flex items-center justify-center group z-30",
+            isResizing && "bg-blue-50",
+          )}
+          style={{ marginTop: "-8px" }}
+        >
+          <div
+            className={cn(
+              "h-1 w-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors",
+              isResizing && "bg-blue-500",
+            )}
+          />
+        </div>
         <div className="flex items-center justify-between pl-4 pr-2 border-b border-gray-200 h-8">
           <div className="flex items-center gap-4 -mb-2">
             <button
