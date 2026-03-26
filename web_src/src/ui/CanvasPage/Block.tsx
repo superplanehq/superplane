@@ -294,14 +294,13 @@ function RightHandle({ data, nodeId }: BlockProps) {
         <React.Fragment key={channel}>
           {/* Label with background to cover the line */}
           <span
-            className="text-xs font-medium whitespace-nowrap absolute"
+            className="text-xs font-medium whitespace-nowrap absolute bg-slate-100"
             style={{
               left: labelStartX,
               top: `calc(50% + ${offsetY}px)`,
               transform: "translateY(-50%)",
               color: "#8B9AAC",
               lineHeight: `${handleSize}px`,
-              background: "#F8FAFC",
               paddingLeft: 4,
               paddingRight: 4,
             }}

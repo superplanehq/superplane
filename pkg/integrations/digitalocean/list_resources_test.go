@@ -510,3 +510,75 @@ func Test__ListResources__ClientCreationError(t *testing.T) {
 		assert.Nil(t, resources)
 	})
 }
+
+func Test__ListResources__SpacesBuckets(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful spaces bucket listing -> checks all regions", func(t *testing.T) {
+		responses := make([]*http.Response, 0, len(allSpacesRegions))
+		for _, region := range allSpacesRegions {
+			body := `<?xml version="1.0" encoding="UTF-8"?><ListAllMyBucketsResult><Buckets></Buckets></ListAllMyBucketsResult>`
+			if region == "nyc1" {
+				body = `<?xml version="1.0" encoding="UTF-8"?><ListAllMyBucketsResult><Buckets><Bucket><Name>alpha-bucket</Name></Bucket></Buckets></ListAllMyBucketsResult>`
+			}
+			if region == "ric1" {
+				body = `<?xml version="1.0" encoding="UTF-8"?><ListAllMyBucketsResult><Buckets><Bucket><Name>omega-bucket</Name></Bucket></Buckets></ListAllMyBucketsResult>`
+			}
+
+			responses = append(responses, &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body)),
+			})
+		}
+
+		httpContext := &contexts.HTTPContext{Responses: responses}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"spacesAccessKey": "test-access-key",
+				"spacesSecretKey": "test-secret-key",
+			},
+		}
+
+		resources, err := integration.ListResources("spaces_bucket", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, len(allSpacesRegions))
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "spaces_bucket", resources[0].Type)
+		assert.Equal(t, "alpha-bucket (nyc1)", resources[0].Name)
+		assert.Equal(t, "nyc1/alpha-bucket", resources[0].ID)
+		assert.Equal(t, "omega-bucket (ric1)", resources[1].Name)
+		assert.Equal(t, "ric1/omega-bucket", resources[1].ID)
+	})
+
+	t.Run("spaces API error -> returns error", func(t *testing.T) {
+		responses := make([]*http.Response, 0, len(allSpacesRegions))
+		for range allSpacesRegions {
+			responses = append(responses, &http.Response{
+				StatusCode: http.StatusForbidden,
+				Body:       io.NopCloser(strings.NewReader(`<Error><Code>SignatureDoesNotMatch</Code></Error>`)),
+			})
+		}
+
+		httpContext := &contexts.HTTPContext{Responses: responses}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"spacesAccessKey": "invalid-access-key",
+				"spacesSecretKey": "invalid-secret-key",
+			},
+		}
+
+		resources, err := integration.ListResources("spaces_bucket", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error listing spaces buckets")
+		assert.Contains(t, err.Error(), "region nyc1")
+		assert.Nil(t, resources)
+	})
+}
