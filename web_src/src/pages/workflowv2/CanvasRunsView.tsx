@@ -415,8 +415,8 @@ export function filterRunEvents(
 
     if (statusFilter !== "all") {
       const aggregate = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
-      if (statusFilter === "completed" && aggregate !== "completed") return false;
-      if (statusFilter === "errors" && aggregate !== "error" && aggregate !== "cancelled") return false;
+      if (statusFilter === "completed" && aggregate !== "completed" && aggregate !== "cancelled") return false;
+      if (statusFilter === "errors" && aggregate !== "error") return false;
       if (statusFilter === "running" && aggregate !== "running") return false;
       if (statusFilter === "queued" && aggregate !== "queued") return false;
     }
@@ -460,8 +460,8 @@ export function computeRunsCounts(events: CanvasesCanvasEventWithExecutions[], n
       continue;
     }
     const aggregate = getAggregateStatus(executions, nodes);
-    if (aggregate === "completed") completed++;
-    else if (aggregate === "error" || aggregate === "cancelled") errors++;
+    if (aggregate === "completed" || aggregate === "cancelled") completed++;
+    else if (aggregate === "error") errors++;
     else if (aggregate === "running") running++;
     else if (aggregate === "queued") queued++;
   }
