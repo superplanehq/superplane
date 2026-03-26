@@ -15,7 +15,6 @@ import {
 } from "@xyflow/react";
 
 import {
-  CircleX,
   GitBranch,
   Group,
   Loader2,
@@ -352,7 +351,6 @@ export interface CanvasPageProps {
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
-  onResolveExecutionErrors?: (executionIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
   runsHasNextPage?: boolean;
@@ -1297,7 +1295,6 @@ function CanvasPage(props: CanvasPageProps) {
                 focusRequest={props.focusRequest}
                 onExecutionChainHandled={props.onExecutionChainHandled}
                 initialFocusNodeId={props.initialFocusNodeId}
-                onResolveExecutionErrors={props.onResolveExecutionErrors}
                 runsEvents={props.runsEvents}
                 runsTotalCount={props.runsTotalCount}
                 runsHasNextPage={props.runsHasNextPage}
@@ -1976,7 +1973,6 @@ function CanvasContent({
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
-  onResolveExecutionErrors,
   runsEvents,
   runsTotalCount,
   runsHasNextPage,
@@ -2084,7 +2080,6 @@ function CanvasContent({
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
-  onResolveExecutionErrors?: (executionIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
   runsHasNextPage?: boolean;
@@ -3083,24 +3078,6 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("errors")}
-                        >
-                          <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
-                          <span
-                            className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
-                          >
-                            {logCounts.error}
-                          </span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Errors</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 items-center text-xs font-medium"
                           onClick={() => handleLogButtonClick("warnings")}
                         >
                           <TriangleAlert
@@ -3236,7 +3213,6 @@ function CanvasContent({
           onClose={() => setIsLogSidebarOpen(false)}
           filter={logFilter}
           onFilterChange={setLogFilter}
-          onResolveErrors={onResolveExecutionErrors}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
           scope={logScope}

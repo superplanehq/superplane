@@ -5695,7 +5695,6 @@ export function WorkflowPageV2() {
           triggers={triggers}
           blueprints={blueprints}
           logEntries={logEntries}
-          onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
           runsTotalCount={runsEventsData.totalCount}
           runsHasNextPage={!!infiniteEventsQuery.hasNextPage}

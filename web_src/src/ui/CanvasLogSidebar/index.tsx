@@ -1,15 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  CircleCheck,
-  CircleX,
-  MoreHorizontal,
-  Play,
-  Search,
-  TriangleAlert,
-  X,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Search, TriangleAlert, X } from "lucide-react";
 
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
@@ -18,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
-export type ConsoleTab = "runs" | "errors" | "warnings";
+export type ConsoleTab = "runs" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error" | "run";
 export type LogScope = "runs" | "canvas";
 export type LogScopeFilter = "all" | LogScope;
@@ -57,7 +47,6 @@ export interface CanvasLogSidebarProps {
   onClose: () => void;
   filter: LogTypeFilter;
   onFilterChange: (filter: LogTypeFilter) => void;
-  onResolveErrors?: (executionIds: string[]) => void;
   height?: number;
   defaultHeight?: number;
   minHeight?: number;
@@ -123,7 +112,6 @@ export function CanvasLogSidebar({
   counts,
   expandedRuns,
   onToggleRun,
-  onResolveErrors,
   activeTab: controlledTab,
   onTabChange,
   runsEvents = [],
@@ -146,48 +134,12 @@ export function CanvasLogSidebar({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
 
-  const errorExecutionIds = useMemo(() => {
-    const ids = new Set<string>();
-    entries.forEach((entry) => {
-      if (entry.runItems?.length) {
-        entry.runItems.forEach((item) => {
-          if (item.type === "error") {
-            ids.add(item.id);
-          }
-        });
-      }
-    });
-    return Array.from(ids);
-  }, [entries]);
-
-  const canResolveErrors = Boolean(onResolveErrors) && errorExecutionIds.length > 0;
-
   const filteredEntries = useMemo(() => {
-    const typeFilter = activeTab === "errors" ? "error" : "warning";
     const query = searchValue.trim().toLowerCase();
     const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
 
     return entries.reduce<LogEntry[]>((acc, entry) => {
-      if (entry.type === "run") {
-        const runItems = entry.runItems || [];
-        const filteredRunItems = runItems.filter((item) => {
-          const typeMatch = item.type === typeFilter || (typeFilter === "error" && item.type === "resolved-error");
-          const searchMatch =
-            matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
-          return typeMatch && searchMatch;
-        });
-
-        if (filteredRunItems.length > 0) {
-          const entrySearchMatch =
-            matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-          if (!query || entrySearchMatch || filteredRunItems.length > 0) {
-            acc.push({ ...entry, runItems: filteredRunItems });
-          }
-        }
-        return acc;
-      }
-
-      if (entry.type !== typeFilter && !(typeFilter === "error" && entry.type === "resolved-error")) {
+      if (entry.type !== "warning") {
         return acc;
       }
 
@@ -198,7 +150,7 @@ export function CanvasLogSidebar({
       }
       return acc;
     }, []);
-  }, [entries, activeTab, searchValue]);
+  }, [entries, searchValue]);
 
   const sidebarHeight = height ?? internalHeight;
   const clampHeight = useCallback(
@@ -297,8 +249,7 @@ export function CanvasLogSidebar({
     return null;
   }
 
-  const searchPlaceholder =
-    activeTab === "runs" ? "Search runs…" : activeTab === "errors" ? "Search errors…" : "Search warnings…";
+  const searchPlaceholder = activeTab === "runs" ? "Search runs…" : "Search warnings…";
 
   return (
     <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
@@ -321,39 +272,6 @@ export function CanvasLogSidebar({
             >
               <Play className="h-4 w-4" />
               Runs
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("errors")}
-              className={cn(
-                "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
-                activeTab === "errors"
-                  ? "border-gray-800 text-gray-800"
-                  : "border-transparent text-gray-500 hover:text-gray-800",
-              )}
-            >
-              <CircleX
-                className={cn(
-                  "h-4 w-4",
-                  counts.error > 0
-                    ? "text-red-500"
-                    : activeTab === "errors"
-                      ? "text-gray-800"
-                      : "text-gray-500 group-hover:text-gray-800",
-                )}
-              />
-              <span
-                className={cn(
-                  "tabular-nums",
-                  counts.error > 0
-                    ? "text-red-500"
-                    : activeTab === "errors"
-                      ? "text-gray-800"
-                      : "text-gray-500 group-hover:text-gray-800",
-                )}
-              >
-                {counts.error}
-              </span>
             </button>
             <button
               type="button"
@@ -390,21 +308,6 @@ export function CanvasLogSidebar({
             </button>
           </div>
           <div className="flex items-center gap-2">
-            {activeTab === "errors" && canResolveErrors ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (canResolveErrors) {
-                    onResolveErrors?.(errorExecutionIds);
-                  }
-                }}
-                className="h-6 px-2 text-[11px] font-medium"
-              >
-                Resolve all errors
-              </Button>
-            ) : null}
             <Button
               variant="ghost"
               size="icon-sm"
@@ -446,19 +349,11 @@ export function CanvasLogSidebar({
         ) : (
           <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
             {filteredEntries.length === 0 ? (
-              <div className="px-4 py-1.5 text-[13px] text-gray-800">
-                {activeTab === "errors" ? "No errors found." : "No warnings found."}
-              </div>
+              <div className="px-4 py-1.5 text-[13px] text-gray-800">No warnings found.</div>
             ) : (
               <div className="divide-y divide-gray-200">
                 {filteredEntries.map((entry) => (
-                  <LogEntryRow
-                    key={entry.id}
-                    entry={entry}
-                    isExpanded={expandedRuns.has(entry.id)}
-                    onToggleRun={onToggleRun}
-                    onResolveErrors={onResolveErrors}
-                  />
+                  <LogEntryRow key={entry.id} entry={entry} />
                 ))}
               </div>
             )}
@@ -469,91 +364,15 @@ export function CanvasLogSidebar({
   );
 }
 
-function LogEntryRow({
-  entry,
-  isExpanded,
-  onToggleRun,
-  onResolveErrors,
-}: {
-  entry: LogEntry;
-  isExpanded: boolean;
-  onToggleRun: (runId: string) => void;
-  onResolveErrors?: (executionIds: string[]) => void;
-}) {
-  const icon = {
-    success: <CircleCheck className="h-4 w-4 text-emerald-500" />,
-    error: <CircleX className="h-4 w-4 text-red-500" />,
-    "resolved-error": <CircleX className="h-4 w-4 text-gray-400" />,
-    warning: <TriangleAlert className="h-4 w-4 text-amber-600" />,
-  } as const;
+function LogEntryRow({ entry }: { entry: LogEntry }) {
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
-
-  if (entry.type === "run") {
-    const runItems = entry.runItems || [];
-    const showChildren = isExpanded && runItems.length > 0;
-
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() => onToggleRun(entry.id)}
-          className="flex w-full items-center gap-3 px-4 py-1.5 text-sm text-gray-800 hover:bg-gray-50 min-h-8"
-          aria-expanded={isExpanded}
-        >
-          <div className="h-4 w-4 rounded-full text-xs font-mono text-gray-500 flex items-center justify-center border border-gray-400">
-            {runItems.length}
-          </div>
-          <div className="flex-1 min-w-0 text-left font-mono text-xs mt-0.5">{entry.title}</div>
-          <span className="ml-auto text-xs text-gray-500 tabular-nums whitespace-nowrap">
-            {formatLogTimestamp(entry.timestamp)}
-          </span>
-        </button>
-        {showChildren && (
-          <div>
-            {runItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-start gap-3 px-11 pr-4 py-1.5 text-sm text-gray-800 bg-gray-50 border-t border-gray-200 transition-colors min-h-8"
-              >
-                <div className="pt-0.5">
-                  {item.isRunning ? <MoreHorizontal className="h-4 w-4 text-gray-500" /> : icon[item.type]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 min-w-0 text-xs font-mono mt-0.5 flex items-center gap-2">
-                      <span>{item.title}</span>
-                      {item.type === "error" && onResolveErrors ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onResolveErrors([item.id])}
-                          className="h-6 mb-0.5 px-2 text-[11px] font-medium"
-                        >
-                          Resolve
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
-                      {formatLogTimestamp(item.timestamp)}
-                    </span>
-                  </div>
-                  {item.detail && <div className="mt-1 text-xs text-gray-800">{item.detail}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const hasDetail = Boolean(entry.detail);
 
   return (
     <div className="flex items-start gap-3 px-4 py-1.5 text-[13px] text-gray-800">
-      <div className="pt-0.5">{icon[entry.type]}</div>
+      <div className="pt-0.5">
+        <TriangleAlert className="h-4 w-4 text-amber-600" />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           {hasDetail ? (
