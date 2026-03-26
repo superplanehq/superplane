@@ -45,6 +45,30 @@ func (c *UpdateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueOnce, exampleOutputUpdateIssueBytes, &exampleOutputUpdateIssue)
 }
 
+//go:embed example_output_list_alerts.json
+var exampleOutputListAlertsBytes []byte
+
+var exampleOutputListAlertsOnce sync.Once
+var exampleOutputListAlerts map[string]any
+
+//go:embed example_output_get_alert.json
+var exampleOutputGetAlertBytes []byte
+
+var exampleOutputGetAlertOnce sync.Once
+var exampleOutputGetAlert map[string]any
+
+func (c *ListAlerts) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputListAlertsOnce,
+		exampleOutputListAlertsBytes,
+		&exampleOutputListAlerts,
+	)
+}
+
+func (c *GetAlert) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertOnce, exampleOutputGetAlertBytes, &exampleOutputGetAlert)
+}
+
 func (c *GetIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetIssueOnce, exampleOutputGetIssueBytes, &exampleOutputGetIssue)
 }
