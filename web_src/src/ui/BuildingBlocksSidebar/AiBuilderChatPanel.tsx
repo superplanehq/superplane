@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { AiAgentSession, AiBuilderMessage, AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
-import { ArrowUp } from "lucide-react";
+import { ArrowLeft, ArrowUp, Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
@@ -58,6 +58,7 @@ export function AiBuilderChatPanel({
 }: AiBuilderChatPanelProps) {
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
   const maxAiInputHeight = 160;
+  const isNewChatView = currentAgentId === null;
 
   useEffect(() => {
     const container = aiMessagesContainerRef.current;
@@ -80,54 +81,83 @@ export function AiBuilderChatPanel({
   return (
     <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
       <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-        <ConversationList
-          agentSessions={agentSessions}
-          currentAgentId={currentAgentId}
-          isLoadingAgentSessions={isLoadingAgentSessions}
-          isGeneratingResponse={isGeneratingResponse}
-          onSelectAgent={onSelectAgent}
-          onStartNewSession={onStartNewSession}
-        />
-
-        <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
-          {isLoadingAgentMessages ? (
-            <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div>
-          ) : null}
-          {!isLoadingAgentMessages && !currentAgentId && aiMessages.length === 0 ? (
-            <div className="text-xs text-gray-500 px-1 py-1">Select a conversation or start a new chat.</div>
-          ) : null}
-          <AiMessages messages={aiMessages} />
-
-          {isGeneratingResponse ? (
-            <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
-          ) : null}
-
-          {pendingProposal && (
-            <ProposalsList
+        {isNewChatView ? (
+          <>
+            <InputForm
+              aiInputRef={aiInputRef}
+              aiInput={aiInput}
+              onAiInputChange={onAiInputChange}
+              onSendPrompt={onSendPrompt}
               disabled={disabled}
+              canvasId={canvasId}
+              isGeneratingResponse={isGeneratingResponse}
+              maxAiInputHeight={maxAiInputHeight}
+            />
+
+            <ConversationContent
+              aiMessagesContainerRef={aiMessagesContainerRef}
+              isLoadingAgentMessages={isLoadingAgentMessages}
+              aiMessages={aiMessages}
+              isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
-              applyShortcutHint={applyShortcutHint}
               pendingProposalSummaries={pendingProposalSummaries}
+              applyShortcutHint={applyShortcutHint}
               onApplyProposal={onApplyProposal}
               onDiscardProposal={onDiscardProposal}
               isApplyingProposal={isApplyingProposal}
               aiError={aiError}
+              disabled={disabled}
             />
-          )}
 
-          {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
-        </div>
+            <ConversationList
+              agentSessions={agentSessions}
+              currentAgentId={currentAgentId}
+              isLoadingAgentSessions={isLoadingAgentSessions}
+              isGeneratingResponse={isGeneratingResponse}
+              onSelectAgent={onSelectAgent}
+              onStartNewSession={onStartNewSession}
+              title="Previous chats"
+              className="mt-auto border-t border-b-0 border-border px-2 py-2 space-y-2"
+            />
+          </>
+        ) : (
+          <>
+            <ConversationList
+              agentSessions={agentSessions}
+              currentAgentId={currentAgentId}
+              isLoadingAgentSessions={isLoadingAgentSessions}
+              isGeneratingResponse={isGeneratingResponse}
+              onSelectAgent={onSelectAgent}
+              onStartNewSession={onStartNewSession}
+            />
 
-        <InputForm
-          aiInputRef={aiInputRef}
-          aiInput={aiInput}
-          onAiInputChange={onAiInputChange}
-          onSendPrompt={onSendPrompt}
-          disabled={disabled}
-          canvasId={canvasId}
-          isGeneratingResponse={isGeneratingResponse}
-          maxAiInputHeight={maxAiInputHeight}
-        />
+            <ConversationContent
+              aiMessagesContainerRef={aiMessagesContainerRef}
+              isLoadingAgentMessages={isLoadingAgentMessages}
+              aiMessages={aiMessages}
+              isGeneratingResponse={isGeneratingResponse}
+              pendingProposal={pendingProposal}
+              pendingProposalSummaries={pendingProposalSummaries}
+              applyShortcutHint={applyShortcutHint}
+              onApplyProposal={onApplyProposal}
+              onDiscardProposal={onDiscardProposal}
+              isApplyingProposal={isApplyingProposal}
+              aiError={aiError}
+              disabled={disabled}
+            />
+
+            <InputForm
+              aiInputRef={aiInputRef}
+              aiInput={aiInput}
+              onAiInputChange={onAiInputChange}
+              onSendPrompt={onSendPrompt}
+              disabled={disabled}
+              canvasId={canvasId}
+              isGeneratingResponse={isGeneratingResponse}
+              maxAiInputHeight={maxAiInputHeight}
+            />
+          </>
+        )}
       </div>
     </TabsContent>
   );
@@ -140,6 +170,8 @@ type ConversationListProps = {
   isGeneratingResponse: boolean;
   onSelectAgent: (agentId: string) => void;
   onStartNewSession: () => void;
+  title?: string;
+  className?: string;
 };
 
 function ConversationList({
@@ -149,19 +181,45 @@ function ConversationList({
   isGeneratingResponse,
   onSelectAgent,
   onStartNewSession,
+  title,
+  className,
 }: ConversationListProps) {
+  const visibleSessions = currentAgentId
+    ? agentSessions.filter((session) => session.id === currentAgentId)
+    : agentSessions;
+
   return (
-    <div className="border-b border-border px-2 py-2 space-y-2">
+    <div className={cn("border-b border-border px-2 py-2 space-y-2", className)}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">Conversations</p>
-        <Button
-          size="sm"
-          variant={currentAgentId === null ? "default" : "outline"}
-          onClick={onStartNewSession}
-          disabled={isGeneratingResponse}
-        >
-          New chat
-        </Button>
+        <div className="flex min-w-0 items-center gap-2">
+          {currentAgentId ? (
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              onClick={onStartNewSession}
+              disabled={isGeneratingResponse}
+              aria-label="Back to new chat"
+              title="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          ) : null}
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
+            {title ?? (currentAgentId ? "Conversation" : "Conversations")}
+          </p>
+        </div>
+        {!currentAgentId ? (
+          <Button
+            size="icon-xs"
+            variant="secondary"
+            onClick={onStartNewSession}
+            disabled={isGeneratingResponse}
+            aria-label="Start new chat"
+            title="New chat"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        ) : null}
       </div>
 
       <div className="max-h-28 overflow-y-auto space-y-1">
@@ -172,7 +230,7 @@ function ConversationList({
           <div className="text-xs text-gray-500 px-1 py-1">No conversations yet.</div>
         ) : null}
 
-        {agentSessions.map((session) => {
+        {visibleSessions.map((session) => {
           const isSelected = session.id === currentAgentId;
           return (
             <button
@@ -195,6 +253,62 @@ function ConversationList({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+type ConversationContentProps = {
+  aiMessagesContainerRef: React.RefObject<HTMLDivElement | null>;
+  isLoadingAgentMessages: boolean;
+  aiMessages: AiBuilderMessage[];
+  isGeneratingResponse: boolean;
+  pendingProposal: AiBuilderProposal | null;
+  pendingProposalSummaries: string[];
+  applyShortcutHint: string;
+  onApplyProposal: () => void;
+  onDiscardProposal: () => void;
+  isApplyingProposal: boolean;
+  aiError: string | null;
+  disabled: boolean;
+};
+
+function ConversationContent({
+  aiMessagesContainerRef,
+  isLoadingAgentMessages,
+  aiMessages,
+  isGeneratingResponse,
+  pendingProposal,
+  pendingProposalSummaries,
+  applyShortcutHint,
+  onApplyProposal,
+  onDiscardProposal,
+  isApplyingProposal,
+  aiError,
+  disabled,
+}: ConversationContentProps) {
+  return (
+    <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
+      {isLoadingAgentMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
+      <AiMessages messages={aiMessages} />
+
+      {isGeneratingResponse ? (
+        <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
+      ) : null}
+
+      {pendingProposal ? (
+        <ProposalsList
+          disabled={disabled}
+          pendingProposal={pendingProposal}
+          applyShortcutHint={applyShortcutHint}
+          pendingProposalSummaries={pendingProposalSummaries}
+          onApplyProposal={onApplyProposal}
+          onDiscardProposal={onDiscardProposal}
+          isApplyingProposal={isApplyingProposal}
+          aiError={aiError}
+        />
+      ) : null}
+
+      {!pendingProposal && aiError ? <p className="text-xs text-red-700 px-1">{aiError}</p> : null}
     </div>
   );
 }
