@@ -1,6 +1,14 @@
 import type { EventSection } from "@/ui/componentBase";
 import { formatTimeAgo } from "@/utils/date";
-import type { ExecutionInfo, NodeInfo, StateFunction, TriggerRenderer } from "../types";
+import type {
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  StateFunction,
+  SubtitleContext,
+  TriggerRenderer,
+} from "../types";
 
 export function buildEventSections(
   nodes: NodeInfo[],
@@ -62,6 +70,34 @@ export type SentryAlertThresholdConfiguration = {
     targetType?: string;
   };
 };
+
+export function getSentryMetricAlertRuleFromDefaultOutput(outputs: unknown): SentryAlertRule | undefined {
+  const bucket = outputs as { default?: OutputPayload[] } | undefined;
+  return bucket?.default?.[0]?.data as SentryAlertRule | undefined;
+}
+
+export function subtitleForSentryMetricAlertRule(context: SubtitleContext): string {
+  const alertRule = getSentryMetricAlertRuleFromDefaultOutput(context.execution.outputs);
+  const timestamp = formatTimeAgo(new Date(context.execution.updatedAt || context.execution.createdAt));
+  return [alertRule?.name, timestamp].filter(Boolean).join(" · ");
+}
+
+export function executionDetailsForSentryMetricAlertRule(context: ExecutionDetailsContext): Record<string, string> {
+  const alertRule = getSentryMetricAlertRuleFromDefaultOutput(context.execution.outputs);
+  const details: Record<string, string> = {};
+
+  addFormattedTimestamp(details, "Started At", context.execution.createdAt);
+  addOrderedDetails(details, [
+    { label: "Name", value: alertRule?.name },
+    { label: "Project", value: alertRule?.projects?.[0] },
+    { label: "Environment", value: alertRule?.environment || undefined },
+    { label: "Aggregate", value: alertRule?.aggregate },
+    { label: "Query", value: alertRule?.query || undefined },
+    { label: "Triggers", value: summarizeTriggers(alertRule) },
+  ]);
+
+  return details;
+}
 
 export function summarizeTriggers(alertRule: SentryAlertRule | undefined): string | undefined {
   if (!alertRule?.triggers?.length) {

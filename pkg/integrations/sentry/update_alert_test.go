@@ -49,7 +49,9 @@ func Test__UpdateAlert__Configuration(t *testing.T) {
 	fields := component.Configuration()
 
 	require.Len(t, fields, 11)
+	assert.Equal(t, "project", fields[0].Name)
 	assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[0].Type)
+	assert.Equal(t, "alertId", fields[1].Name)
 	assert.Equal(t, configuration.FieldTypeIntegrationResource, fields[1].Type)
 	assert.Equal(t, "critical", fields[9].Name)
 	assert.Equal(t, "warning", fields[10].Name)

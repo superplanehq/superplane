@@ -14,8 +14,8 @@ import (
 type UpdateAlert struct{}
 
 type UpdateAlertConfiguration struct {
-	AlertID       string                      `json:"alertId" mapstructure:"alertId"`
 	Project       string                      `json:"project" mapstructure:"project"`
+	AlertID       string                      `json:"alertId" mapstructure:"alertId"`
 	Name          string                      `json:"name" mapstructure:"name"`
 	Aggregate     string                      `json:"aggregate" mapstructure:"aggregate"`
 	Query         string                      `json:"query" mapstructure:"query"`
@@ -50,8 +50,8 @@ func (c *UpdateAlert) Documentation() string {
 
 ## Configuration
 
+- **Project**: Optional project to narrow alert rule selection or replace the rule's project
 - **Alert Rule**: Existing Sentry alert rule to update
-- **Project**: Optional replacement project if the rule should move
 - **Name / Aggregate / Query / Time Window / Threshold Type / Environment / Event Types**: Optional overrides for the existing rule
 - **Critical / Warning**: Optional updates to trigger thresholds and notification targets. Select the target type first, then choose a Sentry user or team.
 
@@ -75,6 +75,16 @@ func (c *UpdateAlert) OutputChannels(configuration any) []core.OutputChannel {
 func (c *UpdateAlert) Configuration() []configuration.Field {
 	fields := []configuration.Field{
 		{
+			Name:        "project",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Optional project to narrow alert rule selection",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeProject},
+			},
+		},
+		{
 			Name:        "alertId",
 			Label:       "Alert Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -90,16 +100,6 @@ func (c *UpdateAlert) Configuration() []configuration.Field {
 						},
 					},
 				},
-			},
-		},
-		{
-			Name:        "project",
-			Label:       "Project",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Optional project to narrow alert rule selection",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeProject},
 			},
 		},
 	}

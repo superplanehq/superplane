@@ -1,28 +1,18 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
-  addFormattedTimestamp,
-  addOrderedDetails,
-  AlertRuleNodeMetadata,
   buildEventSections,
+  executionDetailsForSentryMetricAlertRule,
   getAlertRuleProjectLabel,
   getAlertRuleSelectionLabel,
   getAlertThresholdMetadataLabel,
-  summarizeTriggers,
-  type SentryAlertRule,
+  subtitleForSentryMetricAlertRule,
+  type AlertRuleNodeMetadata,
   type SentryAlertThresholdConfiguration,
 } from "./utils";
-import type {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
+import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo } from "../types";
 
 interface UpdateAlertConfiguration {
   alertId?: string;
@@ -54,30 +44,9 @@ export const updateAlertMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const alertRule = outputs?.default?.[0]?.data as SentryAlertRule | undefined;
-    const timestamp = formatTimeAgo(new Date(context.execution.updatedAt || context.execution.createdAt));
-    return [alertRule?.name, timestamp].filter(Boolean).join(" · ");
-  },
+  subtitle: subtitleForSentryMetricAlertRule,
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const alertRule = outputs?.default?.[0]?.data as SentryAlertRule | undefined;
-    const details: Record<string, string> = {};
-
-    addFormattedTimestamp(details, "Started At", context.execution.createdAt);
-    addOrderedDetails(details, [
-      { label: "Name", value: alertRule?.name },
-      { label: "Project", value: alertRule?.projects?.[0] },
-      { label: "Environment", value: alertRule?.environment || undefined },
-      { label: "Aggregate", value: alertRule?.aggregate },
-      { label: "Query", value: alertRule?.query || undefined },
-      { label: "Triggers", value: summarizeTriggers(alertRule) },
-    ]);
-
-    return details;
-  },
+  getExecutionDetails: executionDetailsForSentryMetricAlertRule,
 };
 
 function buildMetadata(node: NodeInfo) {
