@@ -226,29 +226,16 @@ export function SettingsTab({
     setShowValidation(false);
   }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
 
-  // Auto-select the first installation if none is selected or selection is invalid
+  // Keep selection honest: if the currently selected integration no longer exists, clear it.
+  // Do not auto-select an integration; users must choose explicitly (or inherit from the node's saved integrationRef).
   useEffect(() => {
-    if (integrationsOfType.length === 0) {
-      if (selectedIntegration) {
-        setSelectedIntegration(undefined);
-      }
-      return;
-    }
-
     const selectedId = selectedIntegration?.id;
-    const hasSelected = selectedId
-      ? integrationsOfType.some((integration) => integration.metadata?.id === selectedId)
-      : false;
-    if (hasSelected) {
-      return;
-    }
-
-    const firstIntegration = integrationsOfType[0];
-    setSelectedIntegration({
-      id: firstIntegration.metadata?.id,
-      name: firstIntegration.metadata?.name,
-    });
-  }, [integrationsOfType, selectedIntegration]);
+    if (!selectedId) return;
+    if (integrationsOfType.length === 0) return;
+    const stillExists = integrationsOfType.some((integration) => integration.metadata?.id === selectedId);
+    if (stillExists) return;
+    setSelectedIntegration(undefined);
+  }, [integrationsOfType, selectedIntegration?.id]);
 
   const shouldShowConfiguration = true;
 
