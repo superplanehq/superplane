@@ -1,3 +1,37 @@
+import type { EventSection } from "@/ui/componentBase";
+import { formatTimeAgo } from "@/utils/date";
+import type { ExecutionInfo, NodeInfo, StateFunction, TriggerRenderer } from "../types";
+
+export function buildEventSections(
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  componentName: string,
+  getTriggerRenderer: (name: string) => TriggerRenderer,
+  getState: (componentName: string) => StateFunction,
+): EventSection[] | undefined {
+  const rootEvent = execution.rootEvent;
+  const createdAt = execution.createdAt;
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
+  const rootComponentName = rootTriggerNode?.componentName;
+
+  if (!rootEvent || !createdAt || !rootComponentName) {
+    return undefined;
+  }
+
+  const rootTriggerRenderer = getTriggerRenderer(rootComponentName);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
+
+  return [
+    {
+      receivedAt: new Date(createdAt),
+      eventTitle: title,
+      eventSubtitle: formatTimeAgo(new Date(createdAt)),
+      eventState: getState(componentName)(execution),
+      eventId: rootEvent.id || "",
+    },
+  ];
+}
+
 export function splitSentryIssueTitle(title?: string): { title?: string; prefix?: string } {
   if (!title) {
     return {};
@@ -40,6 +74,16 @@ export function addFormattedTimestamp(details: Record<string, string>, label: st
   }
 
   details[label] = new Date(value).toLocaleString();
+}
+
+export function addOrderedDetails(details: Record<string, string>, entries: Array<{ label: string; value?: string }>) {
+  entries.forEach(({ label, value }) => {
+    if (!value) {
+      return;
+    }
+
+    details[label] = value;
+  });
 }
 
 export function getProjectLabel(issue?: { project?: { name?: string; slug?: string } }) {
