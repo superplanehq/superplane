@@ -469,10 +469,10 @@ function getHTTPEventSections(
         const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
         if (outputs?.success) {
           const response = outputs.success[0].data as Output;
-          responseCode = response.status.toString();
+          responseCode = response.status?.toString() ?? null;
         } else if (outputs?.failure) {
           const response = outputs.failure[0].data as Output;
-          responseCode = response.status.toString();
+          responseCode = response.status?.toString() ?? null;
         }
       }
 
