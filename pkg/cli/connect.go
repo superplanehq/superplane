@@ -50,8 +50,8 @@ func (c *ConnectCommand) Execute(ctx core.CommandContext) error {
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, _ = fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, baseURL)
-			return nil
+			_, err := fmt.Fprintf(stdout, "Connected to %q (%s)\n", orgName, baseURL)
+			return err
 		})
 	}
 
