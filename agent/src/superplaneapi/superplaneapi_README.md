@@ -45,16 +45,16 @@ configuration = superplaneapi.Configuration(
 # Enter a context with an instance of the API client
 with superplaneapi.ApiClient(configuration) as api_client:
     # Create an instance of the API class
-    api_instance = superplaneapi.BlueprintApi(api_client)
-    body = superplaneapi.BlueprintsCreateBlueprintRequest() # BlueprintsCreateBlueprintRequest | 
+    api_instance = superplaneapi.AgentApi(api_client)
+    body = superplaneapi.AgentsGenerateAgentChatTokenRequest() # AgentsGenerateAgentChatTokenRequest | 
 
     try:
-        # Create blueprint
-        api_response = api_instance.blueprints_create_blueprint(body)
-        print("The response of BlueprintApi->blueprints_create_blueprint:\n")
+        # Generates a new token for an agent chat
+        api_response = api_instance.agents_generate_agent_chat_token(body)
+        print("The response of AgentApi->agents_generate_agent_chat_token:\n")
         pprint(api_response)
     except ApiException as e:
-        print("Exception when calling BlueprintApi->blueprints_create_blueprint: %s\n" % e)
+        print("Exception when calling AgentApi->agents_generate_agent_chat_token: %s\n" % e)
 
 ```
 
@@ -64,6 +64,7 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
+*AgentApi* | [**agents_generate_agent_chat_token**](superplaneapi/docs/AgentApi.md#agents_generate_agent_chat_token) | **POST** /api/v1/agents/chat/tokens | Generates a new token for an agent chat
 *BlueprintApi* | [**blueprints_create_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_create_blueprint) | **POST** /api/v1/blueprints | Create blueprint
 *BlueprintApi* | [**blueprints_delete_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_delete_blueprint) | **DELETE** /api/v1/blueprints/{id} | Delete blueprint
 *BlueprintApi* | [**blueprints_describe_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_describe_blueprint) | **GET** /api/v1/blueprints/{id} | Describe blueprint
@@ -167,6 +168,8 @@ Class | Method | HTTP request | Description
 ## Documentation For Models
 
  - [ActOnCanvasChangeRequestRequestAction](superplaneapi/docs/ActOnCanvasChangeRequestRequestAction.md)
+ - [AgentsGenerateAgentChatTokenRequest](superplaneapi/docs/AgentsGenerateAgentChatTokenRequest.md)
+ - [AgentsGenerateAgentChatTokenResponse](superplaneapi/docs/AgentsGenerateAgentChatTokenResponse.md)
  - [AuthorizationDomainType](superplaneapi/docs/AuthorizationDomainType.md)
  - [AuthorizationPermission](superplaneapi/docs/AuthorizationPermission.md)
  - [BlueprintsBlueprint](superplaneapi/docs/BlueprintsBlueprint.md)
