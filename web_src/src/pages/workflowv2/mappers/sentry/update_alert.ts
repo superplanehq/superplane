@@ -3,46 +3,32 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { addFormattedTimestamp, addOrderedDetails } from "./utils";
+import {
+  addFormattedTimestamp,
+  addOrderedDetails,
+  AlertRuleNodeMetadata,
+  buildEventSections,
+  getAlertRuleProjectLabel,
+  getAlertRuleSelectionLabel,
+  getAlertThresholdMetadataLabel,
+  summarizeTriggers,
+  type SentryAlertRule,
+  type SentryAlertThresholdConfiguration,
+} from "./utils";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
 
-interface AlertThresholdConfiguration {
-  threshold?: number;
-}
-
 interface UpdateAlertConfiguration {
   alertId?: string;
   project?: string;
-  critical?: AlertThresholdConfiguration;
-  warning?: AlertThresholdConfiguration;
-}
-
-interface AlertRuleNodeMetadata {
-  project?: {
-    name?: string;
-    slug?: string;
-  };
-  alertName?: string;
-}
-
-interface SentryAlertRule {
-  name?: string;
-  environment?: string | null;
-  projects?: string[];
-  query?: string;
-  aggregate?: string;
-  triggers?: Array<{
-    label?: string;
-    alertThreshold?: number;
-  }>;
+  critical?: SentryAlertThresholdConfiguration;
+  warning?: SentryAlertThresholdConfiguration;
 }
 
 export const updateAlertMapper: ComponentBaseMapper = {
@@ -59,7 +45,9 @@ export const updateAlertMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? buildEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution
+        ? buildEventSections(context.nodes, lastExecution, componentName, getTriggerRenderer, getState)
+        : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -92,96 +80,25 @@ export const updateAlertMapper: ComponentBaseMapper = {
   },
 };
 
-function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string) {
-  const rootEvent = execution.rootEvent;
-  const createdAt = execution.createdAt;
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
-  const rootComponentName = rootTriggerNode?.componentName;
-
-  if (!rootEvent || !createdAt || !rootComponentName) {
-    return undefined;
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootComponentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(createdAt),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(createdAt)),
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id || "",
-    },
-  ];
-}
-
 function buildMetadata(node: NodeInfo) {
   const configuration = node.configuration as UpdateAlertConfiguration | undefined;
   const nodeMetadata = node.metadata as AlertRuleNodeMetadata | undefined;
   const metadata = [];
 
-  const alertLabel = getAlertLabel(nodeMetadata, configuration);
+  const alertLabel = getAlertRuleSelectionLabel(nodeMetadata, configuration);
   if (alertLabel) {
     metadata.push({ icon: "siren", label: alertLabel });
   }
 
-  const projectLabel = getProjectLabel(nodeMetadata, configuration);
+  const projectLabel = getAlertRuleProjectLabel(nodeMetadata, configuration);
   if (projectLabel) {
     metadata.push({ icon: "folder", label: projectLabel });
   }
 
-  const thresholdLabel = getThresholdLabel(configuration);
+  const thresholdLabel = getAlertThresholdMetadataLabel(configuration);
   if (thresholdLabel) {
     metadata.push({ icon: "triangle-alert", label: thresholdLabel });
   }
 
   return metadata.slice(0, 3);
-}
-
-function summarizeTriggers(alertRule: SentryAlertRule | undefined) {
-  if (!alertRule?.triggers?.length) {
-    return undefined;
-  }
-
-  return alertRule.triggers
-    .map((trigger) => {
-      if (!trigger.label) {
-        return undefined;
-      }
-
-      if (trigger.alertThreshold === undefined) {
-        return trigger.label;
-      }
-
-      return `${trigger.label}: ${trigger.alertThreshold}`;
-    })
-    .filter(Boolean)
-    .join(", ");
-}
-
-function getAlertLabel(
-  nodeMetadata: AlertRuleNodeMetadata | undefined,
-  configuration: UpdateAlertConfiguration | undefined,
-) {
-  return nodeMetadata?.alertName || configuration?.alertId;
-}
-
-function getProjectLabel(
-  nodeMetadata: AlertRuleNodeMetadata | undefined,
-  configuration: UpdateAlertConfiguration | undefined,
-) {
-  return nodeMetadata?.project?.name || nodeMetadata?.project?.slug || configuration?.project;
-}
-
-function getThresholdLabel(configuration: UpdateAlertConfiguration | undefined) {
-  if (configuration?.critical?.threshold !== undefined) {
-    return `Critical ≥ ${configuration.critical.threshold}`;
-  }
-
-  if (configuration?.warning?.threshold !== undefined) {
-    return `Warning ≥ ${configuration.warning.threshold}`;
-  }
-
-  return undefined;
 }

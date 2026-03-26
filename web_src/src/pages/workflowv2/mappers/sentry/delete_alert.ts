@@ -3,12 +3,18 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/utils/colors";
 import { formatTimeAgo } from "@/utils/date";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import { addFormattedTimestamp, addOrderedDetails } from "./utils";
+import {
+  addFormattedTimestamp,
+  addOrderedDetails,
+  AlertRuleNodeMetadata,
+  buildEventSections,
+  getAlertRuleProjectLabel,
+  getAlertRuleSelectionLabel,
+} from "./utils";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -17,14 +23,6 @@ import type {
 interface DeleteAlertConfiguration {
   alertId?: string;
   project?: string;
-}
-
-interface AlertRuleNodeMetadata {
-  project?: {
-    name?: string;
-    slug?: string;
-  };
-  alertName?: string;
 }
 
 interface DeleteAlertOutput {
@@ -47,7 +45,9 @@ export const deleteAlertMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? buildEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution
+        ? buildEventSections(context.nodes, lastExecution, componentName, getTriggerRenderer, getState)
+        : undefined,
       metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
@@ -76,41 +76,17 @@ export const deleteAlertMapper: ComponentBaseMapper = {
   },
 };
 
-function buildEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string) {
-  const rootEvent = execution.rootEvent;
-  const createdAt = execution.createdAt;
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
-  const rootComponentName = rootTriggerNode?.componentName;
-
-  if (!rootEvent || !createdAt || !rootComponentName) {
-    return undefined;
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootComponentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(createdAt),
-      eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(createdAt)),
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id || "",
-    },
-  ];
-}
-
 function buildMetadata(node: NodeInfo) {
   const configuration = node.configuration as DeleteAlertConfiguration | undefined;
   const nodeMetadata = node.metadata as AlertRuleNodeMetadata | undefined;
   const metadata = [];
 
-  const alertLabel = nodeMetadata?.alertName || configuration?.alertId;
+  const alertLabel = getAlertRuleSelectionLabel(nodeMetadata, configuration);
   if (alertLabel) {
     metadata.push({ icon: "siren", label: alertLabel });
   }
 
-  const projectLabel = nodeMetadata?.project?.name || nodeMetadata?.project?.slug || configuration?.project;
+  const projectLabel = getAlertRuleProjectLabel(nodeMetadata, configuration);
   if (projectLabel) {
     metadata.push({ icon: "folder", label: projectLabel });
   }
