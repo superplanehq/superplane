@@ -18,22 +18,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt
-from typing import Any, ClassVar, Dict, List, Optional, Union
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class OrganizationsOrganizationUsage(BaseModel):
+class AgentsGenerateAgentChatTokenRequest(BaseModel):
     """
-    OrganizationsOrganizationUsage
+    AgentsGenerateAgentChatTokenRequest
     """ # noqa: E501
-    canvases: Optional[StrictInt] = None
-    event_bucket_level: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="eventBucketLevel")
-    event_bucket_capacity: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="eventBucketCapacity")
-    event_bucket_last_updated_at: Optional[datetime] = Field(default=None, alias="eventBucketLastUpdatedAt")
-    next_event_bucket_decrease_at: Optional[datetime] = Field(default=None, alias="nextEventBucketDecreaseAt")
-    __properties: ClassVar[List[str]] = ["canvases", "eventBucketLevel", "eventBucketCapacity", "eventBucketLastUpdatedAt", "nextEventBucketDecreaseAt"]
+    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
+    __properties: ClassVar[List[str]] = ["canvasId"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -53,7 +48,7 @@ class OrganizationsOrganizationUsage(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of OrganizationsOrganizationUsage from a JSON string"""
+        """Create an instance of AgentsGenerateAgentChatTokenRequest from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -78,7 +73,7 @@ class OrganizationsOrganizationUsage(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of OrganizationsOrganizationUsage from a dict"""
+        """Create an instance of AgentsGenerateAgentChatTokenRequest from a dict"""
         if obj is None:
             return None
 
@@ -86,11 +81,7 @@ class OrganizationsOrganizationUsage(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "canvases": obj.get("canvases"),
-            "eventBucketLevel": obj.get("eventBucketLevel"),
-            "eventBucketCapacity": obj.get("eventBucketCapacity"),
-            "eventBucketLastUpdatedAt": obj.get("eventBucketLastUpdatedAt"),
-            "nextEventBucketDecreaseAt": obj.get("nextEventBucketDecreaseAt")
+            "canvasId": obj.get("canvasId")
         })
         return _obj
 
