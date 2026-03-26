@@ -7,14 +7,12 @@ import {
   Copy,
   Download,
   ChevronDown,
-  LogOut,
   Palette,
   Plus,
   RefreshCw,
   RotateCcw,
   Undo2,
   Pencil,
-  Rocket,
 } from "lucide-react";
 import { CliCommandsPopover } from "./CliCommandsPopover";
 import { Button } from "../button";
@@ -77,9 +75,6 @@ interface HeaderProps {
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
   /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
   unpublishedDraftChangeCount?: number;
   lastSavedAt?: Date | string | null;
@@ -258,9 +253,6 @@ export function Header({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount = 0,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -655,36 +647,12 @@ export function Header({
                     type="button"
                     variant="default"
                     size="sm"
-                    className="gap-1.5"
                     onClick={() => onPublishVersion?.()}
                     disabled={publishVersionDisabled || !onPublishVersion}
                   >
-                    <Rocket className="h-4 w-4" />
                     {proposeChangeLabel}
                   </UIButton>,
                 )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <UIButton
-                        type="button"
-                        variant="outline"
-                        size="icon-xs"
-                        className="shrink-0"
-                        onClick={() => onExitEditMode?.()}
-                        disabled={exitEditModeDisabled}
-                        aria-label="Exit edit mode"
-                      >
-                        <LogOut className="h-3.5 w-3.5" />
-                      </UIButton>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {exitEditModeDisabled && exitEditModeDisabledTooltip
-                      ? exitEditModeDisabledTooltip
-                      : "Exit edit mode and return to the live version."}
-                  </TooltipContent>
-                </Tooltip>
               </div>
             ) : null}
 
@@ -699,7 +667,7 @@ export function Header({
                     onClick={onEnterEditMode}
                     disabled={enterEditModeDisabled}
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="size-3.5" />
                     Edit
                   </UIButton>,
                 )
