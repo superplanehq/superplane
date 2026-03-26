@@ -15,6 +15,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Deploy" href="#create-deploy" description="Mark a deploy against an existing Sentry release" />
+  <LinkCard title="Create Release" href="#create-release" description="Register a new release in Sentry after a deploy or build step" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Sentry issue with tags, frequency, assignee, and recent events" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status, priority, assignee, or visibility flags" />
 </CardGrid>
 
@@ -24,7 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 1. Create a [personal auth token](https://sentry.io/settings/account/api/auth-tokens/) in Sentry with the permissions below. Copy the token.
 
    > **Token Permissions:**  
-   > Project -> `Read` · Team -> `Read` · Issue & Event -> `Read & Write` · Organization -> `Read & Write`
+   > Project -> `Read` · Releases -> `Read & Write` (`project:releases`) · Team -> `Read` · Issue & Event -> `Read & Write` · Organization -> `Read & Write`
 
 2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
    Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
@@ -63,42 +66,232 @@ This trigger uses the webhook URL configured on your Sentry internal integration
 
 ```json
 {
-  "action": "created",
-  "actor": {
-    "id": "789",
-    "name": "Person",
-    "type": "user"
-  },
   "data": {
-    "issue": {
-      "assignedTo": {
-        "id": "789",
-        "name": "Person",
-        "type": "user"
-      },
-      "culprit": "SentryCustomError(frontend/src/util)",
-      "firstSeen": "2022-04-04T18:17:18.320000Z",
-      "id": "123",
-      "lastSeen": "2022-04-04T18:17:18.320000Z",
-      "level": "error",
-      "permalink": "https://your-org.sentry.io/issues/123/",
-      "project": {
-        "id": "456",
-        "name": "ipe",
-        "slug": "ipe"
-      },
-      "shortId": "IPE-1",
-      "status": "unresolved",
-      "substatus": "new",
-      "title": "Error #1: This is a test error!",
-      "web_url": "https://your-org.sentry.io/issues/123/"
-    }
+    "action": "created",
+    "actor": {
+      "id": "789",
+      "name": "Person",
+      "type": "user"
+    },
+    "data": {
+      "issue": {
+        "assignedTo": {
+          "id": "789",
+          "name": "Person",
+          "type": "user"
+        },
+        "culprit": "SentryCustomError(frontend/src/util)",
+        "firstSeen": "2022-04-04T18:17:18.320000Z",
+        "id": "123",
+        "lastSeen": "2022-04-04T18:17:18.320000Z",
+        "level": "error",
+        "permalink": "https://your-org.sentry.io/issues/123/",
+        "project": {
+          "id": "456",
+          "name": "ipe",
+          "slug": "ipe"
+        },
+        "shortId": "IPE-1",
+        "status": "unresolved",
+        "substatus": "new",
+        "title": "Error #1: This is a test error!",
+        "web_url": "https://your-org.sentry.io/issues/123/"
+      }
+    },
+    "installation": {
+      "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
+    },
+    "resource": "issue",
+    "timestamp": "2022-04-04T18:17:18.320000Z"
   },
-  "installation": {
-    "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
+  "timestamp": "2022-04-04T18:17:18.320000Z",
+  "type": "sentry.issue"
+}
+```
+
+<a id="create-deploy"></a>
+
+## Create Deploy
+
+The Create Deploy component marks a deploy against an existing Sentry release.
+
+### Use Cases
+
+- **Deployment tracking**: record when a release reaches staging or production
+- **Release automation**: pair with Create Release in CI/CD canvases
+- **Operational context**: give Sentry deployment timing and environment information for later triage
+
+### Configuration
+
+- **Project**: Optional Sentry project to associate with the deploy
+- **Release**: Select the existing Sentry release to deploy
+- **Environment**: The target environment, such as staging or production
+- **Name**: Optional deploy name
+- **Deploy URL**: Optional URL for the deployment
+- **Started At**: Optional deployment start time
+- **Finished At**: Optional deployment finish time
+
+### Output
+
+Returns the created deploy record, including environment, timestamps, URL, and release version.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dateFinished": "2026-03-25T10:24:12.000Z",
+    "dateStarted": "2026-03-25T10:20:00.000Z",
+    "environment": "production",
+    "id": "1234567",
+    "name": "Deploy #42",
+    "projects": [
+      "go-gin"
+    ],
+    "releaseVersion": "2026.03.25",
+    "url": "https://example.com/deploys/42"
   },
-  "resource": "issue",
-  "timestamp": "2022-04-04T18:17:18.320000Z"
+  "timestamp": "2026-03-25T10:24:12.000Z",
+  "type": "sentry.deploy"
+}
+```
+
+<a id="create-release"></a>
+
+## Create Release
+
+The Create Release component registers a new release in Sentry for a selected project.
+
+### Use Cases
+
+- **Release tracking**: create a release after a build or deploy succeeds
+- **Commit association**: attach commits and refs so Sentry can correlate new issues with code changes
+- **Post-deploy automation**: feed the created release into downstream deployment and monitoring steps
+
+### Configuration
+
+- **Project**: Select the Sentry project this release applies to
+- **Version**: The release version identifier
+- **Ref**: Optional commit or tag reference for the release
+- **Release URL**: Optional URL for the release, build, or changelog
+- **Commits**: Optional commit metadata to associate with the release
+- **Refs**: Optional repository head/previous commit refs for release comparison
+
+### Output
+
+Returns the created Sentry release object, including version, associated projects, deploy count, and release metadata.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commitCount": 2,
+    "dateCreated": "2026-03-25T10:12:55.109Z",
+    "dateReleased": "2026-03-25T10:15:00.000Z",
+    "deployCount": 0,
+    "id": 2,
+    "newGroups": 0,
+    "projects": [
+      {
+        "name": "go-gin",
+        "slug": "go-gin"
+      }
+    ],
+    "ref": "6ba09a7c53235ee8a8fa5ee4c1ca8ca886e7fdbb",
+    "shortVersion": "2026.03.25",
+    "url": "https://github.com/superplanehq/superplane/releases/tag/2026.03.25",
+    "version": "2026.03.25"
+  },
+  "timestamp": "2026-03-25T10:15:00.000Z",
+  "type": "sentry.release"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+The Get Issue component retrieves a Sentry issue and enriches it with recent events for downstream routing and escalation.
+
+### Use Cases
+
+- **Routing decisions**: inspect assignee, status, project, and issue frequency before branching
+- **Escalation context**: include recent events and tags in notifications or ticket creation
+- **Release correlation**: check whether an issue is already tied to a release before actioning it
+
+### Configuration
+
+- **Issue**: Select the Sentry issue to retrieve
+
+### Output
+
+Returns the Sentry issue object including:
+- issue metadata such as title, status, assignee, tags, and frequency stats
+- recent issue events for additional context
+
+### Example Output
+
+```json
+{
+  "data": {
+    "assignedTo": {
+      "id": "42",
+      "name": "Platform",
+      "type": "team"
+    },
+    "count": "7",
+    "events": [
+      {
+        "dateCreated": "2026-03-24T13:03:56Z",
+        "eventID": "evt_1",
+        "id": "evt_1",
+        "message": "RuntimeError: SuperPlane trigger validation test 008",
+        "platform": "other",
+        "tags": [
+          {
+            "key": "environment",
+            "value": "production"
+          }
+        ],
+        "title": "RuntimeError: SuperPlane trigger validation test 008"
+      }
+    ],
+    "id": "106740394",
+    "numComments": 0,
+    "permalink": "https://washington-x2.sentry.io/issues/106740394/",
+    "priority": "high",
+    "project": {
+      "id": "4511070273339472",
+      "name": "go-gin",
+      "slug": "go-gin"
+    },
+    "shortId": "GO-GIN-G",
+    "stats": {
+      "24h": [
+        [
+          1711270800,
+          7
+        ]
+      ]
+    },
+    "status": "unresolved",
+    "tags": [
+      {
+        "key": "environment",
+        "value": "production"
+      },
+      {
+        "key": "level",
+        "value": "error"
+      }
+    ],
+    "title": "RuntimeError: SuperPlane trigger validation test 008",
+    "userCount": 3,
+    "web_url": "https://washington-x2.sentry.io/issues/106740394/"
+  },
+  "timestamp": "2026-03-24T13:03:56Z",
+  "type": "sentry.issue"
 }
 ```
 
@@ -135,27 +328,31 @@ Returns the updated Sentry issue object.
 
 ```json
 {
-  "assignedTo": {
-    "id": "789",
-    "name": "Person",
-    "type": "user"
+  "data": {
+    "assignedTo": {
+      "id": "789",
+      "name": "Person",
+      "type": "user"
+    },
+    "culprit": "SentryCustomError(frontend/src/util)",
+    "firstSeen": "2022-04-04T18:17:18.320000Z",
+    "id": "123",
+    "lastSeen": "2022-04-04T18:17:18.320000Z",
+    "level": "error",
+    "permalink": "https://your-org.sentry.io/issues/123/",
+    "project": {
+      "id": "456",
+      "name": "ipe",
+      "slug": "ipe"
+    },
+    "shortId": "IPE-1",
+    "status": "resolved",
+    "substatus": "resolved",
+    "title": "Error #1: This is a test error!",
+    "web_url": "https://your-org.sentry.io/issues/123/"
   },
-  "culprit": "SentryCustomError(frontend/src/util)",
-  "firstSeen": "2022-04-04T18:17:18.320000Z",
-  "id": "123",
-  "lastSeen": "2022-04-04T18:17:18.320000Z",
-  "level": "error",
-  "permalink": "https://your-org.sentry.io/issues/123/",
-  "project": {
-    "id": "456",
-    "name": "ipe",
-    "slug": "ipe"
-  },
-  "shortId": "IPE-1",
-  "status": "resolved",
-  "substatus": "resolved",
-  "title": "Error #1: This is a test error!",
-  "web_url": "https://your-org.sentry.io/issues/123/"
+  "timestamp": "2022-04-04T18:17:18.320000Z",
+  "type": "sentry.issue"
 }
 ```
 
