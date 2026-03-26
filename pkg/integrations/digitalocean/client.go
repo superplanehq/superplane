@@ -1723,6 +1723,102 @@ func contentTypeFromPath(filePath string) string {
 	}
 }
 
+// CopyObject copies an object from one location to another within Spaces.
+// The x-amz-copy-source header is included in the signed headers as required by AWS SigV4.
+func (c *SpacesClient) CopyObject(sourceBucket, sourceKey, destBucket, destKey, acl string) (string, error) {
+	host := fmt.Sprintf("%s.%s.digitaloceanspaces.com", destBucket, c.Region)
+	endpoint := fmt.Sprintf("https://%s/%s", host, destKey)
+
+	now := time.Now().UTC()
+	dateStamp := now.Format("20060102")
+	amzDate := now.Format("20060102T150405Z")
+
+	// Empty body for CopyObject
+	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	copySource := "/" + sourceBucket + "/" + sourceKey
+
+	// Canonical headers must be sorted alphabetically
+	canonicalHeaders := fmt.Sprintf(
+		"host:%s\nx-amz-content-sha256:%s\nx-amz-copy-source:%s\nx-amz-date:%s\n",
+		host, payloadHash, copySource, amzDate,
+	)
+	signedHeaders := "host;x-amz-content-sha256;x-amz-copy-source;x-amz-date"
+
+	keyPath := "/" + destKey
+
+	canonicalRequest := strings.Join([]string{
+		http.MethodPut,
+		keyPath,
+		"",
+		canonicalHeaders,
+		signedHeaders,
+		payloadHash,
+	}, "\n")
+
+	credentialScope := fmt.Sprintf("%s/%s/s3/aws4_request", dateStamp, c.Region)
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalRequest))),
+	}, "\n")
+
+	signingKey := hmacSHA256(
+		hmacSHA256(
+			hmacSHA256(
+				hmacSHA256([]byte("AWS4"+c.SecretKey), dateStamp),
+				c.Region,
+			),
+			"s3",
+		),
+		"aws4_request",
+	)
+
+	signature := fmt.Sprintf("%x", hmacSHA256(signingKey, stringToSign))
+	authHeader := fmt.Sprintf(
+		"AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s",
+		c.AccessKey, credentialScope, signedHeaders, signature,
+	)
+
+	req, err := http.NewRequest(http.MethodPut, endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Host", host)
+	req.Header.Set("x-amz-date", amzDate)
+	req.Header.Set("x-amz-content-sha256", payloadHash)
+	req.Header.Set("x-amz-copy-source", copySource)
+	req.Header.Set("Authorization", authHeader)
+
+	if acl != "" {
+		req.Header.Set("x-amz-acl", acl)
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, _ := io.ReadAll(res.Body)
+
+	var result struct {
+		ETag string `xml:"ETag"`
+	}
+	if err := xml.Unmarshal(bodyBytes, &result); err == nil {
+		return strings.Trim(result.ETag, `"`), nil
+	}
+
+	return "", nil
+}
+
 // DeleteObject removes an object from a Spaces bucket.
 // The Spaces API always returns 204 No Content, even if the object does not exist.
 func (c *SpacesClient) DeleteObject(bucket, key string) error {

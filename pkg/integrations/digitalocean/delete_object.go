@@ -93,7 +93,7 @@ func (d *DeleteObject) Configuration() []configuration.Field {
 			Label:       "File Path",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "The path to the object within the bucket",
+			Description: "Full path including file name and extension. Use / to organize into folders (e.g. reports/2024/daily.csv)",
 			Placeholder: "reports/daily.csv",
 		},
 	}

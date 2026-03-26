@@ -187,6 +187,16 @@ func (g *GetObject) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetObjectOnce, exampleOutputGetObjectBytes, &exampleOutputGetObject)
 }
 
+//go:embed example_output_copy_object.json
+var exampleOutputCopyObjectBytes []byte
+
+var exampleOutputCopyObjectOnce sync.Once
+var exampleOutputCopyObject map[string]any
+
+func (c *CopyObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCopyObjectOnce, exampleOutputCopyObjectBytes, &exampleOutputCopyObject)
+}
+
 //go:embed example_output_delete_object.json
 var exampleOutputDeleteObjectBytes []byte
 

@@ -149,6 +149,24 @@ export interface GetObjectOutput {
   body?: string;
 }
 
+export interface CopyObjectConfiguration {
+  sourceBucket?: string;
+  sourceFilePath?: string;
+  destinationBucket?: string;
+  destinationFilePath?: string;
+  deleteSource?: boolean;
+}
+
+export interface CopyObjectOutput {
+  sourceBucket?: string;
+  sourceFilePath?: string;
+  destinationBucket?: string;
+  destinationFilePath?: string;
+  endpoint?: string;
+  eTag?: string;
+  moved?: boolean;
+}
+
 export interface DeleteObjectConfiguration {
   bucket?: string;
   filePath?: string;

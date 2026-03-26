@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
+  <LinkCard title="Copy Object" href="#copy-object" description="Copy or move an object within DigitalOcean Spaces Object Storage" />
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
@@ -104,6 +105,66 @@ Returns the action result including:
   },
   "timestamp": "2026-03-13T10:10:08.000000000Z",
   "type": "digitalocean.reservedip.assign"
+}
+```
+
+<a id="copy-object"></a>
+
+## Copy Object
+
+The Copy Object component copies an object from one location to another within DigitalOcean Spaces. When **Delete Source** is enabled, the source object is deleted after a successful copy, effectively moving the object.
+
+### Prerequisites
+
+Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcean integration settings.
+
+### Configuration
+
+- **Source Bucket**: The bucket containing the object to copy
+- **Source File Path**: The path to the source object (e.g. reports/daily.csv). Supports expressions.
+- **Destination Bucket**: The bucket to copy the object into (can be the same bucket)
+- **Destination File Path**: The path for the copied object (e.g. archive/2026/daily.csv). Supports expressions.
+- **Visibility**: Access control for the destination object — Private (default) or Public
+- **Delete Source**: When enabled, the source object is deleted after a successful copy (move operation)
+
+### Output
+
+- **sourceBucket**: The source bucket name
+- **sourceFilePath**: The source object path
+- **destinationBucket**: The destination bucket name
+- **destinationFilePath**: The destination object path
+- **endpoint**: The full Spaces URL of the copied object
+- **eTag**: MD5 hash of the copied object
+- **moved**: `true` if the source was deleted, `false` otherwise
+
+### Notes
+
+- Both buckets must be in the same region
+- Copying an object to the same path overwrites it
+- Metadata and tags are copied from the source object by default
+
+### Use Cases
+
+- **Archiving**: Move processed files to an archive bucket or folder
+- **Promotion**: Copy an artifact from a staging bucket to production
+- **Backup**: Duplicate a file before modifying it
+- **Renaming**: Move a file to a new path within the same bucket
+
+### Example Output
+
+```json
+{
+  "data": {
+    "destinationBucket": "my-company-archive",
+    "destinationFilePath": "archive/2026/daily.csv",
+    "eTag": "a1b2c3d4ef567890a1b2c3d4ef567890",
+    "endpoint": "https://my-company-archive.fra1.digitaloceanspaces.com/archive/2026/daily.csv",
+    "moved": false,
+    "sourceBucket": "my-company-assets",
+    "sourceFilePath": "reports/daily.csv"
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.copied"
 }
 ```
 

@@ -110,6 +110,7 @@ func (d *DigitalOcean) Components() []core.Component {
 		&GetDropletMetrics{},
 		&GetObject{},
 		&PutObject{},
+		&CopyObject{},
 		&DeleteObject{},
 		&CreateApp{},
 		&DeleteApp{},
