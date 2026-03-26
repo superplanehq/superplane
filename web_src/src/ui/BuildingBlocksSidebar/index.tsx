@@ -11,7 +11,7 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getAgentUrl, isCustomComponentsEnabled } from "@/lib/env";
+import { isCustomComponentsEnabled } from "@/lib/env";
 import { resolveIcon } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/utils/colors";
@@ -223,7 +223,7 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-  const agentUrl = getAgentUrl().replace(/\/+$/, "");
+
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
@@ -233,7 +233,6 @@ export function BuildingBlocksSidebar({
         aiMessages,
         canvasId,
         organizationId,
-        agentUrl,
         isGeneratingResponse,
         setAiMessages,
         setAiInput,
@@ -243,7 +242,7 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [agentUrl, aiInput, aiMessages, canvasId, isGeneratingResponse, organizationId],
+    [aiInput, aiMessages, canvasId, isGeneratingResponse, organizationId],
   );
 
   const handleDiscardProposal = useCallback(() => {
