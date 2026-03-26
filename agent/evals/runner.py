@@ -80,8 +80,8 @@ dataset = Dataset(
               evals.CanvasHasNode("daytona.createRepositorySandbox"),
               evals.CanvasHasNode("wait"),
               evals.CanvasHasNode("daytona.deleteSandbox", count=2),
-              # CanvasHasWorkflow("github.onPullRequest", "...", "daytona.createRepositorySandbox", "...", "wait", "...", "daytona.deleteSandbox"),
-              # CanvasHasWorkflow("github.onPullRequest", "...", "readMemory", "...", "daytona.deleteSandbox"),
+              evals.CanvasHasWorkflow("github.onPullRequest", "...", "daytona.createRepositorySandbox", "...", "wait", "...", "daytona.deleteSandbox"),
+              evals.CanvasHasWorkflow("github.onPullRequest", "...", "readMemory", "...", "daytona.deleteSandbox"),
             ],
         ),
         Case(
