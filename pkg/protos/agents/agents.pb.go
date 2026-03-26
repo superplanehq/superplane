@@ -7,6 +7,7 @@
 package agents
 
 import (
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -23,27 +24,27 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type GenerateAgentChatTokenRequest struct {
+type ListAgentChatsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GenerateAgentChatTokenRequest) Reset() {
-	*x = GenerateAgentChatTokenRequest{}
+func (x *ListAgentChatsRequest) Reset() {
+	*x = ListAgentChatsRequest{}
 	mi := &file_agents_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GenerateAgentChatTokenRequest) String() string {
+func (x *ListAgentChatsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GenerateAgentChatTokenRequest) ProtoMessage() {}
+func (*ListAgentChatsRequest) ProtoMessage() {}
 
-func (x *GenerateAgentChatTokenRequest) ProtoReflect() protoreflect.Message {
+func (x *ListAgentChatsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_agents_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -55,39 +56,39 @@ func (x *GenerateAgentChatTokenRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GenerateAgentChatTokenRequest.ProtoReflect.Descriptor instead.
-func (*GenerateAgentChatTokenRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListAgentChatsRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentChatsRequest) Descriptor() ([]byte, []int) {
 	return file_agents_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *GenerateAgentChatTokenRequest) GetCanvasId() string {
+func (x *ListAgentChatsRequest) GetCanvasId() string {
 	if x != nil {
 		return x.CanvasId
 	}
 	return ""
 }
 
-type GenerateAgentChatTokenResponse struct {
+type ListAgentChatsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	Chats         []*AgentChatInfo       `protobuf:"bytes,1,rep,name=chats,proto3" json:"chats,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GenerateAgentChatTokenResponse) Reset() {
-	*x = GenerateAgentChatTokenResponse{}
+func (x *ListAgentChatsResponse) Reset() {
+	*x = ListAgentChatsResponse{}
 	mi := &file_agents_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GenerateAgentChatTokenResponse) String() string {
+func (x *ListAgentChatsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GenerateAgentChatTokenResponse) ProtoMessage() {}
+func (*ListAgentChatsResponse) ProtoMessage() {}
 
-func (x *GenerateAgentChatTokenResponse) ProtoReflect() protoreflect.Message {
+func (x *ListAgentChatsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_agents_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -99,30 +100,611 @@ func (x *GenerateAgentChatTokenResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GenerateAgentChatTokenResponse.ProtoReflect.Descriptor instead.
-func (*GenerateAgentChatTokenResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListAgentChatsResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentChatsResponse) Descriptor() ([]byte, []int) {
 	return file_agents_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *GenerateAgentChatTokenResponse) GetToken() string {
+func (x *ListAgentChatsResponse) GetChats() []*AgentChatInfo {
+	if x != nil {
+		return x.Chats
+	}
+	return nil
+}
+
+type DescribeAgentChatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	ChatId        string                 `protobuf:"bytes,2,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeAgentChatRequest) Reset() {
+	*x = DescribeAgentChatRequest{}
+	mi := &file_agents_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeAgentChatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeAgentChatRequest) ProtoMessage() {}
+
+func (x *DescribeAgentChatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeAgentChatRequest.ProtoReflect.Descriptor instead.
+func (*DescribeAgentChatRequest) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *DescribeAgentChatRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *DescribeAgentChatRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type DescribeAgentChatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Chat          *AgentChatInfo         `protobuf:"bytes,1,opt,name=chat,proto3" json:"chat,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeAgentChatResponse) Reset() {
+	*x = DescribeAgentChatResponse{}
+	mi := &file_agents_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeAgentChatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeAgentChatResponse) ProtoMessage() {}
+
+func (x *DescribeAgentChatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeAgentChatResponse.ProtoReflect.Descriptor instead.
+func (*DescribeAgentChatResponse) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DescribeAgentChatResponse) GetChat() *AgentChatInfo {
+	if x != nil {
+		return x.Chat
+	}
+	return nil
+}
+
+type ListAgentChatMessagesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	ChatId        string                 `protobuf:"bytes,2,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentChatMessagesRequest) Reset() {
+	*x = ListAgentChatMessagesRequest{}
+	mi := &file_agents_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentChatMessagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentChatMessagesRequest) ProtoMessage() {}
+
+func (x *ListAgentChatMessagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentChatMessagesRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentChatMessagesRequest) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListAgentChatMessagesRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *ListAgentChatMessagesRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type ListAgentChatMessagesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Messages      []*AgentChatMessage    `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentChatMessagesResponse) Reset() {
+	*x = ListAgentChatMessagesResponse{}
+	mi := &file_agents_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentChatMessagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentChatMessagesResponse) ProtoMessage() {}
+
+func (x *ListAgentChatMessagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentChatMessagesResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentChatMessagesResponse) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListAgentChatMessagesResponse) GetMessages() []*AgentChatMessage {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+type AgentChatMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
+	Content       string                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`
+	ToolCallId    string                 `protobuf:"bytes,4,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	ToolStatus    string                 `protobuf:"bytes,5,opt,name=tool_status,json=toolStatus,proto3" json:"tool_status,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentChatMessage) Reset() {
+	*x = AgentChatMessage{}
+	mi := &file_agents_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentChatMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentChatMessage) ProtoMessage() {}
+
+func (x *AgentChatMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentChatMessage.ProtoReflect.Descriptor instead.
+func (*AgentChatMessage) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AgentChatMessage) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AgentChatMessage) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *AgentChatMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *AgentChatMessage) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *AgentChatMessage) GetToolStatus() string {
+	if x != nil {
+		return x.ToolStatus
+	}
+	return ""
+}
+
+func (x *AgentChatMessage) GetCreatedAt() *timestamp.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type CreateAgentChatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAgentChatRequest) Reset() {
+	*x = CreateAgentChatRequest{}
+	mi := &file_agents_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAgentChatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAgentChatRequest) ProtoMessage() {}
+
+func (x *CreateAgentChatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAgentChatRequest.ProtoReflect.Descriptor instead.
+func (*CreateAgentChatRequest) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *CreateAgentChatRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+type CreateAgentChatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAgentChatResponse) Reset() {
+	*x = CreateAgentChatResponse{}
+	mi := &file_agents_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAgentChatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAgentChatResponse) ProtoMessage() {}
+
+func (x *CreateAgentChatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAgentChatResponse.ProtoReflect.Descriptor instead.
+func (*CreateAgentChatResponse) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CreateAgentChatResponse) GetToken() string {
 	if x != nil {
 		return x.Token
 	}
 	return ""
 }
 
+func (x *CreateAgentChatResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type ResumeAgentChatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	ChatId        string                 `protobuf:"bytes,2,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeAgentChatRequest) Reset() {
+	*x = ResumeAgentChatRequest{}
+	mi := &file_agents_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeAgentChatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeAgentChatRequest) ProtoMessage() {}
+
+func (x *ResumeAgentChatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeAgentChatRequest.ProtoReflect.Descriptor instead.
+func (*ResumeAgentChatRequest) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ResumeAgentChatRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *ResumeAgentChatRequest) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+type ResumeAgentChatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeAgentChatResponse) Reset() {
+	*x = ResumeAgentChatResponse{}
+	mi := &file_agents_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeAgentChatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeAgentChatResponse) ProtoMessage() {}
+
+func (x *ResumeAgentChatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeAgentChatResponse.ProtoReflect.Descriptor instead.
+func (*ResumeAgentChatResponse) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ResumeAgentChatResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *ResumeAgentChatResponse) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+type AgentChatInfo struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	InitialMessage string                 `protobuf:"bytes,2,opt,name=initial_message,json=initialMessage,proto3" json:"initial_message,omitempty"`
+	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AgentChatInfo) Reset() {
+	*x = AgentChatInfo{}
+	mi := &file_agents_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentChatInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentChatInfo) ProtoMessage() {}
+
+func (x *AgentChatInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentChatInfo.ProtoReflect.Descriptor instead.
+func (*AgentChatInfo) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AgentChatInfo) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AgentChatInfo) GetInitialMessage() string {
+	if x != nil {
+		return x.InitialMessage
+	}
+	return ""
+}
+
+func (x *AgentChatInfo) GetCreatedAt() *timestamp.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
 var File_agents_proto protoreflect.FileDescriptor
 
 const file_agents_proto_rawDesc = "" +
 	"\n" +
-	"\fagents.proto\x12\x11Superplane.Agents\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"<\n" +
-	"\x1dGenerateAgentChatTokenRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"6\n" +
-	"\x1eGenerateAgentChatTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token2\xa0\x02\n" +
-	"\x06Agents\x12\x95\x02\n" +
-	"\x16GenerateAgentChatToken\x120.Superplane.Agents.GenerateAgentChatTokenRequest\x1a1.Superplane.Agents.GenerateAgentChatTokenResponse\"\x95\x01\x92Am\n" +
-	"\x05Agent\x12'Generates a new token for an agent chat\x1a;Mints a short-lived scoped token for agent chat on a canvas\x82\xd3\xe4\x93\x02\x1f:\x01*\"\x1a/api/v1/agents/chat/tokensB\xca\x01\x92A\x90\x01\x12f\n" +
+	"\fagents.proto\x12\x11Superplane.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"4\n" +
+	"\x15ListAgentChatsRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"P\n" +
+	"\x16ListAgentChatsResponse\x126\n" +
+	"\x05chats\x18\x01 \x03(\v2 .Superplane.Agents.AgentChatInfoR\x05chats\"P\n" +
+	"\x18DescribeAgentChatRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\achat_id\x18\x02 \x01(\tR\x06chatId\"Q\n" +
+	"\x19DescribeAgentChatResponse\x124\n" +
+	"\x04chat\x18\x01 \x01(\v2 .Superplane.Agents.AgentChatInfoR\x04chat\"T\n" +
+	"\x1cListAgentChatMessagesRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\achat_id\x18\x02 \x01(\tR\x06chatId\"`\n" +
+	"\x1dListAgentChatMessagesResponse\x12?\n" +
+	"\bmessages\x18\x01 \x03(\v2#.Superplane.Agents.AgentChatMessageR\bmessages\"\xce\x01\n" +
+	"\x10AgentChatMessage\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04role\x18\x02 \x01(\tR\x04role\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\tR\acontent\x12 \n" +
+	"\ftool_call_id\x18\x04 \x01(\tR\n" +
+	"toolCallId\x12\x1f\n" +
+	"\vtool_status\x18\x05 \x01(\tR\n" +
+	"toolStatus\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"5\n" +
+	"\x16CreateAgentChatRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"A\n" +
+	"\x17CreateAgentChatResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"N\n" +
+	"\x16ResumeAgentChatRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\achat_id\x18\x02 \x01(\tR\x06chatId\"A\n" +
+	"\x17ResumeAgentChatResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"\x83\x01\n" +
+	"\rAgentChatInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
+	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
+	"\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb4\n" +
+	"\n" +
+	"\x06Agents\x12\xf5\x01\n" +
+	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x8d\x01\x92An\n" +
+	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/agents/chats\x12\x90\x02\n" +
+	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\xa5\x01\x92A\x82\x01\n" +
+	"\x05Agent\x12\x18Creates a new agent chat\x1a_Create a new agent chat. The response includes the URL and token for initiating the chat stream\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/agents/chats\x12\x89\x02\n" +
+	"\x11DescribeAgentChat\x12+.Superplane.Agents.DescribeAgentChatRequest\x1a,.Superplane.Agents.DescribeAgentChatResponse\"\x98\x01\x92Ao\n" +
+	"\x05Agent\x122Describes an agent chat for the authenticated user\x1a2Describes an agent chat for the authenticated user\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1/agents/chats/{chat_id}\x12\xfe\x01\n" +
+	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x81\x01\x92AO\n" +
+	"\x05Agent\x12\"List the messages in an agent chat\x1a\"List the messages in an agent chat\x82\xd3\xe4\x93\x02)\x12'/api/v1/agents/chats/{chat_id}/messages\x12\x91\x02\n" +
+	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xa6\x01\x92As\n" +
+	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/chats/{chat_id}/resumeB\xca\x01\x92A\x90\x01\x12f\n" +
 	"\x15SuperPlane Agents API\x12!API for SuperPlane agent sessions\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
 
@@ -138,19 +720,43 @@ func file_agents_proto_rawDescGZIP() []byte {
 	return file_agents_proto_rawDescData
 }
 
-var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_agents_proto_goTypes = []any{
-	(*GenerateAgentChatTokenRequest)(nil),  // 0: Superplane.Agents.GenerateAgentChatTokenRequest
-	(*GenerateAgentChatTokenResponse)(nil), // 1: Superplane.Agents.GenerateAgentChatTokenResponse
+	(*ListAgentChatsRequest)(nil),         // 0: Superplane.Agents.ListAgentChatsRequest
+	(*ListAgentChatsResponse)(nil),        // 1: Superplane.Agents.ListAgentChatsResponse
+	(*DescribeAgentChatRequest)(nil),      // 2: Superplane.Agents.DescribeAgentChatRequest
+	(*DescribeAgentChatResponse)(nil),     // 3: Superplane.Agents.DescribeAgentChatResponse
+	(*ListAgentChatMessagesRequest)(nil),  // 4: Superplane.Agents.ListAgentChatMessagesRequest
+	(*ListAgentChatMessagesResponse)(nil), // 5: Superplane.Agents.ListAgentChatMessagesResponse
+	(*AgentChatMessage)(nil),              // 6: Superplane.Agents.AgentChatMessage
+	(*CreateAgentChatRequest)(nil),        // 7: Superplane.Agents.CreateAgentChatRequest
+	(*CreateAgentChatResponse)(nil),       // 8: Superplane.Agents.CreateAgentChatResponse
+	(*ResumeAgentChatRequest)(nil),        // 9: Superplane.Agents.ResumeAgentChatRequest
+	(*ResumeAgentChatResponse)(nil),       // 10: Superplane.Agents.ResumeAgentChatResponse
+	(*AgentChatInfo)(nil),                 // 11: Superplane.Agents.AgentChatInfo
+	(*timestamp.Timestamp)(nil),           // 12: google.protobuf.Timestamp
 }
 var file_agents_proto_depIdxs = []int32{
-	0, // 0: Superplane.Agents.Agents.GenerateAgentChatToken:input_type -> Superplane.Agents.GenerateAgentChatTokenRequest
-	1, // 1: Superplane.Agents.Agents.GenerateAgentChatToken:output_type -> Superplane.Agents.GenerateAgentChatTokenResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	11, // 0: Superplane.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Agents.AgentChatInfo
+	11, // 1: Superplane.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Agents.AgentChatInfo
+	6,  // 2: Superplane.Agents.ListAgentChatMessagesResponse.messages:type_name -> Superplane.Agents.AgentChatMessage
+	12, // 3: Superplane.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	12, // 4: Superplane.Agents.AgentChatInfo.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 5: Superplane.Agents.Agents.ListAgentChats:input_type -> Superplane.Agents.ListAgentChatsRequest
+	7,  // 6: Superplane.Agents.Agents.CreateAgentChat:input_type -> Superplane.Agents.CreateAgentChatRequest
+	2,  // 7: Superplane.Agents.Agents.DescribeAgentChat:input_type -> Superplane.Agents.DescribeAgentChatRequest
+	4,  // 8: Superplane.Agents.Agents.ListAgentChatMessages:input_type -> Superplane.Agents.ListAgentChatMessagesRequest
+	9,  // 9: Superplane.Agents.Agents.ResumeAgentChat:input_type -> Superplane.Agents.ResumeAgentChatRequest
+	1,  // 10: Superplane.Agents.Agents.ListAgentChats:output_type -> Superplane.Agents.ListAgentChatsResponse
+	8,  // 11: Superplane.Agents.Agents.CreateAgentChat:output_type -> Superplane.Agents.CreateAgentChatResponse
+	3,  // 12: Superplane.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Agents.DescribeAgentChatResponse
+	5,  // 13: Superplane.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Agents.ListAgentChatMessagesResponse
+	10, // 14: Superplane.Agents.Agents.ResumeAgentChat:output_type -> Superplane.Agents.ResumeAgentChatResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_agents_proto_init() }
@@ -164,7 +770,7 @@ func file_agents_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agents_proto_rawDesc), len(file_agents_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
