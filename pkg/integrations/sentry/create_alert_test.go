@@ -55,6 +55,10 @@ func Test__CreateAlert__Configuration(t *testing.T) {
 	assert.Equal(t, "critical", fields[8].Name)
 	assert.Equal(t, configuration.FieldTypeObject, fields[8].Type)
 	assert.Equal(t, "warning", fields[9].Name)
+	criticalSchema := fields[8].TypeOptions.Object.Schema
+	notificationSchema := criticalSchema[2].TypeOptions.Object.Schema
+	assert.Equal(t, "targetIdentifier", notificationSchema[1].Name)
+	assert.Equal(t, configuration.FieldTypeIntegrationResource, notificationSchema[1].Type)
 }
 
 func Test__CreateAlert__Execute(t *testing.T) {

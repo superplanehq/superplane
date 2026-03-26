@@ -52,12 +52,6 @@ type AlertRuleNodeMetadata struct {
 	AlertName string          `json:"alertName,omitempty" mapstructure:"alertName"`
 }
 
-type DeleteAlertOutput struct {
-	ID      string `json:"id" mapstructure:"id"`
-	Name    string `json:"name" mapstructure:"name"`
-	Deleted bool   `json:"deleted" mapstructure:"deleted"`
-}
-
 func alertRuleBaseFields(projectRequired bool) []configuration.Field {
 	return []configuration.Field{
 		{
@@ -132,12 +126,12 @@ func alertRuleBaseFields(projectRequired bool) []configuration.Field {
 	}
 }
 
-func alertThresholdField(label, name string, required bool) configuration.Field {
+func alertThresholdField(label, name string, thresholdRequired bool) configuration.Field {
 	return configuration.Field{
 		Name:        name,
 		Label:       label,
 		Type:        configuration.FieldTypeObject,
-		Required:    required,
+		Required:    thresholdRequired,
 		Description: label + " configuration",
 		TypeOptions: &configuration.TypeOptions{
 			Object: &configuration.ObjectTypeOptions{
@@ -146,7 +140,7 @@ func alertThresholdField(label, name string, required bool) configuration.Field 
 						Name:        "threshold",
 						Label:       "Threshold",
 						Type:        configuration.FieldTypeNumber,
-						Required:    required,
+						Required:    thresholdRequired,
 						Description: "Threshold that fires this trigger",
 					},
 					{
@@ -161,7 +155,7 @@ func alertThresholdField(label, name string, required bool) configuration.Field 
 						Name:        "notification",
 						Label:       "Notification Target",
 						Type:        configuration.FieldTypeObject,
-						Required:    required,
+						Required:    thresholdRequired,
 						Description: "Who Sentry should notify when this trigger fires",
 						TypeOptions: &configuration.TypeOptions{
 							Object: &configuration.ObjectTypeOptions{
@@ -170,7 +164,7 @@ func alertThresholdField(label, name string, required bool) configuration.Field 
 										Name:        "targetType",
 										Label:       "Target Type",
 										Type:        configuration.FieldTypeSelect,
-										Required:    required,
+										Required:    thresholdRequired,
 										Description: "Whether the notification goes to a user or team",
 										TypeOptions: &configuration.TypeOptions{
 											Select: &configuration.SelectTypeOptions{
@@ -180,10 +174,29 @@ func alertThresholdField(label, name string, required bool) configuration.Field 
 									},
 									{
 										Name:        "targetIdentifier",
-										Label:       "Target Identifier",
-										Type:        configuration.FieldTypeString,
-										Required:    required,
-										Description: "Sentry user ID or team ID to notify",
+										Label:       "Target",
+										Type:        configuration.FieldTypeIntegrationResource,
+										Required:    thresholdRequired,
+										Description: "Sentry user or team to notify. Choose Target Type first to load options.",
+										TypeOptions: &configuration.TypeOptions{
+											Resource: &configuration.ResourceTypeOptions{
+												Type: ResourceTypeAlertTarget,
+												Parameters: []configuration.ParameterRef{
+													{
+														Name:      "project",
+														ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+													},
+													{
+														Name:      "alertId",
+														ValueFrom: &configuration.ParameterValueFrom{Field: "alertId"},
+													},
+													{
+														Name:      "targetType",
+														ValueFrom: &configuration.ParameterValueFrom{Field: "targetType"},
+													},
+												},
+											},
+										},
 									},
 								},
 							},
@@ -321,9 +334,6 @@ func buildAlertRequestFromRule(
 	}
 	if strings.TrimSpace(request.Aggregate) == "" {
 		request.Aggregate = strings.TrimSpace(alertRule.Aggregate)
-	}
-	if timeWindow == nil {
-		request.TimeWindow = int(alertRule.TimeWindow)
 	}
 	if strings.TrimSpace(query) == "" {
 		request.Query = strings.TrimSpace(alertRule.Query)

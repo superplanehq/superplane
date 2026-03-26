@@ -18,6 +18,12 @@ type DeleteAlertConfiguration struct {
 	AlertID string `json:"alertId" mapstructure:"alertId"`
 }
 
+type DeleteAlertOutput struct {
+	ID      string `json:"id" mapstructure:"id"`
+	Name    string `json:"name" mapstructure:"name"`
+	Deleted bool   `json:"deleted" mapstructure:"deleted"`
+}
+
 func (c *DeleteAlert) Name() string {
 	return "sentry.deleteAlert"
 }
@@ -50,7 +56,7 @@ Returns the deleted alert ID and name so downstream steps can record the removal
 }
 
 func (c *DeleteAlert) Icon() string {
-	return "bug"
+	return "bell"
 }
 
 func (c *DeleteAlert) Color() string {
