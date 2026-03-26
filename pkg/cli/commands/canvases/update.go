@@ -112,11 +112,21 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		spec := version.GetSpec()
 
 		if versioningContext.versioningEnabled {
-		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		}
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
-		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+
+		integrations := make(map[string]struct{})
+		for _, node := range spec.GetNodes() {
+			if ref, ok := node.GetIntegrationOk(); ok && ref != nil {
+				if id := ref.GetId(); id != "" {
+					integrations[id] = struct{}{}
+				}
+			}
+		}
+		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
 		return err
 	})
 }
