@@ -76,8 +76,8 @@ export const listAlertsMapper: ComponentBaseMapper = {
       { label: "Alert Count", value: String(alerts.length) },
       { label: "Projects", value: summarizeProjects(alerts) },
       { label: "First Alert", value: alerts[0]?.name },
-      { label: "Environment", value: normalizeNullable(alerts[0]?.environment) },
-      { label: "Triggers", value: summarizeTriggerCount(alerts) },
+      { label: "First Alert Environment", value: normalizeNullable(alerts[0]?.environment) },
+      { label: "Total Triggers", value: summarizeTriggerCount(alerts) },
     ]);
 
     return details;

@@ -514,21 +514,29 @@ func (c *Client) UpdateIssue(issueID string, request UpdateIssueRequest) (*Issue
 }
 
 func (c *Client) ListAlertRules() ([]MetricAlertRule, error) {
-	responseBody, err := c.doJSON(
-		http.MethodGet,
-		fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug),
-		nil,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	alertRules := []MetricAlertRule{}
-	if err := json.Unmarshal(responseBody, &alertRules); err != nil {
-		return nil, err
-	}
+	path := fmt.Sprintf("/api/0/organizations/%s/alert-rules/", c.orgSlug)
 
-	return alertRules, nil
+	for {
+		responseBody, headers, err := c.doJSONResponse(http.MethodGet, path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		page := []MetricAlertRule{}
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, err
+		}
+
+		alertRules = append(alertRules, page...)
+
+		nextPath := nextCursorPath(headers.Get("Link"))
+		if nextPath == "" {
+			return alertRules, nil
+		}
+
+		path = nextPath
+	}
 }
 
 func (c *Client) GetAlertRule(alertRuleID string) (*MetricAlertRule, error) {
@@ -550,18 +558,23 @@ func (c *Client) GetAlertRule(alertRuleID string) (*MetricAlertRule, error) {
 }
 
 func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
+	responseBody, _, err := c.doJSONResponse(method, path, payload)
+	return responseBody, err
+}
+
+func (c *Client) doJSONResponse(method, path string, payload any) ([]byte, http.Header, error) {
 	var body io.Reader
 	if payload != nil {
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		body = bytes.NewReader(encoded)
 	}
 
 	req, err := http.NewRequest(method, c.baseURL+path, body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.userToken)
@@ -572,18 +585,54 @@ func (c *Client) doJSON(method, path string, payload any) ([]byte, error) {
 
 	resp, err := c.httpContext.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, &apiError{StatusCode: resp.StatusCode, Body: string(responseBody)}
+		return nil, nil, &apiError{StatusCode: resp.StatusCode, Body: string(responseBody)}
 	}
 
-	return responseBody, nil
+	return responseBody, resp.Header, nil
+}
+
+func nextCursorPath(linkHeader string) string {
+	for _, section := range strings.Split(linkHeader, ",") {
+		section = strings.TrimSpace(section)
+		if section == "" || !strings.Contains(section, `rel="next"`) || !strings.Contains(section, `results="true"`) {
+			continue
+		}
+
+		start := strings.Index(section, "<")
+		end := strings.Index(section, ">")
+		if start == -1 || end == -1 || end <= start+1 {
+			continue
+		}
+
+		nextURL, err := url.Parse(section[start+1 : end])
+		if err != nil {
+			continue
+		}
+
+		if nextURL.RawPath != "" {
+			return nextURL.RawPath + "?" + nextURL.RawQuery
+		}
+
+		if nextURL.Path == "" {
+			continue
+		}
+
+		if nextURL.RawQuery == "" {
+			return nextURL.Path
+		}
+
+		return nextURL.Path + "?" + nextURL.RawQuery
+	}
+
+	return ""
 }

@@ -113,6 +113,21 @@ func (c *GetAlert) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("alertId is required")
 	}
 
+	var project *ProjectSummary
+	if config.Project != "" {
+		project = findProject(ctx.Integration, config.Project)
+		if project == nil {
+			return fmt.Errorf("project %q was not found in the connected Sentry organization", config.Project)
+		}
+	}
+
+	if isExpressionValue(config.AlertID) {
+		return ctx.Metadata.Set(GetAlertNodeMetadata{
+			Project:   project,
+			AlertName: "",
+		})
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create sentry client: %w", err)
@@ -123,16 +138,8 @@ func (c *GetAlert) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to retrieve sentry alert: %w", err)
 	}
 
-	var project *ProjectSummary
-	if config.Project != "" {
-		project = findProject(ctx.Integration, config.Project)
-		if project == nil {
-			return fmt.Errorf("project %q was not found in the connected Sentry organization", config.Project)
-		}
-
-		if !alertRuleContainsProject(*alertRule, config.Project) {
-			return fmt.Errorf("alert %q is not associated with project %q", alertRule.Name, config.Project)
-		}
+	if config.Project != "" && !alertRuleContainsProject(*alertRule, config.Project) {
+		return fmt.Errorf("alert %q is not associated with project %q", alertRule.Name, config.Project)
 	}
 
 	return ctx.Metadata.Set(GetAlertNodeMetadata{
@@ -201,4 +208,9 @@ func decodeGetAlertConfiguration(input any) (GetAlertConfiguration, error) {
 	config.Project = strings.TrimSpace(config.Project)
 	config.AlertID = strings.TrimSpace(config.AlertID)
 	return config, nil
+}
+
+func isExpressionValue(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	return strings.Contains(trimmed, "{{") && strings.Contains(trimmed, "}}")
 }
