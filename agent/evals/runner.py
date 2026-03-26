@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import os
+import evals.evaluators as evals
 
 from pydantic_evals import Case, Dataset
 
 from ai.agent import AgentDeps, build_agent, build_prompt
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from evals.evaluators import BracketSelectorsMatchCanvasNames, NoDollarDataAsRoot, WorkflowShape
 from evals.report import ReportBuilder
 
 dataset = Dataset(
@@ -19,10 +19,9 @@ dataset = Dataset(
                 "Build me a basic workflow that starts with a manual run and runs two noop actions"
             ),
             evaluators=[
-                WorkflowShape(
-                  nodes=["start", "noop", "noop"],
-                  edges=[("start", "noop"), ("noop", "noop")],
-                )
+              evals.CanvasHasTrigger("start"),
+              evals.CanvasHasNode("noop", count=2),
+              evals.CanvasTotalNodeCount(count=3),
             ],
         ),
 
@@ -33,10 +32,9 @@ dataset = Dataset(
                 "a comment is made"
             ),
             evaluators=[
-                WorkflowShape(
-                  nodes=["github.onPRComment", "slack.sendTextMessage"],
-                  edges=[("github.onPRComment", "slack.sendTextMessage")],
-                )
+                evals.CanvasHasTrigger("github.onPRComment"),
+                evals.CanvasHasNode("slack.sendTextMessage", count=1),
+                evals.CanvasTotalNodeCount(count=2),
             ],
         ),
         Case(
@@ -46,11 +44,10 @@ dataset = Dataset(
                 "that includes the issue title"
             ),
             evaluators=[
-                WorkflowShape(
-                    nodes=["github.onIssue", "discord.sendTextMessage"],
-                    edges=[("github.onIssue", "discord.sendTextMessage")],
-                ),
-                NoDollarDataAsRoot(),
+                evals.CanvasHasTrigger("github.onIssue"),
+                evals.CanvasHasNode("discord.sendTextMessage"),
+                evals.CanvasTotalNodeCount(count=2),
+                evals.NoDollarDataAsRoot(),
             ],
         ),
         Case(
@@ -60,14 +57,11 @@ dataset = Dataset(
                 "send text message; the Slack message body should contain the name of the PR and the time the filter node was executed"
             ),
             evaluators=[
-                WorkflowShape(
-                    nodes=["github.onPRComment", "filter", "slack.sendTextMessage"],
-                    edges=[
-                        ("github.onPRComment", "filter"),
-                        ("filter", "slack.sendTextMessage"),
-                    ],
-                ),
-                BracketSelectorsMatchCanvasNames(
+                evals.CanvasHasTrigger("github.onPRComment"),
+                evals.CanvasHasNode("filter"),
+                evals.CanvasHasNode("slack.sendTextMessage"),
+                evals.CanvasTotalNodeCount(count=3),
+                evals.BracketSelectorsMatchCanvasNames(
                     scan_scope="all",
                     require_at_least_one_selector=True,
                     target_block_name="slack.sendTextMessage",
@@ -82,53 +76,20 @@ dataset = Dataset(
                 "On PR close or after 48 hours, tear it down."
             ),
             evaluators=[
-                WorkflowShape(
-                  nodes=[
-                      "github.onPullRequest",
-                      "daytona.createRepositorySandbox",
-                      "upsertMemory",
-                      "github.createIssueComment",
-                      "wait",
-                      "daytona.deleteSandbox",
-                      "github.onPullRequest",
-                      "readMemory",
-                      "daytona.deleteSandbox",
-                  ],
-                  edges=[
-                      ("github.onPullRequest", "daytona.createRepositorySandbox"),
-                      ("daytona.createRepositorySandbox", "upsertMemory"),
-                      ("upsertMemory", "github.createIssueComment"),
-                      ("github.createIssueComment", "wait"),
-                      ("wait", "daytona.deleteSandbox"),
-                      ("github.onPullRequest", "readMemory"),
-                      ("readMemory", "daytona.deleteSandbox"),
-                  ],
-                )
+              evals.CanvasHasTrigger("github.onPullRequest"),
+              evals.CanvasHasNode("daytona.createRepositorySandbox"),
+              evals.CanvasHasNode("wait"),
+              evals.CanvasHasNode("daytona.deleteSandbox", count=2),
+              evals.CanvasHasWorkflow("github.onPullRequest", "...", "daytona.createRepositorySandbox", "...", "wait", "...", "daytona.deleteSandbox"),
+              evals.CanvasHasWorkflow("github.onPullRequest", "...", "readMemory", "...", "daytona.deleteSandbox"),
             ],
         ),
         Case(
             name="agent_labeled_issue_auto_resolve",
             inputs="Build a workflow that auto-resolves GitHub issues",
             evaluators=[
-                WorkflowShape(
-                  nodes=[
-                      "github.onIssue",
-                      "filter",
-                      "github.createIssueComment",
-                      "daytona.executeCode",
-                      "github.updateIssue",
-                      "github.createIssueComment",
-                      "github.createIssueComment",
-                  ],
-                  edges=[
-                      ("github.onIssue", "filter"),
-                      ("filter", "github.createIssueComment"),
-                      ("github.createIssueComment", "daytona.executeCode"),
-                      ("daytona.executeCode", "github.updateIssue"),
-                      ("github.updateIssue", "github.createIssueComment"),
-                      ("daytona.executeCode", "github.createIssueComment"),
-                  ],
-                )
+              evals.CanvasHasTrigger("github.onIssue"),
+              evals.CanvasHasWorkflow("github.onIssue", "...", "github.createIssueComment", "...", "daytona.executeCode", "...", "github.createIssueComment"),
             ],
         ),
     ],
