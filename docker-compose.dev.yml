@@ -122,6 +122,7 @@ services:
       IN_DOCKER: "1"
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
+      JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
     command: >-
       bash -lc "uv run uvicorn ai.web:create_app
       --factory
