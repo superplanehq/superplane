@@ -1,5 +1,7 @@
 import os
 import threading
+import uuid
+
 from concurrent import futures
 from dataclasses import dataclass
 
@@ -7,7 +9,7 @@ import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat, StoredAgentChatMessage
-from internal import agents_pb2
+from private import agents_pb2
 
 
 @dataclass(frozen=True)

@@ -133,9 +133,9 @@ def _parse_stream_event(raw_line: bytes) -> dict[str, Any] | None:
 
 def _resolve_stream_url(web_url: str) -> str:
     normalized = web_url.rstrip("/")
-    if normalized.endswith("/v1/agent/chat/stream"):
+    if re.search(r"/agents/chats/[^/]+/stream$", normalized):
         return normalized
-    return f"{normalized}/v1/agent/chat/stream"
+    return f"{normalized}/agents/chats/local/stream"
 
 
 def _stream_repl_answer(

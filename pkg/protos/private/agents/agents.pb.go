@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v3.15.8
-// source: internal/agents.proto
+// source: private/agents.proto
 
 package agents
 
@@ -33,7 +33,7 @@ type ListAgentChatsRequest struct {
 
 func (x *ListAgentChatsRequest) Reset() {
 	*x = ListAgentChatsRequest{}
-	mi := &file_internal_agents_proto_msgTypes[0]
+	mi := &file_private_agents_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *ListAgentChatsRequest) String() string {
 func (*ListAgentChatsRequest) ProtoMessage() {}
 
 func (x *ListAgentChatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[0]
+	mi := &file_private_agents_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *ListAgentChatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentChatsRequest.ProtoReflect.Descriptor instead.
 func (*ListAgentChatsRequest) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{0}
+	return file_private_agents_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ListAgentChatsRequest) GetOrgId() string {
@@ -91,7 +91,7 @@ type ListAgentChatsResponse struct {
 
 func (x *ListAgentChatsResponse) Reset() {
 	*x = ListAgentChatsResponse{}
-	mi := &file_internal_agents_proto_msgTypes[1]
+	mi := &file_private_agents_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +103,7 @@ func (x *ListAgentChatsResponse) String() string {
 func (*ListAgentChatsResponse) ProtoMessage() {}
 
 func (x *ListAgentChatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[1]
+	mi := &file_private_agents_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +116,7 @@ func (x *ListAgentChatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentChatsResponse.ProtoReflect.Descriptor instead.
 func (*ListAgentChatsResponse) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{1}
+	return file_private_agents_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ListAgentChatsResponse) GetChats() []*ChatInfo {
@@ -138,7 +138,7 @@ type DescribeAgentChatRequest struct {
 
 func (x *DescribeAgentChatRequest) Reset() {
 	*x = DescribeAgentChatRequest{}
-	mi := &file_internal_agents_proto_msgTypes[2]
+	mi := &file_private_agents_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -150,7 +150,7 @@ func (x *DescribeAgentChatRequest) String() string {
 func (*DescribeAgentChatRequest) ProtoMessage() {}
 
 func (x *DescribeAgentChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[2]
+	mi := &file_private_agents_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -163,7 +163,7 @@ func (x *DescribeAgentChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeAgentChatRequest.ProtoReflect.Descriptor instead.
 func (*DescribeAgentChatRequest) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{2}
+	return file_private_agents_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *DescribeAgentChatRequest) GetOrgId() string {
@@ -203,7 +203,7 @@ type DescribeAgentChatResponse struct {
 
 func (x *DescribeAgentChatResponse) Reset() {
 	*x = DescribeAgentChatResponse{}
-	mi := &file_internal_agents_proto_msgTypes[3]
+	mi := &file_private_agents_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -215,7 +215,7 @@ func (x *DescribeAgentChatResponse) String() string {
 func (*DescribeAgentChatResponse) ProtoMessage() {}
 
 func (x *DescribeAgentChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[3]
+	mi := &file_private_agents_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -228,7 +228,7 @@ func (x *DescribeAgentChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeAgentChatResponse.ProtoReflect.Descriptor instead.
 func (*DescribeAgentChatResponse) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{3}
+	return file_private_agents_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *DescribeAgentChatResponse) GetChat() *ChatInfo {
@@ -250,7 +250,7 @@ type ListAgentChatMessagesRequest struct {
 
 func (x *ListAgentChatMessagesRequest) Reset() {
 	*x = ListAgentChatMessagesRequest{}
-	mi := &file_internal_agents_proto_msgTypes[4]
+	mi := &file_private_agents_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -262,7 +262,7 @@ func (x *ListAgentChatMessagesRequest) String() string {
 func (*ListAgentChatMessagesRequest) ProtoMessage() {}
 
 func (x *ListAgentChatMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[4]
+	mi := &file_private_agents_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -275,7 +275,7 @@ func (x *ListAgentChatMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentChatMessagesRequest.ProtoReflect.Descriptor instead.
 func (*ListAgentChatMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{4}
+	return file_private_agents_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListAgentChatMessagesRequest) GetOrgId() string {
@@ -315,7 +315,7 @@ type ListAgentChatMessagesResponse struct {
 
 func (x *ListAgentChatMessagesResponse) Reset() {
 	*x = ListAgentChatMessagesResponse{}
-	mi := &file_internal_agents_proto_msgTypes[5]
+	mi := &file_private_agents_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +327,7 @@ func (x *ListAgentChatMessagesResponse) String() string {
 func (*ListAgentChatMessagesResponse) ProtoMessage() {}
 
 func (x *ListAgentChatMessagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[5]
+	mi := &file_private_agents_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +340,7 @@ func (x *ListAgentChatMessagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentChatMessagesResponse.ProtoReflect.Descriptor instead.
 func (*ListAgentChatMessagesResponse) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{5}
+	return file_private_agents_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListAgentChatMessagesResponse) GetMessages() []*AgentChatMessage {
@@ -364,7 +364,7 @@ type AgentChatMessage struct {
 
 func (x *AgentChatMessage) Reset() {
 	*x = AgentChatMessage{}
-	mi := &file_internal_agents_proto_msgTypes[6]
+	mi := &file_private_agents_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -376,7 +376,7 @@ func (x *AgentChatMessage) String() string {
 func (*AgentChatMessage) ProtoMessage() {}
 
 func (x *AgentChatMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[6]
+	mi := &file_private_agents_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +389,7 @@ func (x *AgentChatMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentChatMessage.ProtoReflect.Descriptor instead.
 func (*AgentChatMessage) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{6}
+	return file_private_agents_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AgentChatMessage) GetId() string {
@@ -445,7 +445,7 @@ type CreateAgentChatRequest struct {
 
 func (x *CreateAgentChatRequest) Reset() {
 	*x = CreateAgentChatRequest{}
-	mi := &file_internal_agents_proto_msgTypes[7]
+	mi := &file_private_agents_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -457,7 +457,7 @@ func (x *CreateAgentChatRequest) String() string {
 func (*CreateAgentChatRequest) ProtoMessage() {}
 
 func (x *CreateAgentChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[7]
+	mi := &file_private_agents_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -470,7 +470,7 @@ func (x *CreateAgentChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAgentChatRequest.ProtoReflect.Descriptor instead.
 func (*CreateAgentChatRequest) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{7}
+	return file_private_agents_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CreateAgentChatRequest) GetOrgId() string {
@@ -503,7 +503,7 @@ type CreateAgentChatResponse struct {
 
 func (x *CreateAgentChatResponse) Reset() {
 	*x = CreateAgentChatResponse{}
-	mi := &file_internal_agents_proto_msgTypes[8]
+	mi := &file_private_agents_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -515,7 +515,7 @@ func (x *CreateAgentChatResponse) String() string {
 func (*CreateAgentChatResponse) ProtoMessage() {}
 
 func (x *CreateAgentChatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[8]
+	mi := &file_private_agents_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -528,7 +528,7 @@ func (x *CreateAgentChatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAgentChatResponse.ProtoReflect.Descriptor instead.
 func (*CreateAgentChatResponse) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{8}
+	return file_private_agents_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateAgentChatResponse) GetChat() *ChatInfo {
@@ -549,7 +549,7 @@ type ChatInfo struct {
 
 func (x *ChatInfo) Reset() {
 	*x = ChatInfo{}
-	mi := &file_internal_agents_proto_msgTypes[9]
+	mi := &file_private_agents_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -561,7 +561,7 @@ func (x *ChatInfo) String() string {
 func (*ChatInfo) ProtoMessage() {}
 
 func (x *ChatInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_agents_proto_msgTypes[9]
+	mi := &file_private_agents_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -574,7 +574,7 @@ func (x *ChatInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatInfo.ProtoReflect.Descriptor instead.
 func (*ChatInfo) Descriptor() ([]byte, []int) {
-	return file_internal_agents_proto_rawDescGZIP(), []int{9}
+	return file_private_agents_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ChatInfo) GetId() string {
@@ -598,11 +598,11 @@ func (x *ChatInfo) GetCreatedAt() *timestamp.Timestamp {
 	return nil
 }
 
-var File_internal_agents_proto protoreflect.FileDescriptor
+var File_private_agents_proto protoreflect.FileDescriptor
 
-const file_internal_agents_proto_rawDesc = "" +
+const file_private_agents_proto_rawDesc = "" +
 	"\n" +
-	"\x15internal/agents.proto\x12\x1aSuperplane.Internal.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\"d\n" +
+	"\x14private/agents.proto\x12\x1aSuperplane.Internal.Agents\x1a\x1fgoogle/protobuf/timestamp.proto\"d\n" +
 	"\x15ListAgentChatsRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
@@ -651,19 +651,19 @@ const file_internal_agents_proto_rawDesc = "" +
 	"\x15ListAgentChatMessages\x128.Superplane.Internal.Agents.ListAgentChatMessagesRequest\x1a9.Superplane.Internal.Agents.ListAgentChatMessagesResponseB>Z<github.com/superplanehq/superplane/pkg/protos/private/agentsb\x06proto3"
 
 var (
-	file_internal_agents_proto_rawDescOnce sync.Once
-	file_internal_agents_proto_rawDescData []byte
+	file_private_agents_proto_rawDescOnce sync.Once
+	file_private_agents_proto_rawDescData []byte
 )
 
-func file_internal_agents_proto_rawDescGZIP() []byte {
-	file_internal_agents_proto_rawDescOnce.Do(func() {
-		file_internal_agents_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_agents_proto_rawDesc), len(file_internal_agents_proto_rawDesc)))
+func file_private_agents_proto_rawDescGZIP() []byte {
+	file_private_agents_proto_rawDescOnce.Do(func() {
+		file_private_agents_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_private_agents_proto_rawDesc), len(file_private_agents_proto_rawDesc)))
 	})
-	return file_internal_agents_proto_rawDescData
+	return file_private_agents_proto_rawDescData
 }
 
-var file_internal_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
-var file_internal_agents_proto_goTypes = []any{
+var file_private_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_private_agents_proto_goTypes = []any{
 	(*ListAgentChatsRequest)(nil),         // 0: Superplane.Internal.Agents.ListAgentChatsRequest
 	(*ListAgentChatsResponse)(nil),        // 1: Superplane.Internal.Agents.ListAgentChatsResponse
 	(*DescribeAgentChatRequest)(nil),      // 2: Superplane.Internal.Agents.DescribeAgentChatRequest
@@ -676,7 +676,7 @@ var file_internal_agents_proto_goTypes = []any{
 	(*ChatInfo)(nil),                      // 9: Superplane.Internal.Agents.ChatInfo
 	(*timestamp.Timestamp)(nil),           // 10: google.protobuf.Timestamp
 }
-var file_internal_agents_proto_depIdxs = []int32{
+var file_private_agents_proto_depIdxs = []int32{
 	9,  // 0: Superplane.Internal.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Internal.Agents.ChatInfo
 	9,  // 1: Superplane.Internal.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Internal.Agents.ChatInfo
 	6,  // 2: Superplane.Internal.Agents.ListAgentChatMessagesResponse.messages:type_name -> Superplane.Internal.Agents.AgentChatMessage
@@ -698,26 +698,26 @@ var file_internal_agents_proto_depIdxs = []int32{
 	0,  // [0:6] is the sub-list for field type_name
 }
 
-func init() { file_internal_agents_proto_init() }
-func file_internal_agents_proto_init() {
-	if File_internal_agents_proto != nil {
+func init() { file_private_agents_proto_init() }
+func file_private_agents_proto_init() {
+	if File_private_agents_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_agents_proto_rawDesc), len(file_internal_agents_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_private_agents_proto_rawDesc), len(file_private_agents_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_internal_agents_proto_goTypes,
-		DependencyIndexes: file_internal_agents_proto_depIdxs,
-		MessageInfos:      file_internal_agents_proto_msgTypes,
+		GoTypes:           file_private_agents_proto_goTypes,
+		DependencyIndexes: file_private_agents_proto_depIdxs,
+		MessageInfos:      file_private_agents_proto_msgTypes,
 	}.Build()
-	File_internal_agents_proto = out.File
-	file_internal_agents_proto_goTypes = nil
-	file_internal_agents_proto_depIdxs = nil
+	File_private_agents_proto = out.File
+	file_private_agents_proto_goTypes = nil
+	file_private_agents_proto_depIdxs = nil
 }

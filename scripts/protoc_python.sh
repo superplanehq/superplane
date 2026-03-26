@@ -13,12 +13,12 @@ print(os.path.join(os.path.dirname(grpc_tools.__file__), "_proto"))
 PY
 )
 
-mkdir -p "$PYTHON_OUT/internal"
-touch "$PYTHON_OUT/internal/__init__.py"
+mkdir -p "$PYTHON_OUT/private"
+touch "$PYTHON_OUT/private/__init__.py"
 
 python -m grpc_tools.protoc \
        --proto_path "$PROTO_DIR" \
        --proto_path "$PROTO_DIR/include" \
        --proto_path "$GRPC_TOOLS_INCLUDE" \
        --python_out="$PYTHON_OUT" \
-       "$PROTO_DIR/internal/agents.proto"
+       "$PROTO_DIR/private/agents.proto"
