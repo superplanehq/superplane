@@ -29,7 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
-  <LinkCard title="SSH Command" href="#ssh-command" description="Run a command on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
+  <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
   <LinkCard title="Update Memory" href="#update-memory" description="Update values in canvas memory by namespace and field matches" />
   <LinkCard title="Upsert Memory" href="#upsert-memory" description="Update matching memory rows, or create one when no match exists" />
@@ -667,7 +667,7 @@ Emits the list of recipients and the subject to the default output channel.
 
 ## SSH Command
 
-Run a single command on a remote host via SSH.
+Run one or more commands on a remote host via SSH.
 
 ### Authentication
 
@@ -679,7 +679,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 ### Configuration
 
 - **Host**, **Port** (default 22), **Username**: Connection details.
-- **Command**: The command to run (supports expressions).
+- **Commands**: One or more commands to run, one per line (supports expressions). The output payload is based on the last command.
 - **Working directory**: Optional; Changes to this directory before running the command.
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).

@@ -2,12 +2,16 @@ package digitalocean
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -1310,6 +1314,312 @@ type VPC struct {
 	Default     bool   `json:"default"`
 }
 
+// SpacesClient handles S3-compatible requests to DigitalOcean Spaces.
+// It uses AWS Signature Version 4 for authentication.
+type SpacesClient struct {
+	AccessKey string
+	SecretKey string
+	Region    string
+	http      core.HTTPContext
+}
+
+// NewSpacesClient creates a new SpacesClient using credentials from the integration configuration.
+func NewSpacesClient(httpCtx core.HTTPContext, ctx core.IntegrationContext, region string) (*SpacesClient, error) {
+	accessKey, err := ctx.GetConfig("spacesAccessKey")
+	if err != nil || string(accessKey) == "" {
+		return nil, fmt.Errorf("spaces access key is required — set it in the DigitalOcean integration configuration")
+	}
+
+	secretKey, err := ctx.GetConfig("spacesSecretKey")
+	if err != nil || string(secretKey) == "" {
+		return nil, fmt.Errorf("spaces secret key is required — set it in the DigitalOcean integration configuration")
+	}
+
+	return &SpacesClient{
+		AccessKey: string(accessKey),
+		SecretKey: string(secretKey),
+		Region:    region,
+		http:      httpCtx,
+	}, nil
+}
+
+// execSpacesRequest signs and executes an HTTP request to the Spaces S3-compatible API.
+// If bucket is empty, a region-level request is made (e.g. ListBuckets).
+// queryString is already encoded, e.g. "" or "tagging=".
+func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string) (*http.Response, error) {
+	var host, endpoint string
+	if bucket == "" {
+		host = fmt.Sprintf("%s.digitaloceanspaces.com", c.Region)
+		endpoint = fmt.Sprintf("https://%s/", host)
+	} else {
+		host = fmt.Sprintf("%s.%s.digitaloceanspaces.com", bucket, c.Region)
+		endpoint = fmt.Sprintf("https://%s/%s", host, key)
+	}
+
+	if queryString != "" {
+		endpoint += "?" + queryString
+	}
+
+	now := time.Now().UTC()
+	dateStamp := now.Format("20060102")
+	amzDate := now.Format("20060102T150405Z")
+
+	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	canonicalHeaders := fmt.Sprintf("host:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
+		host, payloadHash, amzDate)
+	signedHeaders := "host;x-amz-content-sha256;x-amz-date"
+
+	path := "/"
+	if key != "" {
+		path = "/" + key
+	}
+
+	canonicalRequest := strings.Join([]string{
+		method,
+		path,
+		queryString,
+		canonicalHeaders,
+		signedHeaders,
+		payloadHash,
+	}, "\n")
+
+	credentialScope := fmt.Sprintf("%s/%s/s3/aws4_request", dateStamp, c.Region)
+	stringToSign := strings.Join([]string{
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		fmt.Sprintf("%x", sha256.Sum256([]byte(canonicalRequest))),
+	}, "\n")
+
+	signingKey := hmacSHA256(
+		hmacSHA256(
+			hmacSHA256(
+				hmacSHA256([]byte("AWS4"+c.SecretKey), dateStamp),
+				c.Region,
+			),
+			"s3",
+		),
+		"aws4_request",
+	)
+
+	signature := fmt.Sprintf("%x", hmacSHA256(signingKey, stringToSign))
+
+	authHeader := fmt.Sprintf(
+		"AWS4-HMAC-SHA256 Credential=%s/%s,SignedHeaders=%s,Signature=%s",
+		c.AccessKey, credentialScope, signedHeaders, signature,
+	)
+
+	req, err := http.NewRequest(method, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Host", host)
+	req.Header.Set("x-amz-date", amzDate)
+	req.Header.Set("x-amz-content-sha256", payloadHash)
+	req.Header.Set("Authorization", authHeader)
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	return res, nil
+}
+
+// ObjectResult holds the response from a GetObject call.
+type ObjectResult struct {
+	ContentType   string
+	ContentLength int64
+	LastModified  string
+	ETag          string
+	Metadata      map[string]string
+	Body          []byte
+	NotFound      bool
+}
+
+// GetObject retrieves an object (and optionally its body) from a Spaces bucket.
+func (c *SpacesClient) GetObject(bucket, key string, includeBody bool) (*ObjectResult, error) {
+	method := http.MethodGet
+	if !includeBody {
+		method = http.MethodHead
+	}
+
+	res, err := c.execSpacesRequest(method, bucket, key, "")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusNotFound {
+		return &ObjectResult{NotFound: true}, nil
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	result := &ObjectResult{
+		ContentType:  res.Header.Get("Content-Type"),
+		LastModified: res.Header.Get("Last-Modified"),
+		ETag:         strings.Trim(res.Header.Get("ETag"), `"`),
+		Metadata:     map[string]string{},
+	}
+
+	if cl := res.Header.Get("Content-Length"); cl != "" {
+		if n, err := strconv.ParseInt(cl, 10, 64); err == nil {
+			result.ContentLength = n
+		}
+	}
+
+	for k, v := range res.Header {
+		lower := strings.ToLower(k)
+		if strings.HasPrefix(lower, "x-amz-meta-") {
+			metaKey := strings.TrimPrefix(lower, "x-amz-meta-")
+			if len(v) > 0 {
+				result.Metadata[metaKey] = v[0]
+			}
+		}
+	}
+
+	if includeBody && isReadableContentType(result.ContentType) {
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading body: %v", err)
+		}
+		result.Body = bodyBytes
+	}
+
+	return result, nil
+}
+
+// ListBuckets returns all Spaces buckets in the client's region.
+func (c *SpacesClient) ListBuckets() ([]string, error) {
+	res, err := c.execSpacesRequest(http.MethodGet, "", "", "")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading list buckets response: %v", err)
+	}
+
+	var result struct {
+		Buckets struct {
+			Buckets []struct {
+				Name string `xml:"Name"`
+			} `xml:"Bucket"`
+		} `xml:"Buckets"`
+	}
+
+	if err := xml.Unmarshal(bodyBytes, &result); err != nil {
+		return nil, fmt.Errorf("error parsing list buckets response: %v", err)
+	}
+
+	names := make([]string, 0, len(result.Buckets.Buckets))
+	for _, b := range result.Buckets.Buckets {
+		names = append(names, b.Name)
+	}
+
+	return names, nil
+}
+
+// GetObjectTagging retrieves the tags applied to an object in a Spaces bucket.
+func (c *SpacesClient) GetObjectTagging(bucket, key string) (map[string]string, error) {
+	res, err := c.execSpacesRequest(http.MethodGet, bucket, key, "tagging=")
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading tagging response: %v", err)
+	}
+
+	var tagging struct {
+		TagSet struct {
+			Tags []struct {
+				Key   string `xml:"Key"`
+				Value string `xml:"Value"`
+			} `xml:"Tag"`
+		} `xml:"TagSet"`
+	}
+
+	if err := xml.Unmarshal(bodyBytes, &tagging); err != nil {
+		return nil, fmt.Errorf("error parsing tagging response: %v", err)
+	}
+
+	tags := make(map[string]string, len(tagging.TagSet.Tags))
+	for _, tag := range tagging.TagSet.Tags {
+		tags[tag.Key] = tag.Value
+	}
+
+	return tags, nil
+}
+
+// FormatSize converts a byte count to a human-readable string (KiB, MiB, GiB).
+func FormatSize(bytes int64) string {
+	const (
+		kib = 1024
+		mib = 1024 * kib
+		gib = 1024 * mib
+	)
+
+	switch {
+	case bytes >= gib:
+		return fmt.Sprintf("%.2f GiB", float64(bytes)/float64(gib))
+	case bytes >= mib:
+		return fmt.Sprintf("%.2f MiB", float64(bytes)/float64(mib))
+	case bytes >= kib:
+		return fmt.Sprintf("%.2f KiB", float64(bytes)/float64(kib))
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
+
+// isReadableContentType returns true if the content type is human-readable text.
+func isReadableContentType(contentType string) bool {
+	ct := strings.ToLower(strings.Split(contentType, ";")[0])
+	readable := []string{
+		"text/",
+		"application/json",
+		"application/xml",
+		"application/yaml",
+		"application/x-yaml",
+		"application/javascript",
+		"application/toml",
+		"application/x-www-form-urlencoded",
+	}
+	for _, r := range readable {
+		if strings.HasPrefix(ct, r) {
+			return true
+		}
+	}
+	return false
+}
+
+// hmacSHA256 computes HMAC-SHA256 of data with key.
+func hmacSHA256(key []byte, data string) []byte {
+	h := hmac.New(sha256.New, key)
+	h.Write([]byte(data))
+	return h.Sum(nil)
+}
+
 // ListVPCs retrieves all VPCs in the account
 func (c *Client) ListVPCs() ([]VPC, error) {
 	url := fmt.Sprintf("%s/vpcs?per_page=200", c.BaseURL)
@@ -1327,4 +1637,474 @@ func (c *Client) ListVPCs() ([]VPC, error) {
 	}
 
 	return response.VPCs, nil
+}
+
+// App represents a DigitalOcean App Platform application
+type App struct {
+	ID                      string            `json:"id"`
+	Spec                    *AppSpec          `json:"spec"`
+	DefaultIngress          string            `json:"default_ingress,omitempty"`
+	LiveURL                 string            `json:"live_url,omitempty"`
+	LiveURLBase             string            `json:"live_url_base,omitempty"`
+	LiveDomain              string            `json:"live_domain,omitempty"`
+	ActiveDeployment        *Deployment       `json:"active_deployment,omitempty"`
+	InProgressDeployment    *Deployment       `json:"in_progress_deployment,omitempty"`
+	LastDeploymentCreatedAt string            `json:"last_deployment_created_at,omitempty"`
+	CreatedAt               string            `json:"created_at"`
+	UpdatedAt               string            `json:"updated_at"`
+	Region                  *AppRegion        `json:"region,omitempty"`
+	PendingDeployment       PendingDeployment `json:"pending_deployment,omitempty"`
+}
+
+// AppSpec defines the specification for an App Platform application
+type AppSpec struct {
+	Name        string           `json:"name"`
+	Region      string           `json:"region,omitempty"`
+	Services    []*AppService    `json:"services,omitempty"`
+	Workers     []*AppWorker     `json:"workers,omitempty"`
+	Jobs        []*AppJob        `json:"jobs,omitempty"`
+	StaticSites []*AppStaticSite `json:"static_sites,omitempty"`
+	Databases   []*AppDatabase   `json:"databases,omitempty"`
+	Domains     []*AppDomain     `json:"domains,omitempty"`
+	Ingress     *AppIngress      `json:"ingress,omitempty"`
+	VPC         *AppVPC          `json:"vpc,omitempty"`
+}
+
+// AppIngress defines ingress rules for an app
+type AppIngress struct {
+	Rules []*AppIngressRule `json:"rules,omitempty"`
+}
+
+// AppIngressRule defines a single ingress rule
+type AppIngressRule struct {
+	Match     *AppIngressRuleMatch     `json:"match,omitempty"`
+	Component *AppIngressRuleComponent `json:"component,omitempty"`
+	CORS      *AppCORS                 `json:"cors,omitempty"`
+}
+
+// AppIngressRuleMatch defines the match criteria for an ingress rule
+type AppIngressRuleMatch struct {
+	Path *AppIngressRuleMatchPath `json:"path,omitempty"`
+}
+
+// AppIngressRuleMatchPath defines path matching for an ingress rule
+type AppIngressRuleMatchPath struct {
+	Prefix string `json:"prefix,omitempty"`
+}
+
+// AppIngressRuleComponent references a component in an ingress rule
+type AppIngressRuleComponent struct {
+	Name               string `json:"name"`
+	PreservePathPrefix bool   `json:"preserve_path_prefix,omitempty"`
+}
+
+// AppCORS defines Cross-Origin Resource Sharing configuration
+type AppCORS struct {
+	AllowOrigins     []*AppCORSAllowOrigin `json:"allow_origins,omitempty"`
+	AllowMethods     []string              `json:"allow_methods,omitempty"`
+	AllowHeaders     []string              `json:"allow_headers,omitempty"`
+	ExposeHeaders    []string              `json:"expose_headers,omitempty"`
+	MaxAge           string                `json:"max_age,omitempty"`
+	AllowCredentials bool                  `json:"allow_credentials,omitempty"`
+}
+
+// AppCORSAllowOrigin defines an allowed origin for CORS
+type AppCORSAllowOrigin struct {
+	Exact  string `json:"exact,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
+	Regex  string `json:"regex,omitempty"`
+}
+
+// AppService represents a service component in an app
+type AppService struct {
+	Name             string           `json:"name"`
+	GitHub           *GitHubSource    `json:"github,omitempty"`
+	GitLab           *GitLabSource    `json:"gitlab,omitempty"`
+	Bitbucket        *BitbucketSource `json:"bitbucket,omitempty"`
+	Git              *GitSource       `json:"git,omitempty"`
+	Image            *ImageSource     `json:"image,omitempty"`
+	EnvironmentSlug  string           `json:"environment_slug,omitempty"`
+	EnvVariables     []*AppEnvVar     `json:"envs,omitempty"`
+	InstanceCount    int64            `json:"instance_count,omitempty"`
+	InstanceSizeSlug string           `json:"instance_size_slug,omitempty"`
+	Routes           []*AppRoute      `json:"routes,omitempty"`
+	HealthCheck      *HealthCheck     `json:"health_check,omitempty"`
+	HTTPPort         int64            `json:"http_port,omitempty"`
+	RunCommand       string           `json:"run_command,omitempty"`
+	BuildCommand     string           `json:"build_command,omitempty"`
+	SourceDir        string           `json:"source_dir,omitempty"`
+}
+
+// AppWorker represents a worker component in an app
+type AppWorker struct {
+	Name             string           `json:"name"`
+	GitHub           *GitHubSource    `json:"github,omitempty"`
+	GitLab           *GitLabSource    `json:"gitlab,omitempty"`
+	Bitbucket        *BitbucketSource `json:"bitbucket,omitempty"`
+	Git              *GitSource       `json:"git,omitempty"`
+	Image            *ImageSource     `json:"image,omitempty"`
+	EnvironmentSlug  string           `json:"environment_slug,omitempty"`
+	EnvVariables     []*AppEnvVar     `json:"envs,omitempty"`
+	InstanceCount    int64            `json:"instance_count,omitempty"`
+	InstanceSizeSlug string           `json:"instance_size_slug,omitempty"`
+	RunCommand       string           `json:"run_command,omitempty"`
+	BuildCommand     string           `json:"build_command,omitempty"`
+	SourceDir        string           `json:"source_dir,omitempty"`
+}
+
+// AppJob represents a job component in an app
+type AppJob struct {
+	Name             string           `json:"name"`
+	GitHub           *GitHubSource    `json:"github,omitempty"`
+	GitLab           *GitLabSource    `json:"gitlab,omitempty"`
+	Bitbucket        *BitbucketSource `json:"bitbucket,omitempty"`
+	Git              *GitSource       `json:"git,omitempty"`
+	Image            *ImageSource     `json:"image,omitempty"`
+	EnvironmentSlug  string           `json:"environment_slug,omitempty"`
+	EnvVariables     []*AppEnvVar     `json:"envs,omitempty"`
+	InstanceCount    int64            `json:"instance_count,omitempty"`
+	InstanceSizeSlug string           `json:"instance_size_slug,omitempty"`
+	Kind             string           `json:"kind,omitempty"`
+	RunCommand       string           `json:"run_command,omitempty"`
+	BuildCommand     string           `json:"build_command,omitempty"`
+	SourceDir        string           `json:"source_dir,omitempty"`
+}
+
+// AppStaticSite represents a static site component in an app
+type AppStaticSite struct {
+	Name             string           `json:"name"`
+	GitHub           *GitHubSource    `json:"github,omitempty"`
+	GitLab           *GitLabSource    `json:"gitlab,omitempty"`
+	Bitbucket        *BitbucketSource `json:"bitbucket,omitempty"`
+	Git              *GitSource       `json:"git,omitempty"`
+	EnvironmentSlug  string           `json:"environment_slug,omitempty"`
+	EnvVariables     []*AppEnvVar     `json:"envs,omitempty"`
+	BuildCommand     string           `json:"build_command,omitempty"`
+	OutputDir        string           `json:"output_dir,omitempty"`
+	SourceDir        string           `json:"source_dir,omitempty"`
+	IndexDocument    string           `json:"index_document,omitempty"`
+	ErrorDocument    string           `json:"error_document,omitempty"`
+	CatchallDocument string           `json:"catchall_document,omitempty"`
+	Routes           []*AppRoute      `json:"routes,omitempty"`
+}
+
+// AppDatabase represents a database component in an app
+type AppDatabase struct {
+	Name        string `json:"name"`
+	Engine      string `json:"engine,omitempty"`
+	Version     string `json:"version,omitempty"`
+	Production  bool   `json:"production,omitempty"`
+	ClusterName string `json:"cluster_name,omitempty"`
+	DBName      string `json:"db_name,omitempty"`
+	DBUser      string `json:"db_user,omitempty"`
+}
+
+// AppDomain represents a custom domain for an app
+type AppDomain struct {
+	Domain   string `json:"domain"`
+	Type     string `json:"type,omitempty"`
+	Wildcard bool   `json:"wildcard,omitempty"`
+	Zone     string `json:"zone,omitempty"`
+}
+
+// AppVPC represents a VPC configuration for an app
+type AppVPC struct {
+	ID string `json:"id"`
+}
+
+// GitHubSource represents a GitHub repository source
+type GitHubSource struct {
+	Repo         string `json:"repo"`
+	Branch       string `json:"branch,omitempty"`
+	DeployOnPush bool   `json:"deploy_on_push"`
+}
+
+// GitLabSource represents a GitLab repository source
+type GitLabSource struct {
+	Repo         string `json:"repo"`
+	Branch       string `json:"branch,omitempty"`
+	DeployOnPush bool   `json:"deploy_on_push"`
+}
+
+// BitbucketSource represents a Bitbucket repository source
+type BitbucketSource struct {
+	Repo         string `json:"repo"`
+	Branch       string `json:"branch,omitempty"`
+	DeployOnPush bool   `json:"deploy_on_push"`
+}
+
+// GitSource represents a generic Git repository source
+type GitSource struct {
+	RepoCloneURL string `json:"repo_clone_url"`
+	Branch       string `json:"branch,omitempty"`
+}
+
+// ImageSource represents a container image source
+type ImageSource struct {
+	RegistryType string `json:"registry_type"`
+	Registry     string `json:"registry,omitempty"`
+	Repository   string `json:"repository"`
+	Tag          string `json:"tag,omitempty"`
+}
+
+// AppEnvVar represents an environment variable
+type AppEnvVar struct {
+	Key   string `json:"key"`
+	Value string `json:"value,omitempty"`
+	Scope string `json:"scope,omitempty"`
+	Type  string `json:"type,omitempty"`
+}
+
+// AppRoute represents a route configuration for a service
+type AppRoute struct {
+	Path               string `json:"path,omitempty"`
+	PreservePathPrefix bool   `json:"preserve_path_prefix,omitempty"`
+}
+
+// HealthCheck represents health check configuration
+type HealthCheck struct {
+	HTTPPath            string `json:"http_path,omitempty"`
+	InitialDelaySeconds int32  `json:"initial_delay_seconds,omitempty"`
+	PeriodSeconds       int32  `json:"period_seconds,omitempty"`
+	TimeoutSeconds      int32  `json:"timeout_seconds,omitempty"`
+	SuccessThreshold    int32  `json:"success_threshold,omitempty"`
+	FailureThreshold    int32  `json:"failure_threshold,omitempty"`
+}
+
+// Deployment represents an app deployment
+type Deployment struct {
+	ID          string                  `json:"id"`
+	Spec        *AppSpec                `json:"spec,omitempty"`
+	Services    []*DeploymentService    `json:"services,omitempty"`
+	Workers     []*DeploymentWorker     `json:"workers,omitempty"`
+	Jobs        []*DeploymentJob        `json:"jobs,omitempty"`
+	StaticSites []*DeploymentStaticSite `json:"static_sites,omitempty"`
+	Phase       string                  `json:"phase,omitempty"`
+	Progress    *DeploymentProgress     `json:"progress,omitempty"`
+	CreatedAt   string                  `json:"created_at"`
+	UpdatedAt   string                  `json:"updated_at"`
+	Cause       string                  `json:"cause,omitempty"`
+}
+
+// DeploymentService represents a deployed service
+type DeploymentService struct {
+	Name             string `json:"name"`
+	SourceCommitHash string `json:"source_commit_hash,omitempty"`
+}
+
+// DeploymentWorker represents a deployed worker
+type DeploymentWorker struct {
+	Name             string `json:"name"`
+	SourceCommitHash string `json:"source_commit_hash,omitempty"`
+}
+
+// DeploymentJob represents a deployed job
+type DeploymentJob struct {
+	Name             string `json:"name"`
+	SourceCommitHash string `json:"source_commit_hash,omitempty"`
+}
+
+// DeploymentStaticSite represents a deployed static site
+type DeploymentStaticSite struct {
+	Name             string `json:"name"`
+	SourceCommitHash string `json:"source_commit_hash,omitempty"`
+}
+
+// DeploymentProgress tracks deployment progress
+type DeploymentProgress struct {
+	PendingSteps int32                     `json:"pending_steps,omitempty"`
+	RunningSteps int32                     `json:"running_steps,omitempty"`
+	SuccessSteps int32                     `json:"success_steps,omitempty"`
+	ErrorSteps   int32                     `json:"error_steps,omitempty"`
+	TotalSteps   int32                     `json:"total_steps,omitempty"`
+	Steps        []*DeploymentProgressStep `json:"steps,omitempty"`
+}
+
+// DeploymentProgressStep represents a single deployment step
+type DeploymentProgressStep struct {
+	Name      string                    `json:"name"`
+	Status    string                    `json:"status"`
+	Steps     []*DeploymentProgressStep `json:"steps,omitempty"`
+	StartedAt string                    `json:"started_at,omitempty"`
+	EndedAt   string                    `json:"ended_at,omitempty"`
+}
+
+// AppRegion represents the region where an app is deployed
+type AppRegion struct {
+	Slug        string   `json:"slug"`
+	Label       string   `json:"label"`
+	Flag        string   `json:"flag"`
+	Continent   string   `json:"continent"`
+	DataCenters []string `json:"data_centers,omitempty"`
+}
+
+type PendingDeployment struct {
+	ID string `json:"id"`
+}
+
+// CreateAppRequest is the payload for creating an app
+type CreateAppRequest struct {
+	Spec *AppSpec `json:"spec"`
+}
+
+// UpdateAppRequest is the payload for updating an app
+type UpdateAppRequest struct {
+	Spec *AppSpec `json:"spec"`
+}
+
+// CreateApp creates a new App Platform application
+func (c *Client) CreateApp(req CreateAppRequest) (*App, error) {
+	url := fmt.Sprintf("%s/apps", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		App App `json:"app"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.App, nil
+}
+
+// GetApp retrieves an app by its ID
+func (c *Client) GetApp(appID string) (*App, error) {
+	url := fmt.Sprintf("%s/apps/%s", c.BaseURL, appID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		App App `json:"app"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.App, nil
+}
+
+// UpdateApp updates an existing app
+func (c *Client) UpdateApp(appID string, req UpdateAppRequest) (*App, error) {
+	url := fmt.Sprintf("%s/apps/%s", c.BaseURL, appID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		App App `json:"app"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.App, nil
+}
+
+// DeleteApp deletes an app by its ID
+func (c *Client) DeleteApp(appID string) error {
+	url := fmt.Sprintf("%s/apps/%s", c.BaseURL, appID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// GetDeployment retrieves a specific deployment for an app
+func (c *Client) GetDeployment(appID, deploymentID string) (*Deployment, error) {
+	url := fmt.Sprintf("%s/apps/%s/deployments/%s", c.BaseURL, appID, deploymentID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Deployment Deployment `json:"deployment"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Deployment, nil
+}
+
+// ListApps retrieves all apps in the account
+func (c *Client) ListApps() ([]App, error) {
+	url := fmt.Sprintf("%s/apps?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Apps []App `json:"apps"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Apps, nil
+}
+
+// AppNodeMetadata stores metadata about an app for display in the UI
+type AppNodeMetadata struct {
+	AppID   string `json:"appId" mapstructure:"appId"`
+	AppName string `json:"appName" mapstructure:"appName"`
+}
+
+// resolveAppMetadata fetches the app name from the API and stores it in metadata
+func resolveAppMetadata(ctx core.SetupContext, appID string) error {
+	// Handle expression placeholders
+	if strings.Contains(appID, "{{") {
+		return ctx.Metadata.Set(AppNodeMetadata{
+			AppName: appID,
+		})
+	}
+
+	// Check if already cached
+	var existing AppNodeMetadata
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil && existing.AppID == appID && existing.AppName != "" {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	app, err := client.GetApp(appID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch app %q: %w", appID, err)
+	}
+
+	appName := appID
+	if app.Spec != nil {
+		appName = app.Spec.Name
+	}
+
+	return ctx.Metadata.Set(AppNodeMetadata{
+		AppID:   appID,
+		AppName: appName,
+	})
 }

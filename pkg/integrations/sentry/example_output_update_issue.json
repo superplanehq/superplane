@@ -1,0 +1,23 @@
+{
+  "id": "123",
+  "shortId": "IPE-1",
+  "title": "Error #1: This is a test error!",
+  "culprit": "SentryCustomError(frontend/src/util)",
+  "level": "error",
+  "status": "resolved",
+  "substatus": "resolved",
+  "firstSeen": "2022-04-04T18:17:18.320000Z",
+  "lastSeen": "2022-04-04T18:17:18.320000Z",
+  "permalink": "https://your-org.sentry.io/issues/123/",
+  "web_url": "https://your-org.sentry.io/issues/123/",
+  "project": {
+    "id": "456",
+    "name": "ipe",
+    "slug": "ipe"
+  },
+  "assignedTo": {
+    "type": "user",
+    "id": "789",
+    "name": "Person"
+  }
+}
