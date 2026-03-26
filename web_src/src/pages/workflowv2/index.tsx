@@ -5678,6 +5678,10 @@ export function WorkflowPageV2() {
           blueprints={blueprints}
           logEntries={logEntries}
           onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
+          runsEvents={isViewingLiveVersion ? canvasEventsResponse?.events || [] : []}
+          runsNodes={canvas?.spec?.nodes || []}
+          onRunNodeSelect={handleLogRunNodeSelect}
+          onRunExecutionSelect={handleLogRunExecutionSelect}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
           breadcrumbs={[

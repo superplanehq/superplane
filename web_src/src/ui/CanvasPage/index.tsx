@@ -20,9 +20,9 @@ import {
   Group,
   Loader2,
   Map as MapIcon,
+  Play,
   ScanLine,
   ScanText,
-  ScrollText,
   Copy,
   LayoutGrid,
   Trash2,
@@ -38,6 +38,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 
 import {
   ConfigurationField,
+  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   ComponentsNode,
   ComponentsComponent,
@@ -70,7 +71,13 @@ import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
-import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
+import {
+  CanvasLogSidebar,
+  type ConsoleTab,
+  type LogEntry,
+  type LogScopeFilter,
+  type LogTypeFilter,
+} from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 
 export interface SidebarData {
@@ -345,6 +352,10 @@ export interface CanvasPageProps {
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsNodes?: ComponentsNode[];
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
@@ -1275,6 +1286,10 @@ function CanvasPage(props: CanvasPageProps) {
                 onExecutionChainHandled={props.onExecutionChainHandled}
                 initialFocusNodeId={props.initialFocusNodeId}
                 onResolveExecutionErrors={props.onResolveExecutionErrors}
+                runsEvents={props.runsEvents}
+                runsNodes={props.runsNodes}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
                 title={props.title}
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
@@ -1944,6 +1959,10 @@ function CanvasContent({
   focusRequest,
   initialFocusNodeId,
   onResolveExecutionErrors,
+  runsEvents,
+  runsNodes,
+  onRunNodeSelect,
+  onRunExecutionSelect,
   title,
   missingIntegrations,
   onConnectIntegration,
@@ -2042,6 +2061,10 @@ function CanvasContent({
   onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsNodes?: ComponentsNode[];
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
   title?: string;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
@@ -2113,6 +2136,7 @@ function CanvasContent({
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
   const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
+  const [consoleTab, setConsoleTab] = useState<ConsoleTab>("runs");
   const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
   const [logScope, setLogScope] = useState<LogScopeFilter>("all");
   const [logSearch, setLogSearch] = useState("");
@@ -2743,12 +2767,8 @@ function CanvasContent({
     }, []);
   }, [logEntries, logFilter, logScope, logSearch]);
 
-  const handleLogButtonClick = useCallback((filterType: "all" | "error" | "warning") => {
-    if (filterType === "all") {
-      setLogFilter(new Set());
-    } else {
-      setLogFilter(new Set([filterType]));
-    }
+  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
+    setConsoleTab(tab);
     setIsLogSidebarOpen(true);
   }, []);
 
@@ -2986,12 +3006,12 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("all")}
+                          onClick={() => handleLogButtonClick("runs")}
                         >
-                          <ScrollText className="h-3 w-3" />
+                          <Play className="h-3 w-3" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>All Logs</TooltipContent>
+                      <TooltipContent>Runs</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -2999,7 +3019,7 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("error")}
+                          onClick={() => handleLogButtonClick("errors")}
                         >
                           <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
                           <span
@@ -3017,7 +3037,7 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("warning")}
+                          onClick={() => handleLogButtonClick("warnings")}
                         >
                           <TriangleAlert
                             className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
@@ -3163,6 +3183,12 @@ function CanvasContent({
           counts={logCounts}
           expandedRuns={expandedRuns}
           onToggleRun={handleRunToggle}
+          activeTab={consoleTab}
+          onTabChange={setConsoleTab}
+          runsEvents={runsEvents}
+          runsNodes={runsNodes}
+          onRunNodeSelect={onRunNodeSelect}
+          onRunExecutionSelect={onRunExecutionSelect}
         />
       ) : null}
     </div>
