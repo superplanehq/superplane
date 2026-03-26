@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
+  <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
@@ -34,31 +35,23 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-## Create a DigitalOcean Personal Access Token
+## DigitalOcean Personal Access Token
 
-1. Open the [DigitalOcean API Tokens page](https://cloud.digitalocean.com/account/api/tokens)
-2. Click **Generate New Token**
-3. Configure the token:
-   - **Token name**: SuperPlane Integration
-   - **Expiration**: No expiry (or choose an appropriate expiration)
-   - **Scopes**: Select **Full Access** (or customize as needed)
-4. Click **Generate Token**
-5. Copy the token and paste it below
+Generate a [DigitalOcean Personal Access Token](https://cloud.digitalocean.com/account/api/tokens) and copy it.
 
-> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+- Token name: `SuperPlane Integration`
+- Expiration: **No expiry** (or choose an appropriate expiration)
+- Scopes: **Full Access** (or customize as needed)
 
-## Spaces Access Key ID and Secret Access Key (optional)
+## Access Key (optional)
 
-Spaces Access Key and Secret Key are only required if you plan to use **Spaces Object Storage** components (e.g. Get Object). Other components such as Droplets, DNS, Load Balancers, and Snapshots work with the API Token alone.
+Only required for **Spaces Object Storage** components.
 
-To generate Spaces access keys:
+Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spaces/access_keys) and copy the generated pair.
 
-1. Open the [Spaces Access Keys page](https://cloud.digitalocean.com/spaces/access_keys)
-2. Click **Create Access Key**
-3. Select the access scope:
-   - **Full Access** — works across all buckets
-   - **Limited Access** — scoped to specific buckets with Read or Read/Write/Delete permissions
-4. Copy both the **Access Key ID** and the **Secret Access Key** immediately — the secret is only shown once
+- Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
+
+> **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.
 
 <a id="assign-reserved-ip"></a>
 
@@ -1085,6 +1078,65 @@ Returns the action result including:
   },
   "timestamp": "2026-03-12T22:27:20.613332846Z",
   "type": "digitalocean.droplet.power.power_off"
+}
+```
+
+<a id="put-object"></a>
+
+## Put Object
+
+The Put Object component uploads a text-based object to a DigitalOcean Spaces bucket.
+
+### Prerequisites
+
+Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcean integration settings.
+
+### Configuration
+
+- **Bucket**: The Spaces bucket to upload to. The dropdown lists all buckets — the region is determined automatically.
+- **File Path**: The full path including file name and extension (e.g. reports/2024/daily.csv). The content type is detected automatically from the extension.
+- **Body**: The text content to upload. Supports expressions to pass content from upstream components (e.g. `{{ $['HTTP Request'].body }}`). Only text-based formats are supported (JSON, CSV, YAML, plain text, XML, etc.)
+- **ACL**: Access control — `private` (default) restricts access to the owner, `public-read` makes the object publicly accessible.
+- **Metadata**: Optional key-value pairs stored as object metadata (x-amz-meta-* headers). Supports expressions.
+- **Tags**: Optional key-value tags applied to the object. Can be changed later without re-uploading. Supports expressions.
+
+### Output
+
+- **bucket**: The bucket name
+- **filePath**: The path to the uploaded object
+- **endpoint**: The full Spaces URL of the object
+- **eTag**: MD5 hash of the uploaded content
+- **contentType**: Detected MIME type based on file extension
+- **size**: Human-readable size of the uploaded content
+- **metadata**: Metadata set on the object (only present if metadata was provided)
+- **tags**: Tags set on the object (only present if tags were provided)
+
+### Use Cases
+
+- **Config publishing**: Upload a generated JSON or YAML config file to Spaces for downstream services to consume
+- **Report storage**: Save a CSV or text report generated by an upstream component
+- **Objectcopy**: Combine with Get Object to copy an object across buckets, preserving metadata and tags
+
+### Example Output
+
+```json
+{
+  "data": {
+    "bucket": "my-company-assets",
+    "contentType": "text/csv",
+    "eTag": "a1b2c3d4ef567890a1b2c3d4ef567890",
+    "endpoint": "https://my-company-assets.fra1.digitaloceanspaces.com/reports/daily.csv",
+    "filePath": "reports/daily.csv",
+    "metadata": {
+      "uploaded-by": "pipeline"
+    },
+    "size": "128 B",
+    "tags": {
+      "env": "production"
+    }
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.uploaded"
 }
 ```
 

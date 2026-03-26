@@ -149,6 +149,26 @@ export interface GetObjectOutput {
   body?: string;
 }
 
+export interface PutObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+  body?: string;
+  acl?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+}
+
+export interface PutObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  endpoint?: string;
+  eTag?: string;
+  contentType?: string;
+  size?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+}
+
 export interface AppNodeMetadata {
   appId?: string;
   appName?: string;
