@@ -89,25 +89,7 @@ dataset = Dataset(
             inputs="Build a workflow that auto-resolves GitHub issues",
             evaluators=[
               evals.CanvasHasTrigger("github.onIssue"),
-                # WorkflowShape(
-                #   nodes=[
-                #       "github.onIssue",
-                #       "filter",
-                #       "github.createIssueComment",
-                #       "daytona.executeCode",
-                #       "github.updateIssue",
-                #       "github.createIssueComment",
-                #       "github.createIssueComment",
-                #   ],
-                #   edges=[
-                #       ("github.onIssue", "filter"),
-                #       ("filter", "github.createIssueComment"),
-                #       ("github.createIssueComment", "daytona.executeCode"),
-                #       ("daytona.executeCode", "github.updateIssue"),
-                #       ("github.updateIssue", "github.createIssueComment"),
-                #       ("daytona.executeCode", "github.createIssueComment"),
-                #   ],
-                # )
+              evals.CanvasHasWorkflow("github.onIssue", "...", "github.createIssueComment", "...", "daytona.executeCode", "...", "github.createIssueComment"),
             ],
         ),
     ],
