@@ -59,95 +59,99 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
 
 ```json
 {
-  "actor": {
-    "display_name": "John Doe",
-    "links": {
-      "avatar": {
-        "href": "https://bitbucket.org/account/johndoe/avatar/"
+  "data": {
+    "actor": {
+      "display_name": "John Doe",
+      "links": {
+        "avatar": {
+          "href": "https://bitbucket.org/account/johndoe/avatar/"
+        },
+        "html": {
+          "href": "https://bitbucket.org/johndoe/"
+        }
       },
-      "html": {
-        "href": "https://bitbucket.org/johndoe/"
-      }
+      "nickname": "johndoe",
+      "type": "user",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
     },
-    "nickname": "johndoe",
-    "type": "user",
-    "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
-  },
-  "push": {
-    "changes": [
-      {
-        "closed": false,
-        "commits": [
-          {
-            "author": {
-              "raw": "John Doe \u003cjohn@example.com\u003e",
-              "type": "author"
+    "push": {
+      "changes": [
+        {
+          "closed": false,
+          "commits": [
+            {
+              "author": {
+                "raw": "John Doe \u003cjohn@example.com\u003e",
+                "type": "author"
+              },
+              "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+              "links": {
+                "html": {
+                  "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+                }
+              },
+              "message": "Add new feature\n",
+              "type": "commit"
+            }
+          ],
+          "created": false,
+          "forced": false,
+          "new": {
+            "name": "main",
+            "target": {
+              "author": {
+                "raw": "John Doe \u003cjohn@example.com\u003e",
+                "type": "author",
+                "user": {
+                  "display_name": "John Doe",
+                  "type": "user",
+                  "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+                }
+              },
+              "date": "2024-01-15T10:30:00+00:00",
+              "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
+              "links": {
+                "html": {
+                  "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+                }
+              },
+              "message": "Add new feature\n",
+              "type": "commit"
             },
-            "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
-            "links": {
-              "html": {
-                "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
-              }
-            },
-            "message": "Add new feature\n",
-            "type": "commit"
-          }
-        ],
-        "created": false,
-        "forced": false,
-        "new": {
-          "name": "main",
-          "target": {
-            "author": {
-              "raw": "John Doe \u003cjohn@example.com\u003e",
-              "type": "author",
-              "user": {
-                "display_name": "John Doe",
-                "type": "user",
-                "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
-              }
-            },
-            "date": "2024-01-15T10:30:00+00:00",
-            "hash": "709d658dc5b6d6afcd46049c2f332ee3f515a67d",
-            "links": {
-              "html": {
-                "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
-              }
-            },
-            "message": "Add new feature\n",
-            "type": "commit"
+            "type": "branch"
           },
-          "type": "branch"
-        },
-        "old": {
-          "name": "main",
-          "target": {
-            "author": {
-              "raw": "John Doe \u003cjohn@example.com\u003e",
-              "type": "author"
+          "old": {
+            "name": "main",
+            "target": {
+              "author": {
+                "raw": "John Doe \u003cjohn@example.com\u003e",
+                "type": "author"
+              },
+              "date": "2024-01-14T15:00:00+00:00",
+              "hash": "1e65c05c1d5171631d92438a13901ca7dae9618c",
+              "message": "Previous commit\n",
+              "type": "commit"
             },
-            "date": "2024-01-14T15:00:00+00:00",
-            "hash": "1e65c05c1d5171631d92438a13901ca7dae9618c",
-            "message": "Previous commit\n",
-            "type": "commit"
+            "type": "branch"
           },
-          "type": "branch"
-        },
-        "truncated": false
-      }
-    ]
-  },
-  "repository": {
-    "full_name": "my-workspace/my-repo",
-    "links": {
-      "html": {
-        "href": "https://bitbucket.org/my-workspace/my-repo"
-      }
+          "truncated": false
+        }
+      ]
     },
-    "name": "my-repo",
-    "type": "repository",
-    "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
-  }
+    "repository": {
+      "full_name": "my-workspace/my-repo",
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/my-workspace/my-repo"
+        }
+      },
+      "name": "my-repo",
+      "type": "repository",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "bitbucket.push"
 }
 ```
 
