@@ -96,9 +96,9 @@ const httpStateFunction = (execution: ExecutionInfo): EventState => {
 
   if (execution.state === "STATE_FINISHED") {
     const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
-    if (outputs?.success) {
+    if (outputs?.success?.length) {
       return "success";
-    } else if (outputs?.failure) {
+    } else if (outputs?.failure?.length) {
       return "failed";
     }
   }
@@ -112,7 +112,7 @@ export const HTTP_STATE_REGISTRY: EventStateRegistry = {
 };
 
 interface Output {
-  status: number;
+  status?: number | null;
 }
 
 interface Metadata {
@@ -126,6 +126,22 @@ interface Metadata {
     lastResponse: string | null;
     lastError: string | null;
   };
+}
+
+function getHTTPResponseStatusString(
+  outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
+): string | null {
+  if (outputs?.success?.length) {
+    const response = outputs.success?.[0]?.data as Output | undefined;
+    return response?.status?.toString() ?? null;
+  }
+
+  if (outputs?.failure?.length) {
+    const response = outputs.failure?.[0]?.data as Output | undefined;
+    return response?.status?.toString() ?? null;
+  }
+
+  return null;
 }
 
 export const httpMapper: ComponentBaseMapper = {
@@ -153,14 +169,11 @@ export const httpMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Metadata | undefined;
-    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
+    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
 
-    if (outputs?.success) {
-      const response = outputs.success[0].data as Output;
-      details["Response"] = response.status.toString();
-    } else if (outputs?.failure) {
-      const response = outputs.failure[0].data as Output;
-      details["Response"] = response.status.toString();
+    const responseStatusString = getHTTPResponseStatusString(outputs) ?? "";
+    if (responseStatusString) {
+      details["Response"] = responseStatusString;
     }
 
     if (metadata?.retry) {
@@ -197,15 +210,8 @@ export const httpMapper: ComponentBaseMapper = {
 
     // For success/failed states, show response code and time
     if (state === "success" || state === "failed") {
-      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
-      let responseCode: string | null = null;
-      if (outputs?.success) {
-        const response = outputs.success[0].data as Output;
-        responseCode = response.status.toString();
-      } else if (outputs?.failure) {
-        const response = outputs.failure[0].data as Output;
-        responseCode = response.status.toString();
-      }
+      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+      const responseCode = getHTTPResponseStatusString(outputs);
 
       if (responseCode && context.execution.updatedAt) {
         return renderWithTimeAgo(`Response: ${responseCode}`, new Date(context.execution.updatedAt));
@@ -226,7 +232,10 @@ export const httpMapper: ComponentBaseMapper = {
 };
 
 function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
-  const configuration = node.configuration as HTTPConfiguration;
+  const configuration = node.configuration as Partial<HTTPConfiguration> | undefined;
+  if (!configuration) {
+    return [];
+  }
   const metadata: Array<{ icon: string; label: string }> = [];
 
   // Method and URL
@@ -241,7 +250,6 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   const contentType = configuration.contentType;
   if (
     contentType &&
-    node.configuration &&
     (configuration.method === "POST" || configuration.method === "PUT" || configuration.method === "PATCH")
   ) {
     let bodyLabel = "";
@@ -270,10 +278,10 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   }
 
   // Retry configuration
-  if (configuration.retry && configuration.retry.enabled) {
-    const strategy = configuration.retry.strategy;
-    const retries = configuration.retry.maxAttempts;
-    const interval = configuration.retry.intervalSeconds;
+  if (configuration.retry?.enabled) {
+    const strategy = configuration.retry.strategy ?? "";
+    const retries = configuration.retry.maxAttempts ?? 0;
+    const interval = configuration.retry.intervalSeconds ?? 0;
     metadata.push({
       icon: "bolt",
       label: `${retries} retries, ${strategy}, ${interval}s`,
@@ -306,7 +314,10 @@ type RetrySpec = {
 
 function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as HTTPConfiguration;
+  const configuration = node.configuration as Partial<HTTPConfiguration> | undefined;
+  if (!configuration) {
+    return specs;
+  }
 
   const contentType = configuration.contentType || "application/json";
 
@@ -384,7 +395,7 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
     }
   }
 
-  if (configuration.headers && configuration.headers.length > 0) {
+  if (configuration.headers?.length) {
     specs.push({
       title: "header",
       tooltipTitle: "request headers",
@@ -392,12 +403,12 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values: configuration.headers.map((header) => ({
         badges: [
           {
-            label: header.name,
+            label: header.name ?? "",
             bgColor: "bg-blue-100",
             textColor: "text-blue-800",
           },
           {
-            label: header.value,
+            label: header.value ?? "",
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },
@@ -406,7 +417,7 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
     });
   }
 
-  if (configuration.queryParams && configuration.queryParams.length > 0) {
+  if (configuration.queryParams?.length) {
     specs.push({
       title: "query param",
       tooltipTitle: "query params",
@@ -414,12 +425,12 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values: configuration.queryParams.map((param) => ({
         badges: [
           {
-            label: param.key,
+            label: param.key ?? "",
             bgColor: "bg-blue-100",
             textColor: "text-blue-800",
           },
           {
-            label: param.value,
+            label: param.value ?? "",
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },
@@ -464,16 +475,10 @@ function getHTTPEventSections(
       let responseCode: string | null = null;
 
       if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
-        responseCode = metadata.finalStatus.toString();
+        responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;
       } else {
-        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
-        if (outputs?.success) {
-          const response = outputs.success[0].data as Output;
-          responseCode = response.status.toString();
-        } else if (outputs?.failure) {
-          const response = outputs.failure[0].data as Output;
-          responseCode = response.status.toString();
-        }
+        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+        responseCode = getHTTPResponseStatusString(outputs);
       }
 
       if (responseCode && execution.updatedAt) {
