@@ -10,6 +10,11 @@ from pydantic_evals.reporting import EvaluationReport
 from rich.console import Console
 
 from ai.jsonutil import to_jsonable
+from ai.llm_cost_estimate import (
+    estimate_cost_usd_for_model,
+    matched_claude_pricing_key,
+    pricing_reference_url,
+)
 
 
 class ReportBuilder:
@@ -40,6 +45,9 @@ class ReportBuilder:
         total_assertions = 0
         passed_assertions = 0
         usage_by_case: list[dict[str, Any]] = []
+        cost_per_case: list[dict[str, Any]] = []
+        total_cost_usd: float | None = None
+        pricing_match = matched_claude_pricing_key(self.model)
 
         self.console.print()
         self.console.print()
@@ -64,10 +72,19 @@ class ReportBuilder:
             usage_json = to_jsonable(run_usage)
             usage_by_case.append({"name": case_name, "usage": usage_json})
 
+            case_cost = estimate_cost_usd_for_model(self.model, run_usage)
+            if case_cost is not None:
+                cost_per_case.append({"name": case_name, "usd": round(case_cost, 6)})
+                if total_cost_usd is None:
+                    total_cost_usd = 0.0
+                total_cost_usd += case_cost
+
             self.console.print(f"{case_name} {self._format_duration(case_result)}")
             self.console.print(f"  input: {case_input}")
             self.console.print(f"  output: {display_filename}")
             self.console.print(f"  usage: {self._format_usage_line(run_usage)}")
+            if case_cost is not None:
+                self.console.print(f"  est. cost (USD): [yellow]${case_cost:.4f}[/] (approx.)")
             self.console.print("  assertions:")
             assertion_lines = self._format_assertion_lines(case_result)
             if not assertion_lines:
@@ -102,6 +119,11 @@ class ReportBuilder:
             "model": self.model,
             "cases": usage_by_case,
             "total": to_jsonable(total_usage),
+            "estimated_cost_usd": self._cost_summary_json(
+                pricing_match=pricing_match,
+                per_case=cost_per_case,
+                total=total_cost_usd,
+            ),
         }
         with summary_path.open("w", encoding="utf-8") as summary_file:
             json.dump(summary_payload, summary_file, indent=2)
@@ -109,6 +131,17 @@ class ReportBuilder:
         self.console.print(f"duration: {total_duration:.1f}s")
         self.console.print(f"results: {passed_assertions}/{total_assertions}")
         self.console.print(f"usage (total): {self._format_usage_line(total_usage)}")
+        if total_cost_usd is not None:
+            self.console.print(
+                f"est. cost (USD) total: [yellow]${total_cost_usd:.4f}[/] "
+                "(approx., Claude list rates)"
+            )
+            self.console.print(f"pricing reference: {pricing_reference_url()}")
+        else:
+            self.console.print(
+                "est. cost (USD): n/a (no Claude 4.5/4.6 rate match for AI_MODEL — see "
+                f"{pricing_reference_url()} to price manually)"
+            )
         self.console.print(f"usage summary: {display_summary}")
 
     def _serialize_output(self, output: Any) -> Any:
@@ -159,6 +192,30 @@ class ReportBuilder:
         if duration_seconds is None:
             return "-"
         return f"{duration_seconds:.1f}s"
+
+    def _cost_summary_json(
+        self,
+        *,
+        pricing_match: str | None,
+        per_case: list[dict[str, Any]],
+        total: float | None,
+    ) -> dict[str, Any]:
+        base: dict[str, Any] = {
+            "reference": pricing_reference_url(),
+            "claude_pricing_match": pricing_match,
+            "disclaimer": (
+                "Approximate Anthropic Claude 4.5/4.6 list rates (base input/output) plus "
+                "0.1×/1.25× on cache read/write tokens when present; excludes other Claude "
+                "versions, batch, long-context premiums, and non-Claude models."
+            ),
+        }
+        if total is not None:
+            base["per_case"] = per_case
+            base["total"] = round(total, 6)
+        else:
+            base["per_case"] = []
+            base["total"] = None
+        return base
 
     def _format_usage_line(self, usage: RunUsage) -> str:
         parts = [
