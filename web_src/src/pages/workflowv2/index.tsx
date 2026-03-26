@@ -56,7 +56,7 @@ import {
   useCanvasChangeRequests,
   useTriggers,
   useCanvas,
-  useCanvasEvents,
+  useInfiniteCanvasEvents,
   useCanvasMemoryEntries,
   useDeleteCanvasMemoryEntry,
   useCanvasVersion,
@@ -747,7 +747,31 @@ export function WorkflowPageV2() {
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
-  const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
+  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
+  const runsEventsData = useMemo(() => {
+    const pages = infiniteEventsQuery.data?.pages || [];
+    const seen = new Set<string>();
+    const events = pages
+      .flatMap((page) => page?.events || [])
+      .filter((e) => {
+        if (!e.id || seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+      });
+    const totalCount = pages[0]?.totalCount || 0;
+    return { events, totalCount };
+  }, [infiniteEventsQuery.data]);
+  const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
+  const componentIconMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of components) {
+      if (c.name && c.icon) map[c.name] = c.icon;
+    }
+    for (const t of triggers) {
+      if (t.name && t.icon) map[t.name] = t.icon;
+    }
+    return map;
+  }, [components, triggers]);
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -4953,7 +4977,7 @@ export function WorkflowPageV2() {
 
   const [isResolvingErrors, setIsResolvingErrors] = useState(false);
 
-  const handleResolveExecutionErrors = useCallback(
+  const handleAcknowledgeErrors = useCallback(
     async (executionIds: string[]) => {
       if (!canvasId || executionIds.length === 0 || isResolvingErrors) {
         return;
@@ -4967,11 +4991,11 @@ export function WorkflowPageV2() {
           executionIds.forEach((id) => next.add(id));
           return next;
         });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.eventList(canvasId, 50) });
+        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
-        showSuccessToast("Execution errors resolved");
+        showSuccessToast("Errors acknowledged");
       } catch (_error) {
-        showErrorToast("Failed to resolve execution errors");
+        showErrorToast("Failed to acknowledge errors");
       } finally {
         setIsResolvingErrors(false);
       }
@@ -5677,7 +5701,17 @@ export function WorkflowPageV2() {
           triggers={triggers}
           blueprints={blueprints}
           logEntries={logEntries}
-          onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
+          runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
+          runsTotalCount={isViewingLiveVersion ? runsEventsData.totalCount : 0}
+          runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
+          runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
+          onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
+          runsNodes={canvas?.spec?.nodes || []}
+          runsComponentIconMap={componentIconMap}
+          runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
+          onRunNodeSelect={handleLogRunNodeSelect}
+          onRunExecutionSelect={handleLogRunExecutionSelect}
+          onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
           breadcrumbs={[
