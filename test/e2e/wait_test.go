@@ -74,12 +74,21 @@ func (s *WaitSteps) addWaitWithDuration(value int, unit string) {
 }
 
 func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
+	wantFor := strconv.Itoa(value)
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		node := s.canvas.GetNodeFromDB("Wait")
+		config := node.Configuration.Data()
+		if config["mode"] == "interval" && config["waitFor"] == wantFor && config["unit"] == unit {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
 	node := s.canvas.GetNodeFromDB("Wait")
-
 	config := node.Configuration.Data()
-
 	assert.Equal(s.t, "interval", config["mode"])
-	assert.Equal(s.t, strconv.Itoa(value), config["waitFor"])
+	assert.Equal(s.t, wantFor, config["waitFor"])
 	assert.Equal(s.t, unit, config["unit"])
 }
 
