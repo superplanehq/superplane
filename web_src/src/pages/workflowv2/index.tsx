@@ -57,6 +57,7 @@ import {
   useTriggers,
   useCanvas,
   useCanvasEvents,
+  useInfiniteCanvasEvents,
   useCanvasMemoryEntries,
   useDeleteCanvasMemoryEntry,
   useCanvasVersion,
@@ -748,6 +749,13 @@ export function WorkflowPageV2() {
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
+  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
+  const runsEventsData = useMemo(() => {
+    const pages = infiniteEventsQuery.data?.pages || [];
+    const events = pages.flatMap((page) => page?.events || []);
+    const totalCount = pages[0]?.totalCount || 0;
+    return { events, totalCount };
+  }, [infiniteEventsQuery.data]);
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -5678,7 +5686,11 @@ export function WorkflowPageV2() {
           blueprints={blueprints}
           logEntries={logEntries}
           onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
-          runsEvents={isViewingLiveVersion ? canvasEventsResponse?.events || [] : []}
+          runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
+          runsTotalCount={runsEventsData.totalCount}
+          runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
+          runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
+          onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
           runsNodes={canvas?.spec?.nodes || []}
           runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}

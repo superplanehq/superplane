@@ -73,6 +73,10 @@ export interface CanvasLogSidebarProps {
   activeTab?: ConsoleTab;
   onTabChange?: (tab: ConsoleTab) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -116,6 +120,10 @@ export function CanvasLogSidebar({
   activeTab: controlledTab,
   onTabChange,
   runsEvents = [],
+  runsTotalCount,
+  runsHasNextPage,
+  runsIsFetchingNextPage,
+  onRunsLoadMore,
   runsNodes = [],
   runsNodeQueueItemsMap = {},
   onRunNodeSelect,
@@ -416,6 +424,10 @@ export function CanvasLogSidebar({
         {activeTab === "runs" ? (
           <RunsConsoleContent
             events={runsEvents}
+            totalCount={runsTotalCount}
+            hasNextPage={runsHasNextPage}
+            isFetchingNextPage={runsIsFetchingNextPage}
+            onLoadMore={onRunsLoadMore}
             nodes={runsNodes}
             searchQuery={searchValue}
             nodeQueueItemsMap={runsNodeQueueItemsMap}

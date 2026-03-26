@@ -435,6 +435,10 @@ export function computeRunsCounts(events: CanvasesCanvasEventWithExecutions[], n
 
 export function RunsConsoleContent({
   events,
+  totalCount,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   nodes,
   searchQuery,
   nodeQueueItemsMap = {},
@@ -442,6 +446,10 @@ export function RunsConsoleContent({
   onExecutionSelect,
 }: {
   events: CanvasesCanvasEventWithExecutions[];
+  totalCount?: number;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
   nodes: ComponentsNode[];
   searchQuery: string;
   nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
@@ -521,8 +529,10 @@ export function RunsConsoleContent({
 
   const counts = useMemo(() => computeRunsCounts(allEvents, nodes), [allEvents, nodes]);
 
+  const allCount = totalCount != null && totalCount > 0 ? totalCount : counts.total;
+
   const filterButtons: { key: RunsStatusFilter; label: string; count?: number }[] = [
-    { key: "all", label: "All", count: counts.total },
+    { key: "all", label: "All", count: allCount },
     { key: "completed", label: "Completed", count: counts.completed },
     { key: "errors", label: "Errors", count: counts.errors },
     { key: "running", label: "Running", count: counts.running },
@@ -576,6 +586,25 @@ export function RunsConsoleContent({
                 onExecutionSelect={onExecutionSelect}
               />
             ))}
+            {hasNextPage && statusFilter === "all" && !searchQuery.trim() && (
+              <div className="px-4 py-2 text-center border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={onLoadMore}
+                  disabled={isFetchingNextPage}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
+                >
+                  {isFetchingNextPage ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    `Load more (${allEvents.length} of ${allCount})`
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

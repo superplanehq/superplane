@@ -354,6 +354,10 @@ export interface CanvasPageProps {
   onEdgeDelete?: (edgeIds: string[]) => void;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -1289,6 +1293,10 @@ function CanvasPage(props: CanvasPageProps) {
                 initialFocusNodeId={props.initialFocusNodeId}
                 onResolveExecutionErrors={props.onResolveExecutionErrors}
                 runsEvents={props.runsEvents}
+                runsTotalCount={props.runsTotalCount}
+                runsHasNextPage={props.runsHasNextPage}
+                runsIsFetchingNextPage={props.runsIsFetchingNextPage}
+                onRunsLoadMore={props.onRunsLoadMore}
                 runsNodes={props.runsNodes}
                 runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
                 onRunNodeSelect={props.onRunNodeSelect}
@@ -1963,6 +1971,10 @@ function CanvasContent({
   initialFocusNodeId,
   onResolveExecutionErrors,
   runsEvents,
+  runsTotalCount,
+  runsHasNextPage,
+  runsIsFetchingNextPage,
+  onRunsLoadMore,
   runsNodes,
   runsNodeQueueItemsMap,
   onRunNodeSelect,
@@ -2066,6 +2078,10 @@ function CanvasContent({
   initialFocusNodeId?: string | null;
   onResolveExecutionErrors?: (executionIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -3191,6 +3207,10 @@ function CanvasContent({
           activeTab={consoleTab}
           onTabChange={setConsoleTab}
           runsEvents={runsEvents}
+          runsTotalCount={runsTotalCount}
+          runsHasNextPage={runsHasNextPage}
+          runsIsFetchingNextPage={runsIsFetchingNextPage}
+          onRunsLoadMore={onRunsLoadMore}
           runsNodes={runsNodes}
           runsNodeQueueItemsMap={runsNodeQueueItemsMap}
           onRunNodeSelect={onRunNodeSelect}
