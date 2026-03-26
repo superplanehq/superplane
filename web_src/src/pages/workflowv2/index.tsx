@@ -4991,8 +4991,8 @@ export function WorkflowPageV2() {
           executionIds.forEach((id) => next.add(id));
           return next;
         });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.events() });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteEvents(canvasId) });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.eventList(canvasId) });
         showSuccessToast("Errors acknowledged");
       } catch (_error) {
         showErrorToast("Failed to acknowledge errors");
