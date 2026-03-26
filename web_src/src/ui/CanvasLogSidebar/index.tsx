@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 import { RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export type ConsoleTab = "runs" | "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error" | "run";
@@ -78,9 +79,15 @@ export interface CanvasLogSidebarProps {
   runsIsFetchingNextPage?: boolean;
   onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
+  runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
-  onRunExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
+  onRunExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
 }
 
 function formatLogTimestamp(value: string) {
@@ -125,6 +132,7 @@ export function CanvasLogSidebar({
   runsIsFetchingNextPage,
   onRunsLoadMore,
   runsNodes = [],
+  runsComponentIconMap = {},
   runsNodeQueueItemsMap = {},
   onRunNodeSelect,
   onRunExecutionSelect,
@@ -429,6 +437,7 @@ export function CanvasLogSidebar({
             isFetchingNextPage={runsIsFetchingNextPage}
             onLoadMore={onRunsLoadMore}
             nodes={runsNodes}
+            componentIconMap={runsComponentIconMap}
             searchQuery={searchValue}
             nodeQueueItemsMap={runsNodeQueueItemsMap}
             onNodeSelect={onRunNodeSelect}

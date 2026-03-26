@@ -1,31 +1,27 @@
-import { useMemo, useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  CircleCheck,
-  CircleDashed,
-  CircleDot,
-  CircleX,
-  Clock,
-  Loader2,
-  Play,
-  Ban,
-  Zap,
-  ThumbsUp,
-  ThumbsDown,
-  FastForward,
-  DoorOpen,
-} from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Loader2, Play } from "lucide-react";
 import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
 } from "@/api-client";
-import { cn } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 import { formatTimeAgo } from "@/utils/date";
+import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { getState, getTriggerRenderer } from "./mappers";
-import { buildEventInfo, buildExecutionInfo } from "./utils";
+import { buildEventInfo, buildExecutionInfo, mapTriggerEventToSidebarEvent } from "./utils";
+
+function resolveNodeIconSlug(
+  node: ComponentsNode | undefined,
+  componentIconMap: Record<string, string>,
+): string | undefined {
+  const name = node?.component?.name || node?.trigger?.name;
+  if (!name) return undefined;
+  return componentIconMap[name];
+}
 
 export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
 
@@ -61,14 +57,24 @@ export function getAggregateStatus(executions: CanvasesCanvasNodeExecution[], no
   return "queued";
 }
 
+function formatDurationMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) {
+    const s = ms / 1000;
+    return s % 1 === 0 ? `${s}s` : `${s.toFixed(1)}s`;
+  }
+  const m = ms / 60000;
+  if (m % 1 === 0) return `${m}m`;
+  if (m < 10) return `${m.toFixed(1)}m`;
+  return `${Math.round(m)}m`;
+}
+
 export function computeDuration(execution: CanvasesCanvasNodeExecution): string | null {
   if (execution.state !== "STATE_FINISHED" || !execution.createdAt || !execution.updatedAt) {
     return null;
   }
   const ms = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60000).toFixed(1)}m`;
+  return formatDurationMs(ms);
 }
 
 export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {
@@ -100,127 +106,68 @@ export function formatRunTimestamp(value: string): string {
   return `${weekdays[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}, ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export function StatusBadge({ status }: { status: string }) {
-  const config: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
-    completed: {
-      label: "Completed",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <CircleCheck className="h-3 w-3" />,
-    },
-    success: {
-      label: "Success",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <CircleCheck className="h-3 w-3" />,
-    },
-    triggered: {
-      label: "Triggered",
-      className: "bg-violet-50 text-violet-700 border-violet-200",
-      icon: <Zap className="h-3 w-3" />,
-    },
-    finished: {
-      label: "Finished",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <CircleCheck className="h-3 w-3" />,
-    },
-    waiting: {
-      label: "Waiting",
-      className: "bg-amber-50 text-amber-700 border-amber-200",
-      icon: <Clock className="h-3 w-3" />,
-    },
-    approved: {
-      label: "Approved",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <ThumbsUp className="h-3 w-3" />,
-    },
-    rejected: {
-      label: "Rejected",
-      className: "bg-red-50 text-red-700 border-red-200",
-      icon: <ThumbsDown className="h-3 w-3" />,
-    },
-    "pushed through": {
-      label: "Pushed Through",
-      className: "bg-blue-50 text-blue-700 border-blue-200",
-      icon: <FastForward className="h-3 w-3" />,
-    },
-    opened: {
-      label: "Opened",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <DoorOpen className="h-3 w-3" />,
-    },
-    true: {
-      label: "True",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <CircleCheck className="h-3 w-3" />,
-    },
-    false: {
-      label: "False",
-      className: "bg-red-50 text-red-700 border-red-200",
-      icon: <CircleX className="h-3 w-3" />,
-    },
-    passed: {
-      label: "Passed",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <CircleCheck className="h-3 w-3" />,
-    },
-    timeout: {
-      label: "Timeout",
-      className: "bg-gray-50 text-gray-500 border-gray-200",
-      icon: <Clock className="h-3 w-3" />,
-    },
-    queued: {
-      label: "Queued",
-      className: "bg-amber-50 text-amber-700 border-amber-200",
-      icon: <CircleDashed className="h-3 w-3" />,
-    },
-    failed: {
-      label: "Failed",
-      className: "bg-red-50 text-red-700 border-red-200",
-      icon: <CircleX className="h-3 w-3" />,
-    },
-    running: {
-      label: "Running",
-      className: "bg-blue-50 text-blue-700 border-blue-200",
-      icon: <Loader2 className="h-3 w-3 animate-spin" />,
-    },
-    pending: {
-      label: "Pending",
-      className: "bg-gray-50 text-gray-600 border-gray-200",
-      icon: <Clock className="h-3 w-3" />,
-    },
-    cancelled: {
-      label: "Cancelled",
-      className: "bg-gray-50 text-gray-500 border-gray-200",
-      icon: <Ban className="h-3 w-3" />,
-    },
-    error: {
-      label: "Error",
-      className: "bg-red-50 text-red-700 border-red-200",
-      icon: <CircleX className="h-3 w-3" />,
-    },
-  };
+const STATUS_TO_EVENT_STATE: Record<string, EventState> = {
+  completed: "success",
+  success: "success",
+  triggered: "triggered",
+  finished: "success",
+  passed: "success",
+  approved: "success",
+  opened: "success",
+  true: "success",
+  waiting: "queued",
+  queued: "queued",
+  pending: "queued",
+  running: "running",
+  failed: "failed",
+  error: "error",
+  rejected: "error",
+  false: "error",
+  timeout: "failed",
+  cancelled: "cancelled",
+  "pushed through": "running",
+};
 
-  const c = config[status] || {
-    label: status || "Unknown",
-    className: "bg-gray-50 text-gray-600 border-gray-200",
-    icon: <CircleDot className="h-3 w-3" />,
-  };
+const STATUS_LABELS: Record<string, string> = {
+  completed: "Completed",
+  success: "Success",
+  triggered: "Triggered",
+  finished: "Finished",
+  waiting: "Waiting",
+  approved: "Approved",
+  rejected: "Rejected",
+  "pushed through": "Pushed Through",
+  opened: "Opened",
+  true: "True",
+  false: "False",
+  passed: "Passed",
+  timeout: "Timeout",
+  queued: "Queued",
+  failed: "Failed",
+  running: "Running",
+  pending: "Pending",
+  cancelled: "Cancelled",
+  error: "Error",
+};
+
+export function StatusBadge({ status }: { status: string }) {
+  const eventState = STATUS_TO_EVENT_STATE[status] || "neutral";
+  const style = DEFAULT_EVENT_STATE_MAP[eventState];
+  const label = STATUS_LABELS[status] || status || "Unknown";
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
-        c.className,
-      )}
+    <div
+      className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${style.badgeColor}`}
     >
-      {c.icon}
-      {c.label}
-    </span>
+      <span>{label}</span>
+    </div>
   );
 }
 
 export function RunRow({
   event,
   nodes,
+  componentIconMap = {},
   queueItems = [],
   isExpanded,
   onToggle,
@@ -229,11 +176,17 @@ export function RunRow({
 }: {
   event: CanvasesCanvasEventWithExecutions;
   nodes: ComponentsNode[];
+  componentIconMap?: Record<string, string>;
   queueItems?: CanvasesCanvasNodeQueueItem[];
   isExpanded: boolean;
   onToggle: () => void;
   onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
 }) {
   const executions = event.executions || [];
   const triggerNode = nodes.find((n) => n.id === event.nodeId);
@@ -241,8 +194,49 @@ export function RunRow({
   const eventInfo = buildEventInfo(event);
   const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
 
+  const triggerSidebarEvent = useMemo(() => {
+    if (!triggerNode || !event.id) return undefined;
+    return mapTriggerEventToSidebarEvent(
+      {
+        id: event.id,
+        canvasId: event.canvasId,
+        nodeId: event.nodeId,
+        channel: event.channel,
+        data: event.data,
+        createdAt: event.createdAt,
+        customName: event.customName,
+      },
+      triggerNode,
+    );
+  }, [event, triggerNode]);
+
   const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
   const totalSteps = executions.length + queueItems.length;
+
+  const totalDuration = useMemo(() => {
+    if (!event.createdAt || executions.length === 0) return null;
+    const isAllFinished = executions.every((e) => e.state === "STATE_FINISHED");
+    if (!isAllFinished && queueItems.length === 0) return null;
+    const startMs = new Date(event.createdAt).getTime();
+    let latestEndMs = startMs;
+    for (const exec of executions) {
+      if (exec.updatedAt) {
+        const endMs = new Date(exec.updatedAt).getTime();
+        if (endMs > latestEndMs) latestEndMs = endMs;
+      }
+    }
+    const diffMs = latestEndMs - startMs;
+    if (diffMs <= 0) return null;
+    return computeDuration({
+      createdAt: event.createdAt,
+      updatedAt: new Date(latestEndMs).toISOString(),
+      state: "STATE_FINISHED",
+    } as CanvasesCanvasNodeExecution);
+  }, [event.createdAt, executions, queueItems.length]);
+
+  const triggerIconSrc = getHeaderIconSrc(triggerNode?.trigger?.name);
+  const triggerIconSlug = resolveNodeIconSlug(triggerNode, componentIconMap);
+  const triggerName = triggerNode?.name || triggerNode?.trigger?.name || "Trigger";
 
   return (
     <div className="border-b border-gray-200 last:border-b-0">
@@ -256,12 +250,25 @@ export function RunRow({
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </div>
         <div className="flex flex-1 items-center gap-2 min-w-0">
-          <span className="font-mono text-xs text-gray-500">#{event.id?.slice(0, 4)}</span>
+          <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+            {triggerIconSrc ? (
+              <img src={triggerIconSrc} alt={triggerName} className="h-4 w-4 object-contain" />
+            ) : (
+              React.createElement(resolveIcon(triggerIconSlug || "bolt"), {
+                size: 14,
+                className: "text-gray-500",
+              })
+            )}
+          </div>
+          <span className="text-xs text-gray-600 truncate flex-shrink-0">{triggerName}</span>
+          <span className="text-gray-300">·</span>
+          <span className="font-mono text-[10px] text-gray-400">#{event.id?.slice(0, 4)}</span>
           <span className="text-xs font-medium text-gray-900 truncate">{title}</span>
           <StatusBadge status={aggregateStatus} />
           {totalSteps > 0 && (
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400 whitespace-nowrap">
               {totalSteps} {totalSteps === 1 ? "step" : "steps"}
+              {totalDuration && <span className="ml-1">· {totalDuration}</span>}
             </span>
           )}
         </div>
@@ -273,8 +280,11 @@ export function RunRow({
       {isExpanded && (executions.length > 0 || queueItems.length > 0) && (
         <div className="bg-gray-50">
           {executions.map((execution) => {
-            const node = nodes.find((n) => n.id === execution.nodeId);
-            const nodeName = node?.name || node?.id || execution.nodeId || "Unknown";
+            const baseNodeId = execution.nodeId?.includes(":") ? execution.nodeId.split(":")[0] : execution.nodeId;
+            const node = nodes.find((n) => n.id === execution.nodeId) || nodes.find((n) => n.id === baseNodeId);
+            const nodeName = node?.name || execution.nodeId || "Unknown";
+            const componentIconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
+            const componentIconSlug = resolveNodeIconSlug(node, componentIconMap);
             const status = resolveExecutionDisplayStatus(execution, nodes);
             const duration = computeDuration(execution);
             const hasError = execution.result === "RESULT_FAILED" && execution.resultMessage;
@@ -283,7 +293,7 @@ export function RunRow({
               <div
                 key={execution.id}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
+                  "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
                   (onNodeSelect || onExecutionSelect) && "cursor-pointer hover:bg-gray-100 transition-colors",
                 )}
                 role={onNodeSelect || onExecutionSelect ? "button" : undefined}
@@ -294,6 +304,7 @@ export function RunRow({
                       nodeId: execution.nodeId,
                       eventId: event.id,
                       executionId: execution.id,
+                      triggerEvent: triggerSidebarEvent,
                     });
                   } else if (onNodeSelect && execution.nodeId) {
                     onNodeSelect(execution.nodeId);
@@ -307,6 +318,7 @@ export function RunRow({
                         nodeId: execution.nodeId,
                         eventId: event.id,
                         executionId: execution.id,
+                        triggerEvent: triggerSidebarEvent,
                       });
                     } else if (onNodeSelect && execution.nodeId) {
                       onNodeSelect(execution.nodeId);
@@ -314,6 +326,16 @@ export function RunRow({
                   }
                 }}
               >
+                <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                  {componentIconSrc ? (
+                    <img src={componentIconSrc} alt={nodeName} className="h-3.5 w-3.5 object-contain" />
+                  ) : (
+                    React.createElement(resolveIcon(componentIconSlug || "box"), {
+                      size: 13,
+                      className: "text-gray-400",
+                    })
+                  )}
+                </div>
                 <div className="flex flex-1 items-center gap-2 min-w-0">
                   <span className="text-xs text-gray-700 truncate">{nodeName}</span>
                   <StatusBadge status={status} />
@@ -329,14 +351,17 @@ export function RunRow({
             );
           })}
           {queueItems.map((item) => {
-            const node = nodes.find((n) => n.id === item.nodeId);
-            const nodeName = node?.name || node?.id || item.nodeId || "Unknown";
+            const qBaseNodeId = item.nodeId?.includes(":") ? item.nodeId.split(":")[0] : item.nodeId;
+            const node = nodes.find((n) => n.id === item.nodeId) || nodes.find((n) => n.id === qBaseNodeId);
+            const nodeName = node?.name || item.nodeId || "Unknown";
+            const queueIconSrc = getHeaderIconSrc(node?.component?.name || node?.trigger?.name);
+            const queueIconSlug = resolveNodeIconSlug(node, componentIconMap);
 
             return (
               <div
                 key={`q-${item.id}`}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
+                  "flex items-center gap-2 px-4 py-1.5 pl-11 border-t border-gray-200 min-h-8",
                   onNodeSelect && "cursor-pointer hover:bg-gray-100 transition-colors",
                 )}
                 role={onNodeSelect ? "button" : undefined}
@@ -353,6 +378,16 @@ export function RunRow({
                   }
                 }}
               >
+                <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                  {queueIconSrc ? (
+                    <img src={queueIconSrc} alt={nodeName} className="h-3.5 w-3.5 object-contain" />
+                  ) : (
+                    React.createElement(resolveIcon(queueIconSlug || "box"), {
+                      size: 13,
+                      className: "text-gray-400",
+                    })
+                  )}
+                </div>
                 <div className="flex flex-1 items-center gap-2 min-w-0">
                   <span className="text-xs text-gray-700 truncate">{nodeName}</span>
                   <StatusBadge status="queued" />
@@ -440,6 +475,7 @@ export function RunsConsoleContent({
   isFetchingNextPage,
   onLoadMore,
   nodes,
+  componentIconMap = {},
   searchQuery,
   nodeQueueItemsMap = {},
   onNodeSelect,
@@ -451,10 +487,16 @@ export function RunsConsoleContent({
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
   nodes: ComponentsNode[];
+  componentIconMap?: Record<string, string>;
   searchQuery: string;
   nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onNodeSelect?: (nodeId: string) => void;
-  onExecutionSelect?: (options: { nodeId: string; eventId: string; executionId: string }) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<RunsStatusFilter>("all");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
@@ -579,6 +621,7 @@ export function RunsConsoleContent({
                 key={event.id}
                 event={event}
                 nodes={nodes}
+                componentIconMap={componentIconMap}
                 queueItems={queueItemsByEventId[event.id || ""] || []}
                 isExpanded={expandedRuns.has(event.id || "")}
                 onToggle={() => toggleRun(event.id || "")}

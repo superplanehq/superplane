@@ -96,6 +96,11 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
+
+            queryClient.invalidateQueries({
+              queryKey: canvasKeys.events(),
+            });
+
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
@@ -103,6 +108,11 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+
+            queryClient.invalidateQueries({
+              queryKey: canvasKeys.events(),
+            });
+
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;

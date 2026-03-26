@@ -756,6 +756,16 @@ export function WorkflowPageV2() {
     const totalCount = pages[0]?.totalCount || 0;
     return { events, totalCount };
   }, [infiniteEventsQuery.data]);
+  const componentIconMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of components) {
+      if (c.name && c.icon) map[c.name] = c.icon;
+    }
+    for (const t of triggers) {
+      if (t.name && t.icon) map[t.name] = t.icon;
+    }
+    return map;
+  }, [components, triggers]);
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -5692,6 +5702,7 @@ export function WorkflowPageV2() {
           runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
           onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
           runsNodes={canvas?.spec?.nodes || []}
+          runsComponentIconMap={componentIconMap}
           runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
