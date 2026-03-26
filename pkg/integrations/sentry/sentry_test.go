@@ -618,6 +618,70 @@ func Test__Sentry__ListResources(t *testing.T) {
 		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/members/", httpContext.Requests[1].URL.String())
 		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/teams/", httpContext.Requests[2].URL.String())
 	})
+
+	t.Run("lists releases for the selected project", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"version":"2026.03.25","projects":[{"slug":"backend","name":"Backend"}]},{"version":"2026.03.24","projects":[{"slug":"frontend","name":"Frontend"}]},{"version":"2026.03.23","projects":[{"slug":"backend","name":"Backend"},{"slug":"frontend","name":"Frontend"}]}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeRelease, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"project": "backend",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeRelease, ID: "2026.03.25", Name: "2026.03.25"},
+			{Type: ResourceTypeRelease, ID: "2026.03.23", Name: "2026.03.23"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/releases/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("surfaces release scope guidance when listing releases is forbidden", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusForbidden, `{"detail":"You do not have permission to perform this action."}`),
+			},
+		}
+
+		_, err := impl.ListResources(ResourceTypeRelease, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), releaseScope)
+	})
 }
 
 func Test__Sentry__Configuration(t *testing.T) {
@@ -632,7 +696,7 @@ func Test__Sentry__Configuration(t *testing.T) {
 	assert.Equal(t, "userToken", fields[1].Name)
 	assert.Equal(t, "User Token", fields[1].Label)
 	assert.Equal(t, "integrationName", fields[2].Name)
-	assert.Equal(t, "Personal auth token from Sentry.", fields[1].Description)
+	assert.Equal(t, "Personal auth token from Sentry. Include `project:releases` if you use release actions.", fields[1].Description)
 }
 
 func Test__Sentry__Instructions(t *testing.T) {
@@ -643,6 +707,7 @@ func Test__Sentry__Instructions(t *testing.T) {
 	assert.Contains(t, instructions, SentryPersonalTokensURL)
 	assert.Contains(t, instructions, "User Token")
 	assert.Contains(t, instructions, "Token Permissions")
+	assert.Contains(t, instructions, "project:releases")
 	assert.Contains(t, instructions, "Issue & Event -> `Read & Write`")
 	assert.Contains(t, instructions, "Settings → Developer Settings → Custom Integrations")
 }

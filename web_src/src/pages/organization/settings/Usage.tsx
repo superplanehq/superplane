@@ -175,19 +175,30 @@ function buildCanvasUsage(data: OrganizationsDescribeUsageResponse | null | unde
 
 function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
   const level = data?.usage?.eventBucketLevel ?? 0;
+  const displayedLevel = Math.max(0, Math.ceil(level));
   const capacity = data?.usage?.eventBucketCapacity;
   const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
+  const nextDecreaseAt = data?.usage?.nextEventBucketDecreaseAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited ? "∞" : `${formatNumber(level)} / ${formatNumber(capacity ?? 0)}`;
-  const subtitle = lastUpdatedAt
-    ? `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`
-    : "Rolling event usage for the current 30-day window.";
+  const value = isUnlimited ? "∞" : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
 
   return {
     value,
-    subtitle,
-    progress: isUnlimited ? null : percentage(level, capacity),
+    subtitle: formatEventUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
+    progress: isUnlimited ? null : percentage(displayedLevel, capacity),
   };
+}
+
+function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
+  if (nextDecreaseAt) {
+    return `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
+  }
+
+  if (lastUpdatedAt) {
+    return `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
+  }
+
+  return "Rolling event usage for the current 30-day window.";
 }
 
 function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
