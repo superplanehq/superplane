@@ -3,10 +3,11 @@ import {
   buildConflictMarkerYAML,
   buildNodeMap,
   cloneJSON,
+  concatenateBothNodes,
+  concatenateConflictBlockLines,
   deepMergeObjects,
   isPlainObject,
   localResolutionLabel,
-  mergeConflictBlockLines,
   normalizeForCompare,
   parseNodeYAML,
   prettyYAML,
@@ -48,68 +49,68 @@ describe("deepMergeObjects", () => {
   });
 });
 
-describe("mergeConflictBlockLines", () => {
+describe("concatenateConflictBlockLines", () => {
   it("returns incoming lines when current is empty", () => {
-    const result = mergeConflictBlockLines([], ["name: test"]);
+    const result = concatenateConflictBlockLines([], ["name: test"]);
     expect(result).toEqual(["name: test"]);
   });
 
   it("returns current lines when incoming is empty", () => {
-    const result = mergeConflictBlockLines(["name: test"], []);
+    const result = concatenateConflictBlockLines(["name: test"], []);
     expect(result).toEqual(["name: test"]);
   });
 
-  it("returns empty array when both are empty", () => {
-    const result = mergeConflictBlockLines([], []);
-    expect(result).toEqual([]);
+  it("concatenates both sides when both have content", () => {
+    const currentLines = ["name: current-name"];
+    const incomingLines = ["name: incoming-name"];
+    const result = concatenateConflictBlockLines(currentLines, incomingLines);
+    expect(result).toEqual(["name: current-name", "name: incoming-name"]);
   });
 
-  it("deep merges YAML objects from both sides", () => {
-    const currentLines = ["name: current-name", "timeout: 30"];
-    const incomingLines = ["name: incoming-name", "retries: 5"];
-    const result = mergeConflictBlockLines(currentLines, incomingLines);
-    expect(result).toContain("name: incoming-name");
-    expect(result).toContain("retries: 5");
-    expect(result).toContain("timeout: 30");
-  });
-
-  it("produces valid YAML without duplicate keys", () => {
+  it("preserves all lines including duplicates", () => {
     const currentLines = ["configuration:", "  key1: value1", "  key2: value2"];
     const incomingLines = ["configuration:", "  key2: updated", "  key3: value3"];
-    const result = mergeConflictBlockLines(currentLines, incomingLines);
-    const merged = result.join("\n");
-    expect(merged.match(/key2/g)?.length).toBe(1);
-    expect(merged).toContain("key1: value1");
-    expect(merged).toContain("key2: updated");
-    expect(merged).toContain("key3: value3");
+    const result = concatenateConflictBlockLines(currentLines, incomingLines);
+    expect(result).toEqual([
+      "configuration:",
+      "  key1: value1",
+      "  key2: value2",
+      "configuration:",
+      "  key2: updated",
+      "  key3: value3",
+    ]);
+  });
+});
+
+describe("concatenateBothNodes", () => {
+  it("returns 'null' when both nodes are undefined", () => {
+    expect(concatenateBothNodes(undefined, undefined)).toBe("null\n");
   });
 
-  it("uses incoming for non-object YAML values", () => {
-    const currentLines = ["- item1", "- item2"];
-    const incomingLines = ["- item3", "- item4"];
-    const result = mergeConflictBlockLines(currentLines, incomingLines);
-    expect(result).toEqual(["- item3", "- item4"]);
+  it("returns incoming YAML when current is undefined", () => {
+    const result = concatenateBothNodes(undefined, { id: "a", name: "test" });
+    expect(result).toContain("name: test");
+    expect(result.endsWith("\n")).toBe(true);
   });
 
-  it("falls back to concatenation for unparseable YAML", () => {
-    const currentLines = ["  bad: yaml: :::"];
-    const incomingLines = ["  also: bad: :::"];
-    const result = mergeConflictBlockLines(currentLines, incomingLines);
-    expect(result).toEqual(["  bad: yaml: :::", "  also: bad: :::"]);
+  it("returns current YAML when incoming is undefined", () => {
+    const result = concatenateBothNodes({ id: "a", name: "test" }, undefined);
+    expect(result).toContain("name: test");
+    expect(result.endsWith("\n")).toBe(true);
   });
 
-  it("handles null current parsed value", () => {
-    const currentLines = ["null"];
-    const incomingLines = ["name: test"];
-    const result = mergeConflictBlockLines(currentLines, incomingLines);
-    expect(result).toEqual(["name: test"]);
+  it("concatenates both node YAMLs when both exist", () => {
+    const result = concatenateBothNodes({ id: "a", name: "current-name" }, { id: "a", name: "incoming-name" });
+    expect(result).toContain("name: current-name");
+    expect(result).toContain("name: incoming-name");
+    const nameMatches = result.match(/name:/g);
+    expect(nameMatches?.length).toBe(2);
   });
 
-  it("handles null incoming parsed value", () => {
-    const currentLines = ["name: test"];
-    const incomingLines = ["null"];
-    const result = mergeConflictBlockLines(currentLines, incomingLines);
-    expect(result).toEqual(["name: test"]);
+  it("includes all fields from both nodes", () => {
+    const result = concatenateBothNodes({ id: "a", timeout: 30 }, { id: "a", retries: 5 });
+    expect(result).toContain("timeout: 30");
+    expect(result).toContain("retries: 5");
   });
 });
 

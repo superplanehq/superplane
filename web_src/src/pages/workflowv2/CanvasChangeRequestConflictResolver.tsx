@@ -11,9 +11,9 @@ import {
   buildConflictMarkerYAML,
   buildNodeMap,
   cloneJSON,
-  deepMergeObjects,
+  concatenateBothNodes,
+  concatenateConflictBlockLines,
   localResolutionLabel,
-  mergeConflictBlockLines,
   parseNodeYAML,
   prettyYAML,
   pruneEdgesByNodes,
@@ -205,7 +205,7 @@ export function CanvasChangeRequestConflictResolver({
       } else if (resolution === "incoming") {
         replacementLines = incomingLines;
       } else {
-        replacementLines = mergeConflictBlockLines(currentLines, incomingLines);
+        replacementLines = concatenateConflictBlockLines(currentLines, incomingLines);
       }
 
       editor.pushUndoStop();
@@ -218,7 +218,13 @@ export function CanvasChangeRequestConflictResolver({
       ]);
       editor.pushUndoStop();
       setFinalDraftYAML(model.getValue());
-      setFinalDraftError("");
+      if (resolution === "both") {
+        setFinalDraftError(
+          "Both changes were written. The resulting YAML has duplicate keys and is invalid — please edit it manually before marking as resolved.",
+        );
+      } else {
+        setFinalDraftError("");
+      }
       editor.focus();
     },
     [],
@@ -432,14 +438,11 @@ export function CanvasChangeRequestConflictResolver({
       return;
     }
 
-    const merged = cloneJSON(
-      deepMergeObjects(currentNode || {}, incomingNode || {}) as CanvasNodeLike,
-    ) as CanvasNodeLike;
-    merged.id = selectedNodeID;
-    setFinalNodes((current) => upsertNode(current, selectedNodeID, merged));
-    setResolvedNodeIDs((current) => new Set(current).add(selectedNodeID));
-    setFinalDraftYAML(prettyYAML(merged));
-    setFinalDraftError("");
+    const bothYAML = concatenateBothNodes(currentNode, incomingNode);
+    setFinalDraftYAML(bothYAML);
+    setFinalDraftError(
+      "Both changes were written. The resulting YAML has duplicate keys and is invalid — please edit it manually before marking as resolved.",
+    );
   };
 
   const onToggleIncludeNode = () => {

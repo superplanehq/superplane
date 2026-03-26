@@ -146,11 +146,7 @@ export function deepMergeObjects(current: unknown, incoming: unknown): unknown {
   return merged;
 }
 
-export function mergeConflictBlockLines(currentLines: string[], incomingLines: string[]): string[] {
-  if (currentLines.length === 0 && incomingLines.length === 0) {
-    return [];
-  }
-
+export function concatenateConflictBlockLines(currentLines: string[], incomingLines: string[]): string[] {
   if (currentLines.length === 0) {
     return incomingLines;
   }
@@ -159,36 +155,33 @@ export function mergeConflictBlockLines(currentLines: string[], incomingLines: s
     return currentLines;
   }
 
-  try {
-    const currentParsed = yaml.load(currentLines.join("\n"));
-    const incomingParsed = yaml.load(incomingLines.join("\n"));
+  return [...currentLines, ...incomingLines];
+}
 
-    if (currentParsed == null && incomingParsed == null) {
-      return [];
-    }
+export function concatenateBothNodes(
+  currentNode: Record<string, unknown> | undefined,
+  incomingNode: Record<string, unknown> | undefined,
+): string {
+  const currentYAML = currentNode
+    ? yaml.dump(normalizeForCompare(currentNode), { noRefs: true, lineWidth: 120, sortKeys: true }).trimEnd()
+    : "";
+  const incomingYAML = incomingNode
+    ? yaml.dump(normalizeForCompare(incomingNode), { noRefs: true, lineWidth: 120, sortKeys: true }).trimEnd()
+    : "";
 
-    if (currentParsed == null) {
-      return incomingLines;
-    }
-
-    if (incomingParsed == null) {
-      return currentLines;
-    }
-
-    const merged =
-      isPlainObject(currentParsed) && isPlainObject(incomingParsed)
-        ? deepMergeObjects(currentParsed, incomingParsed)
-        : incomingParsed;
-
-    const mergedYAML = yaml.dump(merged, { noRefs: true, lineWidth: 120, sortKeys: true }).trimEnd();
-    if (!mergedYAML) {
-      return [];
-    }
-
-    return mergedYAML.split("\n");
-  } catch {
-    return [...currentLines, ...incomingLines];
+  if (!currentYAML && !incomingYAML) {
+    return "null\n";
   }
+
+  if (!currentYAML) {
+    return `${incomingYAML}\n`;
+  }
+
+  if (!incomingYAML) {
+    return `${currentYAML}\n`;
+  }
+
+  return `${currentYAML}\n${incomingYAML}\n`;
 }
 
 export function upsertNode(nodes: CanvasNodeLike[], nodeID: string, node: CanvasNodeLike | null): CanvasNodeLike[] {
