@@ -34,6 +34,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
       : value
     : [];
+  const itemsRef = React.useRef(items);
+  itemsRef.current = items;
   const itemLabel = listOptions?.itemLabel || "Item";
   const canAddMore = maxItems === undefined || items.length < maxItems;
   const isApprovalItemsList =
@@ -67,16 +69,19 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           : itemDefinition?.type === "day-in-year"
             ? "01/01"
             : "";
-    onChange([...items, newItem]);
+    const newItems = [...itemsRef.current, newItem];
+    itemsRef.current = newItems;
+    onChange(newItems);
   };
 
   const removeItem = (index: number) => {
-    const newItems = items.filter((_, i) => i !== index);
+    const newItems = itemsRef.current.filter((_, i) => i !== index);
+    itemsRef.current = newItems;
     onChange(newItems.length > 0 ? newItems : undefined);
   };
 
   const updateItem = (index: number, newValue: unknown) => {
-    const newItems = [...items];
+    const newItems = [...itemsRef.current];
     newItems[index] = newValue;
     if (isApprovalItemsList) {
       const newKey =
@@ -92,6 +97,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         }
       }
     }
+    itemsRef.current = newItems;
     onChange(newItems);
   };
 

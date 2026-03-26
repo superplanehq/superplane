@@ -76,6 +76,11 @@ import {
   eventStateRegistry as sendgridEventStateRegistry,
 } from "./sendgrid";
 import {
+  componentMappers as sentryComponentMappers,
+  triggerRenderers as sentryTriggerRenderers,
+  eventStateRegistry as sentryEventStateRegistry,
+} from "./sentry/index";
+import {
   componentMappers as renderComponentMappers,
   triggerRenderers as renderTriggerRenderers,
   eventStateRegistry as renderEventStateRegistry,
@@ -284,6 +289,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   sendgrid: sendgridComponentMappers,
+  sentry: sentryComponentMappers,
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
@@ -327,6 +333,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   sendgrid: sendgridTriggerRenderers,
+  sentry: sentryTriggerRenderers,
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
@@ -370,6 +377,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
+  sentry: sentryEventStateRegistry,
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,

@@ -48,6 +48,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
 import honeycombIcon from "@/assets/icons/integrations/honeycomb.svg";
@@ -93,6 +94,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   slack: slackIcon,
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
+  sentry: sentryIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,
@@ -139,6 +141,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   slack: slackIcon,
   smtp: smtpIcon,
   sendgrid: sendgridIcon,
+  sentry: sentryIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
   dockerhub: dockerIcon,

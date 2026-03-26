@@ -162,7 +162,7 @@ dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
 dev.agent.console:
-	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)" --repl-web-url http://127.0.0.1:8090
+	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)"
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
@@ -262,11 +262,12 @@ gen.components.local.update: gen.components.docs
 	rm -rf ../docs/src/content/docs/components
 	cp -R docs/components ../docs/src/content/docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
 pb.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
 
 openapi.spec.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)

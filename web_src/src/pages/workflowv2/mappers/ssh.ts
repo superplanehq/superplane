@@ -59,7 +59,7 @@ type SSHConfiguration = {
   host: string;
   port?: number;
   username: string;
-  command: string;
+  commands?: string;
   authMethod?: string;
 };
 
@@ -169,11 +169,14 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
       label: `${config.username || "user"}@${config.host}${port}`,
     });
   }
-  if (config?.command) {
-    const cmd = config.command.length > 40 ? config.command.slice(0, 40) + "…" : config.command;
+  if (config?.commands) {
+    const oneline = config.commands
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .join(" && ");
     metadata.push({
       icon: "terminal",
-      label: cmd,
+      label: oneline,
     });
   }
 

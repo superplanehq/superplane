@@ -8,7 +8,9 @@ import (
 )
 
 func main() {
-	cli.StartUpdateCheck()
+	if cli.ShouldStartUpdateCheck(os.Args[1:]) {
+		cli.StartUpdateCheck()
+	}
 	err := cli.RootCmd.Execute()
 	cli.PrintUpdateNotice()
 	if err != nil {

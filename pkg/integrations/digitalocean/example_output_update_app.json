@@ -1,0 +1,17 @@
+{
+  "data": {
+    "defaultIngress": "https://my-app-22-b6v8c.ondigitalocean.app",
+    "id": "6d8abe1c-7cc5-4db3-b1aa-d9cdd1c127e7",
+    "liveURL": "https://my-app-22-b6v8c.ondigitalocean.app",
+    "name": "my-app-22",
+    "region": {
+      "continent": "Asia",
+      "data_centers": ["blr1"],
+      "flag": "india",
+      "label": "Bangalore",
+      "slug": "blr"
+    }
+  },
+  "timestamp": "2026-03-24T07:06:01.044139416Z",
+  "type": "digitalocean.app.updated"
+}

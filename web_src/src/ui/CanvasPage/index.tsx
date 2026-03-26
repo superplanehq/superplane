@@ -20,9 +20,9 @@ import {
   Group,
   Loader2,
   Map as MapIcon,
+  Play,
   ScanLine,
   ScanText,
-  ScrollText,
   Copy,
   LayoutGrid,
   Trash2,
@@ -38,7 +38,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent 
 
 import {
   ConfigurationField,
+  CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeQueueItem,
   ComponentsNode,
   ComponentsComponent,
   TriggersTrigger,
@@ -70,8 +72,9 @@ import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
-import { CanvasLogSidebar, type LogEntry, type LogScopeFilter, type LogTypeFilter } from "../CanvasLogSidebar";
+import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -264,7 +267,11 @@ export interface CanvasPageProps {
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved";
+  saveState?: "saved" | "saving" | "unsaved" | "error";
+  lastSavedAt?: Date | string | null;
+  saveErrorMessage?: string | null;
+  /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
+  configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -315,7 +322,7 @@ export interface CanvasPageProps {
     configuration: Record<string, any>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -340,7 +347,22 @@ export interface CanvasPageProps {
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
-  onResolveExecutionErrors?: (executionIds: string[]) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
+  runsNodes?: ComponentsNode[];
+  runsComponentIconMap?: Record<string, string>;
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
@@ -453,6 +475,8 @@ export interface CanvasPageProps {
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
+export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
+export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
 
 const EDGE_STYLE = {
   type: "custom",
@@ -965,11 +989,14 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleSaveConfiguration = useCallback(
     (configuration: Record<string, any>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
-      if (editingNodeData && props.onNodeConfigurationSave) {
-        props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
-        // Close the component sidebar after saving
+      if (!editingNodeData || !props.onNodeConfigurationSave) {
+        return;
+      }
+      const result = props.onNodeConfigurationSave(editingNodeData.nodeId, configuration, nodeName, integrationRef);
+      if (props.configurationSaveMode !== "auto") {
         state.componentSidebar.close();
       }
+      return result;
     },
     [editingNodeData, props, state.componentSidebar],
   );
@@ -1085,6 +1112,8 @@ function CanvasPage(props: CanvasPageProps) {
           autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           headerMode={props.headerMode}
           saveState={props.saveState}
+          lastSavedAt={props.lastSavedAt}
+          saveErrorMessage={props.saveErrorMessage}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1242,6 +1271,8 @@ function CanvasPage(props: CanvasPageProps) {
                 autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
+                lastSavedAt={props.lastSavedAt}
+                saveErrorMessage={props.saveErrorMessage}
                 onEnterEditMode={props.onEnterEditMode}
                 enterEditModeDisabled={props.enterEditModeDisabled}
                 enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1263,7 +1294,17 @@ function CanvasPage(props: CanvasPageProps) {
                 focusRequest={props.focusRequest}
                 onExecutionChainHandled={props.onExecutionChainHandled}
                 initialFocusNodeId={props.initialFocusNodeId}
-                onResolveExecutionErrors={props.onResolveExecutionErrors}
+                runsEvents={props.runsEvents}
+                runsTotalCount={props.runsTotalCount}
+                runsHasNextPage={props.runsHasNextPage}
+                runsIsFetchingNextPage={props.runsIsFetchingNextPage}
+                onRunsLoadMore={props.onRunsLoadMore}
+                runsNodes={props.runsNodes}
+                runsComponentIconMap={props.runsComponentIconMap}
+                runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
                 title={props.title}
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
@@ -1312,6 +1353,7 @@ function CanvasPage(props: CanvasPageProps) {
               onSidebarClose={handleSidebarClose}
               editingNodeData={editingNodeData}
               onSaveConfiguration={handleSaveConfiguration}
+              configurationSaveMode={props.configurationSaveMode}
               onEdit={handleNodeEdit}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
@@ -1387,6 +1429,7 @@ function Sidebar({
   onSidebarClose,
   editingNodeData,
   onSaveConfiguration,
+  configurationSaveMode = "manual",
   onEdit,
   currentTab,
   onTabChange,
@@ -1439,7 +1482,12 @@ function Sidebar({
   ) => { map: EventStateMap; state: EventState };
   onSidebarClose?: () => void;
   editingNodeData?: NodeEditData | null;
-  onSaveConfiguration?: (configuration: Record<string, any>, nodeName: string) => void;
+  onSaveConfiguration?: (
+    configuration: Record<string, any>,
+    nodeName: string,
+    integrationRef?: ComponentsIntegrationRef,
+  ) => void | Promise<void>;
+  configurationSaveMode?: "manual" | "auto";
   onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
@@ -1606,6 +1654,7 @@ function Sidebar({
       nodeConfigurationFields={editingNodeData?.configurationFields || []}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
+      configurationSaveMode={configurationSaveMode}
       onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
@@ -1675,6 +1724,8 @@ function CanvasContentHeader({
   autoSaveDisabledTooltip,
   headerMode,
   saveState,
+  lastSavedAt,
+  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1714,7 +1765,9 @@ function CanvasContentHeader({
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved";
+  saveState?: "saved" | "saving" | "unsaved" | "error";
+  lastSavedAt?: Date | string | null;
+  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1785,6 +1838,8 @@ function CanvasContentHeader({
       autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       mode={headerMode}
       saveState={saveState}
+      lastSavedAt={lastSavedAt}
+      saveErrorMessage={saveErrorMessage}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -1896,6 +1951,8 @@ function CanvasContent({
   autoSaveDisabledTooltip,
   headerMode,
   saveState,
+  lastSavedAt,
+  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1916,7 +1973,17 @@ function CanvasContent({
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
-  onResolveExecutionErrors,
+  runsEvents,
+  runsTotalCount,
+  runsHasNextPage,
+  runsIsFetchingNextPage,
+  onRunsLoadMore,
+  runsNodes,
+  runsComponentIconMap,
+  runsNodeQueueItemsMap,
+  onRunNodeSelect,
+  onRunExecutionSelect,
+  onAcknowledgeErrors,
   title,
   missingIntegrations,
   onConnectIntegration,
@@ -1990,7 +2057,9 @@ function CanvasContent({
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved";
+  saveState?: "saved" | "saving" | "unsaved" | "error";
+  lastSavedAt?: Date | string | null;
+  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -2012,7 +2081,22 @@ function CanvasContent({
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
-  onResolveExecutionErrors?: (executionIds: string[]) => void;
+  runsEvents?: CanvasesCanvasEventWithExecutions[];
+  runsTotalCount?: number;
+  runsHasNextPage?: boolean;
+  runsIsFetchingNextPage?: boolean;
+  onRunsLoadMore?: () => void;
+  runsNodes?: ComponentsNode[];
+  runsComponentIconMap?: Record<string, string>;
+  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  onRunNodeSelect?: (nodeId: string) => void;
+  onRunExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
   title?: string;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
@@ -2083,14 +2167,42 @@ function CanvasContent({
 
   // Track if we've initialized to prevent flicker
   const [isInitialized, setIsInitialized] = useState(hasFitToViewRef.current);
-  const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(false);
-  const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
-  const [logScope, setLogScope] = useState<LogScopeFilter>("all");
+  const [isLogSidebarOpen, setIsLogSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem(CONSOLE_OPEN_STORAGE_KEY);
+    return saved !== null ? saved === "true" : false;
+  });
+  const [consoleTab, setConsoleTab] = useState<ConsoleTab>("runs");
   const [logSearch, setLogSearch] = useState("");
-  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
-  const [logSidebarHeight, setLogSidebarHeight] = useState(320);
+  const [logSidebarHeight, setLogSidebarHeight] = useState(() => {
+    const saved = localStorage.getItem(CONSOLE_HEIGHT_STORAGE_KEY);
+    return saved ? parseInt(saved, 10) : 320;
+  });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
+
+  useEffect(() => {
+    if (showBottomStatusControls) {
+      localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
+    }
+  }, [isLogSidebarOpen, showBottomStatusControls]);
+
+  useEffect(() => {
+    localStorage.setItem(CONSOLE_HEIGHT_STORAGE_KEY, String(logSidebarHeight));
+  }, [logSidebarHeight]);
+
+  const runsCountInfo = useMemo(() => {
+    const events = runsEvents || [];
+    let running = 0;
+    for (const event of events) {
+      const execs = event.executions || [];
+      if (execs.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
+        running++;
+      }
+    }
+    return { total: runsTotalCount || events.length, running };
+  }, [runsEvents, runsTotalCount]);
+
+  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(runsEvents || []), [runsEvents]);
 
   useEffect(() => {
     if (!showBottomStatusControls) {
@@ -2670,69 +2782,17 @@ function CanvasContent({
 
   const filteredLogEntries = useMemo(() => {
     const query = logSearch.trim().toLowerCase();
-    const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
-    // Show all if filter is empty or contains all three types
-    const showAll = logFilter.size === 0 || logFilter.size === 3;
+    if (!query) return logEntries;
 
-    return logEntries.reduce<LogEntry[]>((acc, entry) => {
-      if (logScope !== "all" && entry.source !== logScope) {
-        return acc;
-      }
+    const matchesSearch = (value?: string) => (value || "").toLowerCase().includes(query);
+    return logEntries.filter(
+      (entry) => matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : ""),
+    );
+  }, [logEntries, logSearch]);
 
-      if (entry.type === "run") {
-        const runItems = entry.runItems || [];
-        const filteredRunItems = runItems.filter((item) => {
-          const typeMatch = showAll || (item.type !== "resolved-error" && logFilter.has(item.type));
-          const searchMatch =
-            matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
-          return typeMatch && searchMatch;
-        });
-
-        const entrySearchMatch =
-          matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-        const typeMatch = showAll ? true : filteredRunItems.length > 0;
-        const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
-
-        if (typeMatch && searchMatch) {
-          acc.push({ ...entry, runItems: filteredRunItems });
-        }
-        return acc;
-      }
-
-      if (!showAll && (entry.type === "resolved-error" || !logFilter.has(entry.type))) {
-        return acc;
-      }
-
-      const entrySearchMatch =
-        matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-      if (!entrySearchMatch) {
-        return acc;
-      }
-
-      acc.push(entry);
-      return acc;
-    }, []);
-  }, [logEntries, logFilter, logScope, logSearch]);
-
-  const handleLogButtonClick = useCallback((filterType: "all" | "error" | "warning") => {
-    if (filterType === "all") {
-      setLogFilter(new Set());
-    } else {
-      setLogFilter(new Set([filterType]));
-    }
+  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
+    setConsoleTab(tab);
     setIsLogSidebarOpen(true);
-  }, []);
-
-  const handleRunToggle = useCallback((runId: string) => {
-    setExpandedRuns((prev) => {
-      const next = new Set(prev);
-      if (next.has(runId)) {
-        next.delete(runId);
-      } else {
-        next.add(runId);
-      }
-      return next;
-    });
   }, []);
 
   const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
@@ -2768,6 +2828,8 @@ function CanvasContent({
           autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           mode={headerMode}
           saveState={saveState}
+          lastSavedAt={lastSavedAt}
+          saveErrorMessage={saveErrorMessage}
           onEnterEditMode={onEnterEditMode}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -2832,19 +2894,21 @@ function CanvasContent({
             <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
             <Panel
               position="bottom-left"
-              className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-2"
+              className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
             >
               {missingIntegrations && missingIntegrations.length > 0 && onConnectIntegration && (
-                <IntegrationStatusIndicator
-                  missingIntegrations={missingIntegrations}
-                  onConnect={onConnectIntegration}
-                  readOnly={isReadOnly}
-                  canCreateIntegrations={canCreateIntegrations}
-                />
+                <div style={isLogSidebarOpen ? { marginBottom: logSidebarHeight } : undefined}>
+                  <IntegrationStatusIndicator
+                    missingIntegrations={missingIntegrations}
+                    onConnect={onConnectIntegration}
+                    readOnly={isReadOnly}
+                    canCreateIntegrations={canCreateIntegrations}
+                  />
+                </div>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {showVersionControlTrigger ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center rounded-md p-0.5 h-8">
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center rounded-md p-0.5 h-8">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="relative inline-flex">
@@ -2947,34 +3011,58 @@ function CanvasContent({
                     }}
                   />
                 </ZoomSlider>
-                {showBottomStatusControls ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/20 flex items-center gap-1 rounded-md p-0.5 h-8">
+                {showBottomStatusControls && !isLogSidebarOpen ? (
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("all")}
+                          className={cn(
+                            "h-8 items-center text-xs font-medium",
+                            runsCountInfo.running > 0 && "text-blue-600",
+                          )}
+                          onClick={() => handleLogButtonClick("runs")}
                         >
-                          <ScrollText className="h-3 w-3" />
+                          {runsCountInfo.running > 0 ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Play className="h-3 w-3" />
+                          )}
+                          <span
+                            className={cn(
+                              "tabular-nums",
+                              runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800",
+                            )}
+                          >
+                            {runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total}
+                          </span>
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>All Logs</TooltipContent>
+                      <TooltipContent>
+                        {runsCountInfo.running > 0 ? `${runsCountInfo.running} running` : `${runsCountInfo.total} runs`}
+                      </TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("error")}
+                          className={cn(
+                            "h-8 items-center text-xs font-medium",
+                            unacknowledgedErrorCount > 0 && "text-red-500",
+                          )}
+                          onClick={() => handleLogButtonClick("errors")}
                         >
-                          <CircleX className={logCounts.error > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"} />
+                          <CircleX
+                            className={unacknowledgedErrorCount > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"}
+                          />
                           <span
-                            className={logCounts.error > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"}
+                            className={
+                              unacknowledgedErrorCount > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"
+                            }
                           >
-                            {logCounts.error}
+                            {unacknowledgedErrorCount}
                           </span>
                         </Button>
                       </TooltipTrigger>
@@ -2986,7 +3074,7 @@ function CanvasContent({
                           variant="ghost"
                           size="sm"
                           className="h-8 items-center text-xs font-medium"
-                          onClick={() => handleLogButtonClick("warning")}
+                          onClick={() => handleLogButtonClick("warnings")}
                         >
                           <TriangleAlert
                             className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
@@ -3119,19 +3207,25 @@ function CanvasContent({
         <CanvasLogSidebar
           isOpen={isLogSidebarOpen}
           onClose={() => setIsLogSidebarOpen(false)}
-          filter={logFilter}
-          onFilterChange={setLogFilter}
-          onResolveErrors={onResolveExecutionErrors}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
-          scope={logScope}
-          onScopeChange={setLogScope}
           searchValue={logSearch}
           onSearchChange={setLogSearch}
           entries={filteredLogEntries}
           counts={logCounts}
-          expandedRuns={expandedRuns}
-          onToggleRun={handleRunToggle}
+          activeTab={consoleTab}
+          onTabChange={setConsoleTab}
+          runsEvents={runsEvents}
+          runsTotalCount={runsTotalCount}
+          runsHasNextPage={runsHasNextPage}
+          runsIsFetchingNextPage={runsIsFetchingNextPage}
+          onRunsLoadMore={onRunsLoadMore}
+          runsNodes={runsNodes}
+          runsComponentIconMap={runsComponentIconMap}
+          runsNodeQueueItemsMap={runsNodeQueueItemsMap}
+          onRunNodeSelect={onRunNodeSelect}
+          onRunExecutionSelect={onRunExecutionSelect}
+          onAcknowledgeErrors={onAcknowledgeErrors}
         />
       ) : null}
     </div>
