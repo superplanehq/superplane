@@ -32,26 +32,20 @@ export function getExecutionStatus(execution: CanvasesCanvasNodeExecution, nodes
   return stateResolver(buildExecutionInfo(execution));
 }
 
-export function getAggregateStatus(executions: CanvasesCanvasNodeExecution[], nodes: ComponentsNode[]) {
-  const states = executions.map((e) => ({
-    state: e.state,
-    result: e.result,
-    resolved: getExecutionStatus(e, nodes),
-  }));
-
-  if (states.some((s) => s.state === "STATE_STARTED" || s.state === "STATE_PENDING")) {
+export function getAggregateStatus(executions: CanvasesCanvasNodeExecution[], _nodes: ComponentsNode[]) {
+  if (executions.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
     return "running";
   }
-  if (states.some((s) => s.result === "RESULT_FAILED")) {
+  if (executions.some((e) => e.result === "RESULT_FAILED")) {
     return "error";
   }
-  if (states.some((s) => s.result === "RESULT_CANCELLED")) {
+  if (executions.some((e) => e.result === "RESULT_CANCELLED")) {
     return "cancelled";
   }
-  if (states.every((s) => s.result === "RESULT_PASSED")) {
+  if (executions.every((e) => e.result === "RESULT_PASSED")) {
     return "completed";
   }
-  if (states.every((s) => s.state === "STATE_FINISHED")) {
+  if (executions.every((e) => e.state === "STATE_FINISHED")) {
     return "completed";
   }
   return "queued";
@@ -223,7 +217,7 @@ export function RunRow({
   const totalDuration = useMemo(() => {
     if (!event.createdAt || executions.length === 0) return null;
     const isAllFinished = executions.every((e) => e.state === "STATE_FINISHED");
-    if (!isAllFinished && queueItems.length === 0) return null;
+    if (!isAllFinished) return null;
     const startMs = new Date(event.createdAt).getTime();
     let latestEndMs = startMs;
     for (const exec of executions) {

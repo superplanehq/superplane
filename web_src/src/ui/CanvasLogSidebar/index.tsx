@@ -11,8 +11,6 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 export type ConsoleTab = "runs" | "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error" | "run";
 export type LogScope = "runs" | "canvas";
-export type LogScopeFilter = "all" | LogScope;
-export type LogTypeFilter = Set<"success" | "error" | "warning">;
 
 export interface LogRunItem {
   id: string;
@@ -45,21 +43,15 @@ export interface LogCounts {
 export interface CanvasLogSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  filter: LogTypeFilter;
-  onFilterChange: (filter: LogTypeFilter) => void;
   height?: number;
   defaultHeight?: number;
   minHeight?: number;
   maxHeight?: number;
   onHeightChange?: (height: number) => void;
-  scope: LogScopeFilter;
-  onScopeChange: (scope: LogScopeFilter) => void;
   searchValue: string;
   onSearchChange: (value: string) => void;
   entries: LogEntry[];
   counts: LogCounts;
-  expandedRuns: Set<string>;
-  onToggleRun: (runId: string) => void;
   activeTab?: ConsoleTab;
   onTabChange?: (tab: ConsoleTab) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
@@ -111,8 +103,6 @@ export function CanvasLogSidebar({
   onSearchChange,
   entries,
   counts,
-  expandedRuns,
-  onToggleRun,
   activeTab: controlledTab,
   onTabChange,
   runsEvents = [],

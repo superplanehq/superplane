@@ -72,13 +72,7 @@ import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
-import {
-  CanvasLogSidebar,
-  type ConsoleTab,
-  type LogEntry,
-  type LogScopeFilter,
-  type LogTypeFilter,
-} from "../CanvasLogSidebar";
+import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/CanvasRunsView";
 
@@ -2178,10 +2172,7 @@ function CanvasContent({
     return saved !== null ? saved === "true" : false;
   });
   const [consoleTab, setConsoleTab] = useState<ConsoleTab>("runs");
-  const [logFilter, setLogFilter] = useState<LogTypeFilter>(new Set());
-  const [logScope, setLogScope] = useState<LogScopeFilter>("all");
   const [logSearch, setLogSearch] = useState("");
-  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(() => new Set());
   const [logSidebarHeight, setLogSidebarHeight] = useState(() => {
     const saved = localStorage.getItem(CONSOLE_HEIGHT_STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 320;
@@ -2789,65 +2780,17 @@ function CanvasContent({
 
   const filteredLogEntries = useMemo(() => {
     const query = logSearch.trim().toLowerCase();
-    const matchesSearch = (value?: string) => !query || (value || "").toLowerCase().includes(query);
-    // Show all if filter is empty or contains all three types
-    const showAll = logFilter.size === 0 || logFilter.size === 3;
+    if (!query) return logEntries;
 
-    return logEntries.reduce<LogEntry[]>((acc, entry) => {
-      if (logScope !== "all" && entry.source !== logScope) {
-        return acc;
-      }
-
-      if (entry.type === "run") {
-        const runItems = entry.runItems || [];
-        const filteredRunItems = runItems.filter((item) => {
-          const typeMatch = showAll || (item.type !== "resolved-error" && logFilter.has(item.type));
-          const searchMatch =
-            matchesSearch(item.searchText) || matchesSearch(typeof item.title === "string" ? item.title : "");
-          return typeMatch && searchMatch;
-        });
-
-        const entrySearchMatch =
-          matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-        const typeMatch = showAll ? true : filteredRunItems.length > 0;
-        const searchMatch = query ? entrySearchMatch || filteredRunItems.length > 0 : true;
-
-        if (typeMatch && searchMatch) {
-          acc.push({ ...entry, runItems: filteredRunItems });
-        }
-        return acc;
-      }
-
-      if (!showAll && (entry.type === "resolved-error" || !logFilter.has(entry.type))) {
-        return acc;
-      }
-
-      const entrySearchMatch =
-        matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : "");
-      if (!entrySearchMatch) {
-        return acc;
-      }
-
-      acc.push(entry);
-      return acc;
-    }, []);
-  }, [logEntries, logFilter, logScope, logSearch]);
+    const matchesSearch = (value?: string) => (value || "").toLowerCase().includes(query);
+    return logEntries.filter(
+      (entry) => matchesSearch(entry.searchText) || matchesSearch(typeof entry.title === "string" ? entry.title : ""),
+    );
+  }, [logEntries, logSearch]);
 
   const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
     setConsoleTab(tab);
     setIsLogSidebarOpen(true);
-  }, []);
-
-  const handleRunToggle = useCallback((runId: string) => {
-    setExpandedRuns((prev) => {
-      const next = new Set(prev);
-      if (next.has(runId)) {
-        next.delete(runId);
-      } else {
-        next.add(runId);
-      }
-      return next;
-    });
   }, []);
 
   const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
@@ -3262,18 +3205,12 @@ function CanvasContent({
         <CanvasLogSidebar
           isOpen={isLogSidebarOpen}
           onClose={() => setIsLogSidebarOpen(false)}
-          filter={logFilter}
-          onFilterChange={setLogFilter}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
-          scope={logScope}
-          onScopeChange={setLogScope}
           searchValue={logSearch}
           onSearchChange={setLogSearch}
           entries={filteredLogEntries}
           counts={logCounts}
-          expandedRuns={expandedRuns}
-          onToggleRun={handleRunToggle}
           activeTab={consoleTab}
           onTabChange={setConsoleTab}
           runsEvents={runsEvents}
