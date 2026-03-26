@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/metadata"
 )
@@ -27,7 +26,7 @@ func TestDefaultResourceResolver(t *testing.T) {
 
 func TestCanvasResourceResolver(t *testing.T) {
 	t.Run("returns canvas id when available", func(t *testing.T) {
-		resourceIDs := canvasResourceResolver(&pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"})
+		resourceIDs := canvasResourceResolver(&pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"})
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
 
@@ -130,7 +129,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:read:canvas-123"}),
 				),
 			),
-			req:         &pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"},
+			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: true,
 		},
@@ -143,7 +142,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:read:canvas-456"}),
 				),
 			),
-			req:         &pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"},
+			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: false,
 		},
@@ -156,7 +155,7 @@ func TestHasRequiredScopedTokenPermission(t *testing.T) {
 					marshalScopes(t, []string{"canvases:update"}),
 				),
 			),
-			req:         &pbAgents.GenerateAgentChatTokenRequest{CanvasId: "canvas-123"},
+			req:         &pbCanvases.ListCanvasEventsRequest{CanvasId: "canvas-123"},
 			rule:        ruleWithCanvasResolver,
 			expectAllow: false,
 		},

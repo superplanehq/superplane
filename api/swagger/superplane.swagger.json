@@ -64,16 +64,46 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents/chat/tokens": {
-      "post": {
-        "summary": "Generates a new token for an agent chat",
-        "description": "Mints a short-lived scoped token for agent chat on a canvas",
-        "operationId": "Agents_GenerateAgentChatToken",
+    "/api/v1/agents/chats": {
+      "get": {
+        "summary": "List agent chats for the authenticated user",
+        "description": "Returns a list of agent chats for the authenticated user",
+        "operationId": "Agents_ListAgentChats",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsGenerateAgentChatTokenResponse"
+              "$ref": "#/definitions/AgentsListAgentChatsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      },
+      "post": {
+        "summary": "Creates a new agent chat",
+        "description": "Create a new agent chat. The response includes the URL and token for initiating the chat stream",
+        "operationId": "Agents_CreateAgentChat",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsCreateAgentChatResponse"
             }
           },
           "default": {
@@ -89,7 +119,123 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AgentsGenerateAgentChatTokenRequest"
+              "$ref": "#/definitions/AgentsCreateAgentChatRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/chats/{chatId}": {
+      "get": {
+        "summary": "Describes an agent chat for the authenticated user",
+        "description": "Describes an agent chat for the authenticated user",
+        "operationId": "Agents_DescribeAgentChat",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsDescribeAgentChatResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/chats/{chatId}/messages": {
+      "get": {
+        "summary": "List the messages in an agent chat",
+        "description": "List the messages in an agent chat",
+        "operationId": "Agents_ListAgentChatMessages",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsListAgentChatMessagesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/chats/{chatId}/resume": {
+      "post": {
+        "summary": "Resume an agent chat",
+        "description": "Resumes an agent chat. The response includes the URL and token for resuming the chat",
+        "operationId": "Agents_ResumeAgentChat",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsResumeAgentChatResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "chatId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AgentsResumeAgentChatBody"
             }
           }
         ],
@@ -3944,7 +4090,46 @@
       ],
       "default": "ACTION_UNSPECIFIED"
     },
-    "AgentsGenerateAgentChatTokenRequest": {
+    "AgentsAgentChatInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "initialMessage": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "AgentsAgentChatMessage": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "toolCallId": {
+          "type": "string"
+        },
+        "toolStatus": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "AgentsCreateAgentChatRequest": {
       "type": "object",
       "properties": {
         "canvasId": {
@@ -3952,10 +4137,64 @@
         }
       }
     },
-    "AgentsGenerateAgentChatTokenResponse": {
+    "AgentsCreateAgentChatResponse": {
       "type": "object",
       "properties": {
         "token": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsDescribeAgentChatResponse": {
+      "type": "object",
+      "properties": {
+        "chat": {
+          "$ref": "#/definitions/AgentsAgentChatInfo"
+        }
+      }
+    },
+    "AgentsListAgentChatMessagesResponse": {
+      "type": "object",
+      "properties": {
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AgentsAgentChatMessage"
+          }
+        }
+      }
+    },
+    "AgentsListAgentChatsResponse": {
+      "type": "object",
+      "properties": {
+        "chats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AgentsAgentChatInfo"
+          }
+        }
+      }
+    },
+    "AgentsResumeAgentChatBody": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsResumeAgentChatResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "url": {
           "type": "string"
         }
       }
