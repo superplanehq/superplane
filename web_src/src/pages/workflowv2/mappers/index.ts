@@ -187,6 +187,11 @@ import {
   eventStateRegistry as perplexityEventStateRegistry,
 } from "./perplexity/index";
 import {
+  componentMappers as openrouterComponentMappers,
+  triggerRenderers as openrouterTriggerRenderers,
+  eventStateRegistry as openrouterEventStateRegistry,
+} from "./openrouter/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -301,6 +306,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   circleci: circleCIComponentMappers,
   claude: claudeComponentMappers,
   perplexity: perplexityComponentMappers,
+  openrouter: openrouterComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
@@ -344,6 +350,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   circleci: circleCITriggerRenderers,
   claude: claudeTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
+  openrouter: openrouterTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
@@ -385,6 +392,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   circleci: circleCIEventStateRegistry,
   claude: claudeEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
+  openrouter: openrouterEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
