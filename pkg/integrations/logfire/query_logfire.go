@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -25,11 +26,23 @@ type QueryLogfireNodeMetadata struct {
 type QueryLogfireConfiguration struct {
 	SQL          string `json:"sql" mapstructure:"sql"`
 	ProjectID    string `json:"projectId" mapstructure:"projectId"`
+	TimeWindow   string `json:"timeWindow,omitempty" mapstructure:"timeWindow"`
 	MinTimestamp string `json:"minTimestamp,omitempty" mapstructure:"minTimestamp"`
 	MaxTimestamp string `json:"maxTimestamp,omitempty" mapstructure:"maxTimestamp"`
 	Limit        int    `json:"limit,omitempty" mapstructure:"limit"`
 	RowOriented  bool   `json:"rowOriented,omitempty" mapstructure:"rowOriented"`
 }
+
+const (
+	timeWindowNone   = "none"
+	timeWindow5m     = "5m"
+	timeWindow15m    = "15m"
+	timeWindow1h     = "1h"
+	timeWindow6h     = "6h"
+	timeWindow24h    = "24h"
+	timeWindow7d     = "7d"
+	timeWindowCustom = "custom"
+)
 
 // To ensure query is read-only.
 var forbiddenWriteSQLPattern = regexp.MustCompile(`(?i)\b(insert|update|delete|drop|alter|truncate|create|grant)\b`)
@@ -58,9 +71,9 @@ func (c *QueryLogfire) Documentation() string {
 
 ## Configuration
 
+- **Project**: Required Logfire project to query (scopes the generated read token)
 - **SQL**: Required SQL query (supports expressions). Example: ` + "`SELECT start_timestamp, message FROM records LIMIT 10`" + `
-- **Min Timestamp**: Optional ISO 8601 lower bound. For ` + "`records`" + ` queries, filters by ` + "`start_timestamp`" + ` (` + "`>= min_timestamp`" + `)
-- **Max Timestamp**: Optional ISO 8601 upper bound. For ` + "`records`" + ` queries, filters by ` + "`start_timestamp`" + ` (` + "`<= max_timestamp`" + `)
+- **Time Window**: Optional preset time window (e.g., Last 5 minutes, Last 1 hour). Select "Custom" to specify exact timestamps
 - **Limit**: Optional maximum rows to return. If omitted, Logfire defaults to ` + "`500`" + `; maximum is ` + "`10000`" + `
 - **Row Oriented**: Optional JSON format toggle. ` + "`false`" + ` returns column-oriented JSON; ` + "`true`" + ` returns row-oriented JSON
 
@@ -104,14 +117,6 @@ func (c *QueryLogfire) OutputChannels(configuration any) []core.OutputChannel {
 func (c *QueryLogfire) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "sql",
-			Label:       "SQL",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "Read-only SQL query to execute against Logfire",
-			Placeholder: "SELECT start_timestamp FROM records LIMIT 1",
-		},
-		{
 			Name:        "projectId",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -125,20 +130,59 @@ func (c *QueryLogfire) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "sql",
+			Label:       "SQL",
+			Type:        configuration.FieldTypeExpression,
+			Required:    true,
+			Description: "Read-only SQL query to execute against Logfire",
+			Placeholder: "SELECT start_timestamp, message FROM records LIMIT 10",
+		},
+		{
+			Name:        "timeWindow",
+			Label:       "Time Window",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Description: "Limit query results to a recent time window",
+			Default:     timeWindowNone,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "No limit", Value: timeWindowNone},
+						{Label: "Last 5 minutes", Value: timeWindow5m},
+						{Label: "Last 15 minutes", Value: timeWindow15m},
+						{Label: "Last 1 hour", Value: timeWindow1h},
+						{Label: "Last 6 hours", Value: timeWindow6h},
+						{Label: "Last 24 hours", Value: timeWindow24h},
+						{Label: "Last 7 days", Value: timeWindow7d},
+						{Label: "Custom", Value: timeWindowCustom},
+					},
+				},
+			},
+		},
+		{
 			Name:        "minTimestamp",
 			Label:       "Min Timestamp",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "Optional minimum timestamp bound for query results",
+			Description: "Custom minimum timestamp bound (ISO 8601)",
 			Placeholder: "2026-01-01T00:00:00Z",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "timeWindow", Values: []string{timeWindowCustom}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "timeWindow", Values: []string{timeWindowCustom}},
+			},
 		},
 		{
 			Name:        "maxTimestamp",
 			Label:       "Max Timestamp",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "Optional maximum timestamp bound for query results",
+			Description: "Custom maximum timestamp bound (ISO 8601)",
 			Placeholder: "2026-01-02T00:00:00Z",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "timeWindow", Values: []string{timeWindowCustom}},
+			},
 		},
 		{
 			Name:        "limit",
@@ -236,6 +280,10 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 	config = sanitizeQueryLogfireConfiguration(config)
+
+	if config.SQL == "" {
+		return fmt.Errorf("sql is required")
+	}
 	if err := validateReadOnlySQL(config.SQL); err != nil {
 		return err
 	}
@@ -253,10 +301,12 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("no read token available for project %q - please re-save the component to provision one", config.ProjectID)
 	}
 
+	minTs, maxTs := resolveTimeWindow(config)
+
 	response, err := client.ExecuteQueryWithToken(readToken, QueryRequest{
 		SQL:          config.SQL,
-		MinTimestamp: config.MinTimestamp,
-		MaxTimestamp: config.MaxTimestamp,
+		MinTimestamp: minTs,
+		MaxTimestamp: maxTs,
 		Limit:        config.Limit,
 		RowOriented:  config.RowOriented,
 	})
@@ -274,9 +324,32 @@ func (c *QueryLogfire) Execute(ctx core.ExecutionContext) error {
 func sanitizeQueryLogfireConfiguration(config QueryLogfireConfiguration) QueryLogfireConfiguration {
 	config.SQL = strings.TrimSpace(config.SQL)
 	config.ProjectID = strings.TrimSpace(config.ProjectID)
+	config.TimeWindow = strings.TrimSpace(config.TimeWindow)
 	config.MinTimestamp = strings.TrimSpace(config.MinTimestamp)
 	config.MaxTimestamp = strings.TrimSpace(config.MaxTimestamp)
 	return config
+}
+
+var timeWindowDurations = map[string]time.Duration{
+	timeWindow5m:  5 * time.Minute,
+	timeWindow15m: 15 * time.Minute,
+	timeWindow1h:  time.Hour,
+	timeWindow6h:  6 * time.Hour,
+	timeWindow24h: 24 * time.Hour,
+	timeWindow7d:  7 * 24 * time.Hour,
+}
+
+func resolveTimeWindow(config QueryLogfireConfiguration) (string, string) {
+	if d, ok := timeWindowDurations[config.TimeWindow]; ok {
+		now := time.Now().UTC()
+		return now.Add(-d).Format(time.RFC3339), ""
+	}
+
+	if config.TimeWindow == timeWindowCustom {
+		return config.MinTimestamp, config.MaxTimestamp
+	}
+
+	return "", ""
 }
 
 func validateReadOnlySQL(sql string) error {

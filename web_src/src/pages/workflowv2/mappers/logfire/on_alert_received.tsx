@@ -41,15 +41,24 @@ export const onAlertReceivedTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as LogfireAlertEventData;
 
-    return {
-      "Received At": getReceivedAtValue(context, eventData),
-      "Event Type": eventData?.eventType || "",
-      "Alert ID": eventData?.alertId || "",
+    const values: Record<string, string> = {
       "Alert Name": eventData?.alertName || "",
       Severity: eventData?.severity || "",
       Message: eventData?.message || "",
-      URL: eventData?.url || "",
     };
+
+    const matchingRows = extractMatchingRows(eventData?.message);
+    if (matchingRows !== undefined) {
+      values["Matching Rows"] = String(matchingRows);
+    }
+
+    values["Received At"] = getReceivedAtValue(context, eventData);
+
+    if (eventData?.url) {
+      values["View in Logfire"] = eventData.url;
+    }
+
+    return values;
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
@@ -121,6 +130,12 @@ function buildTitle(eventData: LogfireAlertEventData | undefined): string {
     return eventData.message;
   }
   return "Logfire alert received";
+}
+
+function extractMatchingRows(message?: string): number | undefined {
+  if (!message) return undefined;
+  const match = message.match(/(\d+)\s+matching\s+rows?/i);
+  return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
 function getReceivedAtValue(context: TriggerEventContext, eventData: LogfireAlertEventData): string {
