@@ -53,7 +53,7 @@ func (c *UpdateAlert) Documentation() string {
 - **Alert Rule**: Existing Sentry alert rule to update
 - **Project**: Optional replacement project if the rule should move
 - **Name / Aggregate / Query / Time Window / Threshold Type / Environment / Event Types**: Optional overrides for the existing rule
-- **Critical / Warning**: Optional updates to trigger thresholds and notification targets
+- **Critical / Warning**: Optional updates to trigger thresholds and notification targets. Select the target type first, then choose a Sentry user or team.
 
 ## Output
 
@@ -61,7 +61,7 @@ Returns the updated Sentry metric alert rule after the change is applied.`
 }
 
 func (c *UpdateAlert) Icon() string {
-	return "bug"
+	return "bell"
 }
 
 func (c *UpdateAlert) Color() string {
@@ -74,16 +74,6 @@ func (c *UpdateAlert) OutputChannels(configuration any) []core.OutputChannel {
 
 func (c *UpdateAlert) Configuration() []configuration.Field {
 	fields := []configuration.Field{
-		{
-			Name:        "project",
-			Label:       "Project",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Optional project to narrow alert rule selection",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeProject},
-			},
-		},
 		{
 			Name:        "alertId",
 			Label:       "Alert Rule",
@@ -100,6 +90,16 @@ func (c *UpdateAlert) Configuration() []configuration.Field {
 						},
 					},
 				},
+			},
+		},
+		{
+			Name:        "project",
+			Label:       "Project",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Optional project to narrow alert rule selection",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{Type: ResourceTypeProject},
 			},
 		},
 	}

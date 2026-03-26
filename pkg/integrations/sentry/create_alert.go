@@ -57,7 +57,7 @@ func (c *CreateAlert) Documentation() string {
 - **Threshold Type**: Whether the threshold fires above or below the configured value
 - **Environment**: Optional environment filter
 - **Event Types**: Event types included in the alert evaluation
-- **Critical / Warning**: Thresholds and notification targets for each trigger level
+- **Critical / Warning**: Thresholds and notification targets for each trigger level. Select the target type first, then choose a Sentry user or team.
 
 ## Output
 
@@ -65,7 +65,7 @@ Returns the created Sentry metric alert rule, including triggers, actions, and p
 }
 
 func (c *CreateAlert) Icon() string {
-	return "bug"
+	return "bell"
 }
 
 func (c *CreateAlert) Color() string {
@@ -209,6 +209,11 @@ func validateCreateAlertConfiguration(config CreateAlertConfiguration) error {
 	}
 
 	if config.Warning.Threshold != nil {
+		if strings.TrimSpace(config.Warning.Notification.TargetType) == "" ||
+			strings.TrimSpace(config.Warning.Notification.TargetIdentifier) == "" {
+			return fmt.Errorf("warning notification target is required when warning threshold is set")
+		}
+
 		_, err := buildAlertTriggerInput(alertTriggerLabelWarning, config.Warning)
 		if err != nil {
 			return err

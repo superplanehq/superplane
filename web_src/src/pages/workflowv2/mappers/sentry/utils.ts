@@ -101,17 +101,20 @@ export function getAlertRuleSelectionLabel(
 export function getAlertThresholdMetadataLabel(
   configuration:
     | {
+        thresholdType?: string;
         critical?: { threshold?: number };
         warning?: { threshold?: number };
       }
     | undefined,
 ): string | undefined {
+  const comparison = configuration?.thresholdType === "below" ? "≤" : "≥";
+
   if (configuration?.critical?.threshold !== undefined) {
-    return `Critical ≥ ${configuration.critical.threshold}`;
+    return `Critical ${comparison} ${configuration.critical.threshold}`;
   }
 
   if (configuration?.warning?.threshold !== undefined) {
-    return `Warning ≥ ${configuration.warning.threshold}`;
+    return `Warning ${comparison} ${configuration.warning.threshold}`;
   }
 
   return undefined;
