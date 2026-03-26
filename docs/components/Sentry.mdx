@@ -66,42 +66,46 @@ This trigger uses the webhook URL configured on your Sentry internal integration
 
 ```json
 {
-  "action": "created",
-  "actor": {
-    "id": "789",
-    "name": "Person",
-    "type": "user"
-  },
   "data": {
-    "issue": {
-      "assignedTo": {
-        "id": "789",
-        "name": "Person",
-        "type": "user"
-      },
-      "culprit": "SentryCustomError(frontend/src/util)",
-      "firstSeen": "2022-04-04T18:17:18.320000Z",
-      "id": "123",
-      "lastSeen": "2022-04-04T18:17:18.320000Z",
-      "level": "error",
-      "permalink": "https://your-org.sentry.io/issues/123/",
-      "project": {
-        "id": "456",
-        "name": "ipe",
-        "slug": "ipe"
-      },
-      "shortId": "IPE-1",
-      "status": "unresolved",
-      "substatus": "new",
-      "title": "Error #1: This is a test error!",
-      "web_url": "https://your-org.sentry.io/issues/123/"
-    }
+    "action": "created",
+    "actor": {
+      "id": "789",
+      "name": "Person",
+      "type": "user"
+    },
+    "data": {
+      "issue": {
+        "assignedTo": {
+          "id": "789",
+          "name": "Person",
+          "type": "user"
+        },
+        "culprit": "SentryCustomError(frontend/src/util)",
+        "firstSeen": "2022-04-04T18:17:18.320000Z",
+        "id": "123",
+        "lastSeen": "2022-04-04T18:17:18.320000Z",
+        "level": "error",
+        "permalink": "https://your-org.sentry.io/issues/123/",
+        "project": {
+          "id": "456",
+          "name": "ipe",
+          "slug": "ipe"
+        },
+        "shortId": "IPE-1",
+        "status": "unresolved",
+        "substatus": "new",
+        "title": "Error #1: This is a test error!",
+        "web_url": "https://your-org.sentry.io/issues/123/"
+      }
+    },
+    "installation": {
+      "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
+    },
+    "resource": "issue",
+    "timestamp": "2022-04-04T18:17:18.320000Z"
   },
-  "installation": {
-    "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
-  },
-  "resource": "issue",
-  "timestamp": "2022-04-04T18:17:18.320000Z"
+  "timestamp": "2022-04-04T18:17:18.320000Z",
+  "type": "sentry.issue"
 }
 ```
 
@@ -135,16 +139,20 @@ Returns the created deploy record, including environment, timestamps, URL, and r
 
 ```json
 {
-  "dateFinished": "2026-03-25T10:24:12.000Z",
-  "dateStarted": "2026-03-25T10:20:00.000Z",
-  "environment": "production",
-  "id": "1234567",
-  "name": "Deploy #42",
-  "projects": [
-    "go-gin"
-  ],
-  "releaseVersion": "2026.03.25",
-  "url": "https://example.com/deploys/42"
+  "data": {
+    "dateFinished": "2026-03-25T10:24:12.000Z",
+    "dateStarted": "2026-03-25T10:20:00.000Z",
+    "environment": "production",
+    "id": "1234567",
+    "name": "Deploy #42",
+    "projects": [
+      "go-gin"
+    ],
+    "releaseVersion": "2026.03.25",
+    "url": "https://example.com/deploys/42"
+  },
+  "timestamp": "2026-03-25T10:24:12.000Z",
+  "type": "sentry.deploy"
 }
 ```
 
@@ -177,22 +185,26 @@ Returns the created Sentry release object, including version, associated project
 
 ```json
 {
-  "commitCount": 2,
-  "dateCreated": "2026-03-25T10:12:55.109Z",
-  "dateReleased": "2026-03-25T10:15:00.000Z",
-  "deployCount": 0,
-  "id": 2,
-  "newGroups": 0,
-  "projects": [
-    {
-      "name": "go-gin",
-      "slug": "go-gin"
-    }
-  ],
-  "ref": "6ba09a7c53235ee8a8fa5ee4c1ca8ca886e7fdbb",
-  "shortVersion": "2026.03.25",
-  "url": "https://github.com/superplanehq/superplane/releases/tag/2026.03.25",
-  "version": "2026.03.25"
+  "data": {
+    "commitCount": 2,
+    "dateCreated": "2026-03-25T10:12:55.109Z",
+    "dateReleased": "2026-03-25T10:15:00.000Z",
+    "deployCount": 0,
+    "id": 2,
+    "newGroups": 0,
+    "projects": [
+      {
+        "name": "go-gin",
+        "slug": "go-gin"
+      }
+    ],
+    "ref": "6ba09a7c53235ee8a8fa5ee4c1ca8ca886e7fdbb",
+    "shortVersion": "2026.03.25",
+    "url": "https://github.com/superplanehq/superplane/releases/tag/2026.03.25",
+    "version": "2026.03.25"
+  },
+  "timestamp": "2026-03-25T10:15:00.000Z",
+  "type": "sentry.release"
 }
 ```
 
@@ -222,60 +234,64 @@ Returns the Sentry issue object including:
 
 ```json
 {
-  "assignedTo": {
-    "id": "42",
-    "name": "Platform",
-    "type": "team"
-  },
-  "count": "7",
-  "events": [
-    {
-      "dateCreated": "2026-03-24T13:03:56Z",
-      "eventID": "evt_1",
-      "id": "evt_1",
-      "message": "RuntimeError: SuperPlane trigger validation test 008",
-      "platform": "other",
-      "tags": [
-        {
-          "key": "environment",
-          "value": "production"
-        }
-      ],
-      "title": "RuntimeError: SuperPlane trigger validation test 008"
-    }
-  ],
-  "id": "106740394",
-  "numComments": 0,
-  "permalink": "https://washington-x2.sentry.io/issues/106740394/",
-  "priority": "high",
-  "project": {
-    "id": "4511070273339472",
-    "name": "go-gin",
-    "slug": "go-gin"
-  },
-  "shortId": "GO-GIN-G",
-  "stats": {
-    "24h": [
-      [
-        1711270800,
-        7
-      ]
-    ]
-  },
-  "status": "unresolved",
-  "tags": [
-    {
-      "key": "environment",
-      "value": "production"
+  "data": {
+    "assignedTo": {
+      "id": "42",
+      "name": "Platform",
+      "type": "team"
     },
-    {
-      "key": "level",
-      "value": "error"
-    }
-  ],
-  "title": "RuntimeError: SuperPlane trigger validation test 008",
-  "userCount": 3,
-  "web_url": "https://washington-x2.sentry.io/issues/106740394/"
+    "count": "7",
+    "events": [
+      {
+        "dateCreated": "2026-03-24T13:03:56Z",
+        "eventID": "evt_1",
+        "id": "evt_1",
+        "message": "RuntimeError: SuperPlane trigger validation test 008",
+        "platform": "other",
+        "tags": [
+          {
+            "key": "environment",
+            "value": "production"
+          }
+        ],
+        "title": "RuntimeError: SuperPlane trigger validation test 008"
+      }
+    ],
+    "id": "106740394",
+    "numComments": 0,
+    "permalink": "https://washington-x2.sentry.io/issues/106740394/",
+    "priority": "high",
+    "project": {
+      "id": "4511070273339472",
+      "name": "go-gin",
+      "slug": "go-gin"
+    },
+    "shortId": "GO-GIN-G",
+    "stats": {
+      "24h": [
+        [
+          1711270800,
+          7
+        ]
+      ]
+    },
+    "status": "unresolved",
+    "tags": [
+      {
+        "key": "environment",
+        "value": "production"
+      },
+      {
+        "key": "level",
+        "value": "error"
+      }
+    ],
+    "title": "RuntimeError: SuperPlane trigger validation test 008",
+    "userCount": 3,
+    "web_url": "https://washington-x2.sentry.io/issues/106740394/"
+  },
+  "timestamp": "2026-03-24T13:03:56Z",
+  "type": "sentry.issue"
 }
 ```
 
@@ -312,27 +328,31 @@ Returns the updated Sentry issue object.
 
 ```json
 {
-  "assignedTo": {
-    "id": "789",
-    "name": "Person",
-    "type": "user"
+  "data": {
+    "assignedTo": {
+      "id": "789",
+      "name": "Person",
+      "type": "user"
+    },
+    "culprit": "SentryCustomError(frontend/src/util)",
+    "firstSeen": "2022-04-04T18:17:18.320000Z",
+    "id": "123",
+    "lastSeen": "2022-04-04T18:17:18.320000Z",
+    "level": "error",
+    "permalink": "https://your-org.sentry.io/issues/123/",
+    "project": {
+      "id": "456",
+      "name": "ipe",
+      "slug": "ipe"
+    },
+    "shortId": "IPE-1",
+    "status": "resolved",
+    "substatus": "resolved",
+    "title": "Error #1: This is a test error!",
+    "web_url": "https://your-org.sentry.io/issues/123/"
   },
-  "culprit": "SentryCustomError(frontend/src/util)",
-  "firstSeen": "2022-04-04T18:17:18.320000Z",
-  "id": "123",
-  "lastSeen": "2022-04-04T18:17:18.320000Z",
-  "level": "error",
-  "permalink": "https://your-org.sentry.io/issues/123/",
-  "project": {
-    "id": "456",
-    "name": "ipe",
-    "slug": "ipe"
-  },
-  "shortId": "IPE-1",
-  "status": "resolved",
-  "substatus": "resolved",
-  "title": "Error #1: This is a test error!",
-  "web_url": "https://your-org.sentry.io/issues/123/"
+  "timestamp": "2022-04-04T18:17:18.320000Z",
+  "type": "sentry.issue"
 }
 ```
 
