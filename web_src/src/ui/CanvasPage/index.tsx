@@ -15,6 +15,7 @@ import {
 } from "@xyflow/react";
 
 import {
+  CircleX,
   GitBranch,
   Group,
   Loader2,
@@ -79,6 +80,7 @@ import {
   type LogTypeFilter,
 } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/CanvasRunsView";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -366,6 +368,7 @@ export interface CanvasPageProps {
     executionId: string;
     triggerEvent?: SidebarEvent;
   }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
@@ -1305,6 +1308,7 @@ function CanvasPage(props: CanvasPageProps) {
                 runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
                 onRunNodeSelect={props.onRunNodeSelect}
                 onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
                 title={props.title}
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
@@ -1983,6 +1987,7 @@ function CanvasContent({
   runsNodeQueueItemsMap,
   onRunNodeSelect,
   onRunExecutionSelect,
+  onAcknowledgeErrors,
   title,
   missingIntegrations,
   onConnectIntegration,
@@ -2095,6 +2100,7 @@ function CanvasContent({
     executionId: string;
     triggerEvent?: SidebarEvent;
   }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
   title?: string;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
@@ -2186,6 +2192,8 @@ function CanvasContent({
     }
     return { total: runsTotalCount || events.length, running };
   }, [runsEvents, runsTotalCount]);
+
+  const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(runsEvents || []), [runsEvents]);
 
   useEffect(() => {
     if (!showBottomStatusControls) {
@@ -3077,6 +3085,31 @@ function CanvasContent({
                         <Button
                           variant="ghost"
                           size="sm"
+                          className={cn(
+                            "h-8 items-center text-xs font-medium",
+                            unacknowledgedErrorCount > 0 && "text-red-500",
+                          )}
+                          onClick={() => handleLogButtonClick("errors")}
+                        >
+                          <CircleX
+                            className={unacknowledgedErrorCount > 0 ? "h-3 w-3 text-red-500" : "h-3 w-3 text-gray-800"}
+                          />
+                          <span
+                            className={
+                              unacknowledgedErrorCount > 0 ? "tabular-nums text-red-500" : "tabular-nums text-gray-800"
+                            }
+                          >
+                            {unacknowledgedErrorCount}
+                          </span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Errors</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-8 items-center text-xs font-medium"
                           onClick={() => handleLogButtonClick("warnings")}
                         >
@@ -3235,6 +3268,7 @@ function CanvasContent({
           runsNodeQueueItemsMap={runsNodeQueueItemsMap}
           onRunNodeSelect={onRunNodeSelect}
           onRunExecutionSelect={onRunExecutionSelect}
+          onAcknowledgeErrors={onAcknowledgeErrors}
         />
       ) : null}
     </div>

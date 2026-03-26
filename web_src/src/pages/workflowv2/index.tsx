@@ -4971,7 +4971,7 @@ export function WorkflowPageV2() {
 
   const [isResolvingErrors, setIsResolvingErrors] = useState(false);
 
-  const handleResolveExecutionErrors = useCallback(
+  const handleAcknowledgeErrors = useCallback(
     async (executionIds: string[]) => {
       if (!canvasId || executionIds.length === 0 || isResolvingErrors) {
         return;
@@ -4985,11 +4985,11 @@ export function WorkflowPageV2() {
           executionIds.forEach((id) => next.add(id));
           return next;
         });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.eventList(canvasId, 50) });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.events() });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
-        showSuccessToast("Execution errors resolved");
+        showSuccessToast("Errors acknowledged");
       } catch (_error) {
-        showErrorToast("Failed to resolve execution errors");
+        showErrorToast("Failed to acknowledge errors");
       } finally {
         setIsResolvingErrors(false);
       }
@@ -5705,6 +5705,7 @@ export function WorkflowPageV2() {
           runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
+          onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
           breadcrumbs={[

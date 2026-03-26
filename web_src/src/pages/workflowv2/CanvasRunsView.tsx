@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Play } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleX, Loader2, Play } from "lucide-react";
 import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
@@ -213,6 +213,13 @@ export function RunRow({
   const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
   const totalSteps = executions.length + queueItems.length;
 
+  const errorAckLabel = useMemo(() => {
+    const failedExecs = executions.filter((e) => e.result === "RESULT_FAILED");
+    if (failedExecs.length === 0) return null;
+    const allAcknowledged = failedExecs.every((e) => e.resultReason === "RESULT_REASON_ERROR_RESOLVED");
+    return allAcknowledged ? "acknowledged" : "new";
+  }, [executions]);
+
   const totalDuration = useMemo(() => {
     if (!event.createdAt || executions.length === 0) return null;
     const isAllFinished = executions.every((e) => e.state === "STATE_FINISHED");
@@ -265,6 +272,16 @@ export function RunRow({
           <span className="font-mono text-[10px] text-gray-400">#{event.id?.slice(0, 4)}</span>
           <span className="text-xs font-medium text-gray-900 truncate">{title}</span>
           <StatusBadge status={aggregateStatus} />
+          {errorAckLabel && (
+            <span
+              className={cn(
+                "text-[10px] font-medium rounded px-1.5 py-0.5",
+                errorAckLabel === "new" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500",
+              )}
+            >
+              {errorAckLabel === "new" ? "New" : "Acknowledged"}
+            </span>
+          )}
           {totalSteps > 0 && (
             <span className="text-xs text-gray-400 whitespace-nowrap">
               {totalSteps} {totalSteps === 1 ? "step" : "steps"}
@@ -648,6 +665,201 @@ export function RunsConsoleContent({
                 </button>
               </div>
             )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function countUnacknowledgedErrors(events: CanvasesCanvasEventWithExecutions[]): number {
+  let count = 0;
+  for (const event of events) {
+    for (const exec of event.executions || []) {
+      if (exec.result === "RESULT_FAILED" && exec.resultReason !== "RESULT_REASON_ERROR_RESOLVED") {
+        count++;
+      }
+    }
+  }
+  return count;
+}
+
+export function ErrorsConsoleContent({
+  events,
+  nodes,
+  componentIconMap = {},
+  searchQuery,
+  onNodeSelect,
+  onExecutionSelect,
+  onAcknowledgeErrors,
+}: {
+  events: CanvasesCanvasEventWithExecutions[];
+  nodes: ComponentsNode[];
+  componentIconMap?: Record<string, string>;
+  searchQuery: string;
+  onNodeSelect?: (nodeId: string) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
+}) {
+  const errorItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const items: {
+      execution: CanvasesCanvasNodeExecution;
+      event: CanvasesCanvasEventWithExecutions;
+      node: ComponentsNode | undefined;
+      triggerNode: ComponentsNode | undefined;
+    }[] = [];
+
+    for (const event of events) {
+      const triggerNode = nodes.find((n) => n.id === event.nodeId);
+      for (const exec of event.executions || []) {
+        if (exec.result !== "RESULT_FAILED") continue;
+        if (exec.resultReason === "RESULT_REASON_ERROR_RESOLVED") continue;
+
+        const baseNodeId = exec.nodeId?.includes(":") ? exec.nodeId.split(":")[0] : exec.nodeId;
+        const node = nodes.find((n) => n.id === exec.nodeId) || nodes.find((n) => n.id === baseNodeId);
+
+        if (query) {
+          const searchable = [node?.name, exec.nodeId, exec.resultMessage, event.id]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          if (!searchable.includes(query)) continue;
+        }
+
+        items.push({ execution: exec, event, node, triggerNode });
+      }
+    }
+    return items;
+  }, [events, nodes, searchQuery]);
+
+  const allErrorIds = useMemo(() => errorItems.map((item) => item.execution.id!).filter(Boolean), [errorItems]);
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-200">
+        <span className="text-[11px] font-medium text-gray-600">
+          {errorItems.length} unacknowledged {errorItems.length === 1 ? "error" : "errors"}
+        </span>
+        {onAcknowledgeErrors && allErrorIds.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onAcknowledgeErrors(allErrorIds)}
+            className="ml-auto rounded-md px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            Acknowledge all
+          </button>
+        )}
+      </div>
+      <div className="flex-1 overflow-auto">
+        {errorItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
+            <CircleX className="h-6 w-6 text-gray-300 mb-2" />
+            <p className="text-[13px] font-medium text-gray-600">No unacknowledged errors</p>
+            <p className="mt-0.5 text-xs text-gray-400">All errors have been acknowledged.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {errorItems.map((item) => {
+              const nodeName = item.node?.name || item.execution.nodeId || "Unknown";
+              const iconSrc = getHeaderIconSrc(item.node?.component?.name || item.node?.trigger?.name);
+              const iconSlug = resolveNodeIconSlug(item.node, componentIconMap);
+
+              const triggerSidebarEvent =
+                item.triggerNode && item.event.id
+                  ? mapTriggerEventToSidebarEvent(
+                      {
+                        id: item.event.id,
+                        canvasId: item.event.canvasId,
+                        nodeId: item.event.nodeId,
+                        channel: item.event.channel,
+                        data: item.event.data,
+                        createdAt: item.event.createdAt,
+                        customName: item.event.customName,
+                      },
+                      item.triggerNode,
+                    )
+                  : undefined;
+
+              return (
+                <div
+                  key={item.execution.id}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 min-h-8",
+                    (onNodeSelect || onExecutionSelect) && "cursor-pointer hover:bg-gray-50 transition-colors",
+                  )}
+                  role={onNodeSelect || onExecutionSelect ? "button" : undefined}
+                  tabIndex={onNodeSelect || onExecutionSelect ? 0 : undefined}
+                  onClick={() => {
+                    if (onExecutionSelect && item.execution.id && item.event.id && item.execution.nodeId) {
+                      onExecutionSelect({
+                        nodeId: item.execution.nodeId,
+                        eventId: item.event.id,
+                        executionId: item.execution.id,
+                        triggerEvent: triggerSidebarEvent,
+                      });
+                    } else if (onNodeSelect && item.execution.nodeId) {
+                      onNodeSelect(item.execution.nodeId);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      if (onExecutionSelect && item.execution.id && item.event.id && item.execution.nodeId) {
+                        onExecutionSelect({
+                          nodeId: item.execution.nodeId,
+                          eventId: item.event.id,
+                          executionId: item.execution.id,
+                          triggerEvent: triggerSidebarEvent,
+                        });
+                      } else if (onNodeSelect && item.execution.nodeId) {
+                        onNodeSelect(item.execution.nodeId);
+                      }
+                    }
+                  }}
+                >
+                  <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                    {iconSrc ? (
+                      <img src={iconSrc} alt={nodeName} className="h-4 w-4 object-contain" />
+                    ) : (
+                      React.createElement(resolveIcon(iconSlug || "box"), {
+                        size: 14,
+                        className: "text-gray-500",
+                      })
+                    )}
+                  </div>
+                  <div className="flex flex-1 items-center gap-2 min-w-0">
+                    <span className="text-xs text-gray-700 truncate">{nodeName}</span>
+                    <StatusBadge status="error" />
+                    {item.execution.resultMessage && (
+                      <span className="text-xs text-red-600 truncate max-w-[300px]">
+                        {item.execution.resultMessage}
+                      </span>
+                    )}
+                  </div>
+                  {onAcknowledgeErrors && item.execution.id && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAcknowledgeErrors([item.execution.id!]);
+                      }}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors whitespace-nowrap"
+                    >
+                      Acknowledge
+                    </button>
+                  )}
+                  <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+                    {item.execution.createdAt ? formatRunTimestamp(item.execution.createdAt) : ""}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

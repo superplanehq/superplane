@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Play, Search, TriangleAlert, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleX, Play, Search, TriangleAlert, X } from "lucide-react";
 
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
-import { RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
+import { countUnacknowledgedErrors, ErrorsConsoleContent, RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
-export type ConsoleTab = "runs" | "warnings";
+export type ConsoleTab = "runs" | "errors" | "warnings";
 export type LogEntryType = "success" | "error" | "warning" | "resolved-error" | "run";
 export type LogScope = "runs" | "canvas";
 export type LogScopeFilter = "all" | LogScope;
@@ -77,6 +77,7 @@ export interface CanvasLogSidebarProps {
     executionId: string;
     triggerEvent?: SidebarEvent;
   }) => void;
+  onAcknowledgeErrors?: (executionIds: string[]) => void;
 }
 
 function formatLogTimestamp(value: string) {
@@ -124,6 +125,7 @@ export function CanvasLogSidebar({
   runsNodeQueueItemsMap = {},
   onRunNodeSelect,
   onRunExecutionSelect,
+  onAcknowledgeErrors,
 }: CanvasLogSidebarProps) {
   const [internalTab, setInternalTab] = useState<ConsoleTab>("runs");
   const activeTab = controlledTab ?? internalTab;
@@ -245,11 +247,14 @@ export function CanvasLogSidebar({
     [setSidebarHeight, sidebarHeight],
   );
 
+  const unacknowledgedCount = useMemo(() => countUnacknowledgedErrors(runsEvents), [runsEvents]);
+
   if (!isOpen) {
     return null;
   }
 
-  const searchPlaceholder = activeTab === "runs" ? "Search runs…" : "Search warnings…";
+  const searchPlaceholder =
+    activeTab === "runs" ? "Search runs…" : activeTab === "errors" ? "Search errors…" : "Search warnings…";
 
   return (
     <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
@@ -272,6 +277,39 @@ export function CanvasLogSidebar({
             >
               <Play className="h-4 w-4" />
               Runs
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("errors")}
+              className={cn(
+                "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                activeTab === "errors"
+                  ? "border-gray-800 text-gray-800"
+                  : "border-transparent text-gray-500 hover:text-gray-800",
+              )}
+            >
+              <CircleX
+                className={cn(
+                  "h-4 w-4",
+                  unacknowledgedCount > 0
+                    ? "text-red-500"
+                    : activeTab === "errors"
+                      ? "text-gray-800"
+                      : "text-gray-500 group-hover:text-gray-800",
+                )}
+              />
+              <span
+                className={cn(
+                  "tabular-nums",
+                  unacknowledgedCount > 0
+                    ? "text-red-500"
+                    : activeTab === "errors"
+                      ? "text-gray-800"
+                      : "text-gray-500 group-hover:text-gray-800",
+                )}
+              >
+                {unacknowledgedCount}
+              </span>
             </button>
             <button
               type="button"
@@ -345,6 +383,16 @@ export function CanvasLogSidebar({
             nodeQueueItemsMap={runsNodeQueueItemsMap}
             onNodeSelect={onRunNodeSelect}
             onExecutionSelect={onRunExecutionSelect}
+          />
+        ) : activeTab === "errors" ? (
+          <ErrorsConsoleContent
+            events={runsEvents}
+            nodes={runsNodes}
+            componentIconMap={runsComponentIconMap}
+            searchQuery={searchValue}
+            onNodeSelect={onRunNodeSelect}
+            onExecutionSelect={onRunExecutionSelect}
+            onAcknowledgeErrors={onAcknowledgeErrors}
           />
         ) : (
           <div className="flex-1 overflow-auto" data-log-scroll ref={scrollContainerRef}>
