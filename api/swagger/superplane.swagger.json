@@ -6254,6 +6254,10 @@
         "eventBucketLastUpdatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "nextEventBucketDecreaseAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

@@ -16,6 +16,8 @@
 
 # import models into model package
 from superplaneapi.models.act_on_canvas_change_request_request_action import ActOnCanvasChangeRequestRequestAction
+from superplaneapi.models.agents_generate_agent_chat_token_request import AgentsGenerateAgentChatTokenRequest
+from superplaneapi.models.agents_generate_agent_chat_token_response import AgentsGenerateAgentChatTokenResponse
 from superplaneapi.models.authorization_domain_type import AuthorizationDomainType
 from superplaneapi.models.authorization_permission import AuthorizationPermission
 from superplaneapi.models.blueprints_blueprint import BlueprintsBlueprint

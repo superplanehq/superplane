@@ -964,6 +964,7 @@ export type OrganizationsOrganizationUsage = {
   eventBucketLevel?: number;
   eventBucketCapacity?: number;
   eventBucketLastUpdatedAt?: string;
+  nextEventBucketDecreaseAt?: string;
 };
 
 export type OrganizationsRemoveInvitationResponse = {
