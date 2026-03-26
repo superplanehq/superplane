@@ -182,18 +182,23 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   const isUnlimited = typeof capacity === "number" && capacity === -1;
   const value = isUnlimited ? "∞" : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
 
-  let subtitle = "Rolling event usage for the current 30-day window.";
-  if (nextDecreaseAt) {
-    subtitle = `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
-  } else if (lastUpdatedAt) {
-    subtitle = `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
-  }
-
   return {
     value,
-    subtitle,
+    subtitle: formatEventUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
     progress: isUnlimited ? null : percentage(displayedLevel, capacity),
   };
+}
+
+function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
+  if (nextDecreaseAt) {
+    return `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
+  }
+
+  if (lastUpdatedAt) {
+    return `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
+  }
+
+  return "Rolling event usage for the current 30-day window.";
 }
 
 function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
