@@ -57,6 +57,7 @@ import {
   useTriggers,
   useCanvas,
   useCanvasEvents,
+  useInfiniteCanvasEvents,
   useCanvasMemoryEntries,
   useDeleteCanvasMemoryEntry,
   useCanvasVersion,
@@ -748,6 +749,23 @@ export function WorkflowPageV2() {
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
   const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
+  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
+  const runsEventsData = useMemo(() => {
+    const pages = infiniteEventsQuery.data?.pages || [];
+    const events = pages.flatMap((page) => page?.events || []);
+    const totalCount = pages[0]?.totalCount || 0;
+    return { events, totalCount };
+  }, [infiniteEventsQuery.data]);
+  const componentIconMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of components) {
+      if (c.name && c.icon) map[c.name] = c.icon;
+    }
+    for (const t of triggers) {
+      if (t.name && t.icon) map[t.name] = t.icon;
+    }
+    return map;
+  }, [components, triggers]);
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -5678,6 +5696,16 @@ export function WorkflowPageV2() {
           blueprints={blueprints}
           logEntries={logEntries}
           onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
+          runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
+          runsTotalCount={runsEventsData.totalCount}
+          runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
+          runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
+          onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
+          runsNodes={canvas?.spec?.nodes || []}
+          runsComponentIconMap={componentIconMap}
+          runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
+          onRunNodeSelect={handleLogRunNodeSelect}
+          onRunExecutionSelect={handleLogRunExecutionSelect}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
           breadcrumbs={[
