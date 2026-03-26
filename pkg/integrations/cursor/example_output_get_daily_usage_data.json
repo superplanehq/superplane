@@ -1,4 +1,5 @@
 {
+  "data": {
     "data": [
       {
         "acceptedLinesAdded": 1102,
@@ -25,4 +26,7 @@
       "endDate": 1710892800000,
       "startDate": 1710720000000
     }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cursor.getDailyUsageData.result"
 }
