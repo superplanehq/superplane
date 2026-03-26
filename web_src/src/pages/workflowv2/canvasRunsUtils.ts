@@ -242,9 +242,15 @@ export function findNode(nodes: ComponentsNode[], nodeId: string | undefined): C
 export function mergeQueueItemsWithEvents(
   events: CanvasesCanvasEventWithExecutions[],
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-): { queueItemsByEventId: Record<string, CanvasesCanvasNodeQueueItem[]>; allEvents: CanvasesCanvasEventWithExecutions[] } {
+): {
+  queueItemsByEventId: Record<string, CanvasesCanvasNodeQueueItem[]>;
+  allEvents: CanvasesCanvasEventWithExecutions[];
+} {
   const map: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
-  const orphansByEvent: Record<string, { event: CanvasesCanvasNodeQueueItem["rootEvent"]; items: CanvasesCanvasNodeQueueItem[] }> = {};
+  const orphansByEvent: Record<
+    string,
+    { event: CanvasesCanvasNodeQueueItem["rootEvent"]; items: CanvasesCanvasNodeQueueItem[] }
+  > = {};
   const eventIds = new Set(events.map((e) => e.id));
 
   for (const items of Object.values(nodeQueueItemsMap)) {
