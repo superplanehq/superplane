@@ -36,6 +36,12 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
+	case "gpu_droplet":
+		return listGPUDroplets(ctx)
+	case "gpu_region":
+		return listGPURegions(ctx)
+	case "gpu_size":
+		return listGPUSizes(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -405,6 +411,80 @@ func listApps(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 			Type: "app",
 			Name: name,
 			ID:   app.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGPUDroplets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	droplets, err := client.ListGPUDroplets()
+	if err != nil {
+		return nil, fmt.Errorf("error listing GPU droplets: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(droplets))
+	for _, droplet := range droplets {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gpu_droplet",
+			Name: droplet.Name,
+			ID:   fmt.Sprintf("%d", droplet.ID),
+		})
+	}
+
+	return resources, nil
+}
+
+func listGPURegions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	regions, err := client.ListGPURegions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing GPU regions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(regions))
+	for _, region := range regions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gpu_region",
+			Name: region.Name,
+			ID:   region.Slug,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGPUSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	sizes, err := client.ListGPUSizes()
+	if err != nil {
+		return nil, fmt.Errorf("error listing GPU sizes: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(sizes))
+	for _, size := range sizes {
+		name := size.Slug
+		if size.Description != "" {
+			name = size.Description
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "gpu_size",
+			Name: name,
+			ID:   size.Slug,
 		})
 	}
 

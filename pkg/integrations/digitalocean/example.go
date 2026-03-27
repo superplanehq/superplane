@@ -256,3 +256,43 @@ var exampleOutputUpdateApp map[string]any
 func (u *UpdateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
 }
+
+//go:embed example_output_create_gpu_droplet.json
+var exampleOutputCreateGPUDropletBytes []byte
+
+var exampleOutputCreateGPUDropletOnce sync.Once
+var exampleOutputCreateGPUDroplet map[string]any
+
+func (c *CreateGPUDroplet) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateGPUDropletOnce, exampleOutputCreateGPUDropletBytes, &exampleOutputCreateGPUDroplet)
+}
+
+//go:embed example_output_get_gpu_droplet.json
+var exampleOutputGetGPUDropletBytes []byte
+
+var exampleOutputGetGPUDropletOnce sync.Once
+var exampleOutputGetGPUDroplet map[string]any
+
+func (g *GetGPUDroplet) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetGPUDropletOnce, exampleOutputGetGPUDropletBytes, &exampleOutputGetGPUDroplet)
+}
+
+//go:embed example_output_update_gpu_droplet.json
+var exampleOutputUpdateGPUDropletBytes []byte
+
+var exampleOutputUpdateGPUDropletOnce sync.Once
+var exampleOutputUpdateGPUDroplet map[string]any
+
+func (u *UpdateGPUDroplet) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateGPUDropletOnce, exampleOutputUpdateGPUDropletBytes, &exampleOutputUpdateGPUDroplet)
+}
+
+//go:embed example_output_delete_gpu_droplet.json
+var exampleOutputDeleteGPUDropletBytes []byte
+
+var exampleOutputDeleteGPUDropletOnce sync.Once
+var exampleOutputDeleteGPUDroplet map[string]any
+
+func (d *DeleteGPUDroplet) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteGPUDropletOnce, exampleOutputDeleteGPUDropletBytes, &exampleOutputDeleteGPUDroplet)
+}
