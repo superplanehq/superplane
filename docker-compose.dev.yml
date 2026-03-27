@@ -122,6 +122,7 @@ services:
       - agent/.env
     environment:
       IN_DOCKER: "1"
+      APP_PORT: ${APP_PORT:-8000}
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
       INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
