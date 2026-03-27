@@ -99,6 +99,7 @@ import {
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
+import { CanvasCliView } from "./CanvasCliView";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -766,7 +767,7 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "cli" | "memory" | "settings">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -5502,6 +5503,8 @@ export function WorkflowPageV2() {
         onImport={!isReadOnly ? handleImportYaml : undefined}
         isImporting={updateCanvasVersionMutation.isPending}
       />
+    ) : topViewMode === "cli" ? (
+      <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}

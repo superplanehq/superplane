@@ -14,7 +14,6 @@ import {
   Undo2,
   Pencil,
 } from "lucide-react";
-import { CliCommandsPopover } from "./CliCommandsPopover";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { Switch } from "../switch";
@@ -64,9 +63,8 @@ interface HeaderProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
-  canvasId?: string;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
@@ -242,7 +240,6 @@ export function Header({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
-  canvasId,
   onExportYamlCopy,
   onExportYamlDownload,
   memoryItemCount,
@@ -427,7 +424,7 @@ export function Header({
 
           <div className="justify-self-center">
             {topViewMode && onTopViewModeChange && (
-              <div className="flex items-center rounded-md border border-gray-300 p-0.5 text-[13px] font-medium">
+              <div className="flex items-center rounded-md border border-slate-950/15 p-0.5 text-[13px] font-medium">
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}
@@ -446,7 +443,15 @@ export function Header({
                 >
                   YAML
                 </button>
-                <CliCommandsPopover canvasId={canvasId} organizationId={organizationId} />
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("cli")}
+                  className={`rounded-sm px-2 py-0.5 ${
+                    topViewMode === "cli" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  CLI
+                </button>
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("memory")}

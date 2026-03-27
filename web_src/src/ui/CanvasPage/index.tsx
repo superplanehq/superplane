@@ -280,8 +280,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
@@ -1042,10 +1042,6 @@ function CanvasPage(props: CanvasPageProps) {
     canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
-  const canvasStateBorderClass = canvasStateMode === "previewing-previous-version" ? "border-3 border-sky-500" : "";
-  const canvasStateBadgeClass = canvasStateMode === "previewing-previous-version" ? "bg-sky-500" : "";
-  const canvasStateLabel = canvasStateMode === "previewing-previous-version" ? "Previewing Previous Version" : "";
-
   return (
     <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -1088,7 +1084,6 @@ function CanvasPage(props: CanvasPageProps) {
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
-          canvasId={props.canvasId}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1131,7 +1126,7 @@ function CanvasPage(props: CanvasPageProps) {
       {props.topViewMode && props.topViewMode !== "canvas" ? (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
-          <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+          <div className="flex-1 overflow-auto bg-slate-100">{props.dataViewContent}</div>
         </div>
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
@@ -1155,7 +1150,7 @@ function CanvasPage(props: CanvasPageProps) {
             />
           )}
 
-          <div className={`flex-1 relative ${canvasStateBorderClass}`}>
+          <div className="flex-1 relative">
             {showPreviewFloatingBar || showAwaitingFloatingBar ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
                 <div
@@ -1199,13 +1194,6 @@ function CanvasPage(props: CanvasPageProps) {
                     View details
                   </Button>
                 </div>
-              </div>
-            ) : null}
-            {canvasStateLabel ? (
-              <div
-                className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
-              >
-                {canvasStateLabel}
               </div>
             ) : null}
             <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
@@ -1718,7 +1706,6 @@ function CanvasContentHeader({
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
-  canvasId,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1752,12 +1739,11 @@ function CanvasContentHeader({
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
-  canvasId?: string;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1826,7 +1812,6 @@ function CanvasContentHeader({
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
-      canvasId={canvasId}
     />
   );
 }
