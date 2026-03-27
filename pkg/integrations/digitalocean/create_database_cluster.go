@@ -152,6 +152,26 @@ func (c *CreateDatabaseCluster) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "numNodes",
+			Label:       "Node Count",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     "1",
+			Description: "The number of nodes in the cluster",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "1", Value: "1"},
+						{Label: "2", Value: "2"},
+						{Label: "3", Value: "3"},
+						{Label: "6", Value: "6"},
+						{Label: "9", Value: "9"},
+						{Label: "15", Value: "15"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "size",
 			Label:       "Size",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -170,26 +190,6 @@ func (c *CreateDatabaseCluster) Configuration() []configuration.Field {
 							Name:      "numNodes",
 							ValueFrom: &configuration.ParameterValueFrom{Field: "numNodes"},
 						},
-					},
-				},
-			},
-		},
-		{
-			Name:        "numNodes",
-			Label:       "Node Count",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Default:     "1",
-			Description: "The number of nodes in the cluster",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "1", Value: "1"},
-						{Label: "2", Value: "2"},
-						{Label: "3", Value: "3"},
-						{Label: "6", Value: "6"},
-						{Label: "9", Value: "9"},
-						{Label: "15", Value: "15"},
 					},
 				},
 			},
