@@ -104,8 +104,8 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 		router.HandleFunc("/signup", a.handlePasswordSignup).Methods("POST")
 	}
 
-	router.HandleFunc("/auth/okta/{org_id}", a.handleOktaAuthStart).Methods("GET")
-	router.HandleFunc("/auth/okta/{org_id}/callback", a.handleOktaAuthCallback).Methods("GET")
+	router.HandleFunc("/auth/okta/{org_id}/saml/login", a.handleOktaSAMLLogin).Methods("GET")
+	router.HandleFunc("/auth/okta/{org_id}/saml/acs", a.handleOktaSAMLACS).Methods("POST")
 	router.HandleFunc("/auth/sso/lookup", a.handleSSOLookup).Methods("GET")
 
 	//

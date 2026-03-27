@@ -44,7 +44,7 @@ func (a *Handler) handleSSOLookup(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		loginURL := ""
 		if a.publicAppBaseURL != "" {
-			loginURL = a.publicAppBaseURL + "/auth/okta/" + row.OrgID
+			loginURL = a.publicAppBaseURL + "/auth/okta/" + row.OrgID + "/saml/login"
 		}
 		orgs = append(orgs, ssoOrgResult{
 			ID:       row.OrgID,

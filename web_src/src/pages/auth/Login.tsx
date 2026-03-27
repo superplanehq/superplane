@@ -564,12 +564,7 @@ export const Login: React.FC = () => {
                   />
                   {ssoError && <p className="text-xs text-red-500">{ssoError}</p>}
                   <div className="flex gap-2">
-                    <LoadingButton
-                      type="submit"
-                      loading={ssoLoading}
-                      loadingText="Looking up..."
-                      className="flex-1"
-                    >
+                    <LoadingButton type="submit" loading={ssoLoading} loadingText="Looking up..." className="flex-1">
                       Continue
                     </LoadingButton>
                     <Button

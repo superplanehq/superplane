@@ -2774,7 +2774,7 @@
     "/api/v1/organizations/{id}/okta-idp": {
       "get": {
         "summary": "Get organization Okta IdP settings",
-        "description": "Returns Okta OIDC/SCIM configuration metadata for an organization (no secrets)",
+        "description": "Returns Okta SAML/SCIM configuration metadata for an organization (no secrets)",
         "operationId": "Organizations_GetOktaIdpSettings",
         "responses": {
           "200": {
@@ -2804,7 +2804,7 @@
       },
       "patch": {
         "summary": "Create or update organization Okta IdP settings",
-        "description": "Creates or updates Okta issuer URL, OAuth client id/secret, and OIDC/SCIM toggles",
+        "description": "Creates or updates Okta SAML IdP settings (SSO URL, issuer, certificate) and SAML/SCIM toggles",
         "operationId": "Organizations_UpdateOktaIdpSettings",
         "responses": {
           "200": {
@@ -6191,16 +6191,16 @@
         "configured": {
           "type": "boolean"
         },
-        "issuerBaseUrl": {
+        "samlIdpSsoUrl": {
           "type": "string"
         },
-        "oauthClientId": {
+        "samlIdpIssuer": {
           "type": "string"
         },
-        "oauthClientSecretConfigured": {
+        "samlIdpCertificateConfigured": {
           "type": "boolean"
         },
-        "oidcEnabled": {
+        "samlEnabled": {
           "type": "boolean"
         },
         "scimEnabled": {
@@ -6350,16 +6350,16 @@
     "OrganizationsUpdateOktaIdpSettingsBody": {
       "type": "object",
       "properties": {
-        "issuerBaseUrl": {
+        "samlIdpSsoUrl": {
           "type": "string"
         },
-        "oauthClientId": {
+        "samlIdpIssuer": {
           "type": "string"
         },
-        "oauthClientSecret": {
+        "samlIdpCertificatePem": {
           "type": "string"
         },
-        "oidcEnabled": {
+        "samlEnabled": {
           "type": "boolean"
         },
         "scimEnabled": {

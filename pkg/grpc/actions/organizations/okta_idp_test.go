@@ -1,7 +1,6 @@
 package organizations
 
 import (
-	"context"
 	"slices"
 	"testing"
 
@@ -27,51 +26,46 @@ func Test__GetOktaIdpSettings_Unconfigured(t *testing.T) {
 
 func Test__UpdateOktaIdpSettings_CreateAndPatch(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
 
-	issuer := "https://dev-example.okta.com/oauth2/default"
-	clientID := "client-id-1"
-	secret := "super-secret-value"
+	ssoURL := "https://dev-example.okta.com/app/superplane/exk123/sso/saml"
+	issuer := "http://www.okta.com/exk123"
+	cert := "-----BEGIN CERTIFICATE-----\nMIICmDCCAYAC\n-----END CERTIFICATE-----"
 
-	_, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{})
+	_, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{})
 	require.Error(t, err)
 	st, ok := status.FromError(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 
-	resp, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		IssuerBaseUrl:     &issuer,
-		OauthClientId:     &clientID,
-		OauthClientSecret: &secret,
+	resp, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		SamlIdpSsoUrl:        &ssoURL,
+		SamlIdpIssuer:        &issuer,
+		SamlIdpCertificatePem: &cert,
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp.Settings)
 	assert.True(t, resp.Settings.Configured)
-	assert.Equal(t, issuer, resp.Settings.IssuerBaseUrl)
-	assert.Equal(t, clientID, resp.Settings.OauthClientId)
-	assert.True(t, resp.Settings.OauthClientSecretConfigured)
-	assert.False(t, resp.Settings.OidcEnabled)
+	assert.Equal(t, ssoURL, resp.Settings.SamlIdpSsoUrl)
+	assert.Equal(t, issuer, resp.Settings.SamlIdpIssuer)
+	assert.True(t, resp.Settings.SamlIdpCertificateConfigured)
+	assert.False(t, resp.Settings.SamlEnabled)
 	assert.False(t, resp.Settings.ScimEnabled)
 
 	row, err := models.FindOrganizationOktaIDPByOrganizationID(r.Organization.ID.String())
 	require.NoError(t, err)
-	assert.NotEmpty(t, row.OAuthClientSecretCiphertext)
-	plain, err := r.Encryptor.Decrypt(ctx, row.OAuthClientSecretCiphertext, []byte(oktaOAuthClientSecretCredentialName))
-	require.NoError(t, err)
-	assert.Equal(t, secret, string(plain))
+	assert.NotEmpty(t, row.SamlIdpCertificatePEM)
 
-	issuer2 := "https://dev-example.okta.com/oauth2/custom"
-	patch, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		IssuerBaseUrl: &issuer2,
+	ssoURL2 := "https://dev-example.okta.com/app/superplane/exk456/sso/saml"
+	patch, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		SamlIdpSsoUrl: &ssoURL2,
 	})
 	require.NoError(t, err)
-	assert.Equal(t, issuer2, patch.Settings.IssuerBaseUrl)
-	assert.Equal(t, clientID, patch.Settings.OauthClientId)
+	assert.Equal(t, ssoURL2, patch.Settings.SamlIdpSsoUrl)
+	assert.Equal(t, issuer, patch.Settings.SamlIdpIssuer)
 }
 
 func Test__RotateOktaScimBearerToken(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
 
 	_, err := RotateOktaScimBearerToken(r.Organization.ID.String())
 	require.Error(t, err)
@@ -79,11 +73,11 @@ func Test__RotateOktaScimBearerToken(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.NotFound, st.Code())
 
-	issuer := "https://dev-example.okta.com/oauth2/default"
-	clientID := "cid"
-	_, err = UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		IssuerBaseUrl: &issuer,
-		OauthClientId: &clientID,
+	ssoURL := "https://dev-example.okta.com/app/superplane/exk123/sso/saml"
+	issuer := "http://www.okta.com/exk123"
+	_, err = UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		SamlIdpSsoUrl: &ssoURL,
+		SamlIdpIssuer: &issuer,
 	})
 	require.NoError(t, err)
 
@@ -98,17 +92,16 @@ func Test__RotateOktaScimBearerToken(t *testing.T) {
 	assert.Equal(t, crypto.HashToken(rot.ScimBearerToken), *row.ScimBearerTokenHash)
 }
 
-func Test__UpdateOktaIdpSettings_OIDCRequiresClientSecret(t *testing.T) {
+func Test__UpdateOktaIdpSettings_SAMLRequiresCertificate(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
 
-	issuer := "https://dev-example.okta.com/oauth2/default"
-	clientID := "cid"
-	oidcOn := true
-	_, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		IssuerBaseUrl: &issuer,
-		OauthClientId: &clientID,
-		OidcEnabled:   &oidcOn,
+	ssoURL := "https://dev-example.okta.com/app/superplane/exk123/sso/saml"
+	issuer := "http://www.okta.com/exk123"
+	samlOn := true
+	_, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		SamlIdpSsoUrl: &ssoURL,
+		SamlIdpIssuer: &issuer,
+		SamlEnabled:   &samlOn,
 	})
 	require.Error(t, err)
 	st, ok := status.FromError(err)
@@ -116,19 +109,18 @@ func Test__UpdateOktaIdpSettings_OIDCRequiresClientSecret(t *testing.T) {
 	assert.Equal(t, codes.FailedPrecondition, st.Code())
 }
 
-func Test__UpdateOktaIdpSettings_OIDCEnablesOrgProvider(t *testing.T) {
+func Test__UpdateOktaIdpSettings_SAMLEnablesOrgProvider(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
 
-	issuer := "https://dev-example.okta.com/oauth2/default"
-	clientID := "cid"
-	secret := "secret"
-	oidcOn := true
-	_, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		IssuerBaseUrl:     &issuer,
-		OauthClientId:     &clientID,
-		OauthClientSecret: &secret,
-		OidcEnabled:       &oidcOn,
+	ssoURL := "https://dev-example.okta.com/app/superplane/exk123/sso/saml"
+	issuer := "http://www.okta.com/exk123"
+	cert := "-----BEGIN CERTIFICATE-----\nMIICmDCCAYAC\n-----END CERTIFICATE-----"
+	samlOn := true
+	_, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		SamlIdpSsoUrl:        &ssoURL,
+		SamlIdpIssuer:        &issuer,
+		SamlIdpCertificatePem: &cert,
+		SamlEnabled:          &samlOn,
 	})
 	require.NoError(t, err)
 
@@ -137,15 +129,14 @@ func Test__UpdateOktaIdpSettings_OIDCEnablesOrgProvider(t *testing.T) {
 	assert.True(t, slices.Contains(org.AllowedProviders, models.ProviderOkta))
 }
 
-func Test__UpdateOktaIdpSettings_InvalidIssuer(t *testing.T) {
+func Test__UpdateOktaIdpSettings_InvalidSSOURL(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
 
-	bad := "http://insecure.example/oauth2/default"
-	cid := "x"
-	_, err := UpdateOktaIdpSettings(ctx, r.Encryptor, r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		IssuerBaseUrl: &bad,
-		OauthClientId: &cid,
+	bad := "http://insecure.example/app/saml"
+	issuer := "http://www.okta.com/exk123"
+	_, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
+		SamlIdpSsoUrl: &bad,
+		SamlIdpIssuer: &issuer,
 	})
 	require.Error(t, err)
 	st, ok := status.FromError(err)

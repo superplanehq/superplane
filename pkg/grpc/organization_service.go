@@ -149,7 +149,7 @@ func (s *OrganizationService) UpdateOktaIdpSettings(
 	req *pb.UpdateOktaIdpSettingsRequest,
 ) (*pb.UpdateOktaIdpSettingsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return organizations.UpdateOktaIdpSettings(ctx, s.encryptor, orgID, req)
+	return organizations.UpdateOktaIdpSettings(orgID, req)
 }
 
 func (s *OrganizationService) RotateOktaScimBearerToken(

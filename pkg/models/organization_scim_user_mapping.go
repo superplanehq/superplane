@@ -61,7 +61,7 @@ func FindOktaOrgsForEmail(db *gorm.DB, email string) ([]OktaOrgForEmail, error) 
 	err := db.Raw(`
 		SELECT DISTINCT o.id AS org_id, o.name AS org_name
 		FROM organizations o
-		INNER JOIN organization_okta_idp idp ON idp.organization_id = o.id AND idp.oidc_enabled = true
+		INNER JOIN organization_okta_idp idp ON idp.organization_id = o.id AND idp.saml_enabled = true
 		INNER JOIN users u ON u.organization_id = o.id AND u.email = ? AND u.deleted_at IS NULL
 		INNER JOIN organization_scim_user_mappings scim ON scim.user_id = u.id AND scim.organization_id = o.id
 	`, email).Scan(&results).Error

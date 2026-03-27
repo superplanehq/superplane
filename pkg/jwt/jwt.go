@@ -9,6 +9,7 @@ import (
 )
 
 const oktaOAuthStateSubject = "okta_oauth_state"
+const oktaSAMLStateSubject = "okta_saml_state"
 
 type Signer struct {
 	Secret string
@@ -115,6 +116,43 @@ func (s *Signer) SignOktaOAuthState(orgID, redirect string, ttl time.Duration) (
 		"rd":  redirect,
 	})
 	return token.SignedString([]byte(s.Secret))
+}
+
+// SignOktaSAMLState returns a signed RelayState JWT for SAML SP-initiated flow.
+// It carries the SAML AuthnRequest ID (for replay prevention), the org ID, and optional redirect.
+func (s *Signer) SignOktaSAMLState(orgID, requestID, redirect string, ttl time.Duration) (string, error) {
+	if ttl <= 0 {
+		ttl = 15 * time.Minute
+	}
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iat": now.Unix(),
+		"nbf": now.Unix(),
+		"exp": now.Add(ttl).Unix(),
+		"sub": oktaSAMLStateSubject,
+		"org": orgID,
+		"rid": requestID,
+		"rd":  redirect,
+	})
+	return token.SignedString([]byte(s.Secret))
+}
+
+// ParseOktaSAMLState validates the SAML RelayState JWT and returns org id, request id, and redirect path.
+func (s *Signer) ParseOktaSAMLState(tokenString string) (orgID, requestID, redirect string, err error) {
+	claims, err := s.ValidateAndGetClaims(tokenString)
+	if err != nil {
+		return "", "", "", err
+	}
+	if claims["sub"] != oktaSAMLStateSubject {
+		return "", "", "", fmt.Errorf("invalid SAML state token")
+	}
+	org, _ := claims["org"].(string)
+	if org == "" {
+		return "", "", "", fmt.Errorf("invalid SAML state: missing org")
+	}
+	rid, _ := claims["rid"].(string)
+	rd, _ := claims["rd"].(string)
+	return org, rid, rd, nil
 }
 
 // ParseOktaOAuthState validates `state` from the OIDC callback and returns org id and redirect path.

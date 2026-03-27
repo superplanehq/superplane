@@ -1411,7 +1411,7 @@ export const organizationsResetInviteLink = <ThrowOnError extends boolean = true
 /**
  * Get organization Okta IdP settings
  *
- * Returns Okta OIDC/SCIM configuration metadata for an organization (no secrets)
+ * Returns Okta SAML/SCIM configuration metadata for an organization (no secrets)
  */
 export const organizationsGetOktaIdpSettings = <ThrowOnError extends boolean = true>(
   options: Options<OrganizationsGetOktaIdpSettingsData, ThrowOnError>,
@@ -1425,7 +1425,7 @@ export const organizationsGetOktaIdpSettings = <ThrowOnError extends boolean = t
 /**
  * Create or update organization Okta IdP settings
  *
- * Creates or updates Okta issuer URL, OAuth client id/secret, and OIDC/SCIM toggles
+ * Creates or updates Okta SAML IdP settings (SSO URL, issuer, certificate) and SAML/SCIM toggles
  */
 export const organizationsUpdateOktaIdpSettings = <ThrowOnError extends boolean = true>(
   options: Options<OrganizationsUpdateOktaIdpSettingsData, ThrowOnError>,

@@ -37,13 +37,13 @@ export function OktaSSO() {
   const [settings, setSettings] = useState<OrganizationsOktaIdpSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // OIDC form state
-  const [issuerBaseUrl, setIssuerBaseUrl] = useState("");
-  const [oauthClientId, setOauthClientId] = useState("");
-  const [oauthClientSecret, setOauthClientSecret] = useState("");
-  const [oidcEnabled, setOidcEnabled] = useState(true);
-  const [oidcSaving, setOidcSaving] = useState(false);
-  const [oidcMessage, setOidcMessage] = useState<string | null>(null);
+  // SAML form state
+  const [samlIdpSSOURL, setSamlIdpSSOURL] = useState("");
+  const [samlIdpIssuer, setSamlIdpIssuer] = useState("");
+  const [samlIdpCertificatePEM, setSamlIdpCertificatePEM] = useState("");
+  const [samlEnabled, setSamlEnabled] = useState(false);
+  const [samlSaving, setSamlSaving] = useState(false);
+  const [samlMessage, setSamlMessage] = useState<string | null>(null);
 
   // SCIM form state
   const [scimEnabled, setScimEnabled] = useState(true);
@@ -52,8 +52,9 @@ export function OktaSSO() {
   const [rotatingToken, setRotatingToken] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
 
-  const redirectURI = `${publicBaseURL}/auth/okta/${organizationId}/callback`;
-  const loginURL = `${publicBaseURL}/auth/okta/${organizationId}`;
+  const acsURL = `${publicBaseURL}/auth/okta/${organizationId}/saml/acs`;
+  const entityID = `${publicBaseURL}/auth/okta/${organizationId}`;
+  const loginURL = `${publicBaseURL}/auth/okta/${organizationId}/saml/login`;
   const scimBaseURL = `${publicBaseURL}/api/v1/scim/${organizationId}/v2`;
 
   useEffect(() => {
@@ -63,9 +64,9 @@ export function OktaSSO() {
         const s = res.data?.settings;
         if (s) {
           setSettings(s);
-          setIssuerBaseUrl(s.issuerBaseUrl || "");
-          setOauthClientId(s.oauthClientId || "");
-          setOidcEnabled(s.oidcEnabled ?? true);
+          setSamlIdpSSOURL(s.samlIdpSsoUrl || "");
+          setSamlIdpIssuer(s.samlIdpIssuer || "");
+          setSamlEnabled(s.samlEnabled ?? false);
           setScimEnabled(s.scimEnabled ?? true);
         }
       })
@@ -76,44 +77,40 @@ export function OktaSSO() {
     navigator.clipboard.writeText(text).catch(() => {});
   };
 
-  const flashMessage = (
-    setter: (msg: string | null) => void,
-    message: string,
-    duration = 3000,
-  ) => {
+  const flashMessage = (setter: (msg: string | null) => void, message: string, duration = 3000) => {
     setter(message);
     setTimeout(() => setter(null), duration);
   };
 
-  const handleOidcSave = async () => {
+  const handleSamlSave = async () => {
     if (!canUpdate || !organizationId) return;
-    setOidcSaving(true);
+    setSamlSaving(true);
     try {
       const body: {
-        issuerBaseUrl?: string;
-        oauthClientId?: string;
-        oauthClientSecret?: string;
-        oidcEnabled?: boolean;
+        samlIdpSsoUrl?: string;
+        samlIdpIssuer?: string;
+        samlIdpCertificatePem?: string;
+        samlEnabled?: boolean;
       } = {
-        issuerBaseUrl: issuerBaseUrl.trim(),
-        oauthClientId: oauthClientId.trim(),
-        oidcEnabled,
+        samlIdpSsoUrl: samlIdpSSOURL.trim(),
+        samlIdpIssuer: samlIdpIssuer.trim(),
+        samlEnabled,
       };
-      if (oauthClientSecret.trim()) {
-        body.oauthClientSecret = oauthClientSecret.trim();
+      if (samlIdpCertificatePEM.trim()) {
+        body.samlIdpCertificatePem = samlIdpCertificatePEM.trim();
       }
       const res = await organizationsUpdateOktaIdpSettings(
         withOrganizationHeader({ path: { id: organizationId }, body }),
       );
       if (res.data?.settings) {
         setSettings(res.data.settings);
-        setOauthClientSecret("");
+        setSamlIdpCertificatePEM("");
       }
-      flashMessage(setOidcMessage, "OIDC settings saved.");
+      flashMessage(setSamlMessage, "SAML settings saved.");
     } catch {
-      flashMessage(setOidcMessage, "Failed to save OIDC settings.");
+      flashMessage(setSamlMessage, "Failed to save SAML settings.");
     } finally {
-      setOidcSaving(false);
+      setSamlSaving(false);
     }
   };
 
@@ -160,38 +157,48 @@ export function OktaSSO() {
   }
 
   const tokenConfigured = settings?.scimBearerTokenConfigured ?? false;
-  const secretConfigured = settings?.oauthClientSecretConfigured ?? false;
+  const certConfigured = settings?.samlIdpCertificateConfigured ?? false;
 
   return (
     <div className="space-y-6 pt-6 text-left">
-      {/* OIDC Section */}
+      {/* SAML Section */}
       <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
         <div>
-          <p className="text-sm font-semibold text-gray-800 dark:text-white">OIDC Sign-In</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-white">SAML Sign-In</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Allow members to log in via Okta.
+            Allow members to log in via Okta SAML 2.0. Paste the values from Okta&apos;s{" "}
+            <em>View SAML setup instructions</em> panel, then copy the ACS URL and SP Entity ID into your Okta
+            app&apos;s SAML settings.
           </p>
         </div>
 
         <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Okta Issuer URL</Label>
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Identity Provider Single Sign-On URL
+          </Label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Paste the SSO URL from Okta&apos;s SAML setup instructions.
+          </p>
           <Input
             type="text"
-            placeholder="https://dev-12345.okta.com/oauth2/default"
-            value={issuerBaseUrl}
-            onChange={(e) => setIssuerBaseUrl(e.target.value)}
+            placeholder="https://dev-12345.okta.com/app/superplane/exk.../sso/saml"
+            value={samlIdpSSOURL}
+            onChange={(e) => setSamlIdpSSOURL(e.target.value)}
             disabled={!canUpdate}
             className="max-w-sm"
           />
         </Field>
 
         <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Client ID</Label>
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Identity Provider Issuer</Label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Paste the issuer (Entity ID) from Okta&apos;s SAML setup instructions.
+          </p>
           <Input
             type="text"
-            placeholder="Client ID"
-            value={oauthClientId}
-            onChange={(e) => setOauthClientId(e.target.value)}
+            placeholder="http://www.okta.com/exk..."
+            value={samlIdpIssuer}
+            onChange={(e) => setSamlIdpIssuer(e.target.value)}
             disabled={!canUpdate}
             className="max-w-sm"
           />
@@ -199,27 +206,48 @@ export function OktaSSO() {
 
         <Field className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Client Secret</Label>
-            {secretConfigured && (
-              <Badge variant="secondary" className="text-xs">Configured</Badge>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">X.509 Certificate</Label>
+            {certConfigured && (
+              <Badge variant="secondary" className="text-xs">
+                Configured
+              </Badge>
             )}
           </div>
-          <Input
-            type="password"
-            placeholder={secretConfigured ? "Leave blank to keep existing" : "Client Secret"}
-            value={oauthClientSecret}
-            onChange={(e) => setOauthClientSecret(e.target.value)}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Paste the PEM certificate from Okta&apos;s SAML setup instructions.{" "}
+            {certConfigured && "Leave blank to keep the existing certificate."}
+          </p>
+          <textarea
+            placeholder={certConfigured ? "Leave blank to keep existing" : "-----BEGIN CERTIFICATE-----\n..."}
+            value={samlIdpCertificatePEM}
+            onChange={(e) => setSamlIdpCertificatePEM(e.target.value)}
             disabled={!canUpdate}
-            className="max-w-sm"
+            rows={5}
+            className="w-full max-w-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
           />
         </Field>
 
         <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sign-in redirect URI</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Paste this into your Okta app's redirect URIs.</p>
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">ACS URL (Single Sign-On URL)</Label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Paste this into your Okta app&apos;s <strong>Single sign on URL</strong> field.
+          </p>
           <div className="flex items-center gap-2 max-w-sm">
-            <Input type="text" value={redirectURI} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-            <Button type="button" variant="outline" onClick={() => copyToClipboard(redirectURI)}>
+            <Input type="text" value={acsURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+            <Button type="button" variant="outline" onClick={() => copyToClipboard(acsURL)}>
+              Copy
+            </Button>
+          </div>
+        </Field>
+
+        <Field className="space-y-1.5">
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SP Entity ID (Audience URI)</Label>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Paste this into your Okta app&apos;s <strong>Audience URI (SP Entity ID)</strong> field.
+          </p>
+          <div className="flex items-center gap-2 max-w-sm">
+            <Input type="text" value={entityID} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+            <Button type="button" variant="outline" onClick={() => copyToClipboard(entityID)}>
               Copy
             </Button>
           </div>
@@ -227,7 +255,9 @@ export function OktaSSO() {
 
         <Field className="space-y-1.5">
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee login URL</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Share this URL with employees to let them sign in via Okta.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Share this URL with employees to let them sign in via Okta.
+          </p>
           <div className="flex items-center gap-2 max-w-sm">
             <Input type="text" value={loginURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
             <Button type="button" variant="outline" onClick={() => copyToClipboard(loginURL)}>
@@ -239,14 +269,12 @@ export function OktaSSO() {
         <Field>
           <div className="flex items-center gap-3">
             <Switch
-              checked={oidcEnabled}
-              onCheckedChange={setOidcEnabled}
+              checked={samlEnabled}
+              onCheckedChange={setSamlEnabled}
               disabled={!canUpdate}
-              aria-label="Enable OIDC sign-in"
+              aria-label="Enable SAML sign-in"
             />
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Enable OIDC sign-in
-            </Label>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SAML sign-in</Label>
           </div>
         </Field>
 
@@ -257,17 +285,17 @@ export function OktaSSO() {
           >
             <LoadingButton
               type="button"
-              onClick={handleOidcSave}
+              onClick={handleSamlSave}
               disabled={!canUpdate}
-              loading={oidcSaving}
+              loading={samlSaving}
               loadingText="Saving..."
             >
               Save
             </LoadingButton>
           </PermissionTooltip>
-          {oidcMessage && (
-            <span className={`text-sm ${oidcMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
-              {oidcMessage}
+          {samlMessage && (
+            <span className={`text-sm ${samlMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
+              {samlMessage}
             </span>
           )}
         </div>
@@ -278,13 +306,16 @@ export function OktaSSO() {
         <div>
           <p className="text-sm font-semibold text-gray-800 dark:text-white">SCIM Provisioning</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Automatically provision and deprovision members via Okta.
+            Automatically provision and deprovision members via Okta. Configure SCIM in your Okta app&apos;s{" "}
+            <em>Provisioning</em> tab.
           </p>
         </div>
 
         <Field className="space-y-1.5">
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM base URL</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Paste this into your Okta SCIM app configuration.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Paste this into your Okta SCIM connector base URL field.
+          </p>
           <div className="flex items-center gap-2 max-w-sm">
             <Input type="text" value={scimBaseURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
             <Button type="button" variant="outline" onClick={() => copyToClipboard(scimBaseURL)}>
@@ -297,9 +328,13 @@ export function OktaSSO() {
           <div className="flex items-center gap-2">
             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM bearer token</Label>
             {tokenConfigured ? (
-              <Badge variant="secondary" className="text-xs">Configured</Badge>
+              <Badge variant="secondary" className="text-xs">
+                Configured
+              </Badge>
             ) : (
-              <Badge variant="outline" className="text-xs">Not configured</Badge>
+              <Badge variant="outline" className="text-xs">
+                Not configured
+              </Badge>
             )}
           </div>
           <PermissionTooltip
@@ -327,9 +362,7 @@ export function OktaSSO() {
               disabled={!canUpdate}
               aria-label="Enable SCIM provisioning"
             />
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Enable SCIM provisioning
-            </Label>
+            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SCIM provisioning</Label>
           </div>
         </Field>
 
@@ -357,13 +390,16 @@ export function OktaSSO() {
       </Fieldset>
 
       {/* New token modal */}
-      <Dialog open={!!newToken} onOpenChange={(open) => { if (!open) setNewToken(null); }}>
+      <Dialog
+        open={!!newToken}
+        onOpenChange={(open) => {
+          if (!open) setNewToken(null);
+        }}
+      >
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>SCIM bearer token generated</DialogTitle>
-            <DialogDescription>
-              Copy this token now — it will not be shown again.
-            </DialogDescription>
+            <DialogDescription>Copy this token now — it will not be shown again.</DialogDescription>
           </DialogHeader>
           <div className="my-2">
             <Input

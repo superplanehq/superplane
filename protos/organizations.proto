@@ -191,7 +191,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization Okta IdP settings";
-      description: "Returns Okta OIDC/SCIM configuration metadata for an organization (no secrets)";
+      description: "Returns Okta SAML/SCIM configuration metadata for an organization (no secrets)";
       tags: "Organization";
     };
   }
@@ -203,7 +203,7 @@ service Organizations {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create or update organization Okta IdP settings";
-      description: "Creates or updates Okta issuer URL, OAuth client id/secret, and OIDC/SCIM toggles";
+      description: "Creates or updates Okta SAML IdP settings (SSO URL, issuer, certificate) and SAML/SCIM toggles";
       tags: "Organization";
     };
   }
@@ -456,10 +456,10 @@ message DeleteAgentOpenAIKeyResponse {
 message OktaIdpSettings {
   string organization_id = 1;
   bool configured = 2;
-  string issuer_base_url = 3;
-  string oauth_client_id = 4;
-  bool oauth_client_secret_configured = 5;
-  bool oidc_enabled = 6;
+  string saml_idp_sso_url = 3;
+  string saml_idp_issuer = 4;
+  bool saml_idp_certificate_configured = 5;
+  bool saml_enabled = 6;
   bool scim_enabled = 7;
   bool scim_bearer_token_configured = 8;
   google.protobuf.Timestamp created_at = 9;
@@ -476,10 +476,10 @@ message GetOktaIdpSettingsResponse {
 
 message UpdateOktaIdpSettingsRequest {
   string id = 1;
-  optional string issuer_base_url = 2;
-  optional string oauth_client_id = 3;
-  optional string oauth_client_secret = 4;
-  optional bool oidc_enabled = 5;
+  optional string saml_idp_sso_url = 2;
+  optional string saml_idp_issuer = 3;
+  optional string saml_idp_certificate_pem = 4;
+  optional bool saml_enabled = 5;
   optional bool scim_enabled = 6;
 }
 

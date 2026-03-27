@@ -1,7 +1,6 @@
 package organizations
 
 import (
-	"context"
 	"errors"
 	"net/url"
 	"strings"
@@ -17,8 +16,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
-
-const oktaOAuthClientSecretCredentialName = "okta_oauth_client_secret"
 
 func GetOktaIdpSettings(orgID string) (*pb.GetOktaIdpSettingsResponse, error) {
 	orgUUID, err := uuid.Parse(orgID)
@@ -45,8 +42,6 @@ func GetOktaIdpSettings(orgID string) (*pb.GetOktaIdpSettingsResponse, error) {
 }
 
 func UpdateOktaIdpSettings(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
 	orgID string,
 	req *pb.UpdateOktaIdpSettingsRequest,
 ) (*pb.UpdateOktaIdpSettingsResponse, error) {
@@ -66,49 +61,42 @@ func UpdateOktaIdpSettings(
 		}
 
 		if errors.Is(e, gorm.ErrRecordNotFound) {
+			ssoURL := ""
+			if req.SamlIdpSsoUrl != nil {
+				ssoURL = strings.TrimSpace(*req.SamlIdpSsoUrl)
+			}
 			issuer := ""
-			if req.IssuerBaseUrl != nil {
-				issuer = strings.TrimSpace(*req.IssuerBaseUrl)
+			if req.SamlIdpIssuer != nil {
+				issuer = strings.TrimSpace(*req.SamlIdpIssuer)
 			}
-			clientID := ""
-			if req.OauthClientId != nil {
-				clientID = strings.TrimSpace(*req.OauthClientId)
+			if ssoURL == "" || issuer == "" {
+				return status.Error(codes.InvalidArgument, "saml_idp_sso_url and saml_idp_issuer are required to create Okta IdP settings")
 			}
-			if issuer == "" || clientID == "" {
-				return status.Error(codes.InvalidArgument, "issuer_base_url and oauth_client_id are required to create Okta IdP settings")
-			}
-			if vErr := validateOktaIssuerBaseURL(issuer); vErr != nil {
+			if vErr := validateOktaSSOURL(ssoURL); vErr != nil {
 				return vErr
 			}
 
 			now := time.Now()
 			row = &models.OrganizationOktaIDP{
 				OrganizationID: orgUUID,
-				IssuerBaseURL:  issuer,
-				OAuthClientID:  clientID,
-				OIDCEnabled:    false,
+				SamlIdpSSOURL:  ssoURL,
+				SamlIdpIssuer:  issuer,
+				SamlEnabled:    false,
 				ScimEnabled:    false,
 				CreatedAt:      now,
 				UpdatedAt:      now,
 			}
-			if req.OidcEnabled != nil {
-				row.OIDCEnabled = *req.OidcEnabled
+			if req.SamlIdpCertificatePem != nil {
+				row.SamlIdpCertificatePEM = strings.TrimSpace(*req.SamlIdpCertificatePem)
+			}
+			if req.SamlEnabled != nil {
+				row.SamlEnabled = *req.SamlEnabled
 			}
 			if req.ScimEnabled != nil {
 				row.ScimEnabled = *req.ScimEnabled
 			}
-			if req.OauthClientSecret != nil {
-				secret := strings.TrimSpace(*req.OauthClientSecret)
-				if secret != "" {
-					ct, encErr := encryptor.Encrypt(ctx, []byte(secret), []byte(oktaOAuthClientSecretCredentialName))
-					if encErr != nil {
-						return status.Error(codes.Internal, "failed to encrypt OAuth client secret")
-					}
-					row.OAuthClientSecretCiphertext = ct
-				}
-			}
 
-			if e := syncOktaProviderWhenOIDCEnabled(tx, orgID, row); e != nil {
+			if e := syncOktaProviderWhenSAMLEnabled(tx, orgID, row); e != nil {
 				return e
 			}
 			if e := models.CreateOrganizationOktaIDPInTransaction(tx, row); e != nil {
@@ -118,41 +106,37 @@ func UpdateOktaIdpSettings(
 			return nil
 		}
 
-		if req.IssuerBaseUrl != nil {
-			issuer := strings.TrimSpace(*req.IssuerBaseUrl)
-			if issuer == "" {
-				return status.Error(codes.InvalidArgument, "issuer_base_url cannot be empty")
+		if req.SamlIdpSsoUrl != nil {
+			ssoURL := strings.TrimSpace(*req.SamlIdpSsoUrl)
+			if ssoURL == "" {
+				return status.Error(codes.InvalidArgument, "saml_idp_sso_url cannot be empty")
 			}
-			if vErr := validateOktaIssuerBaseURL(issuer); vErr != nil {
+			if vErr := validateOktaSSOURL(ssoURL); vErr != nil {
 				return vErr
 			}
-			row.IssuerBaseURL = issuer
+			row.SamlIdpSSOURL = ssoURL
 		}
-		if req.OauthClientId != nil {
-			cid := strings.TrimSpace(*req.OauthClientId)
-			if cid == "" {
-				return status.Error(codes.InvalidArgument, "oauth_client_id cannot be empty")
+		if req.SamlIdpIssuer != nil {
+			issuer := strings.TrimSpace(*req.SamlIdpIssuer)
+			if issuer == "" {
+				return status.Error(codes.InvalidArgument, "saml_idp_issuer cannot be empty")
 			}
-			row.OAuthClientID = cid
+			row.SamlIdpIssuer = issuer
 		}
-		if req.OauthClientSecret != nil {
-			secret := strings.TrimSpace(*req.OauthClientSecret)
-			if secret != "" {
-				ct, encErr := encryptor.Encrypt(ctx, []byte(secret), []byte(oktaOAuthClientSecretCredentialName))
-				if encErr != nil {
-					return status.Error(codes.Internal, "failed to encrypt OAuth client secret")
-				}
-				row.OAuthClientSecretCiphertext = ct
+		if req.SamlIdpCertificatePem != nil {
+			cert := strings.TrimSpace(*req.SamlIdpCertificatePem)
+			if cert != "" {
+				row.SamlIdpCertificatePEM = cert
 			}
 		}
-		if req.OidcEnabled != nil {
-			row.OIDCEnabled = *req.OidcEnabled
+		if req.SamlEnabled != nil {
+			row.SamlEnabled = *req.SamlEnabled
 		}
 		if req.ScimEnabled != nil {
 			row.ScimEnabled = *req.ScimEnabled
 		}
 
-		if e := syncOktaProviderWhenOIDCEnabled(tx, orgID, row); e != nil {
+		if e := syncOktaProviderWhenSAMLEnabled(tx, orgID, row); e != nil {
 			return e
 		}
 		if e := models.SaveOrganizationOktaIDPInTransaction(tx, row); e != nil {
@@ -215,36 +199,36 @@ func RotateOktaScimBearerToken(orgID string) (*pb.RotateOktaScimBearerTokenRespo
 }
 
 func serializeOktaIdpSettings(row *models.OrganizationOktaIDP) *pb.OktaIdpSettings {
-	secretConfigured := len(row.OAuthClientSecretCiphertext) > 0
+	certConfigured := len(row.SamlIdpCertificatePEM) > 0
 	scimTokenConfigured := row.ScimBearerTokenHash != nil && *row.ScimBearerTokenHash != ""
 	return &pb.OktaIdpSettings{
-		OrganizationId:              row.OrganizationID.String(),
-		Configured:                  true,
-		IssuerBaseUrl:               row.IssuerBaseURL,
-		OauthClientId:               row.OAuthClientID,
-		OauthClientSecretConfigured: secretConfigured,
-		OidcEnabled:                 row.OIDCEnabled,
-		ScimEnabled:                 row.ScimEnabled,
-		ScimBearerTokenConfigured:   scimTokenConfigured,
-		CreatedAt:                   timestamppb.New(row.CreatedAt),
-		UpdatedAt:                   timestamppb.New(row.UpdatedAt),
+		OrganizationId:               row.OrganizationID.String(),
+		Configured:                   true,
+		SamlIdpSsoUrl:                row.SamlIdpSSOURL,
+		SamlIdpIssuer:                row.SamlIdpIssuer,
+		SamlIdpCertificateConfigured: certConfigured,
+		SamlEnabled:                  row.SamlEnabled,
+		ScimEnabled:                  row.ScimEnabled,
+		ScimBearerTokenConfigured:    scimTokenConfigured,
+		CreatedAt:                    timestamppb.New(row.CreatedAt),
+		UpdatedAt:                    timestamppb.New(row.UpdatedAt),
 	}
 }
 
-func validateOktaIssuerBaseURL(raw string) error {
+func validateOktaSSOURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
-		return status.Error(codes.InvalidArgument, "issuer_base_url must be a valid https URL")
+		return status.Error(codes.InvalidArgument, "saml_idp_sso_url must be a valid https URL")
 	}
 	return nil
 }
 
-func syncOktaProviderWhenOIDCEnabled(tx *gorm.DB, orgID string, row *models.OrganizationOktaIDP) error {
-	if !row.OIDCEnabled {
+func syncOktaProviderWhenSAMLEnabled(tx *gorm.DB, orgID string, row *models.OrganizationOktaIDP) error {
+	if !row.SamlEnabled {
 		return nil
 	}
-	if len(row.OAuthClientSecretCiphertext) == 0 {
-		return status.Error(codes.FailedPrecondition, "configure oauth client secret before enabling Okta OIDC sign-in")
+	if row.SamlIdpCertificatePEM == "" {
+		return status.Error(codes.FailedPrecondition, "configure SAML certificate before enabling Okta SAML sign-in")
 	}
 	return models.EnsureOrganizationAllowsProviderInTransaction(tx, orgID, models.ProviderOkta)
 }

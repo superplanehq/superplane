@@ -929,10 +929,10 @@ export type OrganizationsListInvitationsResponse = {
 export type OrganizationsOktaIdpSettings = {
   organizationId?: string;
   configured?: boolean;
-  issuerBaseUrl?: string;
-  oauthClientId?: string;
-  oauthClientSecretConfigured?: boolean;
-  oidcEnabled?: boolean;
+  samlIdpSsoUrl?: string;
+  samlIdpIssuer?: string;
+  samlIdpCertificateConfigured?: boolean;
+  samlEnabled?: boolean;
   scimEnabled?: boolean;
   scimBearerTokenConfigured?: boolean;
   createdAt?: string;
@@ -1006,10 +1006,10 @@ export type OrganizationsUpdateInviteLinkResponse = {
 };
 
 export type OrganizationsUpdateOktaIdpSettingsBody = {
-  issuerBaseUrl?: string;
-  oauthClientId?: string;
-  oauthClientSecret?: string;
-  oidcEnabled?: boolean;
+  samlIdpSsoUrl?: string;
+  samlIdpIssuer?: string;
+  samlIdpCertificatePem?: string;
+  samlEnabled?: boolean;
   scimEnabled?: boolean;
 };
 
