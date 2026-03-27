@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
@@ -15,22 +16,22 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps := &settingsAutoSaveSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Autosave Partial")
-		steps.addWaitNodeWithName("WaitPartial")
-		steps.clearWaitForField()
+		steps.addFilterNode("FilterPartial")
+		steps.clearExpressionField()
 		steps.waitForAutoSave()
-		steps.assertWaitForFieldSavedAsEmpty("WaitPartial")
+		steps.assertExpressionFieldSavedAsEmpty("FilterPartial")
 	})
 
 	t.Run("partial configuration persists after switching to Runs tab", func(t *testing.T) {
 		steps := &settingsAutoSaveSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists("Autosave Tab Switch")
-		steps.addWaitNodeWithName("WaitSwitch")
-		steps.clearWaitForField()
+		steps.addFilterNode("FilterSwitch")
+		steps.clearExpressionField()
 		steps.waitForAutoSave()
 		steps.switchToRunsTab()
 		steps.switchToConfigurationTab()
-		steps.assertWaitForFieldSavedAsEmpty("WaitSwitch")
+		steps.assertExpressionFieldSavedAsEmpty("FilterSwitch")
 	})
 }
 
@@ -51,23 +52,13 @@ func (s *settingsAutoSaveSteps) givenACanvasExists(canvasName string) {
 	s.canvas.Create()
 }
 
-func (s *settingsAutoSaveSteps) addWaitNodeWithName(name string) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-wait")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 500, 250)
-	s.session.Sleep(500)
-	s.session.FillIn(q.TestID("node-name-input"), name)
-
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+func (s *settingsAutoSaveSteps) addFilterNode(name string) {
+	s.canvas.AddFilter(name, models.Position{X: 500, Y: 250})
 }
 
-func (s *settingsAutoSaveSteps) clearWaitForField() {
-	valueInput := q.Locator("textarea[data-testid='string-field-waitfor']")
-	s.session.FillIn(valueInput, "")
+func (s *settingsAutoSaveSteps) clearExpressionField() {
+	expressionInput := q.TestID("expression-field-expression")
+	s.session.FillIn(expressionInput, "")
 }
 
 func (s *settingsAutoSaveSteps) waitForAutoSave() {
@@ -85,13 +76,13 @@ func (s *settingsAutoSaveSteps) switchToConfigurationTab() {
 	s.session.Sleep(500)
 }
 
-func (s *settingsAutoSaveSteps) assertWaitForFieldSavedAsEmpty(nodeName string) {
+func (s *settingsAutoSaveSteps) assertExpressionFieldSavedAsEmpty(nodeName string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		node := s.canvas.GetNodeFromDB(nodeName)
 		config := node.Configuration.Data()
 
-		val, exists := config["waitFor"]
+		val, exists := config["expression"]
 		if exists && val == "" {
 			return
 		}
@@ -103,9 +94,9 @@ func (s *settingsAutoSaveSteps) assertWaitForFieldSavedAsEmpty(nodeName string) 
 
 	node := s.canvas.GetNodeFromDB(nodeName)
 	config := node.Configuration.Data()
-	val, exists := config["waitFor"]
+	val, exists := config["expression"]
 	if !exists {
 		return
 	}
-	require.Equal(s.t, "", val, "expected waitFor to be empty in DB but got %v", val)
+	require.Equal(s.t, "", val, "expected expression to be empty in DB but got %v", val)
 }
