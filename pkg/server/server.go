@@ -238,6 +238,7 @@ func startInternalAPI(
 	oidcProvider oidc.Provider,
 ) {
 	log.Println("Starting Internal API")
+
 	grpc.RunServer(
 		baseURL,
 		webhooksBaseURL,

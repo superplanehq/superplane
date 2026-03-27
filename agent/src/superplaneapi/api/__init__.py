@@ -1,6 +1,7 @@
 # flake8: noqa
 
 # import apis into api package
+from superplaneapi.api.agent_api import AgentApi
 from superplaneapi.api.blueprint_api import BlueprintApi
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_change_request_api import CanvasChangeRequestApi
