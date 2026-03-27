@@ -88,11 +88,13 @@ class ReportBuilder:
                 total_cost_usd += case_cost
 
             self.console.print(f"{case_name} {self._format_duration(case_result)}")
-            self.console.print(f"  input: {case_input}")
-            self.console.print(f"  output: {display_filename}")
-            self.console.print(f"  usage: {self._format_usage_line(run_usage)}")
-            if case_cost is not None:
-                self.console.print(f"  est. cost (USD): [yellow]${case_cost:.4f}[/] (approx.)")
+            self.console.print(f"  input:        {case_input}")
+            self.console.print(f"  output:       {display_filename}")
+            self.console.print(f"  toolCalls:    {run_usage.tool_calls}")
+            self.console.print(f"  inputTokens:  {run_usage.input_tokens}")
+            self.console.print(f"  outputTokens: {run_usage.output_tokens}")
+            self.console.print(f"  cost:         ${case_cost:.4f}")
+
             self.console.print("  assertions:")
             assertion_lines = self._format_assertion_lines(case_result)
             if not assertion_lines:
@@ -142,30 +144,24 @@ class ReportBuilder:
                 total=total_cost_usd,
             ),
         }
+
+        self.console.print("================================================")
+        self.console.print("")
+
         with summary_path.open("w", encoding="utf-8") as summary_file:
             json.dump(summary_payload, summary_file, indent=2)
 
-        self.console.print(
-            f"task time (sum of case durations): {task_time_sum_seconds:.1f}s "
-            f"({case_count_with_duration} cases)"
-        )
-        self.console.print(
-            f"wall time (dataset.evaluate): {self.evaluate_wall_seconds:.1f}s"
-        )
-        self.console.print(f"results: {passed_assertions}/{total_assertions}")
-        self.console.print(f"usage (total): {self._format_usage_line(total_usage)}")
-        if total_cost_usd is not None:
-            self.console.print(
-                f"est. cost (USD) total: [yellow]${total_cost_usd:.4f}[/] "
-                "(approx., Claude list rates)"
-            )
-            self.console.print(f"pricing reference: {pricing_reference_url()}")
-        else:
-            self.console.print(
-                "est. cost (USD): n/a (no Claude 4.5/4.6 rate match for AI_MODEL — see "
-                f"{pricing_reference_url()} to price manually)"
-            )
-        self.console.print(f"usage summary: {display_summary}")
+        time = task_time_sum_seconds + self.evaluate_wall_seconds
+
+        self.console.print(f"totalTime:    {time:.1f}s ")
+        self.console.print(f"totalCost:    ${total_cost_usd:.4f} ")
+        self.console.print(f"toolCalls:    {total_usage.tool_calls}")
+        self.console.print(f"inputTokens:  {total_usage.input_tokens}")
+        self.console.print(f"outputTokens: {total_usage.output_tokens}")
+
+        self.console.print("")
+
+        self.console.print(f"{passed_assertions}/{total_assertions} assertions passed")
 
     def _inputs_key(self, case_result: Any, *, case_index: int) -> str:
         raw = getattr(case_result, "inputs", getattr(case_result, "input", None))
