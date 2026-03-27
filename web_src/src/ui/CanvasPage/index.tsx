@@ -48,6 +48,7 @@ import {
   ComponentsIntegrationRef,
   OrganizationsIntegration,
 } from "@/api-client";
+import { buildComponentDocumentationUrl } from "@/utils/componentDocsUrl";
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
@@ -218,6 +219,8 @@ export interface NodeEditData {
   configuration: Record<string, any>;
   configurationFields: ConfigurationField[];
   integrationName?: string;
+  /** Integration catalog label; used to resolve docs.superplane.com path for integration components. */
+  integrationLabel?: string;
   blockName?: string;
   integrationRef?: ComponentsIntegrationRef;
 }
@@ -1557,24 +1560,43 @@ function Sidebar({
 
     const matchedComponent = components?.find((c) => c.name === blockName);
     if (matchedComponent) {
+      const blockLabel = matchedComponent.label || editingNodeData?.displayLabel || blockName;
       return {
         description: matchedComponent.description,
         examplePayload: matchedComponent.exampleOutput,
         payloadLabel: "Example Output" as const,
+        documentationUrl: buildComponentDocumentationUrl({
+          integrationName: editingNodeData?.integrationName,
+          integrationLabel: editingNodeData?.integrationLabel,
+          blockLabel,
+        }),
       };
     }
 
     const matchedTrigger = triggers?.find((t) => t.name === blockName);
     if (matchedTrigger) {
+      const blockLabel = matchedTrigger.label || editingNodeData?.displayLabel || blockName;
       return {
         description: matchedTrigger.description,
         examplePayload: matchedTrigger.exampleData,
         payloadLabel: "Example Data" as const,
+        documentationUrl: buildComponentDocumentationUrl({
+          integrationName: editingNodeData?.integrationName,
+          integrationLabel: editingNodeData?.integrationLabel,
+          blockLabel,
+        }),
       };
     }
 
     return null;
-  }, [editingNodeData?.blockName, components, triggers]);
+  }, [
+    editingNodeData?.blockName,
+    editingNodeData?.displayLabel,
+    editingNodeData?.integrationName,
+    editingNodeData?.integrationLabel,
+    components,
+    triggers,
+  ]);
 
   if (!sidebarData) {
     return null;
@@ -1677,6 +1699,7 @@ function Sidebar({
       componentDescription={componentDocsData?.description}
       componentExamplePayload={componentDocsData?.examplePayload}
       componentPayloadLabel={componentDocsData?.payloadLabel}
+      componentDocumentationUrl={componentDocsData?.documentationUrl}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}

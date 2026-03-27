@@ -134,6 +134,8 @@ interface ComponentSidebarProps {
   componentDescription?: string;
   componentExamplePayload?: Record<string, unknown>;
   componentPayloadLabel?: string;
+  /** Full URL to SuperPlane docs (e.g. docs.superplane.com/components/…#section). */
+  componentDocumentationUrl?: string;
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
@@ -245,6 +247,7 @@ export const ComponentSidebar = ({
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
+  componentDocumentationUrl,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -816,6 +819,7 @@ export const ComponentSidebar = ({
                   description={componentDescription}
                   examplePayload={componentExamplePayload}
                   payloadLabel={componentPayloadLabel}
+                  documentationUrl={componentDocumentationUrl}
                   configurationFields={nodeConfigurationFields}
                 />
               </TabsContent>
