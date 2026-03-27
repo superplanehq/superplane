@@ -109,9 +109,10 @@ func (c *Client) GetAccount() (*Account, error) {
 
 // Region represents a DigitalOcean region
 type Region struct {
-	Slug      string `json:"slug"`
-	Name      string `json:"name"`
-	Available bool   `json:"available"`
+	Slug      string   `json:"slug"`
+	Name      string   `json:"name"`
+	Sizes     []string `json:"sizes"`
+	Available bool     `json:"available"`
 }
 
 // ListRegions retrieves all available regions
@@ -140,6 +141,7 @@ type Size struct {
 	VCPUs        int     `json:"vcpus"`
 	Disk         int     `json:"disk"`
 	PriceMonthly float64 `json:"price_monthly"`
+	Description  string  `json:"description"`
 	Available    bool    `json:"available"`
 }
 
@@ -2330,4 +2332,119 @@ func resolveAppMetadata(ctx core.SetupContext, appID string) error {
 		AppID:   appID,
 		AppName: appName,
 	})
+}
+
+// ListGPUSizes returns only GPU-specific droplet sizes
+func (c *Client) ListGPUSizes() ([]Size, error) {
+	sizes, err := c.ListSizes()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuSizes := make([]Size, 0)
+	for _, size := range sizes {
+		if strings.HasPrefix(size.Slug, "gpu-") {
+			gpuSizes = append(gpuSizes, size)
+		}
+	}
+
+	return gpuSizes, nil
+}
+
+// ListGPURegions returns only regions that support GPU droplets
+func (c *Client) ListGPURegions() ([]Region, error) {
+	regions, err := c.ListRegions()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuRegions := make([]Region, 0)
+	for _, region := range regions {
+		if !region.Available {
+			continue
+		}
+
+		for _, size := range region.Sizes {
+			if strings.HasPrefix(size, "gpu-") {
+				gpuRegions = append(gpuRegions, region)
+				break
+			}
+		}
+	}
+
+	return gpuRegions, nil
+}
+
+// ListGPUDroplets returns only GPU droplets (droplets using GPU sizes)
+func (c *Client) ListGPUDroplets() ([]Droplet, error) {
+	droplets, err := c.ListDroplets()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuDroplets := make([]Droplet, 0)
+	for _, droplet := range droplets {
+		if strings.HasPrefix(droplet.SizeSlug, "gpu-") {
+			gpuDroplets = append(gpuDroplets, droplet)
+		}
+	}
+
+	return gpuDroplets, nil
+}
+
+// RenameDroplet renames a droplet
+func (c *Client) RenameDroplet(dropletID int, name string) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]string{
+		"type": "rename",
+		"name": name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// ResizeDroplet resizes a droplet to a new size (only supports upsizing)
+func (c *Client) ResizeDroplet(dropletID int, size string, resizeDisk bool) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]any{
+		"type": "resize",
+		"size": size,
+		"disk": resizeDisk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
 }
