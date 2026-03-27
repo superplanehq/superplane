@@ -120,3 +120,4 @@ class JwtValidator:
             raise ValueError("Scoped token does not allow the requested canvas.")
 
         return canvas_id
+
