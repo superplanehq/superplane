@@ -20,6 +20,7 @@ type CreateGPUDropletSpec struct {
 	Name       string   `json:"name"`
 	Region     string   `json:"region"`
 	Size       string   `json:"size"`
+	ImageType  string   `json:"imageType"`
 	Image      string   `json:"image"`
 	SSHKeys    []string `json:"sshKeys"`
 	Tags       []string `json:"tags"`
@@ -56,7 +57,9 @@ func (c *CreateGPUDroplet) Documentation() string {
 - **Name**: The hostname for the GPU droplet (required, supports expressions)
 - **Region**: Region slug where the GPU droplet will be created (required, only shows GPU-capable regions)
 - **Size**: GPU size slug for the droplet (required, only shows GPU sizes)
-- **Image**: Image slug or ID for the droplet OS (required, shows GPU-compatible images)
+- **Image Type**: Choose between a pre-configured one-click application or a base OS image (required)
+- **One-Click Application**: Pre-configured GPU-optimized applications like ML-in-a-Box (with PyTorch, TensorFlow, CUDA), CUDA Toolkit, and other marketplace apps (shown when Image Type is "One-Click Application")
+- **Base OS Image**: GPU-compatible base operating systems including Ubuntu, Debian, Rocky Linux, and Fedora (shown when Image Type is "Base OS Image")
 - **SSH Keys**: SSH keys to add to the droplet. Must have been added to the DigitalOcean team. (optional)
 - **Tags**: Tags to apply to the droplet (optional)
 - **User Data**: Cloud-init user data script (optional)
@@ -124,16 +127,51 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "imageType",
+			Label:       "Image Type",
+			Type:        configuration.FieldTypeSelect,
+			Required:    true,
+			Default:     "one-click",
+			Description: "Choose between a pre-configured one-click application or a base OS image",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "One-Click Application (ML-in-a-Box, CUDA, etc.)", Value: "one-click"},
+						{Label: "Base OS Image", Value: "base-os"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "image",
-			Label:       "Image",
+			Label:       "One-Click Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The OS image for the GPU droplet",
-			Placeholder: "Select an image",
+			Description: "Pre-configured GPU-optimized applications including ML-in-a-Box, CUDA Toolkit, PyTorch, and TensorFlow",
+			Placeholder: "Select a one-click application",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "image",
+					Type: "gpu_image",
 				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "imageType", Values: []string{"one-click"}},
+			},
+		},
+		{
+			Name:        "image",
+			Label:       "Base OS Image",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    true,
+			Description: "GPU-compatible base operating system (Ubuntu, Debian, Rocky Linux, Fedora)",
+			Placeholder: "Select a base OS",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "gpu_image",
+				},
+			},
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "imageType", Values: []string{"base-os"}},
 			},
 		},
 		{
