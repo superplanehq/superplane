@@ -142,63 +142,130 @@ export function BuildingBlocksSidebar({
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
 
   if (!isOpen) {
-    const addNoteButton = (
-      <Button
-        variant="outline"
-        onClick={() => {
-          if (disabled) return;
-          onAddNote?.();
-        }}
-        aria-label="Add Note"
-        data-testid="add-note-button"
-        disabled={disabled}
-      >
-        <StickyNote size={16} />
-        Add Note
-      </Button>
-    );
-    const openSidebarButton = (
-      <Button
-        variant="outline"
-        onClick={() => {
-          if (disabled) return;
-          onToggle(true);
-        }}
-        aria-label="Open sidebar"
-        data-testid="open-sidebar-button"
-        disabled={disabled}
-      >
-        <Plus size={16} />
-        Components
-      </Button>
-    );
-
     return (
-      <div className="absolute top-4 right-4 z-10 flex gap-3">
-        {disabled ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          addNoteButton
-        )}
-        {disabled ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          openSidebarButton
-        )}
-      </div>
+      <ClosedBuildingBlocksSidebar
+        disabled={disabled}
+        disabledTooltip={disabledTooltip}
+        onAddNote={onAddNote}
+        onToggle={onToggle}
+      />
     );
   }
 
+  return (
+    <OpenBuildingBlocksSidebar
+      onToggle={onToggle}
+      blocks={blocks}
+      showAiBuilderTab={showAiBuilderTab}
+      canvasId={canvasId}
+      organizationId={organizationId}
+      onApplyAiOperations={onApplyAiOperations}
+      integrations={integrations}
+      canvasZoom={canvasZoom}
+      disabled={disabled}
+      disabledTooltip={disabledTooltip}
+      onBlockClick={onBlockClick}
+    />
+  );
+}
+
+interface ClosedBuildingBlocksSidebarProps {
+  disabled: boolean;
+  disabledTooltip: string;
+  onAddNote?: () => void;
+  onToggle: (open: boolean) => void;
+}
+
+function ClosedBuildingBlocksSidebar({
+  disabled,
+  disabledTooltip,
+  onAddNote,
+  onToggle,
+}: ClosedBuildingBlocksSidebarProps) {
+  const addNoteButton = (
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (disabled) return;
+        onAddNote?.();
+      }}
+      aria-label="Add Note"
+      data-testid="add-note-button"
+      disabled={disabled}
+    >
+      <StickyNote size={16} />
+      Add Note
+    </Button>
+  );
+  const openSidebarButton = (
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (disabled) return;
+        onToggle(true);
+      }}
+      aria-label="Open sidebar"
+      data-testid="open-sidebar-button"
+      disabled={disabled}
+    >
+      <Plus size={16} />
+      Components
+    </Button>
+  );
+
+  return (
+    <div className="absolute top-4 right-4 z-10 flex gap-3">
+      {disabled ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
+          <TooltipContent side="left" sideOffset={10}>
+            <p>{disabledTooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        addNoteButton
+      )}
+      {disabled ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
+          <TooltipContent side="left" sideOffset={10}>
+            <p>{disabledTooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        openSidebarButton
+      )}
+    </div>
+  );
+}
+
+interface OpenBuildingBlocksSidebarProps {
+  onToggle: (open: boolean) => void;
+  blocks: BuildingBlockCategory[];
+  showAiBuilderTab: boolean;
+  canvasId?: string;
+  organizationId?: string;
+  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  integrations: OrganizationsIntegration[];
+  canvasZoom: number;
+  disabled: boolean;
+  disabledTooltip: string;
+  onBlockClick?: (block: BuildingBlock) => void;
+}
+
+function OpenBuildingBlocksSidebar({
+  onToggle,
+  blocks,
+  showAiBuilderTab,
+  canvasId,
+  organizationId,
+  onApplyAiOperations,
+  integrations,
+  canvasZoom,
+  disabled,
+  disabledTooltip,
+  onBlockClick,
+}: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -206,7 +273,11 @@ export function BuildingBlocksSidebar({
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+    if (typeof window === "undefined") {
+      return 450;
+    }
+
+    const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 450;
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -508,13 +579,19 @@ export function BuildingBlocksSidebar({
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      // Small delay to ensure the sidebar is fully rendered
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
+    if (!searchInputRef.current) {
+      return;
     }
-  }, [isOpen]);
+
+    // Small delay to ensure the sidebar is fully rendered
+    const timeoutId = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Handle resize mouse events
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

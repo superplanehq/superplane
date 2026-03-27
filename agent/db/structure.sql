@@ -28,25 +28,12 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.agent_chat_messages (
-    id bigint NOT NULL,
+    id uuid NOT NULL,
     chat_id text NOT NULL,
+    message_index integer NOT NULL,
     message jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: agent_chat_messages_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-ALTER TABLE public.agent_chat_messages ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME public.agent_chat_messages_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
 );
 
 
@@ -100,10 +87,10 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: idx_agent_chat_messages_chat_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_agent_chat_messages_chat_id_message_index; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_agent_chat_messages_chat_id ON public.agent_chat_messages USING btree (chat_id, id);
+CREATE UNIQUE INDEX idx_agent_chat_messages_chat_id_message_index ON public.agent_chat_messages USING btree (chat_id, message_index);
 
 
 --

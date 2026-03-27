@@ -21,8 +21,9 @@ def test_flatten_message_record_exposes_output_tool_answer_as_assistant() -> Non
     now = datetime.now(UTC)
     store = _build_store()
     record = StoredAgentChatMessageRecord(
-        id=119,
+        id="119c8cab-e93f-42d1-a96d-d2d77f2d4d6f",
         chat_id="chat-123",
+        message_index=0,
         message={
             "kind": "response",
             "parts": [
@@ -70,7 +71,7 @@ def test_flatten_message_record_exposes_output_tool_answer_as_assistant() -> Non
     messages = store._flatten_message_record(record)
 
     assert len(messages) == 1
-    assert messages[0].id == "119"
+    assert messages[0].id == "119c8cab-e93f-42d1-a96d-d2d77f2d4d6f"
     assert messages[0].role == "assistant"
     assert messages[0].content == "Your canvas contains two nodes."
     assert messages[0].tool_call_id is None
@@ -81,8 +82,9 @@ def test_flatten_message_record_ignores_output_tool_returns() -> None:
     now = datetime.now(UTC)
     store = _build_store()
     record = StoredAgentChatMessageRecord(
-        id=120,
+        id="b7774432-1cdb-473d-b12e-28ccb055f780",
         chat_id="chat-123",
+        message_index=0,
         message={
             "kind": "request",
             "parts": [
@@ -128,8 +130,9 @@ def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> No
     store = _build_store()
     records = [
         StoredAgentChatMessageRecord(
-            id=1,
+            id="0f57a7f6-e181-4482-8637-4accf779b324",
             chat_id="chat-123",
+            message_index=0,
             message={
                 "kind": "request",
                 "parts": [
@@ -148,8 +151,9 @@ def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> No
             updated_at=now,
         ),
         StoredAgentChatMessageRecord(
-            id=2,
+            id="857ca69d-f77f-4cbc-ba85-47a49ab75e3d",
             chat_id="chat-123",
+            message_index=1,
             message={"kind": "broken"},
             created_at=now,
             updated_at=now,
