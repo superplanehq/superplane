@@ -15,12 +15,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Create GPU Droplet" href="#create-gpu-droplet" description="Create a new DigitalOcean GPU Droplet" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
   <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
   <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete GPU Droplet" href="#delete-gpu-droplet" description="Delete a DigitalOcean GPU Droplet by ID" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
@@ -28,11 +30,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
+  <LinkCard title="Get GPU Droplet" href="#get-gpu-droplet" description="Fetch details of a DigitalOcean GPU Droplet by ID" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
+  <LinkCard title="Update GPU Droplet" href="#update-gpu-droplet" description="Rename or upsize a DigitalOcean GPU Droplet" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
 </CardGrid>
 
@@ -472,6 +476,81 @@ Returns the created droplet object including:
 }
 ```
 
+<a id="create-gpu-droplet"></a>
+
+## Create GPU Droplet
+
+The Create GPU Droplet component creates a new GPU-powered droplet in DigitalOcean.
+
+### Use Cases
+
+- **AI/ML workloads**: Provision GPU-powered instances for training and inference
+- **High-performance computing**: Spin up GPU instances for compute-intensive tasks
+- **Rendering workloads**: Create GPU droplets for 3D rendering pipelines
+
+### Configuration
+
+- **Name**: The hostname for the GPU droplet (required, supports expressions)
+- **Region**: Region slug where the GPU droplet will be created (required, only shows GPU-capable regions)
+- **Size**: GPU size slug for the droplet (required, only shows GPU sizes)
+- **Image**: Image slug or ID for the droplet OS (required, shows GPU-compatible images)
+- **SSH Keys**: SSH keys to add to the droplet. Must have been added to the DigitalOcean team. (optional)
+- **Tags**: Tags to apply to the droplet (optional)
+- **User Data**: Cloud-init user data script (optional)
+- **Backups**: Enable automated backups for the droplet (optional)
+- **IPv6**: Enable IPv6 networking on the droplet (optional)
+- **Monitoring**: Enable DigitalOcean monitoring agent on the droplet (optional)
+- **VPC UUID**: UUID of the VPC to create the droplet in (optional)
+
+### Output
+
+Returns the created GPU droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status
+- **region**: Region information
+- **size_slug**: GPU size identifier
+- **networks**: Network information including IP addresses
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 720,
+    "id": 412345678,
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "memory": 245760,
+    "name": "my-gpu-droplet",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "143.198.100.50",
+          "type": "public"
+        }
+      ]
+    },
+    "region": {
+      "name": "Toronto 1",
+      "slug": "tor1"
+    },
+    "size_slug": "gpu-h100x1-80gb",
+    "status": "active",
+    "tags": [
+      "gpu",
+      "ml-training"
+    ],
+    "vcpus": 20
+  },
+  "timestamp": "2026-03-12T21:10:00.000000000Z",
+  "type": "digitalocean.gpuDroplet.created"
+}
+```
+
 <a id="create-load-balancer"></a>
 
 ## Create Load Balancer
@@ -751,6 +830,47 @@ Returns information about the deleted droplet:
   },
   "timestamp": "2026-03-12T21:25:45.688697002Z",
   "type": "digitalocean.droplet.deleted"
+}
+```
+
+<a id="delete-gpu-droplet"></a>
+
+## Delete GPU Droplet
+
+The Delete GPU Droplet component permanently deletes a GPU droplet from your DigitalOcean account.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary GPU droplets after training or inference tasks
+- **Cost optimization**: Automatically tear down expensive GPU infrastructure when not in use
+- **Automated workflows**: Delete GPU droplets as part of ML pipeline cleanup
+- **Environment management**: Remove ephemeral GPU environments after testing
+
+### Configuration
+
+- **Droplet**: The GPU droplet to delete (required, supports expressions)
+
+### Output
+
+Returns information about the deleted GPU droplet:
+- **dropletId**: The ID of the GPU droplet that was deleted
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- All data on the GPU droplet will be lost
+- The droplet will be shut down if it's running before deletion
+- Any snapshots of the GPU droplet will remain in your account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dropletId": 957784760
+  },
+  "timestamp": "2026-03-12T21:25:45.688697002Z",
+  "type": "digitalocean.gpuDroplet.deleted"
 }
 ```
 
@@ -1256,6 +1376,81 @@ All metric values are rounded to two decimal places.
 }
 ```
 
+<a id="get-gpu-droplet"></a>
+
+## Get GPU Droplet
+
+The Get GPU Droplet component retrieves detailed information about a specific GPU droplet.
+
+### Use Cases
+
+- **Status checks**: Verify GPU droplet state before performing operations
+- **Information retrieval**: Get current IP addresses, GPU configuration, and status
+- **Pre-flight validation**: Check GPU droplet exists before operations like snapshot or power management
+- **Monitoring**: Track GPU droplet configuration and network details
+
+### Configuration
+
+- **Droplet**: The GPU droplet to retrieve (required, supports expressions)
+
+### Output
+
+Returns the GPU droplet object including:
+- **id**: Droplet ID
+- **name**: Droplet hostname
+- **status**: Current droplet status (new, active, off, archive)
+- **memory**: RAM in MB
+- **vcpus**: Number of virtual CPUs
+- **disk**: Disk size in GB
+- **region**: Region information
+- **image**: Image information
+- **size_slug**: GPU size identifier
+- **networks**: Network information including IP addresses
+- **tags**: Applied tags
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 720,
+    "id": 412345678,
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "memory": 245760,
+    "name": "my-gpu-droplet",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "143.198.100.50",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.132.0.5",
+          "type": "private"
+        }
+      ]
+    },
+    "region": {
+      "name": "Toronto 1",
+      "slug": "tor1"
+    },
+    "size_slug": "gpu-h100x1-80gb",
+    "status": "active",
+    "tags": [
+      "gpu",
+      "ml-training"
+    ],
+    "vcpus": 20
+  },
+  "timestamp": "2026-03-12T21:13:32.946693411Z",
+  "type": "digitalocean.gpuDroplet.fetched"
+}
+```
+
 <a id="get-object"></a>
 
 ## Get Object
@@ -1610,6 +1805,85 @@ Returns the updated app including:
   },
   "timestamp": "2026-03-24T07:06:01.044139416Z",
   "type": "digitalocean.app.updated"
+}
+```
+
+<a id="update-gpu-droplet"></a>
+
+## Update GPU Droplet
+
+The Update GPU Droplet component allows renaming and upsizing an existing GPU droplet.
+
+### Use Cases
+
+- **Renaming**: Update the hostname of a GPU droplet
+- **Upsizing**: Scale up a GPU droplet to a larger GPU size for more compute power
+- **Combined updates**: Rename and upsize in a single operation
+
+### Configuration
+
+- **Droplet**: The GPU droplet to update (required, supports expressions)
+- **New Name**: The new hostname for the GPU droplet (optional, supports expressions)
+- **New GPU Size**: The new GPU size to upsize the droplet to (optional, only upsizing is supported)
+
+### Output
+
+Returns the updated GPU droplet object including:
+- **id**: Droplet ID
+- **name**: Updated droplet hostname
+- **status**: Current droplet status
+- **size_slug**: New GPU size identifier (if resized)
+- **region**: Region information
+- **networks**: Network information including IP addresses
+
+### Important Notes
+
+- At least one of **New Name** or **New GPU Size** must be provided
+- Only **upsizing** is supported — you cannot downsize a GPU droplet
+- The GPU droplet must be powered off before resizing
+- If both rename and resize are specified, rename is performed first
+- The component waits for each operation to complete before proceeding
+
+### Example Output
+
+```json
+{
+  "data": {
+    "disk": 2046,
+    "id": 412345678,
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "memory": 655360,
+    "name": "my-gpu-droplet-renamed",
+    "networks": {
+      "v4": [
+        {
+          "ip_address": "143.198.100.50",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.132.0.5",
+          "type": "private"
+        }
+      ]
+    },
+    "region": {
+      "name": "Toronto 1",
+      "slug": "tor1"
+    },
+    "size_slug": "gpu-h100x8-640gb",
+    "status": "active",
+    "tags": [
+      "gpu",
+      "ml-training"
+    ],
+    "vcpus": 160
+  },
+  "timestamp": "2026-03-12T22:30:00.000000000Z",
+  "type": "digitalocean.gpuDroplet.updated"
 }
 ```
 

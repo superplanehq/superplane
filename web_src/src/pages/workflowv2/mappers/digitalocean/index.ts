@@ -24,6 +24,10 @@ import { createAppMapper } from "./create_app";
 import { getAppMapper } from "./get_app";
 import { deleteAppMapper } from "./delete_app";
 import { updateAppMapper } from "./update_app";
+import { createGPUDropletMapper } from "./create_gpu_droplet";
+import { getGPUDropletMapper } from "./get_gpu_droplet";
+import { updateGPUDropletMapper } from "./update_gpu_droplet";
+import { deleteGPUDropletMapper } from "./delete_gpu_droplet";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -52,6 +56,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getApp: getAppMapper,
   deleteApp: deleteAppMapper,
   updateApp: updateAppMapper,
+  createGPUDroplet: createGPUDropletMapper,
+  getGPUDroplet: getGPUDropletMapper,
+  updateGPUDroplet: updateGPUDropletMapper,
+  deleteGPUDroplet: deleteGPUDropletMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -82,4 +90,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getApp: buildActionStateRegistry("fetched"),
   deleteApp: buildActionStateRegistry("deleted"),
   updateApp: buildActionStateRegistry("updated"),
+  createGPUDroplet: buildActionStateRegistry("created"),
+  getGPUDroplet: buildActionStateRegistry("fetched"),
+  updateGPUDroplet: buildActionStateRegistry("updated"),
+  deleteGPUDroplet: buildActionStateRegistry("deleted"),
 };
