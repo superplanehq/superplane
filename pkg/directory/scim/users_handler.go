@@ -1,6 +1,7 @@
 package scim
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -120,9 +121,20 @@ func (h *UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 		}
 
 		name := displayName(attributes, userName)
-		account, e := models.CreateManagedAccountInTransaction(tx, name, email, true)
-		if e != nil {
-			log.Errorf("SCIM [%s] Create: failed to create account for email=%s: %v", orgID, email, e)
+		var account *models.Account
+		var existingAccount models.Account
+		if e := tx.Where("email = ?", email).First(&existingAccount).Error; e == nil {
+			// Account already exists (user is a member of another org) — reuse it.
+			log.Infof("SCIM [%s] Create: reusing existing account id=%s for email=%s", orgID, existingAccount.ID, email)
+			account = &existingAccount
+		} else if errors.Is(e, gorm.ErrRecordNotFound) {
+			account, e = models.CreateManagedAccountInTransaction(tx, name, email, true)
+			if e != nil {
+				log.Errorf("SCIM [%s] Create: failed to create account for email=%s: %v", orgID, email, e)
+				return e
+			}
+		} else {
+			log.Errorf("SCIM [%s] Create: failed to look up account for email=%s: %v", orgID, email, e)
 			return e
 		}
 
