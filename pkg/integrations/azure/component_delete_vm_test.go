@@ -69,11 +69,17 @@ func TestDeleteVMComponent_ExampleOutput(t *testing.T) {
 	example := component.ExampleOutput()
 
 	require.NotNil(t, example)
-	assert.Contains(t, example, "id")
-	assert.Contains(t, example, "name")
-	assert.Contains(t, example, "resourceGroup")
-	assert.Equal(t, "my-vm", example["name"])
-	assert.Equal(t, "my-rg", example["resourceGroup"])
+	assert.Contains(t, example, "data")
+	assert.Contains(t, example, "timestamp")
+	assert.Contains(t, example, "type")
+
+	data, ok := example["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, data, "id")
+	assert.Contains(t, data, "name")
+	assert.Contains(t, data, "resourceGroup")
+	assert.Equal(t, "my-vm", data["name"])
+	assert.Equal(t, "my-rg", data["resourceGroup"])
 }
 
 func TestDeleteVMComponent_OutputChannels(t *testing.T) {
