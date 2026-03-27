@@ -21,7 +21,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("at least one flag must be provided: --name, --description, or --versioning-enabled")
 	}
 
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
