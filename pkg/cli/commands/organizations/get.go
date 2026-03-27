@@ -1,4 +1,4 @@
-package secrets
+package organizations
 
 import (
 	"io"
@@ -14,21 +14,19 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	response, _, err := ctx.API.SecretAPI.
-		SecretsDescribeSecret(ctx.Context, ctx.Args[0]).
-		DomainType(string(organizationDomainType())).
-		DomainId(organizationID).
+	response, _, err := ctx.API.OrganizationAPI.
+		OrganizationsDescribeOrganization(ctx.Context, organizationID).
 		Execute()
 	if err != nil {
 		return err
 	}
 
-	secret := response.GetSecret()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(secret)
+		return ctx.Renderer.Render(response)
 	}
 
+	org := response.GetOrganization()
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		return renderSecretText(stdout, secret)
+		return renderOrganization(stdout, org)
 	})
 }
