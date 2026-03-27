@@ -41,7 +41,7 @@ export function OktaSSO() {
   const [samlIdpSSOURL, setSamlIdpSSOURL] = useState("");
   const [samlIdpIssuer, setSamlIdpIssuer] = useState("");
   const [samlIdpCertificatePEM, setSamlIdpCertificatePEM] = useState("");
-  const [samlEnabled, setSamlEnabled] = useState(false);
+  const [samlEnabled, setSamlEnabled] = useState(true);
   const [samlSaving, setSamlSaving] = useState(false);
   const [samlMessage, setSamlMessage] = useState<string | null>(null);
 
@@ -66,8 +66,8 @@ export function OktaSSO() {
           setSettings(s);
           setSamlIdpSSOURL(s.samlIdpSsoUrl || "");
           setSamlIdpIssuer(s.samlIdpIssuer || "");
-          setSamlEnabled(s.samlEnabled ?? false);
-          setScimEnabled(s.scimEnabled ?? true);
+          setSamlEnabled(s.configured ? (s.samlEnabled ?? true) : true);
+          setScimEnabled(s.configured ? (s.scimEnabled ?? true) : true);
         }
       })
       .catch(() => setLoadError("Failed to load SSO settings."));
@@ -218,7 +218,7 @@ export function OktaSSO() {
             {certConfigured && "Leave blank to keep the existing certificate."}
           </p>
           <textarea
-            placeholder={certConfigured ? "Leave blank to keep existing" : "-----BEGIN CERTIFICATE-----\n..."}
+            placeholder={certConfigured ? "Leave blank to keep existing" : "MIIDtDCCApygAwIBAgI..."}
             value={samlIdpCertificatePEM}
             onChange={(e) => setSamlIdpCertificatePEM(e.target.value)}
             disabled={!canUpdate}
