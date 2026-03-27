@@ -6,7 +6,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic_ai.messages import ModelRequest, UserPromptPart
+from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
 
 from ai.models import CanvasQuestionRequest
 import ai.repl_web as repl_web
@@ -193,6 +193,33 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
         for message in history
         for part in message.parts
     )
+
+
+def test_persisted_run_recorder_does_not_duplicate_final_assistant_message() -> None:
+    store = MagicMock()
+    store.count_chat_model_messages.return_value = 0
+    store.create_agent_chat_model_message.side_effect = [
+        SimpleNamespace(id="user-message-1"),
+        SimpleNamespace(id="tool-message-1"),
+    ]
+
+    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "Current question")
+    recorder.tool_finished(
+        SimpleNamespace(
+            result=ToolReturnPart(
+                tool_name="get_canvas",
+                content={"ok": True},
+                tool_call_id="tool-call-123",
+            ),
+            content=None,
+        )
+    )
+    recorder.save_authoritative_messages([ModelResponse(parts=[TextPart("Final answer")])])
+    recorder.set_assistant_content("Final answer")
+
+    assert store.create_agent_chat_model_message.call_count == 2
+    store.replace_agent_chat_messages_after.assert_called_once()
+    store.update_agent_chat_model_message.assert_not_called()
 
 
 def test_main_non_test_mode_mints_agent_chat_session(

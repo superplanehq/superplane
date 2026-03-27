@@ -61,6 +61,7 @@ class PersistedRunRecorder:
         self._store = store
         self._chat_id = chat_id
         self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
+        self._authoritative_messages_saved = False
         self._current_response_message_id: str | None = None
         self._current_response: ModelResponse | None = None
         self._store.set_initial_chat_message_if_missing(chat_id, user_prompt)
@@ -74,7 +75,7 @@ class PersistedRunRecorder:
         return self._history_count_before_run
 
     def _persist_current_response(self) -> None:
-        if self._current_response is None:
+        if self._current_response is None or self._authoritative_messages_saved:
             return
 
         if self._current_response_message_id is None:
@@ -83,6 +84,17 @@ class PersistedRunRecorder:
             return
 
         self._store.update_agent_chat_model_message(self._current_response_message_id, self._current_response)
+
+    def save_authoritative_messages(self, messages: Any) -> None:
+        validated_messages = ModelMessagesTypeAdapter.validate_python(messages)
+        self._store.replace_agent_chat_messages_after(
+            self._chat_id,
+            self._history_count_before_run,
+            list(validated_messages),
+        )
+        self._authoritative_messages_saved = True
+        self._current_response_message_id = None
+        self._current_response = None
 
     def append_assistant_content(self, chunk: str) -> None:
         if not chunk:
@@ -255,10 +267,6 @@ def _load_message_history(store: SessionStore, chat_id: str) -> Any:
         return None
     return ModelMessagesTypeAdapter.validate_python(history)
 
-def _save_new_messages(store: SessionStore, chat_id: str, preserved_message_count: int, messages: Any) -> None:
-    validated_messages = ModelMessagesTypeAdapter.validate_python(messages)
-    store.replace_agent_chat_messages_after(chat_id, preserved_message_count, list(validated_messages))
-
 
 def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
@@ -362,7 +370,7 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
 
             if isinstance(event, AgentRunResultEvent):
                 result = event.result
-                _save_new_messages(store, chat.id, recorder.history_count_before_run, result.new_messages())
+                recorder.save_authoritative_messages(result.new_messages())
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
@@ -504,7 +512,7 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
-            _save_new_messages(store, chat.id, recorder.history_count_before_run, result.new_messages())
+            recorder.save_authoritative_messages(result.new_messages())
             output = _to_jsonable(result.output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
@@ -543,6 +551,7 @@ def _create_app() -> FastAPI:
             yield
         finally:
             grpc_server.stop()
+            store.close()
 
     app = FastAPI(lifespan=lifespan)
     cors_origins_raw = os.getenv("REPL_WEB_CORS_ORIGINS", "*")

@@ -29,7 +29,7 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.agent_chat_messages (
     id uuid NOT NULL,
-    chat_id text NOT NULL,
+    chat_id uuid NOT NULL,
     message_index integer NOT NULL,
     message jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -42,10 +42,10 @@ CREATE TABLE public.agent_chat_messages (
 --
 
 CREATE TABLE public.agent_chats (
-    id text NOT NULL,
-    org_id text NOT NULL,
-    user_id text NOT NULL,
-    canvas_id text NOT NULL,
+    id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
     initial_message text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL

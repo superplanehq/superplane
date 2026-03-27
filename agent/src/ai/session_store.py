@@ -1,6 +1,9 @@
 import json
 import os
+import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -200,9 +203,16 @@ class AgentChatNotFoundError(Exception):
 class SessionStore:
     def __init__(self, config: SessionStoreConfig | None = None) -> None:
         self._config = config or SessionStoreConfig.from_env()
+        self._thread_local = threading.local()
+        self._connections: list[psycopg.Connection[Any]] = []
+        self._connections_lock = threading.Lock()
 
     def _connect(self) -> psycopg.Connection[Any]:
-        return psycopg.connect(
+        connection = getattr(self._thread_local, "connection", None)
+        if connection is not None and not connection.closed and not connection.broken:
+            return connection
+
+        connection = psycopg.connect(
             host=self._config.host,
             port=self._config.port,
             dbname=self._config.dbname,
@@ -211,7 +221,36 @@ class SessionStore:
             sslmode=self._config.sslmode,
             application_name=self._config.application_name,
             row_factory=dict_row,
+            autocommit=True,
         )
+        self._thread_local.connection = connection
+        with self._connections_lock:
+            self._connections.append(connection)
+        return connection
+
+    @contextmanager
+    def _cursor(self, *, transactional: bool = False) -> Iterator[Any]:
+        conn = self._connect()
+        if transactional:
+            with conn.transaction():
+                with conn.cursor() as cur:
+                    yield cur
+            return
+
+        with conn.cursor() as cur:
+            yield cur
+
+    def close(self) -> None:
+        with self._connections_lock:
+            connections = list(self._connections)
+            self._connections.clear()
+
+        for connection in connections:
+            if connection.closed:
+                continue
+            connection.close()
+
+        self._thread_local.connection = None
 
     def create_agent_chat(self, org_id: str, user_id: str, canvas_id: str, chat_id: str | None = None) -> StoredAgentChat:
         now = _utcnow()
@@ -225,7 +264,7 @@ class SessionStore:
             updated_at=now,
         )
 
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(
                 """
                 INSERT INTO agent_chats (
@@ -246,7 +285,7 @@ class SessionStore:
         return chat
 
     def list_agent_chats(self, org_id: str, user_id: str, canvas_id: str) -> list[StoredAgentChat]:
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(
                 """
                 SELECT *
@@ -268,7 +307,7 @@ class SessionStore:
         return chat
 
     def get_agent_chat(self, chat_id: str) -> StoredAgentChat:
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(
                 """
                 SELECT *
@@ -286,7 +325,7 @@ class SessionStore:
         return self._row_to_agent_chat(row)
 
     def count_chat_model_messages(self, chat_id: str) -> int:
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(
                 "SELECT COUNT(*) AS message_count FROM agent_chat_messages WHERE chat_id = %s",
                 (chat_id,),
@@ -295,7 +334,7 @@ class SessionStore:
         return int(row["message_count"]) if row is not None else 0
 
     def list_agent_chat_message_records(self, chat_id: str) -> list[StoredAgentChatMessageRecord]:
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(
                 """
                 SELECT *
@@ -334,7 +373,7 @@ class SessionStore:
         created_at = _message_timestamp(message)
         message_id = str(uuid.uuid4())
 
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor(transactional=True) as cur:
             cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
             if cur.fetchone() is None:
                 raise AgentChatNotFoundError(chat_id)
@@ -372,7 +411,7 @@ class SessionStore:
         serialized_message = _serialize_model_message(message)
         created_at = _message_timestamp(message)
 
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor(transactional=True) as cur:
             cur.execute(
                 """
                 UPDATE agent_chat_messages
@@ -393,7 +432,7 @@ class SessionStore:
         messages: list[ModelMessage],
     ) -> None:
         now = _utcnow()
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor(transactional=True) as cur:
             cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
             if cur.fetchone() is None:
                 raise AgentChatNotFoundError(chat_id)
@@ -433,7 +472,7 @@ class SessionStore:
             return
 
         now = _utcnow()
-        with self._connect() as conn, conn.cursor() as cur:
+        with self._cursor() as cur:
             cur.execute(
                 """
                 UPDATE agent_chats

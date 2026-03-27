@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+import ai.session_store as session_store
 from ai.session_store import SessionStore, SessionStoreConfig, StoredAgentChatMessageRecord
 
 
@@ -168,3 +169,33 @@ def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> No
     assert len(messages) == 1
     assert messages[0].role == "user"
     assert messages[0].content == "What is in my canvas?"
+
+
+def test_connect_reuses_open_connection_until_closed(monkeypatch) -> None:
+    store = _build_store()
+    created_connections: list[object] = []
+
+    class FakeConnection:
+        def __init__(self) -> None:
+            self.closed = False
+            self.broken = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    def fake_connect(**kwargs):
+        connection = FakeConnection()
+        created_connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(session_store.psycopg, "connect", fake_connect)
+
+    first = store._connect()
+    second = store._connect()
+    store.close()
+    third = store._connect()
+
+    assert first is second
+    assert len(created_connections) == 2
+    assert first is created_connections[0]
+    assert third is created_connections[1]
