@@ -29,14 +29,14 @@ func (c *ContextsCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	//
-	// If not in text mode, render the contexts as a list.
+	// If not in text mode or stdin is not a terminal, render the contexts as a list.
 	//
-	if !ctx.Renderer.IsText() {
+	if !ctx.Renderer.IsText() || !ctx.IsInteractive() {
 		return c.renderContexts(ctx, contexts)
 	}
 
 	//
-	// If in text mode, select the context interactively.
+	// Otherwise, select the context interactively.
 	//
 	selected, err := c.selectContextInteractively(ctx, contexts)
 	if err != nil {

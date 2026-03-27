@@ -99,6 +99,7 @@ import {
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
+import { CanvasCliView } from "./CanvasCliView";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -145,7 +146,6 @@ import { CanvasPageModals } from "./CanvasPageModals";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
-const CANVAS_AUTO_SAVE_STORAGE_KEY = "canvas-auto-save-enabled";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const LOCAL_CANVAS_UPDATE_SUPPRESSION_MS = 2000;
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
@@ -790,7 +790,7 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "cli" | "memory" | "settings">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -891,16 +891,7 @@ export function WorkflowPageV2() {
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
-  // Auto-save toggle state
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem(CANVAS_AUTO_SAVE_STORAGE_KEY);
-      return stored !== null ? JSON.parse(stored) : true; // Default to enabled
-    }
-    return true;
-  });
-  // Non-versioned canvases always auto-save. When versioning is enabled, auto-save follows `isAutoSaveEnabled`.
-  const canAutoSave = !isTemplate && hasEditableVersion && (isVersioningDisabled || isAutoSaveEnabled);
+  const canAutoSave = !isTemplate && hasEditableVersion;
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1407,14 +1398,6 @@ export function WorkflowPageV2() {
       setHasNonPositionalUnsavedChanges(false);
     }
   }, [initialWorkflowSnapshot, organizationId, canvasId, queryClient]);
-
-  const handleToggleAutoSave = useCallback(() => {
-    const newValue = !isAutoSaveEnabled;
-    setIsAutoSaveEnabled(newValue);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_SAVE_STORAGE_KEY, JSON.stringify(newValue));
-    }
-  }, [isAutoSaveEnabled]);
 
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
@@ -4799,6 +4782,7 @@ export function WorkflowPageV2() {
       return;
     }
 
+    setTopViewMode("canvas");
     setSuppressUnpublishedChangesBadge(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
@@ -5414,12 +5398,6 @@ export function WorkflowPageV2() {
     : !hasEditableVersion
       ? "Enable edit mode to save changes."
       : undefined;
-  const autoSaveDisabled = !canUpdateCanvas || !hasEditableVersion;
-  const autoSaveDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
-    : !hasEditableVersion
-      ? "Enable edit mode to use auto-save."
-      : undefined;
   const saveButtonHidden =
     isVersioningDisabled ||
     isTemplate ||
@@ -5554,6 +5532,8 @@ export function WorkflowPageV2() {
         onImport={!isReadOnly ? handleImportYaml : undefined}
         isImporting={updateCanvasVersionMutation.isPending}
       />
+    ) : topViewMode === "cli" ? (
+      <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
@@ -5690,12 +5670,8 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
-          isAutoSaveEnabled={!isVersioningDisabled && isAutoSaveEnabled && !isTemplate}
-          onToggleAutoSave={isTemplate || isVersioningDisabled ? undefined : handleToggleAutoSave}
           lastSavedAt={lastSavedAt}
           saveErrorMessage={lastCanvasSaveError}
-          autoSaveDisabled={autoSaveDisabled}
-          autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           headerMode={headerMode}
           saveState={headerSaveState}
           onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
