@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
-import { Switch } from "../switch";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -234,10 +233,6 @@ export function Header({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
-  isAutoSaveEnabled,
-  onToggleAutoSave,
-  autoSaveDisabled,
-  autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
   onExportYamlCopy,
@@ -563,35 +558,6 @@ export function Header({
                     saveErrorMessage={saveErrorMessage}
                   />
                 ) : null}
-                {onToggleAutoSave
-                  ? wrapWithTooltip(
-                      autoSaveDisabled,
-                      autoSaveDisabledTooltip,
-                      <div className="flex items-center gap-2">
-                        <label
-                          htmlFor="auto-save-toggle"
-                          className={`text-sm hidden sm:inline ${autoSaveDisabled ? "text-gray-400" : "text-gray-800"}`}
-                        >
-                          Auto-save
-                        </label>
-                        <Switch
-                          id="auto-save-toggle"
-                          checked={isAutoSaveEnabled}
-                          onCheckedChange={
-                            isVersioningDisabledMode
-                              ? onToggleAutoSave
-                              : (checked) => {
-                                  if (checked) {
-                                    onSave?.();
-                                  }
-                                  onToggleAutoSave?.();
-                                }
-                          }
-                          disabled={autoSaveDisabled}
-                        />
-                      </div>,
-                    )
-                  : null}
                 {onUndo && canUndo ? (
                   <Button onClick={onUndo} size="sm" variant="outline">
                     <Undo2 />
