@@ -14,6 +14,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./utils";
+import type { CreateGPUDropletConfiguration, DropletData } from "./types";
 
 export const createGPUDropletMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -32,7 +33,7 @@ export const createGPUDropletMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, unknown> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -40,10 +41,10 @@ export const createGPUDropletMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const droplet = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const droplet = outputs?.default?.[0]?.data as DropletData | undefined;
     if (!droplet) return details;
 
-    const ip = droplet.networks?.v4?.find((n: any) => n.type === "public")?.ip_address;
+    const ip = droplet.networks?.v4?.find((n) => n.type === "public")?.ip_address;
 
     details["Droplet ID"] = droplet.id?.toString() || "-";
     details["Name"] = droplet.name || "-";
@@ -66,7 +67,7 @@ export const createGPUDropletMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as CreateGPUDropletConfiguration;
 
   if (configuration?.region) {
     metadata.push({ icon: "map-pin", label: `Region: ${configuration.region}` });
