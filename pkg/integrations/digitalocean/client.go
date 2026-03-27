@@ -109,9 +109,10 @@ func (c *Client) GetAccount() (*Account, error) {
 
 // Region represents a DigitalOcean region
 type Region struct {
-	Slug      string `json:"slug"`
-	Name      string `json:"name"`
-	Available bool   `json:"available"`
+	Slug      string   `json:"slug"`
+	Name      string   `json:"name"`
+	Sizes     []string `json:"sizes"`
+	Available bool     `json:"available"`
 }
 
 // ListRegions retrieves all available regions
@@ -140,6 +141,7 @@ type Size struct {
 	VCPUs        int     `json:"vcpus"`
 	Disk         int     `json:"disk"`
 	PriceMonthly float64 `json:"price_monthly"`
+	Description  string  `json:"description"`
 	Available    bool    `json:"available"`
 }
 
@@ -2330,4 +2332,214 @@ func resolveAppMetadata(ctx core.SetupContext, appID string) error {
 		AppID:   appID,
 		AppName: appName,
 	})
+}
+
+// ListGPUSizes returns only GPU-specific droplet sizes
+func (c *Client) ListGPUSizes() ([]Size, error) {
+	sizes, err := c.ListSizes()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuSizes := make([]Size, 0)
+	for _, size := range sizes {
+		if !size.Available {
+			continue
+		}
+		if strings.HasPrefix(size.Slug, "gpu-") {
+			gpuSizes = append(gpuSizes, size)
+		}
+	}
+
+	return gpuSizes, nil
+}
+
+// ListGPURegions returns only regions that support GPU droplets
+func (c *Client) ListGPURegions() ([]Region, error) {
+	regions, err := c.ListRegions()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuRegions := make([]Region, 0)
+	for _, region := range regions {
+		if !region.Available {
+			continue
+		}
+
+		for _, size := range region.Sizes {
+			if strings.HasPrefix(size, "gpu-") {
+				gpuRegions = append(gpuRegions, region)
+				break
+			}
+		}
+	}
+
+	return gpuRegions, nil
+}
+
+// ListGPUDroplets returns only GPU droplets (droplets using GPU sizes)
+func (c *Client) ListGPUDroplets() ([]Droplet, error) {
+	droplets, err := c.ListDroplets()
+	if err != nil {
+		return nil, err
+	}
+
+	gpuDroplets := make([]Droplet, 0)
+	for _, droplet := range droplets {
+		if strings.HasPrefix(droplet.SizeSlug, "gpu-") {
+			gpuDroplets = append(gpuDroplets, droplet)
+		}
+	}
+
+	return gpuDroplets, nil
+}
+
+// ListGPUImages returns GPU-compatible images including one-click applications
+func (c *Client) ListGPUImages() ([]Image, error) {
+	// Get distribution images (base OS images)
+	distImages, err := c.ListImages("distribution")
+	if err != nil {
+		return nil, err
+	}
+
+	// Get application images (one-click apps and marketplace images)
+	appImages, err := c.ListImages("application")
+	if err != nil {
+		return nil, err
+	}
+
+	// Combine both types
+	allImages := append(distImages, appImages...)
+
+	// Filter for GPU-compatible images
+	// DigitalOcean GPU images typically include:
+	// - Ubuntu, Debian, Rocky Linux, Fedora (base distributions)
+	// - ML-in-a-Box, NVIDIA CUDA, PyTorch, TensorFlow (one-click apps)
+	gpuImages := make([]Image, 0)
+	for _, image := range allImages {
+		// Include base distributions that support GPU
+		if image.Type == "snapshot" || image.Type == "custom" {
+			// Only include marketplace apps that are GPU-related
+			if isGPURelatedImage(image) {
+				gpuImages = append(gpuImages, image)
+			}
+		} else if image.Distribution == "Ubuntu" || image.Distribution == "Debian" ||
+			image.Distribution == "Rocky Linux" || image.Distribution == "Fedora" {
+			// Include standard distributions
+			gpuImages = append(gpuImages, image)
+		}
+	}
+
+	return gpuImages, nil
+}
+
+// isGPURelatedImage checks if an image is GPU-related based on keywords in name/slug
+func isGPURelatedImage(image Image) bool {
+	gpuKeywords := []string{
+		"gpu", "cuda", "nvidia", "ml-in-a-box", "pytorch", "tensorflow",
+		"machine learning", "deep learning", "ai", "ml",
+	}
+
+	// Check image name
+	for _, keyword := range gpuKeywords {
+		if containsCaseInsensitive(image.Name, keyword) {
+			return true
+		}
+	}
+
+	// Check image slug
+	if image.Slug != "" {
+		for _, keyword := range gpuKeywords {
+			if containsCaseInsensitive(image.Slug, keyword) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func containsCaseInsensitive(s, substr string) bool {
+	return len(s) >= len(substr) && findSubstring(s, substr)
+}
+
+func findSubstring(s, substr string) bool {
+	s = toLower(s)
+	substr = toLower(substr)
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'A' && s[i] <= 'Z' {
+			result[i] = s[i] + 32
+		} else {
+			result[i] = s[i]
+		}
+	}
+	return string(result)
+}
+
+// RenameDroplet renames a droplet
+func (c *Client) RenameDroplet(dropletID int, name string) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]string{
+		"type": "rename",
+		"name": name,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
+}
+
+// ResizeDroplet resizes a droplet to a new size (only supports upsizing)
+func (c *Client) ResizeDroplet(dropletID int, size string, resizeDisk bool) (*DOAction, error) {
+	url := fmt.Sprintf("%s/droplets/%d/actions", c.BaseURL, dropletID)
+
+	body, err := json.Marshal(map[string]any{
+		"type": "resize",
+		"size": size,
+		"disk": resizeDisk,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Action DOAction `json:"action"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Action, nil
 }
