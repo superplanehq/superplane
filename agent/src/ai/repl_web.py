@@ -248,22 +248,6 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _format_tool_label(tool_name: str) -> str:
-    normalized = tool_name.strip().lower()
-    label_by_tool = {
-        "get_canvas_shape": "Reading canvas structure",
-        "get_canvas_details": "Reading canvas details",
-        "list_available_blocks": "Listing available components",
-    }
-    if normalized in label_by_tool:
-        return label_by_tool[normalized]
-
-    words = normalized.replace("_", " ").replace("-", " ").strip()
-    if not words:
-        return "Running tool"
-    return words[:1].upper() + words[1:]
-
-
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
     history = store.load_agent_chat_message_history(chat_id)
     if not history:

@@ -1,6 +1,7 @@
 import argparse
 import socket
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -59,6 +60,48 @@ def test_stream_repl_answer_reads_sse_response_end_to_end(
     assert answer == "success (no tool calls)"
     captured = capsys.readouterr()
     assert "success (no tool calls)" in captured.out
+
+
+def test_stream_repl_answer_uses_passed_stream_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested_urls: list[str] = []
+
+    class FakeResponse:
+        def __init__(self) -> None:
+            self._lines = iter(
+                [
+                    b'data: {"type":"final_answer","output":"ok"}\n',
+                    b'data: {"type":"done"}\n',
+                    b"",
+                ]
+            )
+
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+            return None
+
+        def readline(self) -> bytes:
+            return next(self._lines)
+
+    def fake_urlopen(request: Any, timeout: int) -> FakeResponse:
+        requested_urls.append(request.full_url)
+        assert timeout == 30
+        return FakeResponse()
+
+    monkeypatch.setattr(repl_main, "urlopen", fake_urlopen)
+
+    answer = _stream_repl_answer(
+        stream_url="http://agent:8090/agents/chats/chat-123/stream",
+        payload=CanvasQuestionRequest(question="hello from repl"),
+        model="anthropic:claude-sonnet-4-6",
+        token="session-token-123",
+    )
+
+    assert answer == "ok"
+    assert requested_urls == ["http://agent:8090/agents/chats/chat-123/stream"]
 
 
 def test_web_server_start_raises_when_port_is_already_in_use() -> None:
@@ -146,7 +189,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
     ]
     assert stream_calls == [
         {
-            "web_url": "http://agent:8090/agents/chats/chat-123/stream",
+            "stream_url": "http://agent:8090/agents/chats/chat-123/stream",
             "canvas_id": "canvas-123",
             "model": "anthropic:claude-sonnet-4-6",
             "token": "session-token-123",
