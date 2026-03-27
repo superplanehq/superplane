@@ -48,7 +48,7 @@ import {
   ComponentsIntegrationRef,
   OrganizationsIntegration,
 } from "@/api-client";
-import { buildComponentDocumentationUrl } from "@/utils/componentDocsUrl";
+import { buildSidebarComponentDocsPayload } from "@/utils/componentDocsUrl";
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { AiSidebar } from "../ai";
@@ -1560,32 +1560,22 @@ function Sidebar({
 
     const matchedComponent = components?.find((c) => c.name === blockName);
     if (matchedComponent) {
-      const blockLabel = matchedComponent.label || editingNodeData?.displayLabel || blockName;
-      return {
+      return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
+        label: matchedComponent.label,
         description: matchedComponent.description,
         examplePayload: matchedComponent.exampleOutput,
-        payloadLabel: "Example Output" as const,
-        documentationUrl: buildComponentDocumentationUrl({
-          integrationName: editingNodeData?.integrationName,
-          integrationLabel: editingNodeData?.integrationLabel,
-          blockLabel,
-        }),
-      };
+        payloadLabel: "Example Output",
+      });
     }
 
     const matchedTrigger = triggers?.find((t) => t.name === blockName);
     if (matchedTrigger) {
-      const blockLabel = matchedTrigger.label || editingNodeData?.displayLabel || blockName;
-      return {
+      return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
+        label: matchedTrigger.label,
         description: matchedTrigger.description,
         examplePayload: matchedTrigger.exampleData,
-        payloadLabel: "Example Data" as const,
-        documentationUrl: buildComponentDocumentationUrl({
-          integrationName: editingNodeData?.integrationName,
-          integrationLabel: editingNodeData?.integrationLabel,
-          blockLabel,
-        }),
-      };
+        payloadLabel: "Example Data",
+      });
     }
 
     return null;

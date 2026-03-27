@@ -46,3 +46,33 @@ export function buildComponentDocumentationUrl(params: {
     : "core";
   return `${DOCS_COMPONENTS_BASE}/${segment}#${anchor}`;
 }
+
+/** Context from the canvas node editor for docs URL resolution (keeps CanvasPage useMemo complexity low). */
+export type SidebarComponentDocsEditingContext = {
+  displayLabel?: string;
+  integrationName?: string;
+  integrationLabel?: string;
+};
+
+export function buildSidebarComponentDocsPayload(
+  blockName: string,
+  editingNodeData: SidebarComponentDocsEditingContext | null | undefined,
+  parts: {
+    label?: string;
+    description?: string;
+    examplePayload?: Record<string, unknown>;
+    payloadLabel: "Example Output" | "Example Data";
+  },
+) {
+  const blockLabel = parts.label || editingNodeData?.displayLabel || blockName;
+  return {
+    description: parts.description,
+    examplePayload: parts.examplePayload,
+    payloadLabel: parts.payloadLabel,
+    documentationUrl: buildComponentDocumentationUrl({
+      integrationName: editingNodeData?.integrationName,
+      integrationLabel: editingNodeData?.integrationLabel,
+      blockLabel,
+    }),
+  };
+}
