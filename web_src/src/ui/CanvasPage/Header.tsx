@@ -19,7 +19,6 @@ import {
 import { CliCommandsPopover } from "./CliCommandsPopover";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
-import { Switch } from "../switch";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -62,10 +61,6 @@ interface HeaderProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  isAutoSaveEnabled?: boolean;
-  onToggleAutoSave?: () => void;
-  autoSaveDisabled?: boolean;
-  autoSaveDisabledTooltip?: string;
   topViewMode?: "canvas" | "yaml" | "memory" | "settings";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
   canvasId?: string;
@@ -241,10 +236,6 @@ export function Header({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
-  isAutoSaveEnabled,
-  onToggleAutoSave,
-  autoSaveDisabled,
-  autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
   canvasId,
@@ -566,35 +557,6 @@ export function Header({
                     saveErrorMessage={saveErrorMessage}
                   />
                 ) : null}
-                {onToggleAutoSave
-                  ? wrapWithTooltip(
-                      autoSaveDisabled,
-                      autoSaveDisabledTooltip,
-                      <div className="flex items-center gap-2">
-                        <label
-                          htmlFor="auto-save-toggle"
-                          className={`text-sm hidden sm:inline ${autoSaveDisabled ? "text-gray-400" : "text-gray-800"}`}
-                        >
-                          Auto-save
-                        </label>
-                        <Switch
-                          id="auto-save-toggle"
-                          checked={isAutoSaveEnabled}
-                          onCheckedChange={
-                            isVersioningDisabledMode
-                              ? onToggleAutoSave
-                              : (checked) => {
-                                  if (checked) {
-                                    onSave?.();
-                                  }
-                                  onToggleAutoSave?.();
-                                }
-                          }
-                          disabled={autoSaveDisabled}
-                        />
-                      </div>,
-                    )
-                  : null}
                 {onUndo && canUndo ? (
                   <Button onClick={onUndo} size="sm" variant="outline">
                     <Undo2 />
