@@ -17,9 +17,10 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Autosave Partial")
 		steps.addFilterNode("FilterPartial")
+		steps.assertExpressionFieldEquals("FilterPartial", "true")
 		steps.clearExpressionField()
 		steps.waitForAutoSave()
-		steps.assertExpressionFieldSavedAsEmpty("FilterPartial")
+		steps.assertExpressionFieldEquals("FilterPartial", "")
 	})
 
 	t.Run("partial configuration persists after switching to Runs tab", func(t *testing.T) {
@@ -27,11 +28,12 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Autosave Tab Switch")
 		steps.addFilterNode("FilterSwitch")
+		steps.assertExpressionFieldEquals("FilterSwitch", "true")
 		steps.clearExpressionField()
 		steps.waitForAutoSave()
 		steps.switchToRunsTab()
 		steps.switchToConfigurationTab()
-		steps.assertExpressionFieldSavedAsEmpty("FilterSwitch")
+		steps.assertExpressionFieldEquals("FilterSwitch", "")
 	})
 }
 
@@ -76,17 +78,14 @@ func (s *settingsAutoSaveSteps) switchToConfigurationTab() {
 	s.session.Sleep(500)
 }
 
-func (s *settingsAutoSaveSteps) assertExpressionFieldSavedAsEmpty(nodeName string) {
+func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, expected string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		node := s.canvas.GetNodeFromDB(nodeName)
 		config := node.Configuration.Data()
 
 		val, exists := config["expression"]
-		if exists && val == "" {
-			return
-		}
-		if !exists {
+		if exists && val == expected {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
@@ -95,8 +94,6 @@ func (s *settingsAutoSaveSteps) assertExpressionFieldSavedAsEmpty(nodeName strin
 	node := s.canvas.GetNodeFromDB(nodeName)
 	config := node.Configuration.Data()
 	val, exists := config["expression"]
-	if !exists {
-		return
-	}
-	require.Equal(s.t, "", val, "expected expression to be empty in DB but got %v", val)
+	require.True(s.t, exists, "expected expression key to exist in DB config for node %s", nodeName)
+	require.Equal(s.t, expected, val, "expected expression=%q in DB for node %s but got %v", expected, nodeName, val)
 }
