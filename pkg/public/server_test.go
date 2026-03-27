@@ -114,7 +114,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	t.Run("OpenAPI JSON spec is accessible", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method: "GET",
-			path:   "/docs/superplane.swagger.json",
+			path:   "/api/docs/superplane.swagger.json",
 		})
 
 		require.Equal(t, 200, response.Code)
@@ -132,7 +132,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	t.Run("Swagger UI HTML is accessible", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method: "GET",
-			path:   "/docs",
+			path:   "/api/docs",
 		})
 
 		require.Equal(t, 200, response.Code)
@@ -147,7 +147,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	t.Run("OpenAPI spec is accessible via directory path", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method: "GET",
-			path:   "/docs/superplane.swagger.json",
+			path:   "/api/docs/superplane.swagger.json",
 		})
 
 		require.Equal(t, 200, response.Code)
@@ -162,7 +162,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	t.Run("Non-existent file returns 404", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method: "GET",
-			path:   "/docs/non-existent-file.json",
+			path:   "/api/docs/non-existent-file.json",
 		})
 
 		require.Equal(t, 404, response.Code)

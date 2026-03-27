@@ -362,11 +362,11 @@ func (s *Server) RegisterOpenAPIHandler() {
 		return
 	}
 
-	s.Router.HandleFunc(s.BasePath+"/docs", func(w http.ResponseWriter, r *http.Request) {
+	s.Router.HandleFunc("/api/docs", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html")
 	})
 
-	s.Router.HandleFunc(s.BasePath+"/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
+	s.Router.HandleFunc("/api/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json")
 	})
 
