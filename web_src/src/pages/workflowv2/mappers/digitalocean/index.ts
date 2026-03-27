@@ -21,7 +21,9 @@ import { putObjectMapper, PUT_OBJECT_STATE_REGISTRY } from "./put_object";
 import { deleteObjectMapper, DELETE_OBJECT_STATE_REGISTRY } from "./delete_object";
 import { copyObjectMapper, COPY_OBJECT_STATE_REGISTRY } from "./copy_object";
 import { createAppMapper } from "./create_app";
+import { createDatabaseClusterMapper } from "./create_database_cluster";
 import { getAppMapper } from "./get_app";
+import { getDatabaseClusterMapper } from "./get_database_cluster";
 import { deleteAppMapper } from "./delete_app";
 import { updateAppMapper } from "./update_app";
 import { buildActionStateRegistry } from "../utils";
@@ -49,7 +51,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteObject: deleteObjectMapper,
   copyObject: copyObjectMapper,
   createApp: createAppMapper,
+  createDatabaseCluster: createDatabaseClusterMapper,
   getApp: getAppMapper,
+  getDatabaseCluster: getDatabaseClusterMapper,
   deleteApp: deleteAppMapper,
   updateApp: updateAppMapper,
 };
@@ -79,7 +83,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteObject: DELETE_OBJECT_STATE_REGISTRY,
   copyObject: COPY_OBJECT_STATE_REGISTRY,
   createApp: buildActionStateRegistry("created"),
+  createDatabaseCluster: buildActionStateRegistry("created"),
   getApp: buildActionStateRegistry("fetched"),
+  getDatabaseCluster: buildActionStateRegistry("fetched"),
   deleteApp: buildActionStateRegistry("deleted"),
   updateApp: buildActionStateRegistry("updated"),
 };
