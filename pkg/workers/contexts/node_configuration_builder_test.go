@@ -1440,3 +1440,63 @@ func Test_NodeConfigurationBuilder_Config_ExistingExpressionsStillWork(t *testin
 	assert.Equal(t, "alice", result["root_user"])
 	assert.Equal(t, "ok", result["prev_status"])
 }
+
+func Test_NodeConfigurationBuilder_Config_ViaPreviousDepthRootPath(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	node1 := "node-1"
+	node2 := "node-2"
+	node3 := "node-3"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: node1,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: node2,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: node3,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: node1, TargetID: node2, Channel: "default"},
+			{SourceID: node2, TargetID: node3, Channel: "default"},
+		},
+	)
+
+	rootEventData := map[string]any{"origin": "root"}
+	bootstrapRoot := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", nil, map[string]any{"bootstrap": true})
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, node1, bootstrapRoot.ID, bootstrapRoot.ID, nil)
+	node1Config := map[string]any{"region": "us-east-1"}
+	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(node1Config)).Error)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node1, "default", &execution1.ID, rootEventData)
+	require.NoError(t, database.Conn().Model(execution1).Updates(map[string]any{"root_event_id": rootEvent.ID, "event_id": rootEvent.ID}).Error)
+
+	node2Data := map[string]any{"value": "node2"}
+	execution2 := support.CreateNextNodeExecution(t, canvas.ID, node2, rootEvent.ID, rootEvent.ID, &execution1.ID)
+	event2 := support.EmitCanvasEventForNodeWithData(t, canvas.ID, node2, "default", &execution2.ID, node2Data)
+
+	execution3 := support.CreateNextNodeExecution(t, canvas.ID, node3, rootEvent.ID, event2.ID, &execution2.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&execution3.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{node3: map[string]any{"value": "node3"}})
+
+	result, err := builder.Build(map[string]any{
+		"root_config_region": "{{ previous(3).config.region }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "us-east-1", result["root_config_region"])
+}

@@ -103,7 +103,9 @@ describe("getSuggestions", () => {
     expect(labels).toContain("image");
     expect(labels).toContain("sha");
   });
+});
 
+describe("getSuggestions config fields", () => {
   it("suggests config fields for $['NodeName'].config.", () => {
     const expression = '$["my-component"].config.';
     const suggestions = getSuggestions(expression, expression.length, {

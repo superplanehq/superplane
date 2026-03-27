@@ -2313,7 +2313,9 @@ export function WorkflowPageV2() {
         if (!latestExecution?.outputs) {
           const exampleOutput = componentMetadata?.exampleOutput;
           if (exampleOutput && typeof exampleOutput === "object") {
-            exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleOutput)
+              ? [...exampleOutput]
+              : ({ ...exampleOutput } as Record<string, unknown>);
           }
           return;
         }
@@ -2349,10 +2351,6 @@ export function WorkflowPageV2() {
           (obj as Record<string, unknown>).config = configData;
         }
       });
-
-      if (!exampleObj) {
-        return null;
-      }
 
       const getIncomingNodes = (targetId: string): string[] => {
         return workflowEdges

@@ -816,6 +816,13 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 	}
 
 	if payload := rootEvent.Data.Data(); payload != nil {
+		if rootEvent.ExecutionID != nil {
+			execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
+			if err == nil && execution != nil {
+				return injectConfig(payload, execution.Configuration.Data()), nil
+			}
+		}
+
 		return payload, nil
 	}
 
