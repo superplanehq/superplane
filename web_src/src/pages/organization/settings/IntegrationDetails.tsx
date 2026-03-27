@@ -343,7 +343,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                         domainId={organizationId}
                         domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={organizationId}
-                        appInstallationId={integration?.metadata?.id}
+                        integrationId={integration?.metadata?.id}
                       />
                     ))}
 

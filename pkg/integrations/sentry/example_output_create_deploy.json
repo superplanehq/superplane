@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "1234567",
+    "releaseVersion": "2026.03.25",
+    "environment": "production",
+    "name": "Deploy #42",
+    "url": "https://example.com/deploys/42",
+    "dateStarted": "2026-03-25T10:20:00.000Z",
+    "dateFinished": "2026-03-25T10:24:12.000Z",
+    "projects": [
+      "go-gin"
+    ]
+  },
+  "timestamp": "2026-03-25T10:24:12.000Z",
+  "type": "sentry.deploy"
+}

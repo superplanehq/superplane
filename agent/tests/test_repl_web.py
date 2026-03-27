@@ -7,7 +7,7 @@ import pytest
 from ai.models import CanvasQuestionRequest
 from ai.web import WebServer, WebServerConfig
 import repl.main as repl_main
-from repl.main import _parse_stream_event, _stream_repl_answer
+from repl.main import _parse_stream_event, _resolve_stream_url, _stream_repl_answer
 
 
 def _next_free_port() -> int:
@@ -19,6 +19,14 @@ def _next_free_port() -> int:
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
     event = _parse_stream_event(b'data: {"type":"model_delta","content":"hello"}\n')
     assert event == {"type": "model_delta", "content": "hello"}
+
+
+def test_resolve_stream_url_uses_agent_chat_stream_path() -> None:
+    assert _resolve_stream_url("http://agent:8090") == "http://agent:8090/agents/chats/local/stream"
+    assert (
+        _resolve_stream_url("http://agent:8090/agents/chats/chat-123/stream")
+        == "http://agent:8090/agents/chats/chat-123/stream"
+    )
 
 
 def test_stream_repl_answer_reads_sse_response_end_to_end(
@@ -73,7 +81,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
             server=False,
             test_repl_web_host="127.0.0.1",
             test_repl_web_port=8090,
-            repl_web_url="http://127.0.0.1:8090",
+            repl_web_url=None,
             start_repl_web=False,
             start_test_repl_web=False,
             model="anthropic:claude-sonnet-4-6",
@@ -95,12 +103,12 @@ def test_main_non_test_mode_mints_agent_chat_session(
         )
         return "ok"
 
-    def fake_create_agent_chat_session(
+    def fake_create_agent_chat(
         base_url: str,
         api_token: str,
         org_id: str,
         canvas_id: str,
-    ) -> str:
+    ) -> tuple[str, str]:
         session_calls.append(
             {
                 "base_url": base_url,
@@ -109,10 +117,10 @@ def test_main_non_test_mode_mints_agent_chat_session(
                 "canvas_id": canvas_id,
             }
         )
-        return "session-token-123"
+        return "session-token-123", "http://agent:8090/agents/chats/chat-123/stream"
 
     monkeypatch.setattr(argparse.ArgumentParser, "parse_args", fake_parse_args)
-    monkeypatch.setattr(repl_main, "_create_agent_chat_session", fake_create_agent_chat_session)
+    monkeypatch.setattr(repl_main, "_create_agent_chat", fake_create_agent_chat)
     monkeypatch.setattr(repl_main, "_stream_repl_answer", fake_stream_repl_answer)
 
     repl_main.main()
@@ -127,7 +135,7 @@ def test_main_non_test_mode_mints_agent_chat_session(
     ]
     assert stream_calls == [
         {
-            "web_url": "http://127.0.0.1:8090",
+            "web_url": "http://agent:8090/agents/chats/chat-123/stream",
             "canvas_id": "canvas-123",
             "model": "anthropic:claude-sonnet-4-6",
             "token": "session-token-123",

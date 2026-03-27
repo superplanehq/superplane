@@ -1,0 +1,9 @@
+{
+  "data": {
+    "id": "19436",
+    "name": "SuperPlane metric alert example",
+    "deleted": true
+  },
+  "timestamp": "2026-03-26T09:25:00Z",
+  "type": "sentry.alertDeleted"
+}

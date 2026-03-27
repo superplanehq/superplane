@@ -56,7 +56,7 @@ import {
   useCanvasChangeRequests,
   useTriggers,
   useCanvas,
-  useCanvasEvents,
+  useInfiniteCanvasEvents,
   useCanvasMemoryEntries,
   useDeleteCanvasMemoryEntry,
   useCanvasVersion,
@@ -748,7 +748,31 @@ export function WorkflowPageV2() {
   const showVersioningUI = !isVersioningDisabled;
   const hasEditableVersion =
     (!!activeCanvasVersionId && isViewingDraftVersion) || (isVersioningDisabled && !activeCanvasVersionId);
-  const { data: canvasEventsResponse } = useCanvasEvents(canvasId!, isViewingLiveVersion);
+  const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
+  const runsEventsData = useMemo(() => {
+    const pages = infiniteEventsQuery.data?.pages || [];
+    const seen = new Set<string>();
+    const events = pages
+      .flatMap((page) => page?.events || [])
+      .filter((e) => {
+        if (!e.id || seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+      });
+    const totalCount = pages[0]?.totalCount || 0;
+    return { events, totalCount };
+  }, [infiniteEventsQuery.data]);
+  const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
+  const componentIconMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of components) {
+      if (c.name && c.icon) map[c.name] = c.icon;
+    }
+    for (const t of triggers) {
+      if (t.name && t.icon) map[t.name] = t.icon;
+    }
+    return map;
+  }, [components, triggers]);
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -2269,7 +2293,9 @@ export function WorkflowPageV2() {
 
           const exampleData = triggerMetadata?.exampleData;
           if (exampleData && typeof exampleData === "object") {
-            exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleData)
+              ? [...exampleData]
+              : ({ ...exampleData } as Record<string, unknown>);
           }
           return;
         }
@@ -2290,7 +2316,9 @@ export function WorkflowPageV2() {
         if (!latestExecution?.outputs) {
           const exampleOutput = componentMetadata?.exampleOutput;
           if (exampleOutput && typeof exampleOutput === "object") {
-            exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleOutput)
+              ? [...exampleOutput]
+              : ({ ...exampleOutput } as Record<string, unknown>);
           }
           return;
         }
@@ -2310,9 +2338,24 @@ export function WorkflowPageV2() {
         }
       });
 
-      if (!exampleObj) {
-        return null;
-      }
+      // Inject config key into component nodes' example objects for autocomplete
+      chainNodeIds.forEach((chainNodeId) => {
+        const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
+        if (!chainNode || chainNode.type !== "TYPE_COMPONENT") return;
+
+        const obj = exampleObj[chainNodeId];
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
+
+        const latestExecution = visibleNodeExecutionsMap[chainNodeId]?.find(
+          (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
+        );
+        if ("config" in (obj as Record<string, unknown>)) return;
+
+        const configData = latestExecution?.configuration || chainNode.configuration;
+        if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
+          (obj as Record<string, unknown>).config = configData;
+        }
+      });
 
       const getIncomingNodes = (targetId: string): string[] => {
         return workflowEdges
@@ -2545,6 +2588,7 @@ export function WorkflowPageV2() {
       let configurationFields: ComponentsComponent["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
       let integrationName: string | undefined;
+      let integrationLabel: string | undefined;
       let blockName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
@@ -2557,12 +2601,18 @@ export function WorkflowPageV2() {
         displayLabel = componentMetadata?.label || displayLabel;
         blockName = node.component?.name;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
+        integrationLabel = integrationName
+          ? availableIntegrations.find((i) => i.name === integrationName)?.label
+          : undefined;
       } else if (node.type === "TYPE_TRIGGER") {
         const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
         blockName = node.trigger?.name;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
+        integrationLabel = integrationName
+          ? availableIntegrations.find((i) => i.name === integrationName)?.label
+          : undefined;
       } else if (node.type === "TYPE_WIDGET") {
         const widget = widgets.find((w) => w.name === node.widget?.name);
         if (widget) {
@@ -2580,6 +2630,7 @@ export function WorkflowPageV2() {
           },
           configurationFields,
           integrationName,
+          integrationLabel,
           blockName,
           integrationRef: node.integration,
         };
@@ -2592,6 +2643,7 @@ export function WorkflowPageV2() {
         configuration: node.configuration || {},
         configurationFields,
         integrationName,
+        integrationLabel,
         blockName,
         integrationRef: node.integration,
       };
@@ -4955,7 +5007,7 @@ export function WorkflowPageV2() {
 
   const [isResolvingErrors, setIsResolvingErrors] = useState(false);
 
-  const handleResolveExecutionErrors = useCallback(
+  const handleAcknowledgeErrors = useCallback(
     async (executionIds: string[]) => {
       if (!canvasId || executionIds.length === 0 || isResolvingErrors) {
         return;
@@ -4969,11 +5021,11 @@ export function WorkflowPageV2() {
           executionIds.forEach((id) => next.add(id));
           return next;
         });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.eventList(canvasId, 50) });
+        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
-        showSuccessToast("Execution errors resolved");
+        showSuccessToast("Errors acknowledged");
       } catch (_error) {
-        showErrorToast("Failed to resolve execution errors");
+        showErrorToast("Failed to acknowledge errors");
       } finally {
         setIsResolvingErrors(false);
       }
@@ -5677,11 +5729,21 @@ export function WorkflowPageV2() {
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvas?.spec?.nodes}
-          components={components}
-          triggers={triggers}
+          components={allComponents}
+          triggers={allTriggers}
           blueprints={blueprints}
           logEntries={logEntries}
-          onResolveExecutionErrors={canUpdateCanvas && isViewingLiveVersion ? handleResolveExecutionErrors : undefined}
+          runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
+          runsTotalCount={isViewingLiveVersion ? runsEventsData.totalCount : 0}
+          runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
+          runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
+          onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
+          runsNodes={canvas?.spec?.nodes || []}
+          runsComponentIconMap={componentIconMap}
+          runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
+          onRunNodeSelect={handleLogRunNodeSelect}
+          onRunExecutionSelect={handleLogRunExecutionSelect}
+          onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
           breadcrumbs={[
