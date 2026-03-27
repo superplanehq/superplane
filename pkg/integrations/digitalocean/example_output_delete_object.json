@@ -1,0 +1,9 @@
+{
+  "data": {
+    "bucket": "my-company-assets",
+    "filePath": "reports/daily.csv",
+    "deleted": true
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.deleted"
+}

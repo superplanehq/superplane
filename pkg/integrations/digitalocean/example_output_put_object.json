@@ -1,0 +1,18 @@
+{
+  "data": {
+    "bucket": "my-company-assets",
+    "filePath": "reports/daily.csv",
+    "endpoint": "https://my-company-assets.fra1.digitaloceanspaces.com/reports/daily.csv",
+    "eTag": "a1b2c3d4ef567890a1b2c3d4ef567890",
+    "contentType": "text/csv",
+    "size": "128 B",
+    "metadata": {
+      "uploaded-by": "pipeline"
+    },
+    "tags": {
+      "env": "production"
+    }
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.uploaded"
+}

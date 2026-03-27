@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1347,6 +1350,12 @@ func NewSpacesClient(httpCtx core.HTTPContext, ctx core.IntegrationContext, regi
 // If bucket is empty, a region-level request is made (e.g. ListBuckets).
 // queryString is already encoded, e.g. "" or "tagging=".
 func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string) (*http.Response, error) {
+	return c.execSpacesRequestFull(method, bucket, key, queryString, nil, nil)
+}
+
+// execSpacesRequestFull signs and executes an HTTP request to the Spaces S3-compatible API
+// with optional body and extra headers (e.g. Content-Type, x-amz-acl, x-amz-tagging).
+func (c *SpacesClient) execSpacesRequestFull(method, bucket, key, queryString string, body []byte, extraHeaders map[string]string) (*http.Response, error) {
 	var host, endpoint string
 	if bucket == "" {
 		host = fmt.Sprintf("%s.digitaloceanspaces.com", c.Region)
@@ -1364,11 +1373,48 @@ func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string
 	dateStamp := now.Format("20060102")
 	amzDate := now.Format("20060102T150405Z")
 
-	payloadHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	var payloadHash string
+	if len(body) > 0 {
+		h := sha256.Sum256(body)
+		payloadHash = fmt.Sprintf("%x", h)
+	} else {
+		payloadHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	}
 
-	canonicalHeaders := fmt.Sprintf("host:%s\nx-amz-content-sha256:%s\nx-amz-date:%s\n",
-		host, payloadHash, amzDate)
-	signedHeaders := "host;x-amz-content-sha256;x-amz-date"
+	// SigV4 requires that any headers included in the request (especially x-amz-*)
+	// that are part of the signature be present in both CanonicalHeaders and SignedHeaders.
+	// We sign all headers we set on the request to avoid SignatureDoesNotMatch errors.
+	headersToSign := map[string]string{
+		"host":                 host,
+		"x-amz-content-sha256": payloadHash,
+		"x-amz-date":           amzDate,
+	}
+	for k, v := range extraHeaders {
+		lower := strings.ToLower(strings.TrimSpace(k))
+		if lower == "" {
+			continue
+		}
+		// Per SigV4 canonicalization rules, leading/trailing spaces are trimmed and
+		// sequential spaces are collapsed to a single space.
+		cleanValue := strings.Join(strings.Fields(v), " ")
+		headersToSign[lower] = cleanValue
+	}
+
+	headerKeys := make([]string, 0, len(headersToSign))
+	for k := range headersToSign {
+		headerKeys = append(headerKeys, k)
+	}
+	sort.Strings(headerKeys)
+
+	var canonicalHeadersBuilder strings.Builder
+	for _, k := range headerKeys {
+		canonicalHeadersBuilder.WriteString(k)
+		canonicalHeadersBuilder.WriteString(":")
+		canonicalHeadersBuilder.WriteString(headersToSign[k])
+		canonicalHeadersBuilder.WriteString("\n")
+	}
+	canonicalHeaders := canonicalHeadersBuilder.String()
+	signedHeaders := strings.Join(headerKeys, ";")
 
 	path := "/"
 	if key != "" {
@@ -1410,15 +1456,26 @@ func (c *SpacesClient) execSpacesRequest(method, bucket, key, queryString string
 		c.AccessKey, credentialScope, signedHeaders, signature,
 	)
 
-	req, err := http.NewRequest(method, endpoint, nil)
+	var bodyReader io.Reader
+	if len(body) > 0 {
+		bodyReader = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequest(method, endpoint, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
 	}
 
-	req.Header.Set("Host", host)
-	req.Header.Set("x-amz-date", amzDate)
-	req.Header.Set("x-amz-content-sha256", payloadHash)
+	// Set all headers that were signed.
+	// (Go will canonicalize the header names on the wire; signing used lowercase names.)
+	for k, v := range headersToSign {
+		req.Header.Set(k, v)
+	}
 	req.Header.Set("Authorization", authHeader)
+
+	if len(body) > 0 {
+		req.Header.Set("Content-Length", strconv.Itoa(len(body)))
+	}
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -1611,6 +1668,172 @@ func isReadableContentType(contentType string) bool {
 		}
 	}
 	return false
+}
+
+// PutObject uploads an object to a Spaces bucket.
+// It returns the ETag of the uploaded object.
+func (c *SpacesClient) PutObject(bucket, key, body, contentType, acl string, metadata, tags map[string]string) (string, error) {
+	extraHeaders := map[string]string{}
+
+	if contentType != "" {
+		extraHeaders["Content-Type"] = contentType
+	}
+
+	if acl != "" {
+		extraHeaders["x-amz-acl"] = acl
+	}
+
+	if len(tags) > 0 {
+		parts := make([]string, 0, len(tags))
+		for k, v := range tags {
+			parts = append(parts, url.QueryEscape(k)+"="+url.QueryEscape(v))
+		}
+		extraHeaders["x-amz-tagging"] = strings.Join(parts, "&")
+	}
+
+	for k, v := range metadata {
+		extraHeaders["x-amz-meta-"+k] = v
+	}
+
+	res, err := c.execSpacesRequestFull(http.MethodPut, bucket, key, "", []byte(body), extraHeaders)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	return strings.Trim(res.Header.Get("ETag"), `"`), nil
+}
+
+// contentTypeFromPath detects the MIME type from a file path extension.
+// Falls back to application/octet-stream for unknown or missing extensions.
+func contentTypeFromPath(filePath string) string {
+	if strings.Contains(filePath, "{{") {
+		return "application/octet-stream"
+	}
+
+	ext := strings.ToLower(path.Ext(filePath))
+	switch ext {
+	case ".json":
+		return "application/json"
+	case ".csv":
+		return "text/csv"
+	case ".txt":
+		return "text/plain"
+	case ".yaml", ".yml":
+		return "application/yaml"
+	case ".xml":
+		return "application/xml"
+	case ".html", ".htm":
+		return "text/html"
+	case ".md":
+		return "text/markdown"
+	case ".toml":
+		return "application/toml"
+	case ".js":
+		return "application/javascript"
+	case ".css":
+		return "text/css"
+	case ".pdf":
+		return "application/pdf"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".svg":
+		return "image/svg+xml"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+// CopyObject copies an object from one location to another within Spaces.
+// The x-amz-copy-source header is included in the signed headers as required by AWS SigV4.
+func (c *SpacesClient) CopyObject(sourceBucket, sourceKey, destBucket, destKey, acl string) (string, error) {
+	copySource := "/" + sourceBucket + "/" + sourceKey
+
+	extraHeaders := map[string]string{
+		"x-amz-copy-source": copySource,
+	}
+	if acl != "" {
+		extraHeaders["x-amz-acl"] = acl
+	}
+
+	res, err := c.execSpacesRequestFull(http.MethodPut, destBucket, destKey, "", nil, extraHeaders)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading copy object response: %w", err)
+	}
+
+	// The S3 CopyObject API can return HTTP 200 with an <Error> XML body.
+	var apiError struct {
+		Code      string `xml:"Code"`
+		Message   string `xml:"Message"`
+		RequestID string `xml:"RequestId"`
+		HostID    string `xml:"HostId"`
+	}
+	if err := xml.Unmarshal(bodyBytes, &apiError); err == nil && strings.TrimSpace(apiError.Code) != "" {
+		if strings.TrimSpace(apiError.Message) != "" {
+			return "", fmt.Errorf("copy object failed: %s: %s", apiError.Code, apiError.Message)
+		}
+		return "", fmt.Errorf("copy object failed: %s", apiError.Code)
+	}
+
+	var result struct {
+		ETag string `xml:"ETag"`
+	}
+	if err := xml.Unmarshal(bodyBytes, &result); err != nil {
+		return "", fmt.Errorf("error parsing copy object response: %w: %s", err, string(bodyBytes))
+	}
+
+	eTag := strings.TrimSpace(strings.Trim(result.ETag, `"`))
+	if eTag == "" {
+		return "", fmt.Errorf("copy object response missing ETag: %s", string(bodyBytes))
+	}
+
+	return eTag, nil
+}
+
+// DeleteObject removes an object from a Spaces bucket.
+// The Spaces API always returns 204 No Content, even if the object does not exist.
+func (c *SpacesClient) DeleteObject(bucket, key string) error {
+	res, err := c.execSpacesRequest(http.MethodDelete, bucket, key, "")
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		bodyBytes, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("request got %d code: %s", res.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}
+
+// toStringMap converts map[string]any to map[string]string.
+func toStringMap(m map[string]any) map[string]string {
+	result := make(map[string]string, len(m))
+	for k, v := range m {
+		result[k] = fmt.Sprintf("%v", v)
+	}
+	return result
 }
 
 // hmacSHA256 computes HMAC-SHA256 of data with key.
