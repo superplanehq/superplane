@@ -1262,7 +1262,7 @@ const file_secrets_proto_rawDesc = "" +
 	"\x10UpdateSecretName\x12+.Superplane.Secrets.UpdateSecretNameRequest\x1a,.Superplane.Secrets.UpdateSecretNameResponse\"\x98\x01\x92Ai\n" +
 	"\x06Secret\x12\x12Update secret name\x1aKUpdates only the name of the secret. Name must be unique within the domain.\x82\xd3\xe4\x93\x02&:\x01*2!/api/v1/secrets/{id_or_name}/nameB\xc5\x01\x92A\x8a\x01\x12`\n" +
 	"\x16Superplane Secrets API\x12\x1aAPI for Superplane Secrets\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/secretsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/secretsb\x06proto3"
 
 var (
 	file_secrets_proto_rawDescOnce sync.Once

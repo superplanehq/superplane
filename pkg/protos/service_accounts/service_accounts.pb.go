@@ -734,7 +734,7 @@ const file_service_accounts_proto_rawDesc = "" +
 	"\x1dRegenerateServiceAccountToken\x12@.Superplane.ServiceAccounts.RegenerateServiceAccountTokenRequest\x1aA.Superplane.ServiceAccounts.RegenerateServiceAccountTokenResponse\"\x95\x01\x92Ad\n" +
 	"\x0fServiceAccounts\x12 Regenerate service account token\x1a/Regenerates the API token for a service account\x82\xd3\xe4\x93\x02(:\x01*\"#/api/v1/service-accounts/{id}/tokenB\xe0\x01\x92A\x9c\x01\x12r\n" +
 	"\x1fSuperplane Service Accounts API\x12#API for Superplane Service Accounts\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ>github.com/superplanehq/superplane/pkg/protos/service_accountsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ>github.com/superplanehq/superplane/pkg/protos/service_accountsb\x06proto3"
 
 var (
 	file_service_accounts_proto_rawDescOnce sync.Once
