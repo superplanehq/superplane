@@ -124,9 +124,16 @@ services:
       IN_DOCKER: "1"
       APP_PORT: ${APP_PORT:-8000}
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
-      REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
       INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
       INTERNAL_GRPC_PORT: ${INTERNAL_GRPC_PORT:-50061}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-agents_dev}
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
+      REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
     command: >-
       bash -lc "uv run python -m uvicorn ai.web:create_app
