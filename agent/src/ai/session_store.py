@@ -365,7 +365,16 @@ class SessionStore:
 
     def load_agent_chat_message_history(self, chat_id: str) -> list[ModelMessage]:
         records = self.list_agent_chat_message_records(chat_id)
-        return [_deserialize_model_message(record.message) for record in records]
+        history: list[ModelMessage] = []
+        for record in records:
+            try:
+                history.append(_deserialize_model_message(record.message))
+            except Exception as error:
+                print(
+                    f"[agent] failed to deserialize chat history record chat_id={chat_id} message_id={record.id}: {error}",
+                    flush=True,
+                )
+        return history
 
     def create_agent_chat_model_message(self, chat_id: str, message: ModelMessage) -> StoredAgentChatMessageRecord:
         now = _utcnow()

@@ -171,6 +171,49 @@ def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> No
     assert messages[0].content == "What is in my canvas?"
 
 
+def test_load_agent_chat_message_history_skips_undeserializable_records(monkeypatch) -> None:
+    now = datetime.now(UTC)
+    store = _build_store()
+    records = [
+        StoredAgentChatMessageRecord(
+            id="0f57a7f6-e181-4482-8637-4accf779b324",
+            chat_id="chat-123",
+            message_index=0,
+            message={
+                "kind": "request",
+                "parts": [
+                    {
+                        "content": "What is in my canvas?",
+                        "part_kind": "user-prompt",
+                        "timestamp": "2026-03-27T00:01:11.361230Z",
+                    }
+                ],
+                "run_id": "run-1",
+                "metadata": None,
+                "timestamp": "2026-03-27T00:01:11.361347Z",
+                "instructions": None,
+            },
+            created_at=now,
+            updated_at=now,
+        ),
+        StoredAgentChatMessageRecord(
+            id="857ca69d-f77f-4cbc-ba85-47a49ab75e3d",
+            chat_id="chat-123",
+            message_index=1,
+            message={"kind": "broken"},
+            created_at=now,
+            updated_at=now,
+        ),
+    ]
+
+    monkeypatch.setattr(store, "list_agent_chat_message_records", lambda chat_id: records)
+
+    history = store.load_agent_chat_message_history("chat-123")
+
+    assert len(history) == 1
+    assert history[0].parts[0].content == "What is in my canvas?"
+
+
 def test_connect_reuses_open_connection_until_closed(monkeypatch) -> None:
     store = _build_store()
     created_connections: list[object] = []
