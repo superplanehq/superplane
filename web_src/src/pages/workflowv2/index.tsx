@@ -2583,6 +2583,7 @@ export function WorkflowPageV2() {
       let configurationFields: ComponentsComponent["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
       let integrationName: string | undefined;
+      let integrationLabel: string | undefined;
       let blockName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
@@ -2595,12 +2596,18 @@ export function WorkflowPageV2() {
         displayLabel = componentMetadata?.label || displayLabel;
         blockName = node.component?.name;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
+        integrationLabel = integrationName
+          ? availableIntegrations.find((i) => i.name === integrationName)?.label
+          : undefined;
       } else if (node.type === "TYPE_TRIGGER") {
         const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
         blockName = node.trigger?.name;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
+        integrationLabel = integrationName
+          ? availableIntegrations.find((i) => i.name === integrationName)?.label
+          : undefined;
       } else if (node.type === "TYPE_WIDGET") {
         const widget = widgets.find((w) => w.name === node.widget?.name);
         if (widget) {
@@ -2618,6 +2625,7 @@ export function WorkflowPageV2() {
           },
           configurationFields,
           integrationName,
+          integrationLabel,
           blockName,
           integrationRef: node.integration,
         };
@@ -2630,6 +2638,7 @@ export function WorkflowPageV2() {
         configuration: node.configuration || {},
         configurationFields,
         integrationName,
+        integrationLabel,
         blockName,
         integrationRef: node.integration,
       };
@@ -5712,8 +5721,8 @@ export function WorkflowPageV2() {
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvas?.spec?.nodes}
-          components={components}
-          triggers={triggers}
+          components={allComponents}
+          triggers={allTriggers}
           blueprints={blueprints}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
