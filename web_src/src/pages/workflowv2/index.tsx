@@ -2348,6 +2348,8 @@ export function WorkflowPageV2() {
         const latestExecution = visibleNodeExecutionsMap[chainNodeId]?.find(
           (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
         );
+        if ("config" in (obj as Record<string, unknown>)) return;
+
         const configData = latestExecution?.configuration || chainNode.configuration;
         if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
           (obj as Record<string, unknown>).config = configData;
