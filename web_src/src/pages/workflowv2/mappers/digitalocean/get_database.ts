@@ -14,7 +14,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { DatabaseNodeMetadata } from "./types";
+import type { DatabaseNodeMetadata, GetDatabaseConfiguration } from "./types";
 
 export const getDatabaseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -68,12 +68,18 @@ export const getDatabaseMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as DatabaseNodeMetadata | undefined;
+  const configuration = node.configuration as GetDatabaseConfiguration;
 
   if (nodeMetadata?.databaseName) {
     metadata.push({ icon: "database", label: nodeMetadata.databaseName });
+  } else if (configuration?.database) {
+    metadata.push({ icon: "info", label: `Database: ${configuration.database}` });
   }
+
   if (nodeMetadata?.databaseClusterName) {
     metadata.push({ icon: "server", label: nodeMetadata.databaseClusterName });
+  } else if (configuration?.databaseCluster) {
+    metadata.push({ icon: "info", label: `Cluster ID: ${configuration.databaseCluster}` });
   }
 
   return metadata;

@@ -14,7 +14,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import type { DatabaseNodeMetadata } from "./types";
+import type { DatabaseNodeMetadata, GetClusterConfiguration } from "./types";
 
 const CONFIG_LABELS: Record<string, string> = {
   autovacuum_analyze_scale_factor: "Analyze Scale",
@@ -79,9 +79,12 @@ export const getClusterConfigurationMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as DatabaseNodeMetadata | undefined;
+  const configuration = node.configuration as GetClusterConfiguration;
 
   if (nodeMetadata?.databaseClusterName) {
     metadata.push({ icon: "server", label: nodeMetadata.databaseClusterName });
+  } else if (configuration?.databaseCluster) {
+    metadata.push({ icon: "info", label: `Cluster ID: ${configuration.databaseCluster}` });
   }
 
   return metadata;
