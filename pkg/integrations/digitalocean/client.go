@@ -2374,6 +2374,38 @@ func (c *Client) ListDatabasesByEngine(engine string) ([]Database, error) {
 	return response.Databases, nil
 }
 
+type DatabaseCluster struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Engine string `json:"engine,omitempty"`
+}
+
+type ClusterDatabase struct {
+	Name string `json:"name"`
+}
+
+type CreateClusterDatabaseRequest struct {
+	Name string `json:"name"`
+}
+
+func (c *Client) ListDatabaseClusters() ([]DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []DatabaseCluster `json:"databases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
+}
+
 // KnowledgeBase represents a DigitalOcean Gradient AI knowledge base
 type KnowledgeBase struct {
 	UUID               string    `json:"uuid"`
@@ -2406,6 +2438,24 @@ func (c *Client) GetKnowledgeBase(kbUUID string) (*KnowledgeBase, error) {
 	}
 
 	return &response.KnowledgeBase, nil
+}
+
+func (c *Client) ListClusterDatabases(clusterID string) ([]ClusterDatabase, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []ClusterDatabase `json:"dbs"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
 }
 
 // KBSpacesDataSource defines a Spaces bucket data source for a knowledge base
@@ -2472,6 +2522,30 @@ func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*Knowledge
 	}
 
 	return &response.KnowledgeBase, nil
+}
+
+func (c *Client) CreateClusterDatabase(clusterID string, req CreateClusterDatabaseRequest) (*ClusterDatabase, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database ClusterDatabase `json:"db"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
 }
 
 // IndexJob represents a DigitalOcean Gradient AI knowledge base indexing job
@@ -2619,6 +2693,12 @@ func (c *Client) DeleteDatabase(databaseID string) error {
 	return err
 }
 
+func (c *Client) DeleteClusterDatabase(clusterID, name string) error {
+	url := fmt.Sprintf("%s/databases/%s/dbs/%s", c.BaseURL, clusterID, url.PathEscape(name))
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
 // EvaluationTestCase represents a Gradient AI evaluation test case
 type EvaluationTestCase struct {
 	UUID          string `json:"test_case_uuid"`
@@ -2760,7 +2840,6 @@ func (c *Client) GetEvaluationRunResults(runUUID string) (*EvaluationRunResults,
 
 	return &response, nil
 }
-
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
