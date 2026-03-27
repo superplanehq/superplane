@@ -4748,6 +4748,7 @@ export function WorkflowPageV2() {
       return;
     }
 
+    setTopViewMode("canvas");
     setSuppressUnpublishedChangesBadge(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;

@@ -200,6 +200,7 @@ export function CanvasSettingsView({
       approverValidation.itemErrors.some((item) => !!item.type || !!item.userId || !!item.roleName),
     [approverValidation.formErrors.length, approverValidation.itemErrors],
   );
+  const hasEveryoneApprover = useMemo(() => approvers.some((a) => a.type === "TYPE_ANYONE"), [approvers]);
 
   const handleSave = async () => {
     if (!canUpdateCanvas) {
@@ -353,34 +354,30 @@ export function CanvasSettingsView({
 
               <div className="space-y-3">
                 {approvers.map((approver, index) => (
-                  <div key={`approver-${index}`} className="rounded-md bg-slate-50/70 p-3">
-                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-start">
-                      <div className="relative pb-4">
-                        <Label className="text-xs text-gray-600">Request approval from</Label>
+                  <div key={`approver-${index}`} className="border-b border-slate-950/10 py-3">
+                    <div className="grid gap-3 md:grid-cols-[auto_1fr_auto] md:items-start">
+                      <div className="w-full md:w-[12rem] md:justify-self-start">
                         <Select
                           value={approver.type}
                           disabled={!canUpdateCanvas}
                           onValueChange={(value) => updateApproverType(index, value as ChangeRequestApproverType)}
                         >
-                          <SelectTrigger className="mt-1 h-9 w-full">
+                          <SelectTrigger className="h-9 w-full" aria-label="Request approval from">
                             <SelectValue placeholder="Select approver type" />
                           </SelectTrigger>
                           <SelectContent className="max-h-60">
-                            <SelectItem value="TYPE_ANYONE">Any user</SelectItem>
+                            <SelectItem value="TYPE_ANYONE">Everyone</SelectItem>
                             <SelectItem value="TYPE_USER">Specific user</SelectItem>
                             <SelectItem value="TYPE_ROLE">Role</SelectItem>
                           </SelectContent>
                         </Select>
                         {approverValidation.itemErrors[index]?.type ? (
-                          <p className="pointer-events-none absolute bottom-0 left-0 text-xs text-red-600">
-                            {approverValidation.itemErrors[index]?.type}
-                          </p>
+                          <p className="mt-2 text-xs text-red-600">{approverValidation.itemErrors[index]?.type}</p>
                         ) : null}
                       </div>
 
                       {approver.type === "TYPE_USER" ? (
-                        <div className="relative pb-4">
-                          <Label className="text-xs text-gray-600">User</Label>
+                        <div>
                           <Select
                             value={approver.userId || EMPTY_SELECT_VALUE}
                             disabled={!canUpdateCanvas}
@@ -388,11 +385,11 @@ export function CanvasSettingsView({
                               updateApproverUser(index, value === EMPTY_SELECT_VALUE ? "" : value)
                             }
                           >
-                            <SelectTrigger className="mt-1 h-9 w-full">
-                              <SelectValue placeholder="Select a user" />
+                            <SelectTrigger className="h-9 w-full" aria-label="User">
+                              <SelectValue placeholder="Select a user…" />
                             </SelectTrigger>
                             <SelectContent className="max-h-60">
-                              <SelectItem value={EMPTY_SELECT_VALUE}>Select a user</SelectItem>
+                              <SelectItem value={EMPTY_SELECT_VALUE}>Select a user…</SelectItem>
                               {availableUsers.map((user) => (
                                 <SelectItem key={user.id} value={user.id}>
                                   {user.name}
@@ -401,14 +398,11 @@ export function CanvasSettingsView({
                             </SelectContent>
                           </Select>
                           {approverValidation.itemErrors[index]?.userId ? (
-                            <p className="pointer-events-none absolute bottom-0 left-0 text-xs text-red-600">
-                              {approverValidation.itemErrors[index]?.userId}
-                            </p>
+                            <p className="mt-2 text-xs text-red-600">{approverValidation.itemErrors[index]?.userId}</p>
                           ) : null}
                         </div>
                       ) : approver.type === "TYPE_ROLE" ? (
-                        <div className="relative pb-4">
-                          <Label className="text-xs text-gray-600">Role</Label>
+                        <div>
                           <Select
                             value={approver.roleName || EMPTY_SELECT_VALUE}
                             disabled={!canUpdateCanvas}
@@ -416,11 +410,11 @@ export function CanvasSettingsView({
                               updateApproverRole(index, value === EMPTY_SELECT_VALUE ? "" : value)
                             }
                           >
-                            <SelectTrigger className="mt-1 h-9 w-full">
-                              <SelectValue placeholder="Select a role" />
+                            <SelectTrigger className="h-9 w-full" aria-label="Role">
+                              <SelectValue placeholder="Select a role…" />
                             </SelectTrigger>
                             <SelectContent className="max-h-60">
-                              <SelectItem value={EMPTY_SELECT_VALUE}>Select a role</SelectItem>
+                              <SelectItem value={EMPTY_SELECT_VALUE}>Select a role…</SelectItem>
                               {availableRoles.map((role) => (
                                 <SelectItem key={role.name} value={role.name}>
                                   {role.label}
@@ -429,20 +423,20 @@ export function CanvasSettingsView({
                             </SelectContent>
                           </Select>
                           {approverValidation.itemErrors[index]?.roleName ? (
-                            <p className="pointer-events-none absolute bottom-0 left-0 text-xs text-red-600">
+                            <p className="mt-2 text-xs text-red-600">
                               {approverValidation.itemErrors[index]?.roleName}
                             </p>
                           ) : null}
                         </div>
                       ) : (
-                        <div className="text-xs text-gray-500 md:pb-2">Any authenticated user can approve.</div>
+                        <div className="self-center text-xs text-gray-500">Any authenticated user can approve.</div>
                       )}
 
-                      <div className="flex h-full items-center gap-2">
+                      <div className="flex h-full items-start gap-2">
                         <Button
                           type="button"
                           variant="outline"
-                          disabled={!canUpdateCanvas}
+                          disabled={!canUpdateCanvas || approvers.length <= 1}
                           onClick={() => removeApprover(index)}
                         >
                           Remove
@@ -453,7 +447,12 @@ export function CanvasSettingsView({
                 ))}
               </div>
 
-              <Button type="button" variant="outline" disabled={!canUpdateCanvas} onClick={addApprover}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!canUpdateCanvas || hasEveryoneApprover}
+                onClick={addApprover}
+              >
                 Add Approver
               </Button>
             </div>
