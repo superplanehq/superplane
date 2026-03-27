@@ -212,7 +212,7 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 
 	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
 	s.session.Click(q.Locator(`[data-testid="field-type-select"]`))
-	s.session.Click(q.Locator(`div[role="option"]:has-text("Any user")`))
+	s.session.Click(q.Locator(`div[role="option"]:has-text("Everyone")`))
 
 	if err := typeSelects.Nth(1).Click(); err != nil {
 		s.t.Fatalf("clicking second approver type select: %v", err)
@@ -334,7 +334,7 @@ func (s *ApprovalSteps) approveAnyoneRequirement() {
 	s.canvas.StartEditingNode("Approval")
 	s.session.AssertVisible(q.Locator(`button:has-text("Approve")`))
 
-	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Any user"))`)
+	item := s.session.Page().Locator(`[data-slot="item"]:has([data-slot="item-title"]:has-text("Everyone"))`)
 	approveButton := item.Locator(`button:has-text("Approve")`).First()
 	count, err := approveButton.Count()
 	if err != nil {
