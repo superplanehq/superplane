@@ -65,12 +65,16 @@ Emits the created DNS record on the default channel. If the zone is not found, t
 
 ```json
 {
-  "content": "192.0.2.1",
-  "id": "record_abc123",
-  "name": "api.example.com",
-  "proxied": false,
-  "ttl": 1,
-  "type": "A"
+  "data": {
+    "content": "192.0.2.1",
+    "id": "record_abc123",
+    "name": "api.example.com",
+    "proxied": false,
+    "ttl": 1,
+    "type": "A"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.dnsRecord"
 }
 ```
 
@@ -98,16 +102,20 @@ Emits the deleted DNS record (zoneId, recordId, record) on the default channel. 
 
 ```json
 {
-  "record": {
-    "content": "example.com",
-    "id": "record_abc123",
-    "name": "app.example.com",
-    "proxied": false,
-    "ttl": 360,
-    "type": "CNAME"
+  "data": {
+    "record": {
+      "content": "example.com",
+      "id": "record_abc123",
+      "name": "app.example.com",
+      "proxied": false,
+      "ttl": 360,
+      "type": "CNAME"
+    },
+    "recordId": "record_abc123",
+    "zoneId": "zone_xyz789"
   },
-  "recordId": "record_abc123",
-  "zoneId": "zone_xyz789"
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.dnsRecord"
 }
 ```
 
@@ -138,16 +146,20 @@ Emits the updated DNS record (id, type, name, content, proxied, ttl) on the defa
 
 ```json
 {
-  "record": {
-    "content": "203.0.113.10",
-    "id": "record_abc123",
-    "name": "app.example.com",
-    "proxied": true,
-    "ttl": 1,
-    "type": "A"
+  "data": {
+    "record": {
+      "content": "203.0.113.10",
+      "id": "record_abc123",
+      "name": "app.example.com",
+      "proxied": true,
+      "ttl": 1,
+      "type": "A"
+    },
+    "recordId": "record_abc123",
+    "zoneId": "zone_xyz789"
   },
-  "recordId": "record_abc123",
-  "zoneId": "zone_xyz789"
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.dnsRecord"
 }
 ```
 
@@ -185,25 +197,29 @@ Returns the updated redirect rule with all current configuration.
 
 ```json
 {
-  "enabled": true,
-  "rule": {
-    "action": "redirect",
-    "action_parameters": {
-      "from_value": {
-        "preserve_query_string": false,
-        "status_code": 301,
-        "target_url": {
-          "value": "https://example.com/new-path"
-        }
-      }
-    },
-    "description": "Redirect old path to new path",
+  "data": {
     "enabled": true,
-    "expression": "http.request.uri.path eq \"/old-path\"",
-    "id": "rule_abc123"
+    "rule": {
+      "action": "redirect",
+      "action_parameters": {
+        "from_value": {
+          "preserve_query_string": false,
+          "status_code": 301,
+          "target_url": {
+            "value": "https://example.com/new-path"
+          }
+        }
+      },
+      "description": "Redirect old path to new path",
+      "enabled": true,
+      "expression": "http.request.uri.path eq \"/old-path\"",
+      "id": "rule_abc123"
+    },
+    "ruleId": "rule_abc123",
+    "zoneId": "zone_xyz789"
   },
-  "ruleId": "rule_abc123",
-  "zoneId": "zone_xyz789"
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.redirectRule"
 }
 ```
 
