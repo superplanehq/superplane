@@ -39,6 +39,7 @@ export interface ChainItemData {
   tabData?: {
     current?: Record<string, any>;
     payload?: any;
+    configuration?: any;
   };
 }
 
@@ -180,7 +181,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   onToggleOpen,
   getExecutionState,
 }) => {
-  const [activeTab, setActiveTab] = useState<"current" | "payload">("current");
+  const [activeTab, setActiveTab] = useState<"current" | "payload" | "configuration">("current");
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
@@ -236,6 +237,10 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const EventBadgeColor = eventStateStyle.badgeColor;
   const payloadPreview = useMemo(
     () => (item.tabData ? escapeStringValuesForJsonView(item.tabData.payload) : undefined),
+    [item.tabData],
+  );
+  const configurationPreview = useMemo(
+    () => (item.tabData?.configuration ? escapeStringValuesForJsonView(item.tabData.configuration) : undefined),
     [item.tabData],
   );
   const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
@@ -455,6 +460,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 >
                   {React.createElement(resolveIcon("code"), { size: 16 })}
                   Payload
+                </button>
+              )}
+              {item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
+                <button
+                  onClick={() => setActiveTab("configuration")}
+                  className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
+                    activeTab === "configuration"
+                      ? "text-gray-800 border-b-1 border-gray-800"
+                      : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {React.createElement(resolveIcon("settings"), { size: 16 })}
+                  Config
                 </button>
               )}
             </div>
@@ -1012,6 +1030,50 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 <div className="h-50 overflow-auto rounded -mt-2">
                   <JsonView
                     value={payloadPreview as Record<string, unknown>}
+                    style={{
+                      fontSize: "12px",
+                      fontFamily:
+                        'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+                      backgroundColor: "#ffffff",
+                      color: "#24292e",
+                      padding: "8px",
+                    }}
+                    className="json-viewer-hide-types"
+                    displayObjectSize={false}
+                    enableClipboard={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "configuration" && configurationPreview && (
+              <div className="w-full">
+                <div className="flex items-center justify-between mb-2 relative">
+                  <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
+                    <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
+                      <button
+                        onClick={() => copyPayloadToClipboard(item.tabData!.configuration)}
+                        className="p-1 rounded text-gray-500 hover:text-gray-800"
+                      >
+                        {React.createElement(resolveIcon("copy"), { size: 14 })}
+                      </button>
+                    </SimpleTooltip>
+                    <SimpleTooltip content="Configuration">
+                      <button
+                        onClick={() => {
+                          setModalPayload(item.tabData!.configuration);
+                          setIsPayloadModalOpen(true);
+                        }}
+                        className="p-1 text-gray-500 hover:text-gray-800"
+                      >
+                        {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                      </button>
+                    </SimpleTooltip>
+                  </div>
+                </div>
+                <div className="h-50 overflow-auto rounded -mt-2">
+                  <JsonView
+                    value={configurationPreview as Record<string, unknown>}
                     style={{
                       fontSize: "12px",
                       fontFamily:
