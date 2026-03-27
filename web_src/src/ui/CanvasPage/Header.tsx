@@ -7,16 +7,13 @@ import {
   Copy,
   Download,
   ChevronDown,
-  LogOut,
   Palette,
   Plus,
   RefreshCw,
   RotateCcw,
   Undo2,
   Pencil,
-  Rocket,
 } from "lucide-react";
-import { CliCommandsPopover } from "./CliCommandsPopover";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { Switch } from "../switch";
@@ -66,9 +63,8 @@ interface HeaderProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
-  canvasId?: string;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
   memoryItemCount?: number;
@@ -77,9 +73,6 @@ interface HeaderProps {
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
   /** When &gt; 0 (unpublished draft diff items), shown as "Propose Change (n)" in version edit mode. */
   unpublishedDraftChangeCount?: number;
   lastSavedAt?: Date | string | null;
@@ -247,7 +240,6 @@ export function Header({
   autoSaveDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
-  canvasId,
   onExportYamlCopy,
   onExportYamlDownload,
   memoryItemCount,
@@ -258,9 +250,6 @@ export function Header({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount = 0,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
@@ -435,7 +424,7 @@ export function Header({
 
           <div className="justify-self-center">
             {topViewMode && onTopViewModeChange && (
-              <div className="flex items-center rounded-md border border-gray-300 p-0.5 text-[13px] font-medium">
+              <div className="flex items-center rounded-md border border-slate-950/15 p-0.5 text-[13px] font-medium">
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("canvas")}
@@ -454,7 +443,15 @@ export function Header({
                 >
                   YAML
                 </button>
-                <CliCommandsPopover canvasId={canvasId} organizationId={organizationId} />
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("cli")}
+                  className={`rounded-sm px-2 py-0.5 ${
+                    topViewMode === "cli" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  CLI
+                </button>
                 <button
                   type="button"
                   onClick={() => onTopViewModeChange("memory")}
@@ -655,36 +652,12 @@ export function Header({
                     type="button"
                     variant="default"
                     size="sm"
-                    className="gap-1.5"
                     onClick={() => onPublishVersion?.()}
                     disabled={publishVersionDisabled || !onPublishVersion}
                   >
-                    <Rocket className="h-4 w-4" />
                     {proposeChangeLabel}
                   </UIButton>,
                 )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <UIButton
-                        type="button"
-                        variant="outline"
-                        size="icon-xs"
-                        className="shrink-0"
-                        onClick={() => onExitEditMode?.()}
-                        disabled={exitEditModeDisabled}
-                        aria-label="Exit edit mode"
-                      >
-                        <LogOut className="h-3.5 w-3.5" />
-                      </UIButton>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {exitEditModeDisabled && exitEditModeDisabledTooltip
-                      ? exitEditModeDisabledTooltip
-                      : "Exit edit mode and return to the live version."}
-                  </TooltipContent>
-                </Tooltip>
               </div>
             ) : null}
 
@@ -699,7 +672,7 @@ export function Header({
                     onClick={onEnterEditMode}
                     disabled={enterEditModeDisabled}
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="size-3.5" />
                     Edit
                   </UIButton>,
                 )

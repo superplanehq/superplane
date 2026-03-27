@@ -1,16 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { CliCommandsPopover } from "./CliCommandsPopover";
+import { CanvasCliView } from "./CanvasCliView";
 
 const meta = {
-  title: "Pages/CanvasPage/CliCommandsPopover",
-  component: CliCommandsPopover,
+  title: "Pages/Workflow/CanvasCliView",
+  component: CanvasCliView,
   parameters: {
-    layout: "centered",
+    layout: "fullscreen",
   },
-} satisfies Meta<typeof CliCommandsPopover>;
+} satisfies Meta<typeof CanvasCliView>;
 
 export default meta;
-type Story = StoryObj<typeof CliCommandsPopover>;
+type Story = StoryObj<typeof CanvasCliView>;
 
 export const WithCanvasId: Story = {
   args: {

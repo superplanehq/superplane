@@ -30,13 +30,8 @@ export function CanvasYamlView({ yamlText, filename, onCopy, onDownload, onImpor
         <div className="flex items-center gap-2">
           {onImport && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                onClick={() => setIsImportDialogOpen(true)}
-              >
-                <Upload className="h-3.5 w-3.5" />
+              <Button variant="outline" size="sm" onClick={() => setIsImportDialogOpen(true)}>
+                <Upload />
                 Import
               </Button>
               <ImportYamlIntoCanvasDialog
@@ -48,20 +43,20 @@ export function CanvasYamlView({ yamlText, filename, onCopy, onDownload, onImpor
             </>
           )}
           {onCopy && (
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onCopy}>
-              <Copy className="h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" onClick={onCopy}>
+              <Copy />
               Copy
             </Button>
           )}
           {onDownload && (
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={onDownload}>
-              <Download className="h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" onClick={onDownload}>
+              <Download />
               Download
             </Button>
           )}
         </div>
       </div>
-      <div className="flex-1">
+      <div className="canvas-yaml-monaco h-full min-h-0 min-w-0">
         <Editor
           height="100%"
           language="yaml"
@@ -79,6 +74,8 @@ export function CanvasYamlView({ yamlText, filename, onCopy, onDownload, onImpor
             renderWhitespace: "boundary",
             smoothScrolling: true,
             tabSize: 2,
+            renderLineHighlight: "line",
+            renderLineHighlightOnlyWhenFocus: false,
           }}
         />
       </div>
