@@ -14,7 +14,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { DatabaseClusterNodeMetadata } from "./types";
+import type { DatabaseClusterNodeMetadata, GetDatabaseClusterConfiguration } from "./types";
 
 export const getDatabaseClusterMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -67,9 +67,12 @@ export const getDatabaseClusterMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as DatabaseClusterNodeMetadata | undefined;
+  const configuration = node.configuration as GetDatabaseClusterConfiguration;
 
   if (nodeMetadata?.databaseClusterName) {
     metadata.push({ icon: "database", label: nodeMetadata.databaseClusterName });
+  } else if (configuration?.databaseCluster) {
+    metadata.push({ icon: "info", label: `Cluster ID: ${configuration.databaseCluster}` });
   }
 
   return metadata;
