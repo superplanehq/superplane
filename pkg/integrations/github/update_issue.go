@@ -2,7 +2,9 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/google/uuid"
@@ -15,7 +17,7 @@ type UpdateIssue struct{}
 
 type UpdateIssueConfiguration struct {
 	Repository  string   `json:"repository" mapstructure:"repository"`
-	IssueNumber int      `json:"issueNumber" mapstructure:"issueNumber"`
+	IssueNumber string   `json:"issueNumber" mapstructure:"issueNumber"`
 	Title       string   `json:"title" mapstructure:"title"`
 	Body        string   `json:"body" mapstructure:"body"`
 	State       string   `json:"state" mapstructure:"state"`
@@ -48,7 +50,7 @@ func (c *UpdateIssue) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository containing the issue
-- **Issue Number**: The issue number to update
+	- **Issue Number**: The issue number to update (supports expressions)
 - **Title**: New title for the issue (optional, supports expressions)
 - **Body**: New body/description for the issue (optional, supports expressions)
 - **State**: Change issue state to "open" or "closed" (optional)
@@ -89,7 +91,7 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 		{
 			Name:     "issueNumber",
 			Label:    "Issue Number",
-			Type:     configuration.FieldTypeNumber,
+			Type:     configuration.FieldTypeString,
 			Required: true,
 		},
 		{
@@ -157,6 +159,19 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 }
 
 func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
+	var config UpdateIssueConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if config.Repository == "" {
+		return errors.New("repository is required")
+	}
+
+	if config.IssueNumber == "" {
+		return errors.New("issue number is required")
+	}
+
 	return ensureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
@@ -168,6 +183,11 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	var config UpdateIssueConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	issueNumber, err := strconv.Atoi(config.IssueNumber)
+	if err != nil {
+		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
 	var appMetadata Metadata
@@ -210,7 +230,7 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		context.Background(),
 		appMetadata.Owner,
 		config.Repository,
-		config.IssueNumber,
+		issueNumber,
 		issueRequest,
 	)
 
