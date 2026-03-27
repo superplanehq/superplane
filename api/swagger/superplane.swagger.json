@@ -64,7 +64,7 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents/chats": {
+    "/api/v1alpha/agents/chats": {
       "get": {
         "summary": "List agent chats for the authenticated user",
         "description": "Returns a list of agent chats for the authenticated user",
@@ -128,7 +128,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}": {
+    "/api/v1alpha/agents/chats/{chatId}": {
       "get": {
         "summary": "Describes an agent chat for the authenticated user",
         "description": "Describes an agent chat for the authenticated user",
@@ -166,7 +166,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}/messages": {
+    "/api/v1alpha/agents/chats/{chatId}/messages": {
       "get": {
         "summary": "List the messages in an agent chat",
         "description": "List the messages in an agent chat",
@@ -204,7 +204,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}/resume": {
+    "/api/v1alpha/agents/chats/{chatId}/resume": {
       "post": {
         "summary": "Resume an agent chat",
         "description": "Resumes an agent chat. The response includes the URL and token for resuming the chat",
@@ -244,7 +244,7 @@
         ]
       }
     },
-    "/api/v1/blueprints": {
+    "/api/v1alpha/blueprints": {
       "get": {
         "summary": "List blueprints",
         "description": "Returns a list of all blueprints",
@@ -300,7 +300,7 @@
         ]
       }
     },
-    "/api/v1/blueprints/{id}": {
+    "/api/v1alpha/blueprints/{id}": {
       "get": {
         "summary": "Describe blueprint",
         "description": "Returns a blueprint",
@@ -400,7 +400,7 @@
         ]
       }
     },
-    "/api/v1/canvases": {
+    "/api/v1alpha/canvases": {
       "get": {
         "summary": "List canvases",
         "description": "Returns a list of all canvases",
@@ -464,7 +464,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/change-requests": {
+    "/api/v1alpha/canvases/{canvasId}/change-requests": {
       "get": {
         "summary": "List canvas change requests",
         "description": "Lists change requests for a canvas",
@@ -566,7 +566,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}": {
+    "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}": {
       "get": {
         "summary": "Describe canvas change request",
         "description": "Returns one canvas change request by ID",
@@ -604,7 +604,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions": {
+    "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/actions": {
       "patch": {
         "summary": "Act on canvas change request",
         "description": "Applies an action (approve, unapprove, reject, reopen, publish) to a change request",
@@ -650,7 +650,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve": {
+    "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/resolve": {
       "patch": {
         "summary": "Resolve canvas change request conflicts",
         "description": "Updates a change request version with a conflict-resolved result",
@@ -696,7 +696,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/events": {
+    "/api/v1alpha/canvases/{canvasId}/events": {
       "get": {
         "summary": "List canvas events",
         "description": "Returns a list of root events that triggered executions in a canvas",
@@ -742,7 +742,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/events/{eventId}/executions": {
+    "/api/v1alpha/canvases/{canvasId}/events/{eventId}/executions": {
       "get": {
         "summary": "List event executions",
         "description": "Returns a list of all node executions triggered by a root event",
@@ -780,7 +780,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/executions/resolve": {
+    "/api/v1alpha/canvases/{canvasId}/executions/resolve": {
       "patch": {
         "summary": "Resolve execution errors",
         "description": "Marks canvas node execution errors as resolved",
@@ -820,7 +820,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}": {
+    "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/actions/{actionName}": {
       "post": {
         "summary": "Invoke execution action",
         "description": "Invokes a custom action on a canvas node execution",
@@ -872,7 +872,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel": {
+    "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/cancel": {
       "patch": {
         "summary": "Cancel execution",
         "description": "Cancels a running canvas node execution",
@@ -918,7 +918,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/executions/{executionId}/children": {
+    "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/children": {
       "post": {
         "summary": "List child executions for an execution",
         "description": "List child executions for an execution",
@@ -964,7 +964,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/memory": {
+    "/api/v1alpha/canvases/{canvasId}/memory": {
       "get": {
         "summary": "List canvas memories",
         "description": "Returns append-only memory records for a canvas",
@@ -996,7 +996,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/memory/{memoryId}": {
+    "/api/v1alpha/canvases/{canvasId}/memory/{memoryId}": {
       "delete": {
         "summary": "Delete canvas memory entry",
         "description": "Deletes one memory record by ID from a canvas",
@@ -1034,7 +1034,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events": {
+    "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events": {
       "get": {
         "summary": "List node events",
         "description": "Returns a list of events for a specific canvas node",
@@ -1130,7 +1130,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions": {
+    "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/executions": {
       "get": {
         "summary": "List node executions",
         "description": "Returns a list of executions for a specific canvas node",
@@ -1214,7 +1214,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause": {
+    "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/pause": {
       "patch": {
         "summary": "Pause or resume node processing",
         "description": "Pauses or resumes processing for a canvas node while continuing to queue incoming items",
@@ -1260,7 +1260,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue": {
+    "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue": {
       "get": {
         "summary": "List items in a node's queue",
         "description": "Returns a list of items in a node's queue",
@@ -1312,7 +1312,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}": {
+    "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}": {
       "delete": {
         "summary": "Delete item from a node's queue",
         "description": "Deletes a specific item in a node's queue",
@@ -1356,7 +1356,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}": {
+    "/api/v1alpha/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}": {
       "post": {
         "summary": "Invoke trigger action",
         "description": "Invokes a custom action on a canvas node trigger",
@@ -1408,7 +1408,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/versions": {
+    "/api/v1alpha/canvases/{canvasId}/versions": {
       "get": {
         "summary": "List canvas versions",
         "description": "Lists all versions for a canvas",
@@ -1530,7 +1530,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/versions/{versionId}": {
+    "/api/v1alpha/canvases/{canvasId}/versions/{versionId}": {
       "get": {
         "summary": "Describe canvas version",
         "description": "Returns one canvas version by ID",
@@ -1612,7 +1612,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{id}": {
+    "/api/v1alpha/canvases/{id}": {
       "get": {
         "summary": "Describe canvas",
         "description": "Returns a canvas by ID",
@@ -1712,7 +1712,7 @@
         ]
       }
     },
-    "/api/v1/components": {
+    "/api/v1alpha/components": {
       "get": {
         "summary": "List components",
         "description": "Returns a list of all components",
@@ -1736,7 +1736,7 @@
         ]
       }
     },
-    "/api/v1/components/{name}": {
+    "/api/v1alpha/components/{name}": {
       "get": {
         "summary": "Describe component",
         "description": "Returns a component by its name",
@@ -1768,7 +1768,7 @@
         ]
       }
     },
-    "/api/v1/components/{name}/actions": {
+    "/api/v1alpha/components/{name}/actions": {
       "get": {
         "summary": "List component actions",
         "description": "Returns available actions for a component",
@@ -1800,7 +1800,7 @@
         ]
       }
     },
-    "/api/v1/groups": {
+    "/api/v1alpha/groups": {
       "get": {
         "summary": "List groups",
         "description": "Returns a list of groups within a domain",
@@ -1875,7 +1875,7 @@
         ]
       }
     },
-    "/api/v1/groups/{groupName}": {
+    "/api/v1alpha/groups/{groupName}": {
       "get": {
         "summary": "Get group",
         "description": "Returns details of a specific group within a domain",
@@ -2009,7 +2009,7 @@
         ]
       }
     },
-    "/api/v1/groups/{groupName}/users": {
+    "/api/v1alpha/groups/{groupName}/users": {
       "get": {
         "summary": "Get group users",
         "description": "Returns users that belong to a specific group within a domain",
@@ -2096,7 +2096,7 @@
         ]
       }
     },
-    "/api/v1/groups/{groupName}/users/remove": {
+    "/api/v1alpha/groups/{groupName}/users/remove": {
       "patch": {
         "summary": "Remove user from group",
         "description": "Removes a user from a group within a domain",
@@ -2136,7 +2136,7 @@
         ]
       }
     },
-    "/api/v1/integrations": {
+    "/api/v1alpha/integrations": {
       "get": {
         "summary": "List available integrations",
         "description": "List available integrations",
@@ -2160,7 +2160,7 @@
         ]
       }
     },
-    "/api/v1/invite-links/{token}/accept": {
+    "/api/v1alpha/invite-links/{token}/accept": {
       "post": {
         "summary": "Accept an invite link",
         "description": "Accepts an organization invite link for the authenticated account",
@@ -2224,7 +2224,7 @@
         ]
       }
     },
-    "/api/v1/me": {
+    "/api/v1alpha/me": {
       "get": {
         "summary": "Get current user",
         "description": "Returns the currently authenticated user",
@@ -2248,7 +2248,7 @@
         ]
       }
     },
-    "/api/v1/me/token": {
+    "/api/v1alpha/me/token": {
       "post": {
         "summary": "Regenerate API token",
         "description": "Regenerates the currently authencated user's API token",
@@ -2272,7 +2272,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}": {
+    "/api/v1alpha/organizations/{id}": {
       "get": {
         "summary": "Get organization details",
         "description": "Returns the details of a specific organization (can be referenced by ID or name)",
@@ -2372,7 +2372,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/agent-settings": {
+    "/api/v1alpha/organizations/{id}/agent-settings": {
       "get": {
         "summary": "Get organization Agent Mode settings",
         "description": "Returns Agent Mode enablement and OpenAI key status for an organization",
@@ -2442,7 +2442,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/agent-settings/openai-key": {
+    "/api/v1alpha/organizations/{id}/agent-settings/openai-key": {
       "delete": {
         "summary": "Delete organization OpenAI key for Agent Mode",
         "description": "Deletes the OpenAI key used by organization Agent Mode",
@@ -2512,7 +2512,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/integrations": {
+    "/api/v1alpha/organizations/{id}/integrations": {
       "get": {
         "summary": "List integrations in an organization",
         "description": "Returns a list of integrations in an organization",
@@ -2582,7 +2582,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/integrations/{integrationId}": {
+    "/api/v1alpha/organizations/{id}/integrations/{integrationId}": {
       "get": {
         "summary": "Describe an integration in an organization",
         "description": "Returns details of a specific integration in an organization",
@@ -2700,7 +2700,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/integrations/{integrationId}/resources": {
+    "/api/v1alpha/organizations/{id}/integrations/{integrationId}/resources": {
       "get": {
         "summary": "List integration resources",
         "description": "Lists resources for an integration",
@@ -2744,7 +2744,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/invitations": {
+    "/api/v1alpha/organizations/{id}/invitations": {
       "get": {
         "summary": "List organization invitations",
         "description": "Returns pending invitations for an organization",
@@ -2814,7 +2814,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/invitations/{invitationId}": {
+    "/api/v1alpha/organizations/{id}/invitations/{invitationId}": {
       "delete": {
         "summary": "Remove an organization invitation",
         "description": "Removes an organization invitation",
@@ -2852,7 +2852,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/invite-link": {
+    "/api/v1alpha/organizations/{id}/invite-link": {
       "get": {
         "summary": "Get an organization invite link",
         "description": "Returns the invite link for an organization",
@@ -2922,7 +2922,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/invite-link/reset": {
+    "/api/v1alpha/organizations/{id}/invite-link/reset": {
       "post": {
         "summary": "Reset an organization invite link",
         "description": "Generates a new invite link token for an organization",
@@ -2954,7 +2954,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/usage": {
+    "/api/v1alpha/organizations/{id}/usage": {
       "get": {
         "summary": "Describe organization usage",
         "description": "Returns usage tracking and limits for an organization",
@@ -2986,7 +2986,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{id}/users/{userId}": {
+    "/api/v1alpha/organizations/{id}/users/{userId}": {
       "delete": {
         "summary": "Remove a user from an organization",
         "description": "Removes a user from an organization (can be referenced by ID or name)",
@@ -3024,7 +3024,7 @@
         ]
       }
     },
-    "/api/v1/roles": {
+    "/api/v1alpha/roles": {
       "get": {
         "summary": "List roles",
         "description": "Returns available roles for a specific domain type with their permissions and inheritance",
@@ -3099,7 +3099,7 @@
         ]
       }
     },
-    "/api/v1/roles/{roleName}": {
+    "/api/v1alpha/roles/{roleName}": {
       "get": {
         "summary": "Describe role",
         "description": "Returns detailed information about a specific role including permissions and inheritance",
@@ -3233,7 +3233,7 @@
         ]
       }
     },
-    "/api/v1/roles/{roleName}/users": {
+    "/api/v1alpha/roles/{roleName}/users": {
       "post": {
         "summary": "Assign role",
         "description": "Assigns a role to a user within a domain",
@@ -3273,7 +3273,7 @@
         ]
       }
     },
-    "/api/v1/secrets": {
+    "/api/v1alpha/secrets": {
       "get": {
         "summary": "List secrets",
         "description": "Returns the list of secrets",
@@ -3348,7 +3348,7 @@
         ]
       }
     },
-    "/api/v1/secrets/{idOrName}": {
+    "/api/v1alpha/secrets/{idOrName}": {
       "get": {
         "summary": "Get secret details",
         "description": "Returns the details of a specific secret",
@@ -3482,7 +3482,7 @@
         ]
       }
     },
-    "/api/v1/secrets/{idOrName}/keys/{keyName}": {
+    "/api/v1alpha/secrets/{idOrName}/keys/{keyName}": {
       "delete": {
         "summary": "Remove a key from a secret",
         "description": "Removes one key from the secret. Secret must have at least one key remaining.",
@@ -3581,7 +3581,7 @@
         ]
       }
     },
-    "/api/v1/secrets/{idOrName}/name": {
+    "/api/v1alpha/secrets/{idOrName}/name": {
       "patch": {
         "summary": "Update secret name",
         "description": "Updates only the name of the secret. Name must be unique within the domain.",
@@ -3621,7 +3621,7 @@
         ]
       }
     },
-    "/api/v1/service-accounts": {
+    "/api/v1alpha/service-accounts": {
       "get": {
         "summary": "List service accounts",
         "description": "Returns all service accounts in the organization",
@@ -3677,7 +3677,7 @@
         ]
       }
     },
-    "/api/v1/service-accounts/{id}": {
+    "/api/v1alpha/service-accounts/{id}": {
       "get": {
         "summary": "Describe a service account",
         "description": "Returns details of a specific service account",
@@ -3777,7 +3777,7 @@
         ]
       }
     },
-    "/api/v1/service-accounts/{id}/token": {
+    "/api/v1alpha/service-accounts/{id}/token": {
       "post": {
         "summary": "Regenerate service account token",
         "description": "Regenerates the API token for a service account",
@@ -3817,7 +3817,7 @@
         ]
       }
     },
-    "/api/v1/triggers": {
+    "/api/v1alpha/triggers": {
       "get": {
         "summary": "List triggers",
         "description": "Returns a list of all available triggers",
@@ -3841,7 +3841,7 @@
         ]
       }
     },
-    "/api/v1/triggers/{name}": {
+    "/api/v1alpha/triggers/{name}": {
       "get": {
         "summary": "Describe trigger",
         "description": "Returns a trigger by its name",
@@ -3873,7 +3873,7 @@
         ]
       }
     },
-    "/api/v1/users": {
+    "/api/v1alpha/users": {
       "get": {
         "summary": "List users",
         "description": "Returns all users that have roles within a domain",
@@ -3922,7 +3922,7 @@
         ]
       }
     },
-    "/api/v1/users/{userId}/permissions": {
+    "/api/v1alpha/users/{userId}/permissions": {
       "get": {
         "summary": "List user permissions",
         "description": "Returns all permissions a user has within a specific domain",
@@ -3971,7 +3971,7 @@
         ]
       }
     },
-    "/api/v1/users/{userId}/roles": {
+    "/api/v1alpha/users/{userId}/roles": {
       "get": {
         "summary": "Get user roles",
         "description": "Returns the roles a user has within a specific domain",
@@ -4020,7 +4020,7 @@
         ]
       }
     },
-    "/api/v1/widgets": {
+    "/api/v1alpha/widgets": {
       "get": {
         "summary": "List widgets",
         "description": "Returns a list of all available widgets",
@@ -4044,7 +4044,7 @@
         ]
       }
     },
-    "/api/v1/widgets/{name}": {
+    "/api/v1alpha/widgets/{name}": {
       "get": {
         "summary": "Describe widget",
         "description": "Returns a widget by its name",

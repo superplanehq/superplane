@@ -208,7 +208,7 @@ func (t *Teams) Sync(ctx core.SyncContext) error {
 	})
 
 	// Always regenerate manifest ZIP so config changes (e.g. bot name) take effect
-	webhookURL := fmt.Sprintf("%s/api/v1/integrations/%s/messages", ctx.WebhooksBaseURL, ctx.Integration.ID())
+	webhookURL := fmt.Sprintf("%s/api/v1alpha/integrations/%s/messages", ctx.WebhooksBaseURL, ctx.Integration.ID())
 	instructions := fmt.Sprintf(installAppInstructionsTemplate, webhookURL)
 	zipBytes, err := generateManifestZIP(string(appID), botName)
 	if err != nil {

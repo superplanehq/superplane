@@ -5856,73 +5856,73 @@ const file_canvases_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
 	"\n" +
 	"version_id\x18\x02 \x01(\tR\tversionId\x128\n" +
-	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xad>\n" +
-	"\bCanvases\x12\xb7\x01\n" +
-	"\fListCanvases\x12(.Superplane.Canvases.ListCanvasesRequest\x1a).Superplane.Canvases.ListCanvasesResponse\"R\x92A7\n" +
-	"\x06Canvas\x12\rList canvases\x1a\x1eReturns a list of all canvases\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/canvases\x12\xb0\x01\n" +
-	"\fCreateCanvas\x12(.Superplane.Canvases.CreateCanvasRequest\x1a).Superplane.Canvases.CreateCanvasResponse\"K\x92A-\n" +
-	"\x06Canvas\x12\rCreate canvas\x1a\x14Creates a new canvas\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/canvases\x12\xbc\x01\n" +
-	"\x0eDescribeCanvas\x12*.Superplane.Canvases.DescribeCanvasRequest\x1a+.Superplane.Canvases.DescribeCanvasResponse\"Q\x92A1\n" +
-	"\x06Canvas\x12\x0fDescribe canvas\x1a\x16Returns a canvas by ID\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/canvases/{id}\x12\xb8\x01\n" +
-	"\fUpdateCanvas\x12(.Superplane.Canvases.UpdateCanvasRequest\x1a).Superplane.Canvases.UpdateCanvasResponse\"S\x92A0\n" +
-	"\x06Canvas\x12\rUpdate canvas\x1a\x17Updates canvas metadata\x82\xd3\xe4\x93\x02\x1a:\x01*\x1a\x15/api/v1/canvases/{id}\x12\x96\x02\n" +
-	"\x13CreateCanvasVersion\x12/.Superplane.Canvases.CreateCanvasVersionRequest\x1a0.Superplane.Canvases.CreateCanvasVersionResponse\"\x9b\x01\x92Ah\n" +
-	"\rCanvasVersion\x12\x15Create canvas version\x1a@Creates a user-owned canvas version from the current live canvas\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/canvases/{canvas_id}/versions\x12\xed\x01\n" +
-	"\x12ListCanvasVersions\x12..Superplane.Canvases.ListCanvasVersionsRequest\x1a/.Superplane.Canvases.ListCanvasVersionsResponse\"v\x92AF\n" +
-	"\rCanvasVersion\x12\x14List canvas versions\x1a\x1fLists all versions for a canvas\x82\xd3\xe4\x93\x02'\x12%/api/v1/canvases/{canvas_id}/versions\x12\x88\x02\n" +
-	"\x15DescribeCanvasVersion\x121.Superplane.Canvases.DescribeCanvasVersionRequest\x1a2.Superplane.Canvases.DescribeCanvasVersionResponse\"\x87\x01\x92AJ\n" +
-	"\rCanvasVersion\x12\x17Describe canvas version\x1a Returns one canvas version by ID\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id}/versions/{version_id}\x12\x82\x03\n" +
-	"\x13UpdateCanvasVersion\x12/.Superplane.Canvases.UpdateCanvasVersionRequest\x1a0.Superplane.Canvases.UpdateCanvasVersionResponse\"\x87\x02\x92A\x9a\x01\n" +
-	"\rCanvasVersion\x12\x15Update canvas version\x1arUpdates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled\x82\xd3\xe4\x93\x02c:\x01*Z*:\x01*\x1a%/api/v1/canvases/{canvas_id}/versions\x1a2/api/v1/canvases/{canvas_id}/versions/{version_id}\x12\xaf\x02\n" +
-	"\x19CreateCanvasChangeRequest\x125.Superplane.Canvases.CreateCanvasChangeRequestRequest\x1a6.Superplane.Canvases.CreateCanvasChangeRequestResponse\"\xa2\x01\x92Ah\n" +
-	"\x13CanvasChangeRequest\x12\x1cCreate canvas change request\x1a3Creates a change request for a draft canvas version\x82\xd3\xe4\x93\x021:\x01*\",/api/v1/canvases/{canvas_id}/change-requests\x12\x97\x02\n" +
-	"\x18ListCanvasChangeRequests\x124.Superplane.Canvases.ListCanvasChangeRequestsRequest\x1a5.Superplane.Canvases.ListCanvasChangeRequestsResponse\"\x8d\x01\x92AV\n" +
-	"\x13CanvasChangeRequest\x12\x1bList canvas change requests\x1a\"Lists change requests for a canvas\x82\xd3\xe4\x93\x02.\x12,/api/v1/canvases/{canvas_id}/change-requests\x12\xbc\x02\n" +
-	"\x1bDescribeCanvasChangeRequest\x127.Superplane.Canvases.DescribeCanvasChangeRequestRequest\x1a8.Superplane.Canvases.DescribeCanvasChangeRequestResponse\"\xa9\x01\x92A^\n" +
-	"\x13CanvasChangeRequest\x12\x1eDescribe canvas change request\x1a'Returns one canvas change request by ID\x82\xd3\xe4\x93\x02B\x12@/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}\x12\xe9\x02\n" +
-	"\x18ActOnCanvasChangeRequest\x124.Superplane.Canvases.ActOnCanvasChangeRequestRequest\x1a5.Superplane.Canvases.ActOnCanvasChangeRequestResponse\"\xdf\x01\x92A\x88\x01\n" +
-	"\x13CanvasChangeRequest\x12\x1cAct on canvas change request\x1aSApplies an action (approve, unapprove, reject, reopen, publish) to a change request\x82\xd3\xe4\x93\x02M:\x01*2H/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/actions\x12\xe7\x02\n" +
-	"\x1aResolveCanvasChangeRequest\x126.Superplane.Canvases.ResolveCanvasChangeRequestRequest\x1a7.Superplane.Canvases.ResolveCanvasChangeRequestResponse\"\xd7\x01\x92A\x80\x01\n" +
-	"\x13CanvasChangeRequest\x12'Resolve canvas change request conflicts\x1a@Updates a change request version with a conflict-resolved result\x82\xd3\xe4\x93\x02M:\x01*2H/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/resolve\x12\xb8\x01\n" +
-	"\fDeleteCanvas\x12(.Superplane.Canvases.DeleteCanvasRequest\x1a).Superplane.Canvases.DeleteCanvasResponse\"S\x92A3\n" +
-	"\x06Canvas\x12\rDelete canvas\x1a\x1aDeletes an existing canvas\x82\xd3\xe4\x93\x02\x17*\x15/api/v1/canvases/{id}\x12\x8a\x02\n" +
-	"\x12ListNodeQueueItems\x12..Superplane.Canvases.ListNodeQueueItemsRequest\x1a/.Superplane.Canvases.ListNodeQueueItemsResponse\"\x92\x01\x92AU\n" +
+	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xc4?\n" +
+	"\bCanvases\x12\xbc\x01\n" +
+	"\fListCanvases\x12(.Superplane.Canvases.ListCanvasesRequest\x1a).Superplane.Canvases.ListCanvasesResponse\"W\x92A7\n" +
+	"\x06Canvas\x12\rList canvases\x1a\x1eReturns a list of all canvases\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1alpha/canvases\x12\xb5\x01\n" +
+	"\fCreateCanvas\x12(.Superplane.Canvases.CreateCanvasRequest\x1a).Superplane.Canvases.CreateCanvasResponse\"P\x92A-\n" +
+	"\x06Canvas\x12\rCreate canvas\x1a\x14Creates a new canvas\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1alpha/canvases\x12\xc1\x01\n" +
+	"\x0eDescribeCanvas\x12*.Superplane.Canvases.DescribeCanvasRequest\x1a+.Superplane.Canvases.DescribeCanvasResponse\"V\x92A1\n" +
+	"\x06Canvas\x12\x0fDescribe canvas\x1a\x16Returns a canvas by ID\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1alpha/canvases/{id}\x12\xbd\x01\n" +
+	"\fUpdateCanvas\x12(.Superplane.Canvases.UpdateCanvasRequest\x1a).Superplane.Canvases.UpdateCanvasResponse\"X\x92A0\n" +
+	"\x06Canvas\x12\rUpdate canvas\x1a\x17Updates canvas metadata\x82\xd3\xe4\x93\x02\x1f:\x01*\x1a\x1a/api/v1alpha/canvases/{id}\x12\x9b\x02\n" +
+	"\x13CreateCanvasVersion\x12/.Superplane.Canvases.CreateCanvasVersionRequest\x1a0.Superplane.Canvases.CreateCanvasVersionResponse\"\xa0\x01\x92Ah\n" +
+	"\rCanvasVersion\x12\x15Create canvas version\x1a@Creates a user-owned canvas version from the current live canvas\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1alpha/canvases/{canvas_id}/versions\x12\xf2\x01\n" +
+	"\x12ListCanvasVersions\x12..Superplane.Canvases.ListCanvasVersionsRequest\x1a/.Superplane.Canvases.ListCanvasVersionsResponse\"{\x92AF\n" +
+	"\rCanvasVersion\x12\x14List canvas versions\x1a\x1fLists all versions for a canvas\x82\xd3\xe4\x93\x02,\x12*/api/v1alpha/canvases/{canvas_id}/versions\x12\x8d\x02\n" +
+	"\x15DescribeCanvasVersion\x121.Superplane.Canvases.DescribeCanvasVersionRequest\x1a2.Superplane.Canvases.DescribeCanvasVersionResponse\"\x8c\x01\x92AJ\n" +
+	"\rCanvasVersion\x12\x17Describe canvas version\x1a Returns one canvas version by ID\x82\xd3\xe4\x93\x029\x127/api/v1alpha/canvases/{canvas_id}/versions/{version_id}\x12\x8c\x03\n" +
+	"\x13UpdateCanvasVersion\x12/.Superplane.Canvases.UpdateCanvasVersionRequest\x1a0.Superplane.Canvases.UpdateCanvasVersionResponse\"\x91\x02\x92A\x9a\x01\n" +
+	"\rCanvasVersion\x12\x15Update canvas version\x1arUpdates a user-owned canvas version; if version_id is omitted, updates the live canvas when versioning is disabled\x82\xd3\xe4\x93\x02m:\x01*Z/:\x01*\x1a*/api/v1alpha/canvases/{canvas_id}/versions\x1a7/api/v1alpha/canvases/{canvas_id}/versions/{version_id}\x12\xb4\x02\n" +
+	"\x19CreateCanvasChangeRequest\x125.Superplane.Canvases.CreateCanvasChangeRequestRequest\x1a6.Superplane.Canvases.CreateCanvasChangeRequestResponse\"\xa7\x01\x92Ah\n" +
+	"\x13CanvasChangeRequest\x12\x1cCreate canvas change request\x1a3Creates a change request for a draft canvas version\x82\xd3\xe4\x93\x026:\x01*\"1/api/v1alpha/canvases/{canvas_id}/change-requests\x12\x9c\x02\n" +
+	"\x18ListCanvasChangeRequests\x124.Superplane.Canvases.ListCanvasChangeRequestsRequest\x1a5.Superplane.Canvases.ListCanvasChangeRequestsResponse\"\x92\x01\x92AV\n" +
+	"\x13CanvasChangeRequest\x12\x1bList canvas change requests\x1a\"Lists change requests for a canvas\x82\xd3\xe4\x93\x023\x121/api/v1alpha/canvases/{canvas_id}/change-requests\x12\xc1\x02\n" +
+	"\x1bDescribeCanvasChangeRequest\x127.Superplane.Canvases.DescribeCanvasChangeRequestRequest\x1a8.Superplane.Canvases.DescribeCanvasChangeRequestResponse\"\xae\x01\x92A^\n" +
+	"\x13CanvasChangeRequest\x12\x1eDescribe canvas change request\x1a'Returns one canvas change request by ID\x82\xd3\xe4\x93\x02G\x12E/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}\x12\xee\x02\n" +
+	"\x18ActOnCanvasChangeRequest\x124.Superplane.Canvases.ActOnCanvasChangeRequestRequest\x1a5.Superplane.Canvases.ActOnCanvasChangeRequestResponse\"\xe4\x01\x92A\x88\x01\n" +
+	"\x13CanvasChangeRequest\x12\x1cAct on canvas change request\x1aSApplies an action (approve, unapprove, reject, reopen, publish) to a change request\x82\xd3\xe4\x93\x02R:\x01*2M/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/actions\x12\xec\x02\n" +
+	"\x1aResolveCanvasChangeRequest\x126.Superplane.Canvases.ResolveCanvasChangeRequestRequest\x1a7.Superplane.Canvases.ResolveCanvasChangeRequestResponse\"\xdc\x01\x92A\x80\x01\n" +
+	"\x13CanvasChangeRequest\x12'Resolve canvas change request conflicts\x1a@Updates a change request version with a conflict-resolved result\x82\xd3\xe4\x93\x02R:\x01*2M/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/resolve\x12\xbd\x01\n" +
+	"\fDeleteCanvas\x12(.Superplane.Canvases.DeleteCanvasRequest\x1a).Superplane.Canvases.DeleteCanvasResponse\"X\x92A3\n" +
+	"\x06Canvas\x12\rDelete canvas\x1a\x1aDeletes an existing canvas\x82\xd3\xe4\x93\x02\x1c*\x1a/api/v1alpha/canvases/{id}\x12\x8f\x02\n" +
+	"\x12ListNodeQueueItems\x12..Superplane.Canvases.ListNodeQueueItemsRequest\x1a/.Superplane.Canvases.ListNodeQueueItemsResponse\"\x97\x01\x92AU\n" +
 	"\n" +
-	"CanvasNode\x12\x1cList items in a node's queue\x1a)Returns a list of items in a node's queue\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue\x12\x9a\x02\n" +
-	"\x13DeleteNodeQueueItem\x12/.Superplane.Canvases.DeleteNodeQueueItemRequest\x1a0.Superplane.Canvases.DeleteNodeQueueItemResponse\"\x9f\x01\x92AX\n" +
+	"CanvasNode\x12\x1cList items in a node's queue\x1a)Returns a list of items in a node's queue\x82\xd3\xe4\x93\x029\x127/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue\x12\x9f\x02\n" +
+	"\x13DeleteNodeQueueItem\x12/.Superplane.Canvases.DeleteNodeQueueItemRequest\x1a0.Superplane.Canvases.DeleteNodeQueueItemResponse\"\xa4\x01\x92AX\n" +
 	"\n" +
-	"CanvasNode\x12\x1fDelete item from a node's queue\x1a)Deletes a specific item in a node's queue\x82\xd3\xe4\x93\x02>*</api/v1/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}\x12\xb6\x02\n" +
-	"\x0fUpdateNodePause\x12+.Superplane.Canvases.UpdateNodePauseRequest\x1a,.Superplane.Canvases.UpdateNodePauseResponse\"\xc7\x01\x92A\x86\x01\n" +
+	"CanvasNode\x12\x1fDelete item from a node's queue\x1a)Deletes a specific item in a node's queue\x82\xd3\xe4\x93\x02C*A/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}\x12\xbb\x02\n" +
+	"\x0fUpdateNodePause\x12+.Superplane.Canvases.UpdateNodePauseRequest\x1a,.Superplane.Canvases.UpdateNodePauseResponse\"\xcc\x01\x92A\x86\x01\n" +
 	"\n" +
-	"CanvasNode\x12\x1fPause or resume node processing\x1aWPauses or resumes processing for a canvas node while continuing to queue incoming items\x82\xd3\xe4\x93\x027:\x01*22/api/v1/canvases/{canvas_id}/nodes/{node_id}/pause\x12\x95\x02\n" +
-	"\x12ListNodeExecutions\x12..Superplane.Canvases.ListNodeExecutionsRequest\x1a/.Superplane.Canvases.ListNodeExecutionsResponse\"\x9d\x01\x92A[\n" +
+	"CanvasNode\x12\x1fPause or resume node processing\x1aWPauses or resumes processing for a canvas node while continuing to queue incoming items\x82\xd3\xe4\x93\x02<:\x01*27/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/pause\x12\x9a\x02\n" +
+	"\x12ListNodeExecutions\x12..Superplane.Canvases.ListNodeExecutionsRequest\x1a/.Superplane.Canvases.ListNodeExecutionsResponse\"\xa2\x01\x92A[\n" +
 	"\n" +
-	"CanvasNode\x12\x14List node executions\x1a7Returns a list of executions for a specific canvas node\x82\xd3\xe4\x93\x029\x127/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions\x12\xfd\x01\n" +
-	"\x0eListNodeEvents\x12*.Superplane.Canvases.ListNodeEventsRequest\x1a+.Superplane.Canvases.ListNodeEventsResponse\"\x91\x01\x92AS\n" +
+	"CanvasNode\x12\x14List node executions\x1a7Returns a list of executions for a specific canvas node\x82\xd3\xe4\x93\x02>\x12</api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/executions\x12\x82\x02\n" +
+	"\x0eListNodeEvents\x12*.Superplane.Canvases.ListNodeEventsRequest\x1a+.Superplane.Canvases.ListNodeEventsResponse\"\x96\x01\x92AS\n" +
 	"\n" +
-	"CanvasNode\x12\x10List node events\x1a3Returns a list of events for a specific canvas node\x82\xd3\xe4\x93\x025\x123/api/v1/canvases/{canvas_id}/nodes/{node_id}/events\x12\xfc\x01\n" +
-	"\rEmitNodeEvent\x12).Superplane.Canvases.EmitNodeEventRequest\x1a*.Superplane.Canvases.EmitNodeEventResponse\"\x93\x01\x92AR\n" +
+	"CanvasNode\x12\x10List node events\x1a3Returns a list of events for a specific canvas node\x82\xd3\xe4\x93\x02:\x128/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events\x12\x81\x02\n" +
+	"\rEmitNodeEvent\x12).Superplane.Canvases.EmitNodeEventRequest\x1a*.Superplane.Canvases.EmitNodeEventResponse\"\x98\x01\x92AR\n" +
 	"\n" +
-	"CanvasNode\x12!Emit output event for canvas node\x1a!Emit output event for canvas node\x82\xd3\xe4\x93\x028:\x01*\"3/api/v1/canvases/{canvas_id}/nodes/{node_id}/events\x12\xc9\x02\n" +
-	"\x19InvokeNodeExecutionAction\x125.Superplane.Canvases.InvokeNodeExecutionActionRequest\x1a6.Superplane.Canvases.InvokeNodeExecutionActionResponse\"\xbc\x01\x92Ab\n" +
-	"\x13CanvasNodeExecution\x12\x17Invoke execution action\x1a2Invokes a custom action on a canvas node execution\x82\xd3\xe4\x93\x02Q:\x01*\"L/api/v1/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}\x12\xaf\x02\n" +
-	"\x17InvokeNodeTriggerAction\x123.Superplane.Canvases.InvokeNodeTriggerActionRequest\x1a4.Superplane.Canvases.InvokeNodeTriggerActionResponse\"\xa8\x01\x92AU\n" +
+	"CanvasNode\x12!Emit output event for canvas node\x1a!Emit output event for canvas node\x82\xd3\xe4\x93\x02=:\x01*\"8/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events\x12\xce\x02\n" +
+	"\x19InvokeNodeExecutionAction\x125.Superplane.Canvases.InvokeNodeExecutionActionRequest\x1a6.Superplane.Canvases.InvokeNodeExecutionActionResponse\"\xc1\x01\x92Ab\n" +
+	"\x13CanvasNodeExecution\x12\x17Invoke execution action\x1a2Invokes a custom action on a canvas node execution\x82\xd3\xe4\x93\x02V:\x01*\"Q/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}\x12\xb4\x02\n" +
+	"\x17InvokeNodeTriggerAction\x123.Superplane.Canvases.InvokeNodeTriggerActionRequest\x1a4.Superplane.Canvases.InvokeNodeTriggerActionResponse\"\xad\x01\x92AU\n" +
 	"\n" +
-	"CanvasNode\x12\x15Invoke trigger action\x1a0Invokes a custom action on a canvas node trigger\x82\xd3\xe4\x93\x02J:\x01*\"E/api/v1/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}\x12\xad\x02\n" +
-	"\x13ListChildExecutions\x12/.Superplane.Canvases.ListChildExecutionsRequest\x1a0.Superplane.Canvases.ListChildExecutionsResponse\"\xb2\x01\x92Ae\n" +
-	"\x13CanvasNodeExecution\x12&List child executions for an execution\x1a&List child executions for an execution\x82\xd3\xe4\x93\x02D:\x01*\"?/api/v1/canvases/{canvas_id}/executions/{execution_id}/children\x12\x8a\x02\n" +
-	"\x0fCancelExecution\x12+.Superplane.Canvases.CancelExecutionRequest\x1a,.Superplane.Canvases.CancelExecutionResponse\"\x9b\x01\x92AP\n" +
-	"\x13CanvasNodeExecution\x12\x10Cancel execution\x1a'Cancels a running canvas node execution\x82\xd3\xe4\x93\x02B:\x01*2=/api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel\x12\xa0\x02\n" +
-	"\x16ResolveExecutionErrors\x122.Superplane.Canvases.ResolveExecutionErrorsRequest\x1a3.Superplane.Canvases.ResolveExecutionErrorsResponse\"\x9c\x01\x92A_\n" +
-	"\x13CanvasNodeExecution\x12\x18Resolve execution errors\x1a.Marks canvas node execution errors as resolved\x82\xd3\xe4\x93\x024:\x01*2//api/v1/canvases/{canvas_id}/executions/resolve\x12\x86\x02\n" +
-	"\x10ListCanvasEvents\x12,.Superplane.Canvases.ListCanvasEventsRequest\x1a-.Superplane.Canvases.ListCanvasEventsResponse\"\x94\x01\x92Af\n" +
-	"\vCanvasEvent\x12\x12List canvas events\x1aCReturns a list of root events that triggered executions in a canvas\x82\xd3\xe4\x93\x02%\x12#/api/v1/canvases/{canvas_id}/events\x12\xf4\x01\n" +
-	"\x12ListCanvasMemories\x12..Superplane.Canvases.ListCanvasMemoriesRequest\x1a/.Superplane.Canvases.ListCanvasMemoriesResponse\"}\x92AO\n" +
-	"\x06Canvas\x12\x14List canvas memories\x1a/Returns append-only memory records for a canvas\x82\xd3\xe4\x93\x02%\x12#/api/v1/canvases/{canvas_id}/memory\x12\x85\x02\n" +
-	"\x12DeleteCanvasMemory\x12..Superplane.Canvases.DeleteCanvasMemoryRequest\x1a/.Superplane.Canvases.DeleteCanvasMemoryResponse\"\x8d\x01\x92AS\n" +
-	"\x06Canvas\x12\x1aDelete canvas memory entry\x1a-Deletes one memory record by ID from a canvas\x82\xd3\xe4\x93\x021*//api/v1/canvases/{canvas_id}/memory/{memory_id}\x12\xa4\x02\n" +
-	"\x13ListEventExecutions\x12/.Superplane.Canvases.ListEventExecutionsRequest\x1a0.Superplane.Canvases.ListEventExecutionsResponse\"\xa9\x01\x92Ae\n" +
-	"\vCanvasEvent\x12\x15List event executions\x1a?Returns a list of all node executions triggered by a root event\x82\xd3\xe4\x93\x02;\x129/api/v1/canvases/{canvas_id}/events/{event_id}/executionsB\xc8\x01\x92A\x8c\x01\x12b\n" +
+	"CanvasNode\x12\x15Invoke trigger action\x1a0Invokes a custom action on a canvas node trigger\x82\xd3\xe4\x93\x02O:\x01*\"J/api/v1alpha/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}\x12\xb2\x02\n" +
+	"\x13ListChildExecutions\x12/.Superplane.Canvases.ListChildExecutionsRequest\x1a0.Superplane.Canvases.ListChildExecutionsResponse\"\xb7\x01\x92Ae\n" +
+	"\x13CanvasNodeExecution\x12&List child executions for an execution\x1a&List child executions for an execution\x82\xd3\xe4\x93\x02I:\x01*\"D/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/children\x12\x8f\x02\n" +
+	"\x0fCancelExecution\x12+.Superplane.Canvases.CancelExecutionRequest\x1a,.Superplane.Canvases.CancelExecutionResponse\"\xa0\x01\x92AP\n" +
+	"\x13CanvasNodeExecution\x12\x10Cancel execution\x1a'Cancels a running canvas node execution\x82\xd3\xe4\x93\x02G:\x01*2B/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/cancel\x12\xa5\x02\n" +
+	"\x16ResolveExecutionErrors\x122.Superplane.Canvases.ResolveExecutionErrorsRequest\x1a3.Superplane.Canvases.ResolveExecutionErrorsResponse\"\xa1\x01\x92A_\n" +
+	"\x13CanvasNodeExecution\x12\x18Resolve execution errors\x1a.Marks canvas node execution errors as resolved\x82\xd3\xe4\x93\x029:\x01*24/api/v1alpha/canvases/{canvas_id}/executions/resolve\x12\x8b\x02\n" +
+	"\x10ListCanvasEvents\x12,.Superplane.Canvases.ListCanvasEventsRequest\x1a-.Superplane.Canvases.ListCanvasEventsResponse\"\x99\x01\x92Af\n" +
+	"\vCanvasEvent\x12\x12List canvas events\x1aCReturns a list of root events that triggered executions in a canvas\x82\xd3\xe4\x93\x02*\x12(/api/v1alpha/canvases/{canvas_id}/events\x12\xfa\x01\n" +
+	"\x12ListCanvasMemories\x12..Superplane.Canvases.ListCanvasMemoriesRequest\x1a/.Superplane.Canvases.ListCanvasMemoriesResponse\"\x82\x01\x92AO\n" +
+	"\x06Canvas\x12\x14List canvas memories\x1a/Returns append-only memory records for a canvas\x82\xd3\xe4\x93\x02*\x12(/api/v1alpha/canvases/{canvas_id}/memory\x12\x8a\x02\n" +
+	"\x12DeleteCanvasMemory\x12..Superplane.Canvases.DeleteCanvasMemoryRequest\x1a/.Superplane.Canvases.DeleteCanvasMemoryResponse\"\x92\x01\x92AS\n" +
+	"\x06Canvas\x12\x1aDelete canvas memory entry\x1a-Deletes one memory record by ID from a canvas\x82\xd3\xe4\x93\x026*4/api/v1alpha/canvases/{canvas_id}/memory/{memory_id}\x12\xa9\x02\n" +
+	"\x13ListEventExecutions\x12/.Superplane.Canvases.ListEventExecutionsRequest\x1a0.Superplane.Canvases.ListEventExecutionsResponse\"\xae\x01\x92Ae\n" +
+	"\vCanvasEvent\x12\x15List event executions\x1a?Returns a list of all node executions triggered by a root event\x82\xd3\xe4\x93\x02@\x12>/api/v1alpha/canvases/{canvas_id}/events/{event_id}/executionsB\xc8\x01\x92A\x8c\x01\x12b\n" +
 	"\x17Superplane Canvases API\x12\x1bAPI for Superplane canvases\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/canvasesb\x06proto3"
 

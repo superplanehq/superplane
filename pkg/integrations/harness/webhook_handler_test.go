@@ -161,7 +161,7 @@ func Test__HarnessWebhookHandler__SetupAndCleanup(t *testing.T) {
 			{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(fmt.Sprintf(
-					`{"data":{"yamlPipeline":"pipeline:\n  identifier: Superplane_Test\n  notificationRules:\n    - identifier: %s\n      name: %s\n      enabled: true\n      pipelineEvents:\n        - type: PipelineEnd\n      notificationMethod:\n        type: Webhook\n        spec:\n          webhookUrl: https://example.com/api/v1/webhooks/webhook-123\n"}}`,
+					`{"data":{"yamlPipeline":"pipeline:\n  identifier: Superplane_Test\n  notificationRules:\n    - identifier: %s\n      name: %s\n      enabled: true\n      pipelineEvents:\n        - type: PipelineEnd\n      notificationMethod:\n        type: Webhook\n        spec:\n          webhookUrl: https://example.com/api/v1alpha/webhooks/webhook-123\n"}}`,
 					expectedRuleIdentifier,
 					expectedRuleIdentifier,
 				))),
@@ -181,7 +181,7 @@ func Test__HarnessWebhookHandler__SetupAndCleanup(t *testing.T) {
 
 	webhookCtx := &webhookContextMock{
 		id:     webhookID,
-		url:    "https://example.com/api/v1/webhooks/webhook-123",
+		url:    "https://example.com/api/v1alpha/webhooks/webhook-123",
 		secret: "secret-value",
 		configuration: WebhookConfiguration{
 			PipelineIdentifier: "Superplane_Test",
@@ -204,13 +204,13 @@ func Test__HarnessWebhookHandler__SetupAndCleanup(t *testing.T) {
 	assert.Equal(t, "default", decoded.OrgID)
 	assert.Equal(t, "default_project", decoded.ProjectID)
 	assert.Equal(t, expectedRuleIdentifier, decoded.RuleIdentifier)
-	assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", decoded.URL)
+	assert.Equal(t, "https://example.com/api/v1alpha/webhooks/webhook-123", decoded.URL)
 
 	require.Len(t, httpCtx.Requests, 2)
 	setupPayload, readErr := io.ReadAll(httpCtx.Requests[1].Body)
 	require.NoError(t, readErr)
 	assert.Contains(t, string(setupPayload), expectedRuleIdentifier)
-	assert.Contains(t, string(setupPayload), "https://example.com/api/v1/webhooks/webhook-123")
+	assert.Contains(t, string(setupPayload), "https://example.com/api/v1alpha/webhooks/webhook-123")
 	assert.Contains(t, string(setupPayload), "Authorization")
 	assert.Contains(t, string(setupPayload), "Bearer secret-value")
 
@@ -236,7 +236,7 @@ func Test__HarnessWebhookHandler__Setup_WithoutPipeline_FallsBackToPolling(t *te
 
 	webhookCtx := &webhookContextMock{
 		id:            "webhook-123",
-		url:           "https://example.com/api/v1/webhooks/webhook-123",
+		url:           "https://example.com/api/v1alpha/webhooks/webhook-123",
 		secret:        "secret-value",
 		configuration: WebhookConfiguration{EventTypes: []string{"PipelineEnd"}},
 	}
@@ -251,7 +251,7 @@ func Test__HarnessWebhookHandler__Setup_WithoutPipeline_FallsBackToPolling(t *te
 	decoded := WebhookMetadata{}
 	require.NoError(t, mapstructure.Decode(metadata, &decoded))
 	assert.Empty(t, decoded.RuleIdentifier)
-	assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", decoded.URL)
+	assert.Equal(t, "https://example.com/api/v1alpha/webhooks/webhook-123", decoded.URL)
 	assert.Len(t, httpCtx.Requests, 0)
 }
 
@@ -280,7 +280,7 @@ func Test__HarnessWebhookHandler__Setup_ReturnsErrorWhenProvisioningFails(t *tes
 
 	webhookCtx := &webhookContextMock{
 		id:     "webhook-123",
-		url:    "https://example.com/api/v1/webhooks/webhook-123",
+		url:    "https://example.com/api/v1alpha/webhooks/webhook-123",
 		secret: "secret-value",
 		configuration: WebhookConfiguration{
 			PipelineIdentifier: "Superplane_Test",

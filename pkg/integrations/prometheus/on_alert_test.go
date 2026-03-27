@@ -35,7 +35,7 @@ func Test__OnAlert__Setup(t *testing.T) {
 			Configuration: map[string]any{"statuses": []string{AlertStateFiring}},
 			Integration:   integrationCtx,
 			Metadata:      metadataCtx,
-			Webhook:       &setupWebhookContext{url: "https://superplane.example.com/api/v1/webhooks/wh_123"},
+			Webhook:       &setupWebhookContext{url: "https://superplane.example.com/api/v1alpha/webhooks/wh_123"},
 		})
 
 		require.NoError(t, err)
@@ -44,7 +44,7 @@ func Test__OnAlert__Setup(t *testing.T) {
 
 		metadata, ok := metadataCtx.Metadata.(OnAlertMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "https://superplane.example.com/api/v1/webhooks/wh_123", metadata.WebhookURL)
+		assert.Equal(t, "https://superplane.example.com/api/v1alpha/webhooks/wh_123", metadata.WebhookURL)
 		assert.True(t, metadata.WebhookAuthEnabled)
 	})
 }
@@ -222,5 +222,5 @@ func (s *setupWebhookContext) Setup() (string, error) {
 }
 
 func (s *setupWebhookContext) GetBaseURL() string {
-	return "https://superplane.example.com/api/v1"
+	return "https://superplane.example.com/api/v1alpha"
 }

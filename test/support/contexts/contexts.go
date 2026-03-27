@@ -50,7 +50,7 @@ func (w *NodeWebhookContext) Setup() (string, error) {
 }
 
 func (w *NodeWebhookContext) GetBaseURL() string {
-	return "http://localhost:3000/api/v1"
+	return "http://localhost:3000/api/v1alpha"
 }
 
 type WebhookContext struct {

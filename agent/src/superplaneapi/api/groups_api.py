@@ -319,7 +319,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/groups/{groupName}/users',
+            resource_path='/api/v1alpha/groups/{groupName}/users',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -592,7 +592,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/groups',
+            resource_path='/api/v1alpha/groups',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -886,7 +886,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='DELETE',
-            resource_path='/api/v1/groups/{groupName}',
+            resource_path='/api/v1alpha/groups/{groupName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1180,7 +1180,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/groups/{groupName}',
+            resource_path='/api/v1alpha/groups/{groupName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1474,7 +1474,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/groups/{groupName}/users',
+            resource_path='/api/v1alpha/groups/{groupName}/users',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1753,7 +1753,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/groups',
+            resource_path='/api/v1alpha/groups',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -2041,7 +2041,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='PATCH',
-            resource_path='/api/v1/groups/{groupName}/users/remove',
+            resource_path='/api/v1alpha/groups/{groupName}/users/remove',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -2329,7 +2329,7 @@ class GroupsApi:
 
         return self.api_client.param_serialize(
             method='PUT',
-            resource_path='/api/v1/groups/{groupName}',
+            resource_path='/api/v1alpha/groups/{groupName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

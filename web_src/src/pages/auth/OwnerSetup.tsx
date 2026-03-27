@@ -101,7 +101,7 @@ const OwnerSetup: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/v1/setup-owner", {
+      const response = await fetch("/api/v1alpha/setup-owner", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

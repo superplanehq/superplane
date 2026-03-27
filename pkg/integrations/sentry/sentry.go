@@ -993,7 +993,7 @@ func eventsURL(ctx core.SyncContext) string {
 	if ctx.WebhooksBaseURL != "" {
 		baseURL = strings.TrimSuffix(ctx.WebhooksBaseURL, "/")
 	}
-	return fmt.Sprintf("%s/api/v1/integrations/%s/events", baseURL, ctx.Integration.ID().String())
+	return fmt.Sprintf("%s/api/v1alpha/integrations/%s/events", baseURL, ctx.Integration.ID().String())
 }
 
 func verifyWebhookSignature(signature string, body, secret []byte) error {

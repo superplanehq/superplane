@@ -149,7 +149,7 @@ func listIntegrationResourcesRequest(
 
 	baseURL = strings.TrimRight(baseURL, "/")
 	endpoint := fmt.Sprintf(
-		"%s/api/v1/organizations/%s/integrations/%s/resources",
+		"%s/api/v1alpha/organizations/%s/integrations/%s/resources",
 		baseURL,
 		url.PathEscape(organizationID),
 		url.PathEscape(integrationID),

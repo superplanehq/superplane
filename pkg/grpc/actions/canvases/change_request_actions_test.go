@@ -16,7 +16,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 )
 
-const testWebhookBaseURL = "http://localhost:3000/api/v1"
+const testWebhookBaseURL = "http://localhost:3000/api/v1alpha"
 
 func TestCreateCanvasChangeRequestCreatesOpenRequestOnly(t *testing.T) {
 	r := support.Setup(t)

@@ -692,19 +692,19 @@ const file_agents_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb4\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xcd\n" +
 	"\n" +
-	"\x06Agents\x12\xf5\x01\n" +
-	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x8d\x01\x92An\n" +
-	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/agents/chats\x12\x90\x02\n" +
-	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\xa5\x01\x92A\x82\x01\n" +
-	"\x05Agent\x12\x18Creates a new agent chat\x1a_Create a new agent chat. The response includes the URL and token for initiating the chat stream\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/agents/chats\x12\x89\x02\n" +
-	"\x11DescribeAgentChat\x12+.Superplane.Agents.DescribeAgentChatRequest\x1a,.Superplane.Agents.DescribeAgentChatResponse\"\x98\x01\x92Ao\n" +
-	"\x05Agent\x122Describes an agent chat for the authenticated user\x1a2Describes an agent chat for the authenticated user\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1/agents/chats/{chat_id}\x12\xfe\x01\n" +
-	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x81\x01\x92AO\n" +
-	"\x05Agent\x12\"List the messages in an agent chat\x1a\"List the messages in an agent chat\x82\xd3\xe4\x93\x02)\x12'/api/v1/agents/chats/{chat_id}/messages\x12\x91\x02\n" +
-	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xa6\x01\x92As\n" +
-	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/chats/{chat_id}/resumeB\xca\x01\x92A\x90\x01\x12f\n" +
+	"\x06Agents\x12\xfa\x01\n" +
+	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x92\x01\x92An\n" +
+	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1alpha/agents/chats\x12\x95\x02\n" +
+	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\xaa\x01\x92A\x82\x01\n" +
+	"\x05Agent\x12\x18Creates a new agent chat\x1a_Create a new agent chat. The response includes the URL and token for initiating the chat stream\x82\xd3\xe4\x93\x02\x1e:\x01*\"\x19/api/v1alpha/agents/chats\x12\x8e\x02\n" +
+	"\x11DescribeAgentChat\x12+.Superplane.Agents.DescribeAgentChatRequest\x1a,.Superplane.Agents.DescribeAgentChatResponse\"\x9d\x01\x92Ao\n" +
+	"\x05Agent\x122Describes an agent chat for the authenticated user\x1a2Describes an agent chat for the authenticated user\x82\xd3\xe4\x93\x02%\x12#/api/v1alpha/agents/chats/{chat_id}\x12\x83\x02\n" +
+	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x86\x01\x92AO\n" +
+	"\x05Agent\x12\"List the messages in an agent chat\x1a\"List the messages in an agent chat\x82\xd3\xe4\x93\x02.\x12,/api/v1alpha/agents/chats/{chat_id}/messages\x12\x96\x02\n" +
+	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xab\x01\x92As\n" +
+	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02/:\x01*\"*/api/v1alpha/agents/chats/{chat_id}/resumeB\xca\x01\x92A\x90\x01\x12f\n" +
 	"\x15SuperPlane Agents API\x12!API for SuperPlane agent sessions\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
 

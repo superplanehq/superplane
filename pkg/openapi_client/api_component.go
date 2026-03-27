@@ -66,7 +66,7 @@ func (a *ComponentAPIService) ComponentsDescribeComponentExecute(r ApiComponents
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/components/{name}"
+	localVarPath := localBasePath + "/api/v1alpha/components/{name}"
 	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -178,7 +178,7 @@ func (a *ComponentAPIService) ComponentsListComponentActionsExecute(r ApiCompone
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/components/{name}/actions"
+	localVarPath := localBasePath + "/api/v1alpha/components/{name}/actions"
 	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -287,7 +287,7 @@ func (a *ComponentAPIService) ComponentsListComponentsExecute(r ApiComponentsLis
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/components"
+	localVarPath := localBasePath + "/api/v1alpha/components"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

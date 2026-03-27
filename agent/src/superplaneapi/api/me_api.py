@@ -267,7 +267,7 @@ class MeApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/me',
+            resource_path='/api/v1alpha/me',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -512,7 +512,7 @@ class MeApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/me/token',
+            resource_path='/api/v1alpha/me/token',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

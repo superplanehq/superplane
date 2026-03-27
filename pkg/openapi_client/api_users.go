@@ -78,7 +78,7 @@ func (a *UsersAPIService) UsersListUserPermissionsExecute(r ApiUsersListUserPerm
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/users/{userId}/permissions"
+	localVarPath := localBasePath + "/api/v1alpha/users/{userId}/permissions"
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -211,7 +211,7 @@ func (a *UsersAPIService) UsersListUserRolesExecute(r ApiUsersListUserRolesReque
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/users/{userId}/roles"
+	localVarPath := localBasePath + "/api/v1alpha/users/{userId}/roles"
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -347,7 +347,7 @@ func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*Us
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/users"
+	localVarPath := localBasePath + "/api/v1alpha/users"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

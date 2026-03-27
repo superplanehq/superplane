@@ -72,7 +72,7 @@ func (a *GroupsAPIService) GroupsAddUserToGroupExecute(r ApiGroupsAddUserToGroup
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users"
+	localVarPath := localBasePath + "/api/v1alpha/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -192,7 +192,7 @@ func (a *GroupsAPIService) GroupsCreateGroupExecute(r ApiGroupsCreateGroupReques
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups"
+	localVarPath := localBasePath + "/api/v1alpha/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -320,7 +320,7 @@ func (a *GroupsAPIService) GroupsDeleteGroupExecute(r ApiGroupsDeleteGroupReques
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}"
+	localVarPath := localBasePath + "/api/v1alpha/groups/{groupName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -453,7 +453,7 @@ func (a *GroupsAPIService) GroupsDescribeGroupExecute(r ApiGroupsDescribeGroupRe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}"
+	localVarPath := localBasePath + "/api/v1alpha/groups/{groupName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -586,7 +586,7 @@ func (a *GroupsAPIService) GroupsListGroupUsersExecute(r ApiGroupsListGroupUsers
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users"
+	localVarPath := localBasePath + "/api/v1alpha/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -716,7 +716,7 @@ func (a *GroupsAPIService) GroupsListGroupsExecute(r ApiGroupsListGroupsRequest)
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups"
+	localVarPath := localBasePath + "/api/v1alpha/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -842,7 +842,7 @@ func (a *GroupsAPIService) GroupsRemoveUserFromGroupExecute(r ApiGroupsRemoveUse
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users/remove"
+	localVarPath := localBasePath + "/api/v1alpha/groups/{groupName}/users/remove"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -965,7 +965,7 @@ func (a *GroupsAPIService) GroupsUpdateGroupExecute(r ApiGroupsUpdateGroupReques
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}"
+	localVarPath := localBasePath + "/api/v1alpha/groups/{groupName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)

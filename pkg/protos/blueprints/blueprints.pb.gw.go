@@ -206,7 +206,7 @@ func RegisterBlueprintsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/ListBlueprints", runtime.WithHTTPPathPattern("/api/v1/blueprints"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/ListBlueprints", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -226,7 +226,7 @@ func RegisterBlueprintsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DescribeBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DescribeBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -246,7 +246,7 @@ func RegisterBlueprintsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/CreateBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/CreateBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -266,7 +266,7 @@ func RegisterBlueprintsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/UpdateBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/UpdateBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -286,7 +286,7 @@ func RegisterBlueprintsHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DeleteBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DeleteBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -344,7 +344,7 @@ func RegisterBlueprintsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/ListBlueprints", runtime.WithHTTPPathPattern("/api/v1/blueprints"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/ListBlueprints", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -361,7 +361,7 @@ func RegisterBlueprintsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DescribeBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DescribeBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -378,7 +378,7 @@ func RegisterBlueprintsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/CreateBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/CreateBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -395,7 +395,7 @@ func RegisterBlueprintsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/UpdateBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/UpdateBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -412,7 +412,7 @@ func RegisterBlueprintsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DeleteBlueprint", runtime.WithHTTPPathPattern("/api/v1/blueprints/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Blueprints.Blueprints/DeleteBlueprint", runtime.WithHTTPPathPattern("/api/v1alpha/blueprints/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -429,11 +429,11 @@ func RegisterBlueprintsHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 }
 
 var (
-	pattern_Blueprints_ListBlueprints_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "blueprints"}, ""))
-	pattern_Blueprints_DescribeBlueprint_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "blueprints", "id"}, ""))
-	pattern_Blueprints_CreateBlueprint_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "blueprints"}, ""))
-	pattern_Blueprints_UpdateBlueprint_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "blueprints", "id"}, ""))
-	pattern_Blueprints_DeleteBlueprint_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "blueprints", "id"}, ""))
+	pattern_Blueprints_ListBlueprints_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha", "blueprints"}, ""))
+	pattern_Blueprints_DescribeBlueprint_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "blueprints", "id"}, ""))
+	pattern_Blueprints_CreateBlueprint_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha", "blueprints"}, ""))
+	pattern_Blueprints_UpdateBlueprint_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "blueprints", "id"}, ""))
+	pattern_Blueprints_DeleteBlueprint_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "blueprints", "id"}, ""))
 )
 
 var (

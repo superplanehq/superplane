@@ -27,7 +27,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Widgets {
   rpc ListWidgets(ListWidgetsRequest) returns (ListWidgetsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/widgets"
+      get: "/api/v1alpha/widgets"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List widgets";
@@ -38,7 +38,7 @@ service Widgets {
 
   rpc DescribeWidget(DescribeWidgetRequest) returns (DescribeWidgetResponse) {
     option (google.api.http) = {
-      get: "/api/v1/widgets/{name}"
+      get: "/api/v1alpha/widgets/{name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe widget";

@@ -284,7 +284,7 @@ class ComponentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/components/{name}',
+            resource_path='/api/v1alpha/components/{name}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -544,7 +544,7 @@ class ComponentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/components/{name}/actions',
+            resource_path='/api/v1alpha/components/{name}/actions',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -789,7 +789,7 @@ class ComponentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/components',
+            resource_path='/api/v1alpha/components',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

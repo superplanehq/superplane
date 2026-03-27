@@ -96,7 +96,7 @@ func TestHandleEnsureCloudBuildCreatesTopicAndSubscription(t *testing.T) {
 	assert.Equal(t, "projects/demo-project/topics/cloud-builds", subscriptionRequestBody.Topic)
 	assert.Equal(
 		t,
-		"https://superplane.example/api/v1/integrations/"+integrationID+"/cloud-build-events?token="+string(secret.Value),
+		"https://superplane.example/api/v1alpha/integrations/"+integrationID+"/cloud-build-events?token="+string(secret.Value),
 		subscriptionRequestBody.PushConfig.PushEndpoint,
 	)
 }

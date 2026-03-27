@@ -72,7 +72,7 @@ func (a *RolesAPIService) RolesAssignRoleExecute(r ApiRolesAssignRoleRequest) (m
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/{roleName}/users"
+	localVarPath := localBasePath + "/api/v1alpha/roles/{roleName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -192,7 +192,7 @@ func (a *RolesAPIService) RolesCreateRoleExecute(r ApiRolesCreateRoleRequest) (*
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles"
+	localVarPath := localBasePath + "/api/v1alpha/roles"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -320,7 +320,7 @@ func (a *RolesAPIService) RolesDeleteRoleExecute(r ApiRolesDeleteRoleRequest) (m
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/{roleName}"
+	localVarPath := localBasePath + "/api/v1alpha/roles/{roleName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -453,7 +453,7 @@ func (a *RolesAPIService) RolesDescribeRoleExecute(r ApiRolesDescribeRoleRequest
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/{roleName}"
+	localVarPath := localBasePath + "/api/v1alpha/roles/{roleName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -583,7 +583,7 @@ func (a *RolesAPIService) RolesListRolesExecute(r ApiRolesListRolesRequest) (*Ro
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles"
+	localVarPath := localBasePath + "/api/v1alpha/roles"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -709,7 +709,7 @@ func (a *RolesAPIService) RolesUpdateRoleExecute(r ApiRolesUpdateRoleRequest) (*
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/roles/{roleName}"
+	localVarPath := localBasePath + "/api/v1alpha/roles/{roleName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)

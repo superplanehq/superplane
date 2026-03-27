@@ -1243,24 +1243,24 @@ const file_secrets_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x04 \x01(\tR\bdomainId\"N\n" +
 	"\x18UpdateSecretNameResponse\x122\n" +
-	"\x06secret\x18\x01 \x01(\v2\x1a.Superplane.Secrets.SecretR\x06secret2\x9f\x0e\n" +
-	"\aSecrets\x12\xb3\x01\n" +
-	"\fCreateSecret\x12'.Superplane.Secrets.CreateSecretRequest\x1a(.Superplane.Secrets.CreateSecretResponse\"P\x92A3\n" +
-	"\x06Secret\x12\x13Create a new secret\x1a\x14Creates a new secret\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/api/v1/secrets\x12\xd6\x01\n" +
-	"\x0eDescribeSecret\x12).Superplane.Secrets.DescribeSecretRequest\x1a*.Superplane.Secrets.DescribeSecretResponse\"m\x92AF\n" +
-	"\x06Secret\x12\x12Get secret details\x1a(Returns the details of a specific secret\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/secrets/{id_or_name}\x12\xad\x01\n" +
-	"\vListSecrets\x12&.Superplane.Secrets.ListSecretsRequest\x1a'.Superplane.Secrets.ListSecretsResponse\"M\x92A3\n" +
-	"\x06Secret\x12\fList secrets\x1a\x1bReturns the list of secrets\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/secrets\x12\xc5\x01\n" +
-	"\fUpdateSecret\x12'.Superplane.Secrets.UpdateSecretRequest\x1a(.Superplane.Secrets.UpdateSecretResponse\"b\x92A8\n" +
-	"\x06Secret\x12\x10Updates a secret\x1a\x1cUpdates the specified secret\x82\xd3\xe4\x93\x02!:\x01*2\x1c/api/v1/secrets/{id_or_name}\x12\xc2\x01\n" +
-	"\fDeleteSecret\x12'.Superplane.Secrets.DeleteSecretRequest\x1a(.Superplane.Secrets.DeleteSecretResponse\"_\x92A8\n" +
-	"\x06Secret\x12\x10Deletes a secret\x1a\x1cDeletes the specified secret\x82\xd3\xe4\x93\x02\x1e*\x1c/api/v1/secrets/{id_or_name}\x12\xa2\x02\n" +
-	"\fSetSecretKey\x12'.Superplane.Secrets.SetSecretKeyRequest\x1a(.Superplane.Secrets.SetSecretKeyResponse\"\xbe\x01\x92A\x83\x01\n" +
-	"\x06Secret\x12)Set or overwrite a single key in a secret\x1aNSets the value for one key. Creates the key if missing, overwrites if present.\x82\xd3\xe4\x93\x021:\x01*\x1a,/api/v1/secrets/{id_or_name}/keys/{key_name}\x12\x97\x02\n" +
-	"\x0fDeleteSecretKey\x12*.Superplane.Secrets.DeleteSecretKeyRequest\x1a+.Superplane.Secrets.DeleteSecretKeyResponse\"\xaa\x01\x92As\n" +
-	"\x06Secret\x12\x1aRemove a key from a secret\x1aMRemoves one key from the secret. Secret must have at least one key remaining.\x82\xd3\xe4\x93\x02.*,/api/v1/secrets/{id_or_name}/keys/{key_name}\x12\x88\x02\n" +
-	"\x10UpdateSecretName\x12+.Superplane.Secrets.UpdateSecretNameRequest\x1a,.Superplane.Secrets.UpdateSecretNameResponse\"\x98\x01\x92Ai\n" +
-	"\x06Secret\x12\x12Update secret name\x1aKUpdates only the name of the secret. Name must be unique within the domain.\x82\xd3\xe4\x93\x02&:\x01*2!/api/v1/secrets/{id_or_name}/nameB\xc5\x01\x92A\x8a\x01\x12`\n" +
+	"\x06secret\x18\x01 \x01(\v2\x1a.Superplane.Secrets.SecretR\x06secret2\xc7\x0e\n" +
+	"\aSecrets\x12\xb8\x01\n" +
+	"\fCreateSecret\x12'.Superplane.Secrets.CreateSecretRequest\x1a(.Superplane.Secrets.CreateSecretResponse\"U\x92A3\n" +
+	"\x06Secret\x12\x13Create a new secret\x1a\x14Creates a new secret\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1alpha/secrets\x12\xdb\x01\n" +
+	"\x0eDescribeSecret\x12).Superplane.Secrets.DescribeSecretRequest\x1a*.Superplane.Secrets.DescribeSecretResponse\"r\x92AF\n" +
+	"\x06Secret\x12\x12Get secret details\x1a(Returns the details of a specific secret\x82\xd3\xe4\x93\x02#\x12!/api/v1alpha/secrets/{id_or_name}\x12\xb2\x01\n" +
+	"\vListSecrets\x12&.Superplane.Secrets.ListSecretsRequest\x1a'.Superplane.Secrets.ListSecretsResponse\"R\x92A3\n" +
+	"\x06Secret\x12\fList secrets\x1a\x1bReturns the list of secrets\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1alpha/secrets\x12\xca\x01\n" +
+	"\fUpdateSecret\x12'.Superplane.Secrets.UpdateSecretRequest\x1a(.Superplane.Secrets.UpdateSecretResponse\"g\x92A8\n" +
+	"\x06Secret\x12\x10Updates a secret\x1a\x1cUpdates the specified secret\x82\xd3\xe4\x93\x02&:\x01*2!/api/v1alpha/secrets/{id_or_name}\x12\xc7\x01\n" +
+	"\fDeleteSecret\x12'.Superplane.Secrets.DeleteSecretRequest\x1a(.Superplane.Secrets.DeleteSecretResponse\"d\x92A8\n" +
+	"\x06Secret\x12\x10Deletes a secret\x1a\x1cDeletes the specified secret\x82\xd3\xe4\x93\x02#*!/api/v1alpha/secrets/{id_or_name}\x12\xa7\x02\n" +
+	"\fSetSecretKey\x12'.Superplane.Secrets.SetSecretKeyRequest\x1a(.Superplane.Secrets.SetSecretKeyResponse\"\xc3\x01\x92A\x83\x01\n" +
+	"\x06Secret\x12)Set or overwrite a single key in a secret\x1aNSets the value for one key. Creates the key if missing, overwrites if present.\x82\xd3\xe4\x93\x026:\x01*\x1a1/api/v1alpha/secrets/{id_or_name}/keys/{key_name}\x12\x9c\x02\n" +
+	"\x0fDeleteSecretKey\x12*.Superplane.Secrets.DeleteSecretKeyRequest\x1a+.Superplane.Secrets.DeleteSecretKeyResponse\"\xaf\x01\x92As\n" +
+	"\x06Secret\x12\x1aRemove a key from a secret\x1aMRemoves one key from the secret. Secret must have at least one key remaining.\x82\xd3\xe4\x93\x023*1/api/v1alpha/secrets/{id_or_name}/keys/{key_name}\x12\x8d\x02\n" +
+	"\x10UpdateSecretName\x12+.Superplane.Secrets.UpdateSecretNameRequest\x1a,.Superplane.Secrets.UpdateSecretNameResponse\"\x9d\x01\x92Ai\n" +
+	"\x06Secret\x12\x12Update secret name\x1aKUpdates only the name of the secret. Name must be unique within the domain.\x82\xd3\xe4\x93\x02+:\x01*2&/api/v1alpha/secrets/{id_or_name}/nameB\xc5\x01\x92A\x8a\x01\x12`\n" +
 	"\x16Superplane Secrets API\x12\x1aAPI for Superplane Secrets\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/secretsb\x06proto3"
 

@@ -294,12 +294,12 @@ const file_widgets_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x12\n" +
 	"\x04icon\x18\x04 \x01(\tR\x04icon\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\tR\x05color\x12E\n" +
-	"\rconfiguration\x18\x06 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration2\x89\x03\n" +
-	"\aWidgets\x12\xb9\x01\n" +
-	"\vListWidgets\x12&.Superplane.Widgets.ListWidgetsRequest\x1a'.Superplane.Widgets.ListWidgetsResponse\"Y\x92A?\n" +
-	"\x06Widget\x12\fList widgets\x1a'Returns a list of all available widgets\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/widgets\x12\xc1\x01\n" +
-	"\x0eDescribeWidget\x12).Superplane.Widgets.DescribeWidgetRequest\x1a*.Superplane.Widgets.DescribeWidgetResponse\"X\x92A7\n" +
-	"\x06Widget\x12\x0fDescribe widget\x1a\x1cReturns a widget by its name\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/widgets/{name}B\xc5\x01\x92A\x8a\x01\x12`\n" +
+	"\rconfiguration\x18\x06 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration2\x93\x03\n" +
+	"\aWidgets\x12\xbe\x01\n" +
+	"\vListWidgets\x12&.Superplane.Widgets.ListWidgetsRequest\x1a'.Superplane.Widgets.ListWidgetsResponse\"^\x92A?\n" +
+	"\x06Widget\x12\fList widgets\x1a'Returns a list of all available widgets\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1alpha/widgets\x12\xc6\x01\n" +
+	"\x0eDescribeWidget\x12).Superplane.Widgets.DescribeWidgetRequest\x1a*.Superplane.Widgets.DescribeWidgetResponse\"]\x92A7\n" +
+	"\x06Widget\x12\x0fDescribe widget\x1a\x1cReturns a widget by its name\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1alpha/widgets/{name}B\xc5\x01\x92A\x8a\x01\x12`\n" +
 	"\x16Superplane Widgets API\x12\x1aAPI for Superplane Widgets\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/widgetsb\x06proto3"
 

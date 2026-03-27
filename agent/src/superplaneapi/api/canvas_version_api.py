@@ -316,7 +316,7 @@ class CanvasVersionApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/canvases/{canvasId}/versions',
+            resource_path='/api/v1alpha/canvases/{canvasId}/versions',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -591,7 +591,7 @@ class CanvasVersionApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/canvases/{canvasId}/versions/{versionId}',
+            resource_path='/api/v1alpha/canvases/{canvasId}/versions/{versionId}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -894,7 +894,7 @@ class CanvasVersionApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/canvases/{canvasId}/versions',
+            resource_path='/api/v1alpha/canvases/{canvasId}/versions',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1197,7 +1197,7 @@ class CanvasVersionApi:
 
         return self.api_client.param_serialize(
             method='PUT',
-            resource_path='/api/v1/canvases/{canvasId}/versions/{versionId}',
+            resource_path='/api/v1alpha/canvases/{canvasId}/versions/{versionId}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1485,7 +1485,7 @@ class CanvasVersionApi:
 
         return self.api_client.param_serialize(
             method='PUT',
-            resource_path='/api/v1/canvases/{canvasId}/versions',
+            resource_path='/api/v1alpha/canvases/{canvasId}/versions',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

@@ -69,7 +69,7 @@ func (a *CanvasAPIService) CanvasesCreateCanvasExecute(r ApiCanvasesCreateCanvas
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases"
+	localVarPath := localBasePath + "/api/v1alpha/canvases"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -185,7 +185,7 @@ func (a *CanvasAPIService) CanvasesDeleteCanvasExecute(r ApiCanvasesDeleteCanvas
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{id}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -300,7 +300,7 @@ func (a *CanvasAPIService) CanvasesDeleteCanvasMemoryExecute(r ApiCanvasesDelete
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/memory/{memoryId}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/memory/{memoryId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"memoryId"+"}", url.PathEscape(parameterValueToString(r.memoryId, "memoryId")), -1)
 
@@ -413,7 +413,7 @@ func (a *CanvasAPIService) CanvasesDescribeCanvasExecute(r ApiCanvasesDescribeCa
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{id}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -525,7 +525,7 @@ func (a *CanvasAPIService) CanvasesListCanvasMemoriesExecute(r ApiCanvasesListCa
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/memory"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/memory"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -640,7 +640,7 @@ func (a *CanvasAPIService) CanvasesListCanvasesExecute(r ApiCanvasesListCanvases
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases"
+	localVarPath := localBasePath + "/api/v1alpha/canvases"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -760,7 +760,7 @@ func (a *CanvasAPIService) CanvasesUpdateCanvasExecute(r ApiCanvasesUpdateCanvas
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{id}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)

@@ -34,7 +34,7 @@ func Test__ElasticWebhookHandler__Setup__CreatesConnectorWithoutRule(t *testing.
 		},
 	}
 	webhookCtx := &contexts.WebhookContext{
-		URL: "https://superplane.example.com/api/v1/webhooks/elastic-123",
+		URL: "https://superplane.example.com/api/v1alpha/webhooks/elastic-123",
 		Configuration: map[string]any{
 			"kibanaUrl": "https://kibana.example.com",
 			"ruleId":    "",
@@ -69,7 +69,7 @@ func Test__ElasticWebhookHandler__Setup__ReusesExistingConnectorAndAttachesSelec
 						"name":"SuperPlane Alert",
 						"connector_type_id":".webhook",
 						"config":{
-							"url":"https://superplane.example.com/api/v1/webhooks/elastic-123",
+							"url":"https://superplane.example.com/api/v1alpha/webhooks/elastic-123",
 							"method":"post",
 							"headers":{"X-Superplane-Secret":"existing-secret"}
 						}
@@ -110,7 +110,7 @@ func Test__ElasticWebhookHandler__Setup__ReusesExistingConnectorAndAttachesSelec
 		},
 	}
 	webhookCtx := &contexts.WebhookContext{
-		URL: "https://superplane.example.com/api/v1/webhooks/elastic-123",
+		URL: "https://superplane.example.com/api/v1alpha/webhooks/elastic-123",
 		Configuration: map[string]any{
 			"kibanaUrl": "https://kibana.example.com",
 			"ruleId":    "rule-123",
@@ -154,7 +154,7 @@ func Test__ElasticWebhookHandler__Setup__DetachesPreviousRuleWhenRuleChanges(t *
 						"name":"SuperPlane Alert",
 						"connector_type_id":".webhook",
 						"config":{
-							"url":"https://superplane.example.com/api/v1/webhooks/elastic-123",
+							"url":"https://superplane.example.com/api/v1alpha/webhooks/elastic-123",
 							"method":"post",
 							"headers":{"X-Superplane-Secret":"existing-secret"}
 						}
@@ -213,7 +213,7 @@ func Test__ElasticWebhookHandler__Setup__DetachesPreviousRuleWhenRuleChanges(t *
 		},
 	}
 	webhookCtx := &contexts.WebhookContext{
-		URL:      "https://superplane.example.com/api/v1/webhooks/elastic-123",
+		URL:      "https://superplane.example.com/api/v1alpha/webhooks/elastic-123",
 		Metadata: map[string]any{"connectorId": "connector-456", "ruleId": "rule-old"},
 		Configuration: map[string]any{
 			"kibanaUrl": "https://kibana.example.com",

@@ -66,7 +66,7 @@ func RegisterIntegrationsHandlerServer(ctx context.Context, mux *runtime.ServeMu
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/integrations"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1alpha/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -124,7 +124,7 @@ func RegisterIntegrationsHandlerClient(ctx context.Context, mux *runtime.ServeMu
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/integrations"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Integrations.Integrations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1alpha/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -141,7 +141,7 @@ func RegisterIntegrationsHandlerClient(ctx context.Context, mux *runtime.ServeMu
 }
 
 var (
-	pattern_Integrations_ListIntegrations_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "integrations"}, ""))
+	pattern_Integrations_ListIntegrations_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha", "integrations"}, ""))
 )
 
 var (

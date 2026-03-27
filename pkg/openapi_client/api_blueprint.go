@@ -69,7 +69,7 @@ func (a *BlueprintAPIService) BlueprintsCreateBlueprintExecute(r ApiBlueprintsCr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/blueprints"
+	localVarPath := localBasePath + "/api/v1alpha/blueprints"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -185,7 +185,7 @@ func (a *BlueprintAPIService) BlueprintsDeleteBlueprintExecute(r ApiBlueprintsDe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/blueprints/{id}"
+	localVarPath := localBasePath + "/api/v1alpha/blueprints/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -297,7 +297,7 @@ func (a *BlueprintAPIService) BlueprintsDescribeBlueprintExecute(r ApiBlueprints
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/blueprints/{id}"
+	localVarPath := localBasePath + "/api/v1alpha/blueprints/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -406,7 +406,7 @@ func (a *BlueprintAPIService) BlueprintsListBlueprintsExecute(r ApiBlueprintsLis
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/blueprints"
+	localVarPath := localBasePath + "/api/v1alpha/blueprints"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -523,7 +523,7 @@ func (a *BlueprintAPIService) BlueprintsUpdateBlueprintExecute(r ApiBlueprintsUp
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/blueprints/{id}"
+	localVarPath := localBasePath + "/api/v1alpha/blueprints/{id}"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)

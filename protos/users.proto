@@ -33,7 +33,7 @@ service Users {
   //
   rpc ListUserPermissions(ListUserPermissionsRequest) returns (ListUserPermissionsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/permissions"
+      get: "/api/v1alpha/users/{user_id}/permissions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List user permissions";
@@ -48,7 +48,7 @@ service Users {
   //
   rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/roles"
+      get: "/api/v1alpha/users/{user_id}/roles"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get user roles";
@@ -63,7 +63,7 @@ service Users {
   //
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/users"
+      get: "/api/v1alpha/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List users";

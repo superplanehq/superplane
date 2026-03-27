@@ -216,7 +216,7 @@ func (g *GitLab) Sync(ctx core.SyncContext) error {
 
 func (g *GitLab) oauthSync(ctx core.SyncContext, configuration Configuration) error {
 	baseURL := configuration.BaseURL
-	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
+	callbackURL := fmt.Sprintf("%s/api/v1alpha/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
 
 	clientID, _ := ctx.Integration.GetConfig("clientId")
 	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
@@ -432,7 +432,7 @@ func (g *GitLab) handleCallback(ctx core.HTTPRequestContext, config *Configurati
 		return
 	}
 
-	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", redirectBaseURL, ctx.Integration.ID().String())
+	redirectURI := fmt.Sprintf("%s/api/v1alpha/integrations/%s/callback", redirectBaseURL, ctx.Integration.ID().String())
 
 	auth := NewAuth(ctx.HTTP)
 	tokenResponse, err := auth.HandleCallback(ctx.Request, config, *metadata.State, redirectURI)

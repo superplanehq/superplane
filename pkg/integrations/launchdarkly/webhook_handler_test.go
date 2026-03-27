@@ -50,7 +50,7 @@ func Test__LaunchDarklyWebhookHandler__Merge(t *testing.T) {
 func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 	handler := &LaunchDarklyWebhookHandler{}
 
-	createWebhookResponse := `{"_id":"ld-webhook-abc123","url":"https://example.com/api/v1/webhooks/w1","secret":"auto-generated-secret","on":true,"sign":true}`
+	createWebhookResponse := `{"_id":"ld-webhook-abc123","url":"https://example.com/api/v1alpha/webhooks/w1","secret":"auto-generated-secret","on":true,"sign":true}`
 
 	t.Run("creates webhook in LaunchDarkly and stores secret", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
@@ -67,7 +67,7 @@ func Test__LaunchDarklyWebhookHandler__Setup(t *testing.T) {
 		}
 
 		webhookCtx := &contexts.WebhookContext{
-			URL:           "https://example.com/api/v1/webhooks/w1",
+			URL:           "https://example.com/api/v1alpha/webhooks/w1",
 			Configuration: WebhookConfiguration{ProjectKey: "default"},
 		}
 

@@ -32,7 +32,7 @@ service Roles {
   //
   rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/roles"
+      get: "/api/v1alpha/roles"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List roles";
@@ -47,7 +47,7 @@ service Roles {
   //
   rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse) {
     option (google.api.http) = {
-      post: "/api/v1/roles"
+      post: "/api/v1alpha/roles"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -63,7 +63,7 @@ service Roles {
   //
   rpc DescribeRole(DescribeRoleRequest) returns (DescribeRoleResponse) {
     option (google.api.http) = {
-      get: "/api/v1/roles/{role_name}"
+      get: "/api/v1alpha/roles/{role_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe role";
@@ -78,7 +78,7 @@ service Roles {
   //
   rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse) {
     option (google.api.http) = {
-      put: "/api/v1/roles/{role_name}"
+      put: "/api/v1alpha/roles/{role_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -94,7 +94,7 @@ service Roles {
   //
   rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/roles/{role_name}"
+      delete: "/api/v1alpha/roles/{role_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete role";
@@ -109,7 +109,7 @@ service Roles {
   //
   rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
     option (google.api.http) = {
-      post: "/api/v1/roles/{role_name}/users"
+      post: "/api/v1alpha/roles/{role_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {

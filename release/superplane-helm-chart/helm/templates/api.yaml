@@ -81,7 +81,7 @@ spec:
             - name: START_RBAC_POLICY_RELOAD_CONSUMER
               value: "yes"
             - name: PUBLIC_API_BASE_PATH
-              value: "/api/v1"
+              value: "/api/v1alpha"
             - name: WEB_BASE_PATH
               value: ""
             - name: SWAGGER_BASE_PATH

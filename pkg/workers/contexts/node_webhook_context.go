@@ -92,8 +92,8 @@ func (c *NodeWebhookContext) Setup() (string, error) {
 	}
 
 	c.node.WebhookID = &webhook.ID
-	// Must include /api/v1 to match the public route; WebhookContext.GetURL uses the same pattern
-	return fmt.Sprintf("%s/api/v1/webhooks/%s", c.GetBaseURL(), webhook.ID.String()), nil
+	// Must include /api/v1alpha to match the public route; WebhookContext.GetURL uses the same pattern
+	return fmt.Sprintf("%s/api/v1alpha/webhooks/%s", c.GetBaseURL(), webhook.ID.String()), nil
 }
 
 func (c *NodeWebhookContext) findOrCreateWebhook() (*models.Webhook, error) {

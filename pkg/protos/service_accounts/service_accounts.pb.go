@@ -719,20 +719,20 @@ const file_service_accounts_proto_rawDesc = "" +
 	"$RegenerateServiceAccountTokenRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"=\n" +
 	"%RegenerateServiceAccountTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token2\xba\r\n" +
-	"\x0fServiceAccounts\x12\x90\x02\n" +
-	"\x14CreateServiceAccount\x127.Superplane.ServiceAccounts.CreateServiceAccountRequest\x1a8.Superplane.ServiceAccounts.CreateServiceAccountResponse\"\x84\x01\x92A^\n" +
-	"\x0fServiceAccounts\x12\x18Create a service account\x1a1Creates a new service account in the organization\x82\xd3\xe4\x93\x02\x1d:\x01*\"\x18/api/v1/service-accounts\x12\x85\x02\n" +
-	"\x13ListServiceAccounts\x126.Superplane.ServiceAccounts.ListServiceAccountsRequest\x1a7.Superplane.ServiceAccounts.ListServiceAccountsResponse\"}\x92AZ\n" +
-	"\x0fServiceAccounts\x12\x15List service accounts\x1a0Returns all service accounts in the organization\x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/service-accounts\x12\x96\x02\n" +
-	"\x16DescribeServiceAccount\x129.Superplane.ServiceAccounts.DescribeServiceAccountRequest\x1a:.Superplane.ServiceAccounts.DescribeServiceAccountResponse\"\x84\x01\x92A\\\n" +
-	"\x0fServiceAccounts\x12\x1aDescribe a service account\x1a-Returns details of a specific service account\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/service-accounts/{id}\x12\x98\x02\n" +
-	"\x14UpdateServiceAccount\x127.Superplane.ServiceAccounts.UpdateServiceAccountRequest\x1a8.Superplane.ServiceAccounts.UpdateServiceAccountResponse\"\x8c\x01\x92Aa\n" +
-	"\x0fServiceAccounts\x12\x18Update a service account\x1a4Updates the name or description of a service account\x82\xd3\xe4\x93\x02\":\x01*2\x1d/api/v1/service-accounts/{id}\x12\x98\x02\n" +
-	"\x14DeleteServiceAccount\x127.Superplane.ServiceAccounts.DeleteServiceAccountRequest\x1a8.Superplane.ServiceAccounts.DeleteServiceAccountResponse\"\x8c\x01\x92Ad\n" +
-	"\x0fServiceAccounts\x12\x18Delete a service account\x1a7Deletes a service account and removes its RBAC policies\x82\xd3\xe4\x93\x02\x1f*\x1d/api/v1/service-accounts/{id}\x12\xbc\x02\n" +
-	"\x1dRegenerateServiceAccountToken\x12@.Superplane.ServiceAccounts.RegenerateServiceAccountTokenRequest\x1aA.Superplane.ServiceAccounts.RegenerateServiceAccountTokenResponse\"\x95\x01\x92Ad\n" +
-	"\x0fServiceAccounts\x12 Regenerate service account token\x1a/Regenerates the API token for a service account\x82\xd3\xe4\x93\x02(:\x01*\"#/api/v1/service-accounts/{id}/tokenB\xe0\x01\x92A\x9c\x01\x12r\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token2\xd9\r\n" +
+	"\x0fServiceAccounts\x12\x95\x02\n" +
+	"\x14CreateServiceAccount\x127.Superplane.ServiceAccounts.CreateServiceAccountRequest\x1a8.Superplane.ServiceAccounts.CreateServiceAccountResponse\"\x89\x01\x92A^\n" +
+	"\x0fServiceAccounts\x12\x18Create a service account\x1a1Creates a new service account in the organization\x82\xd3\xe4\x93\x02\":\x01*\"\x1d/api/v1alpha/service-accounts\x12\x8b\x02\n" +
+	"\x13ListServiceAccounts\x126.Superplane.ServiceAccounts.ListServiceAccountsRequest\x1a7.Superplane.ServiceAccounts.ListServiceAccountsResponse\"\x82\x01\x92AZ\n" +
+	"\x0fServiceAccounts\x12\x15List service accounts\x1a0Returns all service accounts in the organization\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1alpha/service-accounts\x12\x9b\x02\n" +
+	"\x16DescribeServiceAccount\x129.Superplane.ServiceAccounts.DescribeServiceAccountRequest\x1a:.Superplane.ServiceAccounts.DescribeServiceAccountResponse\"\x89\x01\x92A\\\n" +
+	"\x0fServiceAccounts\x12\x1aDescribe a service account\x1a-Returns details of a specific service account\x82\xd3\xe4\x93\x02$\x12\"/api/v1alpha/service-accounts/{id}\x12\x9d\x02\n" +
+	"\x14UpdateServiceAccount\x127.Superplane.ServiceAccounts.UpdateServiceAccountRequest\x1a8.Superplane.ServiceAccounts.UpdateServiceAccountResponse\"\x91\x01\x92Aa\n" +
+	"\x0fServiceAccounts\x12\x18Update a service account\x1a4Updates the name or description of a service account\x82\xd3\xe4\x93\x02':\x01*2\"/api/v1alpha/service-accounts/{id}\x12\x9d\x02\n" +
+	"\x14DeleteServiceAccount\x127.Superplane.ServiceAccounts.DeleteServiceAccountRequest\x1a8.Superplane.ServiceAccounts.DeleteServiceAccountResponse\"\x91\x01\x92Ad\n" +
+	"\x0fServiceAccounts\x12\x18Delete a service account\x1a7Deletes a service account and removes its RBAC policies\x82\xd3\xe4\x93\x02$*\"/api/v1alpha/service-accounts/{id}\x12\xc1\x02\n" +
+	"\x1dRegenerateServiceAccountToken\x12@.Superplane.ServiceAccounts.RegenerateServiceAccountTokenRequest\x1aA.Superplane.ServiceAccounts.RegenerateServiceAccountTokenResponse\"\x9a\x01\x92Ad\n" +
+	"\x0fServiceAccounts\x12 Regenerate service account token\x1a/Regenerates the API token for a service account\x82\xd3\xe4\x93\x02-:\x01*\"(/api/v1alpha/service-accounts/{id}/tokenB\xe0\x01\x92A\x9c\x01\x12r\n" +
 	"\x1fSuperplane Service Accounts API\x12#API for Superplane Service Accounts\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ>github.com/superplanehq/superplane/pkg/protos/service_accountsb\x06proto3"
 

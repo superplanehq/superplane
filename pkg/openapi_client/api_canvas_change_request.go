@@ -76,7 +76,7 @@ func (a *CanvasChangeRequestAPIService) CanvasesActOnCanvasChangeRequestExecute(
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/actions"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"changeRequestId"+"}", url.PathEscape(parameterValueToString(r.changeRequestId, "changeRequestId")), -1)
 
@@ -200,7 +200,7 @@ func (a *CanvasChangeRequestAPIService) CanvasesCreateCanvasChangeRequestExecute
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/change-requests"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/change-requests"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -320,7 +320,7 @@ func (a *CanvasChangeRequestAPIService) CanvasesDescribeCanvasChangeRequestExecu
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"changeRequestId"+"}", url.PathEscape(parameterValueToString(r.changeRequestId, "changeRequestId")), -1)
 
@@ -463,7 +463,7 @@ func (a *CanvasChangeRequestAPIService) CanvasesListCanvasChangeRequestsExecute(
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/change-requests"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/change-requests"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -599,7 +599,7 @@ func (a *CanvasChangeRequestAPIService) CanvasesResolveCanvasChangeRequestExecut
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/resolve"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"changeRequestId"+"}", url.PathEscape(parameterValueToString(r.changeRequestId, "changeRequestId")), -1)
 

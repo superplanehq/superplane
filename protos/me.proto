@@ -31,7 +31,7 @@ service Me {
   //
   rpc Me(google.protobuf.Empty) returns (User) {
     option (google.api.http) = {
-      get: "/api/v1/me"
+      get: "/api/v1alpha/me"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get current user";
@@ -45,7 +45,7 @@ service Me {
   //
   rpc RegenerateToken(google.protobuf.Empty) returns (RegenerateTokenResponse) {
     option (google.api.http) = {
-      post: "/api/v1/me/token"
+      post: "/api/v1alpha/me/token"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Regenerate API token";

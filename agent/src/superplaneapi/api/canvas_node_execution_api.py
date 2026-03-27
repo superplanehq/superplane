@@ -328,7 +328,7 @@ class CanvasNodeExecutionApi:
 
         return self.api_client.param_serialize(
             method='PATCH',
-            resource_path='/api/v1/canvases/{canvasId}/executions/{executionId}/cancel',
+            resource_path='/api/v1alpha/canvases/{canvasId}/executions/{executionId}/cancel',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -646,7 +646,7 @@ class CanvasNodeExecutionApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}',
+            resource_path='/api/v1alpha/canvases/{canvasId}/executions/{executionId}/actions/{actionName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -949,7 +949,7 @@ class CanvasNodeExecutionApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/canvases/{canvasId}/executions/{executionId}/children',
+            resource_path='/api/v1alpha/canvases/{canvasId}/executions/{executionId}/children',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1237,7 +1237,7 @@ class CanvasNodeExecutionApi:
 
         return self.api_client.param_serialize(
             method='PATCH',
-            resource_path='/api/v1/canvases/{canvasId}/executions/resolve',
+            resource_path='/api/v1alpha/canvases/{canvasId}/executions/resolve',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

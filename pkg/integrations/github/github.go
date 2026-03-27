@@ -485,10 +485,10 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"statuses":                    "write",
 			"organization_administration": "read",
 		},
-		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
-		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
+		"setup_url":    fmt.Sprintf(`%s/api/v1alpha/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
+		"redirect_url": fmt.Sprintf(`%s/api/v1alpha/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"hook_attributes": map[string]any{
-			"url": fmt.Sprintf(`%s/api/v1/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.Integration.ID().String()),
+			"url": fmt.Sprintf(`%s/api/v1alpha/integrations/%s/webhook`, ctx.WebhooksBaseURL, ctx.Integration.ID().String()),
 		},
 	}
 

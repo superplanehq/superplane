@@ -909,25 +909,26 @@ const file_roles_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12F\n" +
 	"\vpermissions\x18\x03 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12=\n" +
-	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\xe8\t\n" +
-	"\x05Roles\x12\xdd\x01\n" +
-	"\tListRoles\x12\".Superplane.Roles.ListRolesRequest\x1a#.Superplane.Roles.ListRolesResponse\"\x86\x01\x92An\n" +
+	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\x86\n" +
+	"\n" +
+	"\x05Roles\x12\xe2\x01\n" +
+	"\tListRoles\x12\".Superplane.Roles.ListRolesRequest\x1a#.Superplane.Roles.ListRolesResponse\"\x8b\x01\x92An\n" +
 	"\x05Roles\x12\n" +
-	"List roles\x1aYReturns available roles for a specific domain type with their permissions and inheritance\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/roles\x12\xbe\x01\n" +
+	"List roles\x1aYReturns available roles for a specific domain type with their permissions and inheritance\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1alpha/roles\x12\xc3\x01\n" +
 	"\n" +
-	"CreateRole\x12#.Superplane.Roles.CreateRoleRequest\x1a$.Superplane.Roles.CreateRoleResponse\"e\x92AJ\n" +
-	"\x05Roles\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/api/v1/roles\x12\xf4\x01\n" +
-	"\fDescribeRole\x12%.Superplane.Roles.DescribeRoleRequest\x1a&.Superplane.Roles.DescribeRoleResponse\"\x94\x01\x92Ap\n" +
-	"\x05Roles\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/roles/{role_name}\x12\xca\x01\n" +
+	"CreateRole\x12#.Superplane.Roles.CreateRoleRequest\x1a$.Superplane.Roles.CreateRoleResponse\"j\x92AJ\n" +
+	"\x05Roles\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1alpha/roles\x12\xf9\x01\n" +
+	"\fDescribeRole\x12%.Superplane.Roles.DescribeRoleRequest\x1a&.Superplane.Roles.DescribeRoleResponse\"\x99\x01\x92Ap\n" +
+	"\x05Roles\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1alpha/roles/{role_name}\x12\xcf\x01\n" +
 	"\n" +
-	"UpdateRole\x12#.Superplane.Roles.UpdateRoleRequest\x1a$.Superplane.Roles.UpdateRoleResponse\"q\x92AJ\n" +
-	"\x05Roles\x12\vUpdate role\x1a4Updates an existing custom role with new permissions\x82\xd3\xe4\x93\x02\x1e:\x01*\x1a\x19/api/v1/roles/{role_name}\x12\xb2\x01\n" +
+	"UpdateRole\x12#.Superplane.Roles.UpdateRoleRequest\x1a$.Superplane.Roles.UpdateRoleResponse\"v\x92AJ\n" +
+	"\x05Roles\x12\vUpdate role\x1a4Updates an existing custom role with new permissions\x82\xd3\xe4\x93\x02#:\x01*\x1a\x1e/api/v1alpha/roles/{role_name}\x12\xb7\x01\n" +
 	"\n" +
-	"DeleteRole\x12#.Superplane.Roles.DeleteRoleRequest\x1a$.Superplane.Roles.DeleteRoleResponse\"Y\x92A5\n" +
-	"\x05Roles\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02\x1b*\x19/api/v1/roles/{role_name}\x12\xc4\x01\n" +
+	"DeleteRole\x12#.Superplane.Roles.DeleteRoleRequest\x1a$.Superplane.Roles.DeleteRoleResponse\"^\x92A5\n" +
+	"\x05Roles\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02 *\x1e/api/v1alpha/roles/{role_name}\x12\xc9\x01\n" +
 	"\n" +
-	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"k\x92A>\n" +
-	"\x05Roles\x12\vAssign role\x1a(Assigns a role to a user within a domain\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/roles/{role_name}/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
+	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"p\x92A>\n" +
+	"\x05Roles\x12\vAssign role\x1a(Assigns a role to a user within a domain\x82\xd3\xe4\x93\x02):\x01*\"$/api/v1alpha/roles/{role_name}/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
 	"\x14Superplane Roles API\x12\x18API for Superplane Roles\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/rolesb\x06proto3"
 

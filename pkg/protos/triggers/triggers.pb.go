@@ -304,12 +304,12 @@ const file_triggers_proto_rawDesc = "" +
 	"\x04icon\x18\x04 \x01(\tR\x04icon\x12\x14\n" +
 	"\x05color\x18\x05 \x01(\tR\x05color\x12E\n" +
 	"\rconfiguration\x18\x06 \x03(\v2\x1f.Superplane.Configuration.FieldR\rconfiguration\x12:\n" +
-	"\fexample_data\x18\a \x01(\v2\x17.google.protobuf.StructR\vexampleData2\x9c\x03\n" +
-	"\bTriggers\x12\xc2\x01\n" +
-	"\fListTriggers\x12(.Superplane.Triggers.ListTriggersRequest\x1a).Superplane.Triggers.ListTriggersResponse\"]\x92AB\n" +
-	"\aTrigger\x12\rList triggers\x1a(Returns a list of all available triggers\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/triggers\x12\xca\x01\n" +
-	"\x0fDescribeTrigger\x12+.Superplane.Triggers.DescribeTriggerRequest\x1a,.Superplane.Triggers.DescribeTriggerResponse\"\\\x92A:\n" +
-	"\aTrigger\x12\x10Describe trigger\x1a\x1dReturns a trigger by its name\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/triggers/{name}B\xc8\x01\x92A\x8c\x01\x12b\n" +
+	"\fexample_data\x18\a \x01(\v2\x17.google.protobuf.StructR\vexampleData2\xa6\x03\n" +
+	"\bTriggers\x12\xc7\x01\n" +
+	"\fListTriggers\x12(.Superplane.Triggers.ListTriggersRequest\x1a).Superplane.Triggers.ListTriggersResponse\"b\x92AB\n" +
+	"\aTrigger\x12\rList triggers\x1a(Returns a list of all available triggers\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1alpha/triggers\x12\xcf\x01\n" +
+	"\x0fDescribeTrigger\x12+.Superplane.Triggers.DescribeTriggerRequest\x1a,.Superplane.Triggers.DescribeTriggerResponse\"a\x92A:\n" +
+	"\aTrigger\x12\x10Describe trigger\x1a\x1dReturns a trigger by its name\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1alpha/triggers/{name}B\xc8\x01\x92A\x8c\x01\x12b\n" +
 	"\x17Superplane Triggers API\x12\x1bAPI for Superplane Triggers\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/triggersb\x06proto3"
 

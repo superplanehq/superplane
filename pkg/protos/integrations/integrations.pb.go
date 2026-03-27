@@ -224,10 +224,10 @@ const file_integrations_proto_rawDesc = "" +
 	"components\x18\x06 \x03(\v2 .Superplane.Components.ComponentR\n" +
 	"components\x128\n" +
 	"\btriggers\x18\a \x03(\v2\x1c.Superplane.Triggers.TriggerR\btriggers\x12\"\n" +
-	"\finstructions\x18\b \x01(\tR\finstructions2\xf0\x01\n" +
-	"\fIntegrations\x12\xdf\x01\n" +
-	"\x10ListIntegrations\x120.Superplane.Integrations.ListIntegrationsRequest\x1a1.Superplane.Integrations.ListIntegrationsResponse\"f\x92AG\n" +
-	"\vIntegration\x12\x1bList available integrations\x1a\x1bList available integrations\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/integrationsB\xd4\x01\x92A\x94\x01\x12j\n" +
+	"\finstructions\x18\b \x01(\tR\finstructions2\xf5\x01\n" +
+	"\fIntegrations\x12\xe4\x01\n" +
+	"\x10ListIntegrations\x120.Superplane.Integrations.ListIntegrationsRequest\x1a1.Superplane.Integrations.ListIntegrationsResponse\"k\x92AG\n" +
+	"\vIntegration\x12\x1bList available integrations\x1a\x1bList available integrations\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1alpha/integrationsB\xd4\x01\x92A\x94\x01\x12j\n" +
 	"\x1bSuperplane Integrations API\x12\x1fAPI for Superplane Integrations\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ:github.com/superplanehq/superplane/pkg/protos/integrationsb\x06proto3"
 

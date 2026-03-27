@@ -18,7 +18,7 @@ class FakeCanvasApi:
         self, canvas_id: str, _request_timeout: int | tuple[int, int] | None = None
     ) -> CanvasesDescribeCanvasResponse:
         _ = _request_timeout
-        payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}")
+        payload = self._payloads.get(f"/api/v1alpha/canvases/{canvas_id}")
         if payload is None:
             raise ValueError(f"Missing payload for canvas: {canvas_id}")
         return CanvasesDescribeCanvasResponse.from_dict(payload)
@@ -37,7 +37,7 @@ class FakeCanvasNodeApi:
         _request_timeout: int | tuple[int, int] | None = None,
     ) -> CanvasesListNodeEventsResponse:
         _ = (limit, before, _request_timeout)
-        payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}/nodes/{node_id}/events")
+        payload = self._payloads.get(f"/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events")
         if payload is None:
             raise ValueError(f"Missing payload for node events: {canvas_id}/{node_id}")
         return CanvasesListNodeEventsResponse.from_dict(payload)
@@ -51,7 +51,7 @@ class FakeComponentApi:
         self, _request_timeout: int | tuple[int, int] | None = None
     ) -> ComponentsListComponentsResponse:
         _ = _request_timeout
-        payload = self._payloads.get("/api/v1/components")
+        payload = self._payloads.get("/api/v1alpha/components")
         if payload is None:
             raise ValueError("Missing payload for components list.")
         return ComponentsListComponentsResponse.from_dict(payload)
@@ -65,7 +65,7 @@ class FakeTriggerApi:
         self, _request_timeout: int | tuple[int, int] | None = None
     ) -> TriggersListTriggersResponse:
         _ = _request_timeout
-        payload = self._payloads.get("/api/v1/triggers")
+        payload = self._payloads.get("/api/v1alpha/triggers")
         if payload is None:
             raise ValueError("Missing payload for triggers list.")
         return TriggersListTriggersResponse.from_dict(payload)
@@ -79,7 +79,7 @@ class FakeIntegrationApi:
         self, _request_timeout: int | tuple[int, int] | None = None
     ) -> SuperplaneIntegrationsListIntegrationsResponse:
         _ = _request_timeout
-        payload = self._payloads.get("/api/v1/integrations")
+        payload = self._payloads.get("/api/v1alpha/integrations")
         if payload is None:
             raise ValueError("Missing payload for integration catalog list.")
         return SuperplaneIntegrationsListIntegrationsResponse.from_dict(payload)
@@ -104,7 +104,7 @@ class FakeSuperplaneClient(SuperplaneClient):
 def test_describe_canvas_maps_nodes_and_edges() -> None:
     client = FakeSuperplaneClient(
         payloads={
-            "/api/v1/canvases/canvas-1": {
+            "/api/v1alpha/canvases/canvas-1": {
                 "canvas": {
                     "metadata": {"id": "canvas-1", "name": "Demo"},
                     "spec": {
@@ -147,7 +147,7 @@ def test_describe_canvas_maps_nodes_and_edges() -> None:
 def test_get_node_details_includes_recent_events() -> None:
     client = FakeSuperplaneClient(
         payloads={
-            "/api/v1/canvases/canvas-1": {
+            "/api/v1alpha/canvases/canvas-1": {
                 "canvas": {
                     "metadata": {"id": "canvas-1"},
                     "spec": {
@@ -163,7 +163,7 @@ def test_get_node_details_includes_recent_events() -> None:
                     },
                 }
             },
-            "/api/v1/canvases/canvas-1/nodes/node-action/events": {
+            "/api/v1alpha/canvases/canvas-1/nodes/node-action/events": {
                 "events": [
                     {
                         "id": "evt-1",
@@ -187,7 +187,7 @@ def test_get_node_details_includes_recent_events() -> None:
 def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details() -> None:
     client = FakeSuperplaneClient(
         payloads={
-            "/api/v1/canvases/canvas-1": {
+            "/api/v1alpha/canvases/canvas-1": {
                 "canvas": {
                     "metadata": {"id": "canvas-1", "name": "Demo"},
                     "spec": {
@@ -234,8 +234,8 @@ def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details(
 def test_list_components_includes_integration_scoped_components() -> None:
     client = FakeSuperplaneClient(
         payloads={
-            "/api/v1/components": {"components": [{"name": "noop", "label": "Noop"}]},
-            "/api/v1/integrations": {
+            "/api/v1alpha/components": {"components": [{"name": "noop", "label": "Noop"}]},
+            "/api/v1alpha/integrations": {
                 "integrations": [
                     {
                         "name": "slack",
@@ -261,8 +261,8 @@ def test_list_components_includes_integration_scoped_components() -> None:
 def test_list_triggers_includes_integration_scoped_triggers() -> None:
     client = FakeSuperplaneClient(
         payloads={
-            "/api/v1/triggers": {"triggers": [{"name": "start", "label": "Manual Run"}]},
-            "/api/v1/integrations": {
+            "/api/v1alpha/triggers": {"triggers": [{"name": "start", "label": "Manual Run"}]},
+            "/api/v1alpha/integrations": {
                 "integrations": [
                     {
                         "name": "github",

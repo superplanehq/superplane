@@ -28,7 +28,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Triggers {
   rpc ListTriggers(ListTriggersRequest) returns (ListTriggersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/triggers"
+      get: "/api/v1alpha/triggers"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List triggers";
@@ -39,7 +39,7 @@ service Triggers {
 
   rpc DescribeTrigger(DescribeTriggerRequest) returns (DescribeTriggerResponse) {
     option (google.api.http) = {
-      get: "/api/v1/triggers/{name}"
+      get: "/api/v1alpha/triggers/{name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe trigger";

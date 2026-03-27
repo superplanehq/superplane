@@ -102,7 +102,7 @@ func Test__Teams__HandleRequest__MissingAuth(t *testing.T) {
 	s := &Teams{}
 
 	body := []byte(`{"type": "message", "text": "hello"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/messages", bytes.NewBuffer(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1alpha/integrations/test/messages", bytes.NewBuffer(body))
 	recorder := httptest.NewRecorder()
 
 	s.HandleRequest(core.HTTPRequestContext{
@@ -121,7 +121,7 @@ func Test__Teams__HandleRequest__InvalidAuthFormat(t *testing.T) {
 	s := &Teams{}
 
 	body := []byte(`{"type": "message", "text": "hello"}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/test/messages", bytes.NewBuffer(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1alpha/integrations/test/messages", bytes.NewBuffer(body))
 	req.Header.Set("Authorization", "Basic dGVzdDp0ZXN0")
 	recorder := httptest.NewRecorder()
 

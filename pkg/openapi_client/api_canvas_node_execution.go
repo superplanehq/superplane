@@ -75,7 +75,7 @@ func (a *CanvasNodeExecutionAPIService) CanvasesCancelExecutionExecute(r ApiCanv
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/cancel"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"executionId"+"}", url.PathEscape(parameterValueToString(r.executionId, "executionId")), -1)
 
@@ -205,7 +205,7 @@ func (a *CanvasNodeExecutionAPIService) CanvasesInvokeNodeExecutionActionExecute
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/actions/{actionName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"executionId"+"}", url.PathEscape(parameterValueToString(r.executionId, "executionId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"actionName"+"}", url.PathEscape(parameterValueToString(r.actionName, "actionName")), -1)
@@ -333,7 +333,7 @@ func (a *CanvasNodeExecutionAPIService) CanvasesListChildExecutionsExecute(r Api
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/executions/{executionId}/children"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/children"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"executionId"+"}", url.PathEscape(parameterValueToString(r.executionId, "executionId")), -1)
 
@@ -457,7 +457,7 @@ func (a *CanvasNodeExecutionAPIService) CanvasesResolveExecutionErrorsExecute(r 
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/executions/resolve"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/executions/resolve"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 
 	localVarHeaderParams := make(map[string]string)

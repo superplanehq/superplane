@@ -856,15 +856,15 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9a\x05\n" +
-	"\x05Users\x12\xfe\x01\n" +
-	"\x13ListUserPermissions\x12,.Superplane.Users.ListUserPermissionsRequest\x1a-.Superplane.Users.ListUserPermissionsResponse\"\x89\x01\x92A[\n" +
-	"\x05Users\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x02%\x12#/api/v1/users/{user_id}/permissions\x12\xd8\x01\n" +
-	"\rListUserRoles\x12&.Superplane.Users.ListUserRolesRequest\x1a'.Superplane.Users.ListUserRolesResponse\"v\x92AN\n" +
-	"\x05Users\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/users/{user_id}/roles\x12\xb4\x01\n" +
-	"\tListUsers\x12\".Superplane.Users.ListUsersRequest\x1a#.Superplane.Users.ListUsersResponse\"^\x92AF\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xa9\x05\n" +
+	"\x05Users\x12\x83\x02\n" +
+	"\x13ListUserPermissions\x12,.Superplane.Users.ListUserPermissionsRequest\x1a-.Superplane.Users.ListUserPermissionsResponse\"\x8e\x01\x92A[\n" +
+	"\x05Users\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x02*\x12(/api/v1alpha/users/{user_id}/permissions\x12\xdd\x01\n" +
+	"\rListUserRoles\x12&.Superplane.Users.ListUserRolesRequest\x1a'.Superplane.Users.ListUserRolesResponse\"{\x92AN\n" +
+	"\x05Users\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02$\x12\"/api/v1alpha/users/{user_id}/roles\x12\xb9\x01\n" +
+	"\tListUsers\x12\".Superplane.Users.ListUsersRequest\x1a#.Superplane.Users.ListUsersResponse\"c\x92AF\n" +
 	"\x05Users\x12\n" +
-	"List users\x1a1Returns all users that have roles within a domain\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
+	"List users\x1a1Returns all users that have roles within a domain\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1alpha/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
 	"\x14Superplane Users API\x12\x18API for Superplane Users\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/usersb\x06proto3"
 

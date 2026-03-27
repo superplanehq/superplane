@@ -62,7 +62,7 @@ func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*SuperplaneMeUser, *http.R
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/me"
+	localVarPath := localBasePath + "/api/v1alpha/me"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -170,7 +170,7 @@ func (a *MeAPIService) MeRegenerateTokenExecute(r ApiMeRegenerateTokenRequest) (
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/me/token"
+	localVarPath := localBasePath + "/api/v1alpha/me/token"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

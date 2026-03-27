@@ -74,7 +74,7 @@ func (a *CanvasNodeAPIService) CanvasesDeleteNodeQueueItemExecute(r ApiCanvasesD
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"itemId"+"}", url.PathEscape(parameterValueToString(r.itemId, "itemId")), -1)
@@ -197,7 +197,7 @@ func (a *CanvasNodeAPIService) CanvasesEmitNodeEventExecute(r ApiCanvasesEmitNod
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 
@@ -327,7 +327,7 @@ func (a *CanvasNodeAPIService) CanvasesInvokeNodeTriggerActionExecute(r ApiCanva
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"actionName"+"}", url.PathEscape(parameterValueToString(r.actionName, "actionName")), -1)
@@ -461,7 +461,7 @@ func (a *CanvasNodeAPIService) CanvasesListNodeEventsExecute(r ApiCanvasesListNo
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 
@@ -607,7 +607,7 @@ func (a *CanvasNodeAPIService) CanvasesListNodeExecutionsExecute(r ApiCanvasesLi
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/executions"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 
@@ -763,7 +763,7 @@ func (a *CanvasNodeAPIService) CanvasesListNodeQueueItemsExecute(r ApiCanvasesLi
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 
@@ -891,7 +891,7 @@ func (a *CanvasNodeAPIService) CanvasesUpdateNodePauseExecute(r ApiCanvasesUpdat
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/pause"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"nodeId"+"}", url.PathEscape(parameterValueToString(r.nodeId, "nodeId")), -1)
 

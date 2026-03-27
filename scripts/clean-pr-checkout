@@ -74,7 +74,7 @@ done
 
 # --- Seed via setup-owner (same as /setup in browser) ---
 echo ">>> Seeding database via setup-owner (Demo org, default owner)..."
-HTTP_CODE=$(curl -s -o /tmp/setup-owner-response.json -w "%{http_code}" -X POST "http://localhost:8000/api/v1/setup-owner" \
+HTTP_CODE=$(curl -s -o /tmp/setup-owner-response.json -w "%{http_code}" -X POST "http://localhost:8000/api/v1alpha/setup-owner" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "owner@localhost.dev",

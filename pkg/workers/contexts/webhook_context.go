@@ -30,7 +30,7 @@ func (c *WebhookContext) GetID() string {
 }
 
 func (c *WebhookContext) GetURL() string {
-	return fmt.Sprintf("%s/api/v1/webhooks/%s", c.baseURL, c.webhook.ID)
+	return fmt.Sprintf("%s/api/v1alpha/webhooks/%s", c.baseURL, c.webhook.ID)
 }
 
 func (c *WebhookContext) GetSecret() ([]byte, error) {

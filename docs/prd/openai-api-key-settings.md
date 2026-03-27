@@ -182,7 +182,7 @@ One row per organization controls Agent Mode state and stores encrypted key mate
 
 ### API Contracts
 
-#### `GET /api/v1/organizations/{organization_id}/agent-settings`
+#### `GET /api/v1alpha/organizations/{organization_id}/agent-settings`
 
 Returns Agent Mode and OpenAI key status for rendering `Settings > General`.
 
@@ -204,7 +204,7 @@ Response `200`:
 }
 ```
 
-#### `PATCH /api/v1/organizations/{organization_id}/agent-settings`
+#### `PATCH /api/v1alpha/organizations/{organization_id}/agent-settings`
 
 Updates Agent Mode enabled state.
 
@@ -230,7 +230,7 @@ Response `200`:
 }
 ```
 
-#### `PUT /api/v1/organizations/{organization_id}/agent-settings/openai-key`
+#### `PUT /api/v1alpha/organizations/{organization_id}/agent-settings/openai-key`
 
 Creates or replaces the OpenAI API key.
 
@@ -260,7 +260,7 @@ Response `200`:
 }
 ```
 
-#### `DELETE /api/v1/organizations/{organization_id}/agent-settings/openai-key`
+#### `DELETE /api/v1alpha/organizations/{organization_id}/agent-settings/openai-key`
 
 Deletes configured OpenAI API key and clears metadata.
 

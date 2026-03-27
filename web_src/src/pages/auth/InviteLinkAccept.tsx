@@ -38,7 +38,7 @@ export default function InviteLinkAccept() {
     const acceptInvite = async () => {
       try {
         setStatus("loading");
-        const response = await fetch(`/api/v1/invite-links/${token}/accept`, {
+        const response = await fetch(`/api/v1alpha/invite-links/${token}/accept`, {
           method: "POST",
           credentials: "include",
         });

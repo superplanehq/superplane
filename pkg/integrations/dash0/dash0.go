@@ -122,7 +122,7 @@ func (d *Dash0) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.SetMetadata(Metadata{
 		WebhookURL: fmt.Sprintf(
-			"%s/api/v1/integrations/%s/webhook",
+			"%s/api/v1alpha/integrations/%s/webhook",
 			strings.TrimRight(ctx.WebhooksBaseURL, "/"),
 			ctx.Integration.ID().String(),
 		),

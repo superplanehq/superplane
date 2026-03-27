@@ -15,7 +15,7 @@ import (
 func TestWidgetsCommandExecuteListText(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/widgets", r.URL.Path)
+		require.Equal(t, "/api/v1alpha/widgets", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"widgets":[{"name":"annotation","label":"Annotation","description":"Canvas note"}]}`))
 	}))
@@ -35,7 +35,7 @@ func TestWidgetsCommandExecuteListText(t *testing.T) {
 func TestWidgetsCommandExecuteDescribeJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/widgets/annotation", r.URL.Path)
+		require.Equal(t, "/api/v1alpha/widgets/annotation", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"widget":{"name":"annotation","label":"Annotation","description":"Canvas note"}}`))
 	}))
@@ -54,7 +54,7 @@ func TestWidgetsCommandExecuteDescribeJSON(t *testing.T) {
 func TestWidgetsCommandExecuteListYAML(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/widgets", r.URL.Path)
+		require.Equal(t, "/api/v1alpha/widgets", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"widgets":[{"name":"annotation","label":"Annotation","description":"Canvas note"}]}`))
 	}))
@@ -73,7 +73,7 @@ func TestWidgetsCommandExecuteListYAML(t *testing.T) {
 func TestWidgetsCommandExecuteReturnsAPIError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/widgets/annotation", r.URL.Path)
+		require.Equal(t, "/api/v1alpha/widgets/annotation", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"code":13,"message":"widget lookup failed"}`))

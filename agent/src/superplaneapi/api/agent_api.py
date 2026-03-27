@@ -302,7 +302,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/agents/chats',
+            resource_path='/api/v1alpha/agents/chats',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -579,7 +579,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/agents/chats/{chatId}',
+            resource_path='/api/v1alpha/agents/chats/{chatId}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -856,7 +856,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/agents/chats/{chatId}/messages',
+            resource_path='/api/v1alpha/agents/chats/{chatId}/messages',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1118,7 +1118,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/agents/chats',
+            resource_path='/api/v1alpha/agents/chats',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1406,7 +1406,7 @@ class AgentApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/agents/chats/{chatId}/resume',
+            resource_path='/api/v1alpha/agents/chats/{chatId}/resume',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

@@ -1020,7 +1020,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeOrganization", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeOrganization", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1040,7 +1040,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateOrganization", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateOrganization", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1060,7 +1060,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteOrganization", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteOrganization", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1080,7 +1080,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveUser", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveUser", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1100,7 +1100,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateInvitation", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invitations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1120,7 +1120,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListInvitations", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListInvitations", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invitations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1140,7 +1140,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations/{invitation_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveInvitation", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invitations/{invitation_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1160,7 +1160,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetInviteLink", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invite-link"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invite-link"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1180,7 +1180,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateInviteLink", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invite-link"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invite-link"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1200,7 +1200,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ResetInviteLink", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invite-link/reset"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ResetInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invite-link/reset"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1220,7 +1220,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetAgentSettings", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetAgentSettings", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1240,7 +1240,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateAgentSettings", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateAgentSettings", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1260,7 +1260,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/SetAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings/openai-key"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/SetAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings/openai-key"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1280,7 +1280,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings/openai-key"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings/openai-key"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1300,7 +1300,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeUsage", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/usage"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeUsage", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/usage"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1320,7 +1320,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/AcceptInviteLink", runtime.WithHTTPPathPattern("/api/v1/invite-links/{token}/accept"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/AcceptInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/invite-links/{token}/accept"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1340,7 +1340,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1360,7 +1360,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1380,7 +1380,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrationResources", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}/resources"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrationResources", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}/resources"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1400,7 +1400,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1420,7 +1420,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1440,7 +1440,7 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1498,7 +1498,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeOrganization", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeOrganization", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1515,7 +1515,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateOrganization", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateOrganization", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1532,7 +1532,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteOrganization", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteOrganization", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1549,7 +1549,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveUser", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveUser", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1566,7 +1566,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateInvitation", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invitations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1583,7 +1583,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListInvitations", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListInvitations", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invitations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1600,7 +1600,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveInvitation", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invitations/{invitation_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/RemoveInvitation", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invitations/{invitation_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1617,7 +1617,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetInviteLink", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invite-link"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invite-link"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1634,7 +1634,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateInviteLink", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invite-link"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invite-link"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1651,7 +1651,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ResetInviteLink", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/invite-link/reset"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ResetInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/invite-link/reset"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1668,7 +1668,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetAgentSettings", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/GetAgentSettings", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1685,7 +1685,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateAgentSettings", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateAgentSettings", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1702,7 +1702,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/SetAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings/openai-key"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/SetAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings/openai-key"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1719,7 +1719,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/agent-settings/openai-key"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteAgentOpenAIKey", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/agent-settings/openai-key"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1736,7 +1736,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeUsage", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/usage"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeUsage", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/usage"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1753,7 +1753,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/AcceptInviteLink", runtime.WithHTTPPathPattern("/api/v1/invite-links/{token}/accept"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/AcceptInviteLink", runtime.WithHTTPPathPattern("/api/v1alpha/invite-links/{token}/accept"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1770,7 +1770,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrations", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1787,7 +1787,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DescribeIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1804,7 +1804,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrationResources", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}/resources"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/ListIntegrationResources", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}/resources"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1821,7 +1821,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/CreateIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1838,7 +1838,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/UpdateIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1855,7 +1855,7 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteIntegration", runtime.WithHTTPPathPattern("/api/v1/organizations/{id}/integrations/{integration_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Organizations.Organizations/DeleteIntegration", runtime.WithHTTPPathPattern("/api/v1alpha/organizations/{id}/integrations/{integration_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1872,28 +1872,28 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 }
 
 var (
-	pattern_Organizations_DescribeOrganization_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "organizations", "id"}, ""))
-	pattern_Organizations_UpdateOrganization_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "organizations", "id"}, ""))
-	pattern_Organizations_DeleteOrganization_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "organizations", "id"}, ""))
-	pattern_Organizations_RemoveUser_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "users", "user_id"}, ""))
-	pattern_Organizations_CreateInvitation_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "invitations"}, ""))
-	pattern_Organizations_ListInvitations_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "invitations"}, ""))
-	pattern_Organizations_RemoveInvitation_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "invitations", "invitation_id"}, ""))
-	pattern_Organizations_GetInviteLink_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "invite-link"}, ""))
-	pattern_Organizations_UpdateInviteLink_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "invite-link"}, ""))
-	pattern_Organizations_ResetInviteLink_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "organizations", "id", "invite-link", "reset"}, ""))
-	pattern_Organizations_GetAgentSettings_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "agent-settings"}, ""))
-	pattern_Organizations_UpdateAgentSettings_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "agent-settings"}, ""))
-	pattern_Organizations_SetAgentOpenAIKey_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "organizations", "id", "agent-settings", "openai-key"}, ""))
-	pattern_Organizations_DeleteAgentOpenAIKey_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "organizations", "id", "agent-settings", "openai-key"}, ""))
-	pattern_Organizations_DescribeUsage_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "usage"}, ""))
-	pattern_Organizations_AcceptInviteLink_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "invite-links", "token", "accept"}, ""))
-	pattern_Organizations_ListIntegrations_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "integrations"}, ""))
-	pattern_Organizations_DescribeIntegration_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id"}, ""))
-	pattern_Organizations_ListIntegrationResources_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id", "resources"}, ""))
-	pattern_Organizations_CreateIntegration_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "integrations"}, ""))
-	pattern_Organizations_UpdateIntegration_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id"}, ""))
-	pattern_Organizations_DeleteIntegration_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id"}, ""))
+	pattern_Organizations_DescribeOrganization_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "organizations", "id"}, ""))
+	pattern_Organizations_UpdateOrganization_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "organizations", "id"}, ""))
+	pattern_Organizations_DeleteOrganization_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "organizations", "id"}, ""))
+	pattern_Organizations_RemoveUser_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "organizations", "id", "users", "user_id"}, ""))
+	pattern_Organizations_CreateInvitation_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "invitations"}, ""))
+	pattern_Organizations_ListInvitations_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "invitations"}, ""))
+	pattern_Organizations_RemoveInvitation_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "organizations", "id", "invitations", "invitation_id"}, ""))
+	pattern_Organizations_GetInviteLink_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "invite-link"}, ""))
+	pattern_Organizations_UpdateInviteLink_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "invite-link"}, ""))
+	pattern_Organizations_ResetInviteLink_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1alpha", "organizations", "id", "invite-link", "reset"}, ""))
+	pattern_Organizations_GetAgentSettings_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "agent-settings"}, ""))
+	pattern_Organizations_UpdateAgentSettings_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "agent-settings"}, ""))
+	pattern_Organizations_SetAgentOpenAIKey_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1alpha", "organizations", "id", "agent-settings", "openai-key"}, ""))
+	pattern_Organizations_DeleteAgentOpenAIKey_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1alpha", "organizations", "id", "agent-settings", "openai-key"}, ""))
+	pattern_Organizations_DescribeUsage_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "usage"}, ""))
+	pattern_Organizations_AcceptInviteLink_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "invite-links", "token", "accept"}, ""))
+	pattern_Organizations_ListIntegrations_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "integrations"}, ""))
+	pattern_Organizations_DescribeIntegration_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "organizations", "id", "integrations", "integration_id"}, ""))
+	pattern_Organizations_ListIntegrationResources_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "organizations", "id", "integrations", "integration_id", "resources"}, ""))
+	pattern_Organizations_CreateIntegration_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "organizations", "id", "integrations"}, ""))
+	pattern_Organizations_UpdateIntegration_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "organizations", "id", "integrations", "integration_id"}, ""))
+	pattern_Organizations_DeleteIntegration_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "organizations", "id", "integrations", "integration_id"}, ""))
 )
 
 var (

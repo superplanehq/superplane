@@ -302,7 +302,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/canvases',
+            resource_path='/api/v1alpha/canvases',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -562,7 +562,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='DELETE',
-            resource_path='/api/v1/canvases/{id}',
+            resource_path='/api/v1alpha/canvases/{id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -837,7 +837,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='DELETE',
-            resource_path='/api/v1/canvases/{canvasId}/memory/{memoryId}',
+            resource_path='/api/v1alpha/canvases/{canvasId}/memory/{memoryId}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1097,7 +1097,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/canvases/{id}',
+            resource_path='/api/v1alpha/canvases/{id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1357,7 +1357,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/canvases/{canvasId}/memory',
+            resource_path='/api/v1alpha/canvases/{canvasId}/memory',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1619,7 +1619,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/canvases',
+            resource_path='/api/v1alpha/canvases',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1907,7 +1907,7 @@ class CanvasApi:
 
         return self.api_client.param_serialize(
             method='PUT',
-            resource_path='/api/v1/canvases/{id}',
+            resource_path='/api/v1alpha/canvases/{id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

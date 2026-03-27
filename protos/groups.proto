@@ -33,7 +33,7 @@ service Groups {
   //
   rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/groups"
+      post: "/api/v1alpha/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -49,7 +49,7 @@ service Groups {
   //
   rpc AddUserToGroup(AddUserToGroupRequest) returns (AddUserToGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/groups/{group_name}/users"
+      post: "/api/v1alpha/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -65,7 +65,7 @@ service Groups {
   //
   rpc RemoveUserFromGroup(RemoveUserFromGroupRequest) returns (RemoveUserFromGroupResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/groups/{group_name}/users/remove"
+      patch: "/api/v1alpha/groups/{group_name}/users/remove"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -81,7 +81,7 @@ service Groups {
   //
   rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups"
+      get: "/api/v1alpha/groups"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List groups";
@@ -96,7 +96,7 @@ service Groups {
   //
   rpc ListGroupUsers(ListGroupUsersRequest) returns (ListGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups/{group_name}/users"
+      get: "/api/v1alpha/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get group users";
@@ -111,7 +111,7 @@ service Groups {
   //
   rpc DescribeGroup(DescribeGroupRequest) returns (DescribeGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups/{group_name}"
+      get: "/api/v1alpha/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get group";
@@ -126,7 +126,7 @@ service Groups {
   //
   rpc UpdateGroup(UpdateGroupRequest) returns (UpdateGroupResponse) {
     option (google.api.http) = {
-      put: "/api/v1/groups/{group_name}"
+      put: "/api/v1alpha/groups/{group_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -142,7 +142,7 @@ service Groups {
   //
   rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/groups/{group_name}"
+      delete: "/api/v1alpha/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete group";

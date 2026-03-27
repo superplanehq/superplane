@@ -100,8 +100,8 @@ func Test__Slack__Sync(t *testing.T) {
 		eventSubs := settings["event_subscriptions"].(map[string]any)
 		interactivity := settings["interactivity"].(map[string]any)
 
-		assert.Equal(t, fmt.Sprintf("https://app.example.com/api/v1/integrations/%s/events", integrationID), eventSubs["request_url"])
-		assert.Equal(t, fmt.Sprintf("https://app.example.com/api/v1/integrations/%s/interactions", integrationID), interactivity["request_url"])
+		assert.Equal(t, fmt.Sprintf("https://app.example.com/api/v1alpha/integrations/%s/events", integrationID), eventSubs["request_url"])
+		assert.Equal(t, fmt.Sprintf("https://app.example.com/api/v1alpha/integrations/%s/interactions", integrationID), interactivity["request_url"])
 	})
 }
 

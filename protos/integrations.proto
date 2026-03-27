@@ -30,7 +30,7 @@ service Integrations {
 
   rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/integrations"
+      get: "/api/v1alpha/integrations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List available integrations";

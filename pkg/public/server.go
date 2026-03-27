@@ -255,7 +255,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}
 
 	// Public health check
-	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
+	s.Router.HandleFunc("/api/v1alpha/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
@@ -266,22 +266,22 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
 	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))
 
-	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
-	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/me").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/components").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/triggers").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
-	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/users").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/groups").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/roles").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/canvases").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/organizations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/invite-links").Handler(protectedAccountGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/integrations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/secrets").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/me").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/components").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/triggers").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/widgets").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/blueprints").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/service-accounts").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/agents").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1alpha/workflows").Handler(protectedGRPCHandler)
 
 	return nil
 }
@@ -427,7 +427,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Health check
 	publicRoute.HandleFunc("/health", s.HealthCheck).Methods("GET")
-	publicRoute.HandleFunc("/api/v1/setup-owner", s.setupOwner).Methods("POST")
+	publicRoute.HandleFunc("/api/v1alpha/setup-owner", s.setupOwner).Methods("POST")
 
 	// OIDC discovery endpoints
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")

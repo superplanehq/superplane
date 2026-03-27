@@ -29,7 +29,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Components {
   rpc ListComponents(ListComponentsRequest) returns (ListComponentsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/components"
+      get: "/api/v1alpha/components"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List components";
@@ -40,7 +40,7 @@ service Components {
 
   rpc DescribeComponent(DescribeComponentRequest) returns (DescribeComponentResponse) {
     option (google.api.http) = {
-      get: "/api/v1/components/{name}"
+      get: "/api/v1alpha/components/{name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe component";
@@ -51,7 +51,7 @@ service Components {
 
   rpc ListComponentActions(ListComponentActionsRequest) returns (ListComponentActionsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/components/{name}/actions"
+      get: "/api/v1alpha/components/{name}/actions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List component actions";

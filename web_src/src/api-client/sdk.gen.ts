@@ -340,7 +340,7 @@ export const agentsListAgentChats = <ThrowOnError extends boolean = true>(
   options?: Options<AgentsListAgentChatsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<AgentsListAgentChatsResponses, AgentsListAgentChatsErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats",
+    url: "/api/v1alpha/agents/chats",
     ...options,
   });
 
@@ -353,7 +353,7 @@ export const agentsCreateAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsCreateAgentChatData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<AgentsCreateAgentChatResponses, AgentsCreateAgentChatErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats",
+    url: "/api/v1alpha/agents/chats",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -370,7 +370,7 @@ export const agentsDescribeAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsDescribeAgentChatData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<AgentsDescribeAgentChatResponses, AgentsDescribeAgentChatErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats/{chatId}",
+    url: "/api/v1alpha/agents/chats/{chatId}",
     ...options,
   });
 
@@ -383,7 +383,7 @@ export const agentsListAgentChatMessages = <ThrowOnError extends boolean = true>
   options: Options<AgentsListAgentChatMessagesData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<AgentsListAgentChatMessagesResponses, AgentsListAgentChatMessagesErrors, ThrowOnError>(
-    { url: "/api/v1/agents/chats/{chatId}/messages", ...options },
+    { url: "/api/v1alpha/agents/chats/{chatId}/messages", ...options },
   );
 
 /**
@@ -395,7 +395,7 @@ export const agentsResumeAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsResumeAgentChatData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<AgentsResumeAgentChatResponses, AgentsResumeAgentChatErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats/{chatId}/resume",
+    url: "/api/v1alpha/agents/chats/{chatId}/resume",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -412,7 +412,7 @@ export const blueprintsListBlueprints = <ThrowOnError extends boolean = true>(
   options?: Options<BlueprintsListBlueprintsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<BlueprintsListBlueprintsResponses, BlueprintsListBlueprintsErrors, ThrowOnError>({
-    url: "/api/v1/blueprints",
+    url: "/api/v1alpha/blueprints",
     ...options,
   });
 
@@ -425,7 +425,7 @@ export const blueprintsCreateBlueprint = <ThrowOnError extends boolean = true>(
   options: Options<BlueprintsCreateBlueprintData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<BlueprintsCreateBlueprintResponses, BlueprintsCreateBlueprintErrors, ThrowOnError>({
-    url: "/api/v1/blueprints",
+    url: "/api/v1alpha/blueprints",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -442,7 +442,7 @@ export const blueprintsDeleteBlueprint = <ThrowOnError extends boolean = true>(
   options: Options<BlueprintsDeleteBlueprintData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<BlueprintsDeleteBlueprintResponses, BlueprintsDeleteBlueprintErrors, ThrowOnError>({
-    url: "/api/v1/blueprints/{id}",
+    url: "/api/v1alpha/blueprints/{id}",
     ...options,
   });
 
@@ -455,7 +455,7 @@ export const blueprintsDescribeBlueprint = <ThrowOnError extends boolean = true>
   options: Options<BlueprintsDescribeBlueprintData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<BlueprintsDescribeBlueprintResponses, BlueprintsDescribeBlueprintErrors, ThrowOnError>(
-    { url: "/api/v1/blueprints/{id}", ...options },
+    { url: "/api/v1alpha/blueprints/{id}", ...options },
   );
 
 /**
@@ -467,7 +467,7 @@ export const blueprintsUpdateBlueprint = <ThrowOnError extends boolean = true>(
   options: Options<BlueprintsUpdateBlueprintData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<BlueprintsUpdateBlueprintResponses, BlueprintsUpdateBlueprintErrors, ThrowOnError>({
-    url: "/api/v1/blueprints/{id}",
+    url: "/api/v1alpha/blueprints/{id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -484,7 +484,7 @@ export const canvasesListCanvases = <ThrowOnError extends boolean = true>(
   options?: Options<CanvasesListCanvasesData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<CanvasesListCanvasesResponses, CanvasesListCanvasesErrors, ThrowOnError>({
-    url: "/api/v1/canvases",
+    url: "/api/v1alpha/canvases",
     ...options,
   });
 
@@ -497,7 +497,7 @@ export const canvasesCreateCanvas = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesCreateCanvasData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<CanvasesCreateCanvasResponses, CanvasesCreateCanvasErrors, ThrowOnError>({
-    url: "/api/v1/canvases",
+    url: "/api/v1alpha/canvases",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -517,7 +517,7 @@ export const canvasesListCanvasChangeRequests = <ThrowOnError extends boolean = 
     CanvasesListCanvasChangeRequestsResponses,
     CanvasesListCanvasChangeRequestsErrors,
     ThrowOnError
-  >({ url: "/api/v1/canvases/{canvasId}/change-requests", ...options });
+  >({ url: "/api/v1alpha/canvases/{canvasId}/change-requests", ...options });
 
 /**
  * Create canvas change request
@@ -532,7 +532,7 @@ export const canvasesCreateCanvasChangeRequest = <ThrowOnError extends boolean =
     CanvasesCreateCanvasChangeRequestErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/change-requests",
+    url: "/api/v1alpha/canvases/{canvasId}/change-requests",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -552,7 +552,7 @@ export const canvasesDescribeCanvasChangeRequest = <ThrowOnError extends boolean
     CanvasesDescribeCanvasChangeRequestResponses,
     CanvasesDescribeCanvasChangeRequestErrors,
     ThrowOnError
-  >({ url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}", ...options });
+  >({ url: "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}", ...options });
 
 /**
  * Act on canvas change request
@@ -567,7 +567,7 @@ export const canvasesActOnCanvasChangeRequest = <ThrowOnError extends boolean = 
     CanvasesActOnCanvasChangeRequestErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions",
+    url: "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/actions",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -588,7 +588,7 @@ export const canvasesResolveCanvasChangeRequest = <ThrowOnError extends boolean 
     CanvasesResolveCanvasChangeRequestErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve",
+    url: "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/resolve",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -605,7 +605,7 @@ export const canvasesListCanvasEvents = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesListCanvasEventsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListCanvasEventsResponses, CanvasesListCanvasEventsErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/events",
+    url: "/api/v1alpha/canvases/{canvasId}/events",
     ...options,
   });
 
@@ -618,7 +618,7 @@ export const canvasesListEventExecutions = <ThrowOnError extends boolean = true>
   options: Options<CanvasesListEventExecutionsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListEventExecutionsResponses, CanvasesListEventExecutionsErrors, ThrowOnError>(
-    { url: "/api/v1/canvases/{canvasId}/events/{eventId}/executions", ...options },
+    { url: "/api/v1alpha/canvases/{canvasId}/events/{eventId}/executions", ...options },
   );
 
 /**
@@ -634,7 +634,7 @@ export const canvasesResolveExecutionErrors = <ThrowOnError extends boolean = tr
     CanvasesResolveExecutionErrorsErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/executions/resolve",
+    url: "/api/v1alpha/canvases/{canvasId}/executions/resolve",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -655,7 +655,7 @@ export const canvasesInvokeNodeExecutionAction = <ThrowOnError extends boolean =
     CanvasesInvokeNodeExecutionActionErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}",
+    url: "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/actions/{actionName}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -672,7 +672,7 @@ export const canvasesCancelExecution = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesCancelExecutionData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<CanvasesCancelExecutionResponses, CanvasesCancelExecutionErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel",
+    url: "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/cancel",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -693,7 +693,7 @@ export const canvasesListChildExecutions = <ThrowOnError extends boolean = true>
     CanvasesListChildExecutionsErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/executions/{executionId}/children",
+    url: "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/children",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -710,7 +710,7 @@ export const canvasesListCanvasMemories = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesListCanvasMemoriesData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListCanvasMemoriesResponses, CanvasesListCanvasMemoriesErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/memory",
+    url: "/api/v1alpha/canvases/{canvasId}/memory",
     ...options,
   });
 
@@ -726,7 +726,7 @@ export const canvasesDeleteCanvasMemory = <ThrowOnError extends boolean = true>(
     CanvasesDeleteCanvasMemoryResponses,
     CanvasesDeleteCanvasMemoryErrors,
     ThrowOnError
-  >({ url: "/api/v1/canvases/{canvasId}/memory/{memoryId}", ...options });
+  >({ url: "/api/v1alpha/canvases/{canvasId}/memory/{memoryId}", ...options });
 
 /**
  * List node events
@@ -737,7 +737,7 @@ export const canvasesListNodeEvents = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesListNodeEventsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListNodeEventsResponses, CanvasesListNodeEventsErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events",
+    url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events",
     ...options,
   });
 
@@ -750,7 +750,7 @@ export const canvasesEmitNodeEvent = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesEmitNodeEventData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<CanvasesEmitNodeEventResponses, CanvasesEmitNodeEventErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events",
+    url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -767,7 +767,7 @@ export const canvasesListNodeExecutions = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesListNodeExecutionsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListNodeExecutionsResponses, CanvasesListNodeExecutionsErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions",
+    url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/executions",
     ...options,
   });
 
@@ -780,7 +780,7 @@ export const canvasesUpdateNodePause = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateNodePauseData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<CanvasesUpdateNodePauseResponses, CanvasesUpdateNodePauseErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause",
+    url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/pause",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -797,7 +797,7 @@ export const canvasesListNodeQueueItems = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesListNodeQueueItemsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListNodeQueueItemsResponses, CanvasesListNodeQueueItemsErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue",
+    url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue",
     ...options,
   });
 
@@ -813,7 +813,7 @@ export const canvasesDeleteNodeQueueItem = <ThrowOnError extends boolean = true>
     CanvasesDeleteNodeQueueItemResponses,
     CanvasesDeleteNodeQueueItemErrors,
     ThrowOnError
-  >({ url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}", ...options });
+  >({ url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}", ...options });
 
 /**
  * Invoke trigger action
@@ -828,7 +828,7 @@ export const canvasesInvokeNodeTriggerAction = <ThrowOnError extends boolean = t
     CanvasesInvokeNodeTriggerActionErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}",
+    url: "/api/v1alpha/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -845,7 +845,7 @@ export const canvasesListCanvasVersions = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesListCanvasVersionsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesListCanvasVersionsResponses, CanvasesListCanvasVersionsErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{canvasId}/versions",
+    url: "/api/v1alpha/canvases/{canvasId}/versions",
     ...options,
   });
 
@@ -862,7 +862,7 @@ export const canvasesCreateCanvasVersion = <ThrowOnError extends boolean = true>
     CanvasesCreateCanvasVersionErrors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/versions",
+    url: "/api/v1alpha/canvases/{canvasId}/versions",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -883,7 +883,7 @@ export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true
     CanvasesUpdateCanvasVersion2Errors,
     ThrowOnError
   >({
-    url: "/api/v1/canvases/{canvasId}/versions",
+    url: "/api/v1alpha/canvases/{canvasId}/versions",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -903,7 +903,7 @@ export const canvasesDescribeCanvasVersion = <ThrowOnError extends boolean = tru
     CanvasesDescribeCanvasVersionResponses,
     CanvasesDescribeCanvasVersionErrors,
     ThrowOnError
-  >({ url: "/api/v1/canvases/{canvasId}/versions/{versionId}", ...options });
+  >({ url: "/api/v1alpha/canvases/{canvasId}/versions/{versionId}", ...options });
 
 /**
  * Update canvas version
@@ -915,7 +915,7 @@ export const canvasesUpdateCanvasVersion = <ThrowOnError extends boolean = true>
 ) =>
   (options.client ?? client).put<CanvasesUpdateCanvasVersionResponses, CanvasesUpdateCanvasVersionErrors, ThrowOnError>(
     {
-      url: "/api/v1/canvases/{canvasId}/versions/{versionId}",
+      url: "/api/v1alpha/canvases/{canvasId}/versions/{versionId}",
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -933,7 +933,7 @@ export const canvasesDeleteCanvas = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesDeleteCanvasData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<CanvasesDeleteCanvasResponses, CanvasesDeleteCanvasErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{id}",
+    url: "/api/v1alpha/canvases/{id}",
     ...options,
   });
 
@@ -946,7 +946,7 @@ export const canvasesDescribeCanvas = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesDescribeCanvasData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<CanvasesDescribeCanvasResponses, CanvasesDescribeCanvasErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{id}",
+    url: "/api/v1alpha/canvases/{id}",
     ...options,
   });
 
@@ -959,7 +959,7 @@ export const canvasesUpdateCanvas = <ThrowOnError extends boolean = true>(
   options: Options<CanvasesUpdateCanvasData, ThrowOnError>,
 ) =>
   (options.client ?? client).put<CanvasesUpdateCanvasResponses, CanvasesUpdateCanvasErrors, ThrowOnError>({
-    url: "/api/v1/canvases/{id}",
+    url: "/api/v1alpha/canvases/{id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -976,7 +976,7 @@ export const componentsListComponents = <ThrowOnError extends boolean = true>(
   options?: Options<ComponentsListComponentsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<ComponentsListComponentsResponses, ComponentsListComponentsErrors, ThrowOnError>({
-    url: "/api/v1/components",
+    url: "/api/v1alpha/components",
     ...options,
   });
 
@@ -989,7 +989,7 @@ export const componentsDescribeComponent = <ThrowOnError extends boolean = true>
   options: Options<ComponentsDescribeComponentData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<ComponentsDescribeComponentResponses, ComponentsDescribeComponentErrors, ThrowOnError>(
-    { url: "/api/v1/components/{name}", ...options },
+    { url: "/api/v1alpha/components/{name}", ...options },
   );
 
 /**
@@ -1004,7 +1004,7 @@ export const componentsListComponentActions = <ThrowOnError extends boolean = tr
     ComponentsListComponentActionsResponses,
     ComponentsListComponentActionsErrors,
     ThrowOnError
-  >({ url: "/api/v1/components/{name}/actions", ...options });
+  >({ url: "/api/v1alpha/components/{name}/actions", ...options });
 
 /**
  * List groups
@@ -1015,7 +1015,7 @@ export const groupsListGroups = <ThrowOnError extends boolean = true>(
   options?: Options<GroupsListGroupsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<GroupsListGroupsResponses, GroupsListGroupsErrors, ThrowOnError>({
-    url: "/api/v1/groups",
+    url: "/api/v1alpha/groups",
     ...options,
   });
 
@@ -1028,7 +1028,7 @@ export const groupsCreateGroup = <ThrowOnError extends boolean = true>(
   options: Options<GroupsCreateGroupData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<GroupsCreateGroupResponses, GroupsCreateGroupErrors, ThrowOnError>({
-    url: "/api/v1/groups",
+    url: "/api/v1alpha/groups",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1045,7 +1045,7 @@ export const groupsDeleteGroup = <ThrowOnError extends boolean = true>(
   options: Options<GroupsDeleteGroupData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<GroupsDeleteGroupResponses, GroupsDeleteGroupErrors, ThrowOnError>({
-    url: "/api/v1/groups/{groupName}",
+    url: "/api/v1alpha/groups/{groupName}",
     ...options,
   });
 
@@ -1058,7 +1058,7 @@ export const groupsDescribeGroup = <ThrowOnError extends boolean = true>(
   options: Options<GroupsDescribeGroupData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<GroupsDescribeGroupResponses, GroupsDescribeGroupErrors, ThrowOnError>({
-    url: "/api/v1/groups/{groupName}",
+    url: "/api/v1alpha/groups/{groupName}",
     ...options,
   });
 
@@ -1071,7 +1071,7 @@ export const groupsUpdateGroup = <ThrowOnError extends boolean = true>(
   options: Options<GroupsUpdateGroupData, ThrowOnError>,
 ) =>
   (options.client ?? client).put<GroupsUpdateGroupResponses, GroupsUpdateGroupErrors, ThrowOnError>({
-    url: "/api/v1/groups/{groupName}",
+    url: "/api/v1alpha/groups/{groupName}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1088,7 +1088,7 @@ export const groupsListGroupUsers = <ThrowOnError extends boolean = true>(
   options: Options<GroupsListGroupUsersData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<GroupsListGroupUsersResponses, GroupsListGroupUsersErrors, ThrowOnError>({
-    url: "/api/v1/groups/{groupName}/users",
+    url: "/api/v1alpha/groups/{groupName}/users",
     ...options,
   });
 
@@ -1101,7 +1101,7 @@ export const groupsAddUserToGroup = <ThrowOnError extends boolean = true>(
   options: Options<GroupsAddUserToGroupData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<GroupsAddUserToGroupResponses, GroupsAddUserToGroupErrors, ThrowOnError>({
-    url: "/api/v1/groups/{groupName}/users",
+    url: "/api/v1alpha/groups/{groupName}/users",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1118,7 +1118,7 @@ export const groupsRemoveUserFromGroup = <ThrowOnError extends boolean = true>(
   options: Options<GroupsRemoveUserFromGroupData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<GroupsRemoveUserFromGroupResponses, GroupsRemoveUserFromGroupErrors, ThrowOnError>({
-    url: "/api/v1/groups/{groupName}/users/remove",
+    url: "/api/v1alpha/groups/{groupName}/users/remove",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1138,7 +1138,7 @@ export const integrationsListIntegrations = <ThrowOnError extends boolean = true
     IntegrationsListIntegrationsResponses,
     IntegrationsListIntegrationsErrors,
     ThrowOnError
-  >({ url: "/api/v1/integrations", ...options });
+  >({ url: "/api/v1alpha/integrations", ...options });
 
 /**
  * Accept an invite link
@@ -1152,7 +1152,7 @@ export const organizationsAcceptInviteLink = <ThrowOnError extends boolean = tru
     OrganizationsAcceptInviteLinkResponses,
     OrganizationsAcceptInviteLinkErrors,
     ThrowOnError
-  >({ url: "/api/v1/invite-links/{token}/accept", ...options });
+  >({ url: "/api/v1alpha/invite-links/{token}/accept", ...options });
 
 /**
  * Get current user
@@ -1160,7 +1160,7 @@ export const organizationsAcceptInviteLink = <ThrowOnError extends boolean = tru
  * Returns the currently authenticated user
  */
 export const meMe = <ThrowOnError extends boolean = true>(options?: Options<MeMeData, ThrowOnError>) =>
-  (options?.client ?? client).get<MeMeResponses, MeMeErrors, ThrowOnError>({ url: "/api/v1/me", ...options });
+  (options?.client ?? client).get<MeMeResponses, MeMeErrors, ThrowOnError>({ url: "/api/v1alpha/me", ...options });
 
 /**
  * Regenerate API token
@@ -1171,7 +1171,7 @@ export const meRegenerateToken = <ThrowOnError extends boolean = true>(
   options?: Options<MeRegenerateTokenData, ThrowOnError>,
 ) =>
   (options?.client ?? client).post<MeRegenerateTokenResponses, MeRegenerateTokenErrors, ThrowOnError>({
-    url: "/api/v1/me/token",
+    url: "/api/v1alpha/me/token",
     ...options,
   });
 
@@ -1187,7 +1187,7 @@ export const organizationsDeleteOrganization = <ThrowOnError extends boolean = t
     OrganizationsDeleteOrganizationResponses,
     OrganizationsDeleteOrganizationErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}", ...options });
 
 /**
  * Get organization details
@@ -1201,7 +1201,7 @@ export const organizationsDescribeOrganization = <ThrowOnError extends boolean =
     OrganizationsDescribeOrganizationResponses,
     OrganizationsDescribeOrganizationErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}", ...options });
 
 /**
  * Update an organization
@@ -1216,7 +1216,7 @@ export const organizationsUpdateOrganization = <ThrowOnError extends boolean = t
     OrganizationsUpdateOrganizationErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}",
+    url: "/api/v1alpha/organizations/{id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1236,7 +1236,7 @@ export const organizationsGetAgentSettings = <ThrowOnError extends boolean = tru
     OrganizationsGetAgentSettingsResponses,
     OrganizationsGetAgentSettingsErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/agent-settings", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/agent-settings", ...options });
 
 /**
  * Update organization Agent Mode settings
@@ -1251,7 +1251,7 @@ export const organizationsUpdateAgentSettings = <ThrowOnError extends boolean = 
     OrganizationsUpdateAgentSettingsErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/agent-settings",
+    url: "/api/v1alpha/organizations/{id}/agent-settings",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1271,7 +1271,7 @@ export const organizationsDeleteAgentOpenAiKey = <ThrowOnError extends boolean =
     OrganizationsDeleteAgentOpenAiKeyResponses,
     OrganizationsDeleteAgentOpenAiKeyErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/agent-settings/openai-key", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/agent-settings/openai-key", ...options });
 
 /**
  * Create or update organization OpenAI key for Agent Mode
@@ -1286,7 +1286,7 @@ export const organizationsSetAgentOpenAiKey = <ThrowOnError extends boolean = tr
     OrganizationsSetAgentOpenAiKeyErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/agent-settings/openai-key",
+    url: "/api/v1alpha/organizations/{id}/agent-settings/openai-key",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1306,7 +1306,7 @@ export const organizationsListIntegrations = <ThrowOnError extends boolean = tru
     OrganizationsListIntegrationsResponses,
     OrganizationsListIntegrationsErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/integrations", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/integrations", ...options });
 
 /**
  * Create organization integration
@@ -1321,7 +1321,7 @@ export const organizationsCreateIntegration = <ThrowOnError extends boolean = tr
     OrganizationsCreateIntegrationErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/integrations",
+    url: "/api/v1alpha/organizations/{id}/integrations",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1341,7 +1341,7 @@ export const organizationsDeleteIntegration = <ThrowOnError extends boolean = tr
     OrganizationsDeleteIntegrationResponses,
     OrganizationsDeleteIntegrationErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/integrations/{integrationId}", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}", ...options });
 
 /**
  * Describe an integration in an organization
@@ -1355,7 +1355,7 @@ export const organizationsDescribeIntegration = <ThrowOnError extends boolean = 
     OrganizationsDescribeIntegrationResponses,
     OrganizationsDescribeIntegrationErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/integrations/{integrationId}", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}", ...options });
 
 /**
  * Update integration
@@ -1370,7 +1370,7 @@ export const organizationsUpdateIntegration = <ThrowOnError extends boolean = tr
     OrganizationsUpdateIntegrationErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/integrations/{integrationId}",
+    url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1390,7 +1390,7 @@ export const organizationsListIntegrationResources = <ThrowOnError extends boole
     OrganizationsListIntegrationResourcesResponses,
     OrganizationsListIntegrationResourcesErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}/resources", ...options });
 
 /**
  * List organization invitations
@@ -1404,7 +1404,7 @@ export const organizationsListInvitations = <ThrowOnError extends boolean = true
     OrganizationsListInvitationsResponses,
     OrganizationsListInvitationsErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/invitations", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/invitations", ...options });
 
 /**
  * Create an organization invitation
@@ -1419,7 +1419,7 @@ export const organizationsCreateInvitation = <ThrowOnError extends boolean = tru
     OrganizationsCreateInvitationErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/invitations",
+    url: "/api/v1alpha/organizations/{id}/invitations",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1439,7 +1439,7 @@ export const organizationsRemoveInvitation = <ThrowOnError extends boolean = tru
     OrganizationsRemoveInvitationResponses,
     OrganizationsRemoveInvitationErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/invitations/{invitationId}", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/invitations/{invitationId}", ...options });
 
 /**
  * Get an organization invite link
@@ -1450,7 +1450,7 @@ export const organizationsGetInviteLink = <ThrowOnError extends boolean = true>(
   options: Options<OrganizationsGetInviteLinkData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<OrganizationsGetInviteLinkResponses, OrganizationsGetInviteLinkErrors, ThrowOnError>({
-    url: "/api/v1/organizations/{id}/invite-link",
+    url: "/api/v1alpha/organizations/{id}/invite-link",
     ...options,
   });
 
@@ -1467,7 +1467,7 @@ export const organizationsUpdateInviteLink = <ThrowOnError extends boolean = tru
     OrganizationsUpdateInviteLinkErrors,
     ThrowOnError
   >({
-    url: "/api/v1/organizations/{id}/invite-link",
+    url: "/api/v1alpha/organizations/{id}/invite-link",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1487,7 +1487,7 @@ export const organizationsResetInviteLink = <ThrowOnError extends boolean = true
     OrganizationsResetInviteLinkResponses,
     OrganizationsResetInviteLinkErrors,
     ThrowOnError
-  >({ url: "/api/v1/organizations/{id}/invite-link/reset", ...options });
+  >({ url: "/api/v1alpha/organizations/{id}/invite-link/reset", ...options });
 
 /**
  * Describe organization usage
@@ -1498,7 +1498,7 @@ export const organizationsDescribeUsage = <ThrowOnError extends boolean = true>(
   options: Options<OrganizationsDescribeUsageData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<OrganizationsDescribeUsageResponses, OrganizationsDescribeUsageErrors, ThrowOnError>({
-    url: "/api/v1/organizations/{id}/usage",
+    url: "/api/v1alpha/organizations/{id}/usage",
     ...options,
   });
 
@@ -1511,7 +1511,7 @@ export const organizationsRemoveUser = <ThrowOnError extends boolean = true>(
   options: Options<OrganizationsRemoveUserData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<OrganizationsRemoveUserResponses, OrganizationsRemoveUserErrors, ThrowOnError>({
-    url: "/api/v1/organizations/{id}/users/{userId}",
+    url: "/api/v1alpha/organizations/{id}/users/{userId}",
     ...options,
   });
 
@@ -1524,7 +1524,7 @@ export const rolesListRoles = <ThrowOnError extends boolean = true>(
   options?: Options<RolesListRolesData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<RolesListRolesResponses, RolesListRolesErrors, ThrowOnError>({
-    url: "/api/v1/roles",
+    url: "/api/v1alpha/roles",
     ...options,
   });
 
@@ -1537,7 +1537,7 @@ export const rolesCreateRole = <ThrowOnError extends boolean = true>(
   options: Options<RolesCreateRoleData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<RolesCreateRoleResponses, RolesCreateRoleErrors, ThrowOnError>({
-    url: "/api/v1/roles",
+    url: "/api/v1alpha/roles",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1554,7 +1554,7 @@ export const rolesDeleteRole = <ThrowOnError extends boolean = true>(
   options: Options<RolesDeleteRoleData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<RolesDeleteRoleResponses, RolesDeleteRoleErrors, ThrowOnError>({
-    url: "/api/v1/roles/{roleName}",
+    url: "/api/v1alpha/roles/{roleName}",
     ...options,
   });
 
@@ -1567,7 +1567,7 @@ export const rolesDescribeRole = <ThrowOnError extends boolean = true>(
   options: Options<RolesDescribeRoleData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<RolesDescribeRoleResponses, RolesDescribeRoleErrors, ThrowOnError>({
-    url: "/api/v1/roles/{roleName}",
+    url: "/api/v1alpha/roles/{roleName}",
     ...options,
   });
 
@@ -1580,7 +1580,7 @@ export const rolesUpdateRole = <ThrowOnError extends boolean = true>(
   options: Options<RolesUpdateRoleData, ThrowOnError>,
 ) =>
   (options.client ?? client).put<RolesUpdateRoleResponses, RolesUpdateRoleErrors, ThrowOnError>({
-    url: "/api/v1/roles/{roleName}",
+    url: "/api/v1alpha/roles/{roleName}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1597,7 +1597,7 @@ export const rolesAssignRole = <ThrowOnError extends boolean = true>(
   options: Options<RolesAssignRoleData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<RolesAssignRoleResponses, RolesAssignRoleErrors, ThrowOnError>({
-    url: "/api/v1/roles/{roleName}/users",
+    url: "/api/v1alpha/roles/{roleName}/users",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1614,7 +1614,7 @@ export const secretsListSecrets = <ThrowOnError extends boolean = true>(
   options?: Options<SecretsListSecretsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<SecretsListSecretsResponses, SecretsListSecretsErrors, ThrowOnError>({
-    url: "/api/v1/secrets",
+    url: "/api/v1alpha/secrets",
     ...options,
   });
 
@@ -1627,7 +1627,7 @@ export const secretsCreateSecret = <ThrowOnError extends boolean = true>(
   options: Options<SecretsCreateSecretData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<SecretsCreateSecretResponses, SecretsCreateSecretErrors, ThrowOnError>({
-    url: "/api/v1/secrets",
+    url: "/api/v1alpha/secrets",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1644,7 +1644,7 @@ export const secretsDeleteSecret = <ThrowOnError extends boolean = true>(
   options: Options<SecretsDeleteSecretData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<SecretsDeleteSecretResponses, SecretsDeleteSecretErrors, ThrowOnError>({
-    url: "/api/v1/secrets/{idOrName}",
+    url: "/api/v1alpha/secrets/{idOrName}",
     ...options,
   });
 
@@ -1657,7 +1657,7 @@ export const secretsDescribeSecret = <ThrowOnError extends boolean = true>(
   options: Options<SecretsDescribeSecretData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<SecretsDescribeSecretResponses, SecretsDescribeSecretErrors, ThrowOnError>({
-    url: "/api/v1/secrets/{idOrName}",
+    url: "/api/v1alpha/secrets/{idOrName}",
     ...options,
   });
 
@@ -1670,7 +1670,7 @@ export const secretsUpdateSecret = <ThrowOnError extends boolean = true>(
   options: Options<SecretsUpdateSecretData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<SecretsUpdateSecretResponses, SecretsUpdateSecretErrors, ThrowOnError>({
-    url: "/api/v1/secrets/{idOrName}",
+    url: "/api/v1alpha/secrets/{idOrName}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1687,7 +1687,7 @@ export const secretsDeleteSecretKey = <ThrowOnError extends boolean = true>(
   options: Options<SecretsDeleteSecretKeyData, ThrowOnError>,
 ) =>
   (options.client ?? client).delete<SecretsDeleteSecretKeyResponses, SecretsDeleteSecretKeyErrors, ThrowOnError>({
-    url: "/api/v1/secrets/{idOrName}/keys/{keyName}",
+    url: "/api/v1alpha/secrets/{idOrName}/keys/{keyName}",
     ...options,
   });
 
@@ -1700,7 +1700,7 @@ export const secretsSetSecretKey = <ThrowOnError extends boolean = true>(
   options: Options<SecretsSetSecretKeyData, ThrowOnError>,
 ) =>
   (options.client ?? client).put<SecretsSetSecretKeyResponses, SecretsSetSecretKeyErrors, ThrowOnError>({
-    url: "/api/v1/secrets/{idOrName}/keys/{keyName}",
+    url: "/api/v1alpha/secrets/{idOrName}/keys/{keyName}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1717,7 +1717,7 @@ export const secretsUpdateSecretName = <ThrowOnError extends boolean = true>(
   options: Options<SecretsUpdateSecretNameData, ThrowOnError>,
 ) =>
   (options.client ?? client).patch<SecretsUpdateSecretNameResponses, SecretsUpdateSecretNameErrors, ThrowOnError>({
-    url: "/api/v1/secrets/{idOrName}/name",
+    url: "/api/v1alpha/secrets/{idOrName}/name",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1737,7 +1737,7 @@ export const serviceAccountsListServiceAccounts = <ThrowOnError extends boolean 
     ServiceAccountsListServiceAccountsResponses,
     ServiceAccountsListServiceAccountsErrors,
     ThrowOnError
-  >({ url: "/api/v1/service-accounts", ...options });
+  >({ url: "/api/v1alpha/service-accounts", ...options });
 
 /**
  * Create a service account
@@ -1752,7 +1752,7 @@ export const serviceAccountsCreateServiceAccount = <ThrowOnError extends boolean
     ServiceAccountsCreateServiceAccountErrors,
     ThrowOnError
   >({
-    url: "/api/v1/service-accounts",
+    url: "/api/v1alpha/service-accounts",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1772,7 +1772,7 @@ export const serviceAccountsDeleteServiceAccount = <ThrowOnError extends boolean
     ServiceAccountsDeleteServiceAccountResponses,
     ServiceAccountsDeleteServiceAccountErrors,
     ThrowOnError
-  >({ url: "/api/v1/service-accounts/{id}", ...options });
+  >({ url: "/api/v1alpha/service-accounts/{id}", ...options });
 
 /**
  * Describe a service account
@@ -1786,7 +1786,7 @@ export const serviceAccountsDescribeServiceAccount = <ThrowOnError extends boole
     ServiceAccountsDescribeServiceAccountResponses,
     ServiceAccountsDescribeServiceAccountErrors,
     ThrowOnError
-  >({ url: "/api/v1/service-accounts/{id}", ...options });
+  >({ url: "/api/v1alpha/service-accounts/{id}", ...options });
 
 /**
  * Update a service account
@@ -1801,7 +1801,7 @@ export const serviceAccountsUpdateServiceAccount = <ThrowOnError extends boolean
     ServiceAccountsUpdateServiceAccountErrors,
     ThrowOnError
   >({
-    url: "/api/v1/service-accounts/{id}",
+    url: "/api/v1alpha/service-accounts/{id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1822,7 +1822,7 @@ export const serviceAccountsRegenerateServiceAccountToken = <ThrowOnError extend
     ServiceAccountsRegenerateServiceAccountTokenErrors,
     ThrowOnError
   >({
-    url: "/api/v1/service-accounts/{id}/token",
+    url: "/api/v1alpha/service-accounts/{id}/token",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -1839,7 +1839,7 @@ export const triggersListTriggers = <ThrowOnError extends boolean = true>(
   options?: Options<TriggersListTriggersData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<TriggersListTriggersResponses, TriggersListTriggersErrors, ThrowOnError>({
-    url: "/api/v1/triggers",
+    url: "/api/v1alpha/triggers",
     ...options,
   });
 
@@ -1852,7 +1852,7 @@ export const triggersDescribeTrigger = <ThrowOnError extends boolean = true>(
   options: Options<TriggersDescribeTriggerData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<TriggersDescribeTriggerResponses, TriggersDescribeTriggerErrors, ThrowOnError>({
-    url: "/api/v1/triggers/{name}",
+    url: "/api/v1alpha/triggers/{name}",
     ...options,
   });
 
@@ -1865,7 +1865,7 @@ export const usersListUsers = <ThrowOnError extends boolean = true>(
   options?: Options<UsersListUsersData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<UsersListUsersResponses, UsersListUsersErrors, ThrowOnError>({
-    url: "/api/v1/users",
+    url: "/api/v1alpha/users",
     ...options,
   });
 
@@ -1878,7 +1878,7 @@ export const usersListUserPermissions = <ThrowOnError extends boolean = true>(
   options: Options<UsersListUserPermissionsData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<UsersListUserPermissionsResponses, UsersListUserPermissionsErrors, ThrowOnError>({
-    url: "/api/v1/users/{userId}/permissions",
+    url: "/api/v1alpha/users/{userId}/permissions",
     ...options,
   });
 
@@ -1891,7 +1891,7 @@ export const usersListUserRoles = <ThrowOnError extends boolean = true>(
   options: Options<UsersListUserRolesData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<UsersListUserRolesResponses, UsersListUserRolesErrors, ThrowOnError>({
-    url: "/api/v1/users/{userId}/roles",
+    url: "/api/v1alpha/users/{userId}/roles",
     ...options,
   });
 
@@ -1904,7 +1904,7 @@ export const widgetsListWidgets = <ThrowOnError extends boolean = true>(
   options?: Options<WidgetsListWidgetsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<WidgetsListWidgetsResponses, WidgetsListWidgetsErrors, ThrowOnError>({
-    url: "/api/v1/widgets",
+    url: "/api/v1alpha/widgets",
     ...options,
   });
 
@@ -1917,6 +1917,6 @@ export const widgetsDescribeWidget = <ThrowOnError extends boolean = true>(
   options: Options<WidgetsDescribeWidgetData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<WidgetsDescribeWidgetResponses, WidgetsDescribeWidgetErrors, ThrowOnError>({
-    url: "/api/v1/widgets/{name}",
+    url: "/api/v1alpha/widgets/{name}",
     ...options,
   });

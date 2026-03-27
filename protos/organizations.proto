@@ -28,7 +28,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Organizations {
   rpc DescribeOrganization(DescribeOrganizationRequest) returns (DescribeOrganizationResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}"
+      get: "/api/v1alpha/organizations/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization details";
@@ -39,7 +39,7 @@ service Organizations {
 
   rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}"
+      patch: "/api/v1alpha/organizations/{id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -51,7 +51,7 @@ service Organizations {
 
   rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}"
+      delete: "/api/v1alpha/organizations/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete an organization";
@@ -62,7 +62,7 @@ service Organizations {
 
   rpc RemoveUser(RemoveUserRequest) returns (RemoveUserResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/users/{user_id}"
+      delete: "/api/v1alpha/organizations/{id}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove a user from an organization";
@@ -73,7 +73,7 @@ service Organizations {
 
   rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/invitations"
+      post: "/api/v1alpha/organizations/{id}/invitations"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -85,7 +85,7 @@ service Organizations {
 
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/invitations"
+      get: "/api/v1alpha/organizations/{id}/invitations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization invitations";
@@ -96,7 +96,7 @@ service Organizations {
 
   rpc RemoveInvitation(RemoveInvitationRequest) returns (RemoveInvitationResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/invitations/{invitation_id}"
+      delete: "/api/v1alpha/organizations/{id}/invitations/{invitation_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove an organization invitation";
@@ -107,7 +107,7 @@ service Organizations {
 
   rpc GetInviteLink(GetInviteLinkRequest) returns (GetInviteLinkResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/invite-link"
+      get: "/api/v1alpha/organizations/{id}/invite-link"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get an organization invite link";
@@ -118,7 +118,7 @@ service Organizations {
 
   rpc UpdateInviteLink(UpdateInviteLinkRequest) returns (UpdateInviteLinkResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/invite-link"
+      patch: "/api/v1alpha/organizations/{id}/invite-link"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -130,7 +130,7 @@ service Organizations {
 
   rpc ResetInviteLink(ResetInviteLinkRequest) returns (ResetInviteLinkResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/invite-link/reset"
+      post: "/api/v1alpha/organizations/{id}/invite-link/reset"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Reset an organization invite link";
@@ -141,7 +141,7 @@ service Organizations {
 
   rpc GetAgentSettings(GetAgentSettingsRequest) returns (GetAgentSettingsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/agent-settings"
+      get: "/api/v1alpha/organizations/{id}/agent-settings"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization Agent Mode settings";
@@ -152,7 +152,7 @@ service Organizations {
 
   rpc UpdateAgentSettings(UpdateAgentSettingsRequest) returns (UpdateAgentSettingsResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/agent-settings"
+      patch: "/api/v1alpha/organizations/{id}/agent-settings"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -164,7 +164,7 @@ service Organizations {
 
   rpc SetAgentOpenAIKey(SetAgentOpenAIKeyRequest) returns (SetAgentOpenAIKeyResponse) {
     option (google.api.http) = {
-      put: "/api/v1/organizations/{id}/agent-settings/openai-key"
+      put: "/api/v1alpha/organizations/{id}/agent-settings/openai-key"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -176,7 +176,7 @@ service Organizations {
 
   rpc DeleteAgentOpenAIKey(DeleteAgentOpenAIKeyRequest) returns (DeleteAgentOpenAIKeyResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/agent-settings/openai-key"
+      delete: "/api/v1alpha/organizations/{id}/agent-settings/openai-key"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete organization OpenAI key for Agent Mode";
@@ -187,7 +187,7 @@ service Organizations {
 
   rpc DescribeUsage(DescribeUsageRequest) returns (DescribeUsageResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/usage"
+      get: "/api/v1alpha/organizations/{id}/usage"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe organization usage";
@@ -198,7 +198,7 @@ service Organizations {
 
   rpc AcceptInviteLink(InviteLink) returns (google.protobuf.Struct) {
     option (google.api.http) = {
-      post: "/api/v1/invite-links/{token}/accept"
+      post: "/api/v1alpha/invite-links/{token}/accept"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Accept an invite link";
@@ -209,7 +209,7 @@ service Organizations {
 
   rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/integrations"
+      get: "/api/v1alpha/organizations/{id}/integrations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List integrations in an organization";
@@ -220,7 +220,7 @@ service Organizations {
 
   rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/integrations/{integration_id}"
+      get: "/api/v1alpha/organizations/{id}/integrations/{integration_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe an integration in an organization";
@@ -231,7 +231,7 @@ service Organizations {
 
   rpc ListIntegrationResources(ListIntegrationResourcesRequest) returns (ListIntegrationResourcesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id}/integrations/{integration_id}/resources"
+      get: "/api/v1alpha/organizations/{id}/integrations/{integration_id}/resources"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List integration resources";
@@ -242,7 +242,7 @@ service Organizations {
 
   rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{id}/integrations"
+      post: "/api/v1alpha/organizations/{id}/integrations"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -254,7 +254,7 @@ service Organizations {
 
   rpc UpdateIntegration(UpdateIntegrationRequest) returns (UpdateIntegrationResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/organizations/{id}/integrations/{integration_id}"
+      patch: "/api/v1alpha/organizations/{id}/integrations/{integration_id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -266,7 +266,7 @@ service Organizations {
 
   rpc DeleteIntegration(DeleteIntegrationRequest) returns (DeleteIntegrationResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id}/integrations/{integration_id}"
+      delete: "/api/v1alpha/organizations/{id}/integrations/{integration_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete organization integration";

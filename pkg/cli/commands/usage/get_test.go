@@ -17,10 +17,10 @@ func TestGetCommandExecuteText(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 
 		switch r.URL.Path {
-		case "/api/v1/me":
+		case "/api/v1alpha/me":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-123"}`))
-		case "/api/v1/organizations/org-123/usage":
+		case "/api/v1alpha/organizations/org-123/usage":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{
 				"enabled": true,
@@ -65,10 +65,10 @@ func TestGetCommandExecuteJSON(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 
 		switch r.URL.Path {
-		case "/api/v1/me":
+		case "/api/v1alpha/me":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-123"}`))
-		case "/api/v1/organizations/org-123/usage":
+		case "/api/v1alpha/organizations/org-123/usage":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"enabled":false,"statusMessage":"usage disabled"}`))
 		default:
@@ -88,7 +88,7 @@ func TestGetCommandExecuteJSON(t *testing.T) {
 func TestGetCommandExecuteRequiresOrganizationID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/me", r.URL.Path)
+		require.Equal(t, "/api/v1alpha/me", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"user-1"}`))
 	}))

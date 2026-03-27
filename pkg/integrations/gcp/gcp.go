@@ -354,7 +354,7 @@ func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, me
 		if err != nil {
 			return fmt.Errorf("generate events secret: %w", err)
 		}
-		pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
+		pushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
 		return gcppubsub.UpdatePushEndpoint(context.Background(), client, client.ProjectID(), metadata.PubSubSubscription, pushEndpoint)
 	}
 
@@ -382,7 +382,7 @@ func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, me
 		return fmt.Errorf("create Pub/Sub topic: %w", err)
 	}
 
-	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
+	pushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/events?token=%s", ctx.WebhooksBaseURL, ctx.Integration.ID(), secret)
 	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, subscriptionID, topicID, pushEndpoint); err != nil {
 		return fmt.Errorf("create Pub/Sub push subscription: %w", err)
 	}
@@ -416,7 +416,7 @@ func (g *GCP) ensureCloudBuildSetup(
 		if err != nil {
 			return fmt.Errorf("generate cloud build secret: %w", err)
 		}
-		pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/cloud-build-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+		pushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/cloud-build-events?token=%s", webhooksBaseURL, integration.ID(), secret)
 		return gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.CloudBuildSubscription, pushEndpoint)
 	}
 
@@ -451,7 +451,7 @@ func (g *GCP) ensureCloudBuildSetup(
 
 	sanitized := sanitizeID(integration.ID().String())
 	subscriptionID := "sp-cb-sub-" + sanitized
-	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/cloud-build-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+	pushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/cloud-build-events?token=%s", webhooksBaseURL, integration.ID(), secret)
 
 	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, CloudBuildTopicID); err != nil {
 		return fmt.Errorf("create Cloud Build topic: %w", err)
@@ -500,7 +500,7 @@ func (g *GCP) syncArtifactRegistrySubscriptions(
 		return false, fmt.Errorf("generate artifact push secret: %w", err)
 	}
 
-	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), secret)
+	pushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), secret)
 	updateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ArtifactPushSubscription, pushEndpoint)
 	if updateErr != nil {
 		if !gcpcommon.IsNotFoundError(updateErr) {
@@ -517,7 +517,7 @@ func (g *GCP) syncArtifactRegistrySubscriptions(
 		if err != nil {
 			return false, fmt.Errorf("generate container analysis secret: %w", err)
 		}
-		caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
+		caPushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
 		caUpdateErr := gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.ContainerAnalysisSubscription, caPushEndpoint)
 		if caUpdateErr == nil {
 			return true, nil
@@ -585,7 +585,7 @@ func (g *GCP) bootstrapArtifactRegistrySubscriptions(
 		return fmt.Errorf("generate artifact push secret: %w", err)
 	}
 	arSubscriptionID := "sp-ar-sub-" + sanitized
-	arPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), arSecret)
+	arPushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/artifact-push-events?token=%s", webhooksBaseURL, integration.ID(), arSecret)
 
 	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ArtifactPushTopicID); err != nil {
 		return fmt.Errorf("create Artifact Registry gcr topic: %w", err)
@@ -624,7 +624,7 @@ func (g *GCP) createContainerAnalysisSubscription(
 	if err != nil {
 		return fmt.Errorf("generate container analysis secret: %w", err)
 	}
-	caPushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
+	caPushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/artifact-analysis-events?token=%s", webhooksBaseURL, integration.ID(), caSecret)
 
 	if err := gcppubsub.CreateTopic(reqCtx, client, projectID, ContainerAnalysisTopicID); err != nil {
 		return fmt.Errorf("create Container Analysis topic: %w", err)
@@ -828,7 +828,7 @@ func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationActionContext) err
 	// Delete existing subscription (handles topic changes and idempotency)
 	_ = gcppubsub.DeleteSubscription(reqCtx, client, projectID, params.GCPSubName)
 
-	pushEndpoint := fmt.Sprintf("%s/api/v1/integrations/%s/pubsub-events?token=%s&gcpSubName=%s",
+	pushEndpoint := fmt.Sprintf("%s/api/v1alpha/integrations/%s/pubsub-events?token=%s&gcpSubName=%s",
 		ctx.WebhooksBaseURL, ctx.Integration.ID(), secret, params.GCPSubName)
 
 	if err := gcppubsub.CreatePushSubscription(reqCtx, client, projectID, params.GCPSubName, params.Topic, pushEndpoint); err != nil {

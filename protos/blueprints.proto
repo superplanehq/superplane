@@ -29,7 +29,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Blueprints {
   rpc ListBlueprints(ListBlueprintsRequest) returns (ListBlueprintsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/blueprints"
+      get: "/api/v1alpha/blueprints"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List blueprints";
@@ -40,7 +40,7 @@ service Blueprints {
 
   rpc DescribeBlueprint(DescribeBlueprintRequest) returns (DescribeBlueprintResponse) {
     option (google.api.http) = {
-      get: "/api/v1/blueprints/{id}"
+      get: "/api/v1alpha/blueprints/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe blueprint";
@@ -51,7 +51,7 @@ service Blueprints {
 
   rpc CreateBlueprint(CreateBlueprintRequest) returns (CreateBlueprintResponse) {
     option (google.api.http) = {
-      post: "/api/v1/blueprints"
+      post: "/api/v1alpha/blueprints"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -63,7 +63,7 @@ service Blueprints {
 
   rpc UpdateBlueprint(UpdateBlueprintRequest) returns (UpdateBlueprintResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/blueprints/{id}"
+      patch: "/api/v1alpha/blueprints/{id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -75,7 +75,7 @@ service Blueprints {
 
   rpc DeleteBlueprint(DeleteBlueprintRequest) returns (DeleteBlueprintResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/blueprints/{id}"
+      delete: "/api/v1alpha/blueprints/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete blueprint";

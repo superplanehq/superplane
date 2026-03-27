@@ -64,109 +64,109 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
-*AgentApi* | [**agents_create_agent_chat**](superplaneapi/docs/AgentApi.md#agents_create_agent_chat) | **POST** /api/v1/agents/chats | Creates a new agent chat
-*AgentApi* | [**agents_describe_agent_chat**](superplaneapi/docs/AgentApi.md#agents_describe_agent_chat) | **GET** /api/v1/agents/chats/{chatId} | Describes an agent chat for the authenticated user
-*AgentApi* | [**agents_list_agent_chat_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_chat_messages) | **GET** /api/v1/agents/chats/{chatId}/messages | List the messages in an agent chat
-*AgentApi* | [**agents_list_agent_chats**](superplaneapi/docs/AgentApi.md#agents_list_agent_chats) | **GET** /api/v1/agents/chats | List agent chats for the authenticated user
-*AgentApi* | [**agents_resume_agent_chat**](superplaneapi/docs/AgentApi.md#agents_resume_agent_chat) | **POST** /api/v1/agents/chats/{chatId}/resume | Resume an agent chat
-*BlueprintApi* | [**blueprints_create_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_create_blueprint) | **POST** /api/v1/blueprints | Create blueprint
-*BlueprintApi* | [**blueprints_delete_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_delete_blueprint) | **DELETE** /api/v1/blueprints/{id} | Delete blueprint
-*BlueprintApi* | [**blueprints_describe_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_describe_blueprint) | **GET** /api/v1/blueprints/{id} | Describe blueprint
-*BlueprintApi* | [**blueprints_list_blueprints**](superplaneapi/docs/BlueprintApi.md#blueprints_list_blueprints) | **GET** /api/v1/blueprints | List blueprints
-*BlueprintApi* | [**blueprints_update_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_update_blueprint) | **PATCH** /api/v1/blueprints/{id} | Update blueprint
-*CanvasApi* | [**canvases_create_canvas**](superplaneapi/docs/CanvasApi.md#canvases_create_canvas) | **POST** /api/v1/canvases | Create canvas
-*CanvasApi* | [**canvases_delete_canvas**](superplaneapi/docs/CanvasApi.md#canvases_delete_canvas) | **DELETE** /api/v1/canvases/{id} | Delete canvas
-*CanvasApi* | [**canvases_delete_canvas_memory**](superplaneapi/docs/CanvasApi.md#canvases_delete_canvas_memory) | **DELETE** /api/v1/canvases/{canvasId}/memory/{memoryId} | Delete canvas memory entry
-*CanvasApi* | [**canvases_describe_canvas**](superplaneapi/docs/CanvasApi.md#canvases_describe_canvas) | **GET** /api/v1/canvases/{id} | Describe canvas
-*CanvasApi* | [**canvases_list_canvas_memories**](superplaneapi/docs/CanvasApi.md#canvases_list_canvas_memories) | **GET** /api/v1/canvases/{canvasId}/memory | List canvas memories
-*CanvasApi* | [**canvases_list_canvases**](superplaneapi/docs/CanvasApi.md#canvases_list_canvases) | **GET** /api/v1/canvases | List canvases
-*CanvasApi* | [**canvases_update_canvas**](superplaneapi/docs/CanvasApi.md#canvases_update_canvas) | **PUT** /api/v1/canvases/{id} | Update canvas
-*CanvasChangeRequestApi* | [**canvases_act_on_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_act_on_canvas_change_request) | **PATCH** /api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions | Act on canvas change request
-*CanvasChangeRequestApi* | [**canvases_create_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_create_canvas_change_request) | **POST** /api/v1/canvases/{canvasId}/change-requests | Create canvas change request
-*CanvasChangeRequestApi* | [**canvases_describe_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_describe_canvas_change_request) | **GET** /api/v1/canvases/{canvasId}/change-requests/{changeRequestId} | Describe canvas change request
-*CanvasChangeRequestApi* | [**canvases_list_canvas_change_requests**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_list_canvas_change_requests) | **GET** /api/v1/canvases/{canvasId}/change-requests | List canvas change requests
-*CanvasChangeRequestApi* | [**canvases_resolve_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_resolve_canvas_change_request) | **PATCH** /api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve | Resolve canvas change request conflicts
-*CanvasEventApi* | [**canvases_list_canvas_events**](superplaneapi/docs/CanvasEventApi.md#canvases_list_canvas_events) | **GET** /api/v1/canvases/{canvasId}/events | List canvas events
-*CanvasEventApi* | [**canvases_list_event_executions**](superplaneapi/docs/CanvasEventApi.md#canvases_list_event_executions) | **GET** /api/v1/canvases/{canvasId}/events/{eventId}/executions | List event executions
-*CanvasNodeApi* | [**canvases_delete_node_queue_item**](superplaneapi/docs/CanvasNodeApi.md#canvases_delete_node_queue_item) | **DELETE** /api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId} | Delete item from a node&#39;s queue
-*CanvasNodeApi* | [**canvases_emit_node_event**](superplaneapi/docs/CanvasNodeApi.md#canvases_emit_node_event) | **POST** /api/v1/canvases/{canvasId}/nodes/{nodeId}/events | Emit output event for canvas node
-*CanvasNodeApi* | [**canvases_invoke_node_trigger_action**](superplaneapi/docs/CanvasNodeApi.md#canvases_invoke_node_trigger_action) | **POST** /api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName} | Invoke trigger action
-*CanvasNodeApi* | [**canvases_list_node_events**](superplaneapi/docs/CanvasNodeApi.md#canvases_list_node_events) | **GET** /api/v1/canvases/{canvasId}/nodes/{nodeId}/events | List node events
-*CanvasNodeApi* | [**canvases_list_node_executions**](superplaneapi/docs/CanvasNodeApi.md#canvases_list_node_executions) | **GET** /api/v1/canvases/{canvasId}/nodes/{nodeId}/executions | List node executions
-*CanvasNodeApi* | [**canvases_list_node_queue_items**](superplaneapi/docs/CanvasNodeApi.md#canvases_list_node_queue_items) | **GET** /api/v1/canvases/{canvasId}/nodes/{nodeId}/queue | List items in a node&#39;s queue
-*CanvasNodeApi* | [**canvases_update_node_pause**](superplaneapi/docs/CanvasNodeApi.md#canvases_update_node_pause) | **PATCH** /api/v1/canvases/{canvasId}/nodes/{nodeId}/pause | Pause or resume node processing
-*CanvasNodeExecutionApi* | [**canvases_cancel_execution**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_cancel_execution) | **PATCH** /api/v1/canvases/{canvasId}/executions/{executionId}/cancel | Cancel execution
-*CanvasNodeExecutionApi* | [**canvases_invoke_node_execution_action**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_invoke_node_execution_action) | **POST** /api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName} | Invoke execution action
-*CanvasNodeExecutionApi* | [**canvases_list_child_executions**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_list_child_executions) | **POST** /api/v1/canvases/{canvasId}/executions/{executionId}/children | List child executions for an execution
-*CanvasNodeExecutionApi* | [**canvases_resolve_execution_errors**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_resolve_execution_errors) | **PATCH** /api/v1/canvases/{canvasId}/executions/resolve | Resolve execution errors
-*CanvasVersionApi* | [**canvases_create_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_create_canvas_version) | **POST** /api/v1/canvases/{canvasId}/versions | Create canvas version
-*CanvasVersionApi* | [**canvases_describe_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_describe_canvas_version) | **GET** /api/v1/canvases/{canvasId}/versions/{versionId} | Describe canvas version
-*CanvasVersionApi* | [**canvases_list_canvas_versions**](superplaneapi/docs/CanvasVersionApi.md#canvases_list_canvas_versions) | **GET** /api/v1/canvases/{canvasId}/versions | List canvas versions
-*CanvasVersionApi* | [**canvases_update_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version) | **PUT** /api/v1/canvases/{canvasId}/versions/{versionId} | Update canvas version
-*CanvasVersionApi* | [**canvases_update_canvas_version2**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version2) | **PUT** /api/v1/canvases/{canvasId}/versions | Update canvas version
-*ComponentApi* | [**components_describe_component**](superplaneapi/docs/ComponentApi.md#components_describe_component) | **GET** /api/v1/components/{name} | Describe component
-*ComponentApi* | [**components_list_component_actions**](superplaneapi/docs/ComponentApi.md#components_list_component_actions) | **GET** /api/v1/components/{name}/actions | List component actions
-*ComponentApi* | [**components_list_components**](superplaneapi/docs/ComponentApi.md#components_list_components) | **GET** /api/v1/components | List components
-*GroupsApi* | [**groups_add_user_to_group**](superplaneapi/docs/GroupsApi.md#groups_add_user_to_group) | **POST** /api/v1/groups/{groupName}/users | Add user to group
-*GroupsApi* | [**groups_create_group**](superplaneapi/docs/GroupsApi.md#groups_create_group) | **POST** /api/v1/groups | Create group
-*GroupsApi* | [**groups_delete_group**](superplaneapi/docs/GroupsApi.md#groups_delete_group) | **DELETE** /api/v1/groups/{groupName} | Delete group
-*GroupsApi* | [**groups_describe_group**](superplaneapi/docs/GroupsApi.md#groups_describe_group) | **GET** /api/v1/groups/{groupName} | Get group
-*GroupsApi* | [**groups_list_group_users**](superplaneapi/docs/GroupsApi.md#groups_list_group_users) | **GET** /api/v1/groups/{groupName}/users | Get group users
-*GroupsApi* | [**groups_list_groups**](superplaneapi/docs/GroupsApi.md#groups_list_groups) | **GET** /api/v1/groups | List groups
-*GroupsApi* | [**groups_remove_user_from_group**](superplaneapi/docs/GroupsApi.md#groups_remove_user_from_group) | **PATCH** /api/v1/groups/{groupName}/users/remove | Remove user from group
-*GroupsApi* | [**groups_update_group**](superplaneapi/docs/GroupsApi.md#groups_update_group) | **PUT** /api/v1/groups/{groupName} | Update group
-*IntegrationApi* | [**integrations_list_integrations**](superplaneapi/docs/IntegrationApi.md#integrations_list_integrations) | **GET** /api/v1/integrations | List available integrations
-*MeApi* | [**me_me**](superplaneapi/docs/MeApi.md#me_me) | **GET** /api/v1/me | Get current user
-*MeApi* | [**me_regenerate_token**](superplaneapi/docs/MeApi.md#me_regenerate_token) | **POST** /api/v1/me/token | Regenerate API token
-*OrganizationApi* | [**organizations_accept_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_accept_invite_link) | **POST** /api/v1/invite-links/{token}/accept | Accept an invite link
-*OrganizationApi* | [**organizations_create_integration**](superplaneapi/docs/OrganizationApi.md#organizations_create_integration) | **POST** /api/v1/organizations/{id}/integrations | Create organization integration
-*OrganizationApi* | [**organizations_create_invitation**](superplaneapi/docs/OrganizationApi.md#organizations_create_invitation) | **POST** /api/v1/organizations/{id}/invitations | Create an organization invitation
-*OrganizationApi* | [**organizations_delete_agent_open_ai_key**](superplaneapi/docs/OrganizationApi.md#organizations_delete_agent_open_ai_key) | **DELETE** /api/v1/organizations/{id}/agent-settings/openai-key | Delete organization OpenAI key for Agent Mode
-*OrganizationApi* | [**organizations_delete_integration**](superplaneapi/docs/OrganizationApi.md#organizations_delete_integration) | **DELETE** /api/v1/organizations/{id}/integrations/{integrationId} | Delete organization integration
-*OrganizationApi* | [**organizations_delete_organization**](superplaneapi/docs/OrganizationApi.md#organizations_delete_organization) | **DELETE** /api/v1/organizations/{id} | Delete an organization
-*OrganizationApi* | [**organizations_describe_integration**](superplaneapi/docs/OrganizationApi.md#organizations_describe_integration) | **GET** /api/v1/organizations/{id}/integrations/{integrationId} | Describe an integration in an organization
-*OrganizationApi* | [**organizations_describe_organization**](superplaneapi/docs/OrganizationApi.md#organizations_describe_organization) | **GET** /api/v1/organizations/{id} | Get organization details
-*OrganizationApi* | [**organizations_describe_usage**](superplaneapi/docs/OrganizationApi.md#organizations_describe_usage) | **GET** /api/v1/organizations/{id}/usage | Describe organization usage
-*OrganizationApi* | [**organizations_get_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_get_agent_settings) | **GET** /api/v1/organizations/{id}/agent-settings | Get organization Agent Mode settings
-*OrganizationApi* | [**organizations_get_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_get_invite_link) | **GET** /api/v1/organizations/{id}/invite-link | Get an organization invite link
-*OrganizationApi* | [**organizations_list_integration_resources**](superplaneapi/docs/OrganizationApi.md#organizations_list_integration_resources) | **GET** /api/v1/organizations/{id}/integrations/{integrationId}/resources | List integration resources
-*OrganizationApi* | [**organizations_list_integrations**](superplaneapi/docs/OrganizationApi.md#organizations_list_integrations) | **GET** /api/v1/organizations/{id}/integrations | List integrations in an organization
-*OrganizationApi* | [**organizations_list_invitations**](superplaneapi/docs/OrganizationApi.md#organizations_list_invitations) | **GET** /api/v1/organizations/{id}/invitations | List organization invitations
-*OrganizationApi* | [**organizations_remove_invitation**](superplaneapi/docs/OrganizationApi.md#organizations_remove_invitation) | **DELETE** /api/v1/organizations/{id}/invitations/{invitationId} | Remove an organization invitation
-*OrganizationApi* | [**organizations_remove_user**](superplaneapi/docs/OrganizationApi.md#organizations_remove_user) | **DELETE** /api/v1/organizations/{id}/users/{userId} | Remove a user from an organization
-*OrganizationApi* | [**organizations_reset_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_reset_invite_link) | **POST** /api/v1/organizations/{id}/invite-link/reset | Reset an organization invite link
-*OrganizationApi* | [**organizations_set_agent_open_ai_key**](superplaneapi/docs/OrganizationApi.md#organizations_set_agent_open_ai_key) | **PUT** /api/v1/organizations/{id}/agent-settings/openai-key | Create or update organization OpenAI key for Agent Mode
-*OrganizationApi* | [**organizations_update_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_update_agent_settings) | **PATCH** /api/v1/organizations/{id}/agent-settings | Update organization Agent Mode settings
-*OrganizationApi* | [**organizations_update_integration**](superplaneapi/docs/OrganizationApi.md#organizations_update_integration) | **PATCH** /api/v1/organizations/{id}/integrations/{integrationId} | Update integration
-*OrganizationApi* | [**organizations_update_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_update_invite_link) | **PATCH** /api/v1/organizations/{id}/invite-link | Update an organization invite link
-*OrganizationApi* | [**organizations_update_organization**](superplaneapi/docs/OrganizationApi.md#organizations_update_organization) | **PATCH** /api/v1/organizations/{id} | Update an organization
-*RolesApi* | [**roles_assign_role**](superplaneapi/docs/RolesApi.md#roles_assign_role) | **POST** /api/v1/roles/{roleName}/users | Assign role
-*RolesApi* | [**roles_create_role**](superplaneapi/docs/RolesApi.md#roles_create_role) | **POST** /api/v1/roles | Create role
-*RolesApi* | [**roles_delete_role**](superplaneapi/docs/RolesApi.md#roles_delete_role) | **DELETE** /api/v1/roles/{roleName} | Delete role
-*RolesApi* | [**roles_describe_role**](superplaneapi/docs/RolesApi.md#roles_describe_role) | **GET** /api/v1/roles/{roleName} | Describe role
-*RolesApi* | [**roles_list_roles**](superplaneapi/docs/RolesApi.md#roles_list_roles) | **GET** /api/v1/roles | List roles
-*RolesApi* | [**roles_update_role**](superplaneapi/docs/RolesApi.md#roles_update_role) | **PUT** /api/v1/roles/{roleName} | Update role
-*SecretApi* | [**secrets_create_secret**](superplaneapi/docs/SecretApi.md#secrets_create_secret) | **POST** /api/v1/secrets | Create a new secret
-*SecretApi* | [**secrets_delete_secret**](superplaneapi/docs/SecretApi.md#secrets_delete_secret) | **DELETE** /api/v1/secrets/{idOrName} | Deletes a secret
-*SecretApi* | [**secrets_delete_secret_key**](superplaneapi/docs/SecretApi.md#secrets_delete_secret_key) | **DELETE** /api/v1/secrets/{idOrName}/keys/{keyName} | Remove a key from a secret
-*SecretApi* | [**secrets_describe_secret**](superplaneapi/docs/SecretApi.md#secrets_describe_secret) | **GET** /api/v1/secrets/{idOrName} | Get secret details
-*SecretApi* | [**secrets_list_secrets**](superplaneapi/docs/SecretApi.md#secrets_list_secrets) | **GET** /api/v1/secrets | List secrets
-*SecretApi* | [**secrets_set_secret_key**](superplaneapi/docs/SecretApi.md#secrets_set_secret_key) | **PUT** /api/v1/secrets/{idOrName}/keys/{keyName} | Set or overwrite a single key in a secret
-*SecretApi* | [**secrets_update_secret**](superplaneapi/docs/SecretApi.md#secrets_update_secret) | **PATCH** /api/v1/secrets/{idOrName} | Updates a secret
-*SecretApi* | [**secrets_update_secret_name**](superplaneapi/docs/SecretApi.md#secrets_update_secret_name) | **PATCH** /api/v1/secrets/{idOrName}/name | Update secret name
-*ServiceAccountsApi* | [**service_accounts_create_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_create_service_account) | **POST** /api/v1/service-accounts | Create a service account
-*ServiceAccountsApi* | [**service_accounts_delete_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_delete_service_account) | **DELETE** /api/v1/service-accounts/{id} | Delete a service account
-*ServiceAccountsApi* | [**service_accounts_describe_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_describe_service_account) | **GET** /api/v1/service-accounts/{id} | Describe a service account
-*ServiceAccountsApi* | [**service_accounts_list_service_accounts**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_list_service_accounts) | **GET** /api/v1/service-accounts | List service accounts
-*ServiceAccountsApi* | [**service_accounts_regenerate_service_account_token**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_regenerate_service_account_token) | **POST** /api/v1/service-accounts/{id}/token | Regenerate service account token
-*ServiceAccountsApi* | [**service_accounts_update_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_update_service_account) | **PATCH** /api/v1/service-accounts/{id} | Update a service account
-*TriggerApi* | [**triggers_describe_trigger**](superplaneapi/docs/TriggerApi.md#triggers_describe_trigger) | **GET** /api/v1/triggers/{name} | Describe trigger
-*TriggerApi* | [**triggers_list_triggers**](superplaneapi/docs/TriggerApi.md#triggers_list_triggers) | **GET** /api/v1/triggers | List triggers
-*UsersApi* | [**users_list_user_permissions**](superplaneapi/docs/UsersApi.md#users_list_user_permissions) | **GET** /api/v1/users/{userId}/permissions | List user permissions
-*UsersApi* | [**users_list_user_roles**](superplaneapi/docs/UsersApi.md#users_list_user_roles) | **GET** /api/v1/users/{userId}/roles | Get user roles
-*UsersApi* | [**users_list_users**](superplaneapi/docs/UsersApi.md#users_list_users) | **GET** /api/v1/users | List users
-*WidgetApi* | [**widgets_describe_widget**](superplaneapi/docs/WidgetApi.md#widgets_describe_widget) | **GET** /api/v1/widgets/{name} | Describe widget
-*WidgetApi* | [**widgets_list_widgets**](superplaneapi/docs/WidgetApi.md#widgets_list_widgets) | **GET** /api/v1/widgets | List widgets
+*AgentApi* | [**agents_create_agent_chat**](superplaneapi/docs/AgentApi.md#agents_create_agent_chat) | **POST** /api/v1alpha/agents/chats | Creates a new agent chat
+*AgentApi* | [**agents_describe_agent_chat**](superplaneapi/docs/AgentApi.md#agents_describe_agent_chat) | **GET** /api/v1alpha/agents/chats/{chatId} | Describes an agent chat for the authenticated user
+*AgentApi* | [**agents_list_agent_chat_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_chat_messages) | **GET** /api/v1alpha/agents/chats/{chatId}/messages | List the messages in an agent chat
+*AgentApi* | [**agents_list_agent_chats**](superplaneapi/docs/AgentApi.md#agents_list_agent_chats) | **GET** /api/v1alpha/agents/chats | List agent chats for the authenticated user
+*AgentApi* | [**agents_resume_agent_chat**](superplaneapi/docs/AgentApi.md#agents_resume_agent_chat) | **POST** /api/v1alpha/agents/chats/{chatId}/resume | Resume an agent chat
+*BlueprintApi* | [**blueprints_create_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_create_blueprint) | **POST** /api/v1alpha/blueprints | Create blueprint
+*BlueprintApi* | [**blueprints_delete_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_delete_blueprint) | **DELETE** /api/v1alpha/blueprints/{id} | Delete blueprint
+*BlueprintApi* | [**blueprints_describe_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_describe_blueprint) | **GET** /api/v1alpha/blueprints/{id} | Describe blueprint
+*BlueprintApi* | [**blueprints_list_blueprints**](superplaneapi/docs/BlueprintApi.md#blueprints_list_blueprints) | **GET** /api/v1alpha/blueprints | List blueprints
+*BlueprintApi* | [**blueprints_update_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_update_blueprint) | **PATCH** /api/v1alpha/blueprints/{id} | Update blueprint
+*CanvasApi* | [**canvases_create_canvas**](superplaneapi/docs/CanvasApi.md#canvases_create_canvas) | **POST** /api/v1alpha/canvases | Create canvas
+*CanvasApi* | [**canvases_delete_canvas**](superplaneapi/docs/CanvasApi.md#canvases_delete_canvas) | **DELETE** /api/v1alpha/canvases/{id} | Delete canvas
+*CanvasApi* | [**canvases_delete_canvas_memory**](superplaneapi/docs/CanvasApi.md#canvases_delete_canvas_memory) | **DELETE** /api/v1alpha/canvases/{canvasId}/memory/{memoryId} | Delete canvas memory entry
+*CanvasApi* | [**canvases_describe_canvas**](superplaneapi/docs/CanvasApi.md#canvases_describe_canvas) | **GET** /api/v1alpha/canvases/{id} | Describe canvas
+*CanvasApi* | [**canvases_list_canvas_memories**](superplaneapi/docs/CanvasApi.md#canvases_list_canvas_memories) | **GET** /api/v1alpha/canvases/{canvasId}/memory | List canvas memories
+*CanvasApi* | [**canvases_list_canvases**](superplaneapi/docs/CanvasApi.md#canvases_list_canvases) | **GET** /api/v1alpha/canvases | List canvases
+*CanvasApi* | [**canvases_update_canvas**](superplaneapi/docs/CanvasApi.md#canvases_update_canvas) | **PUT** /api/v1alpha/canvases/{id} | Update canvas
+*CanvasChangeRequestApi* | [**canvases_act_on_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_act_on_canvas_change_request) | **PATCH** /api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/actions | Act on canvas change request
+*CanvasChangeRequestApi* | [**canvases_create_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_create_canvas_change_request) | **POST** /api/v1alpha/canvases/{canvasId}/change-requests | Create canvas change request
+*CanvasChangeRequestApi* | [**canvases_describe_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_describe_canvas_change_request) | **GET** /api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId} | Describe canvas change request
+*CanvasChangeRequestApi* | [**canvases_list_canvas_change_requests**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_list_canvas_change_requests) | **GET** /api/v1alpha/canvases/{canvasId}/change-requests | List canvas change requests
+*CanvasChangeRequestApi* | [**canvases_resolve_canvas_change_request**](superplaneapi/docs/CanvasChangeRequestApi.md#canvases_resolve_canvas_change_request) | **PATCH** /api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/resolve | Resolve canvas change request conflicts
+*CanvasEventApi* | [**canvases_list_canvas_events**](superplaneapi/docs/CanvasEventApi.md#canvases_list_canvas_events) | **GET** /api/v1alpha/canvases/{canvasId}/events | List canvas events
+*CanvasEventApi* | [**canvases_list_event_executions**](superplaneapi/docs/CanvasEventApi.md#canvases_list_event_executions) | **GET** /api/v1alpha/canvases/{canvasId}/events/{eventId}/executions | List event executions
+*CanvasNodeApi* | [**canvases_delete_node_queue_item**](superplaneapi/docs/CanvasNodeApi.md#canvases_delete_node_queue_item) | **DELETE** /api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId} | Delete item from a node&#39;s queue
+*CanvasNodeApi* | [**canvases_emit_node_event**](superplaneapi/docs/CanvasNodeApi.md#canvases_emit_node_event) | **POST** /api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events | Emit output event for canvas node
+*CanvasNodeApi* | [**canvases_invoke_node_trigger_action**](superplaneapi/docs/CanvasNodeApi.md#canvases_invoke_node_trigger_action) | **POST** /api/v1alpha/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName} | Invoke trigger action
+*CanvasNodeApi* | [**canvases_list_node_events**](superplaneapi/docs/CanvasNodeApi.md#canvases_list_node_events) | **GET** /api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events | List node events
+*CanvasNodeApi* | [**canvases_list_node_executions**](superplaneapi/docs/CanvasNodeApi.md#canvases_list_node_executions) | **GET** /api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/executions | List node executions
+*CanvasNodeApi* | [**canvases_list_node_queue_items**](superplaneapi/docs/CanvasNodeApi.md#canvases_list_node_queue_items) | **GET** /api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue | List items in a node&#39;s queue
+*CanvasNodeApi* | [**canvases_update_node_pause**](superplaneapi/docs/CanvasNodeApi.md#canvases_update_node_pause) | **PATCH** /api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/pause | Pause or resume node processing
+*CanvasNodeExecutionApi* | [**canvases_cancel_execution**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_cancel_execution) | **PATCH** /api/v1alpha/canvases/{canvasId}/executions/{executionId}/cancel | Cancel execution
+*CanvasNodeExecutionApi* | [**canvases_invoke_node_execution_action**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_invoke_node_execution_action) | **POST** /api/v1alpha/canvases/{canvasId}/executions/{executionId}/actions/{actionName} | Invoke execution action
+*CanvasNodeExecutionApi* | [**canvases_list_child_executions**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_list_child_executions) | **POST** /api/v1alpha/canvases/{canvasId}/executions/{executionId}/children | List child executions for an execution
+*CanvasNodeExecutionApi* | [**canvases_resolve_execution_errors**](superplaneapi/docs/CanvasNodeExecutionApi.md#canvases_resolve_execution_errors) | **PATCH** /api/v1alpha/canvases/{canvasId}/executions/resolve | Resolve execution errors
+*CanvasVersionApi* | [**canvases_create_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_create_canvas_version) | **POST** /api/v1alpha/canvases/{canvasId}/versions | Create canvas version
+*CanvasVersionApi* | [**canvases_describe_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_describe_canvas_version) | **GET** /api/v1alpha/canvases/{canvasId}/versions/{versionId} | Describe canvas version
+*CanvasVersionApi* | [**canvases_list_canvas_versions**](superplaneapi/docs/CanvasVersionApi.md#canvases_list_canvas_versions) | **GET** /api/v1alpha/canvases/{canvasId}/versions | List canvas versions
+*CanvasVersionApi* | [**canvases_update_canvas_version**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version) | **PUT** /api/v1alpha/canvases/{canvasId}/versions/{versionId} | Update canvas version
+*CanvasVersionApi* | [**canvases_update_canvas_version2**](superplaneapi/docs/CanvasVersionApi.md#canvases_update_canvas_version2) | **PUT** /api/v1alpha/canvases/{canvasId}/versions | Update canvas version
+*ComponentApi* | [**components_describe_component**](superplaneapi/docs/ComponentApi.md#components_describe_component) | **GET** /api/v1alpha/components/{name} | Describe component
+*ComponentApi* | [**components_list_component_actions**](superplaneapi/docs/ComponentApi.md#components_list_component_actions) | **GET** /api/v1alpha/components/{name}/actions | List component actions
+*ComponentApi* | [**components_list_components**](superplaneapi/docs/ComponentApi.md#components_list_components) | **GET** /api/v1alpha/components | List components
+*GroupsApi* | [**groups_add_user_to_group**](superplaneapi/docs/GroupsApi.md#groups_add_user_to_group) | **POST** /api/v1alpha/groups/{groupName}/users | Add user to group
+*GroupsApi* | [**groups_create_group**](superplaneapi/docs/GroupsApi.md#groups_create_group) | **POST** /api/v1alpha/groups | Create group
+*GroupsApi* | [**groups_delete_group**](superplaneapi/docs/GroupsApi.md#groups_delete_group) | **DELETE** /api/v1alpha/groups/{groupName} | Delete group
+*GroupsApi* | [**groups_describe_group**](superplaneapi/docs/GroupsApi.md#groups_describe_group) | **GET** /api/v1alpha/groups/{groupName} | Get group
+*GroupsApi* | [**groups_list_group_users**](superplaneapi/docs/GroupsApi.md#groups_list_group_users) | **GET** /api/v1alpha/groups/{groupName}/users | Get group users
+*GroupsApi* | [**groups_list_groups**](superplaneapi/docs/GroupsApi.md#groups_list_groups) | **GET** /api/v1alpha/groups | List groups
+*GroupsApi* | [**groups_remove_user_from_group**](superplaneapi/docs/GroupsApi.md#groups_remove_user_from_group) | **PATCH** /api/v1alpha/groups/{groupName}/users/remove | Remove user from group
+*GroupsApi* | [**groups_update_group**](superplaneapi/docs/GroupsApi.md#groups_update_group) | **PUT** /api/v1alpha/groups/{groupName} | Update group
+*IntegrationApi* | [**integrations_list_integrations**](superplaneapi/docs/IntegrationApi.md#integrations_list_integrations) | **GET** /api/v1alpha/integrations | List available integrations
+*MeApi* | [**me_me**](superplaneapi/docs/MeApi.md#me_me) | **GET** /api/v1alpha/me | Get current user
+*MeApi* | [**me_regenerate_token**](superplaneapi/docs/MeApi.md#me_regenerate_token) | **POST** /api/v1alpha/me/token | Regenerate API token
+*OrganizationApi* | [**organizations_accept_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_accept_invite_link) | **POST** /api/v1alpha/invite-links/{token}/accept | Accept an invite link
+*OrganizationApi* | [**organizations_create_integration**](superplaneapi/docs/OrganizationApi.md#organizations_create_integration) | **POST** /api/v1alpha/organizations/{id}/integrations | Create organization integration
+*OrganizationApi* | [**organizations_create_invitation**](superplaneapi/docs/OrganizationApi.md#organizations_create_invitation) | **POST** /api/v1alpha/organizations/{id}/invitations | Create an organization invitation
+*OrganizationApi* | [**organizations_delete_agent_open_ai_key**](superplaneapi/docs/OrganizationApi.md#organizations_delete_agent_open_ai_key) | **DELETE** /api/v1alpha/organizations/{id}/agent-settings/openai-key | Delete organization OpenAI key for Agent Mode
+*OrganizationApi* | [**organizations_delete_integration**](superplaneapi/docs/OrganizationApi.md#organizations_delete_integration) | **DELETE** /api/v1alpha/organizations/{id}/integrations/{integrationId} | Delete organization integration
+*OrganizationApi* | [**organizations_delete_organization**](superplaneapi/docs/OrganizationApi.md#organizations_delete_organization) | **DELETE** /api/v1alpha/organizations/{id} | Delete an organization
+*OrganizationApi* | [**organizations_describe_integration**](superplaneapi/docs/OrganizationApi.md#organizations_describe_integration) | **GET** /api/v1alpha/organizations/{id}/integrations/{integrationId} | Describe an integration in an organization
+*OrganizationApi* | [**organizations_describe_organization**](superplaneapi/docs/OrganizationApi.md#organizations_describe_organization) | **GET** /api/v1alpha/organizations/{id} | Get organization details
+*OrganizationApi* | [**organizations_describe_usage**](superplaneapi/docs/OrganizationApi.md#organizations_describe_usage) | **GET** /api/v1alpha/organizations/{id}/usage | Describe organization usage
+*OrganizationApi* | [**organizations_get_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_get_agent_settings) | **GET** /api/v1alpha/organizations/{id}/agent-settings | Get organization Agent Mode settings
+*OrganizationApi* | [**organizations_get_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_get_invite_link) | **GET** /api/v1alpha/organizations/{id}/invite-link | Get an organization invite link
+*OrganizationApi* | [**organizations_list_integration_resources**](superplaneapi/docs/OrganizationApi.md#organizations_list_integration_resources) | **GET** /api/v1alpha/organizations/{id}/integrations/{integrationId}/resources | List integration resources
+*OrganizationApi* | [**organizations_list_integrations**](superplaneapi/docs/OrganizationApi.md#organizations_list_integrations) | **GET** /api/v1alpha/organizations/{id}/integrations | List integrations in an organization
+*OrganizationApi* | [**organizations_list_invitations**](superplaneapi/docs/OrganizationApi.md#organizations_list_invitations) | **GET** /api/v1alpha/organizations/{id}/invitations | List organization invitations
+*OrganizationApi* | [**organizations_remove_invitation**](superplaneapi/docs/OrganizationApi.md#organizations_remove_invitation) | **DELETE** /api/v1alpha/organizations/{id}/invitations/{invitationId} | Remove an organization invitation
+*OrganizationApi* | [**organizations_remove_user**](superplaneapi/docs/OrganizationApi.md#organizations_remove_user) | **DELETE** /api/v1alpha/organizations/{id}/users/{userId} | Remove a user from an organization
+*OrganizationApi* | [**organizations_reset_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_reset_invite_link) | **POST** /api/v1alpha/organizations/{id}/invite-link/reset | Reset an organization invite link
+*OrganizationApi* | [**organizations_set_agent_open_ai_key**](superplaneapi/docs/OrganizationApi.md#organizations_set_agent_open_ai_key) | **PUT** /api/v1alpha/organizations/{id}/agent-settings/openai-key | Create or update organization OpenAI key for Agent Mode
+*OrganizationApi* | [**organizations_update_agent_settings**](superplaneapi/docs/OrganizationApi.md#organizations_update_agent_settings) | **PATCH** /api/v1alpha/organizations/{id}/agent-settings | Update organization Agent Mode settings
+*OrganizationApi* | [**organizations_update_integration**](superplaneapi/docs/OrganizationApi.md#organizations_update_integration) | **PATCH** /api/v1alpha/organizations/{id}/integrations/{integrationId} | Update integration
+*OrganizationApi* | [**organizations_update_invite_link**](superplaneapi/docs/OrganizationApi.md#organizations_update_invite_link) | **PATCH** /api/v1alpha/organizations/{id}/invite-link | Update an organization invite link
+*OrganizationApi* | [**organizations_update_organization**](superplaneapi/docs/OrganizationApi.md#organizations_update_organization) | **PATCH** /api/v1alpha/organizations/{id} | Update an organization
+*RolesApi* | [**roles_assign_role**](superplaneapi/docs/RolesApi.md#roles_assign_role) | **POST** /api/v1alpha/roles/{roleName}/users | Assign role
+*RolesApi* | [**roles_create_role**](superplaneapi/docs/RolesApi.md#roles_create_role) | **POST** /api/v1alpha/roles | Create role
+*RolesApi* | [**roles_delete_role**](superplaneapi/docs/RolesApi.md#roles_delete_role) | **DELETE** /api/v1alpha/roles/{roleName} | Delete role
+*RolesApi* | [**roles_describe_role**](superplaneapi/docs/RolesApi.md#roles_describe_role) | **GET** /api/v1alpha/roles/{roleName} | Describe role
+*RolesApi* | [**roles_list_roles**](superplaneapi/docs/RolesApi.md#roles_list_roles) | **GET** /api/v1alpha/roles | List roles
+*RolesApi* | [**roles_update_role**](superplaneapi/docs/RolesApi.md#roles_update_role) | **PUT** /api/v1alpha/roles/{roleName} | Update role
+*SecretApi* | [**secrets_create_secret**](superplaneapi/docs/SecretApi.md#secrets_create_secret) | **POST** /api/v1alpha/secrets | Create a new secret
+*SecretApi* | [**secrets_delete_secret**](superplaneapi/docs/SecretApi.md#secrets_delete_secret) | **DELETE** /api/v1alpha/secrets/{idOrName} | Deletes a secret
+*SecretApi* | [**secrets_delete_secret_key**](superplaneapi/docs/SecretApi.md#secrets_delete_secret_key) | **DELETE** /api/v1alpha/secrets/{idOrName}/keys/{keyName} | Remove a key from a secret
+*SecretApi* | [**secrets_describe_secret**](superplaneapi/docs/SecretApi.md#secrets_describe_secret) | **GET** /api/v1alpha/secrets/{idOrName} | Get secret details
+*SecretApi* | [**secrets_list_secrets**](superplaneapi/docs/SecretApi.md#secrets_list_secrets) | **GET** /api/v1alpha/secrets | List secrets
+*SecretApi* | [**secrets_set_secret_key**](superplaneapi/docs/SecretApi.md#secrets_set_secret_key) | **PUT** /api/v1alpha/secrets/{idOrName}/keys/{keyName} | Set or overwrite a single key in a secret
+*SecretApi* | [**secrets_update_secret**](superplaneapi/docs/SecretApi.md#secrets_update_secret) | **PATCH** /api/v1alpha/secrets/{idOrName} | Updates a secret
+*SecretApi* | [**secrets_update_secret_name**](superplaneapi/docs/SecretApi.md#secrets_update_secret_name) | **PATCH** /api/v1alpha/secrets/{idOrName}/name | Update secret name
+*ServiceAccountsApi* | [**service_accounts_create_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_create_service_account) | **POST** /api/v1alpha/service-accounts | Create a service account
+*ServiceAccountsApi* | [**service_accounts_delete_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_delete_service_account) | **DELETE** /api/v1alpha/service-accounts/{id} | Delete a service account
+*ServiceAccountsApi* | [**service_accounts_describe_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_describe_service_account) | **GET** /api/v1alpha/service-accounts/{id} | Describe a service account
+*ServiceAccountsApi* | [**service_accounts_list_service_accounts**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_list_service_accounts) | **GET** /api/v1alpha/service-accounts | List service accounts
+*ServiceAccountsApi* | [**service_accounts_regenerate_service_account_token**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_regenerate_service_account_token) | **POST** /api/v1alpha/service-accounts/{id}/token | Regenerate service account token
+*ServiceAccountsApi* | [**service_accounts_update_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_update_service_account) | **PATCH** /api/v1alpha/service-accounts/{id} | Update a service account
+*TriggerApi* | [**triggers_describe_trigger**](superplaneapi/docs/TriggerApi.md#triggers_describe_trigger) | **GET** /api/v1alpha/triggers/{name} | Describe trigger
+*TriggerApi* | [**triggers_list_triggers**](superplaneapi/docs/TriggerApi.md#triggers_list_triggers) | **GET** /api/v1alpha/triggers | List triggers
+*UsersApi* | [**users_list_user_permissions**](superplaneapi/docs/UsersApi.md#users_list_user_permissions) | **GET** /api/v1alpha/users/{userId}/permissions | List user permissions
+*UsersApi* | [**users_list_user_roles**](superplaneapi/docs/UsersApi.md#users_list_user_roles) | **GET** /api/v1alpha/users/{userId}/roles | Get user roles
+*UsersApi* | [**users_list_users**](superplaneapi/docs/UsersApi.md#users_list_users) | **GET** /api/v1alpha/users | List users
+*WidgetApi* | [**widgets_describe_widget**](superplaneapi/docs/WidgetApi.md#widgets_describe_widget) | **GET** /api/v1alpha/widgets/{name} | Describe widget
+*WidgetApi* | [**widgets_list_widgets**](superplaneapi/docs/WidgetApi.md#widgets_list_widgets) | **GET** /api/v1alpha/widgets | List widgets
 
 
 ## Documentation For Models

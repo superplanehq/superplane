@@ -69,7 +69,7 @@ func (a *SecretAPIService) SecretsCreateSecretExecute(r ApiSecretsCreateSecretRe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets"
+	localVarPath := localBasePath + "/api/v1alpha/secrets"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -197,7 +197,7 @@ func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
+	localVarPath := localBasePath + "/api/v1alpha/secrets/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -333,7 +333,7 @@ func (a *SecretAPIService) SecretsDeleteSecretKeyExecute(r ApiSecretsDeleteSecre
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}/keys/{keyName}"
+	localVarPath := localBasePath + "/api/v1alpha/secrets/{idOrName}/keys/{keyName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"keyName"+"}", url.PathEscape(parameterValueToString(r.keyName, "keyName")), -1)
 
@@ -467,7 +467,7 @@ func (a *SecretAPIService) SecretsDescribeSecretExecute(r ApiSecretsDescribeSecr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
+	localVarPath := localBasePath + "/api/v1alpha/secrets/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -597,7 +597,7 @@ func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequ
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets"
+	localVarPath := localBasePath + "/api/v1alpha/secrets"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -726,7 +726,7 @@ func (a *SecretAPIService) SecretsSetSecretKeyExecute(r ApiSecretsSetSecretKeyRe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}/keys/{keyName}"
+	localVarPath := localBasePath + "/api/v1alpha/secrets/{idOrName}/keys/{keyName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"keyName"+"}", url.PathEscape(parameterValueToString(r.keyName, "keyName")), -1)
 
@@ -850,7 +850,7 @@ func (a *SecretAPIService) SecretsUpdateSecretExecute(r ApiSecretsUpdateSecretRe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
+	localVarPath := localBasePath + "/api/v1alpha/secrets/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -973,7 +973,7 @@ func (a *SecretAPIService) SecretsUpdateSecretNameExecute(r ApiSecretsUpdateSecr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}/name"
+	localVarPath := localBasePath + "/api/v1alpha/secrets/{idOrName}/name"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)

@@ -1246,15 +1246,15 @@ const file_components_proto_rawDesc = "" +
 	"\x06emails\x18\x06 \x03(\tR\x06emails\x12\x16\n" +
 	"\x06groups\x18\a \x03(\tR\x06groups\x12\x14\n" +
 	"\x05roles\x18\b \x03(\tR\x05roles\x128\n" +
-	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xb6\x05\n" +
+	"\ttimestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xc5\x05\n" +
 	"\n" +
-	"Components\x12\xca\x01\n" +
-	"\x0eListComponents\x12,.Superplane.Components.ListComponentsRequest\x1a-.Superplane.Components.ListComponentsResponse\"[\x92A>\n" +
-	"\tComponent\x12\x0fList components\x1a Returns a list of all components\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/components\x12\xdc\x01\n" +
-	"\x11DescribeComponent\x12/.Superplane.Components.DescribeComponentRequest\x1a0.Superplane.Components.DescribeComponentResponse\"d\x92A@\n" +
-	"\tComponent\x12\x12Describe component\x1a\x1fReturns a component by its name\x82\xd3\xe4\x93\x02\x1b\x12\x19/api/v1/components/{name}\x12\xfb\x01\n" +
-	"\x14ListComponentActions\x122.Superplane.Components.ListComponentActionsRequest\x1a3.Superplane.Components.ListComponentActionsResponse\"z\x92AN\n" +
-	"\tComponent\x12\x16List component actions\x1a)Returns available actions for a component\x82\xd3\xe4\x93\x02#\x12!/api/v1/components/{name}/actionsB\xce\x01\x92A\x90\x01\x12f\n" +
+	"Components\x12\xcf\x01\n" +
+	"\x0eListComponents\x12,.Superplane.Components.ListComponentsRequest\x1a-.Superplane.Components.ListComponentsResponse\"`\x92A>\n" +
+	"\tComponent\x12\x0fList components\x1a Returns a list of all components\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1alpha/components\x12\xe1\x01\n" +
+	"\x11DescribeComponent\x12/.Superplane.Components.DescribeComponentRequest\x1a0.Superplane.Components.DescribeComponentResponse\"i\x92A@\n" +
+	"\tComponent\x12\x12Describe component\x1a\x1fReturns a component by its name\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1alpha/components/{name}\x12\x80\x02\n" +
+	"\x14ListComponentActions\x122.Superplane.Components.ListComponentActionsRequest\x1a3.Superplane.Components.ListComponentActionsResponse\"\x7f\x92AN\n" +
+	"\tComponent\x12\x16List component actions\x1a)Returns available actions for a component\x82\xd3\xe4\x93\x02(\x12&/api/v1alpha/components/{name}/actionsB\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Components API\x12\x1dAPI for Superplane Components\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/componentsb\x06proto3"
 

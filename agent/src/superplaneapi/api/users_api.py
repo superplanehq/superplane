@@ -319,7 +319,7 @@ class UsersApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/users/{userId}/permissions',
+            resource_path='/api/v1alpha/users/{userId}/permissions',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -613,7 +613,7 @@ class UsersApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/users/{userId}/roles',
+            resource_path='/api/v1alpha/users/{userId}/roles',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -909,7 +909,7 @@ class UsersApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/users',
+            resource_path='/api/v1alpha/users',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

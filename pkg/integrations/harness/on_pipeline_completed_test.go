@@ -45,7 +45,7 @@ func (c *failingNodeWebhookContext) ResetSecret() ([]byte, []byte, error) {
 }
 
 func (c *failingNodeWebhookContext) GetBaseURL() string {
-	return "http://localhost:3000/api/v1"
+	return "http://localhost:3000/api/v1alpha"
 }
 
 func Test__OnPipelineCompleted__Setup(t *testing.T) {

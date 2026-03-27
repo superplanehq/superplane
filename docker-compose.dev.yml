@@ -34,7 +34,7 @@ services:
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
       START_CONSUMERS: "yes"
-      PUBLIC_API_BASE_PATH: /api/v1
+      PUBLIC_API_BASE_PATH: /api/v1alpha
       START_WEB_SERVER: "yes"
       PUBLIC_API_PORT: ${PUBLIC_API_PORT:-8000}
       INTERNAL_API_PORT: ${INTERNAL_API_PORT:-50051}

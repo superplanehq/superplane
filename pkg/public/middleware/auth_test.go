@@ -26,7 +26,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	}))
 
 	t.Run("missing account cookie returns unauthorized", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.Header.Set("x-organization-id", r.Organization.ID.String())
 
 		res := httptest.NewRecorder()
@@ -36,7 +36,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	})
 
 	t.Run("missing organization id returns not found", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 
 		res := httptest.NewRecorder()
@@ -46,7 +46,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	})
 
 	t.Run("organization without matching user returns not found", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 		req.Header.Set("x-organization-id", uuid.NewString())
 
@@ -57,7 +57,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	})
 
 	t.Run("valid cookie and organization reaches next handler", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 		req.Header.Set("x-organization-id", r.Organization.ID.String())
 
@@ -89,7 +89,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		}, time.Minute)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		res := httptest.NewRecorder()
@@ -107,7 +107,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		}, time.Minute)
 		require.NoError(t, err)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 
 		res := httptest.NewRecorder()
@@ -121,7 +121,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
 
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1alpha/users", nil)
 		req.Header.Set("Authorization", "Bearer "+rawToken)
 
 		res := httptest.NewRecorder()

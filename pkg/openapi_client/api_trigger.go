@@ -66,7 +66,7 @@ func (a *TriggerAPIService) TriggersDescribeTriggerExecute(r ApiTriggersDescribe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/triggers/{name}"
+	localVarPath := localBasePath + "/api/v1alpha/triggers/{name}"
 	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -175,7 +175,7 @@ func (a *TriggerAPIService) TriggersListTriggersExecute(r ApiTriggersListTrigger
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/triggers"
+	localVarPath := localBasePath + "/api/v1alpha/triggers"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

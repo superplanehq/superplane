@@ -573,7 +573,7 @@ func (a *AWS) createAPIDestination(
 		client,
 		fmt.Sprintf("superplane-%s", integration.ID().String()),
 		connectionArn,
-		baseURL+"/api/v1/integrations/"+integration.ID().String()+"/events",
+		baseURL+"/api/v1alpha/integrations/"+integration.ID().String()+"/events",
 		tags,
 	)
 

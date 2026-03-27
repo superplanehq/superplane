@@ -301,7 +301,7 @@ class BlueprintApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/blueprints',
+            resource_path='/api/v1alpha/blueprints',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -561,7 +561,7 @@ class BlueprintApi:
 
         return self.api_client.param_serialize(
             method='DELETE',
-            resource_path='/api/v1/blueprints/{id}',
+            resource_path='/api/v1alpha/blueprints/{id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -821,7 +821,7 @@ class BlueprintApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/blueprints/{id}',
+            resource_path='/api/v1alpha/blueprints/{id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1066,7 +1066,7 @@ class BlueprintApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/blueprints',
+            resource_path='/api/v1alpha/blueprints',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1354,7 +1354,7 @@ class BlueprintApi:
 
         return self.api_client.param_serialize(
             method='PATCH',
-            resource_path='/api/v1/blueprints/{id}',
+            resource_path='/api/v1alpha/blueprints/{id}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

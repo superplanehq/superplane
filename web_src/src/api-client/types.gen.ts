@@ -1420,7 +1420,7 @@ export type AgentsListAgentChatsData = {
   query?: {
     canvasId?: string;
   };
-  url: "/api/v1/agents/chats";
+  url: "/api/v1alpha/agents/chats";
 };
 
 export type AgentsListAgentChatsErrors = {
@@ -1445,7 +1445,7 @@ export type AgentsCreateAgentChatData = {
   body: AgentsCreateAgentChatRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/agents/chats";
+  url: "/api/v1alpha/agents/chats";
 };
 
 export type AgentsCreateAgentChatErrors = {
@@ -1474,7 +1474,7 @@ export type AgentsDescribeAgentChatData = {
   query?: {
     canvasId?: string;
   };
-  url: "/api/v1/agents/chats/{chatId}";
+  url: "/api/v1alpha/agents/chats/{chatId}";
 };
 
 export type AgentsDescribeAgentChatErrors = {
@@ -1503,7 +1503,7 @@ export type AgentsListAgentChatMessagesData = {
   query?: {
     canvasId?: string;
   };
-  url: "/api/v1/agents/chats/{chatId}/messages";
+  url: "/api/v1alpha/agents/chats/{chatId}/messages";
 };
 
 export type AgentsListAgentChatMessagesErrors = {
@@ -1532,7 +1532,7 @@ export type AgentsResumeAgentChatData = {
     chatId: string;
   };
   query?: never;
-  url: "/api/v1/agents/chats/{chatId}/resume";
+  url: "/api/v1alpha/agents/chats/{chatId}/resume";
 };
 
 export type AgentsResumeAgentChatErrors = {
@@ -1557,7 +1557,7 @@ export type BlueprintsListBlueprintsData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/blueprints";
+  url: "/api/v1alpha/blueprints";
 };
 
 export type BlueprintsListBlueprintsErrors = {
@@ -1583,7 +1583,7 @@ export type BlueprintsCreateBlueprintData = {
   body: BlueprintsCreateBlueprintRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/blueprints";
+  url: "/api/v1alpha/blueprints";
 };
 
 export type BlueprintsCreateBlueprintErrors = {
@@ -1611,7 +1611,7 @@ export type BlueprintsDeleteBlueprintData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/blueprints/{id}";
+  url: "/api/v1alpha/blueprints/{id}";
 };
 
 export type BlueprintsDeleteBlueprintErrors = {
@@ -1639,7 +1639,7 @@ export type BlueprintsDescribeBlueprintData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/blueprints/{id}";
+  url: "/api/v1alpha/blueprints/{id}";
 };
 
 export type BlueprintsDescribeBlueprintErrors = {
@@ -1668,7 +1668,7 @@ export type BlueprintsUpdateBlueprintData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/blueprints/{id}";
+  url: "/api/v1alpha/blueprints/{id}";
 };
 
 export type BlueprintsUpdateBlueprintErrors = {
@@ -1696,7 +1696,7 @@ export type CanvasesListCanvasesData = {
   query?: {
     includeTemplates?: boolean;
   };
-  url: "/api/v1/canvases";
+  url: "/api/v1alpha/canvases";
 };
 
 export type CanvasesListCanvasesErrors = {
@@ -1721,7 +1721,7 @@ export type CanvasesCreateCanvasData = {
   body: CanvasesCreateCanvasRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/canvases";
+  url: "/api/v1alpha/canvases";
 };
 
 export type CanvasesCreateCanvasErrors = {
@@ -1754,7 +1754,7 @@ export type CanvasesListCanvasChangeRequestsData = {
     onlyMine?: boolean;
     query?: string;
   };
-  url: "/api/v1/canvases/{canvasId}/change-requests";
+  url: "/api/v1alpha/canvases/{canvasId}/change-requests";
 };
 
 export type CanvasesListCanvasChangeRequestsErrors = {
@@ -1783,7 +1783,7 @@ export type CanvasesCreateCanvasChangeRequestData = {
     canvasId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/change-requests";
+  url: "/api/v1alpha/canvases/{canvasId}/change-requests";
 };
 
 export type CanvasesCreateCanvasChangeRequestErrors = {
@@ -1813,7 +1813,7 @@ export type CanvasesDescribeCanvasChangeRequestData = {
     changeRequestId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}";
+  url: "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}";
 };
 
 export type CanvasesDescribeCanvasChangeRequestErrors = {
@@ -1843,7 +1843,7 @@ export type CanvasesActOnCanvasChangeRequestData = {
     changeRequestId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/actions";
+  url: "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/actions";
 };
 
 export type CanvasesActOnCanvasChangeRequestErrors = {
@@ -1873,7 +1873,7 @@ export type CanvasesResolveCanvasChangeRequestData = {
     changeRequestId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/change-requests/{changeRequestId}/resolve";
+  url: "/api/v1alpha/canvases/{canvasId}/change-requests/{changeRequestId}/resolve";
 };
 
 export type CanvasesResolveCanvasChangeRequestErrors = {
@@ -1905,7 +1905,7 @@ export type CanvasesListCanvasEventsData = {
     limit?: number;
     before?: string;
   };
-  url: "/api/v1/canvases/{canvasId}/events";
+  url: "/api/v1alpha/canvases/{canvasId}/events";
 };
 
 export type CanvasesListCanvasEventsErrors = {
@@ -1934,7 +1934,7 @@ export type CanvasesListEventExecutionsData = {
     eventId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/events/{eventId}/executions";
+  url: "/api/v1alpha/canvases/{canvasId}/events/{eventId}/executions";
 };
 
 export type CanvasesListEventExecutionsErrors = {
@@ -1963,7 +1963,7 @@ export type CanvasesResolveExecutionErrorsData = {
     canvasId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/executions/resolve";
+  url: "/api/v1alpha/canvases/{canvasId}/executions/resolve";
 };
 
 export type CanvasesResolveExecutionErrorsErrors = {
@@ -1994,7 +1994,7 @@ export type CanvasesInvokeNodeExecutionActionData = {
     actionName: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/actions/{actionName}";
+  url: "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/actions/{actionName}";
 };
 
 export type CanvasesInvokeNodeExecutionActionErrors = {
@@ -2024,7 +2024,7 @@ export type CanvasesCancelExecutionData = {
     executionId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/cancel";
+  url: "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/cancel";
 };
 
 export type CanvasesCancelExecutionErrors = {
@@ -2052,7 +2052,7 @@ export type CanvasesListChildExecutionsData = {
     executionId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/executions/{executionId}/children";
+  url: "/api/v1alpha/canvases/{canvasId}/executions/{executionId}/children";
 };
 
 export type CanvasesListChildExecutionsErrors = {
@@ -2081,7 +2081,7 @@ export type CanvasesListCanvasMemoriesData = {
     canvasId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/memory";
+  url: "/api/v1alpha/canvases/{canvasId}/memory";
 };
 
 export type CanvasesListCanvasMemoriesErrors = {
@@ -2110,7 +2110,7 @@ export type CanvasesDeleteCanvasMemoryData = {
     memoryId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/memory/{memoryId}";
+  url: "/api/v1alpha/canvases/{canvasId}/memory/{memoryId}";
 };
 
 export type CanvasesDeleteCanvasMemoryErrors = {
@@ -2142,7 +2142,7 @@ export type CanvasesListNodeEventsData = {
     limit?: number;
     before?: string;
   };
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events";
+  url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events";
 };
 
 export type CanvasesListNodeEventsErrors = {
@@ -2170,7 +2170,7 @@ export type CanvasesEmitNodeEventData = {
     nodeId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/events";
+  url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/events";
 };
 
 export type CanvasesEmitNodeEventErrors = {
@@ -2203,7 +2203,7 @@ export type CanvasesListNodeExecutionsData = {
     limit?: number;
     before?: string;
   };
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/executions";
+  url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/executions";
 };
 
 export type CanvasesListNodeExecutionsErrors = {
@@ -2232,7 +2232,7 @@ export type CanvasesUpdateNodePauseData = {
     nodeId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/pause";
+  url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/pause";
 };
 
 export type CanvasesUpdateNodePauseErrors = {
@@ -2263,7 +2263,7 @@ export type CanvasesListNodeQueueItemsData = {
     limit?: number;
     before?: string;
   };
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue";
+  url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue";
 };
 
 export type CanvasesListNodeQueueItemsErrors = {
@@ -2293,7 +2293,7 @@ export type CanvasesDeleteNodeQueueItemData = {
     itemId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}";
+  url: "/api/v1alpha/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}";
 };
 
 export type CanvasesDeleteNodeQueueItemErrors = {
@@ -2324,7 +2324,7 @@ export type CanvasesInvokeNodeTriggerActionData = {
     actionName: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}";
+  url: "/api/v1alpha/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}";
 };
 
 export type CanvasesInvokeNodeTriggerActionErrors = {
@@ -2356,7 +2356,7 @@ export type CanvasesListCanvasVersionsData = {
     limit?: number;
     before?: string;
   };
-  url: "/api/v1/canvases/{canvasId}/versions";
+  url: "/api/v1alpha/canvases/{canvasId}/versions";
 };
 
 export type CanvasesListCanvasVersionsErrors = {
@@ -2384,7 +2384,7 @@ export type CanvasesCreateCanvasVersionData = {
     canvasId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/versions";
+  url: "/api/v1alpha/canvases/{canvasId}/versions";
 };
 
 export type CanvasesCreateCanvasVersionErrors = {
@@ -2413,7 +2413,7 @@ export type CanvasesUpdateCanvasVersion2Data = {
     canvasId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/versions";
+  url: "/api/v1alpha/canvases/{canvasId}/versions";
 };
 
 export type CanvasesUpdateCanvasVersion2Errors = {
@@ -2443,7 +2443,7 @@ export type CanvasesDescribeCanvasVersionData = {
     versionId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+  url: "/api/v1alpha/canvases/{canvasId}/versions/{versionId}";
 };
 
 export type CanvasesDescribeCanvasVersionErrors = {
@@ -2473,7 +2473,7 @@ export type CanvasesUpdateCanvasVersionData = {
     versionId: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{canvasId}/versions/{versionId}";
+  url: "/api/v1alpha/canvases/{canvasId}/versions/{versionId}";
 };
 
 export type CanvasesUpdateCanvasVersionErrors = {
@@ -2502,7 +2502,7 @@ export type CanvasesDeleteCanvasData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{id}";
+  url: "/api/v1alpha/canvases/{id}";
 };
 
 export type CanvasesDeleteCanvasErrors = {
@@ -2529,7 +2529,7 @@ export type CanvasesDescribeCanvasData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{id}";
+  url: "/api/v1alpha/canvases/{id}";
 };
 
 export type CanvasesDescribeCanvasErrors = {
@@ -2556,7 +2556,7 @@ export type CanvasesUpdateCanvasData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/canvases/{id}";
+  url: "/api/v1alpha/canvases/{id}";
 };
 
 export type CanvasesUpdateCanvasErrors = {
@@ -2581,7 +2581,7 @@ export type ComponentsListComponentsData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/components";
+  url: "/api/v1alpha/components";
 };
 
 export type ComponentsListComponentsErrors = {
@@ -2609,7 +2609,7 @@ export type ComponentsDescribeComponentData = {
     name: string;
   };
   query?: never;
-  url: "/api/v1/components/{name}";
+  url: "/api/v1alpha/components/{name}";
 };
 
 export type ComponentsDescribeComponentErrors = {
@@ -2638,7 +2638,7 @@ export type ComponentsListComponentActionsData = {
     name: string;
   };
   query?: never;
-  url: "/api/v1/components/{name}/actions";
+  url: "/api/v1alpha/components/{name}/actions";
 };
 
 export type ComponentsListComponentActionsErrors = {
@@ -2668,7 +2668,7 @@ export type GroupsListGroupsData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/groups";
+  url: "/api/v1alpha/groups";
 };
 
 export type GroupsListGroupsErrors = {
@@ -2693,7 +2693,7 @@ export type GroupsCreateGroupData = {
   body: GroupsCreateGroupRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/groups";
+  url: "/api/v1alpha/groups";
 };
 
 export type GroupsCreateGroupErrors = {
@@ -2723,7 +2723,7 @@ export type GroupsDeleteGroupData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/groups/{groupName}";
+  url: "/api/v1alpha/groups/{groupName}";
 };
 
 export type GroupsDeleteGroupErrors = {
@@ -2753,7 +2753,7 @@ export type GroupsDescribeGroupData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/groups/{groupName}";
+  url: "/api/v1alpha/groups/{groupName}";
 };
 
 export type GroupsDescribeGroupErrors = {
@@ -2780,7 +2780,7 @@ export type GroupsUpdateGroupData = {
     groupName: string;
   };
   query?: never;
-  url: "/api/v1/groups/{groupName}";
+  url: "/api/v1alpha/groups/{groupName}";
 };
 
 export type GroupsUpdateGroupErrors = {
@@ -2810,7 +2810,7 @@ export type GroupsListGroupUsersData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/groups/{groupName}/users";
+  url: "/api/v1alpha/groups/{groupName}/users";
 };
 
 export type GroupsListGroupUsersErrors = {
@@ -2837,7 +2837,7 @@ export type GroupsAddUserToGroupData = {
     groupName: string;
   };
   query?: never;
-  url: "/api/v1/groups/{groupName}/users";
+  url: "/api/v1alpha/groups/{groupName}/users";
 };
 
 export type GroupsAddUserToGroupErrors = {
@@ -2864,7 +2864,7 @@ export type GroupsRemoveUserFromGroupData = {
     groupName: string;
   };
   query?: never;
-  url: "/api/v1/groups/{groupName}/users/remove";
+  url: "/api/v1alpha/groups/{groupName}/users/remove";
 };
 
 export type GroupsRemoveUserFromGroupErrors = {
@@ -2890,7 +2890,7 @@ export type IntegrationsListIntegrationsData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/integrations";
+  url: "/api/v1alpha/integrations";
 };
 
 export type IntegrationsListIntegrationsErrors = {
@@ -2925,7 +2925,7 @@ export type OrganizationsAcceptInviteLinkData = {
     createdAt?: string;
     updatedAt?: string;
   };
-  url: "/api/v1/invite-links/{token}/accept";
+  url: "/api/v1alpha/invite-links/{token}/accept";
 };
 
 export type OrganizationsAcceptInviteLinkErrors = {
@@ -2954,7 +2954,7 @@ export type MeMeData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/me";
+  url: "/api/v1alpha/me";
 };
 
 export type MeMeErrors = {
@@ -2979,7 +2979,7 @@ export type MeRegenerateTokenData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/me/token";
+  url: "/api/v1alpha/me/token";
 };
 
 export type MeRegenerateTokenErrors = {
@@ -3006,7 +3006,7 @@ export type OrganizationsDeleteOrganizationData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}";
+  url: "/api/v1alpha/organizations/{id}";
 };
 
 export type OrganizationsDeleteOrganizationErrors = {
@@ -3035,7 +3035,7 @@ export type OrganizationsDescribeOrganizationData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}";
+  url: "/api/v1alpha/organizations/{id}";
 };
 
 export type OrganizationsDescribeOrganizationErrors = {
@@ -3064,7 +3064,7 @@ export type OrganizationsUpdateOrganizationData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}";
+  url: "/api/v1alpha/organizations/{id}";
 };
 
 export type OrganizationsUpdateOrganizationErrors = {
@@ -3093,7 +3093,7 @@ export type OrganizationsGetAgentSettingsData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/agent-settings";
+  url: "/api/v1alpha/organizations/{id}/agent-settings";
 };
 
 export type OrganizationsGetAgentSettingsErrors = {
@@ -3122,7 +3122,7 @@ export type OrganizationsUpdateAgentSettingsData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/agent-settings";
+  url: "/api/v1alpha/organizations/{id}/agent-settings";
 };
 
 export type OrganizationsUpdateAgentSettingsErrors = {
@@ -3151,7 +3151,7 @@ export type OrganizationsDeleteAgentOpenAiKeyData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/agent-settings/openai-key";
+  url: "/api/v1alpha/organizations/{id}/agent-settings/openai-key";
 };
 
 export type OrganizationsDeleteAgentOpenAiKeyErrors = {
@@ -3180,7 +3180,7 @@ export type OrganizationsSetAgentOpenAiKeyData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/agent-settings/openai-key";
+  url: "/api/v1alpha/organizations/{id}/agent-settings/openai-key";
 };
 
 export type OrganizationsSetAgentOpenAiKeyErrors = {
@@ -3209,7 +3209,7 @@ export type OrganizationsListIntegrationsData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/integrations";
+  url: "/api/v1alpha/organizations/{id}/integrations";
 };
 
 export type OrganizationsListIntegrationsErrors = {
@@ -3238,7 +3238,7 @@ export type OrganizationsCreateIntegrationData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/integrations";
+  url: "/api/v1alpha/organizations/{id}/integrations";
 };
 
 export type OrganizationsCreateIntegrationErrors = {
@@ -3268,7 +3268,7 @@ export type OrganizationsDeleteIntegrationData = {
     integrationId: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/integrations/{integrationId}";
+  url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}";
 };
 
 export type OrganizationsDeleteIntegrationErrors = {
@@ -3298,7 +3298,7 @@ export type OrganizationsDescribeIntegrationData = {
     integrationId: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/integrations/{integrationId}";
+  url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}";
 };
 
 export type OrganizationsDescribeIntegrationErrors = {
@@ -3328,7 +3328,7 @@ export type OrganizationsUpdateIntegrationData = {
     integrationId: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/integrations/{integrationId}";
+  url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}";
 };
 
 export type OrganizationsUpdateIntegrationErrors = {
@@ -3360,7 +3360,7 @@ export type OrganizationsListIntegrationResourcesData = {
   query?: {
     parameters?: string;
   };
-  url: "/api/v1/organizations/{id}/integrations/{integrationId}/resources";
+  url: "/api/v1alpha/organizations/{id}/integrations/{integrationId}/resources";
 };
 
 export type OrganizationsListIntegrationResourcesErrors = {
@@ -3389,7 +3389,7 @@ export type OrganizationsListInvitationsData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/invitations";
+  url: "/api/v1alpha/organizations/{id}/invitations";
 };
 
 export type OrganizationsListInvitationsErrors = {
@@ -3418,7 +3418,7 @@ export type OrganizationsCreateInvitationData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/invitations";
+  url: "/api/v1alpha/organizations/{id}/invitations";
 };
 
 export type OrganizationsCreateInvitationErrors = {
@@ -3448,7 +3448,7 @@ export type OrganizationsRemoveInvitationData = {
     invitationId: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/invitations/{invitationId}";
+  url: "/api/v1alpha/organizations/{id}/invitations/{invitationId}";
 };
 
 export type OrganizationsRemoveInvitationErrors = {
@@ -3477,7 +3477,7 @@ export type OrganizationsGetInviteLinkData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/invite-link";
+  url: "/api/v1alpha/organizations/{id}/invite-link";
 };
 
 export type OrganizationsGetInviteLinkErrors = {
@@ -3505,7 +3505,7 @@ export type OrganizationsUpdateInviteLinkData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/invite-link";
+  url: "/api/v1alpha/organizations/{id}/invite-link";
 };
 
 export type OrganizationsUpdateInviteLinkErrors = {
@@ -3534,7 +3534,7 @@ export type OrganizationsResetInviteLinkData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/invite-link/reset";
+  url: "/api/v1alpha/organizations/{id}/invite-link/reset";
 };
 
 export type OrganizationsResetInviteLinkErrors = {
@@ -3563,7 +3563,7 @@ export type OrganizationsDescribeUsageData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/usage";
+  url: "/api/v1alpha/organizations/{id}/usage";
 };
 
 export type OrganizationsDescribeUsageErrors = {
@@ -3592,7 +3592,7 @@ export type OrganizationsRemoveUserData = {
     userId: string;
   };
   query?: never;
-  url: "/api/v1/organizations/{id}/users/{userId}";
+  url: "/api/v1alpha/organizations/{id}/users/{userId}";
 };
 
 export type OrganizationsRemoveUserErrors = {
@@ -3620,7 +3620,7 @@ export type RolesListRolesData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/roles";
+  url: "/api/v1alpha/roles";
 };
 
 export type RolesListRolesErrors = {
@@ -3645,7 +3645,7 @@ export type RolesCreateRoleData = {
   body: RolesCreateRoleRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/roles";
+  url: "/api/v1alpha/roles";
 };
 
 export type RolesCreateRoleErrors = {
@@ -3675,7 +3675,7 @@ export type RolesDeleteRoleData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/roles/{roleName}";
+  url: "/api/v1alpha/roles/{roleName}";
 };
 
 export type RolesDeleteRoleErrors = {
@@ -3705,7 +3705,7 @@ export type RolesDescribeRoleData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/roles/{roleName}";
+  url: "/api/v1alpha/roles/{roleName}";
 };
 
 export type RolesDescribeRoleErrors = {
@@ -3732,7 +3732,7 @@ export type RolesUpdateRoleData = {
     roleName: string;
   };
   query?: never;
-  url: "/api/v1/roles/{roleName}";
+  url: "/api/v1alpha/roles/{roleName}";
 };
 
 export type RolesUpdateRoleErrors = {
@@ -3759,7 +3759,7 @@ export type RolesAssignRoleData = {
     roleName: string;
   };
   query?: never;
-  url: "/api/v1/roles/{roleName}/users";
+  url: "/api/v1alpha/roles/{roleName}/users";
 };
 
 export type RolesAssignRoleErrors = {
@@ -3787,7 +3787,7 @@ export type SecretsListSecretsData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/secrets";
+  url: "/api/v1alpha/secrets";
 };
 
 export type SecretsListSecretsErrors = {
@@ -3812,7 +3812,7 @@ export type SecretsCreateSecretData = {
   body: SecretsCreateSecretRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/secrets";
+  url: "/api/v1alpha/secrets";
 };
 
 export type SecretsCreateSecretErrors = {
@@ -3842,7 +3842,7 @@ export type SecretsDeleteSecretData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/secrets/{idOrName}";
+  url: "/api/v1alpha/secrets/{idOrName}";
 };
 
 export type SecretsDeleteSecretErrors = {
@@ -3872,7 +3872,7 @@ export type SecretsDescribeSecretData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/secrets/{idOrName}";
+  url: "/api/v1alpha/secrets/{idOrName}";
 };
 
 export type SecretsDescribeSecretErrors = {
@@ -3899,7 +3899,7 @@ export type SecretsUpdateSecretData = {
     idOrName: string;
   };
   query?: never;
-  url: "/api/v1/secrets/{idOrName}";
+  url: "/api/v1alpha/secrets/{idOrName}";
 };
 
 export type SecretsUpdateSecretErrors = {
@@ -3930,7 +3930,7 @@ export type SecretsDeleteSecretKeyData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/secrets/{idOrName}/keys/{keyName}";
+  url: "/api/v1alpha/secrets/{idOrName}/keys/{keyName}";
 };
 
 export type SecretsDeleteSecretKeyErrors = {
@@ -3958,7 +3958,7 @@ export type SecretsSetSecretKeyData = {
     keyName: string;
   };
   query?: never;
-  url: "/api/v1/secrets/{idOrName}/keys/{keyName}";
+  url: "/api/v1alpha/secrets/{idOrName}/keys/{keyName}";
 };
 
 export type SecretsSetSecretKeyErrors = {
@@ -3985,7 +3985,7 @@ export type SecretsUpdateSecretNameData = {
     idOrName: string;
   };
   query?: never;
-  url: "/api/v1/secrets/{idOrName}/name";
+  url: "/api/v1alpha/secrets/{idOrName}/name";
 };
 
 export type SecretsUpdateSecretNameErrors = {
@@ -4010,7 +4010,7 @@ export type ServiceAccountsListServiceAccountsData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/service-accounts";
+  url: "/api/v1alpha/service-accounts";
 };
 
 export type ServiceAccountsListServiceAccountsErrors = {
@@ -4037,7 +4037,7 @@ export type ServiceAccountsCreateServiceAccountData = {
   body: ServiceAccountsCreateServiceAccountRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/service-accounts";
+  url: "/api/v1alpha/service-accounts";
 };
 
 export type ServiceAccountsCreateServiceAccountErrors = {
@@ -4066,7 +4066,7 @@ export type ServiceAccountsDeleteServiceAccountData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/service-accounts/{id}";
+  url: "/api/v1alpha/service-accounts/{id}";
 };
 
 export type ServiceAccountsDeleteServiceAccountErrors = {
@@ -4095,7 +4095,7 @@ export type ServiceAccountsDescribeServiceAccountData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/service-accounts/{id}";
+  url: "/api/v1alpha/service-accounts/{id}";
 };
 
 export type ServiceAccountsDescribeServiceAccountErrors = {
@@ -4124,7 +4124,7 @@ export type ServiceAccountsUpdateServiceAccountData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/service-accounts/{id}";
+  url: "/api/v1alpha/service-accounts/{id}";
 };
 
 export type ServiceAccountsUpdateServiceAccountErrors = {
@@ -4153,7 +4153,7 @@ export type ServiceAccountsRegenerateServiceAccountTokenData = {
     id: string;
   };
   query?: never;
-  url: "/api/v1/service-accounts/{id}/token";
+  url: "/api/v1alpha/service-accounts/{id}/token";
 };
 
 export type ServiceAccountsRegenerateServiceAccountTokenErrors = {
@@ -4180,7 +4180,7 @@ export type TriggersListTriggersData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/triggers";
+  url: "/api/v1alpha/triggers";
 };
 
 export type TriggersListTriggersErrors = {
@@ -4207,7 +4207,7 @@ export type TriggersDescribeTriggerData = {
     name: string;
   };
   query?: never;
-  url: "/api/v1/triggers/{name}";
+  url: "/api/v1alpha/triggers/{name}";
 };
 
 export type TriggersDescribeTriggerErrors = {
@@ -4236,7 +4236,7 @@ export type UsersListUsersData = {
     domainId?: string;
     includeServiceAccounts?: boolean;
   };
-  url: "/api/v1/users";
+  url: "/api/v1alpha/users";
 };
 
 export type UsersListUsersErrors = {
@@ -4266,7 +4266,7 @@ export type UsersListUserPermissionsData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/users/{userId}/permissions";
+  url: "/api/v1alpha/users/{userId}/permissions";
 };
 
 export type UsersListUserPermissionsErrors = {
@@ -4297,7 +4297,7 @@ export type UsersListUserRolesData = {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
   };
-  url: "/api/v1/users/{userId}/roles";
+  url: "/api/v1alpha/users/{userId}/roles";
 };
 
 export type UsersListUserRolesErrors = {
@@ -4322,7 +4322,7 @@ export type WidgetsListWidgetsData = {
   body?: never;
   path?: never;
   query?: never;
-  url: "/api/v1/widgets";
+  url: "/api/v1alpha/widgets";
 };
 
 export type WidgetsListWidgetsErrors = {
@@ -4349,7 +4349,7 @@ export type WidgetsDescribeWidgetData = {
     name: string;
   };
   query?: never;
-  url: "/api/v1/widgets/{name}";
+  url: "/api/v1alpha/widgets/{name}";
 };
 
 export type WidgetsDescribeWidgetErrors = {

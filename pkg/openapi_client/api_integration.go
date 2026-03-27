@@ -62,7 +62,7 @@ func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegra
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/integrations"
+	localVarPath := localBasePath + "/api/v1alpha/integrations"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

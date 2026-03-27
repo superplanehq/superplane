@@ -456,10 +456,10 @@ nodes:
 The difference between triggers and components is that triggers cannot be connected to.
 
 You can emit an event for any node in the workflow with:
-  /api/v1/workflows/{workflow_id}/nodes/{node_id}/events
+  /api/v1alpha/workflows/{workflow_id}/nodes/{node_id}/events
 
 Trigger nodes may also have another endpoint, which uses different authentication than the one used by the API:
-  /api/v1/webhooks/{webhook_id}
+  /api/v1alpha/webhooks/{webhook_id}
 
 The handler for that endpoint will find the webhook and its handlers, and invoke the actions specified on them.
 

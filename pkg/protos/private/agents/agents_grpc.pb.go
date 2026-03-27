@@ -30,7 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // The internal gRPC service exposed by the Agent Service.
-// This is used by SuperPlane for /api/v1/agents/* endpoints.
+// This is used by SuperPlane for /api/v1alpha/agents/* endpoints.
 // See: protos/agents.proto
 type AgentsClient interface {
 	CreateAgentChat(ctx context.Context, in *CreateAgentChatRequest, opts ...grpc.CallOption) (*CreateAgentChatResponse, error)
@@ -92,7 +92,7 @@ func (c *agentsClient) ListAgentChatMessages(ctx context.Context, in *ListAgentC
 // for forward compatibility.
 //
 // The internal gRPC service exposed by the Agent Service.
-// This is used by SuperPlane for /api/v1/agents/* endpoints.
+// This is used by SuperPlane for /api/v1alpha/agents/* endpoints.
 // See: protos/agents.proto
 type AgentsServer interface {
 	CreateAgentChat(context.Context, *CreateAgentChatRequest) (*CreateAgentChatResponse, error)

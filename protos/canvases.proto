@@ -29,7 +29,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Canvases {
   rpc ListCanvases(ListCanvasesRequest) returns (ListCanvasesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases"
+      get: "/api/v1alpha/canvases"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvases";
@@ -40,7 +40,7 @@ service Canvases {
 
   rpc CreateCanvas(CreateCanvasRequest) returns (CreateCanvasResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases"
+      post: "/api/v1alpha/canvases"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -52,7 +52,7 @@ service Canvases {
 
   rpc DescribeCanvas(DescribeCanvasRequest) returns (DescribeCanvasResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{id}"
+      get: "/api/v1alpha/canvases/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas";
@@ -63,7 +63,7 @@ service Canvases {
 
   rpc UpdateCanvas(UpdateCanvasRequest) returns (UpdateCanvasResponse) {
     option (google.api.http) = {
-      put: "/api/v1/canvases/{id}"
+      put: "/api/v1alpha/canvases/{id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -75,7 +75,7 @@ service Canvases {
 
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/versions"
+      post: "/api/v1alpha/canvases/{canvas_id}/versions"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -87,7 +87,7 @@ service Canvases {
 
   rpc ListCanvasVersions(ListCanvasVersionsRequest) returns (ListCanvasVersionsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/versions"
+      get: "/api/v1alpha/canvases/{canvas_id}/versions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas versions";
@@ -98,7 +98,7 @@ service Canvases {
 
   rpc DescribeCanvasVersion(DescribeCanvasVersionRequest) returns (DescribeCanvasVersionResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      get: "/api/v1alpha/canvases/{canvas_id}/versions/{version_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas version";
@@ -109,10 +109,10 @@ service Canvases {
 
   rpc UpdateCanvasVersion(UpdateCanvasVersionRequest) returns (UpdateCanvasVersionResponse) {
     option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
+      put: "/api/v1alpha/canvases/{canvas_id}/versions/{version_id}"
       body: "*"
       additional_bindings {
-        put: "/api/v1/canvases/{canvas_id}/versions"
+        put: "/api/v1alpha/canvases/{canvas_id}/versions"
         body: "*"
       }
     };
@@ -125,7 +125,7 @@ service Canvases {
 
   rpc CreateCanvasChangeRequest(CreateCanvasChangeRequestRequest) returns (CreateCanvasChangeRequestResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/change-requests"
+      post: "/api/v1alpha/canvases/{canvas_id}/change-requests"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -137,7 +137,7 @@ service Canvases {
 
   rpc ListCanvasChangeRequests(ListCanvasChangeRequestsRequest) returns (ListCanvasChangeRequestsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/change-requests"
+      get: "/api/v1alpha/canvases/{canvas_id}/change-requests"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas change requests";
@@ -148,7 +148,7 @@ service Canvases {
 
   rpc DescribeCanvasChangeRequest(DescribeCanvasChangeRequestRequest) returns (DescribeCanvasChangeRequestResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}"
+      get: "/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas change request";
@@ -159,7 +159,7 @@ service Canvases {
 
   rpc ActOnCanvasChangeRequest(ActOnCanvasChangeRequestRequest) returns (ActOnCanvasChangeRequestResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/actions"
+      patch: "/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/actions"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -171,7 +171,7 @@ service Canvases {
 
   rpc ResolveCanvasChangeRequest(ResolveCanvasChangeRequestRequest) returns (ResolveCanvasChangeRequestResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"
+      patch: "/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -183,7 +183,7 @@ service Canvases {
 
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{id}"
+      delete: "/api/v1alpha/canvases/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete canvas";
@@ -194,7 +194,7 @@ service Canvases {
 
   rpc ListNodeQueueItems(ListNodeQueueItemsRequest) returns (ListNodeQueueItemsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue"
+      get: "/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List items in a node's queue";
@@ -205,7 +205,7 @@ service Canvases {
 
   rpc DeleteNodeQueueItem(DeleteNodeQueueItemRequest) returns (DeleteNodeQueueItemResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}"
+      delete: "/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete item from a node's queue";
@@ -216,7 +216,7 @@ service Canvases {
 
   rpc UpdateNodePause(UpdateNodePauseRequest) returns (UpdateNodePauseResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/pause"
+      patch: "/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/pause"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -228,7 +228,7 @@ service Canvases {
 
   rpc ListNodeExecutions(ListNodeExecutionsRequest) returns (ListNodeExecutionsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions"
+      get: "/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/executions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List node executions";
@@ -239,7 +239,7 @@ service Canvases {
 
   rpc ListNodeEvents(ListNodeEventsRequest) returns (ListNodeEventsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"
+      get: "/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List node events";
@@ -250,7 +250,7 @@ service Canvases {
 
   rpc EmitNodeEvent(EmitNodeEventRequest) returns (EmitNodeEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"
+      post: "/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -262,7 +262,7 @@ service Canvases {
 
   rpc InvokeNodeExecutionAction(InvokeNodeExecutionActionRequest) returns (InvokeNodeExecutionActionResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"
+      post: "/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -274,7 +274,7 @@ service Canvases {
 
   rpc InvokeNodeTriggerAction(InvokeNodeTriggerActionRequest) returns (InvokeNodeTriggerActionResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"
+      post: "/api/v1alpha/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -286,7 +286,7 @@ service Canvases {
 
   rpc ListChildExecutions(ListChildExecutionsRequest) returns (ListChildExecutionsResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/children"
+      post: "/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/children"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -298,7 +298,7 @@ service Canvases {
 
   rpc CancelExecution(CancelExecutionRequest) returns (CancelExecutionResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel"
+      patch: "/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/cancel"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -310,7 +310,7 @@ service Canvases {
 
   rpc ResolveExecutionErrors(ResolveExecutionErrorsRequest) returns (ResolveExecutionErrorsResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/executions/resolve"
+      patch: "/api/v1alpha/canvases/{canvas_id}/executions/resolve"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -322,7 +322,7 @@ service Canvases {
 
   rpc ListCanvasEvents(ListCanvasEventsRequest) returns (ListCanvasEventsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/events"
+      get: "/api/v1alpha/canvases/{canvas_id}/events"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas events";
@@ -333,7 +333,7 @@ service Canvases {
 
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/memory"
+      get: "/api/v1alpha/canvases/{canvas_id}/memory"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas memories";
@@ -344,7 +344,7 @@ service Canvases {
 
   rpc DeleteCanvasMemory(DeleteCanvasMemoryRequest) returns (DeleteCanvasMemoryResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id}/memory/{memory_id}"
+      delete: "/api/v1alpha/canvases/{canvas_id}/memory/{memory_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete canvas memory entry";
@@ -355,7 +355,7 @@ service Canvases {
 
   rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/events/{event_id}/executions"
+      get: "/api/v1alpha/canvases/{canvas_id}/events/{event_id}/executions"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List event executions";

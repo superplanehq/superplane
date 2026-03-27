@@ -3,7 +3,7 @@ version: 1
 interactions:
     - request:
         body: |
-            {"name":"web","config":{"content_type":"json","url":"https://superplane.sxmoon.com/api/v1/webhooks/25d51628-5912-45f0-996b-67d9cd4e08c3","secret":"N9uCp20mvAUlcT2hZDbB0dnCOI2TWKFKzst8VYJ3m_4="},"events":["push"],"active":true}
+            {"name":"web","config":{"content_type":"json","url":"https://superplane.sxmoon.com/api/v1alpha/webhooks/25d51628-5912-45f0-996b-67d9cd4e08c3","secret":"N9uCp20mvAUlcT2hZDbB0dnCOI2TWKFKzst8VYJ3m_4="},"events":["push"],"active":true}
         form: {}
         headers:
             Accept:
@@ -19,7 +19,7 @@ interactions:
         url: https://api.github.com/repos/puppies-inc/front/hooks
         method: POST
       response:
-        body: '{"type":"Repository","id":585776376,"name":"web","active":true,"events":["push"],"config":{"content_type":"json","insecure_ssl":"0","secret":"********","url":"https://superplane.sxmoon.com/api/v1/webhooks/25d51628-5912-45f0-996b-67d9cd4e08c3"},"updated_at":"2025-12-11T15:46:12Z","created_at":"2025-12-11T15:46:12Z","url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376","test_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/test","ping_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/pings","deliveries_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/deliveries","last_response":{"code":null,"status":"unused","message":null}}'
+        body: '{"type":"Repository","id":585776376,"name":"web","active":true,"events":["push"],"config":{"content_type":"json","insecure_ssl":"0","secret":"********","url":"https://superplane.sxmoon.com/api/v1alpha/webhooks/25d51628-5912-45f0-996b-67d9cd4e08c3"},"updated_at":"2025-12-11T15:46:12Z","created_at":"2025-12-11T15:46:12Z","url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376","test_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/test","ping_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/pings","deliveries_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776376/deliveries","last_response":{"code":null,"status":"unused","message":null}}'
         headers:
             Access-Control-Allow-Origin:
                 - '*'
@@ -356,7 +356,7 @@ interactions:
         duration: 396.011083ms
     - request:
         body: |
-            {"name":"web","config":{"content_type":"json","url":"https://superplane.sxmoon.com/api/v1/webhooks/8368f0f0-5f56-430f-a128-a7f907e483b0","secret":"Ljyl9SAQ3sAE1iV2ipggoM8MANa6N2X6c6dvM7l_huw="},"events":["push"],"active":true}
+            {"name":"web","config":{"content_type":"json","url":"https://superplane.sxmoon.com/api/v1alpha/webhooks/8368f0f0-5f56-430f-a128-a7f907e483b0","secret":"Ljyl9SAQ3sAE1iV2ipggoM8MANa6N2X6c6dvM7l_huw="},"events":["push"],"active":true}
         form: {}
         headers:
             Accept:
@@ -372,7 +372,7 @@ interactions:
         url: https://api.github.com/repos/puppies-inc/front/hooks
         method: POST
       response:
-        body: '{"type":"Repository","id":585776410,"name":"web","active":true,"events":["push"],"config":{"content_type":"json","insecure_ssl":"0","secret":"********","url":"https://superplane.sxmoon.com/api/v1/webhooks/8368f0f0-5f56-430f-a128-a7f907e483b0"},"updated_at":"2025-12-11T15:46:24Z","created_at":"2025-12-11T15:46:24Z","url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410","test_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/test","ping_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/pings","deliveries_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/deliveries","last_response":{"code":null,"status":"unused","message":null}}'
+        body: '{"type":"Repository","id":585776410,"name":"web","active":true,"events":["push"],"config":{"content_type":"json","insecure_ssl":"0","secret":"********","url":"https://superplane.sxmoon.com/api/v1alpha/webhooks/8368f0f0-5f56-430f-a128-a7f907e483b0"},"updated_at":"2025-12-11T15:46:24Z","created_at":"2025-12-11T15:46:24Z","url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410","test_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/test","ping_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/pings","deliveries_url":"https://api.github.com/repos/puppies-inc/front/hooks/585776410/deliveries","last_response":{"code":null,"status":"unused","message":null}}'
         headers:
             Access-Control-Allow-Origin:
                 - '*'

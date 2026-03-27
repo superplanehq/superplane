@@ -185,7 +185,7 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 
 	response := execRequest(server, requestParams{
 		method: "GET",
-		path:   "/api/v1/canvases/is-alive",
+		path:   "/api/v1alpha/canvases/is-alive",
 	})
 
 	require.Equal(t, "", response.Body.String())

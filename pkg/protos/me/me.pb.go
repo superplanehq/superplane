@@ -158,13 +158,12 @@ const file_me_proto_rawDesc = "" +
 	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1b\n" +
 	"\thas_token\x18\x05 \x01(\bR\bhasToken\"/\n" +
 	"\x17RegenerateTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token2\xd2\x02\n" +
-	"\x02Me\x12\x88\x01\n" +
-	"\x02Me\x12\x16.google.protobuf.Empty\x1a\x13.Superplane.Me.User\"U\x92A@\n" +
-	"\x02Me\x12\x10Get current user\x1a(Returns the currently authenticated user\x82\xd3\xe4\x93\x02\f\x12\n" +
-	"/api/v1/me\x12\xc0\x01\n" +
-	"\x0fRegenerateToken\x12\x16.google.protobuf.Empty\x1a&.Superplane.Me.RegenerateTokenResponse\"m\x92AR\n" +
-	"\x02Me\x12\x14Regenerate API token\x1a6Regenerates the currently authencated user's API token\x82\xd3\xe4\x93\x02\x12\"\x10/api/v1/me/tokenB\x9e\x01\x92Ai\x12?\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token2\xdc\x02\n" +
+	"\x02Me\x12\x8d\x01\n" +
+	"\x02Me\x12\x16.google.protobuf.Empty\x1a\x13.Superplane.Me.User\"Z\x92A@\n" +
+	"\x02Me\x12\x10Get current user\x1a(Returns the currently authenticated user\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1alpha/me\x12\xc5\x01\n" +
+	"\x0fRegenerateToken\x12\x16.google.protobuf.Empty\x1a&.Superplane.Me.RegenerateTokenResponse\"r\x92AR\n" +
+	"\x02Me\x12\x14Regenerate API token\x1a6Regenerates the currently authencated user's API token\x82\xd3\xe4\x93\x02\x17\"\x15/api/v1alpha/me/tokenB\x9e\x01\x92Ai\x12?\n" +
 	"\x11Superplane Me API\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ0github.com/superplanehq/superplane/pkg/protos/meb\x06proto3"
 

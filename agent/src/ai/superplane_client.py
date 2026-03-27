@@ -354,7 +354,7 @@ class SuperplaneClient:
             if isinstance(component.name, str) and component.name:
                 components_by_name[component.name] = component
 
-        # Integration-scoped components are exposed under /api/v1/integrations.
+        # Integration-scoped components are exposed under /api/v1alpha/integrations.
         try:
             integration_definitions = self._list_available_integrations_raw()
         except Exception as error:

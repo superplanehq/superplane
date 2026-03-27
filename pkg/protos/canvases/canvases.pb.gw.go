@@ -1614,7 +1614,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvases", runtime.WithHTTPPathPattern("/api/v1/canvases"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvases", runtime.WithHTTPPathPattern("/api/v1alpha/canvases"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1634,7 +1634,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1654,7 +1654,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1674,7 +1674,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1694,7 +1694,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1714,7 +1714,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasVersions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasVersions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1734,7 +1734,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions/{version_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1754,7 +1754,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions/{version_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1774,7 +1774,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1794,7 +1794,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1814,7 +1814,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasChangeRequests", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasChangeRequests", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1834,7 +1834,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1854,7 +1854,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ActOnCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/actions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ActOnCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/actions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1874,7 +1874,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1894,7 +1894,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1914,7 +1914,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1934,7 +1934,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteNodeQueueItem", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteNodeQueueItem", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1954,7 +1954,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateNodePause", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/pause"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateNodePause", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/pause"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1974,7 +1974,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/executions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1994,7 +1994,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeEvents", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2014,7 +2014,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/EmitNodeEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/EmitNodeEvent", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2034,7 +2034,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2054,7 +2054,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2074,7 +2074,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListChildExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/{execution_id}/children"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListChildExecutions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/children"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2094,7 +2094,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CancelExecution", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CancelExecution", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/cancel"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2114,7 +2114,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveExecutionErrors", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/resolve"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveExecutionErrors", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/resolve"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2134,7 +2134,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/events"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasEvents", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2154,7 +2154,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasMemories", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/memory"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasMemories", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/memory"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2174,7 +2174,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvasMemory", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/memory/{memory_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvasMemory", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/memory/{memory_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2194,7 +2194,7 @@ func RegisterCanvasesHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListEventExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/events/{event_id}/executions"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListEventExecutions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/events/{event_id}/executions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2252,7 +2252,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvases", runtime.WithHTTPPathPattern("/api/v1/canvases"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvases", runtime.WithHTTPPathPattern("/api/v1alpha/canvases"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2269,7 +2269,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2286,7 +2286,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2303,7 +2303,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2320,7 +2320,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2337,7 +2337,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasVersions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasVersions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2354,7 +2354,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions/{version_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2371,7 +2371,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions/{version_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions/{version_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2388,7 +2388,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/versions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateCanvasVersion", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/versions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2405,7 +2405,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CreateCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2422,7 +2422,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasChangeRequests", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasChangeRequests", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2439,7 +2439,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2456,7 +2456,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ActOnCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/actions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ActOnCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/actions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2473,7 +2473,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveCanvasChangeRequest", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/change-requests/{change_request_id}/resolve"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2490,7 +2490,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvas", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2507,7 +2507,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeQueueItems", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2524,7 +2524,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteNodeQueueItem", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteNodeQueueItem", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/queue/{item_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2541,7 +2541,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateNodePause", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/pause"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/UpdateNodePause", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/pause"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2558,7 +2558,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeExecutions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/executions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2575,7 +2575,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListNodeEvents", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2592,7 +2592,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/EmitNodeEvent", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/EmitNodeEvent", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/nodes/{node_id}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2609,7 +2609,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeExecutionAction", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/actions/{action_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2626,7 +2626,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/InvokeNodeTriggerAction", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/triggers/{node_id}/actions/{action_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2643,7 +2643,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListChildExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/{execution_id}/children"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListChildExecutions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/children"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2660,7 +2660,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CancelExecution", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/{execution_id}/cancel"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/CancelExecution", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/{execution_id}/cancel"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2677,7 +2677,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveExecutionErrors", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/executions/resolve"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ResolveExecutionErrors", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/executions/resolve"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2694,7 +2694,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasEvents", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/events"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasEvents", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/events"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2711,7 +2711,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasMemories", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/memory"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListCanvasMemories", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/memory"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2728,7 +2728,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvasMemory", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/memory/{memory_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/DeleteCanvasMemory", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/memory/{memory_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2745,7 +2745,7 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListEventExecutions", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id}/events/{event_id}/executions"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Canvases.Canvases/ListEventExecutions", runtime.WithHTTPPathPattern("/api/v1alpha/canvases/{canvas_id}/events/{event_id}/executions"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2762,36 +2762,36 @@ func RegisterCanvasesHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 }
 
 var (
-	pattern_Canvases_ListCanvases_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
-	pattern_Canvases_CreateCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
-	pattern_Canvases_DescribeCanvas_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
-	pattern_Canvases_UpdateCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
-	pattern_Canvases_CreateCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
-	pattern_Canvases_ListCanvasVersions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
-	pattern_Canvases_DescribeCanvasVersion_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
-	pattern_Canvases_UpdateCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "versions", "version_id"}, ""))
-	pattern_Canvases_UpdateCanvasVersion_1         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "versions"}, ""))
-	pattern_Canvases_CreateCanvasChangeRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "change-requests"}, ""))
-	pattern_Canvases_ListCanvasChangeRequests_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "change-requests"}, ""))
-	pattern_Canvases_DescribeCanvasChangeRequest_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id"}, ""))
-	pattern_Canvases_ActOnCanvasChangeRequest_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id", "actions"}, ""))
-	pattern_Canvases_ResolveCanvasChangeRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "change-requests", "change_request_id", "resolve"}, ""))
-	pattern_Canvases_DeleteCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id"}, ""))
-	pattern_Canvases_ListNodeQueueItems_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "queue"}, ""))
-	pattern_Canvases_DeleteNodeQueueItem_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "queue", "item_id"}, ""))
-	pattern_Canvases_UpdateNodePause_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "pause"}, ""))
-	pattern_Canvases_ListNodeExecutions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "executions"}, ""))
-	pattern_Canvases_ListNodeEvents_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
-	pattern_Canvases_EmitNodeEvent_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
-	pattern_Canvases_InvokeNodeExecutionAction_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "actions", "action_name"}, ""))
-	pattern_Canvases_InvokeNodeTriggerAction_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id", "triggers", "node_id", "actions", "action_name"}, ""))
-	pattern_Canvases_ListChildExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "children"}, ""))
-	pattern_Canvases_CancelExecution_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "executions", "execution_id", "cancel"}, ""))
-	pattern_Canvases_ResolveExecutionErrors_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "canvases", "canvas_id", "executions", "resolve"}, ""))
-	pattern_Canvases_ListCanvasEvents_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "events"}, ""))
-	pattern_Canvases_ListCanvasMemories_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id", "memory"}, ""))
-	pattern_Canvases_DeleteCanvasMemory_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id", "memory", "memory_id"}, ""))
-	pattern_Canvases_ListEventExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id", "events", "event_id", "executions"}, ""))
+	pattern_Canvases_ListCanvases_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha", "canvases"}, ""))
+	pattern_Canvases_CreateCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1alpha", "canvases"}, ""))
+	pattern_Canvases_DescribeCanvas_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "canvases", "id"}, ""))
+	pattern_Canvases_UpdateCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "canvases", "id"}, ""))
+	pattern_Canvases_CreateCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "versions"}, ""))
+	pattern_Canvases_ListCanvasVersions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "versions"}, ""))
+	pattern_Canvases_DescribeCanvasVersion_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "canvases", "canvas_id", "versions", "version_id"}, ""))
+	pattern_Canvases_UpdateCanvasVersion_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "canvases", "canvas_id", "versions", "version_id"}, ""))
+	pattern_Canvases_UpdateCanvasVersion_1         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "versions"}, ""))
+	pattern_Canvases_CreateCanvasChangeRequest_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "change-requests"}, ""))
+	pattern_Canvases_ListCanvasChangeRequests_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "change-requests"}, ""))
+	pattern_Canvases_DescribeCanvasChangeRequest_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "canvases", "canvas_id", "change-requests", "change_request_id"}, ""))
+	pattern_Canvases_ActOnCanvasChangeRequest_0    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "change-requests", "change_request_id", "actions"}, ""))
+	pattern_Canvases_ResolveCanvasChangeRequest_0  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "change-requests", "change_request_id", "resolve"}, ""))
+	pattern_Canvases_DeleteCanvas_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1alpha", "canvases", "id"}, ""))
+	pattern_Canvases_ListNodeQueueItems_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "nodes", "node_id", "queue"}, ""))
+	pattern_Canvases_DeleteNodeQueueItem_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1alpha", "canvases", "canvas_id", "nodes", "node_id", "queue", "item_id"}, ""))
+	pattern_Canvases_UpdateNodePause_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "nodes", "node_id", "pause"}, ""))
+	pattern_Canvases_ListNodeExecutions_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "nodes", "node_id", "executions"}, ""))
+	pattern_Canvases_ListNodeEvents_0              = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
+	pattern_Canvases_EmitNodeEvent_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "nodes", "node_id", "events"}, ""))
+	pattern_Canvases_InvokeNodeExecutionAction_0   = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1alpha", "canvases", "canvas_id", "executions", "execution_id", "actions", "action_name"}, ""))
+	pattern_Canvases_InvokeNodeTriggerAction_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1alpha", "canvases", "canvas_id", "triggers", "node_id", "actions", "action_name"}, ""))
+	pattern_Canvases_ListChildExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "executions", "execution_id", "children"}, ""))
+	pattern_Canvases_CancelExecution_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "executions", "execution_id", "cancel"}, ""))
+	pattern_Canvases_ResolveExecutionErrors_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1alpha", "canvases", "canvas_id", "executions", "resolve"}, ""))
+	pattern_Canvases_ListCanvasEvents_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "events"}, ""))
+	pattern_Canvases_ListCanvasMemories_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1alpha", "canvases", "canvas_id", "memory"}, ""))
+	pattern_Canvases_DeleteCanvasMemory_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1alpha", "canvases", "canvas_id", "memory", "memory_id"}, ""))
+	pattern_Canvases_ListEventExecutions_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1alpha", "canvases", "canvas_id", "events", "event_id", "executions"}, ""))
 )
 
 var (

@@ -1203,25 +1203,25 @@ const file_groups_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x1a-\n" +
 	"\x06Status\x12#\n" +
-	"\rmembers_count\x18\x01 \x01(\x05R\fmembersCount2\xbb\r\n" +
-	"\x06Groups\x12\xca\x01\n" +
-	"\vCreateGroup\x12%.Superplane.Groups.CreateGroupRequest\x1a&.Superplane.Groups.CreateGroupResponse\"l\x92AP\n" +
-	"\x06Groups\x12\fCreate group\x1a8Creates a new group within a domain with a specific role\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/api/v1/groups\x12\xd9\x01\n" +
-	"\x0eAddUserToGroup\x12(.Superplane.Groups.AddUserToGroupRequest\x1a).Superplane.Groups.AddUserToGroupResponse\"r\x92AC\n" +
-	"\x06Groups\x12\x11Add user to group\x1a&Adds a user to a group within a domain\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/groups/{group_name}/users\x12\xfa\x01\n" +
-	"\x13RemoveUserFromGroup\x12-.Superplane.Groups.RemoveUserFromGroupRequest\x1a..Superplane.Groups.RemoveUserFromGroupResponse\"\x83\x01\x92AM\n" +
-	"\x06Groups\x12\x16Remove user from group\x1a+Removes a user from a group within a domain\x82\xd3\xe4\x93\x02-:\x01*2(/api/v1/groups/{group_name}/users/remove\x12\xb3\x01\n" +
+	"\rmembers_count\x18\x01 \x01(\x05R\fmembersCount2\xe3\r\n" +
+	"\x06Groups\x12\xcf\x01\n" +
+	"\vCreateGroup\x12%.Superplane.Groups.CreateGroupRequest\x1a&.Superplane.Groups.CreateGroupResponse\"q\x92AP\n" +
+	"\x06Groups\x12\fCreate group\x1a8Creates a new group within a domain with a specific role\x82\xd3\xe4\x93\x02\x18:\x01*\"\x13/api/v1alpha/groups\x12\xde\x01\n" +
+	"\x0eAddUserToGroup\x12(.Superplane.Groups.AddUserToGroupRequest\x1a).Superplane.Groups.AddUserToGroupResponse\"w\x92AC\n" +
+	"\x06Groups\x12\x11Add user to group\x1a&Adds a user to a group within a domain\x82\xd3\xe4\x93\x02+:\x01*\"&/api/v1alpha/groups/{group_name}/users\x12\xff\x01\n" +
+	"\x13RemoveUserFromGroup\x12-.Superplane.Groups.RemoveUserFromGroupRequest\x1a..Superplane.Groups.RemoveUserFromGroupResponse\"\x88\x01\x92AM\n" +
+	"\x06Groups\x12\x16Remove user from group\x1a+Removes a user from a group within a domain\x82\xd3\xe4\x93\x022:\x01*2-/api/v1alpha/groups/{group_name}/users/remove\x12\xb8\x01\n" +
 	"\n" +
-	"ListGroups\x12$.Superplane.Groups.ListGroupsRequest\x1a%.Superplane.Groups.ListGroupsResponse\"X\x92A?\n" +
-	"\x06Groups\x12\vList groups\x1a(Returns a list of groups within a domain\x82\xd3\xe4\x93\x02\x10\x12\x0e/api/v1/groups\x12\xec\x01\n" +
-	"\x0eListGroupUsers\x12(.Superplane.Groups.ListGroupUsersRequest\x1a).Superplane.Groups.ListGroupUsersResponse\"\x84\x01\x92AX\n" +
-	"\x06Groups\x12\x0fGet group users\x1a=Returns users that belong to a specific group within a domain\x82\xd3\xe4\x93\x02#\x12!/api/v1/groups/{group_name}/users\x12\xd2\x01\n" +
-	"\rDescribeGroup\x12'.Superplane.Groups.DescribeGroupRequest\x1a(.Superplane.Groups.DescribeGroupResponse\"n\x92AH\n" +
-	"\x06Groups\x12\tGet group\x1a3Returns details of a specific group within a domain\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/groups/{group_name}\x12\xc8\x01\n" +
-	"\vUpdateGroup\x12%.Superplane.Groups.UpdateGroupRequest\x1a&.Superplane.Groups.UpdateGroupResponse\"j\x92AA\n" +
-	"\x06Groups\x12\fUpdate group\x1a)Updates an existing group within a domain\x82\xd3\xe4\x93\x02 :\x01*\x1a\x1b/api/v1/groups/{group_name}\x12\xc5\x01\n" +
-	"\vDeleteGroup\x12%.Superplane.Groups.DeleteGroupRequest\x1a&.Superplane.Groups.DeleteGroupResponse\"g\x92AA\n" +
-	"\x06Groups\x12\fDelete group\x1a)Deletes an existing group within a domain\x82\xd3\xe4\x93\x02\x1d*\x1b/api/v1/groups/{group_name}B\xc2\x01\x92A\x88\x01\x12^\n" +
+	"ListGroups\x12$.Superplane.Groups.ListGroupsRequest\x1a%.Superplane.Groups.ListGroupsResponse\"]\x92A?\n" +
+	"\x06Groups\x12\vList groups\x1a(Returns a list of groups within a domain\x82\xd3\xe4\x93\x02\x15\x12\x13/api/v1alpha/groups\x12\xf1\x01\n" +
+	"\x0eListGroupUsers\x12(.Superplane.Groups.ListGroupUsersRequest\x1a).Superplane.Groups.ListGroupUsersResponse\"\x89\x01\x92AX\n" +
+	"\x06Groups\x12\x0fGet group users\x1a=Returns users that belong to a specific group within a domain\x82\xd3\xe4\x93\x02(\x12&/api/v1alpha/groups/{group_name}/users\x12\xd7\x01\n" +
+	"\rDescribeGroup\x12'.Superplane.Groups.DescribeGroupRequest\x1a(.Superplane.Groups.DescribeGroupResponse\"s\x92AH\n" +
+	"\x06Groups\x12\tGet group\x1a3Returns details of a specific group within a domain\x82\xd3\xe4\x93\x02\"\x12 /api/v1alpha/groups/{group_name}\x12\xcd\x01\n" +
+	"\vUpdateGroup\x12%.Superplane.Groups.UpdateGroupRequest\x1a&.Superplane.Groups.UpdateGroupResponse\"o\x92AA\n" +
+	"\x06Groups\x12\fUpdate group\x1a)Updates an existing group within a domain\x82\xd3\xe4\x93\x02%:\x01*\x1a /api/v1alpha/groups/{group_name}\x12\xca\x01\n" +
+	"\vDeleteGroup\x12%.Superplane.Groups.DeleteGroupRequest\x1a&.Superplane.Groups.DeleteGroupResponse\"l\x92AA\n" +
+	"\x06Groups\x12\fDelete group\x1a)Deletes an existing group within a domain\x82\xd3\xe4\x93\x02\"* /api/v1alpha/groups/{group_name}B\xc2\x01\x92A\x88\x01\x12^\n" +
 	"\x15Superplane Groups API\x12\x19API for Superplane Groups\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/groupsb\x06proto3"
 

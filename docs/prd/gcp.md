@@ -91,7 +91,7 @@ GCP Audit Log → Cloud Logging Sink → Pub/Sub Topic → Push Subscription →
 1. A GCP resource change generates an **Admin Activity audit log** entry.
 2. The trigger's **Cloud Logging sink** matches the entry against its filter (e.g., `protoPayload.serviceName="compute.googleapis.com" AND protoPayload.methodName="v1.compute.instances.insert"`).
 3. The sink forwards the matching log entry to the shared **Pub/Sub topic** (`sp-events-{integrationID}`).
-4. The **push subscription** (`sp-sub-{integrationID}`) delivers the message as an HTTP POST to `{baseURL}/api/v1/integrations/{id}/events?token={secret}`.
+4. The **push subscription** (`sp-sub-{integrationID}`) delivers the message as an HTTP POST to `{baseURL}/api/v1alpha/integrations/{id}/events?token={secret}`.
 5. `HandleRequest` verifies the token, decodes the Pub/Sub envelope (base64 → JSON log entry), and extracts an `AuditLogEvent`.
 6. `subscriptionApplies()` matches the event against registered trigger subscriptions by `serviceName` and `methodName`.
 7. Matching triggers receive the event via `OnIntegrationMessage` and emit it to the workflow.

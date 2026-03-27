@@ -3505,53 +3505,53 @@ const file_organizations_proto_rawDesc = "" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"r\n" +
 	"\x11InvitationCreated\x12#\n" +
 	"\rinvitation_id\x18\x01 \x01(\tR\finvitationId\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\x991\n" +
-	"\rOrganizations\x12\xa7\x02\n" +
-	"\x14DescribeOrganization\x125.Superplane.Organizations.DescribeOrganizationRequest\x1a6.Superplane.Organizations.DescribeOrganizationResponse\"\x9f\x01\x92Az\n" +
-	"\fOrganization\x12\x18Get organization details\x1aPReturns the details of a specific organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02\x1c\x12\x1a/api/v1/organizations/{id}\x12\x96\x02\n" +
-	"\x12UpdateOrganization\x123.Superplane.Organizations.UpdateOrganizationRequest\x1a4.Superplane.Organizations.UpdateOrganizationResponse\"\x94\x01\x92Al\n" +
-	"\fOrganization\x12\x16Update an organization\x1aDUpdates the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02\x1f:\x01*2\x1a/api/v1/organizations/{id}\x12\x93\x02\n" +
-	"\x12DeleteOrganization\x123.Superplane.Organizations.DeleteOrganizationRequest\x1a4.Superplane.Organizations.DeleteOrganizationResponse\"\x91\x01\x92Al\n" +
-	"\fOrganization\x12\x16Delete an organization\x1aDDeletes the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02\x1c*\x1a/api/v1/organizations/{id}\x12\x98\x02\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\x872\n" +
+	"\rOrganizations\x12\xac\x02\n" +
+	"\x14DescribeOrganization\x125.Superplane.Organizations.DescribeOrganizationRequest\x1a6.Superplane.Organizations.DescribeOrganizationResponse\"\xa4\x01\x92Az\n" +
+	"\fOrganization\x12\x18Get organization details\x1aPReturns the details of a specific organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02!\x12\x1f/api/v1alpha/organizations/{id}\x12\x9b\x02\n" +
+	"\x12UpdateOrganization\x123.Superplane.Organizations.UpdateOrganizationRequest\x1a4.Superplane.Organizations.UpdateOrganizationResponse\"\x99\x01\x92Al\n" +
+	"\fOrganization\x12\x16Update an organization\x1aDUpdates the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02$:\x01*2\x1f/api/v1alpha/organizations/{id}\x12\x98\x02\n" +
+	"\x12DeleteOrganization\x123.Superplane.Organizations.DeleteOrganizationRequest\x1a4.Superplane.Organizations.DeleteOrganizationResponse\"\x96\x01\x92Al\n" +
+	"\fOrganization\x12\x16Delete an organization\x1aDDeletes the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02!*\x1f/api/v1alpha/organizations/{id}\x12\x9d\x02\n" +
 	"\n" +
-	"RemoveUser\x12+.Superplane.Organizations.RemoveUserRequest\x1a,.Superplane.Organizations.RemoveUserResponse\"\xae\x01\x92Ay\n" +
-	"\fOrganization\x12\"Remove a user from an organization\x1aERemoves a user from an organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02,**/api/v1/organizations/{id}/users/{user_id}\x12\x92\x02\n" +
-	"\x10CreateInvitation\x121.Superplane.Organizations.CreateInvitationRequest\x1a2.Superplane.Organizations.CreateInvitationResponse\"\x96\x01\x92Ab\n" +
-	"\fOrganization\x12!Create an organization invitation\x1a/Invites a user to join an organization by email\x82\xd3\xe4\x93\x02+:\x01*\"&/api/v1/organizations/{id}/invitations\x12\x88\x02\n" +
-	"\x0fListInvitations\x120.Superplane.Organizations.ListInvitationsRequest\x1a1.Superplane.Organizations.ListInvitationsResponse\"\x8f\x01\x92A^\n" +
-	"\fOrganization\x12\x1dList organization invitations\x1a/Returns pending invitations for an organization\x82\xd3\xe4\x93\x02(\x12&/api/v1/organizations/{id}/invitations\x12\x92\x02\n" +
-	"\x10RemoveInvitation\x121.Superplane.Organizations.RemoveInvitationRequest\x1a2.Superplane.Organizations.RemoveInvitationResponse\"\x96\x01\x92AU\n" +
-	"\fOrganization\x12!Remove an organization invitation\x1a\"Removes an organization invitation\x82\xd3\xe4\x93\x028*6/api/v1/organizations/{id}/invitations/{invitation_id}\x12\x80\x02\n" +
-	"\rGetInviteLink\x12..Superplane.Organizations.GetInviteLinkRequest\x1a/.Superplane.Organizations.GetInviteLinkResponse\"\x8d\x01\x92A\\\n" +
-	"\fOrganization\x12\x1fGet an organization invite link\x1a+Returns the invite link for an organization\x82\xd3\xe4\x93\x02(\x12&/api/v1/organizations/{id}/invite-link\x12\x9b\x02\n" +
-	"\x10UpdateInviteLink\x121.Superplane.Organizations.UpdateInviteLinkRequest\x1a2.Superplane.Organizations.UpdateInviteLinkResponse\"\x9f\x01\x92Ak\n" +
-	"\fOrganization\x12\"Update an organization invite link\x1a7Enables or disables the invite link for an organization\x82\xd3\xe4\x93\x02+:\x01*2&/api/v1/organizations/{id}/invite-link\x12\x98\x02\n" +
-	"\x0fResetInviteLink\x120.Superplane.Organizations.ResetInviteLinkRequest\x1a1.Superplane.Organizations.ResetInviteLinkResponse\"\x9f\x01\x92Ah\n" +
-	"\fOrganization\x12!Reset an organization invite link\x1a5Generates a new invite link token for an organization\x82\xd3\xe4\x93\x02.\",/api/v1/organizations/{id}/invite-link/reset\x12\xad\x02\n" +
-	"\x10GetAgentSettings\x121.Superplane.Organizations.GetAgentSettingsRequest\x1a2.Superplane.Organizations.GetAgentSettingsResponse\"\xb1\x01\x92A}\n" +
-	"\fOrganization\x12$Get organization Agent Mode settings\x1aGReturns Agent Mode enablement and OpenAI key status for an organization\x82\xd3\xe4\x93\x02+\x12)/api/v1/organizations/{id}/agent-settings\x12\xa6\x02\n" +
-	"\x13UpdateAgentSettings\x124.Superplane.Organizations.UpdateAgentSettingsRequest\x1a5.Superplane.Organizations.UpdateAgentSettingsResponse\"\xa1\x01\x92Aj\n" +
-	"\fOrganization\x12'Update organization Agent Mode settings\x1a1Updates Agent Mode enablement for an organization\x82\xd3\xe4\x93\x02.:\x01*2)/api/v1/organizations/{id}/agent-settings\x12\xbd\x02\n" +
-	"\x11SetAgentOpenAIKey\x122.Superplane.Organizations.SetAgentOpenAIKeyRequest\x1a3.Superplane.Organizations.SetAgentOpenAIKeyResponse\"\xbe\x01\x92A|\n" +
-	"\fOrganization\x127Create or update organization OpenAI key for Agent Mode\x1a3Sets the OpenAI key used by organization Agent Mode\x82\xd3\xe4\x93\x029:\x01*\x1a4/api/v1/organizations/{id}/agent-settings/openai-key\x12\xbc\x02\n" +
-	"\x14DeleteAgentOpenAIKey\x125.Superplane.Organizations.DeleteAgentOpenAIKeyRequest\x1a6.Superplane.Organizations.DeleteAgentOpenAIKeyResponse\"\xb4\x01\x92Au\n" +
-	"\fOrganization\x12-Delete organization OpenAI key for Agent Mode\x1a6Deletes the OpenAI key used by organization Agent Mode\x82\xd3\xe4\x93\x026*4/api/v1/organizations/{id}/agent-settings/openai-key\x12\x80\x02\n" +
-	"\rDescribeUsage\x12..Superplane.Organizations.DescribeUsageRequest\x1a/.Superplane.Organizations.DescribeUsageResponse\"\x8d\x01\x92Ab\n" +
-	"\fOrganization\x12\x1bDescribe organization usage\x1a5Returns usage tracking and limits for an organization\x82\xd3\xe4\x93\x02\"\x12 /api/v1/organizations/{id}/usage\x12\xea\x01\n" +
-	"\x10AcceptInviteLink\x12$.Superplane.Organizations.InviteLink\x1a\x17.google.protobuf.Struct\"\x96\x01\x92Ah\n" +
-	"\fOrganization\x12\x15Accept an invite link\x1aAAccepts an organization invite link for the authenticated account\x82\xd3\xe4\x93\x02%\"#/api/v1/invite-links/{token}/accept\x12\x95\x02\n" +
-	"\x10ListIntegrations\x121.Superplane.Organizations.ListIntegrationsRequest\x1a2.Superplane.Organizations.ListIntegrationsResponse\"\x99\x01\x92Ag\n" +
-	"\fOrganization\x12$List integrations in an organization\x1a1Returns a list of integrations in an organization\x82\xd3\xe4\x93\x02)\x12'/api/v1/organizations/{id}/integrations\x12\xc0\x02\n" +
-	"\x13DescribeIntegration\x124.Superplane.Organizations.DescribeIntegrationRequest\x1a5.Superplane.Organizations.DescribeIntegrationResponse\"\xbb\x01\x92Ax\n" +
-	"\fOrganization\x12*Describe an integration in an organization\x1a<Returns details of a specific integration in an organization\x82\xd3\xe4\x93\x02:\x128/api/v1/organizations/{id}/integrations/{integration_id}\x12\xaf\x02\n" +
-	"\x18ListIntegrationResources\x129.Superplane.Organizations.ListIntegrationResourcesRequest\x1a:.Superplane.Organizations.ListIntegrationResourcesResponse\"\x9b\x01\x92AN\n" +
-	"\fOrganization\x12\x1aList integration resources\x1a\"Lists resources for an integration\x82\xd3\xe4\x93\x02D\x12B/api/v1/organizations/{id}/integrations/{integration_id}/resources\x12\x87\x02\n" +
-	"\x11CreateIntegration\x122.Superplane.Organizations.CreateIntegrationRequest\x1a3.Superplane.Organizations.CreateIntegrationResponse\"\x88\x01\x92AS\n" +
-	"\fOrganization\x12\x1fCreate organization integration\x1a\"Create an organization integration\x82\xd3\xe4\x93\x02,:\x01*\"'/api/v1/organizations/{id}/integrations\x12\xa2\x02\n" +
-	"\x11UpdateIntegration\x122.Superplane.Organizations.UpdateIntegrationRequest\x1a3.Superplane.Organizations.UpdateIntegrationResponse\"\xa3\x01\x92A]\n" +
-	"\fOrganization\x12\x12Update integration\x1a9Updates the configuration for an organization integration\x82\xd3\xe4\x93\x02=:\x01*28/api/v1/organizations/{id}/integrations/{integration_id}\x12\x9e\x02\n" +
-	"\x11DeleteIntegration\x122.Superplane.Organizations.DeleteIntegrationRequest\x1a3.Superplane.Organizations.DeleteIntegrationResponse\"\x9f\x01\x92A\\\n" +
-	"\fOrganization\x12\x1fDelete organization integration\x1a+Deletes an integration from an organization\x82\xd3\xe4\x93\x02:*8/api/v1/organizations/{id}/integrations/{integration_id}B\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
+	"RemoveUser\x12+.Superplane.Organizations.RemoveUserRequest\x1a,.Superplane.Organizations.RemoveUserResponse\"\xb3\x01\x92Ay\n" +
+	"\fOrganization\x12\"Remove a user from an organization\x1aERemoves a user from an organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x021*//api/v1alpha/organizations/{id}/users/{user_id}\x12\x97\x02\n" +
+	"\x10CreateInvitation\x121.Superplane.Organizations.CreateInvitationRequest\x1a2.Superplane.Organizations.CreateInvitationResponse\"\x9b\x01\x92Ab\n" +
+	"\fOrganization\x12!Create an organization invitation\x1a/Invites a user to join an organization by email\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1alpha/organizations/{id}/invitations\x12\x8d\x02\n" +
+	"\x0fListInvitations\x120.Superplane.Organizations.ListInvitationsRequest\x1a1.Superplane.Organizations.ListInvitationsResponse\"\x94\x01\x92A^\n" +
+	"\fOrganization\x12\x1dList organization invitations\x1a/Returns pending invitations for an organization\x82\xd3\xe4\x93\x02-\x12+/api/v1alpha/organizations/{id}/invitations\x12\x97\x02\n" +
+	"\x10RemoveInvitation\x121.Superplane.Organizations.RemoveInvitationRequest\x1a2.Superplane.Organizations.RemoveInvitationResponse\"\x9b\x01\x92AU\n" +
+	"\fOrganization\x12!Remove an organization invitation\x1a\"Removes an organization invitation\x82\xd3\xe4\x93\x02=*;/api/v1alpha/organizations/{id}/invitations/{invitation_id}\x12\x85\x02\n" +
+	"\rGetInviteLink\x12..Superplane.Organizations.GetInviteLinkRequest\x1a/.Superplane.Organizations.GetInviteLinkResponse\"\x92\x01\x92A\\\n" +
+	"\fOrganization\x12\x1fGet an organization invite link\x1a+Returns the invite link for an organization\x82\xd3\xe4\x93\x02-\x12+/api/v1alpha/organizations/{id}/invite-link\x12\xa0\x02\n" +
+	"\x10UpdateInviteLink\x121.Superplane.Organizations.UpdateInviteLinkRequest\x1a2.Superplane.Organizations.UpdateInviteLinkResponse\"\xa4\x01\x92Ak\n" +
+	"\fOrganization\x12\"Update an organization invite link\x1a7Enables or disables the invite link for an organization\x82\xd3\xe4\x93\x020:\x01*2+/api/v1alpha/organizations/{id}/invite-link\x12\x9d\x02\n" +
+	"\x0fResetInviteLink\x120.Superplane.Organizations.ResetInviteLinkRequest\x1a1.Superplane.Organizations.ResetInviteLinkResponse\"\xa4\x01\x92Ah\n" +
+	"\fOrganization\x12!Reset an organization invite link\x1a5Generates a new invite link token for an organization\x82\xd3\xe4\x93\x023\"1/api/v1alpha/organizations/{id}/invite-link/reset\x12\xb2\x02\n" +
+	"\x10GetAgentSettings\x121.Superplane.Organizations.GetAgentSettingsRequest\x1a2.Superplane.Organizations.GetAgentSettingsResponse\"\xb6\x01\x92A}\n" +
+	"\fOrganization\x12$Get organization Agent Mode settings\x1aGReturns Agent Mode enablement and OpenAI key status for an organization\x82\xd3\xe4\x93\x020\x12./api/v1alpha/organizations/{id}/agent-settings\x12\xab\x02\n" +
+	"\x13UpdateAgentSettings\x124.Superplane.Organizations.UpdateAgentSettingsRequest\x1a5.Superplane.Organizations.UpdateAgentSettingsResponse\"\xa6\x01\x92Aj\n" +
+	"\fOrganization\x12'Update organization Agent Mode settings\x1a1Updates Agent Mode enablement for an organization\x82\xd3\xe4\x93\x023:\x01*2./api/v1alpha/organizations/{id}/agent-settings\x12\xc2\x02\n" +
+	"\x11SetAgentOpenAIKey\x122.Superplane.Organizations.SetAgentOpenAIKeyRequest\x1a3.Superplane.Organizations.SetAgentOpenAIKeyResponse\"\xc3\x01\x92A|\n" +
+	"\fOrganization\x127Create or update organization OpenAI key for Agent Mode\x1a3Sets the OpenAI key used by organization Agent Mode\x82\xd3\xe4\x93\x02>:\x01*\x1a9/api/v1alpha/organizations/{id}/agent-settings/openai-key\x12\xc1\x02\n" +
+	"\x14DeleteAgentOpenAIKey\x125.Superplane.Organizations.DeleteAgentOpenAIKeyRequest\x1a6.Superplane.Organizations.DeleteAgentOpenAIKeyResponse\"\xb9\x01\x92Au\n" +
+	"\fOrganization\x12-Delete organization OpenAI key for Agent Mode\x1a6Deletes the OpenAI key used by organization Agent Mode\x82\xd3\xe4\x93\x02;*9/api/v1alpha/organizations/{id}/agent-settings/openai-key\x12\x85\x02\n" +
+	"\rDescribeUsage\x12..Superplane.Organizations.DescribeUsageRequest\x1a/.Superplane.Organizations.DescribeUsageResponse\"\x92\x01\x92Ab\n" +
+	"\fOrganization\x12\x1bDescribe organization usage\x1a5Returns usage tracking and limits for an organization\x82\xd3\xe4\x93\x02'\x12%/api/v1alpha/organizations/{id}/usage\x12\xef\x01\n" +
+	"\x10AcceptInviteLink\x12$.Superplane.Organizations.InviteLink\x1a\x17.google.protobuf.Struct\"\x9b\x01\x92Ah\n" +
+	"\fOrganization\x12\x15Accept an invite link\x1aAAccepts an organization invite link for the authenticated account\x82\xd3\xe4\x93\x02*\"(/api/v1alpha/invite-links/{token}/accept\x12\x9a\x02\n" +
+	"\x10ListIntegrations\x121.Superplane.Organizations.ListIntegrationsRequest\x1a2.Superplane.Organizations.ListIntegrationsResponse\"\x9e\x01\x92Ag\n" +
+	"\fOrganization\x12$List integrations in an organization\x1a1Returns a list of integrations in an organization\x82\xd3\xe4\x93\x02.\x12,/api/v1alpha/organizations/{id}/integrations\x12\xc5\x02\n" +
+	"\x13DescribeIntegration\x124.Superplane.Organizations.DescribeIntegrationRequest\x1a5.Superplane.Organizations.DescribeIntegrationResponse\"\xc0\x01\x92Ax\n" +
+	"\fOrganization\x12*Describe an integration in an organization\x1a<Returns details of a specific integration in an organization\x82\xd3\xe4\x93\x02?\x12=/api/v1alpha/organizations/{id}/integrations/{integration_id}\x12\xb4\x02\n" +
+	"\x18ListIntegrationResources\x129.Superplane.Organizations.ListIntegrationResourcesRequest\x1a:.Superplane.Organizations.ListIntegrationResourcesResponse\"\xa0\x01\x92AN\n" +
+	"\fOrganization\x12\x1aList integration resources\x1a\"Lists resources for an integration\x82\xd3\xe4\x93\x02I\x12G/api/v1alpha/organizations/{id}/integrations/{integration_id}/resources\x12\x8c\x02\n" +
+	"\x11CreateIntegration\x122.Superplane.Organizations.CreateIntegrationRequest\x1a3.Superplane.Organizations.CreateIntegrationResponse\"\x8d\x01\x92AS\n" +
+	"\fOrganization\x12\x1fCreate organization integration\x1a\"Create an organization integration\x82\xd3\xe4\x93\x021:\x01*\",/api/v1alpha/organizations/{id}/integrations\x12\xa7\x02\n" +
+	"\x11UpdateIntegration\x122.Superplane.Organizations.UpdateIntegrationRequest\x1a3.Superplane.Organizations.UpdateIntegrationResponse\"\xa8\x01\x92A]\n" +
+	"\fOrganization\x12\x12Update integration\x1a9Updates the configuration for an organization integration\x82\xd3\xe4\x93\x02B:\x01*2=/api/v1alpha/organizations/{id}/integrations/{integration_id}\x12\xa3\x02\n" +
+	"\x11DeleteIntegration\x122.Superplane.Organizations.DeleteIntegrationRequest\x1a3.Superplane.Organizations.DeleteIntegrationResponse\"\xa4\x01\x92A\\\n" +
+	"\fOrganization\x12\x1fDelete organization integration\x1a+Deletes an integration from an organization\x82\xd3\xe4\x93\x02?*=/api/v1alpha/organizations/{id}/integrations/{integration_id}B\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
 	"\x1cSuperplane Organizations API\x128API for managing organizations in the Superplane service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/organizationsb\x06proto3"
 

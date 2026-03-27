@@ -79,7 +79,7 @@ func (a *CanvasEventAPIService) CanvasesListCanvasEventsExecute(r ApiCanvasesLis
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/events"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/events"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -200,7 +200,7 @@ func (a *CanvasEventAPIService) CanvasesListEventExecutionsExecute(r ApiCanvases
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/events/{eventId}/executions"
+	localVarPath := localBasePath + "/api/v1alpha/canvases/{canvasId}/events/{eventId}/executions"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"eventId"+"}", url.PathEscape(parameterValueToString(r.eventId, "eventId")), -1)
 

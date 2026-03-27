@@ -69,7 +69,7 @@ func (a *AgentAPIService) AgentsCreateAgentChatExecute(r ApiAgentsCreateAgentCha
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats"
+	localVarPath := localBasePath + "/api/v1alpha/agents/chats"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -191,7 +191,7 @@ func (a *AgentAPIService) AgentsDescribeAgentChatExecute(r ApiAgentsDescribeAgen
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}"
+	localVarPath := localBasePath + "/api/v1alpha/agents/chats/{chatId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -312,7 +312,7 @@ func (a *AgentAPIService) AgentsListAgentChatMessagesExecute(r ApiAgentsListAgen
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}/messages"
+	localVarPath := localBasePath + "/api/v1alpha/agents/chats/{chatId}/messages"
 	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -430,7 +430,7 @@ func (a *AgentAPIService) AgentsListAgentChatsExecute(r ApiAgentsListAgentChatsR
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats"
+	localVarPath := localBasePath + "/api/v1alpha/agents/chats"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -550,7 +550,7 @@ func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentCha
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}/resume"
+	localVarPath := localBasePath + "/api/v1alpha/agents/chats/{chatId}/resume"
 	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)

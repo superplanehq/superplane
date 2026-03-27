@@ -38,7 +38,7 @@ func (w *webhookSecretContext) ResetSecret() ([]byte, []byte, error) {
 }
 
 func (w *webhookSecretContext) GetBaseURL() string {
-	return "http://localhost:3000/api/v1"
+	return "http://localhost:3000/api/v1alpha"
 }
 
 func Test__OnAlertFiring__HandleWebhook(t *testing.T) {

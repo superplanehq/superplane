@@ -760,19 +760,19 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x13node_output_channel\x18\x03 \x01(\tR\x11nodeOutputChannel\"-\n" +
 	"\aUserRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name2\x9e\b\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name2\xb7\b\n" +
 	"\n" +
-	"Blueprints\x12\xca\x01\n" +
-	"\x0eListBlueprints\x12,.Superplane.Blueprints.ListBlueprintsRequest\x1a-.Superplane.Blueprints.ListBlueprintsResponse\"[\x92A>\n" +
-	"\tBlueprint\x12\x0fList blueprints\x1a Returns a list of all blueprints\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/blueprints\x12\xce\x01\n" +
-	"\x11DescribeBlueprint\x12/.Superplane.Blueprints.DescribeBlueprintRequest\x1a0.Superplane.Blueprints.DescribeBlueprintResponse\"V\x92A4\n" +
-	"\tBlueprint\x12\x12Describe blueprint\x1a\x13Returns a blueprint\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/blueprints/{id}\x12\xc8\x01\n" +
-	"\x0fCreateBlueprint\x12-.Superplane.Blueprints.CreateBlueprintRequest\x1a..Superplane.Blueprints.CreateBlueprintResponse\"V\x92A6\n" +
-	"\tBlueprint\x12\x10Create blueprint\x1a\x17Creates a new blueprint\x82\xd3\xe4\x93\x02\x17:\x01*\"\x12/api/v1/blueprints\x12\xd3\x01\n" +
-	"\x0fUpdateBlueprint\x12-.Superplane.Blueprints.UpdateBlueprintRequest\x1a..Superplane.Blueprints.UpdateBlueprintResponse\"a\x92A<\n" +
-	"\tBlueprint\x12\x10Update blueprint\x1a\x1dUpdates an existing blueprint\x82\xd3\xe4\x93\x02\x1c:\x01*2\x17/api/v1/blueprints/{id}\x12\xd0\x01\n" +
-	"\x0fDeleteBlueprint\x12-.Superplane.Blueprints.DeleteBlueprintRequest\x1a..Superplane.Blueprints.DeleteBlueprintResponse\"^\x92A<\n" +
-	"\tBlueprint\x12\x10Delete blueprint\x1a\x1dDeletes an existing blueprint\x82\xd3\xe4\x93\x02\x19*\x17/api/v1/blueprints/{id}B\xce\x01\x92A\x90\x01\x12f\n" +
+	"Blueprints\x12\xcf\x01\n" +
+	"\x0eListBlueprints\x12,.Superplane.Blueprints.ListBlueprintsRequest\x1a-.Superplane.Blueprints.ListBlueprintsResponse\"`\x92A>\n" +
+	"\tBlueprint\x12\x0fList blueprints\x1a Returns a list of all blueprints\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1alpha/blueprints\x12\xd3\x01\n" +
+	"\x11DescribeBlueprint\x12/.Superplane.Blueprints.DescribeBlueprintRequest\x1a0.Superplane.Blueprints.DescribeBlueprintResponse\"[\x92A4\n" +
+	"\tBlueprint\x12\x12Describe blueprint\x1a\x13Returns a blueprint\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1alpha/blueprints/{id}\x12\xcd\x01\n" +
+	"\x0fCreateBlueprint\x12-.Superplane.Blueprints.CreateBlueprintRequest\x1a..Superplane.Blueprints.CreateBlueprintResponse\"[\x92A6\n" +
+	"\tBlueprint\x12\x10Create blueprint\x1a\x17Creates a new blueprint\x82\xd3\xe4\x93\x02\x1c:\x01*\"\x17/api/v1alpha/blueprints\x12\xd8\x01\n" +
+	"\x0fUpdateBlueprint\x12-.Superplane.Blueprints.UpdateBlueprintRequest\x1a..Superplane.Blueprints.UpdateBlueprintResponse\"f\x92A<\n" +
+	"\tBlueprint\x12\x10Update blueprint\x1a\x1dUpdates an existing blueprint\x82\xd3\xe4\x93\x02!:\x01*2\x1c/api/v1alpha/blueprints/{id}\x12\xd5\x01\n" +
+	"\x0fDeleteBlueprint\x12-.Superplane.Blueprints.DeleteBlueprintRequest\x1a..Superplane.Blueprints.DeleteBlueprintResponse\"c\x92A<\n" +
+	"\tBlueprint\x12\x10Delete blueprint\x1a\x1dDeletes an existing blueprint\x82\xd3\xe4\x93\x02\x1e*\x1c/api/v1alpha/blueprints/{id}B\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Blueprints API\x12\x1dAPI for Superplane blueprints\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/blueprintsb\x06proto3"
 

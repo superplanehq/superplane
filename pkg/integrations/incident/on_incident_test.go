@@ -23,7 +23,7 @@ type setupFirstWebhookContext struct {
 
 func (w *setupFirstWebhookContext) Setup() (string, error) {
 	w.setupCalled = true
-	return "https://example.com/api/v1/webhooks/webhook-123", nil
+	return "https://example.com/api/v1alpha/webhooks/webhook-123", nil
 }
 
 func (w *setupFirstWebhookContext) SetSecret(secret []byte) error {
@@ -323,7 +323,7 @@ func Test__OnIncident__Setup(t *testing.T) {
 
 		metadata, ok := metadataCtx.Metadata.(OnIncidentMetadata)
 		require.True(t, ok)
-		assert.Equal(t, "https://example.com/api/v1/webhooks/webhook-123", metadata.WebhookURL)
+		assert.Equal(t, "https://example.com/api/v1alpha/webhooks/webhook-123", metadata.WebhookURL)
 		assert.False(t, metadata.SigningSecretConfigured)
 	})
 }

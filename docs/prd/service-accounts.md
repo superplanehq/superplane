@@ -52,7 +52,7 @@ We chose the unified table approach for the following reasons:
 - `account_id` becomes nullable on the `users` table. Service accounts have no account.
 - The `unique_user_in_organization` constraint `(organization_id, account_id, email)` needs adjustment — service accounts don't have an `account_id` or a meaningful email.
 - ~3-4 places that access `user.AccountID` need nil checks (primarily `convertUserToProto` in `pkg/grpc/actions/auth/common.go` and invitation flows).
-- The `/api/v1/me` endpoints need to handle service account callers (either return a service-account-specific response or block them).
+- The `/api/v1alpha/me` endpoints need to handle service account callers (either return a service-account-specific response or block them).
 
 ## Detailed Design
 
@@ -121,8 +121,8 @@ These work automatically because service accounts are rows in the `users` table:
 |------|---------|--------|
 | **User serialization** | `pkg/grpc/actions/auth/common.go` | `convertUserToProto` calls `FindAccountByID(user.AccountID)` — needs nil check for service accounts (no account). Return a simplified proto with no account providers. |
 | **User listing** | `pkg/grpc/actions/auth/common.go` | `GetUsersWithRolesInDomain` / `ListUsers` — decide whether service accounts appear in the user list or need a separate listing. |
-| **`/api/v1/me`** | `pkg/grpc/actions/me/get_user.go` | Return a response that works for both types. |
-| **`/api/v1/me/token`** | `pkg/grpc/actions/me/regenerate_token.go` | Block for service accounts — they manage tokens via the service account token endpoints. |
+| **`/api/v1alpha/me`** | `pkg/grpc/actions/me/get_user.go` | Return a response that works for both types. |
+| **`/api/v1alpha/me/token`** | `pkg/grpc/actions/me/regenerate_token.go` | Block for service accounts — they manage tokens via the service account token endpoints. |
 | **Invitation flow** | `pkg/grpc/actions/organizations/create_invitation.go` | No change needed — invitations work by email, and service accounts have no email. Naturally excluded. |
 | **Assign role** | `pkg/grpc/actions/auth/assign_role.go` | `FindUser` resolves by ID or email. Works for service accounts (by ID). Add guard to prevent `org_owner` assignment. |
 | **Delete organization** | `pkg/grpc/actions/organizations/delete_organization.go` | No change needed — uses user ID for logging only. |
@@ -148,12 +148,12 @@ service ServiceAccounts {
 
 | Method   | Path                                                         | Description                              |
 |----------|--------------------------------------------------------------|------------------------------------------|
-| `POST`   | `/api/v1/service-accounts`                                   | Create a service account.                |
-| `GET`    | `/api/v1/service-accounts`                                   | List service accounts in the org.        |
-| `GET`    | `/api/v1/service-accounts/{id}`                              | Get service account details.             |
-| `PATCH`  | `/api/v1/service-accounts/{id}`                              | Update name/description.                 |
-| `DELETE` | `/api/v1/service-accounts/{id}`                              | Delete a service account.                |
-| `POST`   | `/api/v1/service-accounts/{id}/token`                        | Regenerate the service account's token.  |
+| `POST`   | `/api/v1alpha/service-accounts`                                   | Create a service account.                |
+| `GET`    | `/api/v1alpha/service-accounts`                                   | List service accounts in the org.        |
+| `GET`    | `/api/v1alpha/service-accounts/{id}`                              | Get service account details.             |
+| `PATCH`  | `/api/v1alpha/service-accounts/{id}`                              | Update name/description.                 |
+| `DELETE` | `/api/v1alpha/service-accounts/{id}`                              | Delete a service account.                |
+| `POST`   | `/api/v1alpha/service-accounts/{id}/token`                        | Regenerate the service account's token.  |
 
 #### Authorization Rules
 
@@ -221,7 +221,7 @@ The service accounts management UI should be accessible under **Organization Set
 5. Implement gRPC actions in `pkg/grpc/actions/service_accounts/`.
 6. Add RBAC permissions (`service_accounts:create/read/update/delete`) to the organization policy templates.
 7. Add authorization rules to the interceptor in `pkg/authorization/interceptor.go`.
-8. Guard `/api/v1/me/token` endpoint against service account callers.
+8. Guard `/api/v1alpha/me/token` endpoint against service account callers.
 
 ### Phase 3: API Integration
 

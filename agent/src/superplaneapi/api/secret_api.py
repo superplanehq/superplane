@@ -306,7 +306,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='POST',
-            resource_path='/api/v1/secrets',
+            resource_path='/api/v1alpha/secrets',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -600,7 +600,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='DELETE',
-            resource_path='/api/v1/secrets/{idOrName}',
+            resource_path='/api/v1alpha/secrets/{idOrName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -909,7 +909,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='DELETE',
-            resource_path='/api/v1/secrets/{idOrName}/keys/{keyName}',
+            resource_path='/api/v1alpha/secrets/{idOrName}/keys/{keyName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1203,7 +1203,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/secrets/{idOrName}',
+            resource_path='/api/v1alpha/secrets/{idOrName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1482,7 +1482,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='GET',
-            resource_path='/api/v1/secrets',
+            resource_path='/api/v1alpha/secrets',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -1785,7 +1785,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='PUT',
-            resource_path='/api/v1/secrets/{idOrName}/keys/{keyName}',
+            resource_path='/api/v1alpha/secrets/{idOrName}/keys/{keyName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -2073,7 +2073,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='PATCH',
-            resource_path='/api/v1/secrets/{idOrName}',
+            resource_path='/api/v1alpha/secrets/{idOrName}',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,
@@ -2361,7 +2361,7 @@ class SecretApi:
 
         return self.api_client.param_serialize(
             method='PATCH',
-            resource_path='/api/v1/secrets/{idOrName}/name',
+            resource_path='/api/v1alpha/secrets/{idOrName}/name',
             path_params=_path_params,
             query_params=_query_params,
             header_params=_header_params,

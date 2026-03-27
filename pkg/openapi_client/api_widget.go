@@ -66,7 +66,7 @@ func (a *WidgetAPIService) WidgetsDescribeWidgetExecute(r ApiWidgetsDescribeWidg
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/widgets/{name}"
+	localVarPath := localBasePath + "/api/v1alpha/widgets/{name}"
 	localVarPath = strings.Replace(localVarPath, "{"+"name"+"}", url.PathEscape(parameterValueToString(r.name, "name")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -175,7 +175,7 @@ func (a *WidgetAPIService) WidgetsListWidgetsExecute(r ApiWidgetsListWidgetsRequ
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/widgets"
+	localVarPath := localBasePath + "/api/v1alpha/widgets"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

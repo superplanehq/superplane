@@ -535,12 +535,12 @@
               <span>Bearer auth</span>
             </div>
             <pre><span class="comment"># Verify the token</span>
-<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1/me" \
+<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1alpha/me" \
   -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
   -H "Accept: application/json"
 
 <span class="comment"># List canvases</span>
-<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1/canvases" \
+<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1alpha/canvases" \
   -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
   -H "Accept: application/json"</pre>
             <div class="terminal-note">
@@ -793,7 +793,7 @@
       }
 
       function isPublicOperation(path, operationId) {
-        return path === "/api/v1/invite-links/{token}/accept" || operationId === "Organizations_AcceptInviteLink";
+        return path === "/api/v1alpha/invite-links/{token}/accept" || operationId === "Organizations_AcceptInviteLink";
       }
 
       function isHiddenOperation(operation) {

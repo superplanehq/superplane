@@ -248,7 +248,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -268,7 +268,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -288,7 +288,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats/{chat_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -308,7 +308,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/messages"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats/{chat_id}/messages"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -328,7 +328,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/resume"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats/{chat_id}/resume"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -386,7 +386,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -403,7 +403,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -420,7 +420,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats/{chat_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -437,7 +437,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/messages"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats/{chat_id}/messages"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -454,7 +454,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/resume"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1alpha/agents/chats/{chat_id}/resume"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -471,11 +471,11 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 }
 
 var (
-	pattern_Agents_ListAgentChats_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "agents", "chats"}, ""))
-	pattern_Agents_CreateAgentChat_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "agents", "chats"}, ""))
-	pattern_Agents_DescribeAgentChat_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "agents", "chats", "chat_id"}, ""))
-	pattern_Agents_ListAgentChatMessages_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "agents", "chats", "chat_id", "messages"}, ""))
-	pattern_Agents_ResumeAgentChat_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "agents", "chats", "chat_id", "resume"}, ""))
+	pattern_Agents_ListAgentChats_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1alpha", "agents", "chats"}, ""))
+	pattern_Agents_CreateAgentChat_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1alpha", "agents", "chats"}, ""))
+	pattern_Agents_DescribeAgentChat_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1alpha", "agents", "chats", "chat_id"}, ""))
+	pattern_Agents_ListAgentChatMessages_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1alpha", "agents", "chats", "chat_id", "messages"}, ""))
+	pattern_Agents_ResumeAgentChat_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1alpha", "agents", "chats", "chat_id", "resume"}, ""))
 )
 
 var (

@@ -118,7 +118,7 @@ func (t *Telegram) Sync(ctx core.SyncContext) error {
 	if webhookURL == "" {
 		webhookURL = ctx.BaseURL
 	}
-	webhookURL = fmt.Sprintf("%s/api/v1/integrations/%s/events", webhookURL, ctx.Integration.ID().String())
+	webhookURL = fmt.Sprintf("%s/api/v1alpha/integrations/%s/events", webhookURL, ctx.Integration.ID().String())
 
 	err = client.SetWebhook(webhookURL)
 	if err != nil {
