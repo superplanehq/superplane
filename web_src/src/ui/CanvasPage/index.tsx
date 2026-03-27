@@ -282,8 +282,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
@@ -1061,25 +1061,6 @@ function CanvasPage(props: CanvasPageProps) {
     canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
-  const canvasStateBorderClass =
-    canvasStateMode === "editing"
-      ? "border-3 border-amber-500"
-      : canvasStateMode === "previewing-previous-version"
-        ? "border-3 border-sky-500"
-        : "";
-  const canvasStateBadgeClass =
-    canvasStateMode === "editing"
-      ? "bg-amber-500"
-      : canvasStateMode === "previewing-previous-version"
-        ? "bg-sky-500"
-        : "";
-  const canvasStateLabel =
-    canvasStateMode === "editing"
-      ? "Edit Mode"
-      : canvasStateMode === "previewing-previous-version"
-        ? "Previewing Previous Version"
-        : "";
-
   return (
     <div ref={canvasWrapperRef} className="h-[100vh] w-[100vw] overflow-hidden sp-canvas relative flex flex-col">
       {/* Header at the top spanning full width */}
@@ -1112,25 +1093,55 @@ function CanvasPage(props: CanvasPageProps) {
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-          onExitEditMode={props.onExitEditMode}
-          exitEditModeDisabled={props.exitEditModeDisabled}
-          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
-          canvasId={props.canvasId}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
+
+      {canvasStateMode === "editing" ? (
+        <div
+          className="shrink-0 flex min-h-8 items-center justify-center gap-2 bg-amber-200 px-4 py-1.5 text-[13px] font-medium text-amber-700"
+          role="status"
+        >
+          <p className="m-0 text-amber-700">You’re editing the canvas</p>
+          <span className="select-none text-amber-700" aria-hidden>
+            ·
+          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="min-h-0 shrink-0 gap-1 rounded-sm border border-amber-700 px-1.5 h-5 text-[13px] font-medium !text-amber-700 underline-offset-2 hover:!text-amber-700 hover:bg-white/10 hover:no-underline"
+                  onClick={() => props.onExitEditMode?.()}
+                  disabled={props.exitEditModeDisabled}
+                  aria-label="Exit edit mode"
+                >
+                  Exit
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {props.exitEditModeDisabled && props.exitEditModeDisabledTooltip
+                ? props.exitEditModeDisabledTooltip
+                : "Return to the live version. Draft will be preserved."}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      ) : null}
 
       {/* Main content area with sidebar and canvas/memory/settings views */}
       {props.topViewMode && props.topViewMode !== "canvas" ? (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
-          <div className="flex-1 overflow-auto bg-slate-50">{props.dataViewContent}</div>
+          <div className="flex-1 overflow-auto bg-slate-100">{props.dataViewContent}</div>
         </div>
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
@@ -1154,7 +1165,7 @@ function CanvasPage(props: CanvasPageProps) {
             />
           )}
 
-          <div className={`flex-1 relative ${canvasStateBorderClass}`}>
+          <div className="flex-1 relative">
             {showPreviewFloatingBar || showAwaitingFloatingBar ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
                 <div
@@ -1198,13 +1209,6 @@ function CanvasPage(props: CanvasPageProps) {
                     View details
                   </Button>
                 </div>
-              </div>
-            ) : null}
-            {canvasStateLabel ? (
-              <div
-                className={`uppercase absolute bottom-0 right-0 z-20 px-3 py-1 text-xs font-semibold text-white ${canvasStateBadgeClass}`}
-              >
-                {canvasStateLabel}
               </div>
             ) : null}
             <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
@@ -1267,9 +1271,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onEnterEditMode={props.onEnterEditMode}
                 enterEditModeDisabled={props.enterEditModeDisabled}
                 enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-                onExitEditMode={props.onExitEditMode}
-                exitEditModeDisabled={props.exitEditModeDisabled}
-                exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
                 unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
@@ -1726,16 +1727,12 @@ function CanvasContentHeader({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount,
   topViewMode,
   onTopViewModeChange,
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
-  canvasId,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1764,16 +1761,12 @@ function CanvasContentHeader({
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
-  canvasId?: string;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1832,16 +1825,12 @@ function CanvasContentHeader({
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-      onExitEditMode={onExitEditMode}
-      exitEditModeDisabled={exitEditModeDisabled}
-      exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
-      canvasId={canvasId}
     />
   );
 }
@@ -1941,9 +1930,6 @@ function CanvasContent({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -2044,9 +2030,6 @@ function CanvasContent({
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
-  onExitEditMode?: () => void;
-  exitEditModeDisabled?: boolean;
-  exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -2810,9 +2793,6 @@ function CanvasContent({
           onEnterEditMode={onEnterEditMode}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          onExitEditMode={onExitEditMode}
-          exitEditModeDisabled={exitEditModeDisabled}
-          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           unpublishedDraftChangeCount={unpublishedDraftChangeCount}
         />
       )}
