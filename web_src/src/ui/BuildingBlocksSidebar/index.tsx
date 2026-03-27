@@ -23,9 +23,18 @@ import { BuildingBlockPreview } from "./BuildingBlockPreview";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
-import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import {
+  AiChatSession,
+  AiBuilderMessage,
+  AiBuilderProposal,
+  loadChatConversation,
+  loadChatSessions,
+  pushAiMessages,
+  sendChatPrompt,
+} from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
+
+const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface BuildingBlock {
   name: string;
@@ -131,7 +140,6 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
-  const persistedAiState = loadAiBuilderState<AiCanvasOperation>(canvasId);
 
   if (!isOpen) {
     const addNoteButton = (
@@ -206,15 +214,17 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "ai">(persistedAiState?.activeTab || "components");
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
   const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>(persistedAiState?.messages || []);
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
-    persistedAiState?.pendingProposal || null,
-  );
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
   const applyShortcutHint = useMemo(() => {
     if (typeof navigator === "undefined") {
       return "Ctrl+Enter";
@@ -223,17 +233,18 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      await sendAgentChatPrompt({
+      await sendChatPrompt({
         value,
         aiInput,
-        aiMessages,
         canvasId,
         organizationId,
+        currentChatId,
         isGeneratingResponse,
+        setChatSessions,
+        setCurrentChatId,
         setAiMessages,
         setAiInput,
         setAiError,
@@ -242,8 +253,24 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, aiMessages, canvasId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
   );
+
+  const handleStartNewChatSession = useCallback(() => {
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
+    setAiError(null);
+    requestAnimationFrame(() => {
+      aiInputRef.current?.focus();
+    });
+  }, []);
+
+  const handleSelectChatSession = useCallback((chatId: string) => {
+    setCurrentChatId(chatId);
+    setPendingProposal(null);
+    setAiError(null);
+  }, []);
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
@@ -361,21 +388,123 @@ export function BuildingBlocksSidebar({
   }, [showAiBuilderTab, activeTab]);
 
   useEffect(() => {
-    const nextPersistedState = loadAiBuilderState<AiCanvasOperation>(canvasId);
-    setActiveTab(nextPersistedState?.activeTab || "components");
-    setAiMessages(nextPersistedState?.messages || []);
-    setPendingProposal(nextPersistedState?.pendingProposal || null);
+    setActiveTab("components");
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
     setAiError(null);
     setAiInput("");
   }, [canvasId]);
 
   useEffect(() => {
-    saveAiBuilderState<AiCanvasOperation>(canvasId, {
-      activeTab,
-      messages: aiMessages,
-      pendingProposal,
-    });
-  }, [activeTab, aiMessages, canvasId, pendingProposal]);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(AI_BUILDER_STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId) {
+      setChatSessions([]);
+      setCurrentChatId(null);
+      setAiMessages([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingChatSessions(true);
+      try {
+        const sessions = await loadChatSessions({
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setChatSessions(sessions);
+        setCurrentChatId((previousChatId) => {
+          if (previousChatId && sessions.some((session) => session.id === previousChatId)) {
+            return previousChatId;
+          }
+
+          return null;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat sessions:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatSessions(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, organizationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId || !currentChatId) {
+      if (!currentChatId) {
+        setAiMessages([]);
+        setPendingProposal(null);
+      }
+      setIsLoadingChatMessages(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingChatMessages(true);
+      try {
+        const messages = await loadChatConversation({
+          chatId: currentChatId,
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setAiMessages(messages);
+        setAiError(null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat conversation:", error);
+          setAiError(error instanceof Error ? error.message : "Failed to load chat conversation.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, currentChatId, organizationId]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -644,6 +773,10 @@ export function BuildingBlocksSidebar({
 
         {showAiBuilderTab && (
           <AiBuilderChatPanel
+            chatSessions={chatSessions}
+            currentChatId={currentChatId}
+            isLoadingChatSessions={isLoadingChatSessions}
+            isLoadingChatMessages={isLoadingChatMessages}
             aiMessages={aiMessages}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
@@ -657,6 +790,8 @@ export function BuildingBlocksSidebar({
             canvasId={canvasId}
             aiInput={aiInput}
             onAiInputChange={setAiInput}
+            onSelectChat={handleSelectChatSession}
+            onStartNewSession={handleStartNewChatSession}
             onSendPrompt={() => void handleSendPrompt()}
             aiInputRef={aiInputRef}
           />
