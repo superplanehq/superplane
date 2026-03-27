@@ -9,7 +9,7 @@ import (
 type listCommand struct{}
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
