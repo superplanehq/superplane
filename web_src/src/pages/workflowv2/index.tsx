@@ -2292,7 +2292,9 @@ export function WorkflowPageV2() {
 
           const exampleData = triggerMetadata?.exampleData;
           if (exampleData && typeof exampleData === "object") {
-            exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleData)
+              ? [...exampleData]
+              : ({ ...exampleData } as Record<string, unknown>);
           }
           return;
         }

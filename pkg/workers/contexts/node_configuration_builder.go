@@ -589,6 +589,10 @@ func injectConfig(payload any, configData map[string]any) any {
 		return payload
 	}
 
+	if _, exists := payloadMap["config"]; exists {
+		return payload
+	}
+
 	withConfig := make(map[string]any, len(payloadMap)+1)
 	for key, value := range payloadMap {
 		withConfig[key] = value
