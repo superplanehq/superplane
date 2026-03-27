@@ -1,12 +1,16 @@
 {
-  "zoneId": "zone_xyz789",
-  "recordId": "record_abc123",
-  "record": {
-    "id": "record_abc123",
-    "type": "CNAME",
-    "name": "app.example.com",
-    "content": "example.com",
-    "ttl": 360,
-    "proxied": false
-  }
+  "data": {
+    "zoneId": "zone_xyz789",
+    "recordId": "record_abc123",
+    "record": {
+      "id": "record_abc123",
+      "type": "CNAME",
+      "name": "app.example.com",
+      "content": "example.com",
+      "ttl": 360,
+      "proxied": false
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.dnsRecord"
 }
