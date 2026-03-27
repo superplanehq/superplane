@@ -1,4 +1,4 @@
-import type { GooglerpcStatus } from "@/api-client/types.gen";
+import type { GoogleRpcStatus } from "@/api-client/types.gen";
 
 /**
  * Extract error message from API error response
@@ -38,7 +38,7 @@ export function getApiErrorCode(error: unknown): number | null {
   if (typeof error === "object" && "error" in error) {
     const errorObj = error.error;
     if (errorObj && typeof errorObj === "object" && "code" in errorObj) {
-      const code = (errorObj as GooglerpcStatus).code;
+      const code = (errorObj as GoogleRpcStatus).code;
       if (typeof code === "number") {
         return code;
       }
@@ -46,7 +46,7 @@ export function getApiErrorCode(error: unknown): number | null {
   }
 
   if (typeof error === "object" && "code" in error) {
-    const code = (error as GooglerpcStatus).code;
+    const code = (error as GoogleRpcStatus).code;
     if (typeof code === "number") {
       return code;
     }
@@ -68,7 +68,7 @@ function getStatusMessage(error: unknown): string | null {
     return null;
   }
 
-  return getNonEmptyString((error as GooglerpcStatus).message);
+  return getNonEmptyString((error as GoogleRpcStatus).message);
 }
 
 function getNonEmptyString(value: unknown): string | null {
