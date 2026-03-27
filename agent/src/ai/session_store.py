@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 from dataclasses import dataclass
@@ -45,6 +46,13 @@ def _format_tool_label(tool_name: str) -> str:
     return words[:1].upper() + words[1:]
 
 
+def _likely_output_tool_name(tool_name: str | None) -> bool:
+    if not isinstance(tool_name, str):
+        return False
+
+    return tool_name.strip().lower() in {"final_result", "return_canvasanswer", "canvasanswer"}
+
+
 def _user_content_to_text(content: Any) -> str:
     if isinstance(content, str):
         return content
@@ -77,6 +85,36 @@ def _deserialize_model_message(payload: Any) -> ModelMessage:
     if not messages:
         raise ValueError("Failed to deserialize model message.")
     return messages[0]
+
+
+def _extract_output_tool_answer(payload: dict[str, Any]) -> str:
+    parts = payload.get("parts")
+    if not isinstance(parts, list):
+        return ""
+
+    for part in reversed(parts):
+        if not isinstance(part, dict):
+            continue
+        if part.get("part_kind") != "tool-call":
+            continue
+        if not _likely_output_tool_name(part.get("tool_name")):
+            continue
+
+        args = part.get("args")
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except json.JSONDecodeError:
+                continue
+
+        if not isinstance(args, dict):
+            continue
+
+        answer = args.get("answer")
+        if isinstance(answer, str) and answer:
+            return answer
+
+    return ""
 
 
 @dataclass(frozen=True)
@@ -276,7 +314,13 @@ class SessionStore:
 
         flattened: list[StoredAgentChatMessage] = []
         for record in records:
-            flattened.extend(self._flatten_message_record(record))
+            try:
+                flattened.extend(self._flatten_message_record(record))
+            except Exception as error:
+                print(
+                    f"[agent] failed to flatten chat message record chat_id={chat_id} message_id={record.id}: {error}",
+                    flush=True,
+                )
         return flattened
 
     def load_agent_chat_message_history(self, chat_id: str) -> list[ModelMessage]:
@@ -426,6 +470,8 @@ class SessionStore:
                     continue
 
                 if isinstance(part, ToolReturnPart):
+                    if _likely_output_tool_name(part.tool_name):
+                        continue
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
@@ -440,6 +486,8 @@ class SessionStore:
                     continue
 
                 if isinstance(part, RetryPromptPart) and part.tool_name:
+                    if _likely_output_tool_name(part.tool_name):
+                        continue
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
@@ -456,13 +504,16 @@ class SessionStore:
 
         if isinstance(model_message, ModelResponse):
             assistant_parts = [part.content for part in model_message.parts if isinstance(part, TextPart) and part.content]
-            if assistant_parts:
+            assistant_content = "".join(assistant_parts)
+            if not assistant_content:
+                assistant_content = _extract_output_tool_answer(record.message)
+            if assistant_content:
                 flattened.append(
                     StoredAgentChatMessage(
-                        id=record.id,
+                        id=str(record.id),
                         chat_id=record.chat_id,
                         role="assistant",
-                        content="".join(assistant_parts),
+                        content=assistant_content,
                         tool_call_id=None,
                         tool_status=None,
                         created_at=record.created_at,

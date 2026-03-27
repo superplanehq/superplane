@@ -24,13 +24,13 @@ import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import {
-  AiAgentSession,
+  AiChatSession,
   AiBuilderMessage,
   AiBuilderProposal,
-  loadAgentConversation,
-  loadAgentSessions,
+  loadChatConversation,
+  loadChatSessions,
   pushAiMessages,
-  sendAgentChatPrompt,
+  sendChatPrompt,
 } from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 
@@ -217,10 +217,10 @@ export function BuildingBlocksSidebar({
   const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
   const [aiInput, setAiInput] = useState("");
   const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
-  const [agentSessions, setAgentSessions] = useState<AiAgentSession[]>([]);
-  const [currentAgentId, setCurrentAgentId] = useState<string | null>(null);
-  const [isLoadingAgentSessions, setIsLoadingAgentSessions] = useState(false);
-  const [isLoadingAgentMessages, setIsLoadingAgentMessages] = useState(false);
+  const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -236,14 +236,15 @@ export function BuildingBlocksSidebar({
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      await sendAgentChatPrompt({
+      await sendChatPrompt({
         value,
         aiInput,
         canvasId,
         organizationId,
-        currentAgentId,
+        currentChatId,
         isGeneratingResponse,
-        setCurrentAgentId,
+        setChatSessions,
+        setCurrentChatId,
         setAiMessages,
         setAiInput,
         setAiError,
@@ -252,11 +253,11 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, canvasId, currentAgentId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
   );
 
-  const handleStartNewAgentSession = useCallback(() => {
-    setCurrentAgentId(null);
+  const handleStartNewChatSession = useCallback(() => {
+    setCurrentChatId(null);
     setAiMessages([]);
     setPendingProposal(null);
     setAiError(null);
@@ -265,8 +266,8 @@ export function BuildingBlocksSidebar({
     });
   }, []);
 
-  const handleSelectAgentSession = useCallback((agentId: string) => {
-    setCurrentAgentId(agentId);
+  const handleSelectChatSession = useCallback((chatId: string) => {
+    setCurrentChatId(chatId);
     setPendingProposal(null);
     setAiError(null);
   }, []);
@@ -388,7 +389,7 @@ export function BuildingBlocksSidebar({
 
   useEffect(() => {
     setActiveTab("components");
-    setCurrentAgentId(null);
+    setCurrentChatId(null);
     setAiMessages([]);
     setPendingProposal(null);
     setAiError(null);
@@ -417,8 +418,8 @@ export function BuildingBlocksSidebar({
     let cancelled = false;
 
     if (!canvasId || !organizationId) {
-      setAgentSessions([]);
-      setCurrentAgentId(null);
+      setChatSessions([]);
+      setCurrentChatId(null);
       setAiMessages([]);
       return () => {
         cancelled = true;
@@ -426,9 +427,9 @@ export function BuildingBlocksSidebar({
     }
 
     void (async () => {
-      setIsLoadingAgentSessions(true);
+      setIsLoadingChatSessions(true);
       try {
-        const sessions = await loadAgentSessions({
+        const sessions = await loadChatSessions({
           canvasId,
           organizationId,
         });
@@ -436,21 +437,21 @@ export function BuildingBlocksSidebar({
           return;
         }
 
-        setAgentSessions(sessions);
-        setCurrentAgentId((previousAgentId) => {
-          if (previousAgentId && sessions.some((session) => session.id === previousAgentId)) {
-            return previousAgentId;
+        setChatSessions(sessions);
+        setCurrentChatId((previousChatId) => {
+          if (previousChatId && sessions.some((session) => session.id === previousChatId)) {
+            return previousChatId;
           }
 
           return null;
         });
       } catch (error) {
         if (!cancelled) {
-          console.warn("Failed to load agent sessions:", error);
+          console.warn("Failed to load chat sessions:", error);
         }
       } finally {
         if (!cancelled) {
-          setIsLoadingAgentSessions(false);
+          setIsLoadingChatSessions(false);
         }
       }
     })();
@@ -458,27 +459,27 @@ export function BuildingBlocksSidebar({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, currentAgentId, organizationId]);
+  }, [canvasId, organizationId]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!canvasId || !organizationId || !currentAgentId) {
-      if (!currentAgentId) {
+    if (!canvasId || !organizationId || !currentChatId) {
+      if (!currentChatId) {
         setAiMessages([]);
         setPendingProposal(null);
       }
-      setIsLoadingAgentMessages(false);
+      setIsLoadingChatMessages(false);
       return () => {
         cancelled = true;
       };
     }
 
     void (async () => {
-      setIsLoadingAgentMessages(true);
+      setIsLoadingChatMessages(true);
       try {
-        const messages = await loadAgentConversation({
-          agentId: currentAgentId,
+        const messages = await loadChatConversation({
+          chatId: currentChatId,
           canvasId,
           organizationId,
         });
@@ -487,16 +488,15 @@ export function BuildingBlocksSidebar({
         }
 
         setAiMessages(messages);
-        setPendingProposal(null);
         setAiError(null);
       } catch (error) {
         if (!cancelled) {
-          console.warn("Failed to load agent conversation:", error);
-          setAiError(error instanceof Error ? error.message : "Failed to load agent conversation.");
+          console.warn("Failed to load chat conversation:", error);
+          setAiError(error instanceof Error ? error.message : "Failed to load chat conversation.");
         }
       } finally {
         if (!cancelled) {
-          setIsLoadingAgentMessages(false);
+          setIsLoadingChatMessages(false);
         }
       }
     })();
@@ -504,7 +504,7 @@ export function BuildingBlocksSidebar({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, currentAgentId, organizationId]);
+  }, [canvasId, currentChatId, organizationId]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
@@ -773,10 +773,10 @@ export function BuildingBlocksSidebar({
 
         {showAiBuilderTab && (
           <AiBuilderChatPanel
-            agentSessions={agentSessions}
-            currentAgentId={currentAgentId}
-            isLoadingAgentSessions={isLoadingAgentSessions}
-            isLoadingAgentMessages={isLoadingAgentMessages}
+            chatSessions={chatSessions}
+            currentChatId={currentChatId}
+            isLoadingChatSessions={isLoadingChatSessions}
+            isLoadingChatMessages={isLoadingChatMessages}
             aiMessages={aiMessages}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
@@ -790,8 +790,8 @@ export function BuildingBlocksSidebar({
             canvasId={canvasId}
             aiInput={aiInput}
             onAiInputChange={setAiInput}
-            onSelectAgent={handleSelectAgentSession}
-            onStartNewSession={handleStartNewAgentSession}
+            onSelectChat={handleSelectChatSession}
+            onStartNewSession={handleStartNewChatSession}
             onSendPrompt={() => void handleSendPrompt()}
             aiInputRef={aiInputRef}
           />

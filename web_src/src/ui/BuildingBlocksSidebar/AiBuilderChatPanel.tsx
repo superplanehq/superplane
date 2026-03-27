@@ -1,19 +1,20 @@
+import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { AiAgentSession, AiBuilderMessage, AiBuilderProposal } from "@/ui/BuildingBlocksSidebar/agentChat";
-import { ArrowLeft, ArrowUp, Plus } from "lucide-react";
+import { ArrowLeft, ArrowUp } from "lucide-react";
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
-  agentSessions: AiAgentSession[];
-  currentAgentId: string | null;
-  isLoadingAgentSessions: boolean;
-  isLoadingAgentMessages: boolean;
+  chatSessions: AiChatSession[];
+  currentChatId: string | null;
+  isLoadingChatSessions: boolean;
+  isLoadingChatMessages: boolean;
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
@@ -27,17 +28,17 @@ type AiBuilderChatPanelProps = {
   canvasId?: string;
   aiInput: string;
   onAiInputChange: (value: string) => void;
-  onSelectAgent: (agentId: string) => void;
+  onSelectChat: (chatId: string) => void;
   onStartNewSession: () => void;
   onSendPrompt: () => void;
   aiInputRef: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 export function AiBuilderChatPanel({
-  agentSessions,
-  currentAgentId,
-  isLoadingAgentSessions,
-  isLoadingAgentMessages,
+  chatSessions,
+  currentChatId,
+  isLoadingChatSessions,
+  isLoadingChatMessages,
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
@@ -51,14 +52,17 @@ export function AiBuilderChatPanel({
   canvasId,
   aiInput,
   onAiInputChange,
-  onSelectAgent,
+  onSelectChat,
   onStartNewSession,
   onSendPrompt,
   aiInputRef,
 }: AiBuilderChatPanelProps) {
   const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
-  const maxAiInputHeight = 160;
-  const isNewChatView = currentAgentId === null;
+  const hasConversationState =
+    aiMessages.length > 0 || isGeneratingResponse || pendingProposal !== null || aiError !== null;
+  const isNewChatView = currentChatId === null && !hasConversationState;
+  const showConversationList = currentChatId !== null;
+  const maxAiInputHeight = isNewChatView ? 240 : 160;
 
   useEffect(() => {
     const container = aiMessagesContainerRef.current;
@@ -76,11 +80,11 @@ export function AiBuilderChatPanel({
 
     aiInputRef.current.style.height = "auto";
     aiInputRef.current.style.height = `${Math.min(aiInputRef.current.scrollHeight, maxAiInputHeight)}px`;
-  }, [aiInput, aiInputRef]);
+  }, [aiInput, aiInputRef, maxAiInputHeight]);
 
   return (
     <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
-      <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
+      <div className="h-full rounded-md bg-slate-50/30 flex flex-col">
         {isNewChatView ? (
           <>
             <InputForm
@@ -92,48 +96,37 @@ export function AiBuilderChatPanel({
               canvasId={canvasId}
               isGeneratingResponse={isGeneratingResponse}
               maxAiInputHeight={maxAiInputHeight}
-            />
-
-            <ConversationContent
-              aiMessagesContainerRef={aiMessagesContainerRef}
-              isLoadingAgentMessages={isLoadingAgentMessages}
-              aiMessages={aiMessages}
-              isGeneratingResponse={isGeneratingResponse}
-              pendingProposal={pendingProposal}
-              pendingProposalSummaries={pendingProposalSummaries}
-              applyShortcutHint={applyShortcutHint}
-              onApplyProposal={onApplyProposal}
-              onDiscardProposal={onDiscardProposal}
-              isApplyingProposal={isApplyingProposal}
-              aiError={aiError}
-              disabled={disabled}
+              expanded
             />
 
             <ConversationList
-              agentSessions={agentSessions}
-              currentAgentId={currentAgentId}
-              isLoadingAgentSessions={isLoadingAgentSessions}
+              chatSessions={chatSessions}
+              currentChatId={currentChatId}
+              isLoadingChatSessions={isLoadingChatSessions}
               isGeneratingResponse={isGeneratingResponse}
-              onSelectAgent={onSelectAgent}
+              onSelectChat={onSelectChat}
               onStartNewSession={onStartNewSession}
               title="Previous chats"
-              className="mt-auto border-t border-b-0 border-border px-2 py-2 space-y-2"
+              className="flex-1 min-h-0 px-2 py-2 space-y-2"
+              fillAvailable
             />
           </>
         ) : (
           <>
-            <ConversationList
-              agentSessions={agentSessions}
-              currentAgentId={currentAgentId}
-              isLoadingAgentSessions={isLoadingAgentSessions}
-              isGeneratingResponse={isGeneratingResponse}
-              onSelectAgent={onSelectAgent}
-              onStartNewSession={onStartNewSession}
-            />
+            {showConversationList ? (
+              <ConversationList
+                chatSessions={chatSessions}
+                currentChatId={currentChatId}
+                isLoadingChatSessions={isLoadingChatSessions}
+                isGeneratingResponse={isGeneratingResponse}
+                onSelectChat={onSelectChat}
+                onStartNewSession={onStartNewSession}
+              />
+            ) : null}
 
             <ConversationContent
               aiMessagesContainerRef={aiMessagesContainerRef}
-              isLoadingAgentMessages={isLoadingAgentMessages}
+              isLoadingChatMessages={isLoadingChatMessages}
               aiMessages={aiMessages}
               isGeneratingResponse={isGeneratingResponse}
               pendingProposal={pendingProposal}
@@ -164,35 +157,60 @@ export function AiBuilderChatPanel({
 }
 
 type ConversationListProps = {
-  agentSessions: AiAgentSession[];
-  currentAgentId: string | null;
-  isLoadingAgentSessions: boolean;
+  chatSessions: AiChatSession[];
+  currentChatId: string | null;
+  isLoadingChatSessions: boolean;
   isGeneratingResponse: boolean;
-  onSelectAgent: (agentId: string) => void;
+  onSelectChat: (chatId: string) => void;
   onStartNewSession: () => void;
   title?: string;
   className?: string;
+  fillAvailable?: boolean;
 };
 
 function ConversationList({
-  agentSessions,
-  currentAgentId,
-  isLoadingAgentSessions,
+  chatSessions,
+  currentChatId,
+  isLoadingChatSessions,
   isGeneratingResponse,
-  onSelectAgent,
+  onSelectChat,
   onStartNewSession,
   title,
   className,
+  fillAvailable = false,
 }: ConversationListProps) {
-  const visibleSessions = currentAgentId
-    ? agentSessions.filter((session) => session.id === currentAgentId)
-    : agentSessions;
+  const currentSession = currentChatId ? chatSessions.find((s) => s.id === currentChatId) : undefined;
+  const showCurrentSessionHeader = Boolean(currentChatId);
+
+  const currentSessionHeader = () => {
+    if (isLoadingChatSessions) {
+      return <span className="text-xs text-slate-500">Loading…</span>;
+    }
+
+    if (currentSession) {
+      return (
+        <div
+          className="flex min-w-0 flex-1 items-center justify-between gap-2"
+          title={currentSession.createdAt ? formatSessionDate(currentSession.createdAt) : undefined}
+        >
+          <div className="min-w-0 truncate text-sm font-medium text-slate-800">{currentSession.title}</div>
+          {currentSession.createdAt ? (
+            <TimeAgo date={currentSession.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
+          ) : null}
+        </div>
+      );
+    }
+
+    return <span className="text-sm text-slate-600">Conversation</span>;
+  };
 
   return (
-    <div className={cn("border-b border-border px-2 py-2 space-y-2", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          {currentAgentId ? (
+    <div
+      className={cn("border-b border-border px-2 py-2 space-y-2", fillAvailable && "flex min-h-0 flex-col", className)}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        {showCurrentSessionHeader ? (
+          <>
             <Button
               size="icon-xs"
               variant="ghost"
@@ -200,66 +218,64 @@ function ConversationList({
               disabled={isGeneratingResponse}
               aria-label="Back to new chat"
               title="Back"
+              className="shrink-0"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-          ) : null}
+            {currentSessionHeader()}
+          </>
+        ) : (
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-slate-500">
-            {title ?? (currentAgentId ? "Conversation" : "Conversations")}
+            {title ?? "Conversations"}
           </p>
+        )}
+      </div>
+
+      {!currentChatId ? (
+        <div
+          className={cn(
+            fillAvailable ? "min-h-0 flex-1 overflow-y-auto" : "max-h-28 overflow-y-auto",
+            "bg-transparent",
+            fillAvailable ? "space-y-2" : "space-y-1",
+            "[scrollbar-width:thin] [scrollbar-color:rgb(203_213_225)_transparent]",
+            "[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/70 [&::-webkit-scrollbar-track]:bg-transparent",
+          )}
+        >
+          {isLoadingChatSessions ? (
+            <div className="text-xs text-gray-500 px-2 py-2">Loading conversations...</div>
+          ) : null}
+          {!isLoadingChatSessions && chatSessions.length === 0 ? (
+            <div className="text-xs text-gray-500 px-2 py-2">No conversations yet.</div>
+          ) : null}
+
+          {chatSessions.map((session) => {
+            return (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => onSelectChat(session.id)}
+                disabled={isGeneratingResponse}
+                title={session.createdAt ? formatSessionDate(session.createdAt) : undefined}
+                className="w-full rounded-md border border-slate-200 bg-white px-2 py-2 text-left text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <div className="min-w-0 truncate text-sm font-medium">{session.title}</div>
+                  {session.createdAt ? (
+                    <TimeAgo date={session.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
+                  ) : null}
+                </div>
+              </button>
+            );
+          })}
         </div>
-        {!currentAgentId ? (
-          <Button
-            size="icon-xs"
-            variant="secondary"
-            onClick={onStartNewSession}
-            disabled={isGeneratingResponse}
-            aria-label="Start new chat"
-            title="New chat"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="max-h-28 overflow-y-auto space-y-1">
-        {isLoadingAgentSessions ? (
-          <div className="text-xs text-gray-500 px-1 py-1">Loading conversations...</div>
-        ) : null}
-        {!isLoadingAgentSessions && agentSessions.length === 0 ? (
-          <div className="text-xs text-gray-500 px-1 py-1">No conversations yet.</div>
-        ) : null}
-
-        {visibleSessions.map((session) => {
-          const isSelected = session.id === currentAgentId;
-          return (
-            <button
-              key={session.id}
-              type="button"
-              onClick={() => onSelectAgent(session.id)}
-              disabled={isGeneratingResponse}
-              className={cn(
-                "w-full rounded-md border px-2 py-2 text-left transition-colors",
-                isSelected
-                  ? "border-blue-300 bg-blue-50 text-blue-950"
-                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-              )}
-            >
-              <div className="truncate text-sm font-medium">{session.title}</div>
-              {session.createdAt ? (
-                <div className="text-[11px] text-slate-500">{formatSessionDate(session.createdAt)}</div>
-              ) : null}
-            </button>
-          );
-        })}
-      </div>
+      ) : null}
     </div>
   );
 }
 
 type ConversationContentProps = {
   aiMessagesContainerRef: React.RefObject<HTMLDivElement | null>;
-  isLoadingAgentMessages: boolean;
+  isLoadingChatMessages: boolean;
   aiMessages: AiBuilderMessage[];
   isGeneratingResponse: boolean;
   pendingProposal: AiBuilderProposal | null;
@@ -274,7 +290,7 @@ type ConversationContentProps = {
 
 function ConversationContent({
   aiMessagesContainerRef,
-  isLoadingAgentMessages,
+  isLoadingChatMessages,
   aiMessages,
   isGeneratingResponse,
   pendingProposal,
@@ -288,7 +304,7 @@ function ConversationContent({
 }: ConversationContentProps) {
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
-      {isLoadingAgentMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
+      {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
       <AiMessages messages={aiMessages} />
 
       {isGeneratingResponse ? (
@@ -349,7 +365,8 @@ function AiMessage({ message }: { message: AiBuilderMessage }) {
   let messageClassName = "";
 
   if (message.role === "user") {
-    messageClassName = "w-full rounded-md bg-blue-600 text-white px-2 py-1.5 text-sm";
+    messageClassName =
+      "flex w-full items-start gap-2 rounded-md border border-slate-200/90 bg-slate-100 px-2 py-1.5 text-sm text-slate-800";
   } else if (isToolMessage) {
     messageClassName = `px-2 text-xs leading-relaxed text-gray-500 ${isRunningToolMessage ? "sp-ai-thinking" : ""}`;
   } else {
@@ -358,9 +375,18 @@ function AiMessage({ message }: { message: AiBuilderMessage }) {
 
   return (
     <div key={message.id} className="w-full">
-      <div className={messageClassName}>
-        {message.role === "assistant" ? <AiMessageMarkdown content={message.content} /> : message.content}
-      </div>
+      {message.role === "user" ? (
+        <div className={messageClassName}>
+          <span className="shrink-0 select-none font-mono text-slate-500" aria-hidden="true">
+            &gt;
+          </span>
+          <span className="min-w-0 whitespace-pre-wrap break-words">{message.content}</span>
+        </div>
+      ) : (
+        <div className={messageClassName}>
+          {message.role === "assistant" ? <AiMessageMarkdown content={message.content} /> : message.content}
+        </div>
+      )}
     </div>
   );
 }
@@ -439,6 +465,7 @@ type InputFormProps = {
   canvasId?: string;
   isGeneratingResponse: boolean;
   maxAiInputHeight: number;
+  expanded?: boolean;
 };
 
 const TEXT_AREA_CLASSNAME = cn(
@@ -456,6 +483,7 @@ function InputForm({
   canvasId,
   isGeneratingResponse,
   maxAiInputHeight,
+  expanded = false,
 }: InputFormProps) {
   const isDisabled = disabled || isGeneratingResponse || !canvasId || !aiInput.trim();
 
@@ -472,8 +500,11 @@ function InputForm({
   };
 
   return (
-    <div className="m-1.5">
-      <form onSubmit={submitHandler} className="rounded-md border border-slate-300 bg-white p-1.5">
+    <div className={cn("m-1.5", expanded && "mb-3")}>
+      <form
+        onSubmit={submitHandler}
+        className={cn("rounded-md border border-slate-300 bg-white p-1.5", expanded && "p-3 shadow-sm")}
+      >
         <Textarea
           ref={aiInputRef}
           value={aiInput}
@@ -481,8 +512,8 @@ function InputForm({
           onKeyDown={keyDownHandler}
           placeholder="What would you like to build?"
           disabled={disabled || !canvasId}
-          rows={1}
-          className={TEXT_AREA_CLASSNAME}
+          rows={expanded ? 4 : 1}
+          className={cn(TEXT_AREA_CLASSNAME, expanded && "min-h-[112px] text-[15px] leading-6")}
           style={{ maxHeight: `${maxAiInputHeight}px` }}
         />
 
