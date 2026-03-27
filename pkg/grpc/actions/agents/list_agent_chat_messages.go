@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
 
@@ -28,6 +29,7 @@ func ListAgentChatMessages(ctx context.Context, agentURL string, orgID string, u
 	})
 
 	if err != nil {
+		log.WithError(err).Errorf("failed to list agent chat messages for org %s, user %s, canvas %s, chat %s", orgID, userID, canvasID, chatID)
 		return nil, status.Error(codes.Unavailable, "failed to list agent chat messages")
 	}
 

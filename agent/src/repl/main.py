@@ -139,17 +139,20 @@ def _resolve_stream_url(web_url: str) -> str:
 
 
 def _stream_repl_answer(
-    web_url: str,
+    stream_url: str,
     payload: CanvasQuestionRequest,
     model: str,
     token: str | None = None,
 ) -> str:
     started_at = time.perf_counter()
+    resolved_stream_url = stream_url.strip()
+    if model == "test" and "/agents/chats/" not in resolved_stream_url:
+        resolved_stream_url = f"{resolved_stream_url.rstrip('/')}/agents/chats/test-agent/stream"
     request_payload = payload.model_dump(mode="json")
     request_payload["model"] = model
     request_body = json.dumps(request_payload).encode("utf-8")
     request = Request(
-        url=_resolve_stream_url(web_url),
+        url=_resolve_stream_url(resolved_stream_url),
         data=request_body,
         method="POST",
         headers={
@@ -315,7 +318,7 @@ def _create_agent_chat(
         details = f" HTTP {error.code}"
         if response_text:
             details += f": {response_text}"
-        raise RuntimeError(f"Failed to create agent chat session.{details}") from error
+        raise RuntimeError(f"Failed to create agent chat.{details}") from error
     except URLError as error:
         raise RuntimeError(
             "Failed to reach SuperPlane. "
@@ -323,14 +326,12 @@ def _create_agent_chat(
         ) from error
 
     token = payload.get("token") if isinstance(payload, dict) else None
+    stream_url = payload.get("url") if isinstance(payload, dict) else None
     if not isinstance(token, str) or not token.strip():
-        raise RuntimeError("Agent chat session response did not include a token.")
-
-    url = payload.get("url") if isinstance(payload, dict) else None
-    if not isinstance(url, str) or not url.strip():
-        raise RuntimeError("Agent chat session response did not include a URL.")
-
-    return token.strip(), url.strip()
+        raise RuntimeError("Agent session response did not include a token.")
+    if not isinstance(stream_url, str) or not stream_url.strip():
+        raise RuntimeError("Agent session response did not include a stream URL.")
+    return token.strip(), stream_url.strip()
 
 
 def main() -> None:
@@ -437,6 +438,7 @@ def main() -> None:
         print(f"REPL web app started at {web_url}")
 
     token: str | None = None
+    stream_url: str | None = web_url
     canvas_id = canvas_id_arg
     if should_use_local_repl_web:
         if web_url is None:
@@ -450,11 +452,16 @@ def main() -> None:
             raise ValueError("Missing required argument: --token")
         base_url = require_setting(args.base_url, "SUPERPLANE_BASE_URL")
         org_id = require_setting(args.org_id, "SUPERPLANE_ORG_ID")
-        token, web_url = _create_agent_chat(
+        token, stream_url = _create_agent_chat(
             base_url=base_url,
             api_token=api_token,
             org_id=org_id,
             canvas_id=canvas_id,
+        )
+
+    if stream_url is None:
+        raise ValueError(
+            "Missing REPL stream URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
         )
 
     console_label = (
@@ -477,7 +484,7 @@ def main() -> None:
                     continue
                 payload = CanvasQuestionRequest(question=question, canvas_id=canvas_id)
                 _stream_repl_answer(
-                    web_url=web_url,
+                    stream_url=stream_url,
                     payload=payload,
                     model=args.model,
                     token=token,
@@ -490,7 +497,7 @@ def main() -> None:
     payload = CanvasQuestionRequest(question=args.question, canvas_id=canvas_id)
     try:
         _stream_repl_answer(
-            web_url=web_url,
+            stream_url=stream_url,
             payload=payload,
             model=args.model,
             token=token,
