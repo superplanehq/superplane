@@ -2343,6 +2343,9 @@ func (c *Client) ListGPUSizes() ([]Size, error) {
 
 	gpuSizes := make([]Size, 0)
 	for _, size := range sizes {
+		if !size.Available {
+			continue
+		}
 		if strings.HasPrefix(size.Slug, "gpu-") {
 			gpuSizes = append(gpuSizes, size)
 		}
@@ -2390,6 +2393,43 @@ func (c *Client) ListGPUDroplets() ([]Droplet, error) {
 	}
 
 	return gpuDroplets, nil
+}
+
+// ListGPUImages returns GPU-compatible images including one-click applications
+func (c *Client) ListGPUImages() ([]Image, error) {
+	// Get distribution images (base OS images)
+	distImages, err := c.ListImages("distribution")
+	if err != nil {
+		return nil, err
+	}
+
+	// Get application images (one-click apps and marketplace images)
+	appImages, err := c.ListImages("application")
+	if err != nil {
+		return nil, err
+	}
+
+	// Combine both types
+	allImages := append(distImages, appImages...)
+
+	// Filter for GPU-compatible images
+	// DigitalOcean GPU images typically include:
+	// - Ubuntu, Debian, Rocky Linux, Fedora (base distributions)
+	// - ML-in-a-Box, NVIDIA CUDA, PyTorch, TensorFlow (one-click apps)
+	gpuImages := make([]Image, 0)
+	for _, image := range allImages {
+		// Include base distributions that support GPU
+		if image.Type == "snapshot" || image.Type == "custom" {
+			// Include marketplace/one-click apps
+			gpuImages = append(gpuImages, image)
+		} else if image.Distribution == "Ubuntu" || image.Distribution == "Debian" ||
+			image.Distribution == "Rocky Linux" || image.Distribution == "Fedora" {
+			// Include standard distributions
+			gpuImages = append(gpuImages, image)
+		}
+	}
+
+	return gpuImages, nil
 }
 
 // RenameDroplet renames a droplet

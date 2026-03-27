@@ -42,6 +42,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listGPURegions(ctx)
 	case "gpu_size":
 		return listGPUSizes(ctx)
+	case "gpu_image":
+		return listGPUImages(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -476,6 +478,10 @@ func listGPUSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 
 	resources := make([]core.IntegrationResource, 0, len(sizes))
 	for _, size := range sizes {
+		if !size.Available {
+			continue
+		}
+
 		name := size.Slug
 		if size.Description != "" {
 			name = size.Description
@@ -485,6 +491,39 @@ func listGPUSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 			Type: "gpu_size",
 			Name: name,
 			ID:   size.Slug,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGPUImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	images, err := client.ListGPUImages()
+	if err != nil {
+		return nil, fmt.Errorf("error listing GPU images: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(images))
+	for _, image := range images {
+		name := image.Name
+		if image.Slug != "" {
+			name = fmt.Sprintf("%s (%s)", image.Name, image.Distribution)
+		}
+
+		id := image.Slug
+		if id == "" {
+			id = fmt.Sprintf("%d", image.ID)
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "gpu_image",
+			Name: name,
+			ID:   id,
 		})
 	}
 
