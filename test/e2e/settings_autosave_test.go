@@ -20,7 +20,7 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.assertExpressionFieldEquals("FilterPartial", "true")
 		steps.clearExpressionField()
 		steps.waitForAutoSave()
-		steps.assertExpressionFieldEquals("FilterPartial", "")
+		steps.assertExpressionFieldMissing("FilterPartial")
 	})
 
 	t.Run("partial configuration persists after switching to Runs tab", func(t *testing.T) {
@@ -33,7 +33,8 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.waitForAutoSave()
 		steps.switchToRunsTab()
 		steps.switchToConfigurationTab()
-		steps.assertExpressionFieldEquals("FilterSwitch", "")
+		steps.assertExpressionInputEquals("")
+		steps.assertExpressionFieldMissing("FilterSwitch")
 	})
 }
 
@@ -81,19 +82,70 @@ func (s *settingsAutoSaveSteps) switchToConfigurationTab() {
 func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, expected string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		node := s.canvas.GetNodeFromDB(nodeName)
-		config := node.Configuration.Data()
-
-		val, exists := config["expression"]
-		if exists && val == expected {
+		val, exists, found := s.getExpressionField(nodeName)
+		if found && exists && val == expected {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	node := s.canvas.GetNodeFromDB(nodeName)
-	config := node.Configuration.Data()
-	val, exists := config["expression"]
+	val, exists, found := s.getExpressionField(nodeName)
+	require.True(s.t, found, "expected node %s to exist in DB", nodeName)
 	require.True(s.t, exists, "expected expression key to exist in DB config for node %s", nodeName)
 	require.Equal(s.t, expected, val, "expected expression=%q in DB for node %s but got %v", expected, nodeName, val)
+}
+
+func (s *settingsAutoSaveSteps) assertExpressionFieldMissing(nodeName string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		_, exists, found := s.getExpressionField(nodeName)
+		if found && !exists {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	val, exists, found := s.getExpressionField(nodeName)
+	require.True(s.t, found, "expected node %s to exist in DB", nodeName)
+	require.False(
+		s.t,
+		exists,
+		"expected expression key to be removed from DB config for node %s but got %v",
+		nodeName,
+		val,
+	)
+}
+
+func (s *settingsAutoSaveSteps) assertExpressionInputEquals(expected string) {
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		value, err := q.TestID("expression-field-expression").Run(s.session).InputValue()
+		if err == nil && value == expected {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	value, err := q.TestID("expression-field-expression").Run(s.session).InputValue()
+	require.NoError(s.t, err)
+	require.Equal(s.t, expected, value)
+}
+
+func (s *settingsAutoSaveSteps) getExpressionField(nodeName string) (any, bool, bool) {
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err)
+
+	nodes, err := models.FindCanvasNodes(canvas.ID)
+	require.NoError(s.t, err)
+
+	for _, node := range nodes {
+		if node.Name != nodeName {
+			continue
+		}
+
+		val, exists := node.Configuration.Data()["expression"]
+		return val, exists, true
+	}
+
+	return nil, false, false
 }
