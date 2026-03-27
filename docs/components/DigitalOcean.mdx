@@ -23,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
+  <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
@@ -250,10 +251,10 @@ You can do so by creating a sample app in the DigitalOcean control panel as illu
 Returns the created app including:
 - **id**: The unique app ID
 - **name**: The app name
-- **defaultIngress**: The default ingress URL
-- **liveURL**: The live URL for the app
+- **default_ingress**: The default ingress URL
+- **live_url**: The live URL for the app
 - **region**: The region where the app is deployed
-- **activeDeployment**: Information about the active deployment
+- **active_deployment**: Information about the active deployment
 
 ### Notes
 
@@ -829,6 +830,200 @@ Returns the alert policy object including:
 }
 ```
 
+<a id="get-app"></a>
+
+## Get App
+
+The Get App component retrieves detailed information about a specific DigitalOcean App Platform application.
+
+### Use Cases
+
+- **Status checks**: Verify app state and deployment status before performing operations
+- **Information retrieval**: Get current app configuration, URLs, and deployment details
+- **Pre-flight validation**: Check app exists before operations like update or delete
+- **Monitoring**: Track app configuration, active deployments, and ingress URLs
+- **Integration workflows**: Retrieve app details for use in downstream workflow steps
+
+### Configuration
+
+- **App ID**: The unique identifier of the app to retrieve (required)
+
+### Output
+
+Returns the app object including:
+- **id**: The unique app ID
+- **name**: The app name
+- **default_ingress**: The default ingress URL
+- **live_url**: The live URL for the app
+- **region**: The region where the app is deployed
+- **active_deployment**: Information about the active deployment
+- **in_progress_deployment**: Information about any in-progress deployment
+- **spec**: Complete app specification including services, workers, jobs, static sites, databases, and configuration
+
+### Notes
+
+- The app ID can be obtained from the output of the Create App component or from the DigitalOcean dashboard
+- The component returns the current state of the app, including all deployed components
+- Use this component to verify deployment status before performing updates or other operations
+
+### Example Output
+
+```json
+{
+  "data": {
+    "active_deployment": {
+      "cause": "initial deployment",
+      "created_at": "2026-03-24T10:17:51Z",
+      "id": "a5ad056d-523a-48e2-9715-76db183f5a15",
+      "phase": "ACTIVE",
+      "progress": {
+        "steps": [
+          {
+            "ended_at": "2026-03-24T10:18:56.473548704Z",
+            "name": "build",
+            "started_at": "2026-03-24T10:17:57.360621633Z",
+            "status": "SUCCESS",
+            "steps": [
+              {
+                "ended_at": "2026-03-24T10:18:23.527631658Z",
+                "name": "initialize",
+                "started_at": "2026-03-24T10:17:57.360716517Z",
+                "status": "SUCCESS"
+              },
+              {
+                "ended_at": "2026-03-24T10:18:54.938686340Z",
+                "name": "components",
+                "started_at": "2026-03-24T10:18:23.527664326Z",
+                "status": "SUCCESS",
+                "steps": [
+                  {
+                    "name": "my-app",
+                    "status": "SUCCESS"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "ended_at": "2026-03-24T10:19:06.689255599Z",
+            "name": "deploy",
+            "started_at": "2026-03-24T10:19:02.998040282Z",
+            "status": "SUCCESS",
+            "steps": [
+              {
+                "ended_at": "2026-03-24T10:19:04.851886393Z",
+                "name": "initialize",
+                "started_at": "2026-03-24T10:19:02.998063884Z",
+                "status": "SUCCESS"
+              },
+              {
+                "ended_at": "2026-03-24T10:19:04.851934987Z",
+                "name": "components",
+                "started_at": "2026-03-24T10:19:04.851916324Z",
+                "status": "SUCCESS"
+              },
+              {
+                "ended_at": "2026-03-24T10:19:06.689152591Z",
+                "name": "finalize",
+                "started_at": "2026-03-24T10:19:04.852021129Z",
+                "status": "SUCCESS"
+              }
+            ]
+          }
+        ],
+        "success_steps": 5,
+        "total_steps": 5
+      },
+      "spec": {
+        "ingress": {
+          "rules": [
+            {
+              "component": {
+                "name": "my-app"
+              },
+              "match": {
+                "path": {
+                  "prefix": "/"
+                }
+              }
+            }
+          ]
+        },
+        "name": "my-app",
+        "region": "blr",
+        "static_sites": [
+          {
+            "github": {
+              "branch": "main",
+              "deploy_on_push": true,
+              "repo": "digitalocean/hello-world"
+            },
+            "name": "my-app"
+          }
+        ]
+      },
+      "static_sites": [
+        {
+          "name": "my-app",
+          "source_commit_hash": "8ac84464242f1b430147319deb28abb5a20049b8"
+        }
+      ],
+      "updated_at": "2026-03-24T10:19:07Z"
+    },
+    "created_at": "2026-03-24T10:17:51Z",
+    "default_ingress": "https://my-app-ixj6x.ondigitalocean.app",
+    "id": "eb0fc7fa-8294-48c5-8a48-77d47fc6c89e",
+    "last_deployment_created_at": "2026-03-24T10:17:51Z",
+    "live_domain": "my-app-ixj6x.ondigitalocean.app",
+    "live_url": "https://my-app-ixj6x.ondigitalocean.app",
+    "live_url_base": "https://my-app-ixj6x.ondigitalocean.app",
+    "pending_deployment": {
+      "id": ""
+    },
+    "region": {
+      "continent": "Asia",
+      "data_centers": [
+        "blr1"
+      ],
+      "flag": "india",
+      "label": "Bangalore",
+      "slug": "blr"
+    },
+    "spec": {
+      "ingress": {
+        "rules": [
+          {
+            "component": {
+              "name": "my-app"
+            },
+            "match": {
+              "path": {
+                "prefix": "/"
+              }
+            }
+          }
+        ]
+      },
+      "name": "my-app",
+      "region": "blr",
+      "static_sites": [
+        {
+          "github": {
+            "branch": "main",
+            "deploy_on_push": true,
+            "repo": "digitalocean/hello-world"
+          },
+          "name": "my-app"
+        }
+      ]
+    },
+    "updated_at": "2026-03-24T10:19:13Z"
+  },
+  "timestamp": "2026-03-26T08:21:30.077395918Z",
+  "type": "digitalocean.app.fetched"
+}
+```
+
 <a id="get-droplet"></a>
 
 ## Get Droplet
@@ -1221,9 +1416,9 @@ Returns the updated app including:
 - **id**: The unique app ID
 - **name**: The app name
 - **region**: The region where the app is deployed
-- **liveURL**: The live URL for the app
-- **defaultIngress**: The default ingress URL
-- **activeDeployment**: Information about the updated deployment
+- **live_url**: The live URL for the app
+- **default_ingress**: The default ingress URL
+- **active_deployment**: Information about the updated deployment
 
 ### Notes
 

@@ -197,6 +197,16 @@ func (c *CreateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
 }
 
+//go:embed example_output_get_app.json
+var exampleOutputGetAppBytes []byte
+
+var exampleOutputGetAppOnce sync.Once
+var exampleOutputGetApp map[string]any
+
+func (g *GetApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAppOnce, exampleOutputGetAppBytes, &exampleOutputGetApp)
+}
+
 //go:embed example_output_delete_app.json
 var exampleOutputDeleteAppBytes []byte
 
