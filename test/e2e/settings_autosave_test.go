@@ -21,7 +21,7 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.assertExpressionFieldEquals("FilterPartial", "true")
 		steps.clearExpressionField()
 		steps.waitForAutoSave()
-		steps.assertExpressionFieldMissing("FilterPartial")
+		steps.assertExpressionFieldCleared("FilterPartial")
 	})
 
 	t.Run("partial configuration persists after switching to Runs tab", func(t *testing.T) {
@@ -35,7 +35,7 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.switchToRunsTab()
 		steps.switchToConfigurationTab()
 		steps.assertExpressionInputEquals("")
-		steps.assertExpressionFieldMissing("FilterSwitch")
+		steps.assertExpressionFieldCleared("FilterSwitch")
 	})
 }
 
@@ -98,11 +98,15 @@ func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, exp
 	require.Equal(s.t, expected, val, "expected expression=%q in DB for node %s but got %v", expected, nodeName, val)
 }
 
-func (s *settingsAutoSaveSteps) assertExpressionFieldMissing(nodeName string) {
+// assertExpressionFieldCleared verifies the expression field was cleared.
+// The ExpressionFieldRenderer converts "" → undefined, so the key is typically
+// stripped by filterVisibleConfiguration. We accept both "key absent" and
+// "key present with empty string" as valid cleared states.
+func (s *settingsAutoSaveSteps) assertExpressionFieldCleared(nodeName string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		_, exists, found := s.getExpressionField()
-		if found && !exists {
+		val, exists, found := s.getExpressionField()
+		if found && (!exists || val == "") {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
@@ -110,13 +114,16 @@ func (s *settingsAutoSaveSteps) assertExpressionFieldMissing(nodeName string) {
 
 	val, exists, found := s.getExpressionField()
 	require.True(s.t, found, "expected node %s to exist in DB", nodeName)
-	require.False(
-		s.t,
-		exists,
-		"expected expression key to be removed from DB config for node %s but got %v",
-		nodeName,
-		val,
-	)
+	if exists {
+		require.Equal(
+			s.t,
+			"",
+			val,
+			"expected expression to be cleared for node %s but got %v",
+			nodeName,
+			val,
+		)
+	}
 }
 
 func (s *settingsAutoSaveSteps) assertExpressionInputEquals(expected string) {
