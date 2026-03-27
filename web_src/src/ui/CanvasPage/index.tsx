@@ -1127,7 +1127,7 @@ function CanvasPage(props: CanvasPageProps) {
                   type="button"
                   variant="link"
                   size="sm"
-                  className="h-auto min-h-0 shrink-0 gap-1 rounded-sm border border-amber-700 px-1.5 h-5 text-[13px] font-medium !text-amber-700 underline-offset-2 hover:!text-amber-700 hover:bg-white/10 hover:no-underline"
+                  className="min-h-0 shrink-0 gap-1 rounded-sm border border-amber-700 px-1.5 h-5 text-[13px] font-medium !text-amber-700 underline-offset-2 hover:!text-amber-700 hover:bg-white/10 hover:no-underline"
                   onClick={() => props.onExitEditMode?.()}
                   disabled={props.exitEditModeDisabled}
                   aria-label="Exit edit mode"
