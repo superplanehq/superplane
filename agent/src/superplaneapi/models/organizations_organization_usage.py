@@ -32,7 +32,8 @@ class OrganizationsOrganizationUsage(BaseModel):
     event_bucket_level: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="eventBucketLevel")
     event_bucket_capacity: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, alias="eventBucketCapacity")
     event_bucket_last_updated_at: Optional[datetime] = Field(default=None, alias="eventBucketLastUpdatedAt")
-    __properties: ClassVar[List[str]] = ["canvases", "eventBucketLevel", "eventBucketCapacity", "eventBucketLastUpdatedAt"]
+    next_event_bucket_decrease_at: Optional[datetime] = Field(default=None, alias="nextEventBucketDecreaseAt")
+    __properties: ClassVar[List[str]] = ["canvases", "eventBucketLevel", "eventBucketCapacity", "eventBucketLastUpdatedAt", "nextEventBucketDecreaseAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -88,7 +89,8 @@ class OrganizationsOrganizationUsage(BaseModel):
             "canvases": obj.get("canvases"),
             "eventBucketLevel": obj.get("eventBucketLevel"),
             "eventBucketCapacity": obj.get("eventBucketCapacity"),
-            "eventBucketLastUpdatedAt": obj.get("eventBucketLastUpdatedAt")
+            "eventBucketLastUpdatedAt": obj.get("eventBucketLastUpdatedAt"),
+            "nextEventBucketDecreaseAt": obj.get("nextEventBucketDecreaseAt")
         })
         return _obj
 

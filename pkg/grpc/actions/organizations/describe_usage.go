@@ -145,10 +145,18 @@ func serializeUsage(orgUsage *usagepb.OrganizationUsage) *pb.OrganizationUsage {
 		)
 	}
 
+	var nextEventBucketDecreaseAt *timestamppb.Timestamp
+	if orgUsage.NextEventBucketLeakAtUnixSeconds > 0 {
+		nextEventBucketDecreaseAt = timestamppb.New(
+			time.Unix(orgUsage.NextEventBucketLeakAtUnixSeconds, 0).UTC(),
+		)
+	}
+
 	return &pb.OrganizationUsage{
-		Canvases:                 orgUsage.Canvases,
-		EventBucketLevel:         orgUsage.EventBucketLevel,
-		EventBucketCapacity:      orgUsage.EventBucketCapacity,
-		EventBucketLastUpdatedAt: eventBucketLastUpdatedAt,
+		Canvases:                  orgUsage.Canvases,
+		EventBucketLevel:          orgUsage.EventBucketLevel,
+		EventBucketCapacity:       orgUsage.EventBucketCapacity,
+		EventBucketLastUpdatedAt:  eventBucketLastUpdatedAt,
+		NextEventBucketDecreaseAt: nextEventBucketDecreaseAt,
 	}
 }
