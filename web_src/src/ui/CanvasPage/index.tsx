@@ -63,7 +63,11 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
-import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET } from "../groupNode/constants";
+import {
+  CONFIRM_DELETE_GROUP_MESSAGE,
+  GROUP_CHILD_EDGE_PADDING,
+  GROUP_CHILD_MIN_Y_OFFSET,
+} from "../groupNode/constants";
 import { GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
@@ -3076,82 +3080,111 @@ function CanvasContent({
                     >
                       {onGroupNodes &&
                         multiSelectedNodes.filter((n) => n.data?.type !== "group" && !n.parentId).length >= 2 && (
-                          <button
-                            type="button"
-                            data-testid="multi-select-group"
-                            onPointerDown={stopCanvasPointerEvent}
-                            onMouseDown={stopCanvasPointerEvent}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              const groupable = multiSelectedNodes.filter(
-                                (n) => n.data?.type !== "group" && !n.parentId,
-                              );
-                              const { bounds, nodePositions } = computeSelectionBounds(groupable);
-                              onGroupNodes(bounds, nodePositions);
-                              setMultiSelectedNodes([]);
-                            }}
-                            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                          >
-                            <Group className="h-4 w-4" />
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                data-testid="multi-select-group"
+                                aria-label="Group"
+                                onPointerDown={stopCanvasPointerEvent}
+                                onMouseDown={stopCanvasPointerEvent}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  const groupable = multiSelectedNodes.filter(
+                                    (n) => n.data?.type !== "group" && !n.parentId,
+                                  );
+                                  const { bounds, nodePositions } = computeSelectionBounds(groupable);
+                                  onGroupNodes(bounds, nodePositions);
+                                  setMultiSelectedNodes([]);
+                                }}
+                                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                              >
+                                <Group className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Group</TooltipContent>
+                          </Tooltip>
                         )}
                       {onAutoLayoutNodes && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-auto-layout"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <LayoutGrid className="h-4 w-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="multi-select-auto-layout"
+                              aria-label="Tidy"
+                              onPointerDown={stopCanvasPointerEvent}
+                              onMouseDown={stopCanvasPointerEvent}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                              }}
+                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                            >
+                              <LayoutGrid className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Tidy</TooltipContent>
+                        </Tooltip>
                       )}
                       {onDuplicateNodes && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-duplicate"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="multi-select-duplicate"
+                              aria-label="Copy"
+                              onPointerDown={stopCanvasPointerEvent}
+                              onMouseDown={stopCanvasPointerEvent}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                              }}
+                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copy</TooltipContent>
+                        </Tooltip>
                       )}
                       {(onNodesDelete || onNodeDelete) && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-delete"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const nodeIds = multiSelectedNodes.map((n) => n.id);
-                            if (onNodesDelete) {
-                              onNodesDelete(nodeIds);
-                            } else {
-                              for (const id of nodeIds) {
-                                onNodeDelete?.(id);
-                              }
-                            }
-                            stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
-                            setMultiSelectedNodes([]);
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="multi-select-delete"
+                              aria-label="Delete Group"
+                              onPointerDown={stopCanvasPointerEvent}
+                              onMouseDown={stopCanvasPointerEvent}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (!window.confirm(CONFIRM_DELETE_GROUP_MESSAGE)) {
+                                  return;
+                                }
+                                const nodeIds = multiSelectedNodes.map((n) => n.id);
+                                if (onNodesDelete) {
+                                  onNodesDelete(nodeIds);
+                                } else {
+                                  for (const id of nodeIds) {
+                                    onNodeDelete?.(id);
+                                  }
+                                }
+                                stateRef.current.setNodes((nodes) =>
+                                  nodes.map((node) => ({ ...node, selected: false })),
+                                );
+                                setMultiSelectedNodes([]);
+                              }}
+                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete Group</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>
