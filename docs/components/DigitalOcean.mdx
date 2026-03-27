@@ -1159,16 +1159,20 @@ Returns the cluster configuration including:
 
 ```json
 {
-  "config": {
-    "autovacuum_naptime": 60,
-    "backtrack_commit_timeout": 30,
-    "default_toast_compression": "pglz",
-    "idle_in_transaction_session_timeout": 0,
-    "jit": true,
-    "max_parallel_workers": 8
+  "data": {
+    "config": {
+      "autovacuum_naptime": 60,
+      "backtrack_commit_timeout": 30,
+      "default_toast_compression": "pglz",
+      "idle_in_transaction_session_timeout": 0,
+      "jit": true,
+      "max_parallel_workers": 8
+    },
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test"
   },
-  "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
-  "databaseClusterName": "superplane-db-test"
+  "timestamp": "2026-03-27T11:10:00.000000000Z",
+  "type": "digitalocean.database.cluster.config.fetched"
 }
 ```
 
@@ -1211,24 +1215,28 @@ Returns the requested database enriched with cluster details, including:
 
 ```json
 {
-  "connection": {
-    "database": "defaultdb",
-    "host": "superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com",
-    "port": 25060,
-    "ssl": true,
-    "uri": "postgresql://doadmin@superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com:25060/defaultdb?sslmode=require",
-    "user": "doadmin"
+  "data": {
+    "connection": {
+      "database": "defaultdb",
+      "host": "superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com",
+      "port": 25060,
+      "ssl": true,
+      "uri": "postgresql://doadmin@superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com:25060/defaultdb?sslmode=require",
+      "user": "doadmin"
+    },
+    "database": {
+      "name": "app_db"
+    },
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test",
+    "engine": "pg",
+    "name": "app_db",
+    "region": "nyc1",
+    "status": "online",
+    "version": "17"
   },
-  "database": {
-    "name": "app_db"
-  },
-  "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
-  "databaseClusterName": "superplane-db-test",
-  "engine": "pg",
-  "name": "app_db",
-  "region": "nyc1",
-  "status": "online",
-  "version": "17"
+  "timestamp": "2026-03-27T11:12:00.000000000Z",
+  "type": "digitalocean.database.fetched"
 }
 ```
 
