@@ -44,7 +44,6 @@ export const createDatabaseClusterMapper: ComponentBaseMapper = {
     const cluster = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!cluster) return details;
 
-    details["Cluster ID"] = String(cluster.id || "-");
     details["Name"] = String(cluster.name || "-");
     details["Engine"] = String(cluster.engine || "-");
     details["Version"] = String(cluster.version || "-");
