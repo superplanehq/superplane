@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { agentsGenerateAgentChatToken } from "@/api-client";
+import { agentsCreateAgentChat } from "@/api-client";
 import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
 import type { AiCanvasOperation } from "./index";
 
@@ -287,7 +287,6 @@ type SendAgentChatPromptArgs = {
   aiMessages: AiBuilderMessage[];
   canvasId?: string;
   organizationId?: string;
-  agentUrl: string;
   isGeneratingResponse: boolean;
   setAiMessages: Dispatch<SetStateAction<AiBuilderMessage[]>>;
   setAiInput: Dispatch<SetStateAction<string>>;
@@ -303,7 +302,6 @@ export async function sendAgentChatPrompt({
   aiMessages,
   canvasId,
   organizationId,
-  agentUrl,
   isGeneratingResponse,
   setAiMessages,
   setAiInput,
@@ -354,7 +352,7 @@ export async function sendAgentChatPrompt({
     );
     setPendingProposal(null);
 
-    const tokenResponse = await agentsGenerateAgentChatToken(
+    const chatResponse = await agentsCreateAgentChat(
       withOrganizationHeader({
         organizationId,
         body: {
@@ -363,17 +361,17 @@ export async function sendAgentChatPrompt({
       }),
     );
 
-    const tokenPayload = tokenResponse.data as { token?: unknown };
-    if (typeof tokenPayload.token !== "string" || tokenPayload.token.trim().length === 0) {
+    const { url, token } = chatResponse.data;
+    if (!url || !token) {
       throw new Error("Invalid agent session response");
     }
 
-    const response = await fetch(`${agentUrl}/v1/agent/chat/stream`, {
+    const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
-        Authorization: `Bearer ${tokenPayload.token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         question: contextualPrompt,

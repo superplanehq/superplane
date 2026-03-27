@@ -112,6 +112,25 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
   };
 }
 
+export function buildTriggerSidebarEvent(
+  event: CanvasesCanvasEventWithExecutions,
+  triggerNode: ComponentsNode | undefined,
+): SidebarEvent | undefined {
+  if (!triggerNode || !event.id) return undefined;
+  return mapTriggerEventToSidebarEvent(
+    {
+      id: event.id,
+      canvasId: event.canvasId,
+      nodeId: event.nodeId,
+      channel: event.channel,
+      data: event.data,
+      createdAt: event.createdAt,
+      customName: event.customName,
+    },
+    triggerNode,
+  );
+}
+
 export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],

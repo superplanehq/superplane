@@ -444,6 +444,7 @@ message OrganizationUsage {
   double event_bucket_level = 2;
   double event_bucket_capacity = 3;
   google.protobuf.Timestamp event_bucket_last_updated_at = 4;
+  google.protobuf.Timestamp next_event_bucket_decrease_at = 5;
 }
 
 message DescribeUsageRequest {

@@ -117,9 +117,9 @@ Returns the updated app including:
 - **id**: The unique app ID
 - **name**: The app name
 - **region**: The region where the app is deployed
-- **liveURL**: The live URL for the app
-- **defaultIngress**: The default ingress URL
-- **activeDeployment**: Information about the updated deployment
+- **live_url**: The live URL for the app
+- **default_ingress**: The default ingress URL
+- **active_deployment**: Information about the updated deployment
 
 ## Notes
 
