@@ -647,10 +647,11 @@ class WebServer:
             if not self._thread.is_alive():
                 break
             time.sleep(0.01)
+        error = self._startup_error
         raise RuntimeError(
             f"Failed to start REPL web server at {self.base_url}. "
             "Check whether the port is already in use."
-        )
+        ) from error
 
     def stop(self) -> None:
         self._server.should_exit = True

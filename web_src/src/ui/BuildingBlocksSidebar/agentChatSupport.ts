@@ -36,7 +36,6 @@ type StreamState = {
 
 type StreamController = {
   appendAssistantContent: (chunk: string) => void;
-  replaceAssistantContent: (content: string) => void;
   upsertToolMessage: (event: Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>) => void;
   waitForRenderLoopIdle: () => Promise<void>;
   getAssistantContentSnapshot: () => string;
@@ -211,13 +210,6 @@ function createAssistantStreamController({
     void flushPendingRenderBuffer();
   };
 
-  const replaceAssistantContent = (content: string) => {
-    assistantContentSnapshot = content;
-    setAiMessages((previous) =>
-      previous.map((message) => (message.id === assistantMessageId ? { ...message, content } : message)),
-    );
-  };
-
   const upsertToolMessage = (event: Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>) => {
     const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
     const toolCallId = createToolCallId(toolName, event.tool_call_id);
@@ -259,7 +251,6 @@ function createAssistantStreamController({
 
   return {
     appendAssistantContent,
-    replaceAssistantContent,
     upsertToolMessage,
     waitForRenderLoopIdle,
     getAssistantContentSnapshot: () => assistantContentSnapshot,

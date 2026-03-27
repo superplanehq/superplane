@@ -130,10 +130,11 @@ def test_web_server_start_raises_when_port_is_already_in_use() -> None:
     sock.listen()
 
     server = WebServer(WebServerConfig(host="127.0.0.1", port=port))
-    with pytest.raises(RuntimeError, match="Failed to start REPL web server"):
+    with pytest.raises(RuntimeError, match="Failed to start REPL web server") as exc_info:
         server.start()
 
     sock.close()
+    assert isinstance(exc_info.value.__cause__, SystemExit)
 
 
 def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
