@@ -229,7 +229,7 @@ const file_integrations_proto_rawDesc = "" +
 	"\x10ListIntegrations\x120.Superplane.Integrations.ListIntegrationsRequest\x1a1.Superplane.Integrations.ListIntegrationsResponse\"f\x92AG\n" +
 	"\vIntegration\x12\x1bList available integrations\x1a\x1bList available integrations\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/integrationsB\xd4\x01\x92A\x94\x01\x12j\n" +
 	"\x1bSuperplane Integrations API\x12\x1fAPI for Superplane Integrations\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ:github.com/superplanehq/superplane/pkg/protos/integrationsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ:github.com/superplanehq/superplane/pkg/protos/integrationsb\x06proto3"
 
 var (
 	file_integrations_proto_rawDescOnce sync.Once
