@@ -2420,8 +2420,10 @@ func (c *Client) ListGPUImages() ([]Image, error) {
 	for _, image := range allImages {
 		// Include base distributions that support GPU
 		if image.Type == "snapshot" || image.Type == "custom" {
-			// Include marketplace/one-click apps
-			gpuImages = append(gpuImages, image)
+			// Only include marketplace apps that are GPU-related
+			if isGPURelatedImage(image) {
+				gpuImages = append(gpuImages, image)
+			}
 		} else if image.Distribution == "Ubuntu" || image.Distribution == "Debian" ||
 			image.Distribution == "Rocky Linux" || image.Distribution == "Fedora" {
 			// Include standard distributions
@@ -2430,6 +2432,59 @@ func (c *Client) ListGPUImages() ([]Image, error) {
 	}
 
 	return gpuImages, nil
+}
+
+// isGPURelatedImage checks if an image is GPU-related based on keywords in name/slug
+func isGPURelatedImage(image Image) bool {
+	gpuKeywords := []string{
+		"gpu", "cuda", "nvidia", "ml-in-a-box", "pytorch", "tensorflow",
+		"machine learning", "deep learning", "ai", "ml",
+	}
+
+	// Check image name
+	for _, keyword := range gpuKeywords {
+		if containsCaseInsensitive(image.Name, keyword) {
+			return true
+		}
+	}
+
+	// Check image slug
+	if image.Slug != "" {
+		for _, keyword := range gpuKeywords {
+			if containsCaseInsensitive(image.Slug, keyword) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func containsCaseInsensitive(s, substr string) bool {
+	return len(s) >= len(substr) && findSubstring(s, substr)
+}
+
+func findSubstring(s, substr string) bool {
+	s = toLower(s)
+	substr = toLower(substr)
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'A' && s[i] <= 'Z' {
+			result[i] = s[i] + 32
+		} else {
+			result[i] = s[i]
+		}
+	}
+	return string(result)
 }
 
 // RenameDroplet renames a droplet

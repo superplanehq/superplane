@@ -1,12 +1,11 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/utils/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -14,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { baseEventSections } from "./utils";
 import type { DropletNodeMetadata, UpdateGPUDropletConfiguration } from "./types";
 
 export const updateGPUDropletMapper: ComponentBaseMapper = {
@@ -88,25 +88,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootEvent = execution.rootEvent;
-  if (!rootEvent?.id || !execution.createdAt) return [];
-
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-  if (!rootTriggerNode?.componentName) return [];
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt),
-      eventTitle: title,
-      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id,
-    },
-  ];
 }
