@@ -2289,6 +2289,86 @@ func (c *Client) ListApps() ([]App, error) {
 	return response.Apps, nil
 }
 
+type DatabaseCluster struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Engine string `json:"engine,omitempty"`
+}
+
+type Database struct {
+	Name string `json:"name"`
+}
+
+type CreateDatabaseRequest struct {
+	Name string `json:"name"`
+}
+
+func (c *Client) ListDatabaseClusters() ([]DatabaseCluster, error) {
+	url := fmt.Sprintf("%s/databases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []DatabaseCluster `json:"databases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
+}
+
+func (c *Client) ListDatabases(clusterID string) ([]Database, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []Database `json:"dbs"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
+}
+
+func (c *Client) CreateDatabase(clusterID string, req CreateDatabaseRequest) (*Database, error) {
+	url := fmt.Sprintf("%s/databases/%s/dbs", c.BaseURL, clusterID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Database Database `json:"db"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Database, nil
+}
+
+func (c *Client) DeleteDatabase(clusterID, name string) error {
+	url := fmt.Sprintf("%s/databases/%s/dbs/%s", c.BaseURL, clusterID, url.PathEscape(name))
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`

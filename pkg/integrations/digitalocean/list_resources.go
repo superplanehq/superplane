@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -36,6 +37,10 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
+	case "database_cluster":
+		return listDatabaseClusters(ctx)
+	case "database":
+		return listDatabases(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -254,6 +259,66 @@ func listReservedIPs(ctx core.ListResourcesContext) ([]core.IntegrationResource,
 			Type: "reserved_ip",
 			Name: ip.IP,
 			ID:   ip.IP,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabaseClusters(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	clusters, err := client.ListDatabaseClusters()
+	if err != nil {
+		return nil, fmt.Errorf("error listing database clusters: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(clusters))
+	for _, cluster := range clusters {
+		name := cluster.Name
+		if name == "" {
+			name = cluster.ID
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "database_cluster",
+			Name: name,
+			ID:   cluster.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	clusterID := ctx.Parameters["databaseCluster"]
+	if clusterID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if strings.Contains(clusterID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	databases, err := client.ListDatabases(clusterID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing databases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(databases))
+	for _, database := range databases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "database",
+			Name: database.Name,
+			ID:   database.Name,
 		})
 	}
 

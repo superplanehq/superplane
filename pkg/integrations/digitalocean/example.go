@@ -227,6 +227,16 @@ func (c *CreateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
 }
 
+//go:embed example_output_create_database.json
+var exampleOutputCreateDatabaseBytes []byte
+
+var exampleOutputCreateDatabaseOnce sync.Once
+var exampleOutputCreateDatabase map[string]any
+
+func (c *CreateDatabase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateDatabaseOnce, exampleOutputCreateDatabaseBytes, &exampleOutputCreateDatabase)
+}
+
 //go:embed example_output_get_app.json
 var exampleOutputGetAppBytes []byte
 
@@ -245,6 +255,16 @@ var exampleOutputDeleteApp map[string]any
 
 func (d *DeleteApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAppOnce, exampleOutputDeleteAppBytes, &exampleOutputDeleteApp)
+}
+
+//go:embed example_output_delete_database.json
+var exampleOutputDeleteDatabaseBytes []byte
+
+var exampleOutputDeleteDatabaseOnce sync.Once
+var exampleOutputDeleteDatabase map[string]any
+
+func (d *DeleteDatabase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDatabaseOnce, exampleOutputDeleteDatabaseBytes, &exampleOutputDeleteDatabase)
 }
 
 //go:embed example_output_update_app.json
