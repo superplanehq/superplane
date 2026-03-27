@@ -326,8 +326,17 @@ export function SettingsTab({
       return;
     }
 
-    if (!validateNow() || currentNodeName.trim() === "") {
-      return;
+    // In auto mode, run validation for UI feedback but persist regardless.
+    // In manual mode, block save when validation fails.
+    if (configurationSaveMode === "auto") {
+      validateNow();
+      if (currentNodeName.trim() === "") {
+        return;
+      }
+    } else {
+      if (!validateNow() || currentNodeName.trim() === "") {
+        return;
+      }
     }
 
     if (savingRef.current) {
@@ -367,6 +376,16 @@ export function SettingsTab({
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
 
+  // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
+  useEffect(() => {
+    if (configurationSaveMode !== "auto") {
+      return;
+    }
+    return () => {
+      void handleSaveRef.current();
+    };
+  }, [configurationSaveMode]);
+
   useEffect(() => {
     if (configurationSaveMode !== "auto" || isReadOnly) {
       return;
@@ -377,10 +396,7 @@ export function SettingsTab({
     ) {
       return;
     }
-    if (hasNodeNameError) {
-      return;
-    }
-    if (integrationName && integrationsOfType.length > 0 && !selectedIntegration?.id) {
+    if (currentNodeName.trim() === "") {
       return;
     }
 
@@ -388,16 +404,7 @@ export function SettingsTab({
       void handleSaveRef.current();
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [
-    configurationSaveMode,
-    isReadOnly,
-    nodeConfiguration,
-    currentNodeName,
-    selectedIntegration,
-    hasNodeNameError,
-    integrationName,
-    integrationsOfType.length,
-  ]);
+  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
   return (
     <div className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`} style={{ maxHeight: "80vh" }}>
