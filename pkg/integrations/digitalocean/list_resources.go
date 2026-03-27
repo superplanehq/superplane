@@ -42,8 +42,10 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listGPURegions(ctx)
 	case "gpu_size":
 		return listGPUSizes(ctx)
-	case "gpu_image":
-		return listGPUImages(ctx)
+	case "gpu_image_oneclick":
+		return listGPUImagesOneClick(ctx)
+	case "gpu_image_base":
+		return listGPUImagesBase(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -478,10 +480,6 @@ func listGPUSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 
 	resources := make([]core.IntegrationResource, 0, len(sizes))
 	for _, size := range sizes {
-		if !size.Available {
-			continue
-		}
-
 		name := size.Slug
 		if size.Description != "" {
 			name = size.Description
@@ -497,7 +495,7 @@ func listGPUSizes(ctx core.ListResourcesContext) ([]core.IntegrationResource, er
 	return resources, nil
 }
 
-func listGPUImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+func listGPUImagesOneClick(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
@@ -508,8 +506,13 @@ func listGPUImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, e
 		return nil, fmt.Errorf("error listing GPU images: %w", err)
 	}
 
-	resources := make([]core.IntegrationResource, 0, len(images))
+	resources := make([]core.IntegrationResource, 0)
 	for _, image := range images {
+		// Only include one-click/marketplace apps (snapshot or custom type)
+		if image.Type != "snapshot" && image.Type != "custom" {
+			continue
+		}
+
 		name := image.Name
 		if image.Slug != "" {
 			name = fmt.Sprintf("%s (%s)", image.Name, image.Distribution)
@@ -521,7 +524,45 @@ func listGPUImages(ctx core.ListResourcesContext) ([]core.IntegrationResource, e
 		}
 
 		resources = append(resources, core.IntegrationResource{
-			Type: "gpu_image",
+			Type: "gpu_image_oneclick",
+			Name: name,
+			ID:   id,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGPUImagesBase(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	images, err := client.ListGPUImages()
+	if err != nil {
+		return nil, fmt.Errorf("error listing GPU images: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0)
+	for _, image := range images {
+		// Only include base OS distributions (not snapshots or custom images)
+		if image.Type == "snapshot" || image.Type == "custom" {
+			continue
+		}
+
+		name := image.Name
+		if image.Slug != "" {
+			name = fmt.Sprintf("%s (%s)", image.Name, image.Distribution)
+		}
+
+		id := image.Slug
+		if id == "" {
+			id = fmt.Sprintf("%d", image.ID)
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "gpu_image_base",
 			Name: name,
 			ID:   id,
 		})
