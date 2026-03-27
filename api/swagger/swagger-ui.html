@@ -8,27 +8,31 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f3f5ef;
-      --panel: rgba(255, 255, 255, 0.9);
-      --panel-strong: #ffffff;
-      --line: rgba(25, 36, 25, 0.12);
-      --line-strong: rgba(25, 36, 25, 0.18);
-      --text: #182411;
-      --muted: #5c6d55;
-      --accent: #165a4a;
-      --accent-soft: #d9eee7;
-      --accent-strong: #0b3f33;
-      --warning: #9a6500;
-      --shadow: 0 24px 60px rgba(23, 32, 24, 0.12);
-      --radius-lg: 24px;
-      --radius-md: 18px;
-      --radius-sm: 12px;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --surface-muted: #f3f6fa;
+      --surface-subtle: #eef3f8;
+      --line: #dde5ee;
+      --line-strong: #c2cfdd;
+      --text: #0f1722;
+      --muted: #5c6b7c;
+      --ink: #101821;
+      --ink-soft: #1a2736;
+      --ink-line: rgba(148, 169, 202, 0.16);
+      --ink-text: #f5f7fb;
+      --ink-muted: #94a9ca;
+      --accent: #7fe2b4;
+      --accent-strong: #45c48c;
+      --shadow: 0 18px 40px rgba(15, 23, 34, 0.06);
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 8px;
     }
 
     html {
       box-sizing: border-box;
       overflow-y: scroll;
-      background: linear-gradient(180deg, #edf3e3 0%, #f7f8f4 22%, #f3f5ef 100%);
+      background: var(--bg);
     }
 
     *, *:before, *:after {
@@ -40,13 +44,13 @@
       color: var(--text);
       font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
       background:
-        radial-gradient(circle at top left, rgba(100, 169, 122, 0.18), transparent 28%),
-        radial-gradient(circle at top right, rgba(46, 130, 110, 0.12), transparent 24%),
-        linear-gradient(180deg, #edf3e3 0%, #f7f8f4 22%, #f3f5ef 100%);
+        radial-gradient(circle at top left, rgba(127, 226, 180, 0.14), transparent 22%),
+        radial-gradient(circle at top right, rgba(148, 169, 202, 0.16), transparent 24%),
+        linear-gradient(180deg, #ffffff 0, #f7f8fb 360px, var(--bg) 100%);
     }
 
     a {
-      color: var(--accent);
+      color: inherit;
     }
 
     .swagger-ui .topbar {
@@ -54,54 +58,129 @@
     }
 
     .page {
-      max-width: 1360px;
+      max-width: 1280px;
       margin: 0 auto;
-      padding: 28px 20px 56px;
+      padding: 20px 20px 40px;
     }
 
-    .hero {
+    .masthead {
       position: relative;
       overflow: hidden;
-      padding: 32px;
       border: 1px solid var(--line);
-      border-radius: 28px;
+      border-radius: var(--radius-lg);
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(244, 249, 244, 0.92)),
-        linear-gradient(135deg, #ffffff, #eef4ee);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 252, 0.96)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(194, 207, 221, 0.22) 0,
+          rgba(194, 207, 221, 0.22) 1px,
+          transparent 1px,
+          transparent 120px
+        );
       box-shadow: var(--shadow);
     }
 
-    .hero:before,
-    .hero:after {
+    .masthead:before {
       content: "";
       position: absolute;
-      border-radius: 999px;
+      inset: 0;
+      background:
+        linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), rgba(194, 207, 221, 0.35) calc(100% - 1px)),
+        repeating-linear-gradient(
+          180deg,
+          rgba(194, 207, 221, 0.18) 0,
+          rgba(194, 207, 221, 0.18) 1px,
+          transparent 1px,
+          transparent 96px
+        );
       pointer-events: none;
     }
 
-    .hero:before {
-      width: 280px;
-      height: 280px;
-      top: -96px;
-      right: -64px;
-      background: radial-gradient(circle, rgba(76, 151, 124, 0.22), rgba(76, 151, 124, 0));
+    .masthead-inner {
+      position: relative;
+      z-index: 1;
+      padding: 22px 24px 26px;
     }
 
-    .hero:after {
-      width: 240px;
-      height: 240px;
-      bottom: -120px;
-      left: -32px;
-      background: radial-gradient(circle, rgba(20, 92, 74, 0.12), rgba(20, 92, 74, 0));
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 24px;
     }
 
-    .eyebrow {
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 29px;
+      height: 21px;
+      flex: 0 0 auto;
+      display: block;
+    }
+
+    .brand-mark path {
+      fill: #1e2938;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .nav-link,
+    .nav-link-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+    }
+
+    .nav-link {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .nav-link-primary {
+      color: #0f1722;
+      background: var(--accent);
+      border-color: rgba(69, 196, 140, 0.3);
+    }
+
+    .nav-link:hover,
+    .nav-link-primary:hover {
+      transform: translateY(-1px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .kicker {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: var(--accent-soft);
       color: var(--accent-strong);
       font-size: 12px;
       font-weight: 700;
@@ -109,33 +188,24 @@
       text-transform: uppercase;
     }
 
-    .hero-grid {
-      position: relative;
-      z-index: 1;
-      display: grid;
-      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.9fr);
-      gap: 24px;
-      align-items: start;
-      margin-top: 18px;
-    }
-
     .hero h1 {
-      margin: 0;
-      font-size: clamp(2.3rem, 4vw, 4rem);
-      line-height: 0.98;
-      letter-spacing: -0.04em;
       max-width: 720px;
+      margin: 12px 0 0;
+      color: var(--text);
+      font-size: clamp(2.4rem, 5vw, 4.25rem);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
     }
 
-    .hero p {
-      max-width: 760px;
+    .hero-copy p {
+      max-width: 720px;
       margin: 16px 0 0;
       color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.65;
+      font-size: 1.02rem;
+      line-height: 1.7;
     }
 
-    .hero-points {
+    .hero-list {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
@@ -144,315 +214,267 @@
       list-style: none;
     }
 
-    .hero-points li {
-      padding: 14px 16px;
+    .hero-list li {
+      padding: 14px 14px 15px;
       border: 1px solid var(--line);
-      border-radius: var(--radius-md);
       background: rgba(255, 255, 255, 0.72);
-      font-size: 0.95rem;
-      line-height: 1.45;
+      color: var(--text);
+      font-size: 0.94rem;
+      line-height: 1.55;
     }
 
-    .hero-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 24px;
-    }
-
-    .button-link,
-    .ghost-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 44px;
-      padding: 0 16px;
-      border-radius: 999px;
-      text-decoration: none;
-      font-weight: 600;
-      transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
-    }
-
-    .button-link {
-      color: #fff;
-      background: linear-gradient(135deg, #165a4a, #1f7561);
-      box-shadow: 0 14px 28px rgba(22, 90, 74, 0.22);
-    }
-
-    .ghost-link {
-      color: var(--accent-strong);
-      border: 1px solid var(--line-strong);
-      background: rgba(255, 255, 255, 0.74);
-    }
-
-    .button-link:hover,
-    .ghost-link:hover {
-      transform: translateY(-1px);
-    }
-
-    .summary-card,
-    .panel,
-    .swagger-shell {
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: var(--panel);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(12px);
-    }
-
-    .summary-card {
-      padding: 22px;
-    }
-
-    .summary-card h2,
-    .panel h2,
-    .swagger-shell h2 {
-      margin: 0;
-      font-size: 1.1rem;
-      line-height: 1.2;
-    }
-
-    .summary-card p,
-    .panel p {
-      margin: 10px 0 0;
-      color: var(--muted);
-      line-height: 1.6;
-      font-size: 0.95rem;
-    }
-
-    .summary-card dl {
-      display: grid;
-      gap: 14px;
-      margin: 18px 0 0;
-    }
-
-    .summary-card dt {
-      font-size: 0.8rem;
-      font-weight: 700;
+    .hero-list strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent);
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
+    }
+
+    .terminal {
+      border: 1px solid rgba(128, 227, 181, 0.12);
+      background: rgba(9, 14, 22, 0.95);
+      border-radius: var(--radius-md);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      overflow: hidden;
+    }
+
+    .terminal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(128, 227, 181, 0.1);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--ink-muted);
+      font-size: 12px;
+      font-weight: 600;
       letter-spacing: 0.06em;
-      color: var(--accent-strong);
+      text-transform: uppercase;
     }
 
-    .summary-card dd {
-      margin: 4px 0 0;
-      color: var(--muted);
-      line-height: 1.5;
+    .terminal pre {
+      margin: 0;
+      padding: 16px 18px;
+      overflow-x: auto;
+      color: #d7e8f7;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      white-space: pre;
     }
 
-    .section-grid {
+    .terminal .prompt {
+      color: var(--accent);
+    }
+
+    .terminal .comment {
+      color: #7d91ab;
+    }
+
+    .terminal-note {
+      padding: 0 18px 16px;
+      color: var(--ink-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .content-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 20px;
-      margin-top: 24px;
+      gap: 16px;
+      margin-top: 18px;
     }
 
     .panel {
-      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-inner {
+      padding: 18px 18px 20px;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 1.02rem;
+      line-height: 1.25;
+    }
+
+    .panel p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.65;
     }
 
     .panel ol,
     .panel ul {
-      margin: 16px 0 0;
-      padding-left: 20px;
+      margin: 14px 0 0;
+      padding-left: 18px;
       color: var(--text);
       line-height: 1.65;
+      font-size: 0.94rem;
     }
 
     .panel li + li {
-      margin-top: 10px;
+      margin-top: 8px;
     }
 
-    .tutorial-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 20px;
-      margin-top: 20px;
-    }
-
-    .auth-controls {
-      display: grid;
-      gap: 12px;
-      margin-top: 18px;
-    }
-
-    .field {
-      display: grid;
-      gap: 8px;
-    }
-
-    .field label {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--accent-strong);
-    }
-
-    .token-input,
-    .snippet,
-    .status {
-      width: 100%;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--line-strong);
-      background: rgba(255, 255, 255, 0.92);
-    }
-
-    .token-input {
-      min-height: 48px;
-      padding: 0 14px;
-      color: var(--text);
-      font-size: 0.95rem;
-      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-    }
-
-    .token-input:focus {
-      outline: 2px solid rgba(22, 90, 74, 0.18);
-      outline-offset: 1px;
-      border-color: rgba(22, 90, 74, 0.42);
-    }
-
-    .auth-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .auth-buttons button {
-      min-height: 42px;
-      padding: 0 14px;
-      border: 0;
-      border-radius: 999px;
-      cursor: pointer;
-      font-size: 0.92rem;
-      font-weight: 600;
-      transition: transform 140ms ease, opacity 140ms ease;
-    }
-
-    .auth-buttons button:hover {
-      transform: translateY(-1px);
-    }
-
-    .auth-buttons .primary {
-      color: #fff;
-      background: linear-gradient(135deg, #165a4a, #1f7561);
-    }
-
-    .auth-buttons .secondary {
-      color: var(--accent-strong);
-      background: var(--accent-soft);
-    }
-
-    .auth-buttons .ghost {
-      color: var(--text);
-      background: rgba(255, 255, 255, 0.9);
-      border: 1px solid var(--line-strong);
-    }
-
-    .status {
-      padding: 12px 14px;
+    .panel-eyebrow {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
       color: var(--muted);
-      font-size: 0.92rem;
-      line-height: 1.5;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
-    .status strong {
-      color: var(--text);
-    }
-
-    .status.warning {
-      border-color: rgba(154, 101, 0, 0.22);
-      background: rgba(255, 245, 220, 0.9);
-      color: #6f5300;
-    }
-
-    .snippet {
-      margin-top: 16px;
-      padding: 14px 16px;
-      overflow-x: auto;
-      font-size: 0.9rem;
-      line-height: 1.6;
-      color: var(--text);
+    .inline-code {
+      padding: 0.1em 0.36em;
+      border-radius: 4px;
+      background: rgba(15, 23, 34, 0.06);
       font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-      white-space: pre;
+      font-size: 0.92em;
     }
 
     .swagger-shell {
-      margin-top: 28px;
-      padding: 20px;
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
     }
 
     .swagger-header {
       display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: 16px;
-      align-items: center;
-      margin-bottom: 16px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+    }
+
+    .swagger-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.25;
     }
 
     .swagger-header p {
       margin: 8px 0 0;
       color: var(--muted);
-      line-height: 1.55;
+      font-size: 0.94rem;
+      line-height: 1.6;
+    }
+
+    .swagger-header strong {
+      color: var(--text);
+    }
+
+    .swagger-header-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .swagger-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
     }
 
     #swagger-ui {
-      overflow: hidden;
-      border-radius: 20px;
-      background: var(--panel-strong);
+      background: var(--surface);
     }
 
     .swagger-ui .info {
       margin: 0;
-      padding: 8px 0 0;
+      padding: 12px 20px 0;
     }
 
     .swagger-ui .scheme-container {
+      margin: 0;
+      padding: 16px 20px;
       box-shadow: none;
-      padding: 20px 0;
-      background: transparent;
+      background: var(--surface-subtle);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
     }
 
     .swagger-ui .opblock-tag {
-      border-bottom-color: rgba(25, 36, 25, 0.08);
+      border-bottom-color: var(--line);
     }
 
-    .swagger-ui .information-container {
-      padding-bottom: 18px;
+    .swagger-ui .opblock-tag,
+    .swagger-ui .opblock .opblock-summary {
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
     }
 
-    code,
-    .inline-code {
-      padding: 0.12em 0.36em;
-      border-radius: 8px;
-      background: rgba(17, 24, 16, 0.07);
-      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-      font-size: 0.92em;
+    .swagger-ui .btn.authorize {
+      border-radius: 6px;
+      border-color: #4ebd87;
+      color: #17734f;
+    }
+
+    .swagger-ui .btn.execute {
+      border-radius: 6px;
+      background: #101821;
+      border-color: #101821;
+    }
+
+    .swagger-ui .btn {
+      border-radius: 6px;
+    }
+
+    .swagger-ui input[type=text],
+    .swagger-ui input[type=password],
+    .swagger-ui textarea {
+      border-radius: 6px;
     }
 
     @media (max-width: 1120px) {
-      .hero-grid,
-      .section-grid,
-      .tutorial-grid {
+      .hero,
+      .content-grid {
         grid-template-columns: 1fr;
       }
 
-      .hero-points {
+      .hero-list {
         grid-template-columns: 1fr;
       }
     }
 
     @media (max-width: 720px) {
       .page {
-        padding: 16px 14px 40px;
+        padding: 14px 14px 28px;
       }
 
-      .hero,
-      .panel,
-      .summary-card,
-      .swagger-shell {
-        padding: 20px;
+      .masthead-inner,
+      .panel-inner,
+      .swagger-header {
+        padding-left: 16px;
+        padding-right: 16px;
       }
 
+      .nav,
       .swagger-header {
         flex-direction: column;
         align-items: flex-start;
@@ -462,121 +484,114 @@
 </head>
 <body>
   <main class="page">
-    <section class="hero">
-      <span class="eyebrow">SuperPlane Public API</span>
-      <div class="hero-grid">
-        <div>
-          <h1>Automate canvases, executions, and organization operations without the UI.</h1>
-          <p>
-            The SuperPlane API lets teams provision canvases, update configuration as code, trigger runs,
-            inspect execution state, manage service accounts, and automate organization settings from scripts,
-            CI/CD jobs, and internal tooling.
-          </p>
-          <ul class="hero-points">
-            <li>Canvas lifecycle: create, update, delete, version, duplicate, and inspect canvases programmatically.</li>
-            <li>Execution control: list events, inspect outputs, invoke actions, resolve failures, and cancel runs.</li>
-            <li>Organization automation: manage integrations, invite flows, service accounts, users, roles, and groups.</li>
-            <li>Configuration-as-code ready: pair the API with GitOps workflows and the SuperPlane CLI.</li>
-          </ul>
-          <div class="hero-actions">
-            <a class="button-link" href="#reference">Explore API Reference</a>
-            <a class="ghost-link" id="download-json-link" href="#" target="_blank" rel="noreferrer">Download OpenAPI JSON</a>
-            <a class="ghost-link" href="https://github.com/superplanehq/superplane" target="_blank" rel="noreferrer">GitHub</a>
+    <section class="masthead">
+      <div class="masthead-inner">
+        <div class="nav">
+          <a class="brand" href="https://superplane.com/" target="_blank" rel="noreferrer">
+            <svg class="brand-mark" viewBox="0 0 29 21" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M29 14.32C28.5655 14.7542 28.1107 15.1686 27.6379 15.5626L17.112 5.16914L22.7409 18.5877C22.1782 18.8335 21.6021 19.0552 21.0139 19.2508L15.4286 5.93611V20.2791C15.1216 20.2926 14.8129 20.3 14.5025 20.3L14.2391 20.2982C14.0172 20.2955 13.7961 20.2888 13.5759 20.2791V5.88893L7.97322 19.2446C7.38516 19.0484 6.80914 18.8264 6.24652 18.58L11.8656 5.18536L1.36087 15.5578C0.888333 15.1638 0.434276 14.7489 0 14.3147L14.4975 0L29 14.32Z" />
+            </svg>
+            SuperPlane API
+          </a>
+          <div class="nav-links">
+            <a class="nav-link" href="https://docs.superplane.com/" target="_blank" rel="noreferrer">Docs</a>
+            <a class="nav-link" href="https://github.com/superplanehq/superplane" target="_blank" rel="noreferrer">GitHub</a>
+            <a class="nav-link-primary" id="download-json-link" href="#" target="_blank" rel="noreferrer">OpenAPI JSON</a>
           </div>
         </div>
-        <aside class="summary-card">
-          <h2>Authentication</h2>
-          <p>SuperPlane uses bearer token authentication for API requests.</p>
-          <dl>
-            <div>
-              <dt>Header</dt>
-              <dd><span class="inline-code">Authorization: Bearer &lt;token&gt;</span></dd>
+
+        <div class="hero">
+          <div class="hero-copy">
+            <div class="kicker">Public API for the SuperPlane control plane</div>
+            <h1>Automate canvases, executions, and org workflows the same way the platform does.</h1>
+            <p>
+              Use the SuperPlane API to provision canvases, ship configuration-as-code updates, trigger runs,
+              inspect execution state, manage service accounts, and control organization-level settings from CI,
+              internal tooling, or your own platform workflows.
+            </p>
+            <ul class="hero-list">
+              <li>
+                <strong>Canvases</strong>
+                Create, version, update, delete, and inspect canvases and related runtime state.
+              </li>
+              <li>
+                <strong>Executions</strong>
+                Trigger workflows, inspect outputs, invoke actions, resolve failures, and cancel in-flight work.
+              </li>
+              <li>
+                <strong>Organizations</strong>
+                Manage integrations, invitations, usage, roles, groups, users, and other org-scoped settings.
+              </li>
+              <li>
+                <strong>Automation identities</strong>
+                Use service account tokens for CI/CD and non-human access with scoped org permissions.
+              </li>
+            </ul>
+          </div>
+
+          <aside class="terminal">
+            <div class="terminal-top">
+              <span>Quickstart</span>
+              <span>Bearer auth</span>
             </div>
-            <div>
-              <dt>Token sources</dt>
-              <dd>Personal API tokens from <span class="inline-code">Settings &gt; Profile</span> or org-scoped tokens from <span class="inline-code">Settings &gt; Service accounts</span>.</dd>
+            <pre><span class="comment"># Verify the token</span>
+<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1/me" \
+  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
+  -H "Accept: application/json"
+
+<span class="comment"># List canvases</span>
+<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1/canvases" \
+  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
+  -H "Accept: application/json"</pre>
+            <div class="terminal-note">
+              In the reference below, click <strong>Authorize</strong> and paste either a raw token or
+              <span class="inline-code">Bearer &lt;token&gt;</span>. If you need more context on what a resource,
+              workflow concept, or integration means, see
+              <a href="https://docs.superplane.com/" target="_blank" rel="noreferrer">docs.superplane.com</a>.
             </div>
-            <div>
-              <dt>CLI behavior</dt>
-              <dd>The SuperPlane CLI uses the same bearer header, so requests in these docs match what the CLI sends.</dd>
-            </div>
-          </dl>
-        </aside>
+          </aside>
+        </div>
       </div>
     </section>
 
-    <section class="section-grid">
+    <section class="content-grid">
       <article class="panel">
-        <h2>Quickstart</h2>
-        <p>Use these steps to make authenticated requests directly from the browser docs.</p>
-        <ol>
-          <li>Create a token from <span class="inline-code">Settings &gt; Profile</span> or <span class="inline-code">Settings &gt; Service accounts</span>.</li>
-          <li>Paste the token into the bearer token field on this page and apply it.</li>
-          <li>Open any operation below, click <span class="inline-code">Try it out</span>, and send the request.</li>
-        </ol>
-        <div class="snippet">curl -X GET \
-  "$API_BASE/api/v1/me" \
-  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
-  -H "Accept: application/json"</div>
-      </article>
-
-      <article class="panel">
-        <h2>Use a Personal Token</h2>
-        <p>Personal tokens are useful for local scripts, prototyping, and developer workflows tied to a human user.</p>
-        <ol>
-          <li>In the SuperPlane UI, go to <span class="inline-code">Settings &gt; Profile</span>.</li>
-          <li>Select <span class="inline-code">Generate Token</span> or <span class="inline-code">Regenerate Token</span>.</li>
-          <li>Copy the token immediately. It is shown only once.</li>
-        </ol>
-        <p>Regenerating a personal token invalidates the previous one.</p>
-      </article>
-
-      <article class="panel">
-        <h2>Use a Service Account Token</h2>
-        <p>Service accounts are the right choice for CI/CD, shared automation, and machine-to-machine access.</p>
-        <ol>
-          <li>In the SuperPlane UI, go to <span class="inline-code">Settings &gt; Service accounts</span>.</li>
-          <li>Create a service account and assign it a role.</li>
-          <li>Generate or regenerate its API token and copy it immediately. It is shown only once.</li>
-        </ol>
-        <p>Service account tokens are organization-scoped and should be preferred for production automation.</p>
-      </article>
-    </section>
-
-    <section class="tutorial-grid">
-      <article class="panel">
-        <h2>Authenticate This Page</h2>
-        <p>Paste a raw API token below. The page stores it locally in your browser and sends it as a bearer token for Swagger requests.</p>
-        <div class="auth-controls">
-          <div class="field">
-            <label for="bearer-token">Bearer token</label>
-            <input id="bearer-token" class="token-input" type="password" autocomplete="off" placeholder="sp_..." />
-          </div>
-          <div class="auth-buttons">
-            <button class="primary" id="apply-token" type="button">Apply token</button>
-            <button class="secondary" id="toggle-token" type="button">Show token</button>
-            <button class="ghost" id="clear-token" type="button">Clear token</button>
-          </div>
-          <div class="status warning" id="auth-status">
-            No token configured. Public or unauthenticated endpoints can still be explored, but most API calls will require a token.
-          </div>
+        <div class="panel-eyebrow">Personal access</div>
+        <div class="panel-inner">
+          <h2>Create a personal API token</h2>
+          <p>Use this for local development, manual scripts, and workflows tied to a human user.</p>
+          <ol>
+            <li>Open <span class="inline-code">Settings &gt; Profile</span> in the SuperPlane app.</li>
+            <li>Select <span class="inline-code">Generate Token</span> or <span class="inline-code">Regenerate Token</span>.</li>
+            <li>Copy the token immediately. It is shown only once.</li>
+          </ol>
         </div>
       </article>
 
       <article class="panel">
-        <h2>Starter Requests</h2>
-        <p>These endpoints are a good entry point for building automation around canvases and organization management.</p>
-        <ul>
-          <li><span class="inline-code">GET /api/v1/me</span> to verify authentication and inspect the current user.</li>
-          <li><span class="inline-code">GET /api/v1/canvases</span> to list canvases available to the token.</li>
-          <li><span class="inline-code">POST /api/v1/canvases</span> to provision a new canvas.</li>
-          <li><span class="inline-code">GET /api/v1/service-accounts</span> to list automation identities in the organization.</li>
-          <li><span class="inline-code">GET /api/v1/organizations/{id}/integrations</span> to inspect configured connections without exposing secrets.</li>
-        </ul>
-        <div class="snippet">curl -X GET \
-  "$API_BASE/api/v1/canvases" \
-  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
-  -H "Accept: application/json"</div>
+        <div class="panel-eyebrow">Service accounts</div>
+        <div class="panel-inner">
+          <h2>Create a service account token</h2>
+          <p>Use this for CI/CD, platform automation, and machine-to-machine access.</p>
+          <ol>
+            <li>Open <span class="inline-code">Settings &gt; Service accounts</span>.</li>
+            <li>Create a service account and assign it the correct role.</li>
+            <li>Generate or regenerate its token and store it securely. It is shown only once.</li>
+          </ol>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-eyebrow">Reference flow</div>
+        <div class="panel-inner">
+          <h2>Use Swagger without the UI chrome</h2>
+          <p>The reference below stays generated from the OpenAPI document, but the presentation is cleaned up for public use.</p>
+          <ul>
+            <li>Use <span class="inline-code">Authorize</span> in the Swagger toolbar to set your token.</li>
+            <li>Empty plural service tags are removed from the rendered reference.</li>
+            <li>The raw OpenAPI JSON remains unchanged for generators and SDK consumers.</li>
+          </ul>
+        </div>
       </article>
     </section>
 
@@ -584,9 +599,15 @@
       <div class="swagger-header">
         <div>
           <h2>API Reference</h2>
-          <p>The reference below is generated from the live OpenAPI document, then normalized here for clearer tagging and bearer token support.</p>
+          <p>
+            Click <strong>Authorize</strong> to authenticate requests.
+            If you paste a raw token, the docs automatically send it as
+            <span class="inline-code">Bearer &lt;token&gt;</span>.
+          </p>
         </div>
-        <a class="ghost-link" id="open-json-link" href="#" target="_blank" rel="noreferrer">Open raw JSON</a>
+        <div class="swagger-header-links">
+          <a class="swagger-link" id="open-json-link" href="#" target="_blank" rel="noreferrer">Raw JSON</a>
+        </div>
       </div>
       <div id="swagger-ui"></div>
     </section>
@@ -596,7 +617,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
   <script>
     (function() {
-      const TOKEN_STORAGE_KEY = "superplane.swagger.bearerToken";
       const docsPath = window.location.pathname.replace(/\/$/, "");
       const specUrl = window.location.origin + docsPath + "/superplane.swagger.json";
 
@@ -708,44 +728,11 @@
         }
       };
 
-      const tokenInput = document.getElementById("bearer-token");
-      const applyTokenButton = document.getElementById("apply-token");
-      const toggleTokenButton = document.getElementById("toggle-token");
-      const clearTokenButton = document.getElementById("clear-token");
-      const authStatus = document.getElementById("auth-status");
       const downloadJsonLink = document.getElementById("download-json-link");
       const openJsonLink = document.getElementById("open-json-link");
 
       downloadJsonLink.href = specUrl;
       openJsonLink.href = specUrl;
-
-      function getStoredToken() {
-        return window.localStorage.getItem(TOKEN_STORAGE_KEY) || "";
-      }
-
-      function setStoredToken(token) {
-        if (token) {
-          window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
-          return;
-        }
-        window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-      }
-
-      function updateAuthStatus(token) {
-        if (!token) {
-          authStatus.classList.add("warning");
-          authStatus.innerHTML = "No token configured. Public or unauthenticated endpoints can still be explored, but most API calls will require a token.";
-          return;
-        }
-
-        authStatus.classList.remove("warning");
-        authStatus.innerHTML = "<strong>Token applied.</strong> Requests from Swagger UI will include <span class=\"inline-code\">Authorization: Bearer &lt;token&gt;</span>.";
-      }
-
-      function setTokenField(token) {
-        tokenInput.value = token;
-        updateAuthStatus(token);
-      }
 
       function normalizeTag(tag) {
         const metadata = tagMetadata[tag];
@@ -756,6 +743,7 @@
             order: 999
           };
         }
+
         return metadata;
       }
 
@@ -800,6 +788,10 @@
           });
       }
 
+      function isPublicOperation(path, operationId) {
+        return path === "/api/v1/invite-links/{token}/accept" || operationId === "Organizations_AcceptInviteLink";
+      }
+
       function transformSpec(rawSpec) {
         const spec = JSON.parse(JSON.stringify(rawSpec));
 
@@ -813,16 +805,27 @@
             type: "apiKey",
             name: "Authorization",
             in: "header",
-            description: "Paste a raw SuperPlane API token. Swagger UI sends it as Authorization: Bearer <token>."
+            description: "Use Authorize and paste either a raw token or Bearer <token>."
           }
         });
 
-        Object.values(spec.paths || {}).forEach(function(methods) {
+        Object.entries(spec.paths || {}).forEach(function(entry) {
+          const path = entry[0];
+          const methods = entry[1];
+
           Object.values(methods || {}).forEach(function(operation) {
             const rawTags = operation.tags || [];
+
             operation.tags = unique(rawTags.map(function(tag) {
               return normalizeTag(tag).name;
             }));
+
+            if (isPublicOperation(path, operation.operationId)) {
+              operation.security = [];
+              return;
+            }
+
+            operation.security = [{ BearerToken: [] }];
           });
         });
 
@@ -830,58 +833,19 @@
         return spec;
       }
 
-      let ui;
-
-      function applyTokenToSwaggerUI(token) {
-        if (!ui || !ui.preauthorizeApiKey) {
-          return;
-        }
-
-        if (token) {
-          ui.preauthorizeApiKey("BearerToken", "Bearer " + token);
-        }
-      }
-
-      function readTokenFromField() {
-        return tokenInput.value.trim();
-      }
-
-      function persistAndApplyToken() {
-        const token = readTokenFromField();
-        setStoredToken(token);
-        updateAuthStatus(token);
-        applyTokenToSwaggerUI(token);
-      }
-
-      applyTokenButton.addEventListener("click", persistAndApplyToken);
-
-      toggleTokenButton.addEventListener("click", function() {
-        const isHidden = tokenInput.getAttribute("type") === "password";
-        tokenInput.setAttribute("type", isHidden ? "text" : "password");
-        toggleTokenButton.textContent = isHidden ? "Hide token" : "Show token";
-      });
-
-      clearTokenButton.addEventListener("click", function() {
-        tokenInput.setAttribute("type", "password");
-        toggleTokenButton.textContent = "Show token";
-        setStoredToken("");
-        setTokenField("");
-      });
-
-      setTokenField(getStoredToken());
-
       window.onload = function() {
         fetch(specUrl)
           .then(function(response) {
             if (!response.ok) {
               throw new Error("Failed to load OpenAPI spec");
             }
+
             return response.json();
           })
           .then(function(rawSpec) {
             const spec = transformSpec(rawSpec);
 
-            ui = SwaggerUIBundle({
+            const ui = SwaggerUIBundle({
               spec: spec,
               dom_id: "#swagger-ui",
               deepLinking: true,
@@ -912,21 +876,21 @@
                 return (methodOrder[a.get("method")] || 99) - (methodOrder[b.get("method")] || 99);
               },
               requestInterceptor: function(request) {
-                const token = getStoredToken();
-                if (token) {
-                  request.headers = request.headers || {};
-                  request.headers.Authorization = "Bearer " + token;
+                if (!request.headers) {
+                  return request;
                 }
+
+                const authorization = request.headers.Authorization || request.headers.authorization;
+                if (!authorization || /^Bearer\s+/i.test(authorization)) {
+                  return request;
+                }
+
+                request.headers.Authorization = "Bearer " + String(authorization).trim();
                 return request;
               }
             });
 
-            applyTokenToSwaggerUI(getStoredToken());
             window.ui = ui;
-          })
-          .catch(function(error) {
-            authStatus.classList.add("warning");
-            authStatus.innerHTML = "Failed to load the OpenAPI document. " + error.message;
           });
       };
     })();
