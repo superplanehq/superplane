@@ -21,8 +21,10 @@ import { putObjectMapper, PUT_OBJECT_STATE_REGISTRY } from "./put_object";
 import { deleteObjectMapper, DELETE_OBJECT_STATE_REGISTRY } from "./delete_object";
 import { copyObjectMapper, COPY_OBJECT_STATE_REGISTRY } from "./copy_object";
 import { createAppMapper } from "./create_app";
+import { createDatabaseMapper } from "./create_database";
 import { getAppMapper } from "./get_app";
 import { deleteAppMapper } from "./delete_app";
+import { deleteDatabaseMapper } from "./delete_database";
 import { updateAppMapper } from "./update_app";
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
@@ -54,8 +56,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteObject: deleteObjectMapper,
   copyObject: copyObjectMapper,
   createApp: createAppMapper,
+  createDatabase: createDatabaseMapper,
   getApp: getAppMapper,
   deleteApp: deleteAppMapper,
+  deleteDatabase: deleteDatabaseMapper,
   updateApp: updateAppMapper,
   createKnowledgeBase: createKnowledgeBaseMapper,
   attachKnowledgeBase: attachKnowledgeBaseMapper,
@@ -89,8 +93,10 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteObject: DELETE_OBJECT_STATE_REGISTRY,
   copyObject: COPY_OBJECT_STATE_REGISTRY,
   createApp: buildActionStateRegistry("created"),
+  createDatabase: buildActionStateRegistry("created"),
   getApp: buildActionStateRegistry("fetched"),
   deleteApp: buildActionStateRegistry("deleted"),
+  deleteDatabase: buildActionStateRegistry("deleted"),
   updateApp: buildActionStateRegistry("updated"),
   createKnowledgeBase: buildActionStateRegistry("created"),
   attachKnowledgeBase: buildActionStateRegistry("attached"),
