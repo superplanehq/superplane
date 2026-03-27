@@ -17,18 +17,19 @@ const gpuDropletPollInterval = 10 * time.Second
 type CreateGPUDroplet struct{}
 
 type CreateGPUDropletSpec struct {
-	Name       string   `json:"name"`
-	Region     string   `json:"region"`
-	Size       string   `json:"size"`
-	ImageType  string   `json:"imageType"`
-	Image      string   `json:"image"`
-	SSHKeys    []string `json:"sshKeys"`
-	Tags       []string `json:"tags"`
-	UserData   string   `json:"userData"`
-	Backups    bool     `json:"backups"`
-	IPv6       bool     `json:"ipv6"`
-	Monitoring bool     `json:"monitoring"`
-	VpcUUID    string   `json:"vpcUuid"`
+	Name          string   `json:"name"`
+	Region        string   `json:"region"`
+	Size          string   `json:"size"`
+	ImageType     string   `json:"imageType"`
+	OneClickImage string   `json:"oneClickImage"`
+	BaseImage     string   `json:"baseImage"`
+	SSHKeys       []string `json:"sshKeys"`
+	Tags          []string `json:"tags"`
+	UserData      string   `json:"userData"`
+	Backups       bool     `json:"backups"`
+	IPv6          bool     `json:"ipv6"`
+	Monitoring    bool     `json:"monitoring"`
+	VpcUUID       string   `json:"vpcUuid"`
 }
 
 func (c *CreateGPUDroplet) Name() string {
@@ -143,7 +144,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "image",
+			Name:        "oneClickImage",
 			Label:       "One-Click Application",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -159,7 +160,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "image",
+			Name:        "baseImage",
 			Label:       "Base OS Image",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -300,8 +301,12 @@ func (c *CreateGPUDroplet) Setup(ctx core.SetupContext) error {
 		return errors.New("GPU size is required")
 	}
 
-	if spec.Image == "" {
-		return errors.New("image is required")
+	// Validate image based on imageType
+	if spec.ImageType == "one-click" && spec.OneClickImage == "" {
+		return errors.New("one-click application image is required")
+	}
+	if spec.ImageType == "base-os" && spec.BaseImage == "" {
+		return errors.New("base OS image is required")
 	}
 
 	return nil
@@ -318,6 +323,12 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	// Determine which image to use based on imageType
+	image := spec.OneClickImage
+	if spec.ImageType == "base-os" {
+		image = spec.BaseImage
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
@@ -327,7 +338,7 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 		Name:       spec.Name,
 		Region:     spec.Region,
 		Size:       spec.Size,
-		Image:      spec.Image,
+		Image:      image,
 		SSHKeys:    spec.SSHKeys,
 		Tags:       spec.Tags,
 		UserData:   spec.UserData,
