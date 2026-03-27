@@ -326,17 +326,10 @@ export function SettingsTab({
       return;
     }
 
-    // In auto mode, run validation for UI feedback but persist regardless.
-    // In manual mode, block save when validation fails.
-    if (configurationSaveMode === "auto") {
-      validateNow();
-      if (currentNodeName.trim() === "") {
-        return;
-      }
-    } else {
-      if (!validateNow() || currentNodeName.trim() === "") {
-        return;
-      }
+    // Always run validation for UI feedback; only gate persistence in manual mode.
+    const isValid = validateNow();
+    if (currentNodeName.trim() === "" || (configurationSaveMode !== "auto" && !isValid)) {
+      return;
     }
 
     if (savingRef.current) {
