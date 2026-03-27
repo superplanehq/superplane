@@ -63,11 +63,7 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
-import {
-  CONFIRM_DELETE_GROUP_MESSAGE,
-  GROUP_CHILD_EDGE_PADDING,
-  GROUP_CHILD_MIN_Y_OFFSET,
-} from "../groupNode/constants";
+import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET } from "../groupNode/constants";
 import { GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
@@ -3156,13 +3152,17 @@ function CanvasContent({
                             <button
                               type="button"
                               data-testid="multi-select-delete"
-                              aria-label="Delete Group"
+                              aria-label="Delete Selected"
                               onPointerDown={stopCanvasPointerEvent}
                               onMouseDown={stopCanvasPointerEvent}
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                if (!window.confirm(CONFIRM_DELETE_GROUP_MESSAGE)) {
+                                if (
+                                  !window.confirm(
+                                    "Are you sure you want to delete the selected nodes? This action cannot be undone.",
+                                  )
+                                ) {
                                   return;
                                 }
                                 const nodeIds = multiSelectedNodes.map((n) => n.id);
@@ -3183,7 +3183,7 @@ function CanvasContent({
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </TooltipTrigger>
-                          <TooltipContent>Delete Group</TooltipContent>
+                          <TooltipContent>Delete Selected</TooltipContent>
                         </Tooltip>
                       )}
                     </div>
