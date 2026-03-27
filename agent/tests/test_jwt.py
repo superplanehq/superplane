@@ -4,6 +4,7 @@ from ai.jwt import JwtValidator
 
 
 def test_jwt_validator_decodes_agent_builder_token() -> None:
+    jwt_secret = "test-jwt-secret-with-at-least-32-bytes"
     token = jwt.encode(
         {
             "aud": "superplane_api",
@@ -17,11 +18,11 @@ def test_jwt_validator_decodes_agent_builder_token() -> None:
                 "org:read",
             ],
         },
-        "secret",
+        jwt_secret,
         algorithm="HS256",
     )
 
-    claims = JwtValidator(jwt_secret="secret").decode(token)
+    claims = JwtValidator(jwt_secret=jwt_secret).decode(token)
 
     assert claims.subject == "user-123"
     assert claims.org_id == "org-123"
