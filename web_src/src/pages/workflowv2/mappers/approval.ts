@@ -326,7 +326,7 @@ function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLa
   }
 
   if (record.type === "anyone") {
-    return "Any user";
+    return "Everyone";
   }
 
   return "Approver";
@@ -557,7 +557,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           : record.type === "role" || record.type === "group"
             ? getApprovalDecisionLabel(record, labelMaps)
             : record.type === "anyone"
-              ? "Any user"
+              ? "Everyone"
               : "Unknown");
 
       return {

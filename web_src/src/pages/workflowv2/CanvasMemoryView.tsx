@@ -50,7 +50,7 @@ function renderNamespaceTable(
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50">
+            <tr className="border-b border-slate-950/15 bg-slate-50">
               {columns.map((column) => (
                 <th key={column} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
                   {column}
@@ -63,7 +63,7 @@ function renderNamespaceTable(
             {values.map((entry, index) => {
               const item = objectValues[index];
               return (
-                <tr key={entry.id || index} className="border-b border-slate-100">
+                <tr key={entry.id || index} className="border-b border-slate-950/15">
                   {columns.map((column) => (
                     <td key={`${index}-${column}`} className="px-3 py-2 font-mono text-xs text-gray-700 align-middle">
                       {formatValue(item[column])}
@@ -97,14 +97,14 @@ function renderNamespaceTable(
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50">
+          <tr className="border-b border-slate-950/15 bg-slate-50">
             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Value</th>
             <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase w-12"></th>
           </tr>
         </thead>
         <tbody>
           {values.map((entry, index) => (
-            <tr key={entry.id || index} className="border-b border-slate-100">
+            <tr key={entry.id || index} className="border-b border-slate-950/15">
               <td className="px-3 py-2 font-mono text-xs text-gray-700 align-middle">{formatValue(entry.values)}</td>
               <td className="px-3 py-2 text-right align-middle">
                 <Button
@@ -146,33 +146,35 @@ export function CanvasMemoryView({
   }, {});
 
   return (
-    <div className="p-4">
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-900">Canvas Memory</h2>
-          <p className="text-xs text-gray-500">Shared memory entries for this canvas.</p>
-        </div>
-        {isLoading ? (
-          <div className="px-4 py-6 text-sm text-gray-500">Loading memory entries...</div>
-        ) : errorMessage ? (
-          <div className="px-4 py-6 text-sm text-red-600">
-            Failed to load memory entries.
-            <div className="mt-1 text-xs text-red-500">{errorMessage}</div>
+    <div className="px-4 py-6">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="overflow-hidden rounded-lg border border-slate-950/15 bg-white">
+          <div className="border-b border-slate-950/15 px-4 py-3">
+            <h2 className="text-sm font-semibold text-gray-900">Canvas Memory</h2>
+            <p className="text-[13px] text-gray-500">Shared memory entries for this canvas.</p>
           </div>
-        ) : entries.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-gray-500">No memory entries added yet.</div>
-        ) : (
-          <div className="divide-y divide-slate-200">
-            {Object.entries(groupedEntries).map(([namespace, values]) => (
-              <div key={namespace}>
-                <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
-                  <div className="font-mono text-sm text-gray-800">{namespace}</div>
+          {isLoading ? (
+            <div className="px-4 py-6 text-[13px] text-gray-500">Loading memory entries...</div>
+          ) : errorMessage ? (
+            <div className="px-4 py-6 text-[13px] text-red-600">
+              Failed to load memory entries.
+              <div className="mt-1 text-xs text-red-500">{errorMessage}</div>
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="px-4 py-6 text-[13px] text-gray-500">No memory entries added yet.</div>
+          ) : (
+            <div className="divide-y divide-slate-950/15">
+              {Object.entries(groupedEntries).map(([namespace, values]) => (
+                <div key={namespace}>
+                  <div className="flex items-center justify-between border-b border-slate-950/15 px-4 py-2">
+                    <div className="font-mono text-sm text-gray-800">{namespace}</div>
+                  </div>
+                  {renderNamespaceTable(values, onDeleteEntry, deletingId)}
                 </div>
-                {renderNamespaceTable(values, onDeleteEntry, deletingId)}
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
