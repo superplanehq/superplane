@@ -229,3 +229,13 @@ export interface UpdateAppConfiguration {
   envVars?: string[];
   gitHubBranch?: string;
 }
+
+export interface GetGPUDropletConfiguration {
+  droplet: string;
+}
+
+export interface UpdateGPUDropletConfiguration {
+  droplet: string;
+  name?: string;
+  size?: string;
+}
