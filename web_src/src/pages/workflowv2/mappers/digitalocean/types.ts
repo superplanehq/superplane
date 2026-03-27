@@ -149,6 +149,55 @@ export interface GetObjectOutput {
   body?: string;
 }
 
+export interface CopyObjectConfiguration {
+  sourceBucket?: string;
+  sourceFilePath?: string;
+  destinationBucket?: string;
+  destinationFilePath?: string;
+  deleteSource?: boolean;
+}
+
+export interface CopyObjectOutput {
+  sourceBucket?: string;
+  sourceFilePath?: string;
+  destinationBucket?: string;
+  destinationFilePath?: string;
+  endpoint?: string;
+  eTag?: string;
+  moved?: boolean;
+}
+
+export interface DeleteObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+}
+
+export interface DeleteObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  deleted?: boolean;
+}
+
+export interface PutObjectConfiguration {
+  bucket?: string;
+  filePath?: string;
+  body?: string;
+  acl?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+}
+
+export interface PutObjectOutput {
+  bucket?: string;
+  filePath?: string;
+  endpoint?: string;
+  eTag?: string;
+  contentType?: string;
+  size?: string;
+  metadata?: Record<string, string>;
+  tags?: Record<string, string>;
+}
+
 export interface AppNodeMetadata {
   appId?: string;
   appName?: string;

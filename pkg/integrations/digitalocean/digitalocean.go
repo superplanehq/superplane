@@ -41,31 +41,23 @@ func (d *DigitalOcean) Description() string {
 }
 
 func (d *DigitalOcean) Instructions() string {
-	return `## Create a DigitalOcean Personal Access Token
+	return `## DigitalOcean Personal Access Token
 
-1. Open the [DigitalOcean API Tokens page](https://cloud.digitalocean.com/account/api/tokens)
-2. Click **Generate New Token**
-3. Configure the token:
-   - **Token name**: SuperPlane Integration
-   - **Expiration**: No expiry (or choose an appropriate expiration)
-   - **Scopes**: Select **Full Access** (or customize as needed)
-4. Click **Generate Token**
-5. Copy the token and paste it below
+Generate a [DigitalOcean Personal Access Token](https://cloud.digitalocean.com/account/api/tokens) and copy it.
 
-> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+- Token name: ` + "`SuperPlane Integration`" + `
+- Expiration: **No expiry** (or choose an appropriate expiration)
+- Scopes: **Full Access** (or customize as needed)
 
-## Spaces Access Key ID and Secret Access Key (optional)
+## Access Key (optional)
 
-Spaces Access Key and Secret Key are only required if you plan to use **Spaces Object Storage** components (e.g. Get Object). Other components such as Droplets, DNS, Load Balancers, and Snapshots work with the API Token alone.
+Only required for **Spaces Object Storage** components.
 
-To generate Spaces access keys:
+Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spaces/access_keys) and copy the generated pair.
 
-1. Open the [Spaces Access Keys page](https://cloud.digitalocean.com/spaces/access_keys)
-2. Click **Create Access Key**
-3. Select the access scope:
-   - **Full Access** — works across all buckets
-   - **Limited Access** — scoped to specific buckets with Read or Read/Write/Delete permissions
-4. Copy both the **Access Key ID** and the **Secret Access Key** immediately — the secret is only shown once`
+- Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
+
+> **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.`
 }
 
 func (d *DigitalOcean) Configuration() []configuration.Field {
@@ -117,6 +109,9 @@ func (d *DigitalOcean) Components() []core.Component {
 		&DeleteAlertPolicy{},
 		&GetDropletMetrics{},
 		&GetObject{},
+		&PutObject{},
+		&CopyObject{},
+		&DeleteObject{},
 		&CreateApp{},
 		&GetApp{},
 		&DeleteApp{},

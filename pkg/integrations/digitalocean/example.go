@@ -187,6 +187,36 @@ func (g *GetObject) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetObjectOnce, exampleOutputGetObjectBytes, &exampleOutputGetObject)
 }
 
+//go:embed example_output_copy_object.json
+var exampleOutputCopyObjectBytes []byte
+
+var exampleOutputCopyObjectOnce sync.Once
+var exampleOutputCopyObject map[string]any
+
+func (c *CopyObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCopyObjectOnce, exampleOutputCopyObjectBytes, &exampleOutputCopyObject)
+}
+
+//go:embed example_output_delete_object.json
+var exampleOutputDeleteObjectBytes []byte
+
+var exampleOutputDeleteObjectOnce sync.Once
+var exampleOutputDeleteObject map[string]any
+
+func (d *DeleteObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteObjectOnce, exampleOutputDeleteObjectBytes, &exampleOutputDeleteObject)
+}
+
+//go:embed example_output_put_object.json
+var exampleOutputPutObjectBytes []byte
+
+var exampleOutputPutObjectOnce sync.Once
+var exampleOutputPutObject map[string]any
+
+func (p *PutObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputPutObjectOnce, exampleOutputPutObjectBytes, &exampleOutputPutObject)
+}
+
 //go:embed example_output_create_app.json
 var exampleOutputCreateAppBytes []byte
 
