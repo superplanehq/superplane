@@ -234,7 +234,7 @@ func (a *Handler) handleOktaAuthCallback(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "email claim is required", http.StatusUnauthorized)
 		return
 	}
-	if claims.EmailVerified != nil && !*claims.EmailVerified {
+	if claims.EmailVerified == nil || !*claims.EmailVerified {
 		http.Error(w, "email is not verified", http.StatusForbidden)
 		return
 	}

@@ -2,6 +2,8 @@ package scim
 
 import (
 	"crypto/subtle"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -45,6 +47,17 @@ func RegisterRoutes(r *mux.Router, auth authorization.Authorization) {
 	r.PathPrefix(scimURLPrefix).Handler(scimBearerAndOrgMiddleware(&srv))
 }
 
+func scimError(w http.ResponseWriter, status int, detail string) {
+	w.Header().Set("Content-Type", "application/scim+json")
+	w.WriteHeader(status)
+	body := map[string]interface{}{
+		"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:Error"},
+		"status":  fmt.Sprintf("%d", status),
+		"detail":  detail,
+	}
+	_ = json.NewEncoder(w).Encode(body)
+}
+
 func scimBearerAndOrgMiddleware(inner http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, scimURLPrefix) {
@@ -55,41 +68,48 @@ func scimBearerAndOrgMiddleware(inner http.Handler) http.Handler {
 		rest := strings.TrimPrefix(r.URL.Path, scimURLPrefix)
 		orgID, suffix, ok := strings.Cut(rest, "/")
 		if !ok || orgID == "" || suffix == "" {
-			http.Error(w, "invalid SCIM path", http.StatusBadRequest)
+			scimError(w, http.StatusBadRequest, "invalid SCIM path")
 			return
 		}
 
 		row, err := models.FindOrganizationOktaIDPByOrganizationID(orgID)
 		if err != nil {
-			http.Error(w, "SCIM not configured", http.StatusNotFound)
+			log.Warnf("SCIM [%s] %s %s: org not found or SCIM not configured", orgID, r.Method, r.URL.Path)
+			scimError(w, http.StatusNotFound, "SCIM not configured")
 			return
 		}
 		if !row.ScimEnabled || row.ScimBearerTokenHash == nil || *row.ScimBearerTokenHash == "" {
-			http.Error(w, "SCIM disabled", http.StatusForbidden)
+			log.Warnf("SCIM [%s] %s %s: SCIM disabled or token not set", orgID, r.Method, r.URL.Path)
+			scimError(w, http.StatusForbidden, "SCIM disabled")
 			return
 		}
 
 		authz := r.Header.Get("Authorization")
 		const bearer = "Bearer "
 		if len(authz) < len(bearer) || !strings.EqualFold(authz[:len(bearer)], bearer) {
+			log.Warnf("SCIM [%s] %s %s: missing or malformed Authorization header", orgID, r.Method, r.URL.Path)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="SCIM"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			scimError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 		raw := strings.TrimSpace(authz[len(bearer):])
 		if raw == "" {
+			log.Warnf("SCIM [%s] %s %s: empty bearer token", orgID, r.Method, r.URL.Path)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="SCIM"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			scimError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
 		want := []byte(*row.ScimBearerTokenHash)
 		got := []byte(crypto.HashToken(raw))
 		if len(want) != len(got) || subtle.ConstantTimeCompare(want, got) != 1 {
+			log.Warnf("SCIM [%s] %s %s: bearer token mismatch", orgID, r.Method, r.URL.Path)
 			w.Header().Set("WWW-Authenticate", `Bearer realm="SCIM"`)
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			scimError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
+
+		log.Infof("SCIM [%s] %s %s: authenticated", orgID, r.Method, r.URL.Path)
 
 		r = r.Clone(WithOrganizationID(r.Context(), orgID))
 		r2 := *r

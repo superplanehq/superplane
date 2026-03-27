@@ -106,6 +106,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 
 	router.HandleFunc("/auth/okta/{org_id}", a.handleOktaAuthStart).Methods("GET")
 	router.HandleFunc("/auth/okta/{org_id}/callback", a.handleOktaAuthCallback).Methods("GET")
+	router.HandleFunc("/auth/sso/lookup", a.handleSSOLookup).Methods("GET")
 
 	//
 	// If we are running the application locally,
@@ -320,10 +321,12 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		Providers            []string `json:"providers"`
 		PasswordLoginEnabled bool     `json:"passwordLoginEnabled"`
 		SignupEnabled        bool     `json:"signupEnabled"`
+		PublicAppBaseURL     string   `json:"publicAppBaseUrl"`
 	}{
 		Providers:            providerNames,
 		PasswordLoginEnabled: a.passwordLoginEnabled,
 		SignupEnabled:        !a.blockSignup,
+		PublicAppBaseURL:     a.publicAppBaseURL,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

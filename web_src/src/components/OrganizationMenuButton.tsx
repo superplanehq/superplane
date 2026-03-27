@@ -94,6 +94,12 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       permission: { resource: "org", action: "read" },
     },
     {
+      label: "SSO",
+      href: organizationId ? `/${organizationId}/settings/sso` : "#",
+      Icon: Lock,
+      permission: { resource: "org", action: "read" },
+    },
+    {
       label: "Members",
       href: organizationId ? `/${organizationId}/settings/members` : "#",
       Icon: UserIcon,

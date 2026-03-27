@@ -13,6 +13,7 @@ import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
 import { IntegrationDetails } from "./IntegrationDetails";
+import { OktaSSO } from "./OktaSSO";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { ServiceAccounts } from "./ServiceAccounts";
@@ -92,6 +93,7 @@ export function OrganizationSettings() {
   const sectionIds = [
     "profile",
     "general",
+    "sso",
     "members",
     "groups",
     "roles",
@@ -128,6 +130,13 @@ export function OrganizationSettings() {
       label: "Settings",
       href: `/${organizationId}/settings/general`,
       Icon: Settings,
+      permission: { resource: "org", action: "read" },
+    },
+    {
+      id: "sso",
+      label: "SSO",
+      href: `/${organizationId}/settings/sso`,
+      Icon: Lock,
       permission: { resource: "org", action: "read" },
     },
     {
@@ -215,6 +224,10 @@ export function OrganizationSettings() {
     general: {
       title: "Settings",
       description: "Manage your organization basics.",
+    },
+    sso: {
+      title: "SSO",
+      description: "Configure Okta Single Sign-On and SCIM provisioning.",
     },
     members: {
       title: "Members",
@@ -424,6 +437,14 @@ export function OrganizationSettings() {
                       <p className="text-gray-500 dark:text-gray-400">Loading...</p>
                     </div>
                   )}
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="sso"
+              element={
+                <RequirePermission resource="org" action="read">
+                  <OktaSSO />
                 </RequirePermission>
               }
             />
