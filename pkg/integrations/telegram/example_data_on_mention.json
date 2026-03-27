@@ -1,5 +1,4 @@
 {
-  "type": "telegram.message.mention",
   "data": {
     "message_id": 1234,
     "from": {
@@ -22,5 +21,7 @@
       }
     ],
     "date": 1737028800
-  }
+  },
+  "timestamp": "2026-01-16T12:00:00.000Z",
+  "type": "telegram.message.mention"
 }
