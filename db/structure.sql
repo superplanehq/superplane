@@ -597,7 +597,7 @@ CREATE TABLE public.workflow_nodes (
     parent_node_id character varying(128),
     deleted_at timestamp with time zone,
     app_installation_id uuid,
-    state_reason character varying(255) DEFAULT NULL::character varying
+    state_reason text
 );
 
 
@@ -1980,7 +1980,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260324120000	f
+20260327195840	f
 \.
 
 
