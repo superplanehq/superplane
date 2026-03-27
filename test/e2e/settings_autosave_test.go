@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
@@ -42,6 +43,7 @@ type settingsAutoSaveSteps struct {
 	t       *testing.T
 	session *session.TestSession
 	canvas  *shared.CanvasSteps
+	nodeID  string
 }
 
 func (s *settingsAutoSaveSteps) start() {
@@ -57,6 +59,7 @@ func (s *settingsAutoSaveSteps) givenACanvasExists(canvasName string) {
 
 func (s *settingsAutoSaveSteps) addFilterNode(name string) {
 	s.canvas.AddFilter(name, models.Position{X: 500, Y: 250})
+	s.nodeID = s.waitForSingleNodeID()
 }
 
 func (s *settingsAutoSaveSteps) clearExpressionField() {
@@ -82,14 +85,14 @@ func (s *settingsAutoSaveSteps) switchToConfigurationTab() {
 func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, expected string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		val, exists, found := s.getExpressionField(nodeName)
+		val, exists, found := s.getExpressionField()
 		if found && exists && val == expected {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	val, exists, found := s.getExpressionField(nodeName)
+	val, exists, found := s.getExpressionField()
 	require.True(s.t, found, "expected node %s to exist in DB", nodeName)
 	require.True(s.t, exists, "expected expression key to exist in DB config for node %s", nodeName)
 	require.Equal(s.t, expected, val, "expected expression=%q in DB for node %s but got %v", expected, nodeName, val)
@@ -98,14 +101,14 @@ func (s *settingsAutoSaveSteps) assertExpressionFieldEquals(nodeName string, exp
 func (s *settingsAutoSaveSteps) assertExpressionFieldMissing(nodeName string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		_, exists, found := s.getExpressionField(nodeName)
+		_, exists, found := s.getExpressionField()
 		if found && !exists {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	val, exists, found := s.getExpressionField(nodeName)
+	val, exists, found := s.getExpressionField()
 	require.True(s.t, found, "expected node %s to exist in DB", nodeName)
 	require.False(
 		s.t,
@@ -131,21 +134,42 @@ func (s *settingsAutoSaveSteps) assertExpressionInputEquals(expected string) {
 	require.Equal(s.t, expected, value)
 }
 
-func (s *settingsAutoSaveSteps) getExpressionField(nodeName string) (any, bool, bool) {
+func (s *settingsAutoSaveSteps) waitForSingleNodeID() string {
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+		require.NoError(s.t, err)
+
+		nodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(s.t, err)
+
+		if len(nodes) == 1 {
+			return nodes[0].NodeID
+		}
+
+		time.Sleep(300 * time.Millisecond)
+	}
+
 	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
 	require.NoError(s.t, err)
 
 	nodes, err := models.FindCanvasNodes(canvas.ID)
 	require.NoError(s.t, err)
 
-	for _, node := range nodes {
-		if node.Name != nodeName {
-			continue
-		}
+	require.Len(s.t, nodes, 1, "expected exactly one node in canvas after adding filter")
+	return nodes[0].NodeID
+}
 
-		val, exists := node.Configuration.Data()["expression"]
-		return val, exists, true
+func (s *settingsAutoSaveSteps) getExpressionField() (any, bool, bool) {
+	if s.nodeID == "" {
+		return nil, false, false
 	}
 
-	return nil, false, false
+	node, err := models.FindCanvasNode(database.Conn(), s.canvas.WorkflowID, s.nodeID)
+	if err != nil {
+		return nil, false, false
+	}
+
+	val, exists := node.Configuration.Data()["expression"]
+	return val, exists, true
 }
