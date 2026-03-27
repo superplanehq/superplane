@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"os"
 
+	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
@@ -29,6 +31,15 @@ type CommandContext struct {
 type ConfigContext interface {
 	GetActiveCanvas() string
 	SetActiveCanvas(canvasID string) error
+}
+
+// IsInteractive returns true when stdin is a terminal,
+// meaning the user can respond to interactive prompts.
+func (c CommandContext) IsInteractive() bool {
+	if f, ok := c.Cmd.InOrStdin().(*os.File); ok {
+		return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+	}
+	return false
 }
 
 type BindOptions struct {
