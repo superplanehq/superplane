@@ -2436,55 +2436,23 @@ func (c *Client) ListGPUImages() ([]Image, error) {
 
 // isGPURelatedImage checks if an image is GPU-related based on keywords in name/slug
 func isGPURelatedImage(image Image) bool {
+	// Use more specific keywords to avoid false positives like "rails", "portainer", "phpmyadmin"
 	gpuKeywords := []string{
 		"gpu", "cuda", "nvidia", "ml-in-a-box", "pytorch", "tensorflow",
-		"machine learning", "deep learning", "ai", "ml",
+		"machine learning", "deep learning", "machine-learning", "deep-learning",
 	}
 
-	// Check image name
+	lowerName := strings.ToLower(image.Name)
+	lowerSlug := strings.ToLower(image.Slug)
+
 	for _, keyword := range gpuKeywords {
-		if containsCaseInsensitive(image.Name, keyword) {
+		lowerKeyword := strings.ToLower(keyword)
+		if strings.Contains(lowerName, lowerKeyword) || strings.Contains(lowerSlug, lowerKeyword) {
 			return true
 		}
 	}
 
-	// Check image slug
-	if image.Slug != "" {
-		for _, keyword := range gpuKeywords {
-			if containsCaseInsensitive(image.Slug, keyword) {
-				return true
-			}
-		}
-	}
-
 	return false
-}
-
-func containsCaseInsensitive(s, substr string) bool {
-	return len(s) >= len(substr) && findSubstring(s, substr)
-}
-
-func findSubstring(s, substr string) bool {
-	s = toLower(s)
-	substr = toLower(substr)
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-func toLower(s string) string {
-	result := make([]byte, len(s))
-	for i := 0; i < len(s); i++ {
-		if s[i] >= 'A' && s[i] <= 'Z' {
-			result[i] = s[i] + 32
-		} else {
-			result[i] = s[i]
-		}
-	}
-	return string(result)
 }
 
 // RenameDroplet renames a droplet
