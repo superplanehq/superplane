@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
 
 	pw "github.com/playwright-community/playwright-go"
@@ -21,6 +22,7 @@ func TestCanvasAutoSave(t *testing.T) {
 		steps.enterEditMode()
 		steps.addNoopNode("Auto Save Node", models.Position{X: 500, Y: 220})
 		steps.waitForSaved()
+		steps.dismissSidebar()
 		steps.moveNode("Auto Save Node", 100, 80)
 		steps.waitForSaved()
 	})
@@ -63,10 +65,22 @@ func (s *canvasAutoSaveSteps) addNoopNode(name string, pos models.Position) {
 	s.session.AssertText(name)
 }
 
+func (s *canvasAutoSaveSteps) dismissSidebar() {
+	s.canvas.ClickOnEmptyCanvasArea()
+	s.session.Sleep(300)
+}
+
+// nodeHeaderSelector builds the correct data-testid selector for a node header,
+// matching the DOM convention of lowercase, space-to-dash conversion.
+func nodeHeaderSelector(name string) q.Query {
+	safe := strings.ToLower(name)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	return q.Locator(`[data-testid="node-` + safe + `-header"]`)
+}
+
 // moveNode grabs a node by its header and drags it by the given offset.
 func (s *canvasAutoSaveSteps) moveNode(name string, deltaX, deltaY int) {
-	nodeHeader := q.TestID("node", name, "header")
-	loc := nodeHeader.Run(s.session)
+	loc := nodeHeaderSelector(name).Run(s.session)
 
 	err := loc.WaitFor(pw.LocatorWaitForOptions{
 		State:   pw.WaitForSelectorStateVisible,
