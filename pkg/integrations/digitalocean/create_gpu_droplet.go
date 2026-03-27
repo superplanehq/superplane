@@ -151,7 +151,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Placeholder: "Select a one-click application",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "gpu_image",
+					Type: "gpu_image_oneclick",
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
@@ -167,7 +167,7 @@ func (c *CreateGPUDroplet) Configuration() []configuration.Field {
 			Placeholder: "Select a base OS",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "gpu_image",
+					Type: "gpu_image_base",
 				},
 			},
 			VisibilityConditions: []configuration.VisibilityCondition{
