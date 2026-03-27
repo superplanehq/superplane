@@ -56,10 +56,17 @@ func resolveDatabaseClusterMetadata(ctx core.SetupContext, clusterID string) err
 		return fmt.Errorf("database cluster %q was not found", clusterID)
 	}
 
+	// Do not carry DatabaseName across cluster changes: resolveDatabaseMetadata
+	// would treat (newClusterID, oldName) as cached and skip listing DBs on the new cluster.
+	preservedDBName := existing.DatabaseName
+	if existing.DatabaseClusterID != "" && existing.DatabaseClusterID != clusterID {
+		preservedDBName = ""
+	}
+
 	return ctx.Metadata.Set(DatabaseNodeMetadata{
 		DatabaseClusterID:   clusterID,
 		DatabaseClusterName: clusterName,
-		DatabaseName:        existing.DatabaseName,
+		DatabaseName:        preservedDBName,
 	})
 }
 

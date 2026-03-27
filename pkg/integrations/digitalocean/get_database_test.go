@@ -52,6 +52,42 @@ func Test__GetDatabase__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	t.Run("changing cluster re-validates database name", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"databaseCluster": "cluster-2",
+				"database":        "app_db",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"databases": [
+								{"id":"cluster-1","name":"old-db"},
+								{"id":"cluster-2","name":"new-db"}
+							]
+						}`)),
+					},
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"dbs": [{"name":"other_db"}]
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Metadata: &contexts.MetadataContext{Metadata: map[string]any{
+				"databaseClusterId":   "cluster-1",
+				"databaseClusterName": "old-db",
+				"databaseName":        "app_db",
+			}},
+		})
+
+		require.ErrorContains(t, err, `database "app_db" was not found in cluster "cluster-2"`)
+	})
 }
 
 func Test__GetDatabase__Execute(t *testing.T) {
