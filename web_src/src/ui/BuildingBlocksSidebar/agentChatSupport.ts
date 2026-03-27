@@ -322,7 +322,7 @@ async function processChatStreamEvent({
       state.runModel = typeof event.model === "string" ? event.model.trim().toLowerCase() : "";
       return;
     case "model_delta":
-      if (typeof event.content === "string") {
+      if (typeof event.content === "string" && event.content.length > 0) {
         state.streamedAnyAnswer = true;
         controller.appendAssistantContent(event.content);
       }
