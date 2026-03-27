@@ -23,9 +23,18 @@ import { BuildingBlockPreview } from "./BuildingBlockPreview";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
-import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
+import {
+  AiChatSession,
+  AiBuilderMessage,
+  AiBuilderProposal,
+  loadChatConversation,
+  loadChatSessions,
+  pushAiMessages,
+  sendChatPrompt,
+} from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
+
+const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface BuildingBlock {
   name: string;
@@ -131,66 +140,132 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
-  const persistedAiState = loadAiBuilderState<AiCanvasOperation>(canvasId);
 
   if (!isOpen) {
-    const addNoteButton = (
-      <Button
-        variant="outline"
-        onClick={() => {
-          if (disabled) return;
-          onAddNote?.();
-        }}
-        aria-label="Add Note"
-        data-testid="add-note-button"
-        disabled={disabled}
-      >
-        <StickyNote size={16} />
-        Add Note
-      </Button>
-    );
-    const openSidebarButton = (
-      <Button
-        variant="outline"
-        onClick={() => {
-          if (disabled) return;
-          onToggle(true);
-        }}
-        aria-label="Open sidebar"
-        data-testid="open-sidebar-button"
-        disabled={disabled}
-      >
-        <Plus size={16} />
-        Components
-      </Button>
-    );
-
     return (
-      <div className="absolute top-4 right-4 z-10 flex gap-3">
-        {disabled ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          addNoteButton
-        )}
-        {disabled ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          openSidebarButton
-        )}
-      </div>
+      <ClosedBuildingBlocksSidebar
+        disabled={disabled}
+        disabledTooltip={disabledTooltip}
+        onAddNote={onAddNote}
+        onToggle={onToggle}
+      />
     );
   }
 
+  return (
+    <OpenBuildingBlocksSidebar
+      onToggle={onToggle}
+      blocks={blocks}
+      showAiBuilderTab={showAiBuilderTab}
+      canvasId={canvasId}
+      organizationId={organizationId}
+      onApplyAiOperations={onApplyAiOperations}
+      integrations={integrations}
+      canvasZoom={canvasZoom}
+      disabled={disabled}
+      disabledTooltip={disabledTooltip}
+      onBlockClick={onBlockClick}
+    />
+  );
+}
+
+interface ClosedBuildingBlocksSidebarProps {
+  disabled: boolean;
+  disabledTooltip: string;
+  onAddNote?: () => void;
+  onToggle: (open: boolean) => void;
+}
+
+function ClosedBuildingBlocksSidebar({
+  disabled,
+  disabledTooltip,
+  onAddNote,
+  onToggle,
+}: ClosedBuildingBlocksSidebarProps) {
+  const addNoteButton = (
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (disabled) return;
+        onAddNote?.();
+      }}
+      aria-label="Add Note"
+      data-testid="add-note-button"
+      disabled={disabled}
+    >
+      <StickyNote size={16} />
+      Add Note
+    </Button>
+  );
+  const openSidebarButton = (
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (disabled) return;
+        onToggle(true);
+      }}
+      aria-label="Open sidebar"
+      data-testid="open-sidebar-button"
+      disabled={disabled}
+    >
+      <Plus size={16} />
+      Components
+    </Button>
+  );
+
+  return (
+    <div className="absolute top-4 right-4 z-10 flex gap-3">
+      {disabled ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
+          <TooltipContent side="left" sideOffset={10}>
+            <p>{disabledTooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        addNoteButton
+      )}
+      {disabled ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
+          <TooltipContent side="left" sideOffset={10}>
+            <p>{disabledTooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        openSidebarButton
+      )}
+    </div>
+  );
+}
+
+interface OpenBuildingBlocksSidebarProps {
+  onToggle: (open: boolean) => void;
+  blocks: BuildingBlockCategory[];
+  showAiBuilderTab: boolean;
+  canvasId?: string;
+  organizationId?: string;
+  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  integrations: OrganizationsIntegration[];
+  canvasZoom: number;
+  disabled: boolean;
+  disabledTooltip: string;
+  onBlockClick?: (block: BuildingBlock) => void;
+}
+
+function OpenBuildingBlocksSidebar({
+  onToggle,
+  blocks,
+  showAiBuilderTab,
+  canvasId,
+  organizationId,
+  onApplyAiOperations,
+  integrations,
+  canvasZoom,
+  disabled,
+  disabledTooltip,
+  onBlockClick,
+}: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -198,7 +273,11 @@ export function BuildingBlocksSidebar({
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+    if (typeof window === "undefined") {
+      return 450;
+    }
+
+    const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 450;
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -206,15 +285,17 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "ai">(persistedAiState?.activeTab || "components");
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
   const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>(persistedAiState?.messages || []);
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
-    persistedAiState?.pendingProposal || null,
-  );
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
   const applyShortcutHint = useMemo(() => {
     if (typeof navigator === "undefined") {
       return "Ctrl+Enter";
@@ -223,17 +304,18 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      await sendAgentChatPrompt({
+      await sendChatPrompt({
         value,
         aiInput,
-        aiMessages,
         canvasId,
         organizationId,
+        currentChatId,
         isGeneratingResponse,
+        setChatSessions,
+        setCurrentChatId,
         setAiMessages,
         setAiInput,
         setAiError,
@@ -242,8 +324,24 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, aiMessages, canvasId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
   );
+
+  const handleStartNewChatSession = useCallback(() => {
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
+    setAiError(null);
+    requestAnimationFrame(() => {
+      aiInputRef.current?.focus();
+    });
+  }, []);
+
+  const handleSelectChatSession = useCallback((chatId: string) => {
+    setCurrentChatId(chatId);
+    setPendingProposal(null);
+    setAiError(null);
+  }, []);
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
@@ -361,31 +459,139 @@ export function BuildingBlocksSidebar({
   }, [showAiBuilderTab, activeTab]);
 
   useEffect(() => {
-    const nextPersistedState = loadAiBuilderState<AiCanvasOperation>(canvasId);
-    setActiveTab(nextPersistedState?.activeTab || "components");
-    setAiMessages(nextPersistedState?.messages || []);
-    setPendingProposal(nextPersistedState?.pendingProposal || null);
+    setActiveTab("components");
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
     setAiError(null);
     setAiInput("");
   }, [canvasId]);
 
   useEffect(() => {
-    saveAiBuilderState<AiCanvasOperation>(canvasId, {
-      activeTab,
-      messages: aiMessages,
-      pendingProposal,
-    });
-  }, [activeTab, aiMessages, canvasId, pendingProposal]);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(AI_BUILDER_STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId) {
+      setChatSessions([]);
+      setCurrentChatId(null);
+      setAiMessages([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingChatSessions(true);
+      try {
+        const sessions = await loadChatSessions({
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setChatSessions(sessions);
+        setCurrentChatId((previousChatId) => {
+          if (previousChatId && sessions.some((session) => session.id === previousChatId)) {
+            return previousChatId;
+          }
+
+          return null;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat sessions:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatSessions(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, organizationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId || !currentChatId) {
+      if (!currentChatId) {
+        setAiMessages([]);
+        setPendingProposal(null);
+      }
+      setIsLoadingChatMessages(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void (async () => {
+      setIsLoadingChatMessages(true);
+      try {
+        const messages = await loadChatConversation({
+          chatId: currentChatId,
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setAiMessages(messages);
+        setAiError(null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat conversation:", error);
+          setAiError(error instanceof Error ? error.message : "Failed to load chat conversation.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, currentChatId, organizationId]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      // Small delay to ensure the sidebar is fully rendered
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
+    if (!searchInputRef.current) {
+      return;
     }
-  }, [isOpen]);
+
+    // Small delay to ensure the sidebar is fully rendered
+    const timeoutId = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Handle resize mouse events
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -644,6 +850,10 @@ export function BuildingBlocksSidebar({
 
         {showAiBuilderTab && (
           <AiBuilderChatPanel
+            chatSessions={chatSessions}
+            currentChatId={currentChatId}
+            isLoadingChatSessions={isLoadingChatSessions}
+            isLoadingChatMessages={isLoadingChatMessages}
             aiMessages={aiMessages}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
@@ -657,6 +867,8 @@ export function BuildingBlocksSidebar({
             canvasId={canvasId}
             aiInput={aiInput}
             onAiInputChange={setAiInput}
+            onSelectChat={handleSelectChatSession}
+            onStartNewSession={handleStartNewChatSession}
             onSendPrompt={() => void handleSendPrompt()}
             aiInputRef={aiInputRef}
           />
