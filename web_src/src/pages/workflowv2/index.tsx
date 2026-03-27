@@ -5697,8 +5697,8 @@ export function WorkflowPageV2() {
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvas?.spec?.nodes}
-          components={components}
-          triggers={triggers}
+          components={allComponents}
+          triggers={allTriggers}
           blueprints={blueprints}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
