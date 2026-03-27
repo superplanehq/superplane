@@ -22,12 +22,13 @@ import (
 const (
 	DefaultBaseURL = "https://sentry.io"
 
-	ResourceTypeProject  = "project"
-	ResourceTypeTeam     = "team"
-	ResourceTypeIssue    = "issue"
-	ResourceTypeAssignee = "assignee"
-	ResourceTypeAlert    = "alert"
-	ResourceTypeRelease  = "release"
+	ResourceTypeProject     = "project"
+	ResourceTypeTeam        = "team"
+	ResourceTypeIssue       = "issue"
+	ResourceTypeAssignee    = "assignee"
+	ResourceTypeAlert       = "alert"
+	ResourceTypeAlertTarget = "alert-target"
+	ResourceTypeRelease     = "release"
 
 	SentryPersonalTokensURL = "https://sentry.io/settings/account/api/auth-tokens/"
 )
@@ -39,8 +40,7 @@ const (
    > **Token Permissions:**  
    > ` + "`Project -> Read`" + ` · ` + "`Releases -> Read & Write (project:releases)`" + ` · ` + "`Team -> Read`" + ` · ` + "`Issue & Event -> Read & Write`" + ` · ` + "`Organization -> Read & Write`" + `
 
-2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
-   Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
+2. In Sentry, go to **Settings → Integrations → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it ` + "`%s`" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
 4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
 `
@@ -142,7 +142,7 @@ func (s *Sentry) Icon() string {
 }
 
 func (s *Sentry) Description() string {
-	return "React to issue events and update issues in Sentry"
+	return "React to issue events and manage issues and metric alerts in Sentry"
 }
 
 func (s *Sentry) Instructions() string {
@@ -154,8 +154,7 @@ func (s *Sentry) Instructions() string {
    > **Token Permissions:**  
    > ` + "Project -> `Read`" + ` · ` + "Releases -> `Read & Write` (`project:releases`)" + ` · ` + "Team -> `Read`" + ` · ` + "Issue & Event -> `Read & Write`" + ` · ` + "Organization -> `Read & Write`" + `
 
-2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
-   Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
+2. In Sentry, go to **Settings → Integrations → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it ` + "(e.g. `SuperPlane`)" + `, leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
 4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
 
@@ -201,6 +200,9 @@ func (s *Sentry) Configuration() []configuration.Field {
 
 func (s *Sentry) Components() []core.Component {
 	return []core.Component{
+		&CreateAlert{},
+		&UpdateAlert{},
+		&DeleteAlert{},
 		&ListAlerts{},
 		&GetAlert{},
 		&GetIssue{},
@@ -675,6 +677,108 @@ func (s *Sentry) ListResources(resourceType string, ctx core.ListResourcesContex
 
 		return resources, nil
 
+	case ResourceTypeAlertTarget:
+		targetType := strings.TrimSpace(ctx.Parameters["targetType"])
+		if targetType == "" {
+			return []core.IntegrationResource{}, nil
+		}
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sentry client: %w", err)
+		}
+
+		projectSlug := strings.TrimSpace(ctx.Parameters["project"])
+		if projectSlug == "" {
+			alertID := strings.TrimSpace(ctx.Parameters["alertId"])
+			if alertID != "" {
+				alertRule, err := client.GetAlertRule(alertID)
+				if err != nil {
+					return nil, fmt.Errorf("failed to retrieve alert for target lookup: %w", err)
+				}
+
+				if len(alertRule.Projects) > 0 {
+					projectSlug = strings.TrimSpace(alertRule.Projects[0])
+				}
+			}
+		}
+
+		if projectSlug == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		switch targetType {
+		case alertTargetTypeUser:
+			members, err := client.ListProjectMembers(projectSlug)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list project members: %w", err)
+			}
+
+			resources := make([]core.IntegrationResource, 0, len(members))
+			for _, member := range members {
+				value := ""
+				label := ""
+
+				if member.User != nil {
+					value = strings.TrimSpace(member.User.ID)
+					switch {
+					case strings.TrimSpace(member.User.Name) != "":
+						label = strings.TrimSpace(member.User.Name)
+					case strings.TrimSpace(member.User.Email) != "":
+						label = strings.TrimSpace(member.User.Email)
+					case strings.TrimSpace(member.User.Username) != "":
+						label = strings.TrimSpace(member.User.Username)
+					}
+				}
+
+				if value == "" {
+					value = strings.TrimSpace(member.ID)
+				}
+				if label == "" {
+					switch {
+					case strings.TrimSpace(member.Name) != "":
+						label = strings.TrimSpace(member.Name)
+					case strings.TrimSpace(member.Email) != "":
+						label = strings.TrimSpace(member.Email)
+					}
+				}
+
+				if value == "" || label == "" {
+					continue
+				}
+
+				resources = append(resources, core.IntegrationResource{
+					Type: ResourceTypeAlertTarget,
+					ID:   value,
+					Name: "User · " + label,
+				})
+			}
+
+			return resources, nil
+
+		case alertTargetTypeTeam:
+			teams, err := client.ListProjectTeams(projectSlug)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list project teams: %w", err)
+			}
+
+			resources := make([]core.IntegrationResource, 0, len(teams))
+			for _, team := range teams {
+				if strings.TrimSpace(team.ID) == "" || strings.TrimSpace(team.Name) == "" {
+					continue
+				}
+
+				resources = append(resources, core.IntegrationResource{
+					Type: ResourceTypeAlertTarget,
+					ID:   strings.TrimSpace(team.ID),
+					Name: "Team · " + strings.TrimSpace(team.Name),
+				})
+			}
+
+			return resources, nil
+		}
+
+		return []core.IntegrationResource{}, nil
+
 	case ResourceTypeRelease:
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -959,7 +1063,6 @@ func isExpressionValue(value string) bool {
 	value = strings.TrimSpace(value)
 	return strings.Contains(value, "{{") || strings.Contains(value, "$[")
 }
-
 func alertRuleContainsProject(alertRule MetricAlertRule, projectSlug string) bool {
 	projectSlug = strings.TrimSpace(projectSlug)
 	if projectSlug == "" {
@@ -997,7 +1100,6 @@ func releaseContainsProject(release Release, projectSlug string) bool {
 		return strings.TrimSpace(project.Slug) == projectSlug
 	})
 }
-
 func missingCredentialsMessage(config Configuration) string {
 	missing := make([]string, 0, 2)
 	if strings.TrimSpace(config.UserToken) == "" {

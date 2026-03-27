@@ -18,7 +18,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   onChange,
   domainId,
   domainType,
-  appInstallationId,
+  integrationId,
   organizationId,
   hasError: _,
   validationErrors,
@@ -146,7 +146,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       allValues={nestedValues}
                       domainId={domainId}
                       domainType={domainType}
-                      appInstallationId={appInstallationId}
+                      integrationId={integrationId}
                       organizationId={organizationId}
                       hasError={hasNestedError}
                       autocompleteExampleObj={autocompleteExampleObj}
