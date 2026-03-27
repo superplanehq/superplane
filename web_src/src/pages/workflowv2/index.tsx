@@ -99,6 +99,7 @@ import {
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
+import { CanvasCliView } from "./CanvasCliView";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
@@ -145,7 +146,6 @@ import { CanvasPageModals } from "./CanvasPageModals";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
-const CANVAS_AUTO_SAVE_STORAGE_KEY = "canvas-auto-save-enabled";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const LOCAL_CANVAS_UPDATE_SUPPRESSION_MS = 2000;
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
@@ -790,7 +790,7 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "cli" | "memory" | "settings">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -891,16 +891,7 @@ export function WorkflowPageV2() {
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
-  // Auto-save toggle state
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem(CANVAS_AUTO_SAVE_STORAGE_KEY);
-      return stored !== null ? JSON.parse(stored) : true; // Default to enabled
-    }
-    return true;
-  });
-  // Non-versioned canvases always auto-save. When versioning is enabled, auto-save follows `isAutoSaveEnabled`.
-  const canAutoSave = !isTemplate && hasEditableVersion && (isVersioningDisabled || isAutoSaveEnabled);
+  const canAutoSave = !isTemplate && hasEditableVersion;
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
@@ -1407,14 +1398,6 @@ export function WorkflowPageV2() {
       setHasNonPositionalUnsavedChanges(false);
     }
   }, [initialWorkflowSnapshot, organizationId, canvasId, queryClient]);
-
-  const handleToggleAutoSave = useCallback(() => {
-    const newValue = !isAutoSaveEnabled;
-    setIsAutoSaveEnabled(newValue);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AUTO_SAVE_STORAGE_KEY, JSON.stringify(newValue));
-    }
-  }, [isAutoSaveEnabled]);
 
   const handleToggleAutoLayoutOnUpdate = useCallback(() => {
     const newValue = !isAutoLayoutOnUpdateEnabled;
@@ -2292,7 +2275,9 @@ export function WorkflowPageV2() {
 
           const exampleData = triggerMetadata?.exampleData;
           if (exampleData && typeof exampleData === "object") {
-            exampleObj[chainNodeId] = exampleData as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleData)
+              ? [...exampleData]
+              : ({ ...exampleData } as Record<string, unknown>);
           }
           return;
         }
@@ -2313,7 +2298,9 @@ export function WorkflowPageV2() {
         if (!latestExecution?.outputs) {
           const exampleOutput = componentMetadata?.exampleOutput;
           if (exampleOutput && typeof exampleOutput === "object") {
-            exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleOutput)
+              ? [...exampleOutput]
+              : ({ ...exampleOutput } as Record<string, unknown>);
           }
           return;
         }
@@ -2333,9 +2320,24 @@ export function WorkflowPageV2() {
         }
       });
 
-      if (!exampleObj) {
-        return null;
-      }
+      // Inject config key into component nodes' example objects for autocomplete
+      chainNodeIds.forEach((chainNodeId) => {
+        const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
+        if (!chainNode || chainNode.type !== "TYPE_COMPONENT") return;
+
+        const obj = exampleObj[chainNodeId];
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
+
+        const latestExecution = visibleNodeExecutionsMap[chainNodeId]?.find(
+          (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
+        );
+        if ("config" in (obj as Record<string, unknown>)) return;
+
+        const configData = latestExecution?.configuration || chainNode.configuration;
+        if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
+          (obj as Record<string, unknown>).config = configData;
+        }
+      });
 
       const getIncomingNodes = (targetId: string): string[] => {
         return workflowEdges
@@ -2568,6 +2570,7 @@ export function WorkflowPageV2() {
       let configurationFields: ComponentsComponent["configuration"] = [];
       let displayLabel: string | undefined = node.name || undefined;
       let integrationName: string | undefined;
+      let integrationLabel: string | undefined;
       let blockName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
@@ -2580,12 +2583,18 @@ export function WorkflowPageV2() {
         displayLabel = componentMetadata?.label || displayLabel;
         blockName = node.component?.name;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
+        integrationLabel = integrationName
+          ? availableIntegrations.find((i) => i.name === integrationName)?.label
+          : undefined;
       } else if (node.type === "TYPE_TRIGGER") {
         const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
         blockName = node.trigger?.name;
         integrationName = getNodeIntegrationName(node, availableIntegrations);
+        integrationLabel = integrationName
+          ? availableIntegrations.find((i) => i.name === integrationName)?.label
+          : undefined;
       } else if (node.type === "TYPE_WIDGET") {
         const widget = widgets.find((w) => w.name === node.widget?.name);
         if (widget) {
@@ -2603,6 +2612,7 @@ export function WorkflowPageV2() {
           },
           configurationFields,
           integrationName,
+          integrationLabel,
           blockName,
           integrationRef: node.integration,
         };
@@ -2615,6 +2625,7 @@ export function WorkflowPageV2() {
         configuration: node.configuration || {},
         configurationFields,
         integrationName,
+        integrationLabel,
         blockName,
         integrationRef: node.integration,
       };
@@ -4771,6 +4782,7 @@ export function WorkflowPageV2() {
       return;
     }
 
+    setTopViewMode("canvas");
     setSuppressUnpublishedChangesBadge(false);
 
     const existingDraftVersionID = draftVersions[0]?.metadata?.id;
@@ -5386,12 +5398,6 @@ export function WorkflowPageV2() {
     : !hasEditableVersion
       ? "Enable edit mode to save changes."
       : undefined;
-  const autoSaveDisabled = !canUpdateCanvas || !hasEditableVersion;
-  const autoSaveDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
-    : !hasEditableVersion
-      ? "Enable edit mode to use auto-save."
-      : undefined;
   const saveButtonHidden =
     isVersioningDisabled ||
     isTemplate ||
@@ -5526,6 +5532,8 @@ export function WorkflowPageV2() {
         onImport={!isReadOnly ? handleImportYaml : undefined}
         isImporting={updateCanvasVersionMutation.isPending}
       />
+    ) : topViewMode === "cli" ? (
+      <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
     ) : topViewMode === "memory" ? (
       <CanvasMemoryView
         entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
@@ -5662,12 +5670,8 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
-          isAutoSaveEnabled={!isVersioningDisabled && isAutoSaveEnabled && !isTemplate}
-          onToggleAutoSave={isTemplate || isVersioningDisabled ? undefined : handleToggleAutoSave}
           lastSavedAt={lastSavedAt}
           saveErrorMessage={lastCanvasSaveError}
-          autoSaveDisabled={autoSaveDisabled}
-          autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           headerMode={headerMode}
           saveState={headerSaveState}
           onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
@@ -5697,8 +5701,8 @@ export function WorkflowPageV2() {
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvas?.spec?.nodes}
-          components={components}
-          triggers={triggers}
+          components={allComponents}
+          triggers={allTriggers}
           blueprints={blueprints}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}

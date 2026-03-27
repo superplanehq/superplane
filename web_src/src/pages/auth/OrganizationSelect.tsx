@@ -1,5 +1,5 @@
-import SuperplaneLogo from "@/assets/superplane.svg";
 import { Heading } from "@/components/Heading/heading";
+import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Palette, Plus, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -140,10 +140,15 @@ const OrganizationSelect: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100 p-8 flex justify-center">
-        <div className="w-full max-w-[640px] flex flex-col items-center justify-center gap-4 py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
-          <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
+      <div className="min-h-screen bg-slate-100">
+        <div className="px-4 py-2 bg-white border-b border-slate-200">
+          <OrganizationMenuButton />
+        </div>
+        <div className="p-8 flex justify-center">
+          <div className="w-full max-w-[640px] flex flex-col items-center justify-center gap-4 py-16">
+            <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500"></div>
+            <Text className="text-gray-500 dark:text-gray-400">Loading...</Text>
+          </div>
         </div>
       </div>
     );
@@ -151,10 +156,12 @@ const OrganizationSelect: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100">
+      <div className="px-4 py-2 bg-white border-b border-slate-200">
+        <OrganizationMenuButton />
+      </div>
       <div className="p-8 flex justify-center">
         <div className="w-full max-w-[640px] mx-auto">
           <div className="flex flex-col items-start mb-6">
-            <img src={SuperplaneLogo} alt="Superplane" className="h-6 mb-4" />
             <div className="w-full text-left">
               <Text className="font-medium text-gray-800 block">
                 Hey there{account?.name ? `, ${account.name}` : ""}!

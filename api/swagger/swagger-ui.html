@@ -3,69 +3,931 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SuperPlane API Documentation</title>
+  <title>SuperPlane API</title>
   <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui.css" />
   <style>
-    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
-    *, *:before, *:after { box-sizing: inherit; }
-    body { margin: 0; background: #fafafa; }
-    .topbar { display: none; }
-    .header {
-      background-color: #222;
-      color: white;
-      padding: 10px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --surface-muted: #f3f6fa;
+      --surface-subtle: #eef3f8;
+      --line: #dde5ee;
+      --line-strong: #c2cfdd;
+      --text: #0f1722;
+      --muted: #5c6b7c;
+      --ink: #101821;
+      --ink-soft: #1a2736;
+      --ink-line: rgba(148, 169, 202, 0.16);
+      --ink-text: #f5f7fb;
+      --ink-muted: #94a9ca;
+      --accent: #7fe2b4;
+      --accent-strong: #45c48c;
+      --shadow: 0 18px 40px rgba(15, 23, 34, 0.06);
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 8px;
     }
-    .header h1 {
+
+    html {
+      box-sizing: border-box;
+      overflow-y: scroll;
+      background: var(--bg);
+    }
+
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+
+    body {
       margin: 0;
-      font-size: 24px;
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(127, 226, 180, 0.14), transparent 22%),
+        radial-gradient(circle at top right, rgba(148, 169, 202, 0.16), transparent 24%),
+        linear-gradient(180deg, #ffffff 0, #f7f8fb 360px, var(--bg) 100%);
     }
-    .header-links a {
-      color: white;
-      margin-left: 15px;
+
+    a {
+      color: inherit;
+    }
+
+    .swagger-ui .topbar {
+      display: none;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 20px 20px 40px;
+    }
+
+    .masthead {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 252, 0.96)),
+        repeating-linear-gradient(
+          90deg,
+          rgba(194, 207, 221, 0.22) 0,
+          rgba(194, 207, 221, 0.22) 1px,
+          transparent 1px,
+          transparent 120px
+        );
+      box-shadow: var(--shadow);
+    }
+
+    .masthead:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, transparent 0, transparent calc(100% - 1px), rgba(194, 207, 221, 0.35) calc(100% - 1px)),
+        repeating-linear-gradient(
+          180deg,
+          rgba(194, 207, 221, 0.18) 0,
+          rgba(194, 207, 221, 0.18) 1px,
+          transparent 1px,
+          transparent 96px
+        );
+      pointer-events: none;
+    }
+
+    .masthead-inner {
+      position: relative;
+      z-index: 1;
+      padding: 22px 24px 26px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       text-decoration: none;
     }
-    .header-links a:hover {
-      text-decoration: underline;
+
+    .brand-mark {
+      width: 29px;
+      height: 21px;
+      flex: 0 0 auto;
+      display: block;
+    }
+
+    .brand-mark path {
+      fill: #1e2938;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .nav-link,
+    .nav-link-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+    }
+
+    .nav-link {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .nav-link-primary {
+      color: #0f1722;
+      background: var(--accent);
+      border-color: rgba(69, 196, 140, 0.3);
+    }
+
+    .nav-link:hover,
+    .nav-link-primary:hover {
+      transform: translateY(-1px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-strong);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      max-width: 720px;
+      margin: 12px 0 0;
+      color: var(--text);
+      font-size: clamp(2.4rem, 5vw, 4.25rem);
+      line-height: 0.96;
+      letter-spacing: -0.05em;
+    }
+
+    .hero-copy p {
+      max-width: 720px;
+      margin: 16px 0 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.7;
+    }
+
+    .hero-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 24px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .hero-list li {
+      padding: 14px 14px 15px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--text);
+      font-size: 0.94rem;
+      line-height: 1.55;
+    }
+
+    .hero-list strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent);
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .terminal {
+      border: 1px solid rgba(128, 227, 181, 0.12);
+      background: rgba(9, 14, 22, 0.95);
+      border-radius: var(--radius-md);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      overflow: hidden;
+    }
+
+    .terminal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(128, 227, 181, 0.1);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--ink-muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .terminal pre {
+      margin: 0;
+      padding: 16px 18px;
+      overflow-x: auto;
+      color: #d7e8f7;
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      white-space: pre;
+    }
+
+    .terminal .prompt {
+      color: var(--accent);
+    }
+
+    .terminal .comment {
+      color: #7d91ab;
+    }
+
+    .terminal-note {
+      padding: 0 18px 16px;
+      color: var(--ink-muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-inner {
+      padding: 18px 18px 20px;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 1.02rem;
+      line-height: 1.25;
+    }
+
+    .panel p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.65;
+    }
+
+    .panel ol,
+    .panel ul {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      color: var(--text);
+      line-height: 1.65;
+      font-size: 0.94rem;
+    }
+
+    .panel li + li {
+      margin-top: 8px;
+    }
+
+    .panel-eyebrow {
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .inline-code {
+      padding: 0.1em 0.36em;
+      border-radius: 4px;
+      background: rgba(15, 23, 34, 0.06);
+      font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    .swagger-shell {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .swagger-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+    }
+
+    .swagger-header h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      line-height: 1.25;
+    }
+
+    .swagger-header p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.6;
+    }
+
+    .swagger-header strong {
+      color: var(--text);
+    }
+
+    .swagger-header-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .swagger-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    #swagger-ui {
+      background: var(--surface);
+    }
+
+    .swagger-ui .info {
+      margin: 0;
+      padding: 12px 20px 0;
+    }
+
+    .swagger-ui .scheme-container {
+      margin: 0;
+      padding: 16px 20px;
+      box-shadow: none;
+      background: var(--surface-subtle);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .swagger-ui .opblock-tag {
+      border-bottom-color: var(--line);
+    }
+
+    .swagger-ui .opblock-tag,
+    .swagger-ui .opblock .opblock-summary {
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    .swagger-ui .btn.authorize {
+      border-radius: 6px;
+      border-color: #4ebd87;
+      color: #17734f;
+    }
+
+    .swagger-ui .btn.execute {
+      border-radius: 6px;
+      background: #101821;
+      border-color: #101821;
+    }
+
+    .swagger-ui .btn {
+      border-radius: 6px;
+    }
+
+    .swagger-ui input[type=text],
+    .swagger-ui input[type=password],
+    .swagger-ui textarea {
+      border-radius: 6px;
+    }
+
+    @media (max-width: 1120px) {
+      .hero,
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-list {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        padding: 14px 14px 28px;
+      }
+
+      .masthead-inner,
+      .panel-inner,
+      .swagger-header {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .nav,
+      .swagger-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>SuperPlane API Documentation</h1>
-    <div class="header-links">
-      <a href="./superplane.swagger.json" target="_blank">Download API JSON</a>
-      <a href="https://github.com/superplanehq/superplane" target="_blank">GitHub</a>
-    </div>
-  </div>
-  <div id="swagger-ui"></div>
+  <main class="page">
+    <section class="masthead">
+      <div class="masthead-inner">
+        <div class="nav">
+          <a class="brand" href="https://superplane.com/" target="_blank" rel="noreferrer">
+            <svg class="brand-mark" viewBox="0 0 29 21" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M29 14.32C28.5655 14.7542 28.1107 15.1686 27.6379 15.5626L17.112 5.16914L22.7409 18.5877C22.1782 18.8335 21.6021 19.0552 21.0139 19.2508L15.4286 5.93611V20.2791C15.1216 20.2926 14.8129 20.3 14.5025 20.3L14.2391 20.2982C14.0172 20.2955 13.7961 20.2888 13.5759 20.2791V5.88893L7.97322 19.2446C7.38516 19.0484 6.80914 18.8264 6.24652 18.58L11.8656 5.18536L1.36087 15.5578C0.888333 15.1638 0.434276 14.7489 0 14.3147L14.4975 0L29 14.32Z" />
+            </svg>
+            SuperPlane API
+          </a>
+          <div class="nav-links">
+            <a class="nav-link" href="https://docs.superplane.com/" target="_blank" rel="noreferrer">Docs</a>
+            <a class="nav-link" href="https://github.com/superplanehq/superplane" target="_blank" rel="noreferrer">GitHub</a>
+            <a class="nav-link-primary" id="download-json-link" href="#" target="_blank" rel="noreferrer">OpenAPI JSON</a>
+          </div>
+        </div>
+
+        <div class="hero">
+          <div class="hero-copy">
+            <div class="kicker">Public API for the SuperPlane control plane</div>
+            <h1>Automate canvases, executions, and org workflows the same way the platform does.</h1>
+            <p>
+              Use the SuperPlane API to provision canvases, ship configuration-as-code updates, trigger runs,
+              inspect execution state, manage service accounts, and control organization-level settings from CI,
+              internal tooling, or your own platform workflows.
+            </p>
+            <ul class="hero-list">
+              <li>
+                <strong>Canvases</strong>
+                Create, version, update, delete, and inspect canvases and related runtime state.
+              </li>
+              <li>
+                <strong>Executions</strong>
+                Trigger workflows, inspect outputs, invoke actions, resolve failures, and cancel in-flight work.
+              </li>
+              <li>
+                <strong>Organizations</strong>
+                Manage integrations, invitations, usage, roles, groups, users, and other org-scoped settings.
+              </li>
+              <li>
+                <strong>Automation identities</strong>
+                Use service account tokens for CI/CD and non-human access with scoped org permissions.
+              </li>
+            </ul>
+          </div>
+
+          <aside class="terminal">
+            <div class="terminal-top">
+              <span>Quickstart</span>
+              <span>Bearer auth</span>
+            </div>
+            <pre><span class="comment"># Verify the token</span>
+<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1/me" \
+  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
+  -H "Accept: application/json"
+
+<span class="comment"># List canvases</span>
+<span class="prompt">$</span> curl -X GET "$API_BASE/api/v1/canvases" \
+  -H "Authorization: Bearer $SUPERPLANE_API_TOKEN" \
+  -H "Accept: application/json"</pre>
+            <div class="terminal-note">
+              In the reference below, click <strong>Authorize</strong> and paste either a raw token or
+              <span class="inline-code">Bearer &lt;token&gt;</span>. If you need more context on what a resource,
+              workflow concept, or integration means, see
+              <a href="https://docs.superplane.com/" target="_blank" rel="noreferrer">docs.superplane.com</a>.
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel">
+        <div class="panel-eyebrow">Personal access</div>
+        <div class="panel-inner">
+          <h2>Create a personal API token</h2>
+          <p>Use this for local development, manual scripts, and workflows tied to a human user.</p>
+          <ol>
+            <li>Open <span class="inline-code">Settings &gt; Profile</span> in the SuperPlane app.</li>
+            <li>Select <span class="inline-code">Generate Token</span> or <span class="inline-code">Regenerate Token</span>.</li>
+            <li>Copy the token immediately. It is shown only once.</li>
+          </ol>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-eyebrow">Service accounts</div>
+        <div class="panel-inner">
+          <h2>Create a service account token</h2>
+          <p>Use this for CI/CD, platform automation, and machine-to-machine access.</p>
+          <ol>
+            <li>Open <span class="inline-code">Settings &gt; Service accounts</span>.</li>
+            <li>Create a service account and assign it the correct role.</li>
+            <li>Generate or regenerate its token and store it securely. It is shown only once.</li>
+          </ol>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-eyebrow">Reference flow</div>
+        <div class="panel-inner">
+          <h2>Use Swagger without the UI chrome</h2>
+          <p>The reference below stays generated from the OpenAPI document, but the presentation is cleaned up for public use.</p>
+          <ul>
+            <li>Use <span class="inline-code">Authorize</span> in the Swagger toolbar to set your token.</li>
+            <li>Empty plural service tags are removed from the rendered reference.</li>
+            <li>The raw OpenAPI JSON remains unchanged for generators and SDK consumers.</li>
+          </ul>
+        </div>
+      </article>
+    </section>
+
+    <section class="swagger-shell" id="reference">
+      <div class="swagger-header">
+        <div>
+          <h2>API Reference</h2>
+          <p>
+            Click <strong>Authorize</strong> to authenticate requests.
+            If you paste a raw token, the docs automatically send it as
+            <span class="inline-code">Bearer &lt;token&gt;</span>.
+          </p>
+        </div>
+        <div class="swagger-header-links">
+          <a class="swagger-link" id="open-json-link" href="#" target="_blank" rel="noreferrer">Raw JSON</a>
+        </div>
+      </div>
+      <div id="swagger-ui"></div>
+    </section>
+  </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-bundle.js" charset="UTF-8"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/4.18.3/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
   <script>
-    window.onload = function() {
-      const ui = SwaggerUIBundle({
-        url: "./docs/superplane.swagger.json",
-        dom_id: '#swagger-ui',
-        deepLinking: true,
-        presets: [
-          SwaggerUIBundle.presets.apis,
-          SwaggerUIStandalonePreset
-        ],
-        plugins: [
-          SwaggerUIBundle.plugins.DownloadUrl
-        ],
-        layout: "StandaloneLayout",
-        docExpansion: "list",
-        defaultModelsExpandDepth: 1,
-        defaultModelExpandDepth: 1,
-        displayRequestDuration: true,
-        filter: true
-      });
-      window.ui = ui;
-    };
+    (function() {
+      const docsPath = window.location.pathname.replace(/\/$/, "");
+      const specUrl = window.location.origin + docsPath + "/superplane.swagger.json";
+
+      const tagMetadata = {
+        Agent: {
+          name: "Agents",
+          description: "Manage SuperPlane agents and their lifecycle.",
+          order: 110
+        },
+        Canvas: {
+          name: "Canvases",
+          description: "Create, update, delete, and inspect canvases and canvas-level state.",
+          order: 10
+        },
+        CanvasChangeRequest: {
+          name: "Canvas change requests",
+          description: "Review, approve, reject, and resolve canvas change requests.",
+          order: 30
+        },
+        CanvasEvent: {
+          name: "Canvas events",
+          description: "List emitted canvas events and inspect their related executions.",
+          order: 25
+        },
+        CanvasNode: {
+          name: "Canvas nodes",
+          description: "Inspect node-level metadata, queues, actions, and runtime information.",
+          order: 20
+        },
+        CanvasNodeExecution: {
+          name: "Executions",
+          description: "Control execution state, outputs, retries, actions, and cancellation.",
+          order: 40
+        },
+        CanvasVersion: {
+          name: "Canvas versions",
+          description: "Manage versioned canvas definitions for configuration-as-code workflows.",
+          order: 15
+        },
+        Component: {
+          name: "Components",
+          description: "Discover component definitions and supported actions.",
+          order: 90
+        },
+        Groups: {
+          name: "Groups",
+          description: "Manage organization groups for access control and policy assignment.",
+          order: 70
+        },
+        Integration: {
+          name: "Integrations",
+          description: "Discover available integration definitions and organization connections.",
+          order: 60
+        },
+        Me: {
+          name: "Profile",
+          description: "Inspect the authenticated user and manage personal API tokens.",
+          order: 50
+        },
+        Organization: {
+          name: "Organizations",
+          description: "Manage organization settings, invitations, integrations, usage, and related configuration.",
+          order: 55
+        },
+        Organizations: {
+          name: "Organizations",
+          description: "Manage organization settings, invitations, integrations, usage, and related configuration.",
+          order: 55
+        },
+        Roles: {
+          name: "Roles",
+          description: "Manage roles and permissions within the organization.",
+          order: 80
+        },
+        Secret: {
+          name: "Secrets",
+          description: "Manage secrets and sensitive configuration without returning raw secret values.",
+          order: 65
+        },
+        Secrets: {
+          name: "Secrets",
+          description: "Manage secrets and sensitive configuration without returning raw secret values.",
+          order: 65
+        },
+        ServiceAccounts: {
+          name: "Service accounts",
+          description: "Create automation identities, assign roles, and rotate API tokens.",
+          order: 58
+        },
+        Trigger: {
+          name: "Triggers",
+          description: "Discover trigger definitions that can start or feed canvas executions.",
+          order: 92
+        },
+        Users: {
+          name: "Users",
+          description: "List and manage users and user-specific permissions.",
+          order: 75
+        },
+        Widget: {
+          name: "Widgets",
+          description: "Inspect widget definitions available to canvases and related UI flows.",
+          order: 95
+        }
+      };
+
+      const downloadJsonLink = document.getElementById("download-json-link");
+      const openJsonLink = document.getElementById("open-json-link");
+
+      downloadJsonLink.href = specUrl;
+      openJsonLink.href = specUrl;
+
+      function normalizeTag(tag) {
+        if (tag === "Blueprint" || tag === "Blueprints") {
+          return null;
+        }
+
+        const metadata = tagMetadata[tag];
+        if (!metadata) {
+          return {
+            name: tag,
+            description: "",
+            order: 999
+          };
+        }
+
+        return metadata;
+      }
+
+      function unique(values) {
+        return Array.from(new Set(values));
+      }
+
+      function buildCuratedTags(spec) {
+        const usedTags = new Set();
+
+        Object.values(spec.paths || {}).forEach(function(methods) {
+          Object.values(methods || {}).forEach(function(operation) {
+            (operation.tags || []).forEach(function(tag) {
+              const normalizedTag = normalizeTag(tag);
+              if (!normalizedTag) {
+                return;
+              }
+
+              usedTags.add(normalizedTag.name);
+            });
+          });
+        });
+
+        return Array.from(usedTags)
+          .map(function(name) {
+            const metadata = Object.values(tagMetadata).find(function(item) {
+              return item.name === name;
+            }) || { name: name, description: "", order: 999 };
+
+            return {
+              name: name,
+              description: metadata.description,
+              order: metadata.order
+            };
+          })
+          .sort(function(a, b) {
+            if (a.order !== b.order) {
+              return a.order - b.order;
+            }
+            return a.name.localeCompare(b.name);
+          })
+          .map(function(tag) {
+            return {
+              name: tag.name,
+              description: tag.description
+            };
+          });
+      }
+
+      function isPublicOperation(path, operationId) {
+        return path === "/api/v1/invite-links/{token}/accept" || operationId === "Organizations_AcceptInviteLink";
+      }
+
+      function isHiddenOperation(operation) {
+        return (operation.tags || []).some(function(tag) {
+          return tag === "Blueprint" || tag === "Blueprints";
+        });
+      }
+
+      function transformSpec(rawSpec) {
+        const spec = JSON.parse(JSON.stringify(rawSpec));
+
+        spec.info = Object.assign({}, spec.info || {}, {
+          title: "SuperPlane API",
+          description: "Programmatic access to canvases, executions, organization configuration, service accounts, integrations, and related SuperPlane resources."
+        });
+
+        spec.securityDefinitions = Object.assign({}, spec.securityDefinitions || {}, {
+          BearerToken: {
+            type: "apiKey",
+            name: "Authorization",
+            in: "header",
+            description: "Use Authorize and paste either a raw token or Bearer <token>."
+          }
+        });
+
+        Object.entries(spec.paths || {}).forEach(function(entry) {
+          const path = entry[0];
+          const methods = entry[1];
+          const nextMethods = {};
+
+          Object.entries(methods || {}).forEach(function(methodEntry) {
+            const method = methodEntry[0];
+            const operation = methodEntry[1];
+
+            if (isHiddenOperation(operation)) {
+              return;
+            }
+
+            const rawTags = operation.tags || [];
+
+            operation.tags = unique(
+              rawTags
+                .map(function(tag) {
+                  return normalizeTag(tag);
+                })
+                .filter(Boolean)
+                .map(function(tag) {
+                  return tag.name;
+                })
+            );
+
+            if (isPublicOperation(path, operation.operationId)) {
+              operation.security = [];
+              nextMethods[method] = operation;
+              return;
+            }
+
+            operation.security = [{ BearerToken: [] }];
+            nextMethods[method] = operation;
+          });
+
+          if (Object.keys(nextMethods).length === 0) {
+            delete spec.paths[path];
+            return;
+          }
+
+          spec.paths[path] = nextMethods;
+        });
+
+        spec.tags = buildCuratedTags(spec);
+        return spec;
+      }
+
+      window.onload = function() {
+        fetch(specUrl)
+          .then(function(response) {
+            if (!response.ok) {
+              throw new Error("Failed to load OpenAPI spec");
+            }
+
+            return response.json();
+          })
+          .then(function(rawSpec) {
+            const spec = transformSpec(rawSpec);
+
+            const ui = SwaggerUIBundle({
+              spec: spec,
+              dom_id: "#swagger-ui",
+              deepLinking: true,
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+              ],
+              plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+              ],
+              layout: "BaseLayout",
+              docExpansion: "list",
+              defaultModelsExpandDepth: 1,
+              defaultModelExpandDepth: 1,
+              displayRequestDuration: true,
+              filter: true,
+              persistAuthorization: true,
+              tagsSorter: function(a, b) {
+                const orderA = (spec.tags || []).findIndex(function(tag) { return tag.name === a; });
+                const orderB = (spec.tags || []).findIndex(function(tag) { return tag.name === b; });
+                return orderA - orderB;
+              },
+              operationsSorter: function(a, b) {
+                const methodOrder = { get: 0, post: 1, put: 2, patch: 3, delete: 4 };
+                if (a.get("path") !== b.get("path")) {
+                  return a.get("path").localeCompare(b.get("path"));
+                }
+                return (methodOrder[a.get("method")] || 99) - (methodOrder[b.get("method")] || 99);
+              },
+              requestInterceptor: function(request) {
+                if (!request.headers) {
+                  return request;
+                }
+
+                const authorization = request.headers.Authorization || request.headers.authorization;
+                if (!authorization || /^Bearer\s+/i.test(authorization)) {
+                  return request;
+                }
+
+                request.headers.Authorization = "Bearer " + String(authorization).trim();
+                return request;
+              }
+            });
+
+            window.ui = ui;
+          });
+      };
+    })();
   </script>
 </body>
 </html>
