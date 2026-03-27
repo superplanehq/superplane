@@ -29,6 +29,7 @@ type ServiceAccountsServiceAccount struct {
 	HasToken       *bool      `json:"hasToken,omitempty"`
 	CreatedAt      *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time `json:"updatedAt,omitempty"`
+	CreatedByName  *string    `json:"createdByName,omitempty"`
 }
 
 // NewServiceAccountsServiceAccount instantiates a new ServiceAccountsServiceAccount object
@@ -304,6 +305,38 @@ func (o *ServiceAccountsServiceAccount) SetUpdatedAt(v time.Time) {
 	o.UpdatedAt = &v
 }
 
+// GetCreatedByName returns the CreatedByName field value if set, zero value otherwise.
+func (o *ServiceAccountsServiceAccount) GetCreatedByName() string {
+	if o == nil || IsNil(o.CreatedByName) {
+		var ret string
+		return ret
+	}
+	return *o.CreatedByName
+}
+
+// GetCreatedByNameOk returns a tuple with the CreatedByName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *ServiceAccountsServiceAccount) GetCreatedByNameOk() (*string, bool) {
+	if o == nil || IsNil(o.CreatedByName) {
+		return nil, false
+	}
+	return o.CreatedByName, true
+}
+
+// HasCreatedByName returns a boolean if a field has been set.
+func (o *ServiceAccountsServiceAccount) HasCreatedByName() bool {
+	if o != nil && !IsNil(o.CreatedByName) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedByName gets a reference to the given string and assigns it to the CreatedByName field.
+func (o *ServiceAccountsServiceAccount) SetCreatedByName(v string) {
+	o.CreatedByName = &v
+}
+
 func (o ServiceAccountsServiceAccount) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -337,6 +370,9 @@ func (o ServiceAccountsServiceAccount) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
+	}
+	if !IsNil(o.CreatedByName) {
+		toSerialize["createdByName"] = o.CreatedByName
 	}
 	return toSerialize, nil
 }

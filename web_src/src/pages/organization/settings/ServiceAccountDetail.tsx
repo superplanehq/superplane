@@ -240,7 +240,9 @@ export function ServiceAccountDetail({ organizationId }: ServiceAccountDetailPro
               <dt className="text-gray-500 dark:text-gray-400">Description</dt>
               <dd className="text-gray-800 dark:text-white">{serviceAccount.description || "—"}</dd>
               <dt className="text-gray-500 dark:text-gray-400">Created</dt>
-              <dd className="text-gray-800 dark:text-white">{createdAt}</dd>
+              <dd className="text-gray-800 dark:text-white">
+                {serviceAccount.createdByName ? `${createdAt} by ${serviceAccount.createdByName}` : createdAt}
+              </dd>
               <dt className="text-gray-500 dark:text-gray-400">ID</dt>
               <dd className="text-gray-800 dark:text-white font-mono text-xs">{serviceAccount.id}</dd>
             </dl>

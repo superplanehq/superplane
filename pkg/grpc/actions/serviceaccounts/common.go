@@ -22,6 +22,9 @@ func serializeServiceAccount(user *models.User) *pb.ServiceAccount {
 
 	if user.CreatedBy != nil {
 		sa.CreatedBy = user.CreatedBy.String()
+		if creator, err := models.FindMaybeDeletedUserByID(user.OrganizationID.String(), user.CreatedBy.String()); err == nil && creator != nil {
+			sa.CreatedByName = creator.Name
+		}
 	}
 
 	return sa
