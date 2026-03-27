@@ -282,8 +282,9 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
+	s.session.Sleep(400)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
-	s.session.Sleep(200)
+	s.session.Sleep(400)
 
 	typeSelects := s.session.Page().Locator(`[data-testid="field-type-select"]`)
 	if err := typeSelects.Nth(0).Click(); err != nil {
