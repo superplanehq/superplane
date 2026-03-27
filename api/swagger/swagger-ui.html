@@ -626,11 +626,6 @@
           description: "Manage SuperPlane agents and their lifecycle.",
           order: 110
         },
-        Blueprint: {
-          name: "Blueprints",
-          description: "Inspect and manage reusable blueprint resources.",
-          order: 100
-        },
         Canvas: {
           name: "Canvases",
           description: "Create, update, delete, and inspect canvases and canvas-level state.",
@@ -735,6 +730,10 @@
       openJsonLink.href = specUrl;
 
       function normalizeTag(tag) {
+        if (tag === "Blueprint" || tag === "Blueprints") {
+          return null;
+        }
+
         const metadata = tagMetadata[tag];
         if (!metadata) {
           return {
@@ -757,7 +756,12 @@
         Object.values(spec.paths || {}).forEach(function(methods) {
           Object.values(methods || {}).forEach(function(operation) {
             (operation.tags || []).forEach(function(tag) {
-              usedTags.add(normalizeTag(tag).name);
+              const normalizedTag = normalizeTag(tag);
+              if (!normalizedTag) {
+                return;
+              }
+
+              usedTags.add(normalizedTag.name);
             });
           });
         });
@@ -792,6 +796,12 @@
         return path === "/api/v1/invite-links/{token}/accept" || operationId === "Organizations_AcceptInviteLink";
       }
 
+      function isHiddenOperation(operation) {
+        return (operation.tags || []).some(function(tag) {
+          return tag === "Blueprint" || tag === "Blueprints";
+        });
+      }
+
       function transformSpec(rawSpec) {
         const spec = JSON.parse(JSON.stringify(rawSpec));
 
@@ -812,21 +822,45 @@
         Object.entries(spec.paths || {}).forEach(function(entry) {
           const path = entry[0];
           const methods = entry[1];
+          const nextMethods = {};
 
-          Object.values(methods || {}).forEach(function(operation) {
+          Object.entries(methods || {}).forEach(function(methodEntry) {
+            const method = methodEntry[0];
+            const operation = methodEntry[1];
+
+            if (isHiddenOperation(operation)) {
+              return;
+            }
+
             const rawTags = operation.tags || [];
 
-            operation.tags = unique(rawTags.map(function(tag) {
-              return normalizeTag(tag).name;
-            }));
+            operation.tags = unique(
+              rawTags
+                .map(function(tag) {
+                  return normalizeTag(tag);
+                })
+                .filter(Boolean)
+                .map(function(tag) {
+                  return tag.name;
+                })
+            );
 
             if (isPublicOperation(path, operation.operationId)) {
               operation.security = [];
+              nextMethods[method] = operation;
               return;
             }
 
             operation.security = [{ BearerToken: [] }];
+            nextMethods[method] = operation;
           });
+
+          if (Object.keys(nextMethods).length === 0) {
+            delete spec.paths[path];
+            return;
+          }
+
+          spec.paths[path] = nextMethods;
         });
 
         spec.tags = buildCuratedTags(spec);
