@@ -370,13 +370,16 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 
 	// Get execution chain first to help resolve ambiguous names
 	var executionChainNodeIDs []string
+	var executionByNodeID map[string]models.CanvasNodeExecution
 	if b.previousExecutionID != nil {
 		executionsInChain, err := b.listExecutionsInChain()
 		if err != nil {
 			return nil, err
 		}
+		executionByNodeID = make(map[string]models.CanvasNodeExecution, len(executionsInChain))
 		for _, execution := range executionsInChain {
 			executionChainNodeIDs = append(executionChainNodeIDs, execution.NodeID)
+			executionByNodeID[execution.NodeID] = execution
 		}
 	}
 
@@ -393,6 +396,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 	chainRefs := populateFromInputOrRoot(messageChain, inputMap, rootEvent, refToNodeID)
 
 	if len(chainRefs) == 0 {
+		b.injectConfigIntoMessageChain(messageChain, refToNodeID, executionByNodeID)
 		return messageChain, nil
 	}
 
@@ -405,7 +409,32 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return nil, err
 	}
 
+	b.injectConfigIntoMessageChain(messageChain, refToNodeID, executionByNodeID)
 	return messageChain, nil
+}
+
+func (b *NodeConfigurationBuilder) injectConfigIntoMessageChain(
+	messageChain map[string]any,
+	refToNodeID map[string]string,
+	executionByNodeID map[string]models.CanvasNodeExecution,
+) {
+	if len(executionByNodeID) == 0 {
+		return
+	}
+
+	for nodeRef, nodeID := range refToNodeID {
+		execution, ok := executionByNodeID[nodeID]
+		if !ok {
+			continue
+		}
+
+		payload, ok := messageChain[nodeRef]
+		if !ok {
+			continue
+		}
+
+		messageChain[nodeRef] = injectConfig(payload, execution.Configuration.Data())
+	}
 }
 
 func firstChainRef(chainRefs map[string]string) string {
@@ -515,7 +544,16 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 		return nil, fmt.Errorf("no root event found")
 	}
 
-	return rootEvent.Data.Data(), nil
+	payload := rootEvent.Data.Data()
+
+	if rootEvent.ExecutionID != nil {
+		execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
+		if err == nil && execution != nil {
+			payload = injectConfig(payload, execution.Configuration.Data())
+		}
+	}
+
+	return payload, nil
 }
 
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.CanvasEvent, refToNodeID map[string]string) map[string]string {
@@ -539,6 +577,20 @@ func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]an
 	}
 
 	return chainRefs
+}
+
+func injectConfig(payload any, configData map[string]any) any {
+	if len(configData) == 0 {
+		return payload
+	}
+
+	payloadMap, ok := payload.(map[string]any)
+	if !ok {
+		return payload
+	}
+
+	payloadMap["config"] = configData
+	return payloadMap
 }
 
 func (b *NodeConfigurationBuilder) populateFromExecutions(messageChain map[string]any, chainRefs map[string]string) error {
@@ -673,7 +725,7 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 	if hasInput {
 		step++
 		if step >= depth && inputPayload != nil {
-			return inputPayload, nil
+			return b.injectConfigFromPreviousExecution(inputPayload), nil
 		}
 	}
 
@@ -686,6 +738,19 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 	}
 
 	return b.resolveFromRoot(depth, step)
+}
+
+func (b *NodeConfigurationBuilder) injectConfigFromPreviousExecution(payload any) any {
+	if b.previousExecutionID == nil {
+		return payload
+	}
+
+	execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *b.previousExecutionID)
+	if err != nil || execution == nil {
+		return payload
+	}
+
+	return injectConfig(payload, execution.Configuration.Data())
 }
 
 func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, hasInput bool) (int, any, error) {
@@ -729,7 +794,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		}
 
 		if payload := event.Data.Data(); payload != nil {
-			return step, payload, nil
+			return step, injectConfig(payload, execution.Configuration.Data()), nil
 		}
 	}
 
@@ -751,6 +816,13 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 	}
 
 	if payload := rootEvent.Data.Data(); payload != nil {
+		if rootEvent.ExecutionID != nil {
+			execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
+			if err == nil && execution != nil {
+				return injectConfig(payload, execution.Configuration.Data()), nil
+			}
+		}
+
 		return payload, nil
 	}
 

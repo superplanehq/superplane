@@ -2313,7 +2313,9 @@ export function WorkflowPageV2() {
         if (!latestExecution?.outputs) {
           const exampleOutput = componentMetadata?.exampleOutput;
           if (exampleOutput && typeof exampleOutput === "object") {
-            exampleObj[chainNodeId] = exampleOutput as Record<string, unknown>;
+            exampleObj[chainNodeId] = Array.isArray(exampleOutput)
+              ? [...exampleOutput]
+              : ({ ...exampleOutput } as Record<string, unknown>);
           }
           return;
         }
@@ -2333,9 +2335,22 @@ export function WorkflowPageV2() {
         }
       });
 
-      if (!exampleObj) {
-        return null;
-      }
+      // Inject config key into component nodes' example objects for autocomplete
+      chainNodeIds.forEach((chainNodeId) => {
+        const chainNode = workflowNodes.find((node) => node.id === chainNodeId);
+        if (!chainNode || chainNode.type !== "TYPE_COMPONENT") return;
+
+        const obj = exampleObj[chainNodeId];
+        if (!obj || typeof obj !== "object" || Array.isArray(obj)) return;
+
+        const latestExecution = visibleNodeExecutionsMap[chainNodeId]?.find(
+          (execution) => execution.state === "STATE_FINISHED" && execution.resultReason !== "RESULT_REASON_ERROR",
+        );
+        const configData = latestExecution?.configuration || chainNode.configuration;
+        if (configData && typeof configData === "object" && Object.keys(configData).length > 0) {
+          (obj as Record<string, unknown>).config = configData;
+        }
+      });
 
       const getIncomingNodes = (targetId: string): string[] => {
         return workflowEdges
