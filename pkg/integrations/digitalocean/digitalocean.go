@@ -113,6 +113,8 @@ func (d *DigitalOcean) Components() []core.Component {
 		&CopyObject{},
 		&DeleteObject{},
 		&CreateApp{},
+		&CreateDatabaseCluster{},
+		&GetDatabaseCluster{},
 		&GetApp{},
 		&DeleteApp{},
 		&UpdateApp{},
