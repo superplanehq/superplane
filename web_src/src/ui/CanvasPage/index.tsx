@@ -265,10 +265,6 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  isAutoSaveEnabled?: boolean;
-  onToggleAutoSave?: () => void;
-  autoSaveDisabled?: boolean;
-  autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | string | null;
@@ -1109,10 +1105,6 @@ function CanvasPage(props: CanvasPageProps) {
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-          isAutoSaveEnabled={props.isAutoSaveEnabled}
-          onToggleAutoSave={props.onToggleAutoSave}
-          autoSaveDisabled={props.autoSaveDisabled}
-          autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
           headerMode={props.headerMode}
           saveState={props.saveState}
           lastSavedAt={props.lastSavedAt}
@@ -1268,10 +1260,6 @@ function CanvasPage(props: CanvasPageProps) {
                 publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
                 discardVersionDisabled={props.discardVersionDisabled}
                 discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-                isAutoSaveEnabled={props.isAutoSaveEnabled}
-                onToggleAutoSave={props.onToggleAutoSave}
-                autoSaveDisabled={props.autoSaveDisabled}
-                autoSaveDisabledTooltip={props.autoSaveDisabledTooltip}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
                 lastSavedAt={props.lastSavedAt}
@@ -1731,10 +1719,6 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
-  isAutoSaveEnabled,
-  onToggleAutoSave,
-  autoSaveDisabled,
-  autoSaveDisabledTooltip,
   headerMode,
   saveState,
   lastSavedAt,
@@ -1773,10 +1757,6 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  isAutoSaveEnabled?: boolean;
-  onToggleAutoSave?: () => void;
-  autoSaveDisabled?: boolean;
-  autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | string | null;
@@ -1845,10 +1825,6 @@ function CanvasContentHeader({
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-      isAutoSaveEnabled={isAutoSaveEnabled}
-      onToggleAutoSave={onToggleAutoSave}
-      autoSaveDisabled={autoSaveDisabled}
-      autoSaveDisabledTooltip={autoSaveDisabledTooltip}
       mode={headerMode}
       saveState={saveState}
       lastSavedAt={lastSavedAt}
@@ -1958,10 +1934,6 @@ function CanvasContent({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
-  isAutoSaveEnabled,
-  onToggleAutoSave,
-  autoSaveDisabled,
-  autoSaveDisabledTooltip,
   headerMode,
   saveState,
   lastSavedAt,
@@ -2065,10 +2037,6 @@ function CanvasContent({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  isAutoSaveEnabled?: boolean;
-  onToggleAutoSave?: () => void;
-  autoSaveDisabled?: boolean;
-  autoSaveDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   lastSavedAt?: Date | string | null;
@@ -2835,10 +2803,6 @@ function CanvasContent({
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-          isAutoSaveEnabled={isAutoSaveEnabled}
-          onToggleAutoSave={onToggleAutoSave}
-          autoSaveDisabled={autoSaveDisabled}
-          autoSaveDisabledTooltip={autoSaveDisabledTooltip}
           mode={headerMode}
           saveState={saveState}
           lastSavedAt={lastSavedAt}
