@@ -39,6 +39,10 @@ import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
 import { detachKnowledgeBaseMapper } from "./detach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
 import { runEvaluationMapper, RUN_EVALUATION_STATE_REGISTRY } from "./run_evaluation";
+import { createGPUDropletMapper } from "./create_gpu_droplet";
+import { getGPUDropletMapper } from "./get_gpu_droplet";
+import { updateGPUDropletMapper } from "./update_gpu_droplet";
+import { deleteGPUDropletMapper } from "./delete_gpu_droplet";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -82,6 +86,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   detachKnowledgeBase: detachKnowledgeBaseMapper,
   deleteKnowledgeBase: deleteKnowledgeBaseMapper,
   runEvaluation: runEvaluationMapper,
+  createGPUDroplet: createGPUDropletMapper,
+  getGPUDroplet: getGPUDropletMapper,
+  updateGPUDroplet: updateGPUDropletMapper,
+  deleteGPUDroplet: deleteGPUDropletMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -127,4 +135,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   detachKnowledgeBase: buildActionStateRegistry("detached"),
   deleteKnowledgeBase: buildActionStateRegistry("deleted"),
   runEvaluation: RUN_EVALUATION_STATE_REGISTRY,
+  createGPUDroplet: buildActionStateRegistry("created"),
+  getGPUDroplet: buildActionStateRegistry("fetched"),
+  updateGPUDroplet: buildActionStateRegistry("updated"),
+  deleteGPUDroplet: buildActionStateRegistry("deleted"),
 };

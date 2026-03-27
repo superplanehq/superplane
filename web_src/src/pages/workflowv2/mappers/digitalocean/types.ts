@@ -364,4 +364,12 @@ export interface KnowledgeBaseDataSource {
   semanticThreshold?: number;
   parentChunkSize?: number;
   childChunkSize?: number;
+export interface GetGPUDropletConfiguration {
+  droplet: string;
+}
+
+export interface UpdateGPUDropletConfiguration {
+  droplet: string;
+  name?: string;
+  size?: string;
 }
