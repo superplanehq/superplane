@@ -1,4 +1,4 @@
-.PHONY: lint test test.license.check
+.PHONY: lint test test.license.check test.agent.unit
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -8,6 +8,7 @@ export BUILDKIT_PROGRESS ?= plain
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
+AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 
@@ -73,6 +74,9 @@ test.watch:
 
 test.agent.evals:
 	$(COMPOSE) exec agent uv run python -m evals.runner
+
+test.agent.unit:
+	$(COMPOSE) run --rm -e DB_NAME=agents_test agent uv run --group dev python -m pytest $(AGENT_TEST_TARGETS)
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	

@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -317,8 +318,8 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
     else:
         claims, chat = _resolve_agent_context(chat_id, request)
 
-    recorder = PersistedRunRecorder(store, chat.id, payload.question)
     message_history = _load_message_history(store, chat.id)
+    recorder = PersistedRunRecorder(store, chat.id, payload.question)
     resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
@@ -531,7 +532,19 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
 
 
 def _create_app() -> FastAPI:
-    app = FastAPI()
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        store = SessionStore()
+        app.state.session_store = store
+        grpc_server = InternalAgentServer.from_env(store)
+        grpc_server.start()
+        app.state.internal_agent_server = grpc_server
+        try:
+            yield
+        finally:
+            grpc_server.stop()
+
+    app = FastAPI(lifespan=lifespan)
     cors_origins_raw = os.getenv("REPL_WEB_CORS_ORIGINS", "*")
     cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
     if not cors_origins:
@@ -543,20 +556,6 @@ def _create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.on_event("startup")
-    async def startup() -> None:
-        store = SessionStore()
-        app.state.session_store = store
-        grpc_server = InternalAgentServer.from_env(store)
-        grpc_server.start()
-        app.state.internal_agent_server = grpc_server
-
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
-        grpc_server: InternalAgentServer | None = getattr(app.state, "internal_agent_server", None)
-        if grpc_server is not None:
-            grpc_server.stop()
 
     @app.post("/agents/chats/{chat_id}/stream")
     async def stream_repl(chat_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
@@ -614,9 +613,11 @@ class WebServer:
             port=config.port,
             log_level="warning",
             access_log=False,
+            ws="none",
         )
         self._server = uvicorn.Server(self._uvicorn_config)
         self._thread: threading.Thread | None = None
+        self._startup_error: BaseException | None = None
 
     @property
     def base_url(self) -> str:
@@ -628,6 +629,7 @@ class WebServer:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
+        self._startup_error = None
         self._thread = threading.Thread(target=self.serve_forever, daemon=True)
         self._thread.start()
         for _ in range(200):
@@ -647,4 +649,7 @@ class WebServer:
             self._thread.join(timeout=5.0)
 
     def serve_forever(self) -> None:
-        self._server.run()
+        try:
+            self._server.run()
+        except SystemExit as error:
+            self._startup_error = error
