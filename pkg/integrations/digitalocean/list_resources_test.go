@@ -279,6 +279,105 @@ func Test__ListResources__Sizes(t *testing.T) {
 	})
 }
 
+func Test__ListResources__DatabaseClusters(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful cluster listing returns resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"databases": [
+							{"id": "cluster-1", "name": "primary-postgres", "engine": "pg"},
+							{"id": "cluster-2", "name": "cache-main", "engine": "redis"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database_cluster", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "database_cluster", resources[0].Type)
+		assert.Equal(t, "primary-postgres", resources[0].Name)
+		assert.Equal(t, "cluster-1", resources[0].ID)
+	})
+
+	t.Run("API error returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusForbidden,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"forbidden","message":"missing database:read scope"}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database_cluster", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error listing database clusters")
+		assert.Nil(t, resources)
+	})
+}
+
+func Test__ListResources__Databases(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("missing database cluster parameter returns empty resources", func(t *testing.T) {
+		resources, err := integration.ListResources("database", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+
+	t.Run("successful database listing returns resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"dbs": [
+							{"name": "defaultdb"},
+							{"name": "app_db"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			Parameters: map[string]string{"databaseCluster": "cluster-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "database", resources[1].Type)
+		assert.Equal(t, "app_db", resources[1].Name)
+		assert.Equal(t, "app_db", resources[1].ID)
+	})
+}
+
 func Test__ListResources__Images(t *testing.T) {
 	integration := &DigitalOcean{}
 

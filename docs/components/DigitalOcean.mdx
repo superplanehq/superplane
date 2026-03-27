@@ -14,12 +14,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
+  <LinkCard title="Create Database" href="#create-database" description="Create a new managed database instance in DigitalOcean" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
   <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
   <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
+  <LinkCard title="Delete Database" href="#delete-database" description="Delete an existing database instance from DigitalOcean" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from DigitalOcean Spaces Object Storage" />
@@ -399,6 +401,49 @@ Returns the created DNS record including:
 }
 ```
 
+<a id="create-database"></a>
+
+## Create Database
+
+The Create Database component adds a new database to an existing DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Application bootstrap**: Create an application-specific database as part of environment setup
+- **Tenant provisioning**: Add a dedicated database for a new customer or workspace
+- **Migration workflows**: Prepare a destination database before importing data
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster that will contain the new database (required)
+- **Database Name**: The name of the database to create (required, supports expressions)
+
+### Output
+
+Returns the created database including:
+- **name**: The created database name
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:create` and `database:read`
+- Database management is not supported for Caching or Valkey clusters
+
+### Example Output
+
+```json
+{
+  "data": {
+    "databaseClusterId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseClusterName": "primary-postgres",
+    "name": "app_db"
+  },
+  "timestamp": "2026-03-27T09:15:00Z",
+  "type": "digitalocean.database.created"
+}
+```
+
 <a id="create-droplet"></a>
 
 ## Create Droplet
@@ -710,6 +755,52 @@ Returns information about the deleted record:
   },
   "timestamp": "2026-03-13T10:05:00.000000000Z",
   "type": "digitalocean.dns.record.deleted"
+}
+```
+
+<a id="delete-database"></a>
+
+## Delete Database
+
+The Delete Database component permanently removes a database from a DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Cleanup**: Remove databases that are no longer needed after a workflow completes
+- **Environment teardown**: Delete temporary or preview-environment databases
+- **Tenant offboarding**: Remove customer-specific databases during deprovisioning
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster containing the database (required)
+- **Database**: The database to delete (required)
+
+### Output
+
+Returns information about the deleted database:
+- **name**: The deleted database name
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+- **deleted**: Whether the delete request succeeded
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:delete` and `database:read`
+- Database management is not supported for Caching or Valkey clusters
+- Deleting a database that no longer exists is treated as a success
+
+### Example Output
+
+```json
+{
+  "data": {
+    "databaseClusterId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseClusterName": "primary-postgres",
+    "deleted": true,
+    "name": "app_db"
+  },
+  "timestamp": "2026-03-27T09:20:00Z",
+  "type": "digitalocean.database.deleted"
 }
 ```
 
