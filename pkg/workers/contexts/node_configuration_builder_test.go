@@ -1500,3 +1500,62 @@ func Test_NodeConfigurationBuilder_Config_ViaPreviousDepthRootPath(t *testing.T)
 	require.NoError(t, err)
 	assert.Equal(t, "us-east-1", result["root_config_region"])
 }
+
+func Test_NodeConfigurationBuilder_Config_DoesNotMutateInputPayload(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	targetNode := "target-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: componentNode,
+				Name:   componentNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+			{
+				NodeID: targetNode,
+				Name:   targetNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+			{SourceID: componentNode, TargetID: targetNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, triggerNode, "default", nil, map[string]any{"user": "alice"})
+
+	componentConfig := map[string]any{"url": "https://example.com"}
+	execution1 := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+	require.NoError(t, database.Conn().Model(execution1).Update("configuration", datatypes.NewJSONType(componentConfig)).Error)
+
+	inputPayload := map[string]any{"status": "ok"}
+	input := map[string]any{componentNode: inputPayload}
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&execution1.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(input)
+
+	result, err := builder.Build(map[string]any{
+		"upstream_url": "{{ $[\"" + componentNode + "\"].config.url }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://example.com", result["upstream_url"])
+	assert.Equal(t, map[string]any{"status": "ok"}, inputPayload)
+}

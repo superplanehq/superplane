@@ -404,7 +404,7 @@ func (b *NodeConfigurationBuilder) buildMessageChain(referencedNodes []string) (
 		return nil, fmt.Errorf("node name %s not found in execution chain", firstChainRef(chainRefs))
 	}
 
-	err = b.populateFromExecutions(messageChain, chainRefs)
+	err = b.populateFromExecutions(messageChain, chainRefs, executionByNodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -589,19 +589,29 @@ func injectConfig(payload any, configData map[string]any) any {
 		return payload
 	}
 
-	payloadMap["config"] = configData
-	return payloadMap
+	withConfig := make(map[string]any, len(payloadMap)+1)
+	for key, value := range payloadMap {
+		withConfig[key] = value
+	}
+	withConfig["config"] = configData
+	return withConfig
 }
 
-func (b *NodeConfigurationBuilder) populateFromExecutions(messageChain map[string]any, chainRefs map[string]string) error {
-	executionsInChain, err := b.listExecutionsInChain()
-	if err != nil {
-		return err
-	}
+func (b *NodeConfigurationBuilder) populateFromExecutions(
+	messageChain map[string]any,
+	chainRefs map[string]string,
+	executionByNode map[string]models.CanvasNodeExecution,
+) error {
+	if len(executionByNode) == 0 {
+		executionsInChain, err := b.listExecutionsInChain()
+		if err != nil {
+			return err
+		}
 
-	executionByNode := make(map[string]models.CanvasNodeExecution, len(executionsInChain))
-	for _, execution := range executionsInChain {
-		executionByNode[execution.NodeID] = execution
+		executionByNode = make(map[string]models.CanvasNodeExecution, len(executionsInChain))
+		for _, execution := range executionsInChain {
+			executionByNode[execution.NodeID] = execution
+		}
 	}
 
 	executionIDs := make([]uuid.UUID, 0, len(chainRefs))
