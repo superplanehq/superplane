@@ -134,7 +134,7 @@ function normalizeApprovers(items?: CanvasSettingsApprover[]): CanvasSettingsApp
     return normalized;
   }
 
-  return [{ type: "TYPE_ANYONE" }];
+  return [{ type: "TYPE_USER", userId: "" }];
 }
 
 export function CanvasSettingsView({
@@ -234,7 +234,7 @@ export function CanvasSettingsView({
   };
 
   const addApprover = () => {
-    setApprovers((current) => [...current, { type: "TYPE_ANYONE" }]);
+    setApprovers((current) => [...current, { type: "TYPE_USER", userId: "" }]);
   };
 
   const updateApproverType = (index: number, type: ChangeRequestApproverType) => {
@@ -271,7 +271,7 @@ export function CanvasSettingsView({
   const removeApprover = (index: number) => {
     setApprovers((current) => {
       const next = current.filter((_, currentIndex) => currentIndex !== index);
-      return next.length > 0 ? next : [{ type: "TYPE_ANYONE" }];
+      return next.length > 0 ? next : [{ type: "TYPE_USER", userId: "" }];
     });
   };
 
