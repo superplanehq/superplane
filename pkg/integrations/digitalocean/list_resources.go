@@ -326,6 +326,7 @@ var allSpacesRegions = []string{
 func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	resources := make([]core.IntegrationResource, 0)
 	var firstErr error
+	successCount := 0
 
 	for _, region := range allSpacesRegions {
 		client, err := NewSpacesClient(ctx.HTTP, ctx.Integration, region)
@@ -338,10 +339,10 @@ func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 			if firstErr == nil {
 				firstErr = fmt.Errorf("region %s: %w", region, err)
 			}
-
 			continue
 		}
 
+		successCount++
 		for _, name := range buckets {
 			resources = append(resources, core.IntegrationResource{
 				Type: "spaces_bucket",
@@ -351,7 +352,8 @@ func listSpacesBuckets(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 		}
 	}
 
-	if firstErr != nil {
+	// If no region succeeded and we have an error, it's likely a credentials issue
+	if successCount == 0 && firstErr != nil {
 		return nil, fmt.Errorf("error listing spaces buckets: %w", firstErr)
 	}
 
