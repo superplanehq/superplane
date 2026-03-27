@@ -1,6 +1,6 @@
 from ai.agent import build_agent, build_prompt
+from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasProposal, CanvasQuestionRequest
-from ai.web import _to_jsonable
 
 
 def test_build_prompt_contains_question() -> None:
@@ -37,7 +37,7 @@ def test_canvas_answer_serializes_proposal_with_aliases() -> None:
         ),
     )
 
-    payload = _to_jsonable(answer)
+    payload = to_jsonable(answer)
     assert isinstance(payload, dict)
     proposal = payload.get("proposal")
     assert isinstance(proposal, dict)
