@@ -27,7 +27,7 @@ import { getTriggerRenderer } from "./mappers";
 import { buildEventInfo, buildTriggerSidebarEvent } from "./utils";
 
 /** Fixed width so status badges align across rows (9rem: enough for long labels at 10px; narrower than the old 11rem). */
-const RUNS_CONSOLE_BADGE_COL = "flex w-30 flex-shrink-0 items-center justify-start gap-1.5";
+const RUNS_CONSOLE_BADGE_COL = "flex w-36 flex-shrink-0 items-center justify-start gap-1.5";
 
 function StatusBadge({ status }: { status: string }) {
   const { badgeColor, label } = getStatusBadgeProps(status);
