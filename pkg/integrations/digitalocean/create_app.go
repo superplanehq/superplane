@@ -129,10 +129,10 @@ You can do so by creating a sample app in the DigitalOcean control panel as illu
 Returns the created app including:
 - **id**: The unique app ID
 - **name**: The app name
-- **defaultIngress**: The default ingress URL
-- **liveURL**: The live URL for the app
+- **default_ingress**: The default ingress URL
+- **live_url**: The live URL for the app
 - **region**: The region where the app is deployed
-- **activeDeployment**: Information about the active deployment
+- **active_deployment**: Information about the active deployment
 
 ## Notes
 

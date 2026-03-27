@@ -1,6 +1,6 @@
 import React from "react";
 import Editor from "@monaco-editor/react";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -12,9 +12,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
   value,
   onChange,
+  allValues = {},
   domainId,
   domainType,
-  appInstallationId,
+  integrationId,
   organizationId,
   autocompleteExampleObj,
   allowExpressions = false,
@@ -51,6 +52,23 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const objectOptions = field.typeOptions?.object;
   const schema = objectOptions?.schema;
   const hasSchema = !!schema && schema.length > 0;
+  // Merge schema defaults so visibility/required for nested fields see e.g. authMethod
+  // Use parseDefaultValues to properly convert string defaults to their correct types
+  // (e.g. boolean "false" -> false, number "5" -> 5)
+  const schemaDefaults = React.useMemo(() => {
+    if (!schema) return {};
+    return parseDefaultValues(schema);
+  }, [schema]);
+
+  const objValue = React.useMemo(
+    () => ({ ...schemaDefaults, ...((value as Record<string, unknown>) ?? {}) }),
+    [schemaDefaults, value],
+  );
+  const nestedAllValues = React.useMemo(() => ({ ...allValues, ...objValue }), [allValues, objValue]);
+
+  // When value is missing or empty object, push schema defaults to parent so required-object
+  // validation (e.g. "schedule is required") sees a non-empty value and doesn't flag the field.
+  const hasPushedSchemaDefaults = React.useRef(false);
 
   React.useEffect(() => {
     if (value !== undefined && value !== null) {
@@ -65,6 +83,18 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       setJsonError(null);
     }
   }, [value, field.defaultValue, onChange, coerceDefaultValue, serializeValueForEditor]);
+
+  React.useEffect(() => {
+    if (!hasSchema) return;
+    if (hasPushedSchemaDefaults.current) return;
+    const isEmpty =
+      value === undefined ||
+      value === null ||
+      (typeof value === "object" && value !== null && Object.keys(value).length === 0);
+    if (!isEmpty || Object.keys(schemaDefaults).length === 0) return;
+    hasPushedSchemaDefaults.current = true;
+    onChange(schemaDefaults);
+  }, [hasSchema, value, schemaDefaults, onChange]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(editorValue);
@@ -91,7 +121,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
         const parsed = JSON.parse(valueToUse);
         onChange(parsed);
         setJsonError(null);
-      } catch (error) {
+      } catch {
         if (allowExpressions && hasExpressions) {
           try {
             JSON.parse(normalizeExpressionsForValidation(valueToUse));
@@ -231,33 +261,6 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     );
   }
 
-  // Merge schema defaults so visibility/required for nested fields see e.g. authMethod
-  // Use parseDefaultValues to properly convert string defaults to their correct types
-  // (e.g. boolean "false" -> false, number "5" -> 5)
-  const schemaDefaults = React.useMemo(() => {
-    if (!schema) return {};
-    return parseDefaultValues(schema);
-  }, [schema]);
-
-  const objValue = React.useMemo(
-    () => ({ ...schemaDefaults, ...((value as Record<string, unknown>) ?? {}) }),
-    [schemaDefaults, value],
-  );
-
-  // When value is missing or empty object, push schema defaults to parent so required-object
-  // validation (e.g. "schedule is required") sees a non-empty value and doesn't flag the field.
-  const hasPushedSchemaDefaults = React.useRef(false);
-  React.useEffect(() => {
-    if (hasPushedSchemaDefaults.current) return;
-    const isEmpty =
-      value === undefined ||
-      value === null ||
-      (typeof value === "object" && value !== null && Object.keys(value).length === 0);
-    if (!isEmpty || Object.keys(schemaDefaults).length === 0) return;
-    hasPushedSchemaDefaults.current = true;
-    onChange(schemaDefaults);
-  }, [value, schemaDefaults, onChange]);
-
   return (
     <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
       {schema.map((schemaField) => (
@@ -270,10 +273,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
             const newValue: Record<string, unknown> = { ...objValue, [schemaField.name!]: val };
             onChange(newValue);
           }}
-          allValues={objValue}
+          allValues={nestedAllValues}
           domainId={domainId}
           domainType={domainType}
-          appInstallationId={appInstallationId}
+          integrationId={integrationId}
           organizationId={organizationId}
           autocompleteExampleObj={autocompleteExampleObj}
         />

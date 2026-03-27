@@ -1,0 +1,47 @@
+{
+  "data": {
+    "id": "19436",
+    "name": "SuperPlane metric alert example",
+    "organizationId": "4511070267441152",
+    "queryType": 0,
+    "dataset": "events",
+    "query": "environment:production",
+    "aggregate": "count()",
+    "thresholdType": 0,
+    "resolveThreshold": null,
+    "timeWindow": 60,
+    "environment": "production",
+    "projects": ["go-gin"],
+    "owner": null,
+    "dateModified": "2026-03-26T09:15:00Z",
+    "dateCreated": "2026-03-26T09:15:00Z",
+    "eventTypes": ["default", "error"],
+    "triggers": [
+      {
+        "id": "28750",
+        "alertRuleId": "19436",
+        "label": "critical",
+        "thresholdType": 0,
+        "alertThreshold": 5,
+        "resolveThreshold": 2,
+        "dateCreated": "2026-03-26T09:15:00Z",
+        "actions": [
+          {
+            "id": "26870",
+            "alertRuleTriggerId": "28750",
+            "type": "email",
+            "targetType": "user",
+            "targetIdentifier": "4346509",
+            "inputChannelId": null,
+            "integrationId": null,
+            "sentryAppId": null,
+            "priority": null,
+            "dateCreated": "2026-03-26T09:15:00Z"
+          }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-03-26T09:15:00Z",
+  "type": "sentry.alertRule"
+}
