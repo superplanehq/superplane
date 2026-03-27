@@ -279,6 +279,81 @@ func Test__ListResources__Sizes(t *testing.T) {
 	})
 }
 
+func Test__ListResources__DatabaseClusters(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful database cluster listing returns resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"databases": [
+							{"id":"cluster-1","name":"primary-db"},
+							{"id":"cluster-2","name":"analytics-db"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database_cluster", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "database_cluster", resources[0].Type)
+		assert.Equal(t, "primary-db", resources[0].Name)
+		assert.Equal(t, "cluster-1", resources[0].ID)
+	})
+}
+
+func Test__ListResources__Databases(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("missing cluster returns empty resources", func(t *testing.T) {
+		resources, err := integration.ListResources("database", core.ListResourcesContext{
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+	})
+
+	t.Run("successful database listing returns resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"dbs": [
+							{"name":"app_db"},
+							{"name":"analytics_db"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("database", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters: map[string]string{
+				"databaseCluster": "cluster-1",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "database", resources[0].Type)
+		assert.Equal(t, "app_db", resources[0].Name)
+		assert.Equal(t, "app_db", resources[0].ID)
+	})
+}
+
 func Test__ListResources__Images(t *testing.T) {
 	integration := &DigitalOcean{}
 

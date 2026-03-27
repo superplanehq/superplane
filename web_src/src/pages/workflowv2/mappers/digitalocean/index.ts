@@ -16,6 +16,8 @@ import { getAlertPolicyMapper } from "./get_alert_policy";
 import { deleteAlertPolicyMapper } from "./delete_alert_policy";
 import { updateAlertPolicyMapper } from "./update_alert_policy";
 import { getDropletMetricsMapper } from "./get_droplet_metrics";
+import { getDatabaseMapper } from "./get_database";
+import { getClusterConfigurationMapper } from "./get_cluster_configuration";
 import { getObjectMapper, GET_OBJECT_STATE_REGISTRY } from "./get_object";
 import { putObjectMapper, PUT_OBJECT_STATE_REGISTRY } from "./put_object";
 import { deleteObjectMapper, DELETE_OBJECT_STATE_REGISTRY } from "./delete_object";
@@ -44,6 +46,8 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deleteAlertPolicy: deleteAlertPolicyMapper,
   updateAlertPolicy: updateAlertPolicyMapper,
   getDropletMetrics: getDropletMetricsMapper,
+  getDatabase: getDatabaseMapper,
+  getClusterConfiguration: getClusterConfigurationMapper,
   getObject: getObjectMapper,
   putObject: putObjectMapper,
   deleteObject: deleteObjectMapper,
@@ -74,6 +78,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   deleteAlertPolicy: buildActionStateRegistry("deleted"),
   updateAlertPolicy: buildActionStateRegistry("updated"),
   getDropletMetrics: buildActionStateRegistry("fetched"),
+  getDatabase: buildActionStateRegistry("fetched"),
+  getClusterConfiguration: buildActionStateRegistry("fetched"),
   getObject: GET_OBJECT_STATE_REGISTRY,
   putObject: PUT_OBJECT_STATE_REGISTRY,
   deleteObject: DELETE_OBJECT_STATE_REGISTRY,
