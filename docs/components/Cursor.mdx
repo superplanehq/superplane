@@ -58,32 +58,36 @@ The output includes per-user daily metrics:
 
 ```json
 {
-  "data": [
-    {
-      "acceptedLinesAdded": 1102,
-      "acceptedLinesDeleted": 645,
-      "agentRequests": 12,
-      "chatRequests": 128,
-      "composerRequests": 45,
-      "date": 1710720000000,
-      "email": "developer@company.com",
-      "isActive": true,
-      "mostUsedModel": "gpt-4",
-      "subscriptionIncludedReqs": 180,
-      "totalAccepts": 73,
-      "totalApplies": 87,
-      "totalLinesAdded": 1543,
-      "totalLinesDeleted": 892,
-      "totalRejects": 14,
-      "totalTabsAccepted": 289,
-      "totalTabsShown": 342,
-      "usageBasedReqs": 5
+  "data": {
+    "data": [
+      {
+        "acceptedLinesAdded": 1102,
+        "acceptedLinesDeleted": 645,
+        "agentRequests": 12,
+        "chatRequests": 128,
+        "composerRequests": 45,
+        "date": 1710720000000,
+        "email": "developer@company.com",
+        "isActive": true,
+        "mostUsedModel": "gpt-4",
+        "subscriptionIncludedReqs": 180,
+        "totalAccepts": 73,
+        "totalApplies": 87,
+        "totalLinesAdded": 1543,
+        "totalLinesDeleted": 892,
+        "totalRejects": 14,
+        "totalTabsAccepted": 289,
+        "totalTabsShown": 342,
+        "usageBasedReqs": 5
+      }
+    ],
+    "period": {
+      "endDate": 1710892800000,
+      "startDate": 1710720000000
     }
-  ],
-  "period": {
-    "endDate": 1710892800000,
-    "startDate": 1710720000000
-  }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cursor.getDailyUsageData.result"
 }
 ```
 
@@ -128,12 +132,16 @@ The output includes:
 
 ```json
 {
-  "agentId": "bc_abc123",
-  "message": {
-    "id": "msg_005",
-    "text": "I've added a troubleshooting section to the README.",
-    "type": "assistant_message"
-  }
+  "data": {
+    "agentId": "bc_abc123",
+    "message": {
+      "id": "msg_005",
+      "text": "I've added a troubleshooting section to the README.",
+      "type": "assistant_message"
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cursor.getLastMessage.result"
 }
 ```
 
@@ -158,11 +166,15 @@ The Launch Cloud Agent component triggers a Cursor AI coding agent and waits for
 
 ```json
 {
-  "agentId": "agent_12345",
-  "branchName": "cursor/agent-550e8400",
-  "prUrl": "https://github.com/org/repo/pull/42",
-  "status": "done",
-  "summary": "Refactored login logic."
+  "data": {
+    "agentId": "agent_12345",
+    "branchName": "cursor/agent-550e8400",
+    "prUrl": "https://github.com/org/repo/pull/42",
+    "status": "done",
+    "summary": "Refactored login logic."
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cursor.launchAgent.finished"
 }
 ```
 
