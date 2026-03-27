@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -17,18 +18,24 @@ from pydantic_ai.messages import (
     FinalResultEvent,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
     PartDeltaEvent,
     PartStartEvent,
     TextPartDelta,
+    TextPart,
     ToolCallPart,
     ToolCallPartDelta,
+    UserPromptPart,
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
 from ai.grpc import InternalAgentServer
-from ai.jwt import JwtValidator
+from ai.jwt import JwtClaims, JwtValidator
+from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
@@ -41,13 +48,137 @@ class WebServerConfig:
 
 class ReplStreamRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
-    canvas_id: str | None = Field(default=None, min_length=1, max_length=200)
     model: str = Field(
         default=(os.getenv("AI_MODEL", "test").strip() or "test"),
         min_length=1,
         max_length=200,
     )
     base_url: str | None = None
+
+
+class PersistedRunRecorder:
+    def __init__(self, store: SessionStore, chat_id: str, user_prompt: str) -> None:
+        self._store = store
+        self._chat_id = chat_id
+        self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
+        self._current_response_message_id: str | None = None
+        self._current_response: ModelResponse | None = None
+        self._store.set_initial_chat_message_if_missing(chat_id, user_prompt)
+        self._store.create_agent_chat_model_message(
+            chat_id,
+            ModelRequest(parts=[UserPromptPart(user_prompt)]),
+        )
+
+    @property
+    def history_count_before_run(self) -> int:
+        return self._history_count_before_run
+
+    def _persist_current_response(self) -> None:
+        if self._current_response is None:
+            return
+
+        if self._current_response_message_id is None:
+            record = self._store.create_agent_chat_model_message(self._chat_id, self._current_response)
+            self._current_response_message_id = record.id
+            return
+
+        self._store.update_agent_chat_model_message(self._current_response_message_id, self._current_response)
+
+    def append_assistant_content(self, chunk: str) -> None:
+        if not chunk:
+            return
+
+        if self._current_response is None:
+            self._current_response = ModelResponse(parts=[TextPart(chunk)])
+            self._persist_current_response()
+            return
+
+        text_part_index = next(
+            (index for index, part in enumerate(self._current_response.parts) if isinstance(part, TextPart)),
+            None,
+        )
+        if text_part_index is None:
+            self._current_response.parts = [*self._current_response.parts, TextPart(chunk)]
+        else:
+            text_part = self._current_response.parts[text_part_index]
+            self._current_response.parts = [
+                *self._current_response.parts[:text_part_index],
+                TextPart(f"{text_part.content}{chunk}"),
+                *self._current_response.parts[text_part_index + 1 :],
+            ]
+
+        self._persist_current_response()
+
+    def set_assistant_content(self, content: str) -> None:
+        self._current_response = ModelResponse(parts=[TextPart(content)])
+        self._persist_current_response()
+
+    def tool_started(self, part: ToolCallPart) -> None:
+        if self._current_response is None:
+            self._current_response = ModelResponse(parts=[part])
+            self._persist_current_response()
+            return
+
+        updated_parts = [
+            existing_part
+            for existing_part in self._current_response.parts
+            if not isinstance(existing_part, ToolCallPart) or existing_part.tool_call_id != part.tool_call_id
+        ]
+        updated_parts.append(part)
+        self._current_response.parts = updated_parts
+        self._persist_current_response()
+
+    def tool_call_delta(self, tool_call_id: str, args_delta: str | dict[str, Any] | None, tool_name: str | None) -> None:
+        if self._current_response is None:
+            self._current_response = ModelResponse(parts=[])
+
+        updated = False
+        next_parts: list[Any] = []
+        for part in self._current_response.parts:
+            if not isinstance(part, ToolCallPart) or part.tool_call_id != tool_call_id:
+                next_parts.append(part)
+                continue
+
+            next_tool_name = tool_name or part.tool_name
+            next_args: str | dict[str, Any] | None = part.args
+            if isinstance(args_delta, dict):
+                next_args = args_delta
+            elif isinstance(args_delta, str):
+                if isinstance(next_args, str):
+                    next_args = f"{next_args}{args_delta}"
+                elif next_args is None:
+                    next_args = args_delta
+            next_parts.append(
+                ToolCallPart(
+                    tool_name=next_tool_name,
+                    args=next_args,
+                    tool_call_id=tool_call_id,
+                )
+            )
+            updated = True
+
+        if not updated:
+            next_parts.append(
+                ToolCallPart(
+                    tool_name=tool_name or "tool",
+                    args=args_delta if isinstance(args_delta, (str, dict)) else None,
+                    tool_call_id=tool_call_id,
+                )
+            )
+
+        self._current_response.parts = next_parts
+        self._persist_current_response()
+
+    def tool_finished(self, event: FunctionToolResultEvent) -> None:
+        parts: list[Any] = [event.result]
+        if event.content:
+            parts.append(UserPromptPart(event.content))
+        self._store.create_agent_chat_model_message(
+            self._chat_id,
+            ModelRequest(parts=parts),
+        )
+        self._current_response_message_id = None
+        self._current_response = None
 
 
 def _debug_enabled() -> bool:
@@ -118,18 +249,37 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
-    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+def _load_message_history(store: SessionStore, chat_id: str) -> Any:
+    history = store.load_agent_chat_message_history(chat_id)
+    if not history:
+        return None
+    return ModelMessagesTypeAdapter.validate_python(history)
+
+def _save_new_messages(store: SessionStore, chat_id: str, preserved_message_count: int, messages: Any) -> None:
+    validated_messages = ModelMessagesTypeAdapter.validate_python(messages)
+    store.replace_agent_chat_messages_after(chat_id, preserved_message_count, list(validated_messages))
+
+
+def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
     claims = jwt_validator.decode(api_token)
-    canvas_id = jwt_validator.validate_canvas(payload.canvas_id, claims)
-    organization_id = claims.org_id
+    store: SessionStore = request.app.state.session_store
+    chat = store.get_agent_chat(chat_id)
+    if chat.org_id != claims.org_id or chat.user_id != claims.subject:
+        raise ValueError("Scoped token does not allow the requested agent.")
+    jwt_validator.validate_canvas(chat.canvas_id, claims)
+    return claims, chat
+
+
+def _build_deps(payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str) -> AgentDeps:
+    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+    api_token = _resolve_required_bearer_token(request)
     client = SuperplaneClient(
         SuperplaneClientConfig(
             base_url=base_url,
             api_token=api_token,
-            organization_id=organization_id,
+            organization_id=claims.org_id,
         )
     )
     _debug_log(
@@ -137,7 +287,7 @@ def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
         model=payload.model,
         canvas_id=canvas_id,
         base_url=base_url,
-        organization_id=organization_id,
+        organization_id=claims.org_id,
         has_token=bool(api_token),
     )
     return AgentDeps(
@@ -146,33 +296,64 @@ def _build_deps(payload: ReplStreamRequest, request: Request) -> AgentDeps:
     )
 
 
-async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
+async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
+    async for event in agent.run_stream_events(**kwargs):
+        yield event
+
+
+async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
-    resolved_canvas_id: str | None = None
+    store: SessionStore = request.app.state.session_store
+    claims: JwtClaims | None = None
+    if payload.model == "test" and _resolve_bearer_token(request) is None:
+        try:
+            chat = store.get_agent_chat(chat_id)
+        except AgentChatNotFoundError:
+            chat = store.create_agent_chat(
+                org_id="test-org",
+                user_id="test-user",
+                canvas_id="test-canvas",
+                chat_id=chat_id,
+            )
+    else:
+        claims, chat = _resolve_agent_context(chat_id, request)
+
+    message_history = _load_message_history(store, chat.id)
+    recorder = PersistedRunRecorder(store, chat.id, payload.question)
+    resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
-        deps = _build_deps(payload, request)
-        resolved_canvas_id = deps.canvas_id
+        if claims is None:
+            raise ValueError("Agent claims are missing.")
+        deps = _build_deps(payload, request, claims, resolved_canvas_id)
 
     _debug_log(
         "starting agent run",
+        chat_id=chat.id,
         model=payload.model,
         canvas_id=resolved_canvas_id,
         question_preview=payload.question[:120],
+        has_history=message_history is not None,
     )
     yield {
         "type": "run_started",
+        "chat_id": chat.id,
         "model": payload.model,
         "canvas_id": resolved_canvas_id,
     }
 
+    run_kwargs: dict[str, Any] = {"user_prompt": payload.question}
+    if message_history is not None:
+        run_kwargs["message_history"] = message_history
+
     if payload.model == "test":
-        _debug_log("using test model run path", canvas_id=resolved_canvas_id)
+        _debug_log("using test model run path", canvas_id=resolved_canvas_id, chat_id=chat.id)
         test_agent: Agent[None, str] = Agent(model=TestModel(), output_type=str)
-        async for event in test_agent.run_stream_events(user_prompt=payload.question):
+        async for event in _run_stream_events(test_agent, **run_kwargs):
             if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
                 chunk = event.delta.content_delta
                 if chunk:
+                    recorder.append_assistant_content(chunk)
                     yield {
                         "type": "model_delta",
                         "content": chunk,
@@ -180,10 +361,15 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
                 continue
 
             if isinstance(event, AgentRunResultEvent):
+                result = event.result
+                _save_new_messages(store, chat.id, recorder.history_count_before_run, result.new_messages())
+                output = _to_jsonable(result.output)
+                if isinstance(output, str) and output:
+                    recorder.set_assistant_content(output)
                 yield {
                     "type": "final_answer",
-                    "output": _to_jsonable(event.result.output),
-                    "usage": _to_jsonable(event.result.usage()),
+                    "output": output,
+                    "usage": _to_jsonable(result.usage()),
                 }
 
         yield {
@@ -196,8 +382,11 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
     agent = build_agent(model=payload.model)
     if deps is None:
         raise ValueError("Agent dependencies are missing.")
+
+    run_kwargs["deps"] = deps
     _debug_log(
         "running non-test agent",
+        chat_id=chat.id,
         model=payload.model,
         canvas_id=resolved_canvas_id,
     )
@@ -221,6 +410,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         delta = answer[already_streamed:]
         streamed_answer_length_by_call_id[call_id] = len(answer)
         streamed_any_answer_delta = True
+        recorder.append_assistant_content(delta)
         return {
             "type": "model_delta",
             "content": delta,
@@ -233,11 +423,12 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         return normalized in output_tool_name_hints
 
     tool_started_at_by_call_id: dict[str, float] = {}
-    async for event in agent.run_stream_events(user_prompt=payload.question, deps=deps):
+    async for event in _run_stream_events(agent, **run_kwargs):
         if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
             tool_call_id = event.part.tool_call_id
             if tool_call_id and likely_output_tool_name(event.part.tool_name):
                 output_tool_call_id = tool_call_id
+            recorder.tool_started(event.part)
             continue
 
         if isinstance(event, FinalResultEvent):
@@ -250,8 +441,6 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
             if tool_call_id is None:
                 continue
 
-            # Some models stream output-tool JSON args incrementally.
-            # Surface answer deltas as they become parseable.
             if output_tool_call_id is None and likely_output_tool_name(event.delta.tool_name_delta):
                 output_tool_call_id = tool_call_id
             if output_tool_call_id != tool_call_id:
@@ -259,12 +448,14 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
 
             args_delta = event.delta.args_delta
             if isinstance(args_delta, dict):
+                recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
                 maybe_delta = emit_answer_delta_from_output_args(tool_call_id, args_delta)
                 if maybe_delta is not None:
                     yield maybe_delta
                 continue
 
             if isinstance(args_delta, str):
+                recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
                 buffer = output_args_buffer_by_call_id.get(tool_call_id, "")
                 buffer += args_delta
                 output_args_buffer_by_call_id[tool_call_id] = buffer
@@ -292,6 +483,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
             tool_call_id = event.result.tool_call_id or event.result.tool_name
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
+            recorder.tool_finished(event)
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
@@ -303,6 +495,7 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
         if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
             chunk = event.delta.content_delta
             if chunk:
+                recorder.append_assistant_content(chunk)
                 yield {
                     "type": "model_delta",
                     "content": chunk,
@@ -311,16 +504,20 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
+            _save_new_messages(store, chat.id, recorder.history_count_before_run, result.new_messages())
             output = _to_jsonable(result.output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
                 if isinstance(answer, str) and answer:
+                    recorder.set_assistant_content(answer)
                     for chunk in _iter_text_chunks(answer):
                         yield {
                             "type": "model_delta",
                             "content": chunk,
                         }
                         await asyncio.sleep(0.01)
+            elif isinstance(output, str) and output:
+                recorder.set_assistant_content(output)
             yield {
                 "type": "final_answer",
                 "output": output,
@@ -335,7 +532,19 @@ async def _stream_agent_run(payload: ReplStreamRequest, request: Request) -> Asy
 
 
 def _create_app() -> FastAPI:
-    app = FastAPI()
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        store = SessionStore()
+        app.state.session_store = store
+        grpc_server = InternalAgentServer.from_env(store)
+        grpc_server.start()
+        app.state.internal_agent_server = grpc_server
+        try:
+            yield
+        finally:
+            grpc_server.stop()
+
+    app = FastAPI(lifespan=lifespan)
     cors_origins_raw = os.getenv("REPL_WEB_CORS_ORIGINS", "*")
     cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
     if not cors_origins:
@@ -348,45 +557,28 @@ def _create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.on_event("startup")
-    async def startup() -> None:
-        grpc_server = InternalAgentServer.from_env()
-        grpc_server.start()
-        app.state.grpc_server = grpc_server
-
-    @app.on_event("shutdown")
-    async def shutdown() -> None:
-        grpc_server: InternalAgentServer | None = getattr(app.state, "grpc_server", None)
-        if grpc_server is not None:
-            grpc_server.stop()
-
     @app.post("/agents/chats/{chat_id}/stream")
-    async def stream_repl(
-        chat_id: str,
-        payload: ReplStreamRequest,
-        request: Request,
-    ) -> StreamingResponse:
-        _ = chat_id
+    async def stream_repl(chat_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
         _debug_log(
             "incoming stream request",
+            chat_id=chat_id,
             model=payload.model,
-            canvas_id=payload.canvas_id,
             has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
             has_token=bool(_resolve_bearer_token(request)),
         )
 
         async def event_generator() -> AsyncIterator[str]:
             try:
-                async for event in _stream_agent_run(payload, request):
+                async for event in _stream_agent_run(chat_id, payload, request):
                     if await request.is_disconnected():
-                        _debug_log("client disconnected")
+                        _debug_log("client disconnected", chat_id=chat_id)
                         break
                     yield _encode_sse_event(event)
             except Exception as error:
-                _debug_log("stream failed", error=str(error))
+                _debug_log("stream failed", chat_id=chat_id, error=str(error))
                 yield _encode_sse_event(
                     {
                         "type": "run_failed",
@@ -408,7 +600,6 @@ def _create_app() -> FastAPI:
 
 
 def create_app() -> FastAPI:
-    """Public app factory for uvicorn --factory usage."""
     return _create_app()
 
 
@@ -422,9 +613,11 @@ class WebServer:
             port=config.port,
             log_level="warning",
             access_log=False,
+            ws="none",
         )
         self._server = uvicorn.Server(self._uvicorn_config)
         self._thread: threading.Thread | None = None
+        self._startup_error: BaseException | None = None
 
     @property
     def base_url(self) -> str:
@@ -436,6 +629,7 @@ class WebServer:
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
+        self._startup_error = None
         self._thread = threading.Thread(target=self.serve_forever, daemon=True)
         self._thread.start()
         for _ in range(200):
@@ -455,4 +649,7 @@ class WebServer:
             self._thread.join(timeout=5.0)
 
     def serve_forever(self) -> None:
-        self._server.run()
+        try:
+            self._server.run()
+        except SystemExit as error:
+            self._startup_error = error
