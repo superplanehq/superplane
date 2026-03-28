@@ -13,7 +13,6 @@ function createCategory(name: string): BuildingBlockCategory {
         type: "component",
         componentSubtype: "action",
         integrationName: "smtp",
-        isLive: true,
       },
     ],
   };

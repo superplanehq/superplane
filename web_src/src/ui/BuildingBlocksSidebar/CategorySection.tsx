@@ -60,7 +60,6 @@ function setupDragPreview(
 
 interface BlockItemProps {
   block: BuildingBlock;
-  isLive: boolean;
   canvasZoom: number;
   isDraggingRef: React.RefObject<boolean>;
   setHoveredBlock: (block: BuildingBlock | null) => void;
@@ -70,7 +69,6 @@ interface BlockItemProps {
 
 function BlockItem({
   block,
-  isLive,
   canvasZoom,
   isDraggingRef,
   setHoveredBlock,
@@ -87,21 +85,17 @@ function BlockItem({
     <BuildingBlockPreview block={block}>
       <Item
         data-testid={toTestId(`building-block-${block.name}`)}
-        draggable={isLive}
+        draggable
         onClick={() => {
-          if (isLive && onBlockClick) onBlockClick(block);
+          if (onBlockClick) onBlockClick(block);
         }}
         onMouseEnter={() => {
-          if (isLive) setHoveredBlock(block);
+          setHoveredBlock(block);
         }}
         onMouseLeave={() => {
           setHoveredBlock(null);
         }}
         onDragStart={(e) => {
-          if (!isLive) {
-            e.preventDefault();
-            return;
-          }
           isDraggingRef.current = true;
           e.dataTransfer.effectAllowed = "move";
           e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
@@ -111,8 +105,6 @@ function BlockItem({
           isDraggingRef.current = false;
           setHoveredBlock(null);
         }}
-        aria-disabled={!isLive}
-        title={isLive ? undefined : "Coming soon"}
         className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${hoverBg}`}
         size="sm"
       >
@@ -186,7 +178,7 @@ export function CategorySection({
         return name.includes(query) || label.includes(query);
       });
 
-  let allBlocks = baseBlocks.filter((block) => block.isLive);
+  let allBlocks = baseBlocks;
 
   if (typeFilter !== "all") {
     allBlocks = allBlocks.filter((block) => {
@@ -309,7 +301,6 @@ export function CategorySection({
             <BlockItem
               key={`${block.type}-${block.name}`}
               block={block}
-              isLive={!!block.isLive}
               canvasZoom={canvasZoom}
               isDraggingRef={isDraggingRef}
               setHoveredBlock={setHoveredBlock}
