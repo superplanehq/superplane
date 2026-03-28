@@ -301,6 +301,14 @@ func (c *CreateGPUDroplet) Setup(ctx core.SetupContext) error {
 		return errors.New("GPU size is required")
 	}
 
+	// Validate imageType is set to a valid value
+	if spec.ImageType == "" {
+		return errors.New("image type is required (select either 'One-Click Application' or 'Base OS Image')")
+	}
+	if spec.ImageType != "one-click" && spec.ImageType != "base-os" {
+		return fmt.Errorf("invalid image type %q (must be 'one-click' or 'base-os')", spec.ImageType)
+	}
+
 	// Validate image based on imageType
 	if spec.ImageType == "one-click" && spec.OneClickImage == "" {
 		return errors.New("one-click application image is required")
@@ -327,6 +335,11 @@ func (c *CreateGPUDroplet) Execute(ctx core.ExecutionContext) error {
 	image := spec.OneClickImage
 	if spec.ImageType == "base-os" {
 		image = spec.BaseImage
+	}
+
+	// Defensive check: ensure we never send an empty image
+	if image == "" {
+		return errors.New("no image selected: imageType must be set and the corresponding image field must be populated")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
