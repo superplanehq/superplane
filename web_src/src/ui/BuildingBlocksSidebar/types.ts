@@ -11,7 +11,6 @@ export interface BuildingBlock {
   icon?: string;
   color?: string;
   id?: string;
-  isLive?: boolean;
   integrationName?: string;
   deprecated?: boolean;
   exampleOutput?: Record<string, unknown>;
