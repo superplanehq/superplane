@@ -1,0 +1,40 @@
+{
+  "log_entries": [
+    {
+      "id": "R1YCD0YVSA",
+      "type": "trigger_log_entry",
+      "created_at": "2026-03-28T14:30:00Z",
+      "summary": "Triggered by Datadog monitor: API 5xx Error Rate > 5%",
+      "agent": {
+        "type": "service_reference",
+        "summary": "Datadog Integration"
+      },
+      "channel": {
+        "type": "auto",
+        "details": "Monitor: api-gateway-5xx-rate, Threshold: 5%, Current: 15.3%"
+      }
+    },
+    {
+      "id": "R2BDE1ZWTA",
+      "type": "notify_log_entry",
+      "created_at": "2026-03-28T14:30:05Z",
+      "summary": "Notified Dragan Petrovic via push notification",
+      "agent": {
+        "type": "user_reference",
+        "summary": "PagerDuty"
+      }
+    },
+    {
+      "id": "R3CEF2AXUB",
+      "type": "annotate_log_entry",
+      "created_at": "2026-03-28T14:30:10Z",
+      "summary": "Correlated with deploy-api-v2.14.3 (14:25 UTC)",
+      "agent": {
+        "type": "service_reference",
+        "summary": "Deploy Tracker"
+      }
+    }
+  ],
+  "total": 3,
+  "more": false
+}

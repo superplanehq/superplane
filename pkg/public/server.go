@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -258,6 +259,22 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
+
+	// Canvas lint endpoint — quality gate validation.
+	// Registered before the gRPC gateway catch-all so it takes priority.
+	lintHandler := canvases.LintCanvasHandler(s.registry)
+	orgLintMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+	s.Router.HandleFunc("/api/v1/canvases/{canvasId}/lint", func(w http.ResponseWriter, r *http.Request) {
+		orgLintMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, ok := middleware.GetUserFromContext(r.Context())
+			if !ok {
+				http.Error(w, "User not found in context", http.StatusUnauthorized)
+				return
+			}
+			r.Header.Set("X-Organization-Id", user.OrganizationID.String())
+			lintHandler(w, r)
+		})).ServeHTTP(w, r)
+	}).Methods("POST")
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)

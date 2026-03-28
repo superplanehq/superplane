@@ -1,0 +1,17 @@
+{
+  "id": 12345678,
+  "tag_name": "v2.14.3",
+  "name": "Release v2.14.3 - Order Service Refactor",
+  "body": "## Changes\n- Refactored order validation logic\n- Migrated to new payment gateway client\n- Updated database connection pooling\n\n## Authors\n- @braca (order validation)\n- @fedja (payment gateway)\n\n## Risk: Medium\nDatabase connection pool size changed from 20 to 50",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-03-28T14:25:00Z",
+  "published_at": "2026-03-28T14:25:30Z",
+  "author": {
+    "login": "braca",
+    "id": 87654321
+  },
+  "html_url": "https://github.com/acme-corp/api-service/releases/tag/v2.14.3",
+  "tarball_url": "https://api.github.com/repos/acme-corp/api-service/tarball/v2.14.3",
+  "zipball_url": "https://api.github.com/repos/acme-corp/api-service/zipball/v2.14.3"
+}
