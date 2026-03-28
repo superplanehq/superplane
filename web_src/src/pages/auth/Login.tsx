@@ -71,6 +71,7 @@ export const Login: React.FC = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupFieldErrors, setSignupFieldErrors] = useState<Record<string, string>>({});
 
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
@@ -359,6 +360,13 @@ export const Login: React.FC = () => {
     }
   };
 
+  const isPasswordValid = (password: string) => {
+    if (password.length < 8) return false;
+    if (!/[0-9]/.test(password)) return false;
+    if (!/[A-Z]/.test(password)) return false;
+    return true;
+  };
+
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -367,6 +375,8 @@ export const Login: React.FC = () => {
       setFormError("Signups are currently disabled.");
       return;
     }
+
+    const fieldErrors: Record<string, string> = {};
 
     if (!signupFirstName.trim() || !signupLastName.trim()) {
       setFormError("First and last names are required");
@@ -378,8 +388,16 @@ export const Login: React.FC = () => {
       return;
     }
 
+    if (!isPasswordValid(signupPassword)) {
+      fieldErrors.password = "Password must be 8+ characters with at least 1 number and 1 capital letter.";
+    }
+
     if (signupPassword !== signupConfirmPassword) {
-      setFormError("Passwords do not match");
+      fieldErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    setSignupFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) {
       return;
     }
 
@@ -609,6 +627,11 @@ export const Login: React.FC = () => {
                   value={signupPassword}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupPassword(e.target.value)}
                 />
+                {signupFieldErrors.password ? (
+                  <p className="text-xs text-red-600">{signupFieldErrors.password}</p>
+                ) : (
+                  <p className="text-xs text-gray-500">8+ characters, at least 1 number and 1 capital letter</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -622,6 +645,9 @@ export const Login: React.FC = () => {
                   value={signupConfirmPassword}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupConfirmPassword(e.target.value)}
                 />
+                {signupFieldErrors.confirmPassword && (
+                  <p className="text-xs text-red-600">{signupFieldErrors.confirmPassword}</p>
+                )}
               </div>
 
               <LoadingButton
