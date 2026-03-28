@@ -115,7 +115,7 @@ func (c *TextPrompt) Configuration() []configuration.Field {
 		{
 			Name:        "systemMessage",
 			Label:       "System Message",
-			Type:        configuration.FieldTypeText,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Placeholder: "e.g. You are a concise DevOps assistant",
 			Description: "Optional context to set behavior or persona",
