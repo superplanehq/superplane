@@ -1099,6 +1099,7 @@ function CanvasPage(props: CanvasPageProps) {
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
+          workflowNodes={props.workflowNodes}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1733,6 +1734,7 @@ function CanvasContentHeader({
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
+  workflowNodes,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1767,6 +1769,7 @@ function CanvasContentHeader({
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  workflowNodes?: ComponentsNode[];
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1831,6 +1834,8 @@ function CanvasContentHeader({
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
+      workflowNodes={workflowNodes}
+      workflowEdges={stateRef.current.edges}
     />
   );
 }
@@ -2794,6 +2799,8 @@ function CanvasContent({
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
           unpublishedDraftChangeCount={unpublishedDraftChangeCount}
+          workflowNodes={workflowNodes}
+          workflowEdges={styledEdges}
         />
       )}
 
