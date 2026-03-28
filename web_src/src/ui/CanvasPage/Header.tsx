@@ -2,6 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
+  CheckCircle2,
   CloudAlert,
   CloudCheck,
   Copy,
@@ -11,14 +12,18 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  ShieldAlert,
+  TriangleAlert,
   Undo2,
   Pencil,
 } from "lucide-react";
+import type { ComponentsNode } from "@/api-client";
+import { lintCanvas, type LintResult, type LintEdge } from "@/utils/canvasLinter";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { Link, useParams } from "react-router-dom";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -77,6 +82,10 @@ interface HeaderProps {
   lastSavedAt?: Date | string | null;
   /** Shown in tooltip when saveState is error (last failed save message). */
   saveErrorMessage?: string | null;
+  /** Canvas spec nodes for linter badge. */
+  workflowNodes?: ComponentsNode[];
+  /** Canvas spec edges for linter badge. */
+  workflowEdges?: LintEdge[];
 }
 
 function formatLastSavedTooltip(at: Date | string | null | undefined): string {
@@ -246,8 +255,17 @@ export function Header({
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
   unpublishedDraftChangeCount = 0,
+  workflowNodes,
+  workflowEdges,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
+
+  // Canvas linter — runs on every node/edge change.
+  // Shows the badge whenever the canvas view is active, even on empty canvases.
+  const lintResult = useMemo<LintResult | null>(() => {
+    if (workflowNodes === undefined && workflowEdges === undefined) return null;
+    return lintCanvas(workflowNodes || [], workflowEdges || []);
+  }, [workflowNodes, workflowEdges]);
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canCreateCanvas = permissionsLoading || canAct("canvases", "create");
@@ -475,6 +493,50 @@ export function Header({
           </div>
 
           <div className="flex items-center gap-2 justify-self-end">
+            {lintResult && (topViewMode === "canvas" || topViewMode === undefined) ? (() => {
+              const hasErrors = lintResult.errorCount > 0;
+              const hasWarnings = lintResult.warningCount > 0;
+              const badgeColor = hasErrors
+                ? "bg-red-100 text-red-800"
+                : hasWarnings
+                  ? "bg-yellow-100 text-yellow-800"
+                  : "bg-green-100 text-green-800";
+              const BadgeIcon = hasErrors ? ShieldAlert : hasWarnings ? TriangleAlert : CheckCircle2;
+              const badgeLabel = hasErrors
+                ? `${lintResult.errorCount} error${lintResult.errorCount !== 1 ? "s" : ""}`
+                : hasWarnings
+                  ? `${lintResult.warningCount} warning${lintResult.warningCount !== 1 ? "s" : ""}`
+                  : "Lint OK";
+
+              return (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={cn("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium cursor-default", badgeColor)}>
+                      <BadgeIcon className="h-3.5 w-3.5" />
+                      {badgeLabel}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-sm">
+                    <p className="font-semibold mb-1">
+                      Quality Gate: {lintResult.qualityGrade} ({lintResult.qualityScore}/100)
+                    </p>
+                    {lintResult.errors.map((e, i) => (
+                      <p key={`e-${i}`} className="text-red-400 text-xs">
+                        {e.message}
+                      </p>
+                    ))}
+                    {lintResult.warnings.map((w, i) => (
+                      <p key={`w-${i}`} className="text-yellow-400 text-xs">
+                        {w.message}
+                      </p>
+                    ))}
+                    {!hasErrors && !hasWarnings ? (
+                      <p className="text-green-400 text-xs">No issues found</p>
+                    ) : null}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })() : null}
             {isDefaultMode ? (
               <>
                 {isVersioningDisabledMode && onExportYamlCopy && onExportYamlDownload ? (

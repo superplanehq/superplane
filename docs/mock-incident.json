@@ -1,0 +1,74 @@
+{
+  "event": {
+    "id": "01DEN4HPBQAAAG05V5QQYBRZMF",
+    "event_type": "incident.triggered",
+    "resource_type": "incident",
+    "occurred_at": "2026-03-28T14:30:00.000Z",
+    "agent": {
+      "html_url": "https://acme.pagerduty.com/users/PLH1HKV",
+      "id": "PLH1HKV",
+      "self": "https://api.pagerduty.com/users/PLH1HKV",
+      "summary": "Monitoring Bot",
+      "type": "user_reference"
+    },
+    "data": {
+      "id": "PGR0VU2",
+      "type": "incident",
+      "self": "https://api.pagerduty.com/incidents/PGR0VU2",
+      "html_url": "https://acme.pagerduty.com/incidents/PGR0VU2",
+      "number": 42,
+      "status": "triggered",
+      "incident_key": "hackathon-demo-incident-001",
+      "created_at": "2026-03-28T14:30:00Z",
+      "title": "API Gateway: 5xx error rate spike to 15% on /api/v1/orders",
+      "urgency": "high",
+      "service": {
+        "html_url": "https://acme.pagerduty.com/services/PF9KMXH",
+        "id": "PF9KMXH",
+        "self": "https://api.pagerduty.com/services/PF9KMXH",
+        "summary": "API Gateway (Production)",
+        "type": "service_reference"
+      },
+      "assignees": [
+        {
+          "html_url": "https://acme.pagerduty.com/users/PTUXL6G",
+          "id": "PTUXL6G",
+          "self": "https://api.pagerduty.com/users/PTUXL6G",
+          "summary": "Dragan Petrovic (On-Call SRE)",
+          "type": "user_reference"
+        }
+      ],
+      "escalation_policy": {
+        "html_url": "https://acme.pagerduty.com/escalation_policies/PUS0KTE",
+        "id": "PUS0KTE",
+        "self": "https://api.pagerduty.com/escalation_policies/PUS0KTE",
+        "summary": "Production - Critical",
+        "type": "escalation_policy_reference"
+      },
+      "teams": [
+        {
+          "html_url": "https://acme.pagerduty.com/teams/PFCVPS0",
+          "id": "PFCVPS0",
+          "self": "https://api.pagerduty.com/teams/PFCVPS0",
+          "summary": "Platform Engineering",
+          "type": "team_reference"
+        }
+      ],
+      "priority": {
+        "html_url": "https://acme.pagerduty.com/priorities/PSO75BM",
+        "id": "PSO75BM",
+        "self": "https://api.pagerduty.com/priorities/PSO75BM",
+        "summary": "P1",
+        "type": "priority_reference"
+      },
+      "conference_bridge": {
+        "conference_number": "+1 555-123-4567,,987654321#",
+        "conference_url": "https://meet.google.com/abc-defg-hij"
+      },
+      "body": {
+        "type": "incident_body",
+        "details": "5xx error rate on API Gateway spiked from 0.1% to 15.3% at 14:28 UTC. Affects /api/v1/orders endpoint. 1,247 users impacted in last 2 minutes. Correlated with deployment deploy-api-v2.14.3 at 14:25 UTC."
+      }
+    }
+  }
+}
