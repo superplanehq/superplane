@@ -928,7 +928,6 @@ function CanvasPage(props: CanvasPageProps) {
       name: "annotation",
       label: "Annotation",
       type: "component",
-      isLive: true,
     };
 
     await props.onNodeAdd({
