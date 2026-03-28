@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Plus } from "lucide-react";
 
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./index";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const meta = {
   title: "shadcn Primitives/Tooltip",
@@ -25,11 +25,17 @@ const meta = {
       control: { type: "text" },
       table: { category: "Content" },
     },
+    variant: {
+      control: { type: "radio" },
+      options: ["default", "primary"],
+      table: { category: "Appearance" },
+    },
   },
   args: {
     side: "top",
     align: "center",
     children: "Add to library",
+    variant: "default",
   },
   render: (args) => (
     <TooltipProvider delayDuration={150}>
@@ -70,5 +76,11 @@ export const Left: Story = {
 export const Right: Story = {
   args: {
     side: "right",
+  },
+};
+
+export const Primary: Story = {
+  args: {
+    variant: "primary",
   },
 };

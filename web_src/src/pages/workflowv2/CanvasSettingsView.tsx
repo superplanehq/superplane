@@ -6,7 +6,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type ChangeRequestApproverType = "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
 
@@ -332,7 +332,9 @@ export function CanvasSettingsView({
               <TooltipTrigger asChild>
                 <div className="cursor-not-allowed opacity-60">{versioningContent}</div>
               </TooltipTrigger>
-              <TooltipContent side="top">{versioningEnforcedTooltip}</TooltipContent>
+              <TooltipContent side="top" variant="primary">
+                {versioningEnforcedTooltip}
+              </TooltipContent>
             </Tooltip>
           ) : (
             versioningContent

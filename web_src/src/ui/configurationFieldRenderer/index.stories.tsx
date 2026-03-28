@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { ConfigurationFieldRenderer } from "./index";
 import { ComponentsConfigurationField } from "../../api-client";
-import { TooltipProvider } from "../tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import React from "react";
 
 const meta: Meta<typeof ConfigurationFieldRenderer> = {

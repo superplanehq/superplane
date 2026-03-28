@@ -1,4 +1,4 @@
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import React from "react";
@@ -371,39 +371,35 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         />
 
         {hasBadge && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  data-testid="node-warning-badge"
-                  className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
-                >
-                  <AlertTriangle size={16} className="text-white" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">{hasError ? error : warning}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                data-testid="node-warning-badge"
+                className="absolute -top-6 left-1 bg-orange-500 rounded-t-md h-6 p-1 cursor-pointer"
+              >
+                <AlertTriangle size={16} className="text-white" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs text-sm">{hasError ? error : warning}</p>
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {paused && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  data-testid="node-paused-badge"
-                  className={`absolute -top-6 ${hasBadge ? "left-8" : "left-1"} bg-blue-500 rounded-t-md h-6 p-1 cursor-pointer`}
-                >
-                  <PauseIcon className="h-4 w-4 text-white" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                data-testid="node-paused-badge"
+                className={`absolute -top-6 ${hasBadge ? "left-8" : "left-1"} bg-blue-500 rounded-t-md h-6 p-1 cursor-pointer`}
+              >
+                <PauseIcon className="h-4 w-4 text-white" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="max-w-xs text-sm">Queued items will not be consumed.</p>
+            </TooltipContent>
+          </Tooltip>
         )}
 
         {isCompactView ? null : (

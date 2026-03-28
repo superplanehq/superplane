@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Icon } from "../../../components/Icon";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link } from "../../../components/Link/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -292,22 +292,20 @@ export function Groups({ organizationId }: GroupsProps) {
                           allowed={canDeleteGroups || permissionsLoading}
                           message="You don't have permission to delete groups."
                         >
-                          <TooltipProvider delayDuration={200}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteGroup(group.metadata!.name!)}
-                                  className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
-                                  aria-label="Delete group"
-                                  disabled={deleteGroupMutation.isPending || !canDeleteGroups}
-                                >
-                                  <Icon name="trash-2" size="sm" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Delete Group</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteGroup(group.metadata!.name!)}
+                                className="p-1 rounded-sm text-gray-800 hover:bg-gray-100 transition-colors"
+                                aria-label="Delete group"
+                                disabled={deleteGroupMutation.isPending || !canDeleteGroups}
+                              >
+                                <Icon name="trash-2" size="sm" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Delete Group</TooltipContent>
+                          </Tooltip>
                         </PermissionTooltip>
                       </div>
                     </TableCell>

@@ -8,7 +8,7 @@ import { Heading } from "../../../components/Heading/heading";
 import { Icon } from "../../../components/Icon";
 import { Input } from "../../../components/Input/input";
 import { Table, TableBody, TableCell, TableRow } from "../../../components/Table/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
@@ -268,22 +268,20 @@ export function GroupMembersPage() {
                           allowed={canUpdateGroups || permissionsLoading}
                           message="You don't have permission to update group members."
                         >
-                          <TooltipProvider delayDuration={200}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveMember(member.metadata!.id!)}
-                                  className="p-1 rounded text-gray-800 hover:bg-gray-100 transition-colors"
-                                  aria-label="Remove from Group"
-                                  disabled={!canUpdateGroups}
-                                >
-                                  <Icon name="x" size="sm" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top">Remove from Group</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(member.metadata!.id!)}
+                                className="p-1 rounded text-gray-800 hover:bg-gray-100 transition-colors"
+                                aria-label="Remove from Group"
+                                disabled={!canUpdateGroups}
+                              >
+                                <Icon name="x" size="sm" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">Remove from Group</TooltipContent>
+                          </Tooltip>
                         </PermissionTooltip>
                       </div>
                     </TableCell>
