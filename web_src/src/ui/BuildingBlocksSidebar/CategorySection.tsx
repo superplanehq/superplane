@@ -195,6 +195,11 @@ export function CategorySection({
     });
   }
 
+  const isCoreCategory = category.name === "Core";
+  const hasSearchTerm = query.length > 0;
+  const [isManuallyOpen, setIsManuallyOpen] = useState<boolean | null>(null);
+  const isOpen = hasSearchTerm || (isManuallyOpen ?? isCoreCategory);
+
   if (allBlocks.length === 0) {
     return null;
   }
@@ -246,11 +251,6 @@ export function CategorySection({
   } else {
     CategoryIcon = resolveIcon("puzzle");
   }
-
-  const isCoreCategory = category.name === "Core";
-  const hasSearchTerm = query.length > 0;
-  const [isManuallyOpen, setIsManuallyOpen] = useState<boolean | null>(null);
-  const isOpen = hasSearchTerm || (isManuallyOpen ?? isCoreCategory);
 
   let sortedBlocks: BuildingBlock[] = [];
   if (isOpen) {
