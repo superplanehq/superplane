@@ -1,6 +1,5 @@
 import React from "react";
 import { Composite, type CompositeProps } from "@/ui/composite";
-import { SwitchComponent, type SwitchComponentProps } from "@/ui/switchComponent";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
@@ -12,7 +11,7 @@ import { AnnotationComponent, type AnnotationComponentProps } from "../annotatio
 import type { GroupNodeProps } from "../groupNode";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "merge" | "switch" | "annotation" | "group";
+type BlockType = "trigger" | "component" | "composite" | "merge" | "annotation" | "group";
 
 interface BlockAi {
   show: boolean;
@@ -41,9 +40,6 @@ export interface BlockData {
 
   // composite node specific props
   composite?: CompositeProps;
-
-  // switch node specific props
-  switch?: SwitchComponentProps;
 
   // merge node specific props
   merge?: MergeComponentProps;
@@ -399,8 +395,6 @@ function BlockContent({
           return !!data.composite?.collapsed;
         case "trigger":
           return !!data.trigger?.collapsed;
-        case "switch":
-          return !!data.switch?.collapsed;
         case "component":
           return !!data.component?.collapsed;
         case "merge":
@@ -450,15 +444,6 @@ function BlockContent({
         <Composite
           {...(data.composite as CompositeProps)}
           onExpandChildEvents={handleExpand}
-          selected={selected}
-          showHeader={showHeader}
-          {...actionProps}
-        />
-      );
-    case "switch":
-      return (
-        <SwitchComponent
-          {...(data.switch as SwitchComponentProps)}
           selected={selected}
           showHeader={showHeader}
           {...actionProps}
