@@ -26,3 +26,4 @@ CLAUDE.local.md
 .claude-flow/
 .mcp.json
 *.db
+node_modules/
