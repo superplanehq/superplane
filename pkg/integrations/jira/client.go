@@ -213,6 +213,33 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
+// TransitionIssueRequest is the request body for transitioning an issue.
+type TransitionIssueRequest struct {
+	Transition TransitionRef `json:"transition"`
+}
+
+// TransitionRef references a transition by its ID.
+type TransitionRef struct {
+	ID string `json:"id"`
+}
+
+// TransitionIssue moves a Jira issue to a new workflow state.
+func (c *Client) TransitionIssue(issueKey, transitionID string) error {
+	url := fmt.Sprintf("%s/rest/api/3/issue/%s/transitions", c.BaseURL, issueKey)
+
+	req := TransitionIssueRequest{
+		Transition: TransitionRef{ID: transitionID},
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	return err
+}
+
 // CreateIssue creates a new issue in Jira.
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
 	url := fmt.Sprintf("%s/rest/api/3/issue", c.BaseURL)
