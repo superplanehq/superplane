@@ -62,11 +62,11 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
-import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET } from "../groupNode/constants";
 import { GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
+import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
@@ -92,96 +92,6 @@ export interface SidebarData {
 
 export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
-}
-
-function clampGroupChildNodePositionChanges(changes: NodeChange[], nodes: CanvasNode[]): NodeChange[] {
-  const nodesById = new Map(nodes.map((n) => [n.id, n]));
-
-  return changes.map((change) => {
-    if (change.type !== "position") return change;
-    const posChange = change as { id: string; type: "position"; position?: { x: number; y: number } };
-    if (!posChange.position) return change;
-    const node = nodesById.get(posChange.id);
-    if (!node?.parentId) return change;
-    const parent = nodesById.get(node.parentId);
-    if (!parent || (parent.data as { type?: string })?.type !== "group") return change;
-
-    const x = Math.max(posChange.position.x, GROUP_CHILD_EDGE_PADDING);
-    const y = Math.max(posChange.position.y, GROUP_CHILD_MIN_Y_OFFSET);
-
-    if (x === posChange.position.x && y === posChange.position.y) return change;
-    return {
-      ...posChange,
-      position: { ...posChange.position, x, y },
-    };
-  });
-}
-
-const DEFAULT_GROUP_MIN_WIDTH = 480;
-const DEFAULT_GROUP_MIN_HEIGHT = 320;
-const GROUP_RESIZE_PADDING = 30;
-
-function computeGroupSizeFromChildren(groupId: string, nodes: CanvasNode[]): { width: number; height: number } | null {
-  const children = nodes.filter((n) => n.parentId === groupId);
-  if (children.length === 0) return null;
-
-  let maxRight = 0;
-  let maxBottom = 0;
-
-  for (const child of children) {
-    const cx = child.position?.x ?? 0;
-    const cy = child.position?.y ?? 0;
-    const cw = child.measured?.width ?? child.width ?? 240;
-    const ch = child.measured?.height ?? child.height ?? 80;
-    maxRight = Math.max(maxRight, cx + cw);
-    maxBottom = Math.max(maxBottom, cy + ch);
-  }
-
-  return {
-    width: Math.max(DEFAULT_GROUP_MIN_WIDTH, Math.round(maxRight + GROUP_RESIZE_PADDING)),
-    height: Math.max(DEFAULT_GROUP_MIN_HEIGHT, Math.round(maxBottom + GROUP_RESIZE_PADDING)),
-  };
-}
-
-function resizeGroupsAfterChildChanges(
-  changes: NodeChange[],
-  nodes: CanvasNode[],
-  setNodes: (updater: (nodes: CanvasNode[]) => CanvasNode[]) => void,
-) {
-  const childChangedIds = new Set(
-    changes.filter((c) => c.type === "dimensions" || c.type === "position").map((c) => c.id),
-  );
-  if (childChangedIds.size === 0) return;
-
-  const affectedGroupIds = new Set<string>();
-  for (const node of nodes) {
-    if (node.parentId && childChangedIds.has(node.id)) {
-      affectedGroupIds.add(node.parentId);
-    }
-  }
-  if (affectedGroupIds.size === 0) return;
-
-  setNodes((currentNodes) => {
-    let changed = false;
-    const updated = currentNodes.map((node) => {
-      if (!affectedGroupIds.has(node.id)) return node;
-      const size = computeGroupSizeFromChildren(node.id, currentNodes);
-      if (!size) return node;
-
-      const currentW = node.width ?? 0;
-      const currentH = node.height ?? 0;
-      if (Math.abs(currentW - size.width) < 1 && Math.abs(currentH - size.height) < 1) return node;
-
-      changed = true;
-      return {
-        ...node,
-        width: size.width,
-        height: size.height,
-        style: { ...node.style, width: size.width, height: size.height, zIndex: -1 },
-      };
-    });
-    return changed ? updated : currentNodes;
-  });
 }
 
 export interface CanvasEdge extends ReactFlowEdge {
