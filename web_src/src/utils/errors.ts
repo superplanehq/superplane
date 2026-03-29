@@ -7,6 +7,7 @@ import type { GooglerpcStatus } from "@/api-client/types.gen";
 export function getApiErrorMessage(error: unknown, fallback = "An error occurred"): string {
   return (
     getNonEmptyString(error) ??
+    getStatusMessage(getResponseDataError(error)) ??
     getStatusMessage(getNestedError(error)) ??
     getStatusMessage(error) ??
     getNonEmptyString(error instanceof Error ? error.message : null) ??
@@ -61,6 +62,19 @@ function getNestedError(error: unknown): unknown {
   }
 
   return error.error;
+}
+
+function getResponseDataError(error: unknown): unknown {
+  if (!error || typeof error !== "object" || !("response" in error)) {
+    return null;
+  }
+
+  const response = error.response;
+  if (!response || typeof response !== "object" || !("data" in response)) {
+    return null;
+  }
+
+  return response.data;
 }
 
 function getStatusMessage(error: unknown): string | null {
