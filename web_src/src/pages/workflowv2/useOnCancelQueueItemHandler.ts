@@ -4,8 +4,8 @@ import { useCallback } from "react";
 import { canvasesDeleteNodeQueueItem, CanvasesCanvas } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { showErrorToast } from "@/utils/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { showErrorToast } from "@/lib/toast";
 
 type Params = {
   canvasId: string;

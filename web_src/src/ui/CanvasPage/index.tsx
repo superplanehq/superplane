@@ -48,8 +48,8 @@ import {
   ComponentsIntegrationRef,
   OrganizationsIntegration,
 } from "@/api-client";
-import { buildSidebarComponentDocsPayload } from "@/utils/componentDocsUrl";
-import { parseDefaultValues } from "@/utils/components";
+import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
+import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   AiCanvasOperation,

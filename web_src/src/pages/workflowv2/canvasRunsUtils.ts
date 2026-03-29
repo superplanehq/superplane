@@ -4,7 +4,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
 } from "@/api-client";
-import { formatTimeAgo } from "@/utils/date";
+import { formatTimeAgo } from "@/lib/date";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "./mappers";
 import { buildEventInfo, buildExecutionInfo } from "./utils";

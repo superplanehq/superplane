@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 
 describe("usageLimits", () => {
   it("maps organization canvas limit errors to a usage notice with link", () => {

@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { useAccount } from "@/contexts/AccountContext";
-import { showErrorToast } from "@/utils/toast";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { showErrorToast } from "@/lib/toast";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 
 type AcceptStatus = "idle" | "loading" | "error";
 

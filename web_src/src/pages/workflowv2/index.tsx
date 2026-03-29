@@ -1,6 +1,6 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
 import { QueryClient, useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
@@ -82,11 +82,11 @@ import { EventState, EventStateMap } from "@/ui/componentBase";
 import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { CompositeProps, LastRunState } from "@/ui/composite";
 import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode/constants";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { getApiErrorMessage } from "@/utils/errors";
-import { filterVisibleConfiguration } from "@/utils/components";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { getIntegrationWebhookUrl } from "@/utils/integrationUtils";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
+import { getApiErrorMessage } from "@/lib/errors";
+import { filterVisibleConfiguration } from "@/lib/components";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { Button } from "@/components/ui/button";
 import {
   getComponentAdditionalDataBuilder,
