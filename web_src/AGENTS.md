@@ -59,10 +59,15 @@ src/
 ├── TaskBoard/
 │   ├── components/           # TaskBoard-specific components
 │   ├── stories/             # TaskBoard stories
-│   ├── tests/               # Mock data and utilities
-│   ├── utils/               # Shared utilities
+│   ├── tests/               # Mock data and test helpers
 │   └── types.ts             # Shared TaskBoard types
+├── hooks/                   # Shared React hooks
+└── lib/                     # Shared non-React helpers
 ```
+
+- Do not create or use `src/utils/` folders or `utils.ts` files.
+- Put shared non-React helpers in `src/lib/`.
+- Put reusable React hook logic in `src/hooks/`.
 
 ### Story Development
 

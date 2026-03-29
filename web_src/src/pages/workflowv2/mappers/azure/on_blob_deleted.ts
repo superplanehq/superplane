@@ -5,7 +5,7 @@ import azureIcon from "@/assets/icons/integrations/azure.svg";
 import type { AzureBlobEvent } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "../utils";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 
 export interface OnBlobDeletedConfiguration {

@@ -1,6 +1,6 @@
-import { getColorClass } from "@/utils/colors";
-import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { getNextCronExecution } from "@/utils/cron";
+import { getColorClass } from "@/lib/colors";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
+import { getNextCronExecution } from "@/lib/cron";
 import type {
   TriggerRenderer,
   CustomFieldRenderer,

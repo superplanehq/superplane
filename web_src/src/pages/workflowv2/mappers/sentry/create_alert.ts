@@ -1,6 +1,6 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import {
   buildEventSections,

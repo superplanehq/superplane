@@ -1,5 +1,5 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import renderIcon from "@/assets/icons/integrations/render.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";

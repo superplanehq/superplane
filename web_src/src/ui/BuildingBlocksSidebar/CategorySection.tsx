@@ -3,7 +3,7 @@ import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components
 import { resolveIcon } from "@/lib/utils";
 import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
 import { useState } from "react";
-import { toTestId } from "../../utils/testID";
+import { toTestId } from "../../lib/testID";
 import { getComponentSubtype } from "../buildingBlocks";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
 import { BuildingBlockPreview } from "./BuildingBlockPreview";

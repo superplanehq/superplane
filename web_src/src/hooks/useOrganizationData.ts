@@ -30,7 +30,7 @@ import {
 } from "../api-client/sdk.gen";
 import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { canvasKeys } from "./useCanvasData";
-import { withOrganizationHeader } from "../utils/withOrganizationHeader";
+import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
 export const organizationKeys = {

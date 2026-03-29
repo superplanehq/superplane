@@ -14,7 +14,7 @@ import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import type React from "react";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching backend

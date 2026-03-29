@@ -6,7 +6,7 @@ import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
-import { parseDefaultValues } from "../../utils/components";
+import { parseDefaultValues } from "../../lib/components";
 
 export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
