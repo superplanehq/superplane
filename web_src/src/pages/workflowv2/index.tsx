@@ -6332,13 +6332,6 @@ function prepareComponentNode(
     return canvasNode;
   }
 
-  const componentNameParts = node.component?.name?.split(".") || [];
-  const componentName = componentNameParts[0];
-
-  if (componentName == "merge") {
-    return prepareMergeNode(nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, edges);
-  }
-
   return prepareComponentBaseNode(
     nodes,
     node,
@@ -6349,6 +6342,7 @@ function prepareComponentNode(
     queryClient,
     organizationId || "",
     currentUser,
+    edges,
   );
 }
 
@@ -6362,6 +6356,7 @@ function prepareComponentBaseNode(
   queryClient: QueryClient,
   organizationId: string,
   currentUser?: { id?: string; email?: string },
+  edges?: ComponentsEdge[],
 ): CanvasNode {
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
@@ -6379,6 +6374,7 @@ function prepareComponentBaseNode(
         node: buildNodeInfo(node),
         componentDefinition: buildComponentDefinition(componentDef!),
         lastExecutions: executions.map((e) => buildExecutionInfo(e)),
+        edges,
         canvasId: workflowId,
         queryClient: queryClient,
         organizationId: organizationId,
@@ -6426,72 +6422,6 @@ function prepareComponentBaseNode(
       component: {
         ...componentBaseProps,
         emptyStateProps,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-        paused: !!node.paused,
-      },
-    },
-  };
-}
-
-function prepareMergeNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  edges?: ComponentsEdge[],
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const execution = executions.length > 0 ? executions[0] : null;
-  const componentDef = components.find((c) => c.name === "merge");
-
-  // Calculate incoming sources count from edges
-  const incomingSourcesCount = edges?.filter((edge) => edge.targetId === node.id).length || 0;
-  const additionalData = { incomingSourcesCount };
-
-  // Use the merge state function and mapper for consistent state handling
-  const mergeStateResolver = getState("merge");
-  const mergeStateMap = getStateMap("merge");
-  const mergeMapper = getComponentBaseMapper("merge");
-
-  let lastEvent;
-  if (execution) {
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-
-    const executionInfo = buildExecutionInfo(execution);
-    const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(execution.rootEvent!) });
-
-    // Get subtitle from the merge mapper with incoming sources count
-    const eventSubtitle = mergeMapper.subtitle({ node: buildNodeInfo(node), execution: executionInfo, additionalData });
-
-    lastEvent = {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: eventSubtitle,
-      eventState: mergeStateResolver(executionInfo),
-      eventId: execution.rootEvent?.id,
-    };
-  }
-
-  const displayLabel = node.name || componentDef?.label || "Merge";
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "merge",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: componentDef?.outputChannels?.map((channel) => channel.name!) || ["default"],
-      merge: {
-        title: displayLabel,
-        lastEvent: lastEvent,
-        nextInQueue: getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes),
-        collapsedBackground: getBackgroundColorClass("white"),
-        collapsed: node.isCollapsed,
-        eventStateMap: mergeStateMap,
         error: node.errorMessage,
         warning: node.warningMessage,
         paused: !!node.paused,
