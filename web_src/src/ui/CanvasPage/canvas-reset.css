@@ -108,3 +108,16 @@
 .sp-canvas .edge-label-visible .edge-label-button:hover {
   transform: scale(2);
 }
+
+@keyframes sp-running-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
+  }
+}
+
+.sp-running {
+  animation: sp-running-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

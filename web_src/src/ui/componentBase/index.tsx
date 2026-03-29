@@ -291,11 +291,12 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     eventSections && eventSections.length > 0
       ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
       : undefined;
+  const isRunning = eventSections?.some((s) => s.eventState === "running") ?? false;
 
   return (
     <SelectionWrapper selected={selected}>
       <div
-        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
+        className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""} ${isRunning ? "sp-running" : ""}`}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
         <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
@@ -368,6 +369,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           onDoubleClick={onToggleCollapse}
           isCompactView={isCompactView}
           statusBadgeColor={compactStatusBadgeColor}
+          isRunning={isRunning}
         />
 
         {hasBadge && (
