@@ -31,31 +31,6 @@ export async function getResponseErrorMessage(response: Response, fallback = "An
   }
 }
 
-export function getApiErrorCode(error: unknown): number | null {
-  if (!error) {
-    return null;
-  }
-
-  if (typeof error === "object" && "error" in error) {
-    const errorObj = error.error;
-    if (errorObj && typeof errorObj === "object" && "code" in errorObj) {
-      const code = (errorObj as GooglerpcStatus).code;
-      if (typeof code === "number") {
-        return code;
-      }
-    }
-  }
-
-  if (typeof error === "object" && "code" in error) {
-    const code = (error as GooglerpcStatus).code;
-    if (typeof code === "number") {
-      return code;
-    }
-  }
-
-  return null;
-}
-
 function getNestedError(error: unknown): unknown {
   if (!error || typeof error !== "object" || !("error" in error)) {
     return null;

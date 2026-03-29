@@ -8,7 +8,7 @@ const DOCS_COMPONENTS_BASE = "https://docs.superplane.com/components";
 const camelBoundary = /([a-z0-9])([A-Z])/g;
 
 /** Fragment id for a component or trigger section (Go slugify). */
-export function slugifyDocsAnchor(value: string): string {
+function slugifyDocsAnchor(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
     return "unknown";
@@ -35,7 +35,7 @@ function integrationDocsPathSegment(integrationLabel: string | undefined, integr
   return "core";
 }
 
-export function buildComponentDocumentationUrl(params: {
+function buildComponentDocumentationUrl(params: {
   integrationName?: string;
   integrationLabel?: string;
   blockLabel: string;
