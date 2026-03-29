@@ -16,7 +16,7 @@ function buildField(overrides: Partial<ConfigurationField> = {}): ConfigurationF
   };
 }
 
-describe("components", () => {
+describe("components visibility helpers", () => {
   it("evaluates field visibility with exact and wildcard matches", () => {
     const field = buildField({
       visibilityConditions: [
@@ -100,7 +100,9 @@ describe("components", () => {
     expect(isFieldRequired(conditionallyRequired, { provider: "github" })).toBe(true);
     expect(isFieldRequired(conditionallyRequired, { provider: "slack" })).toBe(false);
   });
+});
 
+describe("components value parsing and validation", () => {
   it("validates cron and number submission values", () => {
     expect(validateFieldForSubmission(buildField({ type: "cron" }), "bad")).toEqual(["Cron expression too short"]);
     expect(
