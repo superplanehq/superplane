@@ -1,5 +1,7 @@
 import type {
+  AdditionalDataBuilderContext,
   ComponentBaseContext,
+  ComponentAdditionalDataBuilder,
   ComponentBaseMapper,
   EventStateRegistry,
   ExecutionDetailsContext,
@@ -55,6 +57,14 @@ interface MergeExecutionMetadata {
 interface MergeAdditionalData {
   incomingSourcesCount?: number;
 }
+
+export const mergeDataBuilder: ComponentAdditionalDataBuilder = {
+  buildAdditionalData(context: AdditionalDataBuilderContext): MergeAdditionalData {
+    return {
+      incomingSourcesCount: context.edges?.filter((edge) => edge.targetId === context.node.id).length || 0,
+    };
+  },
+};
 
 /**
  * Determines which output channel has data, indicating the merge outcome.

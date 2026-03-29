@@ -71,7 +71,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     semaphore: "component",
     wait: "component",
     timeGate: "component",
-    merge: "merge",
+    merge: "component",
   };
   return typeMap[componentName] || "component"; // Default to noop for unknown components
 };

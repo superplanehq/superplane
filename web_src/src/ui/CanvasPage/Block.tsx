@@ -4,14 +4,13 @@ import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
 import { SparklesIcon } from "lucide-react";
 import { Button } from "../button";
-import MergeComponent, { type MergeComponentProps } from "../merge";
 import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
 import type { GroupNodeProps } from "../groupNode";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
-type BlockType = "trigger" | "component" | "composite" | "merge" | "annotation" | "group";
+type BlockType = "trigger" | "component" | "composite" | "annotation" | "group";
 
 interface BlockAi {
   show: boolean;
@@ -40,9 +39,6 @@ export interface BlockData {
 
   // composite node specific props
   composite?: CompositeProps;
-
-  // merge node specific props
-  merge?: MergeComponentProps;
 
   // annotation node specific props
   annotation?: AnnotationComponentProps;
@@ -397,8 +393,6 @@ function BlockContent({
           return !!data.trigger?.collapsed;
         case "component":
           return !!data.component?.collapsed;
-        case "merge":
-          return !!data.merge?.collapsed;
         default:
           return false;
       }
@@ -444,15 +438,6 @@ function BlockContent({
         <Composite
           {...(data.composite as CompositeProps)}
           onExpandChildEvents={handleExpand}
-          selected={selected}
-          showHeader={showHeader}
-          {...actionProps}
-        />
-      );
-    case "merge":
-      return (
-        <MergeComponent
-          {...(data.merge as MergeComponentProps)}
           selected={selected}
           showHeader={showHeader}
           {...actionProps}
