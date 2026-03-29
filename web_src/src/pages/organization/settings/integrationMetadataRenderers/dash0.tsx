@@ -1,5 +1,5 @@
 import { Icon } from "@/components/Icon";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
 import { IntegrationMetadataRenderer } from "./types";
 

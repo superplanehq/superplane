@@ -5,7 +5,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,8 +17,8 @@ import {
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { getApiErrorMessage } from "@/utils/errors";
-import { showErrorToast } from "@/utils/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";

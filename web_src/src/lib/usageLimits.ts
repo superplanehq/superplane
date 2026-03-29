@@ -1,4 +1,4 @@
-import { getApiErrorMessage } from "@/utils/errors";
+import { getApiErrorMessage } from "@/lib/errors";
 
 export interface UsageLimitNotice {
   title: string;

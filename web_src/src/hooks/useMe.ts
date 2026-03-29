@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { meMe } from "@/api-client";
-import { useOrganizationId, withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 export const meKeys = {
   me: (organizationId: string) => ["me", organizationId] as const,

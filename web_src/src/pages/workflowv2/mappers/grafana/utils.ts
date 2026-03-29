@@ -1,4 +1,4 @@
-import { formatTimestampInUserTimezone } from "@/utils/timezone";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 export function formatTimestamp(value?: string): string {
   if (!value) return "-";

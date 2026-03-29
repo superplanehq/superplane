@@ -1,5 +1,5 @@
 import type { EventSection } from "@/ui/componentBase";
-import { formatTimeAgo } from "@/utils/date";
+import { formatTimeAgo } from "@/lib/date";
 import type {
   ExecutionDetailsContext,
   ExecutionInfo,

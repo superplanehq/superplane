@@ -1,4 +1,4 @@
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";

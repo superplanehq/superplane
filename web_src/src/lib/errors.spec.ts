@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getResponseErrorMessage } from "@/utils/errors";
+import { getResponseErrorMessage } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts a message from a JSON error response", async () => {

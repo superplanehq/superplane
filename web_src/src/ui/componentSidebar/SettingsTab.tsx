@@ -10,7 +10,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import {
@@ -18,7 +18,7 @@ import {
   isFieldRequired,
   parseDefaultValues,
   validateFieldForSubmission,
-} from "@/utils/components";
+} from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 

@@ -13,7 +13,7 @@ import type {
   AgentsListAgentChatsResponse,
   AgentsResumeAgentChatResponse,
 } from "@/api-client";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { consumeChatResponseStream } from "./agentChatSupport";
 import {
   addLocalPromptMessages,

@@ -7,7 +7,7 @@ import type {
 } from "../types";
 import React from "react";
 import type { TriggerProps } from "@/ui/trigger";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import { getDetailsForAlert } from "./base";

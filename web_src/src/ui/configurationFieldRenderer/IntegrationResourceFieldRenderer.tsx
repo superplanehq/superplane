@@ -6,7 +6,7 @@ import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
-import { toTestId } from "@/utils/testID";
+import { toTestId } from "@/lib/testID";
 import { type RefObject, useEffect, useMemo, useState } from "react";
 
 interface IntegrationResourceFieldRendererProps {
