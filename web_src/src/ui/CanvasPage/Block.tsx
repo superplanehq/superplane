@@ -2,8 +2,6 @@ import React from "react";
 import { Composite, type CompositeProps } from "@/ui/composite";
 import { Trigger, type TriggerProps } from "@/ui/trigger";
 import { Handle, Position } from "@xyflow/react";
-import { SparklesIcon } from "lucide-react";
-import { Button } from "../button";
 import { ComponentActionsProps } from "../types/componentActions";
 import { ComponentBase, ComponentBaseProps } from "../componentBase";
 import { AnnotationComponent, type AnnotationComponentProps } from "../annotationComponent";
@@ -11,13 +9,6 @@ import type { GroupNodeProps } from "../groupNode";
 
 type BlockState = "pending" | "working" | "success" | "failed" | "running";
 type BlockType = "trigger" | "component" | "composite" | "annotation" | "group";
-
-interface BlockAi {
-  show: boolean;
-  suggestion: string | null;
-  onApply: () => void;
-  onDismiss: () => void;
-}
 
 export interface BlockData {
   label: string;
@@ -59,18 +50,10 @@ interface BlockProps extends ComponentActionsProps {
   onAnnotationBlur?: () => void;
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: (e: React.MouseEvent) => void;
-
-  ai?: BlockAi;
 }
 
 export function Block(props: BlockProps) {
   const data = props.data;
-  const ai = props.ai || {
-    show: false,
-    suggestion: null,
-    onApply: () => {},
-    onDismiss: () => {},
-  };
 
   // Check if this node is highlighted (from execution chain)
   const isHighlighted = (data as any)._isHighlighted || false;
@@ -80,15 +63,11 @@ export function Block(props: BlockProps) {
   const shouldDim = hasHighlightedNodes && !isHighlighted;
 
   return (
-    <>
-      <AiPopup {...ai} />
-
-      <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={(e) => props.onClick?.(e)}>
-        <LeftHandle data={data} nodeId={props.nodeId} />
-        <BlockContent {...props} />
-        <RightHandle data={data} nodeId={props.nodeId} />
-      </div>
-    </>
+    <div className={`relative w-fit ${shouldDim ? "opacity-30" : ""}`} onClick={(e) => props.onClick?.(e)}>
+      <LeftHandle data={data} nodeId={props.nodeId} />
+      <BlockContent {...props} />
+      <RightHandle data={data} nodeId={props.nodeId} />
+    </div>
   );
 }
 
@@ -320,45 +299,6 @@ function RightHandle({ data, nodeId }: BlockProps) {
   );
 }
 
-function AiPopup({ show, suggestion, onApply, onDismiss }: BlockAi) {
-  if (!show) return null;
-  if (!suggestion) return null;
-
-  const handleApply = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onApply();
-  };
-
-  const handleDismiss = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDismiss();
-  };
-
-  return (
-    <div className="absolute left-0 -translate-y-[100%] text-left text-base">
-      <div className="bg-white rounded-lg shadow p-3 relative mb-2 border-blue-500 border-2">
-        <div className="flex items-center gap-1 mb-2">
-          <SparklesIcon className="inline-block text-blue-500" size={14} />
-          <div className="text-gray-800 font-bold">Improvements</div>
-        </div>
-
-        <div className="text-sm">{suggestion}</div>
-
-        <div className="flex gap-2 mt-2">
-          <Button size="sm" variant="default" className="mt-2" onClick={handleApply}>
-            Apply
-          </Button>
-
-          <Button size="sm" variant="secondary" className="mt-2" onClick={handleDismiss}>
-            Dismiss
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-//
 // Block content is the inner area of the block.
 //
 

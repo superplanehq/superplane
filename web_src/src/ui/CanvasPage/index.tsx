@@ -51,7 +51,6 @@ import {
 import { buildSidebarComponentDocsPayload } from "@/utils/componentDocsUrl";
 import { parseDefaultValues } from "@/utils/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
-import { AiSidebar } from "../ai";
 import {
   AiCanvasOperation,
   BuildingBlock,
@@ -199,17 +198,6 @@ interface FocusRequest {
     executionId?: string | null;
     triggerEvent?: SidebarEvent | null;
   };
-}
-
-export interface AiProps {
-  enabled: boolean;
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  showNotifications: boolean;
-  notificationMessage?: string;
-  suggestions: Record<string, string>;
-  onApply: (suggestionId: string) => void;
-  onDismiss: (suggestionId: string) => void;
 }
 
 export interface NodeEditData {
@@ -381,8 +369,6 @@ export interface CanvasPageProps {
   onToggleCollapse?: () => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
-  ai?: AiProps;
-
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
@@ -526,12 +512,6 @@ function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: an
           : undefined
       }
       onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
-      ai={{
-        show: callbacks.aiState.sidebarOpen,
-        suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
-        onApply: () => callbacks.aiState.onApply(nodeProps.id),
-        onDismiss: () => callbacks.aiState.onDismiss(nodeProps.id),
-      }}
     />
   );
 }
@@ -1302,14 +1282,6 @@ function CanvasPage(props: CanvasPageProps) {
                 canCreateIntegrations={props.canCreateIntegrations}
               />
             </ReactFlowProvider>
-
-            <AiSidebar
-              enabled={state.ai.enabled}
-              isOpen={state.ai.sidebarOpen}
-              setIsOpen={state.ai.setSidebarOpen}
-              showNotifications={state.ai.showNotifications}
-              notificationMessage={state.ai.notificationMessage}
-            />
 
             <Sidebar
               state={state}
@@ -2539,7 +2511,6 @@ function CanvasContent({
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
     onUngroupNodes: onUngroupNodesRef,
-    aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2560,7 +2531,6 @@ function CanvasContent({
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
     onUngroupNodes: onUngroupNodesRef,
-    aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
     showHeader,
