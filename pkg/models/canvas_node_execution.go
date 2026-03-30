@@ -172,12 +172,16 @@ func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, re
 }
 
 func ListNodeExecutionsForRootEvents(rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+	return ListNodeExecutionsForRootEventsInTransaction(database.Conn(), rootEventIDs)
+}
+
+func ListNodeExecutionsForRootEventsInTransaction(tx *gorm.DB, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
 	if len(rootEventIDs) == 0 {
 		return []CanvasNodeExecution{}, nil
 	}
 
 	var executions []CanvasNodeExecution
-	err := database.Conn().
+	err := tx.
 		Where("root_event_id IN ?", rootEventIDs).
 		Order("created_at ASC").
 		Find(&executions).
@@ -187,6 +191,22 @@ func ListNodeExecutionsForRootEvents(rootEventIDs []uuid.UUID) ([]CanvasNodeExec
 	}
 
 	return executions, nil
+}
+
+func CountActiveNodeExecutionsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (int64, error) {
+	var count int64
+
+	err := tx.
+		Model(&CanvasNodeExecution{}).
+		Where("root_event_id = ?", rootEventID).
+		Where("state IN ?", []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted}).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }
 
 func CountNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string) (int64, error) {

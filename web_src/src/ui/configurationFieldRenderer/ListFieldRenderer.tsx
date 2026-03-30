@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
   validationErrors?: ValidationError[] | Set<string>;
@@ -18,7 +18,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   onChange,
   domainId,
   domainType,
-  appInstallationId,
+  integrationId,
   organizationId,
   hasError: _,
   validationErrors,
@@ -34,6 +34,8 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
       : value
     : [];
+  const itemsRef = React.useRef(items);
+  itemsRef.current = items;
   const itemLabel = listOptions?.itemLabel || "Item";
   const canAddMore = maxItems === undefined || items.length < maxItems;
   const isApprovalItemsList =
@@ -67,16 +69,19 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           : itemDefinition?.type === "day-in-year"
             ? "01/01"
             : "";
-    onChange([...items, newItem]);
+    const newItems = [...itemsRef.current, newItem];
+    itemsRef.current = newItems;
+    onChange(newItems);
   };
 
   const removeItem = (index: number) => {
-    const newItems = items.filter((_, i) => i !== index);
+    const newItems = itemsRef.current.filter((_, i) => i !== index);
+    itemsRef.current = newItems;
     onChange(newItems.length > 0 ? newItems : undefined);
   };
 
   const updateItem = (index: number, newValue: unknown) => {
-    const newItems = [...items];
+    const newItems = [...itemsRef.current];
     newItems[index] = newValue;
     if (isApprovalItemsList) {
       const newKey =
@@ -92,6 +97,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         }
       }
     }
+    itemsRef.current = newItems;
     onChange(newItems);
   };
 
@@ -140,7 +146,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       allValues={nestedValues}
                       domainId={domainId}
                       domainType={domainType}
-                      appInstallationId={appInstallationId}
+                      integrationId={integrationId}
                       organizationId={organizationId}
                       hasError={hasNestedError}
                       autocompleteExampleObj={autocompleteExampleObj}

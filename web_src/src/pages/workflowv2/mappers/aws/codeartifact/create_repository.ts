@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,13 +7,14 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "../../types";
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
-import { formatTimeAgo } from "@/utils/date";
-import { formatTimestampInUserTimezone } from "@/utils/timezone";
-import { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
+import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 
 interface CreateRepositoryConfiguration {
@@ -78,11 +79,11 @@ export const createRepositoryMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) {
       return "";
     }
-    return formatTimeAgo(new Date(context.execution.createdAt));
+    return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
 
@@ -111,7 +112,7 @@ function createRepositoryEventSections(
     {
       receivedAt: new Date(execution.createdAt ?? 0),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt ?? 0)),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt ?? 0)),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id ?? "",
     },

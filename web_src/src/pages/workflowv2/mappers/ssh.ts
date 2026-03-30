@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -7,16 +7,12 @@ import {
   NodeInfo,
   SubtitleContext,
 } from "./types";
-import {
-  ComponentBaseProps,
-  EventSection,
-  EventState,
-  EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
-} from "@/ui/componentBase";
-import { getColorClass } from "@/utils/colors";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { getColorClass } from "@/lib/colors";
+import type React from "react";
 import { getTriggerRenderer } from ".";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 const SSH_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -63,7 +59,7 @@ type SSHConfiguration = {
   host: string;
   port?: number;
   username: string;
-  command: string;
+  commands?: string;
   authMethod?: string;
 };
 
@@ -132,7 +128,7 @@ export const sshMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const state = sshStateFunction(context.execution);
 
     if (state === "running" && context.execution.createdAt) {
@@ -149,15 +145,14 @@ export const sshMapper: ComponentBaseMapper = {
       const metadata = context.execution.metadata as Record<string, unknown> | undefined;
       const result = metadata?.result as { exitCode?: number } | undefined;
       const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
-      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
-      if (exitStr && timeAgo) {
-        return `${exitStr} · ${timeAgo}`;
+      if (exitStr && context.execution.updatedAt) {
+        return renderWithTimeAgo(exitStr, new Date(context.execution.updatedAt));
       }
-      if (timeAgo) return timeAgo;
+      if (context.execution.updatedAt) return renderTimeAgo(new Date(context.execution.updatedAt));
     }
 
     if (context.execution.updatedAt) {
-      return formatTimeAgo(new Date(context.execution.updatedAt));
+      return renderTimeAgo(new Date(context.execution.updatedAt));
     }
     return "";
   },
@@ -174,11 +169,14 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
       label: `${config.username || "user"}@${config.host}${port}`,
     });
   }
-  if (config?.command) {
-    const cmd = config.command.length > 40 ? config.command.slice(0, 40) + "…" : config.command;
+  if (config?.commands) {
+    const oneline = config.commands
+      .split("\n")
+      .filter((l) => l.trim() !== "")
+      .join(" && ");
     metadata.push({
       icon: "terminal",
-      label: cmd,
+      label: oneline,
     });
   }
 
@@ -194,7 +192,7 @@ function getSSHEventSections(
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const generateEventSubtitle = (): string => {
+  const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
     if (state === "running" && execution.createdAt) {
       const startTime = new Date(execution.createdAt);
@@ -208,12 +206,11 @@ function getSSHEventSections(
       const metadata = execution.metadata as Record<string, unknown> | undefined;
       const result = metadata?.result as { exitCode?: number } | undefined;
       const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
-      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
-      if (exitStr && timeAgo) return `${exitStr} · ${timeAgo}`;
-      if (timeAgo) return timeAgo;
+      if (exitStr && execution.updatedAt) return renderWithTimeAgo(exitStr, new Date(execution.updatedAt));
+      if (execution.updatedAt) return renderTimeAgo(new Date(execution.updatedAt));
     }
     if (execution.updatedAt) {
-      return formatTimeAgo(new Date(execution.updatedAt));
+      return renderTimeAgo(new Date(execution.updatedAt));
     }
     return "";
   };

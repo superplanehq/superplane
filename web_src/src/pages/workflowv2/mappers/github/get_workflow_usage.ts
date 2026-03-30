@@ -1,5 +1,6 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   ComponentBaseMapper,
   ComponentBaseContext,
   SubtitleContext,
@@ -9,7 +10,7 @@ import {
 } from "../types";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 
 const MAX_REPOSITORIES_IN_SUMMARY = 3;
 const MAX_BREAKDOWN_ENTRIES = 3;
@@ -106,7 +107,7 @@ export const getWorkflowUsageMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

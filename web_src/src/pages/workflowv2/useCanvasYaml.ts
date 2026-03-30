@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
 interface UseCanvasYamlParams {

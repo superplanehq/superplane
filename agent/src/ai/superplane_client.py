@@ -28,6 +28,7 @@ from ai.models import (
 from superplaneapi.api.canvas_api import CanvasApi
 from superplaneapi.api.canvas_node_api import CanvasNodeApi
 from superplaneapi.api.component_api import ComponentApi
+from superplaneapi.api.integration_api import IntegrationApi
 from superplaneapi.api.organization_api import OrganizationApi
 from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
@@ -37,14 +38,21 @@ from superplaneapi.models.components_component import ComponentsComponent
 from superplaneapi.models.components_describe_component_response import (
     ComponentsDescribeComponentResponse,
 )
+from superplaneapi.models.canvases_canvas_memory import CanvasesCanvasMemory
 from superplaneapi.models.components_list_components_response import ComponentsListComponentsResponse
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_list_canvas_memories_response import (
+    CanvasesListCanvasMemoriesResponse,
+)
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
 from superplaneapi.models.organizations_list_integration_resources_response import (
     OrganizationsListIntegrationResourcesResponse,
+)
+from superplaneapi.models.superplane_integrations_list_integrations_response import (
+    SuperplaneIntegrationsListIntegrationsResponse,
 )
 from superplaneapi.models.superplane_organizations_list_integrations_response import (
     SuperplaneOrganizationsListIntegrationsResponse,
@@ -60,7 +68,7 @@ def _debug_enabled() -> bool:
 
 def _debug_log(message: str) -> None:
     if _debug_enabled():
-        print(f"[repl_web][superplane_client] {message}", flush=True)
+        print(message, flush=True)
 
 
 @dataclass(frozen=True)
@@ -90,48 +98,35 @@ class SuperplaneClient:
         self._canvas_node_api = CanvasNodeApi(self._api_client)
         self._component_api = ComponentApi(self._api_client)
         self._trigger_api = TriggerApi(self._api_client)
+        self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
 
-    def _with_error_guidance(self, callback: Any, operation: str) -> Any:
-        _debug_log(
-            f"request operation={operation} base_url={self._config.base_url.rstrip('/')} "
-            f"org_id={self._config.organization_id} timeout={self._config.timeout_seconds}s"
-        )
+    def _api_request(self, callback: Any, operation: str, fields: dict[str, Any] | None = None) -> Any:
+        org_id = self._config.organization_id
+        fields_str = " ".join([f"{key}={value}" for key, value in fields.items()]) if fields else ""
+
         try:
             response = callback()
-            _debug_log(f"response operation={operation} status=ok")
+            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status=200 OK")
             return response
         except ApiException as error:
-            status = error.status if isinstance(error.status, int) else None
-            response_text = error.body if isinstance(error.body, str) else ""
-            _debug_log(
-                f"http_error operation={operation} status={status} body={response_text[:400]}"
-            )
+            status = error.status if isinstance(error.status, int) else "unknown"
+            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status={status} reason={error}")
 
-            guidance = (
-                "Check SUPERPLANE_API_TOKEN, SUPERPLANE_ORG_ID, and canvas access permissions."
-                if status in {401, 403}
-                else "Check SUPERPLANE_BASE_URL and request parameters."
-            )
-            if response_text:
-                details = f" HTTP {status}: {response_text}"
-            else:
-                details = f" HTTP {status or 'unknown'}."
-            raise RuntimeError(f"Superplane API request failed.{details} {guidance}") from error
+            raise RuntimeError("Superplane API request failed.") from error
         except Exception as error:
-            _debug_log(f"url_error operation={operation} reason={error}")
-            raise RuntimeError(
-                "Failed to reach Superplane API. "
-                "Check SUPERPLANE_BASE_URL and network connectivity."
-            ) from error
+            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status=unknown_error reason={error}")
+
+            raise RuntimeError("Failed to reach Superplane API.") from error
 
     def describe_canvas(self, canvas_id: str) -> CanvasSummary:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._canvas_api.canvases_describe_canvas(
                 canvas_id,
                 _request_timeout=self._config.timeout_seconds,
             ),
             operation="canvases_describe_canvas",
+            fields={"canvas_id": canvas_id},
         )
         if not isinstance(response, CanvasesDescribeCanvasResponse):
             raise ValueError("Expected typed response from Superplane API.")
@@ -313,12 +308,37 @@ class SuperplaneClient:
             "state_description": status.state_description if status is not None else None,
         }
 
+    @staticmethod
+    def _serialize_available_integration(integration: Any) -> dict[str, Any]:
+        components = integration.components if isinstance(integration.components, list) else []
+        triggers = integration.triggers if isinstance(integration.triggers, list) else []
+        return {
+            "name": integration.name,
+            "provider": integration.name,
+            "label": integration.label,
+            "description": integration.description,
+            "icon": integration.icon,
+            "component_count": len(components),
+            "trigger_count": len(triggers),
+        }
+
+    def _list_available_integrations_raw(self) -> list[Any]:
+        response = self._api_request(
+            lambda: self._integration_api.integrations_list_integrations(
+                _request_timeout=self._config.timeout_seconds,
+            ),
+            operation="integrations_list_integrations",
+        )
+        if not isinstance(response, SuperplaneIntegrationsListIntegrationsResponse):
+            return []
+        return response.integrations if isinstance(response.integrations, list) else []
+
     def list_components(
         self,
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._component_api.components_list_components(
                 _request_timeout=self._config.timeout_seconds,
             ),
@@ -326,12 +346,33 @@ class SuperplaneClient:
         )
         if not isinstance(response, ComponentsListComponentsResponse):
             return []
-        components = response.components if isinstance(response.components, list) else []
+        root_components = response.components if isinstance(response.components, list) else []
+        components_by_name: dict[str, ComponentsComponent] = {}
+        for component in root_components:
+            if not isinstance(component, ComponentsComponent):
+                continue
+            if isinstance(component.name, str) and component.name:
+                components_by_name[component.name] = component
+
+        # Integration-scoped components are exposed under /api/v1/integrations.
+        try:
+            integration_definitions = self._list_available_integrations_raw()
+        except Exception as error:
+            _debug_log(f"integration_components_unavailable reason={error}")
+            integration_definitions = []
+
+        for integration in integration_definitions:
+            scoped_components = integration.components if isinstance(integration.components, list) else []
+            for component in scoped_components:
+                if not isinstance(component, ComponentsComponent):
+                    continue
+                if isinstance(component.name, str) and component.name:
+                    components_by_name[component.name] = component
+
         matches = [
             component
-            for component in components
-            if isinstance(component, ComponentsComponent)
-            and self._matches_filters(
+            for component in components_by_name.values()
+            if self._matches_filters(
                 name=component.name,
                 label=component.label,
                 description=component.description,
@@ -339,10 +380,10 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_component(component) for component in matches]
+        return [self._serialize_component(component) for component in sorted(matches, key=lambda item: item.name or "")]
 
     def describe_component(self, name: str) -> dict[str, Any]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._component_api.components_describe_component(
                 name,
                 _request_timeout=self._config.timeout_seconds,
@@ -360,7 +401,7 @@ class SuperplaneClient:
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._trigger_api.triggers_list_triggers(
                 _request_timeout=self._config.timeout_seconds,
             ),
@@ -368,12 +409,32 @@ class SuperplaneClient:
         )
         if not isinstance(response, TriggersListTriggersResponse):
             return []
-        triggers = response.triggers if isinstance(response.triggers, list) else []
+        root_triggers = response.triggers if isinstance(response.triggers, list) else []
+        triggers_by_name: dict[str, TriggersTrigger] = {}
+        for trigger in root_triggers:
+            if not isinstance(trigger, TriggersTrigger):
+                continue
+            if isinstance(trigger.name, str) and trigger.name:
+                triggers_by_name[trigger.name] = trigger
+
+        try:
+            integration_definitions = self._list_available_integrations_raw()
+        except Exception as error:
+            _debug_log(f"integration_triggers_unavailable reason={error}")
+            integration_definitions = []
+
+        for integration in integration_definitions:
+            scoped_triggers = integration.triggers if isinstance(integration.triggers, list) else []
+            for trigger in scoped_triggers:
+                if not isinstance(trigger, TriggersTrigger):
+                    continue
+                if isinstance(trigger.name, str) and trigger.name:
+                    triggers_by_name[trigger.name] = trigger
+
         matches = [
             trigger
-            for trigger in triggers
-            if isinstance(trigger, TriggersTrigger)
-            and self._matches_filters(
+            for trigger in triggers_by_name.values()
+            if self._matches_filters(
                 name=trigger.name,
                 label=trigger.label,
                 description=trigger.description,
@@ -381,10 +442,18 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_trigger(trigger) for trigger in matches]
+        return [self._serialize_trigger(trigger) for trigger in sorted(matches, key=lambda item: item.name or "")]
+
+    def list_available_integrations(self) -> list[dict[str, Any]]:
+        integrations = self._list_available_integrations_raw()
+        return [
+            self._serialize_available_integration(integration)
+            for integration in integrations
+            if integration is not None
+        ]
 
     def describe_trigger(self, name: str) -> dict[str, Any]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._trigger_api.triggers_describe_trigger(
                 name,
                 _request_timeout=self._config.timeout_seconds,
@@ -398,7 +467,7 @@ class SuperplaneClient:
         return self._serialize_trigger(response.trigger)
 
     def list_org_integrations(self) -> list[dict[str, Any]]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._organization_api.organizations_list_integrations(
                 self._config.organization_id,
                 _request_timeout=self._config.timeout_seconds,
@@ -426,7 +495,7 @@ class SuperplaneClient:
                 {str(key): str(value) for key, value in parameters.items() if key and value}
             )
         encoded_parameters = urlencode(query_params)
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._organization_api.organizations_list_integration_resources(
                 self._config.organization_id,
                 integration_id,
@@ -488,7 +557,7 @@ class SuperplaneClient:
         )
 
     def list_node_events(self, canvas_id: str, node_id: str, limit: int = 5) -> list[NodeEvent]:
-        response = self._with_error_guidance(
+        response = self._api_request(
             lambda: self._canvas_node_api.canvases_list_node_events(
                 canvas_id,
                 node_id,
@@ -497,6 +566,7 @@ class SuperplaneClient:
             ),
             operation="canvases_list_node_events",
         )
+
         if not isinstance(response, CanvasesListNodeEventsResponse) or not isinstance(
             response.events, list
         ):

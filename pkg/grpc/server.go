@@ -12,7 +12,9 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -27,6 +29,7 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	widgetPb "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -54,7 +57,15 @@ func sentryRecoveryHandler(p any) error {
 	return status.Errorf(codes.Internal, "internal server error")
 }
 
-func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry, oidcProvider oidc.Provider, port int) {
+func RunServer(
+	baseURL, webhooksBaseURL, basePath string,
+	encryptor crypto.Encryptor,
+	jwtSigner *jwt.Signer,
+	authService authorization.Authorization,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	port int,
+) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -89,7 +100,20 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	//
 	// Initialize services exposed by this server.
 	//
-	organizationService := NewOrganizationService(authService, encryptor, registry, oidcProvider, baseURL, webhooksBaseURL)
+	usageService, err := usage.NewServiceFromEnv()
+	if err != nil {
+		log.Fatalf("failed to initialize usage service: %v", err)
+	}
+
+	organizationService := NewOrganizationService(
+		authService,
+		encryptor,
+		registry,
+		oidcProvider,
+		baseURL,
+		webhooksBaseURL,
+		usageService,
+	)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	userService := NewUsersService(authService)
@@ -119,7 +143,7 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL)
+	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	integrationService := NewIntegrationService(encryptor, registry)
@@ -127,6 +151,9 @@ func RunServer(baseURL, webhooksBaseURL, basePath string, encryptor crypto.Encry
 
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
+
+	agentsService := NewAgentsService(authService, jwtSigner)
+	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
 
 	reflection.Register(grpcServer)
 

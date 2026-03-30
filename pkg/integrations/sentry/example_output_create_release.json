@@ -1,0 +1,22 @@
+{
+  "data": {
+    "id": 2,
+    "version": "2026.03.25",
+    "shortVersion": "2026.03.25",
+    "ref": "6ba09a7c53235ee8a8fa5ee4c1ca8ca886e7fdbb",
+    "url": "https://github.com/superplanehq/superplane/releases/tag/2026.03.25",
+    "dateCreated": "2026-03-25T10:12:55.109Z",
+    "dateReleased": "2026-03-25T10:15:00.000Z",
+    "commitCount": 2,
+    "deployCount": 0,
+    "newGroups": 0,
+    "projects": [
+      {
+        "name": "go-gin",
+        "slug": "go-gin"
+      }
+    ]
+  },
+  "timestamp": "2026-03-25T10:15:00.000Z",
+  "type": "sentry.release"
+}

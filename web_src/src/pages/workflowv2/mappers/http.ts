@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
@@ -8,10 +8,17 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import { ComponentBaseProps, ComponentBaseSpec, EventSection, EventStateMap, EventState } from "@/ui/componentBase";
-import { getColorClass } from "@/utils/colors";
-import { MetadataItem } from "@/ui/metadataList";
-import { formatTimeAgo } from "@/utils/date";
+import type {
+  ComponentBaseProps,
+  ComponentBaseSpec,
+  EventSection,
+  EventStateMap,
+  EventState,
+} from "@/ui/componentBase";
+import type React from "react";
+import { getColorClass } from "@/lib/colors";
+import type { MetadataItem } from "@/ui/metadataList";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
 
@@ -71,11 +78,7 @@ const HTTP_EVENT_STATE_MAP: EventStateMap = {
 const httpStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
+  if (isHTTPExecutionError(execution)) {
     return "error";
   }
 
@@ -89,9 +92,9 @@ const httpStateFunction = (execution: ExecutionInfo): EventState => {
 
   if (execution.state === "STATE_FINISHED") {
     const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
-    if (outputs?.success) {
+    if (outputs?.success?.length) {
       return "success";
-    } else if (outputs?.failure) {
+    } else if (outputs?.failure?.length) {
       return "failed";
     }
   }
@@ -105,7 +108,23 @@ export const HTTP_STATE_REGISTRY: EventStateRegistry = {
 };
 
 interface Output {
-  status: number;
+  status?: number | null;
+}
+
+function isHTTPExecutionError(execution: ExecutionInfo): boolean {
+  if (!execution.resultMessage) {
+    return false;
+  }
+
+  if (execution.resultReason === "RESULT_REASON_ERROR") {
+    return true;
+  }
+
+  if (execution.result !== "RESULT_FAILED") {
+    return false;
+  }
+
+  return execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED";
 }
 
 interface Metadata {
@@ -119,6 +138,32 @@ interface Metadata {
     lastResponse: string | null;
     lastError: string | null;
   };
+}
+
+function getHTTPResponseStatusString(
+  outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
+): string | null {
+  const success = outputs?.success;
+  if (success && success.length > 0) {
+    const response = success[0]?.data as Output | undefined;
+    const status = response?.status;
+    if (status === undefined || status === null) {
+      return null;
+    }
+    return String(status);
+  }
+
+  const failure = outputs?.failure;
+  if (failure && failure.length > 0) {
+    const response = failure[0]?.data as Output | undefined;
+    const status = response?.status;
+    if (status === undefined || status === null) {
+      return null;
+    }
+    return String(status);
+  }
+
+  return null;
 }
 
 export const httpMapper: ComponentBaseMapper = {
@@ -146,14 +191,11 @@ export const httpMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Metadata | undefined;
-    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
+    const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
 
-    if (outputs?.success) {
-      const response = outputs.success[0].data as Output;
-      details["Response"] = response.status.toString();
-    } else if (outputs?.failure) {
-      const response = outputs.failure[0].data as Output;
-      details["Response"] = response.status.toString();
+    const responseStatusString = getHTTPResponseStatusString(outputs) ?? "";
+    if (responseStatusString) {
+      details["Response"] = responseStatusString;
     }
 
     if (metadata?.retry) {
@@ -168,7 +210,7 @@ export const httpMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const state = httpStateFunction(context.execution);
 
     // For running state, show duration
@@ -190,30 +232,21 @@ export const httpMapper: ComponentBaseMapper = {
 
     // For success/failed states, show response code and time
     if (state === "success" || state === "failed") {
-      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
-      let responseCode: string | null = null;
-      if (outputs?.success) {
-        const response = outputs.success[0].data as Output;
-        responseCode = response.status.toString();
-      } else if (outputs?.failure) {
-        const response = outputs.failure[0].data as Output;
-        responseCode = response.status.toString();
-      }
+      const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+      const responseCode = getHTTPResponseStatusString(outputs);
 
-      const timeAgo = context.execution.updatedAt ? formatTimeAgo(new Date(context.execution.updatedAt)) : "";
-
-      if (responseCode && timeAgo) {
-        return `Response: ${responseCode} · ${timeAgo}`;
+      if (responseCode && context.execution.updatedAt) {
+        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(context.execution.updatedAt));
       } else if (responseCode) {
         return `Response: ${responseCode}`;
-      } else if (timeAgo) {
-        return timeAgo;
+      } else if (context.execution.updatedAt) {
+        return renderTimeAgo(new Date(context.execution.updatedAt));
       }
     }
 
     // Fallback: just show time ago
     if (context.execution.updatedAt) {
-      return formatTimeAgo(new Date(context.execution.updatedAt));
+      return renderTimeAgo(new Date(context.execution.updatedAt));
     }
 
     return "";
@@ -221,7 +254,10 @@ export const httpMapper: ComponentBaseMapper = {
 };
 
 function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
-  const configuration = node.configuration as HTTPConfiguration;
+  const configuration = node.configuration as Partial<HTTPConfiguration> | undefined;
+  if (!configuration) {
+    return [];
+  }
   const metadata: Array<{ icon: string; label: string }> = [];
 
   // Method and URL
@@ -236,27 +272,15 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   const contentType = configuration.contentType;
   if (
     contentType &&
-    node.configuration &&
     (configuration.method === "POST" || configuration.method === "PUT" || configuration.method === "PATCH")
   ) {
-    let bodyLabel = "";
-
-    switch (contentType) {
-      case "application/json":
-        bodyLabel = "JSON body";
-        break;
-      case "application/xml":
-        bodyLabel = "XML body";
-        break;
-      case "text/plain":
-        bodyLabel = "Text body";
-        break;
-      case "application/x-www-form-urlencoded":
-        bodyLabel = "Form data";
-        break;
-      default:
-        bodyLabel = "Request body";
-    }
+    const bodyLabel =
+      {
+        "application/json": "JSON body",
+        "application/xml": "XML body",
+        "text/plain": "Text body",
+        "application/x-www-form-urlencoded": "Form data",
+      }[contentType] ?? "Request body";
 
     metadata.push({
       icon: "code",
@@ -265,10 +289,10 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   }
 
   // Retry configuration
-  if (configuration.retry && configuration.retry.enabled) {
-    const strategy = configuration.retry.strategy;
-    const retries = configuration.retry.maxAttempts;
-    const interval = configuration.retry.intervalSeconds;
+  if (configuration.retry?.enabled) {
+    const strategy = configuration.retry.strategy ?? "";
+    const retries = configuration.retry.maxAttempts ?? 0;
+    const interval = configuration.retry.intervalSeconds ?? 0;
     metadata.push({
       icon: "bolt",
       label: `${retries} retries, ${strategy}, ${interval}s`,
@@ -284,7 +308,7 @@ type HTTPConfiguration = {
   contentType: "application/json" | "application/xml" | "text/plain" | "application/x-www-form-urlencoded";
   headers: Array<{ name: string; value: string }>;
   queryParams: Array<{ key: string; value: string }>;
-  json?: any;
+  json?: unknown;
   formData?: Array<{ key: string; value: string }>;
   text?: string;
   xml?: string;
@@ -301,7 +325,10 @@ type RetrySpec = {
 
 function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as HTTPConfiguration;
+  const configuration = node.configuration as Partial<HTTPConfiguration> | undefined;
+  if (!configuration) {
+    return specs;
+  }
 
   const contentType = configuration.contentType || "application/json";
 
@@ -379,7 +406,7 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
     }
   }
 
-  if (configuration.headers && configuration.headers.length > 0) {
+  if (configuration.headers?.length) {
     specs.push({
       title: "header",
       tooltipTitle: "request headers",
@@ -387,12 +414,12 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values: configuration.headers.map((header) => ({
         badges: [
           {
-            label: header.name,
+            label: header.name ?? "",
             bgColor: "bg-blue-100",
             textColor: "text-blue-800",
           },
           {
-            label: header.value,
+            label: header.value ?? "",
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },
@@ -401,7 +428,7 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
     });
   }
 
-  if (configuration.queryParams && configuration.queryParams.length > 0) {
+  if (configuration.queryParams?.length) {
     specs.push({
       title: "query param",
       tooltipTitle: "query params",
@@ -409,12 +436,12 @@ function getHTTPSpecs(node: NodeInfo): ComponentBaseSpec[] {
       values: configuration.queryParams.map((param) => ({
         badges: [
           {
-            label: param.key,
+            label: param.key ?? "",
             bgColor: "bg-blue-100",
             textColor: "text-blue-800",
           },
           {
-            label: param.value,
+            label: param.value ?? "",
             bgColor: "bg-gray-100",
             textColor: "text-gray-800",
           },
@@ -432,10 +459,10 @@ function getHTTPEventSections(
   stateFunction: (execution: ExecutionInfo) => EventState,
 ): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const generateEventSubtitle = (): string => {
+  const generateEventSubtitle = (): string | React.ReactNode => {
     const state = stateFunction(execution);
 
     if (state === "running") {
@@ -459,32 +486,24 @@ function getHTTPEventSections(
       let responseCode: string | null = null;
 
       if (metadata?.finalStatus !== undefined && metadata.finalStatus !== null) {
-        responseCode = metadata.finalStatus.toString();
+        responseCode = (metadata.finalStatus as { toString?: () => string } | null | undefined)?.toString?.() ?? null;
       } else {
-        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] };
-        if (outputs?.success) {
-          const response = outputs.success[0].data as Output;
-          responseCode = response.status.toString();
-        } else if (outputs?.failure) {
-          const response = outputs.failure[0].data as Output;
-          responseCode = response.status.toString();
-        }
+        const outputs = execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+        responseCode = getHTTPResponseStatusString(outputs);
       }
 
-      const timeAgo = execution.updatedAt ? formatTimeAgo(new Date(execution.updatedAt)) : "";
-
-      if (responseCode && timeAgo) {
-        return `Response: ${responseCode} · ${timeAgo}`;
+      if (responseCode && execution.updatedAt) {
+        return renderWithTimeAgo(`Response: ${responseCode}`, new Date(execution.updatedAt));
       } else if (responseCode) {
         return `Response: ${responseCode}`;
-      } else if (timeAgo) {
-        return timeAgo;
+      } else if (execution.updatedAt) {
+        return renderTimeAgo(new Date(execution.updatedAt));
       }
     }
 
     // Fallback: just show time ago
     if (execution.updatedAt) {
-      return formatTimeAgo(new Date(execution.updatedAt));
+      return renderTimeAgo(new Date(execution.updatedAt));
     }
 
     return "";

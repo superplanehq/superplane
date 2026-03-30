@@ -166,7 +166,7 @@ const file_me_proto_rawDesc = "" +
 	"\x0fRegenerateToken\x12\x16.google.protobuf.Empty\x1a&.Superplane.Me.RegenerateTokenResponse\"m\x92AR\n" +
 	"\x02Me\x12\x14Regenerate API token\x1a6Regenerates the currently authencated user's API token\x82\xd3\xe4\x93\x02\x12\"\x10/api/v1/me/tokenB\x9e\x01\x92Ai\x12?\n" +
 	"\x11Superplane Me API\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ0github.com/superplanehq/superplane/pkg/protos/meb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ0github.com/superplanehq/superplane/pkg/protos/meb\x06proto3"
 
 var (
 	file_me_proto_rawDescOnce sync.Once

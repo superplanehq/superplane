@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -122,9 +121,9 @@ func (g *GetDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	dropletID, err := strconv.Atoi(spec.Droplet)
+	dropletID, err := parseDropletID(spec.Droplet)
 	if err != nil {
-		return fmt.Errorf("invalid droplet ID")
+		return fmt.Errorf("invalid droplet ID %q: %w", spec.Droplet, err)
 	}
 
 	droplet, err := client.GetDroplet(dropletID)

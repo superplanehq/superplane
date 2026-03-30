@@ -1,6 +1,7 @@
-import { ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import type { ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import type React from "react";
 import { noopMapper } from "../noop";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 function getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
@@ -35,9 +36,9 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
   return details;
 }
 
-function subtitle(context: SubtitleContext): string {
+function subtitle(context: SubtitleContext): string | React.ReactNode {
   if (!context.execution.createdAt) return "";
-  return formatTimeAgo(new Date(context.execution.createdAt));
+  return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
 export const jfrogArtifactoryBaseMapper: ComponentBaseMapper = {

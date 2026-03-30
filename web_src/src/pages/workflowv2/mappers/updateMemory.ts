@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,15 +7,11 @@ import {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import {
-  ComponentBaseProps,
-  DEFAULT_EVENT_STATE_MAP,
-  EventSection,
-  EventState,
-  EventStateMap,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
-import { formatTimeAgo } from "@/utils/date";
+import type React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "./stateRegistry";
 
 type UpdateMemoryMetadata = {
@@ -82,9 +78,9 @@ export const updateMemoryMapper: ComponentBaseMapper = {
       eventStateMap: UPDATE_MEMORY_STATE_MAP,
     };
   },
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
-    return timestamp ? formatTimeAgo(new Date(timestamp)) : "";
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
@@ -120,7 +116,7 @@ function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSec
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title: fallbackTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? formatTimeAgo(new Date(subtitleTimestamp)) : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
 
   return [
     {

@@ -1,4 +1,4 @@
-.PHONY: lint test test.license.check
+.PHONY: lint test test.coverage test.license.check test.agent.unit
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -8,6 +8,7 @@ export BUILDKIT_PROGRESS ?= plain
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
+AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 
@@ -39,6 +40,8 @@ test.setup:
 	$(COMPOSE) run --rm app go mod download
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
 	$(COMPOSE) up -d
@@ -63,11 +66,21 @@ test.e2e.single:
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
 
+test.coverage:
+	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
+	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
+
 test.license.check:
 	bash ./scripts/license-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
+
+test.agent.evals:
+	$(COMPOSE) exec agent uv run python -m evals.runner
+
+test.agent.unit:
+	$(COMPOSE) run --rm -e DB_NAME=agents_test agent uv run --group dev python -m pytest $(AGENT_TEST_TARGETS)
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
@@ -104,6 +117,8 @@ dev.setup:
 	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.setup.app:
 	$(COMPOSE) run --rm app go mod download
@@ -118,6 +133,8 @@ dev.setup.no.cache:
 	$(COMPOSE) build --no-cache
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.start.fg:
 	$(COMPOSE) up
@@ -159,7 +176,7 @@ dev.pr.clean.checkout:
 	bash ./scripts/clean-pr-checkout $(PR)
 
 dev.agent.console:
-	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(CANVAS_ID)" --start-repl-web
+	$(COMPOSE) exec agent uv run python -m repl.main --interactive --canvas-id "$(SUPERPLANE_CANVAS_ID)" --token "$(SUPERPLANE_API_TOKEN)" --org-id "$(SUPERPLANE_ORG_ID)"
 
 check.db.structure:
 	bash ./scripts/verify_db_structure_clean.sh
@@ -169,6 +186,12 @@ check.db.migrations:
 
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
+
+check.lint.ui:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
+
+check.lint.ui.baseline.update:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
@@ -215,6 +238,10 @@ db.migrate:
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 db.console:
 	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
@@ -226,10 +253,16 @@ db.recreate.all.dangerous:
 	$(MAKE) dev.down
 	-$(MAKE) db.delete DB_NAME=superplane_dev
 	-$(MAKE) db.delete DB_NAME=superplane_test
+	-$(MAKE) -C agent db.delete DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	-$(MAKE) -C agent db.delete DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 #
 # Protobuf compilation
@@ -253,11 +286,12 @@ gen.components.local.update: gen.components.docs
 	rm -rf ../docs/src/content/docs/components
 	cp -R docs/components ../docs/src/content/docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
 pb.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(COMPOSE) run --rm --no-deps agent bash -lc "cd /app/agent && uv run --with grpcio-tools bash /app/scripts/protoc_python.sh"
 
 openapi.spec.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
@@ -300,8 +334,10 @@ openapi.python.client.gen:
 # Image and CLI build
 #
 
+CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+
 cli.build:
-	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/cli cmd/cli/main.go'
+	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64

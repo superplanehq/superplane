@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -7,8 +7,9 @@ import {
   SubtitleContext,
 } from "../types";
 import { noopMapper } from "../noop";
-import { formatTimeAgo } from "@/utils/date";
-import { MetadataItem } from "@/ui/metadataList";
+import type React from "react";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { MetadataItem } from "@/ui/metadataList";
 
 type HetznerConfiguration = {
   serverType?: unknown;
@@ -176,9 +177,9 @@ function props(context: ComponentBaseContext) {
   };
 }
 
-function subtitle(context: SubtitleContext): string {
+function subtitle(context: SubtitleContext): string | React.ReactNode {
   if (!context.execution.createdAt) return "";
-  return formatTimeAgo(new Date(context.execution.createdAt));
+  return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
 export const hetznerBaseMapper: ComponentBaseMapper = {

@@ -1,0 +1,167 @@
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { AlertTriangle, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback, useState } from "react";
+import type { IntegrationsIntegrationDefinition } from "@/api-client";
+
+export interface MissingIntegration {
+  /** Integration type name, e.g. "github" */
+  integrationName: string;
+  /** Number of canvas nodes that need this integration */
+  affectedNodeCount: number;
+  /** The catalog definition (for icon slug, config fields, etc.) */
+  definition?: IntegrationsIntegrationDefinition;
+  /** Whether this integration was just connected (for success animation) */
+  justConnected?: boolean;
+  /** State of the existing integration instance, if one exists but isn't ready */
+  state?: "pending" | "error";
+  /** Description of the error state */
+  stateDescription?: string;
+}
+
+export interface IntegrationStatusIndicatorProps {
+  missingIntegrations: MissingIntegration[];
+  onConnect: (integrationName: string) => void;
+  readOnly?: boolean;
+  canCreateIntegrations?: boolean;
+}
+
+function IntegrationStateBadge({ state, description }: { state: "pending" | "error"; description?: string }) {
+  const label = state === "error" ? "Error" : "Pending";
+  const colorClass =
+    state === "error"
+      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+      : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
+
+  const badge = (
+    <span
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium leading-none ${description ? "cursor-help" : ""} ${colorClass}`}
+    >
+      {label}
+    </span>
+  );
+
+  if (!description) return badge;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent className="max-w-64 whitespace-normal">{description}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function IntegrationStatusIndicator({
+  missingIntegrations,
+  onConnect,
+  readOnly = false,
+  canCreateIntegrations = true,
+}: IntegrationStatusIndicatorProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const handleToggle = useCallback(() => {
+    setIsCollapsed((prev) => !prev);
+  }, []);
+
+  const handleConnect = useCallback(
+    (integrationName: string) => {
+      onConnect(integrationName);
+    },
+    [onConnect],
+  );
+
+  const activeCount = missingIntegrations.filter((m) => !m.justConnected).length;
+
+  if (activeCount === 0) {
+    return null;
+  }
+
+  if (isCollapsed) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={handleToggle}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 h-8 rounded-md bg-orange-50 dark:bg-orange-950/30 border border-orange-500 dark:border-orange-500 text-orange-500 dark:text-orange-400 hover:bg-white dark:hover:bg-gray-900 transition-colors text-xs font-medium cursor-pointer"
+          >
+            <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+            <span>
+              {activeCount} {activeCount === 1 ? "integration" : "integrations"}
+            </span>
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>Show integrations that need setup</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <div className="w-80 bg-white dark:bg-gray-900 border border-orange-500 dark:border-orange-500 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="w-full px-3 py-2 flex items-center justify-between cursor-pointer bg-gradient-to-b from-orange-50 to-white dark:from-orange-950/40 dark:to-gray-900"
+      >
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
+          <p className="text-xs font-semibold text-orange-500 dark:text-orange-400">
+            {activeCount} {activeCount === 1 ? "integration needs" : "integrations need"} setup
+          </p>
+        </div>
+        <ChevronDown className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
+      </button>
+      <div className="max-h-64 overflow-y-auto">
+        {missingIntegrations.map((integration) => {
+          const displayName =
+            getIntegrationTypeDisplayName(undefined, integration.integrationName) || integration.integrationName;
+
+          return (
+            <div
+              key={integration.integrationName}
+              className={`flex items-center gap-3 px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-b-0 transition-opacity duration-300 ${
+                integration.justConnected ? "opacity-50" : ""
+              }`}
+            >
+              <IntegrationIcon
+                integrationName={integration.integrationName}
+                iconSlug={integration.definition?.icon}
+                className="h-5 w-5 flex-shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{displayName}</p>
+                  {integration.state && (
+                    <IntegrationStateBadge state={integration.state} description={integration.stateDescription} />
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {integration.affectedNodeCount} {integration.affectedNodeCount === 1 ? "node" : "nodes"}
+                </p>
+              </div>
+              {integration.justConnected ? (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  <Check className="h-3.5 w-3.5" />
+                  Connected
+                </span>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0 h-7 text-xs"
+                  onClick={() => handleConnect(integration.integrationName)}
+                  disabled={readOnly || !canCreateIntegrations}
+                >
+                  {integration.state ? "Configure" : "Connect"}
+                </Button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

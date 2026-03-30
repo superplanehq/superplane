@@ -1,5 +1,5 @@
 import React from "react";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
@@ -11,20 +11,15 @@ import {
   StateFunction,
   SubtitleContext,
 } from "./types";
-import {
-  ComponentBaseProps,
-  EventSection,
-  EventState,
-  EventStateMap,
-  DEFAULT_EVENT_STATE_MAP,
-} from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { TimeLeftCountdown } from "@/ui/timeLeftCountdown";
 import { calcRelativeTimeFromDiff, formatTimestamp } from "@/lib/utils";
-import { MetadataItem } from "@/ui/metadataList";
+import type { MetadataItem } from "@/ui/metadataList";
 import Tippy from "@tippyjs/react/headless";
 import "tippy.js/dist/tippy.css";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Helper function to detect if a value contains expressions
 function hasExpressions(value: string): boolean {
@@ -295,11 +290,11 @@ function getWaitEventSubtitle(
   componentName: string,
 ): string | React.ReactNode | undefined {
   const executionState = getState(componentName)(execution);
-  const timeAgo = execution.updatedAt
-    ? formatTimeAgo(new Date(execution.updatedAt))
+  const timeAgoDate = execution.updatedAt
+    ? new Date(execution.updatedAt)
     : execution.createdAt
-      ? formatTimeAgo(new Date(execution.createdAt))
-      : "";
+      ? new Date(execution.createdAt)
+      : null;
 
   // Get expected duration from execution metadata (calculated interval)
   let expectedDuration: number | undefined;
@@ -359,19 +354,27 @@ function getWaitEventSubtitle(
     return (
       <>
         <TimeLeftCountdown createdAt={new Date(execution.createdAt)} expectedDuration={expectedDuration} />
-        {timeAgo ? ` · ${timeAgo}` : ""}
+        {timeAgoDate ? (
+          <>
+            {" · "}
+            {renderTimeAgo(timeAgoDate)}
+          </>
+        ) : (
+          ""
+        )}
       </>
     );
   }
 
   if (executionState === "finished" || executionState === "failed" || executionState === "pushed through") {
     if (execution.updatedAt) {
-      return `Done at: ${formatTimestamp(new Date(execution.updatedAt))} ${timeAgo ? `· ${timeAgo}` : ""}`;
+      const doneAtText = `Done at: ${formatTimestamp(new Date(execution.updatedAt))}`;
+      return renderWithTimeAgo(doneAtText, new Date(execution.updatedAt));
     }
-    return timeAgo ? `Done · ${timeAgo}` : "Done";
+    return timeAgoDate ? renderWithTimeAgo("Done", timeAgoDate) : "Done";
   }
 
-  return timeAgo;
+  return timeAgoDate ? renderTimeAgo(timeAgoDate) : undefined;
 }
 
 function formatDateValue(value?: string): string | undefined {

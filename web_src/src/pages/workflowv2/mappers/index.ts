@@ -76,6 +76,11 @@ import {
   eventStateRegistry as sendgridEventStateRegistry,
 } from "./sendgrid";
 import {
+  componentMappers as sentryComponentMappers,
+  triggerRenderers as sentryTriggerRenderers,
+  eventStateRegistry as sentryEventStateRegistry,
+} from "./sentry/index";
+import {
   componentMappers as renderComponentMappers,
   triggerRenderers as renderTriggerRenderers,
   eventStateRegistry as renderEventStateRegistry,
@@ -231,7 +236,7 @@ import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
-import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
+import { mergeDataBuilder, mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
@@ -279,6 +284,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   slack: slackComponentMappers,
   smtp: smtpComponentMappers,
   sendgrid: sendgridComponentMappers,
+  sentry: sentryComponentMappers,
   render: renderComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
@@ -321,6 +327,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   slack: slackTriggerRenderers,
   smtp: smtpTriggerRenderers,
   sendgrid: sendgridTriggerRenderers,
+  sentry: sentryTriggerRenderers,
   render: renderTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
@@ -363,6 +370,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   slack: slackEventStateRegistry,
   smtp: smtpEventStateRegistry,
   sendgrid: sendgridEventStateRegistry,
+  sentry: sentryEventStateRegistry,
   render: renderEventStateRegistry,
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,
@@ -395,6 +403,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
   approval: approvalDataBuilder,
+  merge: mergeDataBuilder,
 };
 
 const eventStateRegistries: Record<string, EventStateRegistry> = {

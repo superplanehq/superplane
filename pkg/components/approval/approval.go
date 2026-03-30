@@ -319,7 +319,7 @@ func (a *Approval) Documentation() string {
 ## Configuration
 
 - **Approvers**: List of users, groups, or roles who must approve
-  - **Any user**: Any authenticated user can approve
+  - **Everyone**: Any authenticated user can approve
   - **Specific user**: Only the specified user can approve
   - **Group**: Any member of the specified group can approve
   - **Role**: Any user with the specified role can approve
@@ -374,7 +374,7 @@ func (a *Approval) Configuration() []configuration.Field {
 								TypeOptions: &configuration.TypeOptions{
 									Select: &configuration.SelectTypeOptions{
 										Options: []configuration.FieldOption{
-											{Value: "anyone", Label: "Any user"},
+											{Value: "anyone", Label: "Everyone"},
 											{Value: "user", Label: "Specific user"},
 											{Value: "group", Label: "Group"},
 											{Value: "role", Label: "Role"},
@@ -744,8 +744,22 @@ func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata
 		)
 	}
 
-	title := "Approval required"
-	body := "A canvas run item is waiting for your approval. Please visit the URL below to handle it."
+	canvasName := ctx.CanvasName
+	if canvasName == "" {
+		canvasName = "Canvas"
+	}
+
+	approvalName := ctx.NodeName
+	if approvalName == "" {
+		approvalName = "Approval"
+	}
+
+	title := fmt.Sprintf("Approval required: %s — %s", canvasName, approvalName)
+	body := fmt.Sprintf(
+		"An approval is waiting for you.\n\nCanvas: %s\nApproval: %s",
+		canvasName,
+		approvalName,
+	)
 
 	receivers := core.NotificationReceivers{}
 	emailSet := map[string]struct{}{}

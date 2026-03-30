@@ -3,6 +3,7 @@
 .travis.yml
 README.md
 api/openapi.yaml
+api_agent.go
 api_blueprint.go
 api_canvas.go
 api_canvas_change_request.go
@@ -24,6 +25,16 @@ api_widget.go
 client.go
 configuration.go
 docs/ActOnCanvasChangeRequestRequestAction.md
+docs/AgentAPI.md
+docs/AgentsAgentChatInfo.md
+docs/AgentsAgentChatMessage.md
+docs/AgentsCreateAgentChatRequest.md
+docs/AgentsCreateAgentChatResponse.md
+docs/AgentsDescribeAgentChatResponse.md
+docs/AgentsListAgentChatMessagesResponse.md
+docs/AgentsListAgentChatsResponse.md
+docs/AgentsResumeAgentChatBody.md
+docs/AgentsResumeAgentChatResponse.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
 docs/BlueprintAPI.md
@@ -167,6 +178,7 @@ docs/OrganizationsCreateInvitationResponse.md
 docs/OrganizationsDeleteAgentOpenAIKeyResponse.md
 docs/OrganizationsDescribeIntegrationResponse.md
 docs/OrganizationsDescribeOrganizationResponse.md
+docs/OrganizationsDescribeUsageResponse.md
 docs/OrganizationsGetAgentSettingsResponse.md
 docs/OrganizationsGetInviteLinkResponse.md
 docs/OrganizationsGetOktaIdpSettingsResponse.md
@@ -181,7 +193,9 @@ docs/OrganizationsListIntegrationResourcesResponse.md
 docs/OrganizationsListInvitationsResponse.md
 docs/OrganizationsOktaIdpSettings.md
 docs/OrganizationsOrganization.md
+docs/OrganizationsOrganizationLimits.md
 docs/OrganizationsOrganizationMetadata.md
+docs/OrganizationsOrganizationUsage.md
 docs/OrganizationsResetInviteLinkResponse.md
 docs/OrganizationsRotateOktaScimBearerTokenResponse.md
 docs/OrganizationsSetAgentOpenAIKeyBody.md
@@ -262,6 +276,15 @@ docs/WidgetsListWidgetsResponse.md
 docs/WidgetsWidget.md
 git_push.sh
 model_act_on_canvas_change_request_request_action.go
+model_agents_agent_chat_info.go
+model_agents_agent_chat_message.go
+model_agents_create_agent_chat_request.go
+model_agents_create_agent_chat_response.go
+model_agents_describe_agent_chat_response.go
+model_agents_list_agent_chat_messages_response.go
+model_agents_list_agent_chats_response.go
+model_agents_resume_agent_chat_body.go
+model_agents_resume_agent_chat_response.go
 model_authorization_domain_type.go
 model_authorization_permission.go
 model_blueprints_blueprint.go
@@ -393,6 +416,7 @@ model_organizations_create_invitation_response.go
 model_organizations_delete_agent_open_ai_key_response.go
 model_organizations_describe_integration_response.go
 model_organizations_describe_organization_response.go
+model_organizations_describe_usage_response.go
 model_organizations_get_agent_settings_response.go
 model_organizations_get_invite_link_response.go
 model_organizations_get_okta_idp_settings_response.go
@@ -407,7 +431,9 @@ model_organizations_list_integration_resources_response.go
 model_organizations_list_invitations_response.go
 model_organizations_okta_idp_settings.go
 model_organizations_organization.go
+model_organizations_organization_limits.go
 model_organizations_organization_metadata.go
+model_organizations_organization_usage.go
 model_organizations_reset_invite_link_response.go
 model_organizations_rotate_okta_scim_bearer_token_response.go
 model_organizations_set_agent_open_ai_key_body.go
@@ -481,6 +507,7 @@ model_widgets_describe_widget_response.go
 model_widgets_list_widgets_response.go
 model_widgets_widget.go
 response.go
+test/api_agent_test.go
 test/api_blueprint_test.go
 test/api_canvas_change_request_test.go
 test/api_canvas_event_test.go

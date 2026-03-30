@@ -1,17 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  DEFAULT_EVENT_STATE_MAP,
-  EventState,
-  EventStateMap,
-  EventStateStyle,
-  ComponentBaseSpecValue,
-} from "@/ui/componentBase";
-import { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
+import type { EventState, EventStateMap, EventStateStyle, ComponentBaseSpecValue } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { CanvasesCanvasNodeExecution, ComponentsNode, CanvasesCanvasEvent } from "@/api-client";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
-import { formatTimeAgo } from "@/utils/date";
+import { TimeAgo } from "@/components/TimeAgo";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
@@ -44,6 +39,7 @@ export interface ChainItemData {
   tabData?: {
     current?: Record<string, any>;
     payload?: any;
+    configuration?: any;
   };
 }
 
@@ -72,7 +68,7 @@ type ErrorValue = {
 type ApprovalTimelineEntry = {
   label: string;
   status: string;
-  timestamp?: string;
+  timestamp?: React.ReactNode;
   comment?: string;
 };
 
@@ -126,6 +122,56 @@ interface ChainItemProps {
   ) => { map: EventStateMap; state: EventState };
 }
 
+function getReactNodeText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") {
+    return "";
+  }
+
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map((child) => getReactNodeText(child)).join("");
+  }
+
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) {
+    return getReactNodeText(node.props.children);
+  }
+
+  return "";
+}
+
+function getComponentSubtitlePrefix(subtitle: React.ReactNode): string {
+  const subtitleText = getReactNodeText(subtitle);
+  if (!subtitleText.trim()) {
+    return "";
+  }
+
+  const [prefix] = subtitleText.split(" · ");
+  if (!subtitleText.includes(" · ") || !prefix?.trim()) {
+    return "";
+  }
+
+  return prefix.trim();
+}
+
+function escapeStringValuesForJsonView(value: unknown): unknown {
+  if (typeof value === "string") {
+    return JSON.stringify(value).slice(1, -1);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => escapeStringValuesForJsonView(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, escapeStringValuesForJsonView(item)]));
+  }
+
+  return value;
+}
+
 export const ChainItem: React.FC<ChainItemProps> = ({
   item,
   index,
@@ -135,7 +181,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   onToggleOpen,
   getExecutionState,
 }) => {
-  const [activeTab, setActiveTab] = useState<"current" | "payload">("current");
+  const [activeTab, setActiveTab] = useState<"current" | "payload" | "configuration">("current");
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
@@ -170,12 +216,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
       additionalData: { skipIssueCounts: true },
     });
 
-    const parts = subtitle ? subtitle.toString().split(" · ") : [];
-    if (parts.length > 1) {
-      return parts[0];
-    }
-
-    return "";
+    return getComponentSubtitlePrefix(subtitle);
   }, [item.workflowNode, item.originalExecution]);
 
   const copyToClipboard = useCallback((text: string) => {
@@ -194,6 +235,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
   const EventBackground = eventStateStyle.backgroundColor;
   const EventBadgeColor = eventStateStyle.badgeColor;
+  const payloadPreview = useMemo(
+    () => (item.tabData ? escapeStringValuesForJsonView(item.tabData.payload) : undefined),
+    [item.tabData],
+  );
+  const configurationPreview = useMemo(
+    () => (item.tabData?.configuration ? escapeStringValuesForJsonView(item.tabData.configuration) : undefined),
+    [item.tabData],
+  );
+  const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
 
   const showConnectingLine = totalItems && index < totalItems - 1;
   const isDetailValue = (value: unknown): value is DetailValue => {
@@ -315,7 +365,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
         {/* Second row: Time ago and duration */}
         <div className="flex items-center mt-0 ml-6 gap-2">
           <span className="text-[13px] text-gray-950/60">
-            {formatTimeAgo(new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || ""))}
+            <TimeAgo date={new Date(item.originalExecution?.createdAt || item.originalEvent?.createdAt || "")} />
             {item.originalExecution?.state === "STATE_FINISHED" &&
               item.originalExecution?.createdAt &&
               item.originalExecution?.updatedAt && (
@@ -412,6 +462,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                   Payload
                 </button>
               )}
+              {item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
+                <button
+                  onClick={() => setActiveTab("configuration")}
+                  className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
+                    activeTab === "configuration"
+                      ? "text-gray-800 border-b-1 border-gray-800"
+                      : "text-gray-500 hover:text-gray-800"
+                  }`}
+                >
+                  {React.createElement(resolveIcon("settings"), { size: 16 })}
+                  Config
+                </button>
+              )}
             </div>
 
             {/* Tab Content */}
@@ -426,54 +489,63 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                         </span>
                         <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
                           <div className="flex flex-col gap-3">
-                            {value.map((entry, entryIndex) => (
-                              <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
-                                <div
-                                  className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
-                                    entry.status,
-                                  )}`}
-                                />
-                                {entryIndex < value.length - 1 && (
-                                  <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
-                                )}
-                                {entry.label.includes(" · ") ? (
-                                  // Handle combined label with status (e.g., "Check Name · STATUS")
-                                  // Status is in label, so we don't show the separate status line
-                                  <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                    {entry.label.split(" · ").map((part, idx) => (
-                                      <span key={idx}>
-                                        {idx === 0 ? (
-                                          <span>{part}</span>
-                                        ) : (
-                                          <span>
-                                            {" · "}
-                                            <span className="text-[12px] text-gray-600 font-normal">{part}</span>
-                                          </span>
-                                        )}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <>
+                            {value.map((entry, entryIndex) => {
+                              const timestampText = getReactNodeText(entry.timestamp).trim();
+
+                              return (
+                                <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
+                                  <div
+                                    className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
+                                      entry.status,
+                                    )}`}
+                                  />
+                                  {entryIndex < value.length - 1 && (
+                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
+                                  )}
+                                  {entry.label.includes(" · ") ? (
+                                    // Handle combined label with status (e.g., "Check Name · STATUS")
+                                    // Status is in label, so we don't show the separate status line
                                     <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                      {entry.label}
+                                      {entry.label.split(" · ").map((part, idx) => (
+                                        <span key={idx}>
+                                          {idx === 0 ? (
+                                            <span>{part}</span>
+                                          ) : (
+                                            <span>
+                                              {" · "}
+                                              <span className="text-[12px] text-gray-600 font-normal">{part}</span>
+                                            </span>
+                                          )}
+                                        </span>
+                                      ))}
                                     </div>
-                                    {entry.status && (
+                                  ) : (
+                                    <>
                                       <div
-                                        className="text-[12px] text-gray-600 truncate"
-                                        title={`${entry.status}${entry.timestamp ? ` ${entry.timestamp}` : ""}`}
+                                        className="text-[13px] text-gray-800 font-medium truncate"
+                                        title={entry.label}
                                       >
-                                        {entry.status}
-                                        {entry.timestamp ? ` ${entry.timestamp}` : ""}
+                                        {entry.label}
                                       </div>
-                                    )}
-                                  </>
-                                )}
-                                {entry.comment && (
-                                  <div className="text-[12px] text-gray-500 italic break-words">"{entry.comment}"</div>
-                                )}
-                              </div>
-                            ))}
+                                      {entry.status && (
+                                        <div
+                                          className="text-[12px] text-gray-600 truncate"
+                                          title={`${entry.status}${timestampText ? ` ${timestampText}` : ""}`}
+                                        >
+                                          {entry.status}
+                                          {entry.timestamp && <> {entry.timestamp}</>}
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                  {entry.comment && (
+                                    <div className="text-[12px] text-gray-500 italic break-words">
+                                      "{entry.comment}"
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       </div>
@@ -587,7 +659,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                                       <>
                                         {" · "}
                                         <span className="text-[12px] font-normal text-gray-500">
-                                          {formatTimeAgo(new Date(incident.created_at))}
+                                          <TimeAgo date={new Date(incident.created_at)} />
                                         </span>
                                       </>
                                     )}
@@ -957,9 +1029,51 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                 </div>
                 <div className="h-50 overflow-auto rounded -mt-2">
                   <JsonView
-                    value={
-                      typeof item.tabData.payload === "string" ? JSON.parse(item.tabData.payload) : item.tabData.payload
-                    }
+                    value={payloadPreview as Record<string, unknown>}
+                    style={{
+                      fontSize: "12px",
+                      fontFamily:
+                        'Monaco, Menlo, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace',
+                      backgroundColor: "#ffffff",
+                      color: "#24292e",
+                      padding: "8px",
+                    }}
+                    className="json-viewer-hide-types"
+                    displayObjectSize={false}
+                    enableClipboard={false}
+                  />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "configuration" && configurationPreview && (
+              <div className="w-full">
+                <div className="flex items-center justify-between mb-2 relative">
+                  <div className="flex items-center gap-1 absolute right-1.5 top-1.5">
+                    <SimpleTooltip content={payloadCopied ? "Copied!" : "Copy"} hideOnClick={false}>
+                      <button
+                        onClick={() => copyPayloadToClipboard(item.tabData!.configuration)}
+                        className="p-1 rounded text-gray-500 hover:text-gray-800"
+                      >
+                        {React.createElement(resolveIcon("copy"), { size: 14 })}
+                      </button>
+                    </SimpleTooltip>
+                    <SimpleTooltip content="Configuration">
+                      <button
+                        onClick={() => {
+                          setModalPayload(item.tabData!.configuration);
+                          setIsPayloadModalOpen(true);
+                        }}
+                        className="p-1 text-gray-500 hover:text-gray-800"
+                      >
+                        {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
+                      </button>
+                    </SimpleTooltip>
+                  </div>
+                </div>
+                <div className="h-50 overflow-auto rounded -mt-2">
+                  <JsonView
+                    value={configurationPreview as Record<string, unknown>}
                     style={{
                       fontSize: "12px",
                       fontFamily:
@@ -1013,7 +1127,7 @@ export const ChainItem: React.FC<ChainItemProps> = ({
               <div className="p-4">
                 {modalPayload && (
                   <JsonView
-                    value={typeof modalPayload === "string" ? JSON.parse(modalPayload) : modalPayload}
+                    value={modalPayloadPreview as Record<string, unknown>}
                     style={{
                       fontSize: "14px",
                       fontFamily:

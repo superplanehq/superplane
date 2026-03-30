@@ -1,6 +1,7 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -50,7 +51,7 @@ export const getRepositoryPermissionMapper: ComponentBaseMapper = {
     };
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     return buildGithubExecutionSubtitle(context.execution);
   },
 

@@ -8,10 +8,31 @@ import (
 )
 
 type Account struct {
-	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Email          string
-	Name           string
-	ManagedAccount bool `gorm:"column:managed_account;not null;default:false"`
+	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Email             string
+	Name              string
+	ManagedAccount    bool `gorm:"column:managed_account;not null;default:false"`
+	InstallationAdmin bool `gorm:"default:false"`
+}
+
+func (a *Account) IsInstallationAdmin() bool {
+	return a.InstallationAdmin
+}
+
+func PromoteToInstallationAdmin(accountID string) error {
+	return database.Conn().
+		Model(&Account{}).
+		Where("id = ?", accountID).
+		Update("installation_admin", true).
+		Error
+}
+
+func DemoteFromInstallationAdmin(accountID string) error {
+	return database.Conn().
+		Model(&Account{}).
+		Where("id = ?", accountID).
+		Update("installation_admin", false).
+		Error
 }
 
 func CreateAccount(name, email string) (*Account, error) {
@@ -35,6 +56,34 @@ func CreateManagedAccountInTransaction(tx *gorm.DB, name, email string, managed 
 	}
 
 	return account, nil
+}
+
+func ListAccounts(search string, limit, offset int) ([]Account, int64, error) {
+	query := database.Conn().Model(&Account{})
+
+	if search != "" {
+		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var accounts []Account
+	if err := query.Order("name ASC").Find(&accounts).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return accounts, total, nil
 }
 
 func FindAccountByID(id string) (*Account, error) {

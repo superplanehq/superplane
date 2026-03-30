@@ -1,0 +1,60 @@
+{
+  "data": {
+    "id": "106740394",
+    "shortId": "GO-GIN-G",
+    "title": "RuntimeError: SuperPlane trigger validation test 008",
+    "count": "7",
+    "status": "unresolved",
+    "priority": "high",
+    "numComments": 0,
+    "userCount": 3,
+    "permalink": "https://washington-x2.sentry.io/issues/106740394/",
+    "web_url": "https://washington-x2.sentry.io/issues/106740394/",
+    "project": {
+      "id": "4511070273339472",
+      "name": "go-gin",
+      "slug": "go-gin"
+    },
+    "assignedTo": {
+      "type": "team",
+      "id": "42",
+      "name": "Platform"
+    },
+    "tags": [
+      {
+        "key": "environment",
+        "value": "production"
+      },
+      {
+        "key": "level",
+        "value": "error"
+      }
+    ],
+    "stats": {
+      "24h": [
+        [
+          1711270800,
+          7
+        ]
+      ]
+    },
+    "events": [
+      {
+        "id": "evt_1",
+        "eventID": "evt_1",
+        "title": "RuntimeError: SuperPlane trigger validation test 008",
+        "message": "RuntimeError: SuperPlane trigger validation test 008",
+        "dateCreated": "2026-03-24T13:03:56Z",
+        "platform": "other",
+        "tags": [
+          {
+            "key": "environment",
+            "value": "production"
+          }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-03-24T13:03:56Z",
+  "type": "sentry.issue"
+}

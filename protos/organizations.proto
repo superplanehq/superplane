@@ -19,8 +19,8 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
       email: "support@superplane.com";
     };
   };
-  schemes: HTTP;
   schemes: HTTPS;
+  schemes: HTTP;
   consumes: "application/json";
   produces: "application/json";
 };
@@ -215,6 +215,17 @@ service Organizations {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Rotate organization SCIM bearer token";
       description: "Generates a new SCIM bearer token; the plaintext is returned once";
+      tags: "Organization";
+    };
+  }
+
+  rpc DescribeUsage(DescribeUsageRequest) returns (DescribeUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe organization usage";
+      description: "Returns usage tracking and limits for an organization";
       tags: "Organization";
     };
   }
@@ -494,6 +505,34 @@ message RotateOktaScimBearerTokenRequest {
 message RotateOktaScimBearerTokenResponse {
   string scim_bearer_token = 1;
   OktaIdpSettings settings = 2;
+}
+
+message OrganizationLimits {
+  int32 max_canvases = 1;
+  int32 max_nodes_per_canvas = 2;
+  int32 max_users = 3;
+  int32 retention_window_days = 4;
+  int64 max_events_per_month = 5;
+  int32 max_integrations = 6;
+}
+
+message OrganizationUsage {
+  int32 canvases = 1;
+  double event_bucket_level = 2;
+  double event_bucket_capacity = 3;
+  google.protobuf.Timestamp event_bucket_last_updated_at = 4;
+  google.protobuf.Timestamp next_event_bucket_decrease_at = 5;
+}
+
+message DescribeUsageRequest {
+  string id = 1;
+}
+
+message DescribeUsageResponse {
+  bool enabled = 1;
+  string status_message = 2;
+  OrganizationLimits limits = 3;
+  OrganizationUsage usage = 4;
 }
 
 message RemoveUserRequest {

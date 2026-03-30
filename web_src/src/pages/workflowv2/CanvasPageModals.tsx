@@ -13,6 +13,7 @@ import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
 import { DraftNodeDiffSummary } from "./draftNodeDiff";
 
 interface CanvasPageModalsProps {
+  organizationId: string;
   canvas?: CanvasesCanvas | null;
   isUseTemplateOpen: boolean;
   onCloseUseTemplate: () => void;
@@ -24,10 +25,8 @@ interface CanvasPageModalsProps {
   createChangeRequestVersion?: CanvasesCanvasVersion;
   createChangeRequestTitle: string;
   createChangeRequestDescription: string;
-  createChangeRequestDescriptionMode: "write" | "preview";
   onCreateChangeRequestTitleChange: (value: string) => void;
   onCreateChangeRequestDescriptionChange: (value: string) => void;
-  onCreateChangeRequestDescriptionModeChange: (mode: "write" | "preview") => void;
   createChangeRequestNodeDiffSummary: DraftNodeDiffSummary;
   isCreateChangeRequestDraftOutdated: boolean;
   onSubmitCreateChangeRequest: () => void;
@@ -36,6 +35,7 @@ interface CanvasPageModalsProps {
 }
 
 export function CanvasPageModals({
+  organizationId,
   canvas,
   isUseTemplateOpen,
   onCloseUseTemplate,
@@ -47,10 +47,8 @@ export function CanvasPageModals({
   createChangeRequestVersion,
   createChangeRequestTitle,
   createChangeRequestDescription,
-  createChangeRequestDescriptionMode,
   onCreateChangeRequestTitleChange,
   onCreateChangeRequestDescriptionChange,
-  onCreateChangeRequestDescriptionModeChange,
   createChangeRequestNodeDiffSummary,
   isCreateChangeRequestDraftOutdated,
   onSubmitCreateChangeRequest,
@@ -61,6 +59,7 @@ export function CanvasPageModals({
     <>
       {canvas ? (
         <CreateCanvasModal
+          organizationId={organizationId}
           isOpen={isUseTemplateOpen}
           onClose={onCloseUseTemplate}
           onSubmit={onUseTemplateSubmit}
@@ -84,10 +83,8 @@ export function CanvasPageModals({
         version={createChangeRequestVersion}
         title={createChangeRequestTitle}
         description={createChangeRequestDescription}
-        descriptionMode={createChangeRequestDescriptionMode}
         onTitleChange={onCreateChangeRequestTitleChange}
         onDescriptionChange={onCreateChangeRequestDescriptionChange}
-        onDescriptionModeChange={onCreateChangeRequestDescriptionModeChange}
         diffSummary={createChangeRequestNodeDiffSummary}
         isDraftOutdated={isCreateChangeRequestDraftOutdated}
         onPublish={onSubmitCreateChangeRequest}

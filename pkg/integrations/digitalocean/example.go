@@ -126,3 +126,133 @@ var exampleOutputAssignReservedIP map[string]any
 func (a *AssignReservedIP) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAssignReservedIPOnce, exampleOutputAssignReservedIPBytes, &exampleOutputAssignReservedIP)
 }
+
+//go:embed example_output_create_alert_policy.json
+var exampleOutputCreateAlertPolicyBytes []byte
+
+var exampleOutputCreateAlertPolicyOnce sync.Once
+var exampleOutputCreateAlertPolicy map[string]any
+
+func (c *CreateAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAlertPolicyOnce, exampleOutputCreateAlertPolicyBytes, &exampleOutputCreateAlertPolicy)
+}
+
+//go:embed example_output_get_alert_policy.json
+var exampleOutputGetAlertPolicyBytes []byte
+
+var exampleOutputGetAlertPolicyOnce sync.Once
+var exampleOutputGetAlertPolicy map[string]any
+
+func (g *GetAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAlertPolicyOnce, exampleOutputGetAlertPolicyBytes, &exampleOutputGetAlertPolicy)
+}
+
+//go:embed example_output_delete_alert_policy.json
+var exampleOutputDeleteAlertPolicyBytes []byte
+
+var exampleOutputDeleteAlertPolicyOnce sync.Once
+var exampleOutputDeleteAlertPolicy map[string]any
+
+func (d *DeleteAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAlertPolicyOnce, exampleOutputDeleteAlertPolicyBytes, &exampleOutputDeleteAlertPolicy)
+}
+
+//go:embed example_output_update_alert_policy.json
+var exampleOutputUpdateAlertPolicyBytes []byte
+
+var exampleOutputUpdateAlertPolicyOnce sync.Once
+var exampleOutputUpdateAlertPolicy map[string]any
+
+func (u *UpdateAlertPolicy) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAlertPolicyOnce, exampleOutputUpdateAlertPolicyBytes, &exampleOutputUpdateAlertPolicy)
+}
+
+//go:embed example_output_get_droplet_metrics.json
+var exampleOutputGetDropletMetricsBytes []byte
+
+var exampleOutputGetDropletMetricsOnce sync.Once
+var exampleOutputGetDropletMetrics map[string]any
+
+func (g *GetDropletMetrics) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetDropletMetricsOnce, exampleOutputGetDropletMetricsBytes, &exampleOutputGetDropletMetrics)
+}
+
+//go:embed example_output_get_object.json
+var exampleOutputGetObjectBytes []byte
+
+var exampleOutputGetObjectOnce sync.Once
+var exampleOutputGetObject map[string]any
+
+func (g *GetObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetObjectOnce, exampleOutputGetObjectBytes, &exampleOutputGetObject)
+}
+
+//go:embed example_output_copy_object.json
+var exampleOutputCopyObjectBytes []byte
+
+var exampleOutputCopyObjectOnce sync.Once
+var exampleOutputCopyObject map[string]any
+
+func (c *CopyObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCopyObjectOnce, exampleOutputCopyObjectBytes, &exampleOutputCopyObject)
+}
+
+//go:embed example_output_delete_object.json
+var exampleOutputDeleteObjectBytes []byte
+
+var exampleOutputDeleteObjectOnce sync.Once
+var exampleOutputDeleteObject map[string]any
+
+func (d *DeleteObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteObjectOnce, exampleOutputDeleteObjectBytes, &exampleOutputDeleteObject)
+}
+
+//go:embed example_output_put_object.json
+var exampleOutputPutObjectBytes []byte
+
+var exampleOutputPutObjectOnce sync.Once
+var exampleOutputPutObject map[string]any
+
+func (p *PutObject) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputPutObjectOnce, exampleOutputPutObjectBytes, &exampleOutputPutObject)
+}
+
+//go:embed example_output_create_app.json
+var exampleOutputCreateAppBytes []byte
+
+var exampleOutputCreateAppOnce sync.Once
+var exampleOutputCreateApp map[string]any
+
+func (c *CreateApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAppOnce, exampleOutputCreateAppBytes, &exampleOutputCreateApp)
+}
+
+//go:embed example_output_get_app.json
+var exampleOutputGetAppBytes []byte
+
+var exampleOutputGetAppOnce sync.Once
+var exampleOutputGetApp map[string]any
+
+func (g *GetApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetAppOnce, exampleOutputGetAppBytes, &exampleOutputGetApp)
+}
+
+//go:embed example_output_delete_app.json
+var exampleOutputDeleteAppBytes []byte
+
+var exampleOutputDeleteAppOnce sync.Once
+var exampleOutputDeleteApp map[string]any
+
+func (d *DeleteApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAppOnce, exampleOutputDeleteAppBytes, &exampleOutputDeleteApp)
+}
+
+//go:embed example_output_update_app.json
+var exampleOutputUpdateAppBytes []byte
+
+var exampleOutputUpdateAppOnce sync.Once
+var exampleOutputUpdateApp map[string]any
+
+func (u *UpdateApp) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
+}

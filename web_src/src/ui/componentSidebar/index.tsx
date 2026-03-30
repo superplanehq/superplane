@@ -5,7 +5,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,13 +17,14 @@ import {
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { getApiErrorMessage } from "@/utils/errors";
-import { showErrorToast } from "@/utils/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";
 import { TabData } from "./SidebarEventItem/SidebarEventItem";
 import { SidebarEvent } from "./types";
+import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
@@ -124,9 +125,17 @@ interface ComponentSidebarProps {
   // Settings tab props
   showSettingsTab?: boolean;
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
+  hideDocsTab?: boolean; // Hide the "Info" tab (e.g. for annotation nodes)
   hideNodeId?: boolean; // Hide the node ID with copy functionality
-  currentTab?: "latest" | "settings";
-  onTabChange?: (tab: "latest" | "settings") => void;
+  currentTab?: "latest" | "settings" | "docs";
+  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+
+  // Docs tab props
+  componentDescription?: string;
+  componentExamplePayload?: Record<string, unknown>;
+  componentPayloadLabel?: string;
+  /** Full URL to SuperPlane docs (e.g. docs.superplane.com/components/…#section). */
+  componentDocumentationUrl?: string;
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
@@ -137,7 +146,7 @@ interface ComponentSidebarProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
-  ) => void;
+  ) => void | Promise<void>;
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
@@ -149,6 +158,7 @@ interface ComponentSidebarProps {
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
+  configurationSaveMode?: "manual" | "auto";
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
@@ -211,6 +221,7 @@ export const ComponentSidebar = ({
   getExecutionState,
   showSettingsTab = false,
   hideRunsTab = false,
+  hideDocsTab = false,
   hideNodeId = false,
   currentTab = "latest",
   onTabChange,
@@ -232,6 +243,11 @@ export const ComponentSidebar = ({
   canCreateIntegrations,
   canUpdateIntegrations,
   autocompleteExampleObj,
+  configurationSaveMode = "manual",
+  componentDescription,
+  componentExamplePayload,
+  componentPayloadLabel,
+  componentDocumentationUrl,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -691,7 +707,7 @@ export const ComponentSidebar = ({
         >
           <Tabs
             value={activeTab}
-            onValueChange={(value) => onTabChange?.(value as "latest" | "settings")}
+            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
             className="flex-1"
           >
             {showSettingsTab && (
@@ -722,6 +738,18 @@ export const ComponentSidebar = ({
                       <span className="w-1.5 h-1.5 bg-orange-500 rounded-full" />
                     )}
                   </button>
+                  {!hideDocsTab && (
+                    <button
+                      onClick={() => onTabChange?.("docs")}
+                      className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                        activeTab === "docs"
+                          ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                          : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      }`}
+                    >
+                      Info
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -780,6 +808,19 @@ export const ComponentSidebar = ({
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   onOpenCreateIntegrationDialog={handleOpenCreateIntegrationDialog}
                   onOpenConfigureIntegrationDialog={handleOpenConfigureIntegrationDialog}
+                  configurationSaveMode={configurationSaveMode}
+                />
+              </TabsContent>
+            )}
+
+            {showSettingsTab && !hideDocsTab && (
+              <TabsContent value="docs" className="mt-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
+                <DocsTab
+                  description={componentDescription}
+                  examplePayload={componentExamplePayload}
+                  payloadLabel={componentPayloadLabel}
+                  documentationUrl={componentDocumentationUrl}
+                  configurationFields={nodeConfigurationFields}
                 />
               </TabsContent>
             )}
@@ -993,7 +1034,7 @@ export const ComponentSidebar = ({
                         domainId={domainId ?? ""}
                         domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={domainId ?? ""}
-                        appInstallationId={configureIntegration.metadata?.id}
+                        integrationId={configureIntegration.metadata?.id}
                       />
                     );
                   })

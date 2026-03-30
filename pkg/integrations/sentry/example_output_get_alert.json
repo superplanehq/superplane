@@ -1,0 +1,38 @@
+{
+  "data": {
+    "id": "177412243058",
+    "name": "High error rate in production",
+    "dataset": "events",
+    "query": "event.type:error environment:production",
+    "aggregate": "count()",
+    "timeWindow": 60,
+    "environment": "production",
+    "projects": ["backend"],
+    "owner": "team:42",
+    "dateCreated": "2026-03-25T10:00:00Z",
+    "dateModified": "2026-03-25T10:05:00Z",
+    "createdBy": {
+      "name": "Washington",
+      "email": "washington@example.com"
+    },
+    "eventTypes": ["error"],
+    "triggers": [
+      {
+        "id": "294385908",
+        "label": "critical",
+        "alertThreshold": 100,
+        "actions": [
+          {
+            "id": "394280",
+            "type": "slack",
+            "targetType": "specific",
+            "targetIdentifier": "30489048931789",
+            "inputChannelId": "#alerts"
+          }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-03-25T10:05:00Z",
+  "type": "sentry.alertRule"
+}

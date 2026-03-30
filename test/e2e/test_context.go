@@ -57,6 +57,7 @@ func (s *TestContext) Start() {
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
+	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
 
 	s.startVite()
 	s.startAppServer()
@@ -134,7 +135,7 @@ func (s *TestContext) startVite() {
 
 	s.viteCmd = cmd
 
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		resp, err := http.Get("http://127.0.0.1:5173/")
 		if err == nil {

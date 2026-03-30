@@ -48,6 +48,10 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 			telemetry.RecordWorkflowCleanupWorkerCanvasesCount(context.Background(), len(canvases))
 
 			for _, canvas := range canvases {
+				if deletedResourceWithinGracePeriod(canvas.DeletedAt.Time, tickStart) {
+					continue
+				}
+
 				if err := w.semaphore.Acquire(context.Background(), 1); err != nil {
 					w.logger.Errorf("Error acquiring semaphore: %v", err)
 					continue
@@ -68,6 +72,10 @@ func (w *CanvasCleanupWorker) Start(ctx context.Context) {
 }
 
 func (w *CanvasCleanupWorker) LockAndProcessCanvas(canvas models.Canvas) error {
+	if deletedResourceWithinGracePeriod(canvas.DeletedAt.Time, time.Now()) {
+		return nil
+	}
+
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedCanvas, err := models.LockCanvas(tx, canvas.ID)
 		if err != nil {

@@ -117,8 +117,8 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 }
 
 func (s *TimeGateSteps) saveTimeGate() {
-	s.session.Click(q.TestID("save-node-button"))
-	s.session.Sleep(500)
+	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
 }
 
 func (s *TimeGateSteps) openNodeSettings(node string) {
@@ -171,20 +171,25 @@ func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		10*time.Second,
+		30*time.Second,
 	)
 }
 
 func (s *TimeGateSteps) openSidebarForNode(node string) {
-	s.session.Click(q.TestID("node", node, "header"))
+	header := q.TestID("node", node, "header")
+	s.session.AssertVisible(header)
+	s.session.Click(header)
 }
 
 func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
-	eventItem := q.Locator("h2:has-text('Latest') ~ div")
+	// TimeGate maps pending/started executions to UI state "waiting" (see timegate mapper).
+	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"]`)
 	s.session.HoverOver(eventItem)
-	s.session.Click(q.Locator("h2:has-text('Latest') ~ div button[aria-label='Open actions']"))
+	s.session.Sleep(300)
+	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"] button[aria-label="Open actions"]`))
+	s.session.Sleep(300)
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {

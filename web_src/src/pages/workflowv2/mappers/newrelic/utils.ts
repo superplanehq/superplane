@@ -1,7 +1,7 @@
-import { EventSection } from "@/ui/componentBase";
+import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
-import { ExecutionInfo, NodeInfo } from "../types";
-import { formatTimeAgo } from "@/utils/date";
+import type { ExecutionInfo, NodeInfo } from "../types";
+import { renderTimeAgo } from "@/components/TimeAgo";
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -16,7 +16,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
     {
       receivedAt: new Date(execution.createdAt || Date.now()),
       eventTitle: title,
-      eventSubtitle: formatTimeAgo(new Date(execution.createdAt || Date.now())),
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt || Date.now())),
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent?.id || "",
     },

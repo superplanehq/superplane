@@ -41,18 +41,23 @@ func (d *DigitalOcean) Description() string {
 }
 
 func (d *DigitalOcean) Instructions() string {
-	return `## Create a DigitalOcean Personal Access Token
+	return `## DigitalOcean Personal Access Token
 
-1. Open the [DigitalOcean API Tokens page](https://cloud.digitalocean.com/account/api/tokens)
-2. Click **Generate New Token**
-3. Configure the token:
-   - **Token name**: SuperPlane Integration
-   - **Expiration**: No expiry (or choose an appropriate expiration)
-   - **Scopes**: Select **Full Access** (or customize as needed)
-4. Click **Generate Token**
-5. Copy the token and paste it below
+Generate a [DigitalOcean Personal Access Token](https://cloud.digitalocean.com/account/api/tokens) and copy it.
 
-> **Note**: The token is only shown once. Store it securely if needed elsewhere.`
+- Token name: ` + "`SuperPlane Integration`" + `
+- Expiration: **No expiry** (or choose an appropriate expiration)
+- Scopes: **Full Access** (or customize as needed)
+
+## Access Key (optional)
+
+Only required for **Spaces Object Storage** components.
+
+Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spaces/access_keys) and copy the generated pair.
+
+- Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
+
+> **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.`
 }
 
 func (d *DigitalOcean) Configuration() []configuration.Field {
@@ -64,6 +69,22 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 			Required:    true,
 			Sensitive:   true,
 			Description: "DigitalOcean Personal Access Token",
+		},
+		{
+			Name:        "spacesAccessKey",
+			Label:       "Spaces Access Key ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Required for Spaces Object Storage components",
+		},
+		{
+			Name:        "spacesSecretKey",
+			Label:       "Spaces Secret Access Key",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Required for Spaces Object Storage components",
 		},
 	}
 }
@@ -82,6 +103,19 @@ func (d *DigitalOcean) Components() []core.Component {
 		&CreateLoadBalancer{},
 		&DeleteLoadBalancer{},
 		&AssignReservedIP{},
+		&CreateAlertPolicy{},
+		&GetAlertPolicy{},
+		&UpdateAlertPolicy{},
+		&DeleteAlertPolicy{},
+		&GetDropletMetrics{},
+		&GetObject{},
+		&PutObject{},
+		&CopyObject{},
+		&DeleteObject{},
+		&CreateApp{},
+		&GetApp{},
+		&DeleteApp{},
+		&UpdateApp{},
 	}
 }
 

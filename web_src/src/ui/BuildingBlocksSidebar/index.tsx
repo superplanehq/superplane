@@ -1,63 +1,31 @@
-import type {
-  ComponentsEdge,
-  ComponentsNode,
-  OrganizationsIntegration,
-  SuperplaneBlueprintsOutputChannel,
-  SuperplaneComponentsOutputChannel,
-} from "@/api-client";
+import type { ComponentsEdge, ComponentsNode, OrganizationsIntegration } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isCustomComponentsEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { resolveIcon } from "@/lib/utils";
-import { getAgentUrl, isCustomComponentsEnabled } from "@/lib/env";
-import { getBackgroundColorClass } from "@/utils/colors";
-import { getComponentSubtype } from "../buildingBlocks";
-import {
-  ChevronRight,
-  GripVerticalIcon,
-  Plug,
-  Plus,
-  Search,
-  SendHorizontal,
-  Settings2,
-  StickyNote,
-  X,
-} from "lucide-react";
+import { getBackgroundColorClass } from "@/lib/colors";
+import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
-import { toTestId } from "../../utils/testID";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
-import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import { loadAiBuilderState, saveAiBuilderState } from "./aiBuilderStorage";
-import { AiBuilderMessage, AiBuilderProposal, pushAiMessages, sendAgentChatPrompt } from "./agentChat";
+import {
+  AiChatSession,
+  AiBuilderMessage,
+  AiBuilderProposal,
+  loadChatConversation,
+  loadChatSessions,
+  pushAiMessages,
+  sendChatPrompt,
+} from "./agentChat";
+import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
+import { CategorySection } from "./CategorySection";
+import type { BuildingBlock, BuildingBlockCategory } from "./types";
+export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
-export interface BuildingBlock {
-  name: string;
-  label?: string;
-  description?: string;
-  type: "trigger" | "component" | "blueprint";
-  componentSubtype?: "trigger" | "action" | "flow";
-  outputChannels?: Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel>;
-  configuration?: any[];
-  icon?: string;
-  color?: string;
-  id?: string; // for blueprints
-  isLive?: boolean; // marks items that actually work now
-  integrationName?: string; // for components/triggers from integrations
-  deprecated?: boolean; // marks items that are deprecated
-}
-
-export type BuildingBlockCategory = {
-  name: string;
-  blocks: BuildingBlock[];
-};
+const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
 export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
@@ -140,74 +108,144 @@ export function BuildingBlocksSidebar({
   onAddNote,
 }: BuildingBlocksSidebarProps) {
   const disabledTooltip = disabledMessage || "Finish configuring the selected component first";
-  const persistedAiState = loadAiBuilderState<AiCanvasOperation>(canvasId);
 
   if (!isOpen) {
-    const addNoteButton = (
-      <Button
-        variant="outline"
-        onClick={() => {
-          if (disabled) return;
-          onAddNote?.();
-        }}
-        aria-label="Add Note"
-        data-testid="add-note-button"
-        disabled={disabled}
-      >
-        <StickyNote size={16} className="animate-pulse" />
-        Add Note
-      </Button>
-    );
-    const openSidebarButton = (
-      <Button
-        variant="outline"
-        onClick={() => {
-          if (disabled) return;
-          onToggle(true);
-        }}
-        aria-label="Open sidebar"
-        data-testid="open-sidebar-button"
-        disabled={disabled}
-      >
-        <Plus size={16} />
-        Components
-      </Button>
-    );
-
     return (
-      <div className="absolute top-4 right-4 z-10 flex gap-3">
-        {disabled ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          addNoteButton
-        )}
-        {disabled ? (
-          <Tooltip>
-            <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
-            <TooltipContent side="left" sideOffset={10}>
-              <p>{disabledTooltip}</p>
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          openSidebarButton
-        )}
-      </div>
+      <ClosedBuildingBlocksSidebar
+        disabled={disabled}
+        disabledTooltip={disabledTooltip}
+        onAddNote={onAddNote}
+        onToggle={onToggle}
+      />
     );
   }
 
+  return (
+    <OpenBuildingBlocksSidebar
+      onToggle={onToggle}
+      blocks={blocks}
+      showAiBuilderTab={showAiBuilderTab}
+      canvasId={canvasId}
+      organizationId={organizationId}
+      onApplyAiOperations={onApplyAiOperations}
+      integrations={integrations}
+      canvasZoom={canvasZoom}
+      disabled={disabled}
+      disabledTooltip={disabledTooltip}
+      onBlockClick={onBlockClick}
+    />
+  );
+}
+
+interface ClosedBuildingBlocksSidebarProps {
+  disabled: boolean;
+  disabledTooltip: string;
+  onAddNote?: () => void;
+  onToggle: (open: boolean) => void;
+}
+
+function ClosedBuildingBlocksSidebar({
+  disabled,
+  disabledTooltip,
+  onAddNote,
+  onToggle,
+}: ClosedBuildingBlocksSidebarProps) {
+  const addNoteButton = (
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (disabled) return;
+        onAddNote?.();
+      }}
+      aria-label="Add Note"
+      data-testid="add-note-button"
+      disabled={disabled}
+    >
+      <StickyNote size={16} />
+      Add Note
+    </Button>
+  );
+  const openSidebarButton = (
+    <Button
+      variant="outline"
+      onClick={() => {
+        if (disabled) return;
+        onToggle(true);
+      }}
+      aria-label="Open sidebar"
+      data-testid="open-sidebar-button"
+      disabled={disabled}
+    >
+      <Plus size={16} />
+      Components
+    </Button>
+  );
+
+  return (
+    <div className="absolute top-4 right-4 z-10 flex gap-3">
+      {disabled ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{addNoteButton}</TooltipTrigger>
+          <TooltipContent side="left" sideOffset={10}>
+            <p>{disabledTooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        addNoteButton
+      )}
+      {disabled ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{openSidebarButton}</TooltipTrigger>
+          <TooltipContent side="left" sideOffset={10}>
+            <p>{disabledTooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        openSidebarButton
+      )}
+    </div>
+  );
+}
+
+interface OpenBuildingBlocksSidebarProps {
+  onToggle: (open: boolean) => void;
+  blocks: BuildingBlockCategory[];
+  showAiBuilderTab: boolean;
+  canvasId?: string;
+  organizationId?: string;
+  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  integrations: OrganizationsIntegration[];
+  canvasZoom: number;
+  disabled: boolean;
+  disabledTooltip: string;
+  onBlockClick?: (block: BuildingBlock) => void;
+}
+
+function OpenBuildingBlocksSidebar({
+  onToggle,
+  blocks,
+  showAiBuilderTab,
+  canvasId,
+  organizationId,
+  onApplyAiOperations,
+  integrations,
+  canvasZoom,
+  disabled,
+  disabledTooltip,
+  onBlockClick,
+}: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const aiInputRef = useRef<HTMLInputElement>(null);
+  const aiInputRef = useRef<HTMLTextAreaElement>(null);
   const isDraggingRef = useRef(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
+    if (typeof window === "undefined") {
+      return 450;
+    }
+
+    const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 450;
   });
   const [isResizing, setIsResizing] = useState(false);
@@ -215,16 +253,17 @@ export function BuildingBlocksSidebar({
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
   const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
-  const [activeTab, setActiveTab] = useState<"components" | "ai">(persistedAiState?.activeTab || "components");
+  const [activeTab, setActiveTab] = useState<"components" | "ai">("components");
   const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>(persistedAiState?.messages || []);
+  const [aiMessages, setAiMessages] = useState<AiBuilderMessage[]>([]);
+  const [chatSessions, setChatSessions] = useState<AiChatSession[]>([]);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(
-    persistedAiState?.pendingProposal || null,
-  );
-  const aiMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const [pendingProposal, setPendingProposal] = useState<AiBuilderProposal | null>(null);
   const applyShortcutHint = useMemo(() => {
     if (typeof navigator === "undefined") {
       return "Ctrl+Enter";
@@ -233,19 +272,18 @@ export function BuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
-  const agentUrl = getAgentUrl().replace(/\/+$/, "");
-
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
-      await sendAgentChatPrompt({
+      await sendChatPrompt({
         value,
         aiInput,
-        aiMessages,
         canvasId,
         organizationId,
-        agentUrl,
+        currentChatId,
         isGeneratingResponse,
+        setChatSessions,
+        setCurrentChatId,
         setAiMessages,
         setAiInput,
         setAiError,
@@ -254,8 +292,24 @@ export function BuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, aiMessages, agentUrl, canvasId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
   );
+
+  const handleStartNewChatSession = useCallback(() => {
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
+    setAiError(null);
+    requestAnimationFrame(() => {
+      aiInputRef.current?.focus();
+    });
+  }, []);
+
+  const handleSelectChatSession = useCallback((chatId: string) => {
+    setCurrentChatId(chatId);
+    setPendingProposal(null);
+    setAiError(null);
+  }, []);
 
   const handleDiscardProposal = useCallback(() => {
     setPendingProposal(null);
@@ -296,6 +350,15 @@ export function BuildingBlocksSidebar({
         return "Update canvas";
     }
   }, []);
+  const pendingProposalSummaries = useMemo(() => {
+    if (!pendingProposal) {
+      return [];
+    }
+
+    return pendingProposal.operations
+      .filter((operation) => operation.type !== "connect_nodes")
+      .map((operation) => formatOperation(operation, pendingProposal));
+  }, [formatOperation, pendingProposal]);
 
   const handleApplyProposal = useCallback(async () => {
     if (!pendingProposal) return;
@@ -364,44 +427,139 @@ export function BuildingBlocksSidebar({
   }, [showAiBuilderTab, activeTab]);
 
   useEffect(() => {
-    const nextPersistedState = loadAiBuilderState<AiCanvasOperation>(canvasId);
-    setActiveTab(nextPersistedState?.activeTab || "components");
-    setAiMessages(nextPersistedState?.messages || []);
-    setPendingProposal(nextPersistedState?.pendingProposal || null);
+    setActiveTab("components");
+    setCurrentChatId(null);
+    setAiMessages([]);
+    setPendingProposal(null);
     setAiError(null);
     setAiInput("");
   }, [canvasId]);
 
   useEffect(() => {
-    saveAiBuilderState<AiCanvasOperation>(canvasId, {
-      activeTab,
-      messages: aiMessages,
-      pendingProposal,
-    });
-  }, [activeTab, aiMessages, canvasId, pendingProposal]);
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const keysToRemove: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(AI_BUILDER_STORAGE_KEY_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key);
+    }
+  }, []);
 
   useEffect(() => {
-    if (activeTab !== "ai") {
-      return;
+    let cancelled = false;
+
+    if (!canvasId || !organizationId) {
+      setChatSessions([]);
+      setCurrentChatId(null);
+      setAiMessages([]);
+      return () => {
+        cancelled = true;
+      };
     }
 
-    const container = aiMessagesContainerRef.current;
-    if (!container) {
-      return;
+    void (async () => {
+      setIsLoadingChatSessions(true);
+      try {
+        const sessions = await loadChatSessions({
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setChatSessions(sessions);
+        setCurrentChatId((previousChatId) => {
+          if (previousChatId && sessions.some((session) => session.id === previousChatId)) {
+            return previousChatId;
+          }
+
+          return null;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat sessions:", error);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatSessions(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, organizationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!canvasId || !organizationId || !currentChatId) {
+      if (!currentChatId) {
+        setAiMessages([]);
+        setPendingProposal(null);
+      }
+      setIsLoadingChatMessages(false);
+      return () => {
+        cancelled = true;
+      };
     }
 
-    container.scrollTop = container.scrollHeight;
-  }, [activeTab, aiMessages, pendingProposal, isGeneratingResponse, aiError]);
+    void (async () => {
+      setIsLoadingChatMessages(true);
+      try {
+        const messages = await loadChatConversation({
+          chatId: currentChatId,
+          canvasId,
+          organizationId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        setAiMessages(messages);
+        setAiError(null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load chat conversation:", error);
+          setAiError(error instanceof Error ? error.message : "Failed to load chat conversation.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingChatMessages(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canvasId, currentChatId, organizationId]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
-    if (isOpen && searchInputRef.current) {
-      // Small delay to ensure the sidebar is fully rendered
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 100);
+    if (!searchInputRef.current) {
+      return;
     }
-  }, [isOpen]);
+
+    // Small delay to ensure the sidebar is fully rendered
+    const timeoutId = window.setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Handle resize mouse events
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -659,132 +817,29 @@ export function BuildingBlocksSidebar({
         {(!showAiBuilderTab || activeTab === "components") && componentsTabContent}
 
         {showAiBuilderTab && (
-          <TabsContent value="ai" className="mt-0 flex-1 overflow-hidden px-5 pb-5">
-            <div className="h-full rounded-md border border-border bg-slate-50/30 flex flex-col">
-              <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
-                {aiMessages.length === 0 ? (
-                  <div className="text-sm text-gray-600">
-                    <div className="flex items-start gap-2">
-                      <p>Describe your flow and I will propose changes.</p>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {aiMessages.map((message) => {
-                      const isEmptyAssistantPlaceholder =
-                        message.role === "assistant" && message.content.trim().length === 0;
-                      if (isEmptyAssistantPlaceholder) {
-                        return null;
-                      }
-
-                      const isToolMessage = message.role === "tool";
-                      const isRunningToolMessage = isToolMessage && message.toolStatus === "running";
-                      return (
-                        <div
-                          key={message.id}
-                          className={message.role === "user" ? "w-full" : isToolMessage ? "mr-6 pl-1" : "mr-6"}
-                        >
-                          <div
-                            className={
-                              message.role === "user"
-                                ? "w-full rounded-md bg-blue-600 text-white px-3 py-2 text-sm"
-                                : isToolMessage
-                                  ? `px-0.5 py-0.5 text-[11px] leading-relaxed text-gray-500 ${
-                                      isRunningToolMessage ? "sp-ai-thinking" : ""
-                                    }`
-                                  : "px-0.5 py-0.5 text-sm text-gray-800"
-                            }
-                          >
-                            {message.role === "assistant" ? (
-                              <div className="max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1 [&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold">
-                                <ReactMarkdown
-                                  remarkPlugins={[remarkGfm, remarkBreaks]}
-                                  components={{
-                                    a: ({ children, href }) => (
-                                      <a href={href} target="_blank" rel="noopener noreferrer" className="underline">
-                                        {children}
-                                      </a>
-                                    ),
-                                  }}
-                                >
-                                  {message.content}
-                                </ReactMarkdown>
-                              </div>
-                            ) : (
-                              message.content
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {isGeneratingResponse ? (
-                      <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">
-                        Planning next steps...
-                      </div>
-                    ) : null}
-                  </>
-                )}
-
-                {pendingProposal && (
-                  <div className="relative rounded-md border border-blue-200 bg-blue-50 px-3 py-3 space-y-2">
-                    <span className="absolute right-2 top-2 text-[10px] text-blue-800">
-                      {`${applyShortcutHint} to accept`}
-                    </span>
-                    <ul className="text-sm text-blue-900 list-disc pl-5 space-y-1">
-                      {pendingProposal.operations
-                        .filter((operation) => operation.type !== "connect_nodes")
-                        .map((operation) => (
-                          <li key={`${pendingProposal.id}-${JSON.stringify(operation)}`}>
-                            {formatOperation(operation, pendingProposal)}
-                          </li>
-                        ))}
-                    </ul>
-                    <div className="flex items-center gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        onClick={handleApplyProposal}
-                        disabled={disabled || isApplyingProposal || pendingProposal.operations.length === 0}
-                      >
-                        Apply changes
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={handleDiscardProposal} disabled={isApplyingProposal}>
-                        Discard
-                      </Button>
-                    </div>
-                    {aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
-                  </div>
-                )}
-
-                {!pendingProposal && aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
-              </div>
-
-              <div className="border-t border-border px-3 py-2">
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleSendPrompt();
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <Input
-                    ref={aiInputRef}
-                    value={aiInput}
-                    onChange={(e) => setAiInput(e.target.value)}
-                    placeholder="Describe your canvas changes..."
-                    disabled={disabled || !canvasId}
-                  />
-                  <Button
-                    type="submit"
-                    size="icon-sm"
-                    disabled={disabled || isGeneratingResponse || !canvasId || !aiInput.trim()}
-                    aria-label="Send prompt"
-                  >
-                    <SendHorizontal size={14} />
-                  </Button>
-                </form>
-              </div>
-            </div>
-          </TabsContent>
+          <AiBuilderChatPanel
+            chatSessions={chatSessions}
+            currentChatId={currentChatId}
+            isLoadingChatSessions={isLoadingChatSessions}
+            isLoadingChatMessages={isLoadingChatMessages}
+            aiMessages={aiMessages}
+            isGeneratingResponse={isGeneratingResponse}
+            pendingProposal={pendingProposal}
+            pendingProposalSummaries={pendingProposalSummaries}
+            applyShortcutHint={applyShortcutHint}
+            onApplyProposal={() => void handleApplyProposal()}
+            onDiscardProposal={handleDiscardProposal}
+            isApplyingProposal={isApplyingProposal}
+            aiError={aiError}
+            disabled={disabled}
+            canvasId={canvasId}
+            aiInput={aiInput}
+            onAiInputChange={setAiInput}
+            onSelectChat={handleSelectChatSession}
+            onStartNewSession={handleStartNewChatSession}
+            onSendPrompt={() => void handleSendPrompt()}
+            aiInputRef={aiInputRef}
+          />
         )}
       </Tabs>
 
@@ -810,287 +865,5 @@ export function BuildingBlocksSidebar({
         )}
       </div>
     </div>
-  );
-}
-
-interface CategorySectionProps {
-  category: BuildingBlockCategory;
-  integrations: OrganizationsIntegration[];
-  showIntegrationSetupStatus: boolean;
-  canvasZoom: number;
-  searchTerm?: string;
-  typeFilter?: "all" | "trigger" | "action" | "flow";
-  isDraggingRef: React.RefObject<boolean>;
-  setHoveredBlock: (block: BuildingBlock | null) => void;
-  dragPreviewRef: React.RefObject<HTMLDivElement | null>;
-  onBlockClick?: (block: BuildingBlock) => void;
-}
-
-function CategorySection({
-  category,
-  integrations,
-  showIntegrationSetupStatus,
-  canvasZoom,
-  searchTerm = "",
-  typeFilter = "all",
-  isDraggingRef,
-  setHoveredBlock,
-  dragPreviewRef,
-  onBlockClick,
-}: CategorySectionProps) {
-  const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
-  const query = searchTerm.trim().toLowerCase();
-  const categoryMatches = query ? (category.name || "").toLowerCase().includes(query) : true;
-
-  const baseBlocks = categoryMatches
-    ? category.blocks || []
-    : (category.blocks || []).filter((block) => {
-        const name = (block.name || "").toLowerCase();
-        const label = (block.label || "").toLowerCase();
-        return name.includes(query) || label.includes(query);
-      });
-
-  // Only show live/ready blocks
-  let allBlocks = baseBlocks.filter((b) => b.isLive);
-
-  // Apply type filter
-  if (typeFilter !== "all") {
-    allBlocks = allBlocks.filter((block) => {
-      const subtype = block.componentSubtype || getComponentSubtype(block);
-      return subtype === typeFilter;
-    });
-  }
-
-  if (allBlocks.length === 0) {
-    return null;
-  }
-
-  const subtypeOrder: Record<"trigger" | "action" | "flow", number> = {
-    trigger: 0,
-    action: 1,
-    flow: 2,
-  };
-
-  const sortedBlocks = [...allBlocks].sort((a, b) => {
-    const aSubtype = a.componentSubtype || getComponentSubtype(a);
-    const bSubtype = b.componentSubtype || getComponentSubtype(b);
-    const subtypeComparison = subtypeOrder[aSubtype] - subtypeOrder[bSubtype];
-    if (subtypeComparison !== 0) {
-      return subtypeComparison;
-    }
-
-    const aName = (a.label || a.name || "").toLowerCase();
-    const bName = (b.label || b.name || "").toLowerCase();
-    return aName.localeCompare(bName);
-  });
-
-  // Get integration name from first block if available, or match category name
-  const firstBlock = allBlocks[0];
-  const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
-  const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
-
-  // Mirror org/integrations colors: ready=green, pending=amber, error=red, default=gray.
-  const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
-  const matchingIntegrationStates = normalizedIntegrationName
-    ? integrations
-        .filter(
-          (integration) => normalizeIntegrationName(integration.spec?.integrationName) === normalizedIntegrationName,
-        )
-        .map((integration) => integration.status?.state)
-    : [];
-
-  const integrationState =
-    category.name === "Core" || category.name === "Memory"
-      ? "ready"
-      : matchingIntegrationStates.includes("ready")
-        ? "ready"
-        : matchingIntegrationStates.includes("error")
-          ? "error"
-          : matchingIntegrationStates.includes("pending")
-            ? "pending"
-            : undefined;
-
-  const integrationStatusColorClass =
-    integrationState === "ready"
-      ? "text-green-500"
-      : integrationState === "error"
-        ? "text-red-500"
-        : integrationState === "pending"
-          ? "text-amber-600"
-          : "text-gray-500";
-
-  // Determine icon for special categories (Core, Bundles, SMTP use Lucide SVG; others use img when categoryIconSrc)
-  let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
-  if (category.name === "Core") {
-    CategoryIcon = resolveIcon("zap");
-  } else if (category.name === "Memory") {
-    CategoryIcon = resolveIcon("database");
-  } else if (category.name === "Bundles") {
-    CategoryIcon = resolveIcon("package");
-  } else if (integrationName === "smtp") {
-    CategoryIcon = resolveIcon("mail");
-  } else if (categoryIconSrc) {
-    // Integration category - will use img tag
-  } else {
-    CategoryIcon = resolveIcon("puzzle");
-  }
-
-  const isCoreCategory = category.name === "Core";
-  const hasSearchTerm = query.length > 0;
-  // Expand if it's Core category (default) or if there's a search term (show results)
-  const shouldBeOpen = isCoreCategory || hasSearchTerm;
-
-  return (
-    <details className="flex-1 px-5 mb-5 group" open={shouldBeOpen}>
-      <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex w-full items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/60" />
-        <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
-          <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
-          {categoryIconSrc ? (
-            <img src={categoryIconSrc} alt={category.name} className="size-4" />
-          ) : CategoryIcon ? (
-            <CategoryIcon size={14} className="text-gray-500" />
-          ) : null}
-          <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
-        </span>
-        {showIntegrationSetupStatus && (
-          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
-            <Plug size={14} className={integrationStatusColorClass} />
-          </span>
-        )}
-      </summary>
-
-      <ItemGroup>
-        {sortedBlocks.map((block) => {
-          const nameParts = block.name?.split(".") ?? [];
-          const iconSlug =
-            block.type === "blueprint" ? "component" : nameParts[0] === "smtp" ? "mail" : block.icon || "zap";
-
-          const appIconSrc = getHeaderIconSrc(block.name);
-          const IconComponent = resolveIcon(iconSlug);
-
-          const isLive = !!block.isLive;
-          return (
-            <Item
-              data-testid={toTestId(`building-block-${block.name}`)}
-              key={`${block.type}-${block.name}`}
-              draggable={isLive}
-              onClick={() => {
-                if (isLive && onBlockClick) {
-                  onBlockClick(block);
-                }
-              }}
-              onMouseEnter={() => {
-                if (isLive) {
-                  setHoveredBlock(block);
-                }
-              }}
-              onMouseLeave={() => {
-                setHoveredBlock(null);
-              }}
-              onDragStart={(e) => {
-                if (!isLive) {
-                  e.preventDefault();
-                  return;
-                }
-                isDraggingRef.current = true;
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
-
-                // Use the pre-rendered drag preview
-                const previewElement = dragPreviewRef.current?.firstChild as HTMLElement;
-                if (previewElement) {
-                  // Clone the pre-rendered element
-                  const clone = previewElement.cloneNode(true) as HTMLElement;
-
-                  // Create a container div to hold the scaled element
-                  const container = document.createElement("div");
-                  container.style.cssText = `
-                    position: absolute;
-                    top: -10000px;
-                    left: -10000px;
-                    pointer-events: none;
-                  `;
-
-                  // Apply zoom and opacity to the clone
-                  clone.style.transform = `scale(${canvasZoom})`;
-                  clone.style.transformOrigin = "top left";
-                  clone.style.opacity = "0.85";
-
-                  container.appendChild(clone);
-                  document.body.appendChild(container);
-
-                  // Get dimensions for centering
-                  const rect = previewElement.getBoundingClientRect();
-                  const offsetX = (rect.width / 2) * canvasZoom;
-                  const offsetY = 30 * canvasZoom;
-                  e.dataTransfer.setDragImage(container, offsetX, offsetY);
-
-                  // Cleanup after drag starts
-                  setTimeout(() => {
-                    if (document.body.contains(container)) {
-                      document.body.removeChild(container);
-                    }
-                  }, 0);
-                }
-              }}
-              onDragEnd={() => {
-                isDraggingRef.current = false;
-                setHoveredBlock(null);
-              }}
-              aria-disabled={!isLive}
-              title={isLive ? undefined : "Coming soon"}
-              className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${(() => {
-                const subtype = block.componentSubtype || getComponentSubtype(block);
-                return subtype === "trigger"
-                  ? "hover:bg-sky-100 dark:hover:bg-sky-900/20"
-                  : subtype === "flow"
-                    ? "hover:bg-purple-100 dark:hover:bg-purple-900/20"
-                    : "hover:bg-green-100 dark:hover:bg-green-900/20";
-              })()}`}
-              size="sm"
-            >
-              <ItemMedia>
-                {appIconSrc ? (
-                  <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
-                ) : (
-                  <IconComponent size={14} className="text-gray-500" />
-                )}
-              </ItemMedia>
-
-              <ItemContent>
-                <div className="flex items-center gap-2 w-full min-w-0">
-                  <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
-                    <span className="block min-w-0 truncate">{block.label || block.name}</span>
-                  </ItemTitle>
-                  {(() => {
-                    const subtype = block.componentSubtype || getComponentSubtype(block);
-                    const badgeClass =
-                      subtype === "trigger"
-                        ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-sky-600 dark:text-sky-400 rounded whitespace-nowrap flex-shrink-0"
-                        : subtype === "flow"
-                          ? "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-purple-600 dark:text-purple-400 rounded whitespace-nowrap flex-shrink-0"
-                          : "inline-block text-left px-1.5 py-0.5 text-[11px] font-medium text-green-600 dark:text-green-400 rounded whitespace-nowrap flex-shrink-0";
-                    return (
-                      <span className={`${badgeClass} ml-auto`}>
-                        {subtype === "trigger" ? "Trigger" : subtype === "flow" ? "Flow" : "Action"}
-                      </span>
-                    );
-                  })()}
-                  {block.deprecated && (
-                    <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
-                      Deprecated
-                    </span>
-                  )}
-                </div>
-              </ItemContent>
-
-              <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
-            </Item>
-          );
-        })}
-      </ItemGroup>
-    </details>
   );
 }

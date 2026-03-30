@@ -1,0 +1,29 @@
+{
+  "maxAllowedTotalIssues": 1669,
+  "maxAllowedByRule": {
+    "@typescript-eslint/no-explicit-any": 580,
+    "complexity": 274,
+    "@typescript-eslint/consistent-type-imports": 219,
+    "max-lines-per-function": 103,
+    "max-statements": 104,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 102,
+    "react-hooks/exhaustive-deps": 60,
+    "@typescript-eslint/no-unused-vars": 46,
+    "react-hooks/rules-of-hooks": 4,
+    "max-lines": 27,
+    "react-refresh/only-export-components": 27,
+    "eqeqeq": 15,
+    "max-depth": 11,
+    "max-params": 8,
+    "jsx-a11y/label-has-associated-control": 6,
+    "no-empty": 4,
+    "no-console": 2,
+    "no-case-declarations": 2,
+    "no-constant-binary-expression": 2,
+    "@typescript-eslint/no-namespace": 2,
+    "prefer-const": 1,
+    "@typescript-eslint/no-empty-object-type": 1,
+    "no-async-promise-executor": 1
+  },
+  "updatedAt": "2026-03-26T12:57:42.224Z"
+}

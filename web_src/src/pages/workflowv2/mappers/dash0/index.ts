@@ -1,6 +1,6 @@
 import { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
 import { canvasesResolveExecutionErrors } from "@/api-client";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { queryPrometheusMapper } from "./query_prometheus";
 import { listIssuesMapper, LIST_ISSUES_STATE_REGISTRY } from "./list_issues";
 import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";

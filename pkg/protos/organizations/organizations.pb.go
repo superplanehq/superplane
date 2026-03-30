@@ -3434,6 +3434,108 @@ func (x *Integration_NodeRef) GetNodeName() string {
 	return ""
 }
 
+// ─── upstream/main additions ─────────────────────────────────────────────────
+// These types were added in upstream/main (DescribeUsage RPC).
+// They are kept as plain Go structs because the proto descriptor in this
+// branch encodes a different schema; regenerating from a merged .proto file
+// is required to make them fully protobuf-wire-compatible.
+
+type OrganizationLimits struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	MaxCanvases         int32                  `protobuf:"varint,1,opt,name=max_canvases,json=maxCanvases,proto3" json:"max_canvases,omitempty"`
+	MaxNodesPerCanvas   int32                  `protobuf:"varint,2,opt,name=max_nodes_per_canvas,json=maxNodesPerCanvas,proto3" json:"max_nodes_per_canvas,omitempty"`
+	MaxUsers            int32                  `protobuf:"varint,3,opt,name=max_users,json=maxUsers,proto3" json:"max_users,omitempty"`
+	RetentionWindowDays int32                  `protobuf:"varint,4,opt,name=retention_window_days,json=retentionWindowDays,proto3" json:"retention_window_days,omitempty"`
+	MaxEventsPerMonth   int64                  `protobuf:"varint,5,opt,name=max_events_per_month,json=maxEventsPerMonth,proto3" json:"max_events_per_month,omitempty"`
+	MaxIntegrations     int32                  `protobuf:"varint,6,opt,name=max_integrations,json=maxIntegrations,proto3" json:"max_integrations,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *OrganizationLimits) Reset()         { *x = OrganizationLimits{} }
+func (x *OrganizationLimits) String() string { return protoimpl.X.MessageStringOf(x) }
+func (*OrganizationLimits) ProtoMessage()     {}
+func (x *OrganizationLimits) ProtoReflect() protoreflect.Message {
+	return protoimpl.X.MessageOf(x)
+}
+func (x *OrganizationLimits) GetMaxCanvases() int32         { return x.MaxCanvases }
+func (x *OrganizationLimits) GetMaxNodesPerCanvas() int32   { return x.MaxNodesPerCanvas }
+func (x *OrganizationLimits) GetMaxUsers() int32            { return x.MaxUsers }
+func (x *OrganizationLimits) GetRetentionWindowDays() int32 { return x.RetentionWindowDays }
+func (x *OrganizationLimits) GetMaxEventsPerMonth() int64   { return x.MaxEventsPerMonth }
+func (x *OrganizationLimits) GetMaxIntegrations() int32     { return x.MaxIntegrations }
+
+type OrganizationUsage struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	Canvases                  int32                  `protobuf:"varint,1,opt,name=canvases,proto3" json:"canvases,omitempty"`
+	EventBucketLevel          float64                `protobuf:"fixed64,2,opt,name=event_bucket_level,json=eventBucketLevel,proto3" json:"event_bucket_level,omitempty"`
+	EventBucketCapacity       float64                `protobuf:"fixed64,3,opt,name=event_bucket_capacity,json=eventBucketCapacity,proto3" json:"event_bucket_capacity,omitempty"`
+	EventBucketLastUpdatedAt  *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=event_bucket_last_updated_at,json=eventBucketLastUpdatedAt,proto3" json:"event_bucket_last_updated_at,omitempty"`
+	NextEventBucketDecreaseAt *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=next_event_bucket_decrease_at,json=nextEventBucketDecreaseAt,proto3" json:"next_event_bucket_decrease_at,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *OrganizationUsage) Reset()         { *x = OrganizationUsage{} }
+func (x *OrganizationUsage) String() string { return protoimpl.X.MessageStringOf(x) }
+func (*OrganizationUsage) ProtoMessage()     {}
+func (x *OrganizationUsage) ProtoReflect() protoreflect.Message {
+	return protoimpl.X.MessageOf(x)
+}
+func (x *OrganizationUsage) GetCanvases() int32              { return x.Canvases }
+func (x *OrganizationUsage) GetEventBucketLevel() float64    { return x.EventBucketLevel }
+func (x *OrganizationUsage) GetEventBucketCapacity() float64 { return x.EventBucketCapacity }
+func (x *OrganizationUsage) GetEventBucketLastUpdatedAt() *timestamp.Timestamp {
+	return x.EventBucketLastUpdatedAt
+}
+func (x *OrganizationUsage) GetNextEventBucketDecreaseAt() *timestamp.Timestamp {
+	return x.NextEventBucketDecreaseAt
+}
+
+type DescribeUsageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeUsageRequest) Reset()         { *x = DescribeUsageRequest{} }
+func (x *DescribeUsageRequest) String() string { return protoimpl.X.MessageStringOf(x) }
+func (*DescribeUsageRequest) ProtoMessage()     {}
+func (x *DescribeUsageRequest) ProtoReflect() protoreflect.Message {
+	return protoimpl.X.MessageOf(x)
+}
+func (x *DescribeUsageRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DescribeUsageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	StatusMessage string                 `protobuf:"bytes,2,opt,name=status_message,json=statusMessage,proto3" json:"status_message,omitempty"`
+	Limits        *OrganizationLimits    `protobuf:"bytes,3,opt,name=limits,proto3" json:"limits,omitempty"`
+	Usage         *OrganizationUsage     `protobuf:"bytes,4,opt,name=usage,proto3" json:"usage,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeUsageResponse) Reset()         { *x = DescribeUsageResponse{} }
+func (x *DescribeUsageResponse) String() string { return protoimpl.X.MessageStringOf(x) }
+func (*DescribeUsageResponse) ProtoMessage()     {}
+func (x *DescribeUsageResponse) ProtoReflect() protoreflect.Message {
+	return protoimpl.X.MessageOf(x)
+}
+func (x *DescribeUsageResponse) GetEnabled() bool               { return x.Enabled }
+func (x *DescribeUsageResponse) GetStatusMessage() string       { return x.StatusMessage }
+func (x *DescribeUsageResponse) GetLimits() *OrganizationLimits { return x.Limits }
+func (x *DescribeUsageResponse) GetUsage() *OrganizationUsage   { return x.Usage }
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 var File_organizations_proto protoreflect.FileDescriptor
 
 const file_organizations_proto_rawDesc = "" +

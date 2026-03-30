@@ -1223,7 +1223,7 @@ const file_groups_proto_rawDesc = "" +
 	"\vDeleteGroup\x12%.Superplane.Groups.DeleteGroupRequest\x1a&.Superplane.Groups.DeleteGroupResponse\"g\x92AA\n" +
 	"\x06Groups\x12\fDelete group\x1a)Deletes an existing group within a domain\x82\xd3\xe4\x93\x02\x1d*\x1b/api/v1/groups/{group_name}B\xc2\x01\x92A\x88\x01\x12^\n" +
 	"\x15Superplane Groups API\x12\x19API for Superplane Groups\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/groupsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/groupsb\x06proto3"
 
 var (
 	file_groups_proto_rawDescOnce sync.Once

@@ -104,3 +104,22 @@ func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 		Update("updated_at", time.Now()).
 		Error
 }
+
+func CountPendingRequestsForExecutionsInTransaction(tx *gorm.DB, executionIDs []uuid.UUID) (int64, error) {
+	if len(executionIDs) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := tx.
+		Model(&CanvasNodeRequest{}).
+		Where("execution_id IN ?", executionIDs).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}

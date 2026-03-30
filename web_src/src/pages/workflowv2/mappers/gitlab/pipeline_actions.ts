@@ -1,5 +1,6 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import {
+import type React from "react";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -48,7 +49,7 @@ export const pipelineLookupMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const pipeline = getOutputData(context) as PipelineOutput | undefined;
     if (pipeline?.status) {
       return buildGitlabExecutionSubtitle(context.execution, `Pipeline ${pipeline.status}`);
@@ -80,7 +81,7 @@ export const testReportSummaryMapper: ComponentBaseMapper = {
     return baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const summary = getOutputData(context) as TestReportSummaryOutput | undefined;
     const failed = summary?.total?.failed;
     if (failed !== undefined) {

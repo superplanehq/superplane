@@ -1,7 +1,17 @@
 {
-  "successfulVersions": {
-    "1.0.0": {"revision": "REVISION1", "status": "Archived"},
-    "1.0.1": {"revision": "REVISION2", "status": "Archived"}
+  "data": {
+    "successfulVersions": {
+      "1.0.0": {
+        "revision": "REVISION1",
+        "status": "Archived"
+      },
+      "1.0.1": {
+        "revision": "REVISION2",
+        "status": "Archived"
+      }
+    },
+    "failedVersions": {}
   },
-  "failedVersions": {}
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.packageVersions"
 }

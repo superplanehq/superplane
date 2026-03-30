@@ -1,6 +1,7 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import {
+import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
@@ -10,7 +11,7 @@ import {
   SubtitleContext,
 } from "../types";
 import daytonaIcon from "@/assets/icons/integrations/daytona.svg";
-import { formatTimeAgo } from "@/utils/date";
+import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 interface ExecuteCommandOutput {
   exitCode?: number | null;
@@ -86,12 +87,12 @@ export const baseMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string {
+  subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     if (!timestamp) return "";
 
     return (
-      buildExecuteCommandSubtitle(context.node.componentName, context.execution) || formatTimeAgo(new Date(timestamp))
+      buildExecuteCommandSubtitle(context.node.componentName, context.execution) || renderTimeAgo(new Date(timestamp))
     );
   },
 };
@@ -121,7 +122,10 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   ];
 }
 
-function buildExecuteCommandSubtitle(componentName: string, execution: ExecutionInfo): string | undefined {
+function buildExecuteCommandSubtitle(
+  componentName: string,
+  execution: ExecutionInfo,
+): string | React.ReactNode | undefined {
   if (componentName !== "daytona.executeCommand") {
     return undefined;
   }
@@ -129,18 +133,18 @@ function buildExecuteCommandSubtitle(componentName: string, execution: Execution
   const timestamp = execution.updatedAt || execution.createdAt;
   if (!timestamp) return "";
 
-  const timeAgo = formatTimeAgo(new Date(timestamp));
+  const date = new Date(timestamp);
 
   const payload = getFirstOutputPayload(execution.outputs);
   const data = payload?.data as ExecuteCommandOutput | undefined;
 
   if (data?.timeout === true) {
-    return `timed out · ${timeAgo}`;
+    return renderWithTimeAgo("timed out", date);
   }
 
   if (typeof data?.exitCode === "number") {
-    return `exit code ${data.exitCode} · ${timeAgo}`;
+    return renderWithTimeAgo(`exit code ${data.exitCode}`, date);
   }
 
-  return timeAgo;
+  return renderTimeAgo(date);
 }

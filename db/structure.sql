@@ -38,6 +38,21 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_magic_codes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255) NOT NULL,
+    code_hash character varying(64) NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    used_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    verify_attempts integer DEFAULT 0 NOT NULL
+);
+
+
+--
 -- Name: account_password_auth; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -81,7 +96,8 @@ CREATE TABLE public.accounts (
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    managed_account boolean DEFAULT false NOT NULL
+    managed_account boolean DEFAULT false NOT NULL,
+    installation_admin boolean DEFAULT false NOT NULL
 );
 
 
@@ -375,7 +391,10 @@ CREATE TABLE public.organizations (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone,
     description text DEFAULT ''::text,
-    versioning_enabled boolean DEFAULT false NOT NULL
+    versioning_enabled boolean DEFAULT false NOT NULL,
+    usage_synced_at timestamp with time zone,
+    usage_retention_window_days integer,
+    usage_limits_synced_at timestamp with time zone
 );
 
 
@@ -611,7 +630,7 @@ CREATE TABLE public.workflow_nodes (
     parent_node_id character varying(128),
     deleted_at timestamp with time zone,
     app_installation_id uuid,
-    state_reason character varying(255) DEFAULT NULL::character varying
+    state_reason text
 );
 
 
@@ -670,6 +689,14 @@ CREATE TABLE public.workflows (
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: account_magic_codes account_magic_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_magic_codes
+    ADD CONSTRAINT account_magic_codes_pkey PRIMARY KEY (id);
 
 
 --
@@ -1110,6 +1137,20 @@ ALTER TABLE ONLY public.workflows
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_magic_codes_email ON public.account_magic_codes USING btree (email);
+
+
+--
+-- Name: idx_account_magic_codes_email_code_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_magic_codes_email_code_hash ON public.account_magic_codes USING btree (email, code_hash);
 
 
 --
@@ -2064,6 +2105,7 @@ SET row_security = off;
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
 20260319221953	f
+20260327195840	f
 \.
 
 
@@ -2099,7 +2141,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260202201226	f
+20260324120001	f
 \.
 
 

@@ -929,7 +929,7 @@ const file_roles_proto_rawDesc = "" +
 	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"k\x92A>\n" +
 	"\x05Roles\x12\vAssign role\x1a(Assigns a role to a user within a domain\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/roles/{role_name}/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
 	"\x14Superplane Roles API\x12\x18API for Superplane Roles\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/rolesb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ3github.com/superplanehq/superplane/pkg/protos/rolesb\x06proto3"
 
 var (
 	file_roles_proto_rawDescOnce sync.Once

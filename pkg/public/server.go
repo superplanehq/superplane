@@ -36,6 +36,7 @@ import (
 	directoryscim "github.com/superplanehq/superplane/pkg/directory/scim"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
@@ -47,14 +48,18 @@ import (
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
 	pbServiceAccounts "github.com/superplanehq/superplane/pkg/protos/service_accounts"
 	pbTriggers "github.com/superplanehq/superplane/pkg/protos/triggers"
+	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -80,8 +85,9 @@ type Server struct {
 	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
-	isDev                 bool
-	forceSecureCookies    bool
+	isDev              bool
+	forceSecureCookies bool
+	usageService       usage.Service
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -100,6 +106,7 @@ func NewServer(
 	appEnv string,
 	templateDir string,
 	authorizationService authorization.Authorization,
+	usageService usage.Service,
 	blockSignup bool,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
@@ -111,7 +118,8 @@ func NewServer(
 	// without the Secure flag because r.TLS is nil on the plain-HTTP hop from
 	// the proxy to the app, allowing browsers to send them over plain HTTP.
 	forceSecureCookies := os.Getenv("FORCE_SECURE_COOKIES") == "yes"
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, getBaseURL(), blockSignup, passwordLoginEnabled, forceSecureCookies)
+	magicCodeEnabled := os.Getenv("ENABLE_MAGIC_CODE_LOGIN") == "yes"
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, getBaseURL(), blockSignup, passwordLoginEnabled, forceSecureCookies, magicCodeEnabled)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -126,6 +134,7 @@ func NewServer(
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		usageService:          usageService,
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
@@ -248,6 +257,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbAgents.RegisterAgentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -274,6 +288,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/widgets").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
 	return nil
@@ -282,6 +297,8 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 func headersMatcher(key string) (string, bool) {
 	switch key {
 	case "X-User-Id", "X-Organization-Id", "X-Account-Id":
+		return key, true
+	case "X-Token-Scopes":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
@@ -302,6 +319,23 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
 		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+
+		//
+		// Remove the scoped token scopes from the request header,
+		// to not allow them to be spoofed by the client.
+		//
+		r2.Header.Del("x-Token-Scopes")
+
+		scopedClaims, ok := middleware.GetScopedTokenClaimsFromContext(r.Context())
+		if ok {
+			scopes, err := json.Marshal(scopedClaims.Scopes)
+			if err != nil {
+				http.Error(w, "Failed to encode scoped token scopes", http.StatusInternalServerError)
+				return
+			}
+			r2.Header.Set("x-Token-Scopes", string(scopes))
+		}
+
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }
@@ -440,8 +474,23 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt, s.forceSecureCookies))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
+
+	// Admin API routes — requires account auth + installation admin
+	adminRoute := r.PathPrefix("/admin/api").Subrouter()
+	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt, s.forceSecureCookies))
+	adminRoute.Use(middleware.RequireInstallationAdmin())
+	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
+	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
+	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
+	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
+	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
+	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -551,6 +600,95 @@ type OrganizationCreationRequest struct {
 	Name string `json:"name"`
 }
 
+type organizationCreationStatusResponse struct {
+	Allowed              bool   `json:"allowed"`
+	UsageEnabled         bool   `json:"usageEnabled"`
+	CurrentOrganizations int32  `json:"currentOrganizations"`
+	MaxOrganizations     int32  `json:"maxOrganizations"`
+	Message              string `json:"message,omitempty"`
+}
+
+func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		log.Errorf("Error loading organization creation status for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) describeOrganizationCreationStatus(
+	ctx context.Context,
+	accountID string,
+) (*organizationCreationStatusResponse, error) {
+	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
+	}
+
+	response := &organizationCreationStatusResponse{
+		Allowed:              true,
+		UsageEnabled:         s.usageService != nil && s.usageService.Enabled(),
+		CurrentOrganizations: int32(organizationCount),
+	}
+
+	if !response.UsageEnabled {
+		return response, nil
+	}
+
+	checkResponse, err := s.checkAccountOrganizationCreationLimits(
+		ctx,
+		accountID,
+		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
+	}
+
+	response.MaxOrganizations = checkResponse.GetLimits().GetMaxOrganizations()
+
+	if violationErr := usage.LimitViolationError(checkResponse.GetViolations()); violationErr != nil {
+		response.Allowed = false
+		response.Message = status.Convert(violationErr).Message()
+	}
+
+	return response, nil
+}
+
+func (s *Server) checkAccountOrganizationCreationLimits(
+	ctx context.Context,
+	accountID string,
+	state *usagepb.AccountState,
+) (*usagepb.CheckAccountLimitsResponse, error) {
+	if s.usageService == nil || !s.usageService.Enabled() {
+		return &usagepb.CheckAccountLimitsResponse{Allowed: true}, nil
+	}
+
+	response, err := s.usageService.CheckAccountLimits(ctx, accountID, state)
+	if err == nil {
+		return response, nil
+	}
+
+	if status.Code(err) != codes.NotFound {
+		return nil, err
+	}
+
+	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
+		return nil, setupErr
+	}
+
+	return s.usageService.CheckAccountLimits(ctx, accountID, state)
+}
+
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
@@ -573,6 +711,18 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	if req.Name == "" {
 		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+
+	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
+	if err != nil {
+		log.Errorf("Error checking organization creation status for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
+	if !creationStatus.Allowed {
+		http.Error(w, creationStatus.Message, http.StatusTooManyRequests)
 		return
 	}
 
@@ -629,22 +779,34 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	log.Infof("Organization %s (%s) created successfully", organization.Name, organization.ID)
 
+	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
+	if err := organizationCreatedMessage.Publish(); err != nil {
+		log.Errorf("Failed to publish organization created message for %s: %v", organization.ID, err)
+	}
+
 	response := map[string]any{}
 	response["id"] = organization.ID.String()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
+type AccountImpersonation struct {
+	Active   bool   `json:"active"`
+	UserName string `json:"user_name,omitempty"`
+}
+
 type AccountResponse struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Email          string `json:"email"`
-	AvatarURL      string `json:"avatar_url"`
-	ManagedAccount bool   `json:"managed_account"`
+	ID                string                `json:"id"`
+	Name              string                `json:"name"`
+	Email             string                `json:"email"`
+	AvatarURL         string                `json:"avatar_url"`
+	ManagedAccount    bool                  `json:"managed_account"`
+	InstallationAdmin bool                  `json:"installation_admin"`
+	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
 func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return
@@ -658,11 +820,19 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountResponse := AccountResponse{
-		ID:             account.ID.String(),
-		Name:           account.Name,
-		Email:          account.Email,
-		AvatarURL:      getAvatarURL(providers),
-		ManagedAccount: account.ManagedAccount,
+		ID:                account.ID.String(),
+		Name:              account.Name,
+		Email:             account.Email,
+		AvatarURL:         getAvatarURL(providers),
+		ManagedAccount:    account.ManagedAccount,
+		InstallationAdmin: account.IsInstallationAdmin(),
+	}
+
+	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
+		accountResponse.Impersonation = &AccountImpersonation{
+			Active:   true,
+			UserName: info.UserName,
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -670,7 +840,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {
-	account, ok := middleware.GetAccountFromContext(r.Context())
+	account, ok := middleware.GetEffectiveAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
 		return

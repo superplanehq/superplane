@@ -8,8 +8,13 @@ import (
 )
 
 func main() {
-	if err := cli.RootCmd.Execute(); err != nil {
-		fmt.Println(err)
+	if cli.ShouldStartUpdateCheck(os.Args[1:]) {
+		cli.StartUpdateCheck()
+	}
+	err := cli.RootCmd.Execute()
+	cli.PrintUpdateNotice()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

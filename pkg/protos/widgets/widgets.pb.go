@@ -301,7 +301,7 @@ const file_widgets_proto_rawDesc = "" +
 	"\x0eDescribeWidget\x12).Superplane.Widgets.DescribeWidgetRequest\x1a*.Superplane.Widgets.DescribeWidgetResponse\"X\x92A7\n" +
 	"\x06Widget\x12\x0fDescribe widget\x1a\x1cReturns a widget by its name\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/widgets/{name}B\xc5\x01\x92A\x8a\x01\x12`\n" +
 	"\x16Superplane Widgets API\x12\x1aAPI for Superplane Widgets\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/widgetsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ5github.com/superplanehq/superplane/pkg/protos/widgetsb\x06proto3"
 
 var (
 	file_widgets_proto_rawDescOnce sync.Once
