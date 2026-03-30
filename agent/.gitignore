@@ -206,5 +206,3 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Eval artifacts
-tmp/eval_outputs/
