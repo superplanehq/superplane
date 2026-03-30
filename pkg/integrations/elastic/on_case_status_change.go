@@ -64,6 +64,8 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 5. SuperPlane compares each returned case's current status to the last status stored in trigger metadata and only emits when the value changed.
 6. SuperPlane emits one ` + "`elastic.case.status.changed`" + ` event per matching case whose status actually changed.
 
+If canvas versioning is enabled, provisioning happens when the live version is published. Autosave on a draft version does not create the connector or rule.
+
 ## Configuration
 
 - **Cases**: Select one or more specific cases to monitor.

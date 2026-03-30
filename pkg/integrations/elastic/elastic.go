@@ -19,31 +19,15 @@ type Elastic struct{}
 type Configuration struct {
 	URL       string `json:"url"`
 	KibanaURL string `json:"kibanaUrl"`
-	AuthType  string `json:"authType"`
 	APIKey    string `json:"apiKey"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
 }
 
 const installationInstructions = `
 To connect Elastic to SuperPlane:
 
-1. **Elasticsearch URL**:
-   - **Elastic Cloud**: Start at https://cloud.elastic.co/home. In **Hosted deployments**, find your deployment, click **Manage** (or open it from **Open**), then copy the **Elasticsearch endpoint** from the **Application endpoints, cluster and component IDs** section.
-   - **Self-managed Elastic**: Use your Elasticsearch server URL.
-   - Example: ` + "`https://my-cluster.es.us-east-1.aws.found.io:9243`" + `.
-2. **Kibana URL**:
-   - **Elastic Cloud**: From the same deployment page opened from https://cloud.elastic.co/home, copy the **Kibana endpoint** from **Manage**.
-   - **Self-managed Elastic**: Use the base URL of your Kibana instance.
-   - Keep only the base URL: protocol, host, and port.
-   - Example: ` + "`https://my-cluster.kb.us-east-1.aws.found.io:9243`" + `.
-3. **Auth Method**:
-   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded ` + "`id:api_key`" + ` value.
-   - Create an API key that can index documents in Elasticsearch, access Kibana cases, and manage Kibana connectors.
-   - **Username / Password**: Provide the credentials for a user with the required privileges.
-4. **Kibana webhook connector**: SuperPlane creates or reuses one shared Kibana Webhook connector per integration and uses it across the Elastic triggers.
-5. **Alert trigger**: For ` + "`When Alert Fires`" + `, SuperPlane attaches the shared connector to the selected Kibana alert rule automatically.
-6. **Document and case triggers**: For ` + "`On Document Indexed`" + ` and ` + "`When Case Status Changes`" + `, SuperPlane automatically provisions the Kibana Elasticsearch query rules needed for those triggers.
+1. Paste your **Elasticsearch URL** and **Kibana URL**. In Elastic Cloud, open https://cloud.elastic.co/home and copy both endpoints from the same deployment under the manage section.
+2. In Kibana, go to **Stack Management → API Keys**, create a key, and paste the base64-encoded ` + "`id:api_key`" + ` value. The key must be able to access Elasticsearch, Kibana cases, and Kibana connectors.
+3. Save an Elastic trigger on the live workflow to create the Kibana connector and required rules.
 `
 
 func (e *Elastic) Name() string {
@@ -83,52 +67,12 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Description: "Base URL of your Kibana instance, such as https://my-cluster.kb.us-east-1.aws.found.io:9243. In Elastic Cloud, get it from Deployments -> your deployment -> Manage.",
 		},
 		{
-			Name:        "authType",
-			Label:       "Auth Method",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Default:     "apiKey",
-			Description: "Choose whether SuperPlane should authenticate with an API key or a username/password.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "API Key", Value: "apiKey"},
-						{Label: "Username / Password", Value: "basic"},
-					},
-				},
-			},
-		},
-		{
 			Name:        "apiKey",
 			Label:       "API Key",
 			Type:        configuration.FieldTypeString,
-			Required:    false,
+			Required:    true,
 			Sensitive:   true,
 			Description: "API key used to authenticate Elastic API calls.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "authType", Values: []string{"apiKey"}},
-			},
-		},
-		{
-			Name:        "username",
-			Label:       "Username",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Username for basic authentication.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "authType", Values: []string{"basic"}},
-			},
-		},
-		{
-			Name:        "password",
-			Label:       "Password",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Sensitive:   true,
-			Description: "Password for basic authentication.",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "authType", Values: []string{"basic"}},
-			},
 		},
 	}
 }
@@ -170,24 +114,8 @@ func (e *Elastic) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("kibanaUrl is required")
 	}
 
-	if config.AuthType == "" {
-		config.AuthType = "apiKey"
-	}
-
-	switch config.AuthType {
-	case "apiKey":
-		if config.APIKey == "" {
-			return fmt.Errorf("apiKey is required when authType is apiKey")
-		}
-	case "basic":
-		if config.Username == "" {
-			return fmt.Errorf("username is required when authType is basic")
-		}
-		if config.Password == "" {
-			return fmt.Errorf("password is required when authType is basic")
-		}
-	default:
-		return fmt.Errorf("unknown authType %q: must be apiKey or basic", config.AuthType)
+	if config.APIKey == "" {
+		return fmt.Errorf("apiKey is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)

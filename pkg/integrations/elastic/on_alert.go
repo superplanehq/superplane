@@ -59,6 +59,8 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 1. Select the Kibana alert rule in SuperPlane and save the trigger.
 2. SuperPlane automatically creates or reuses the shared Kibana Webhook connector and attaches it to the selected rule if it is missing.
 
+If canvas versioning is enabled, this provisioning happens when the live version is published. Autosave on a draft version does not create the connector.
+
 ### Kibana action body
 
 SuperPlane configures the rule action body with these fields:

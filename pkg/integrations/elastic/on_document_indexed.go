@@ -58,6 +58,8 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 2. Every minute, the rule checks for documents with an ` + "`@timestamp`" + ` value within the current window. When matches are found, Kibana fires the connector.
 3. SuperPlane receives the webhook, queries Elasticsearch for all documents newer than its stored checkpoint, and emits one event per document.
 
+If canvas versioning is enabled, provisioning happens when the live version is published. Autosave on a draft version does not create the connector or rule.
+
 ## Configuration
 
 - **Index**: The Elasticsearch index to monitor for new documents.
