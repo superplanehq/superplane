@@ -33,9 +33,10 @@ class ReportBuilder:
         self.console = Console()
 
     def render(self) -> None:
-        display_output_dir = Path("agent/tmp/eval_outputs")
-        output_dir = Path("/app/tmp/eval_outputs")
+        display_output_dir = Path("tmp/agent/evals")
+        output_dir = Path("/app/tmp/agent/evals")
         output_dir.mkdir(parents=True, exist_ok=True)
+
         if len(self.run_usages) != len(self.report.cases):
             raise RuntimeError(
                 f"usage/case count mismatch: {len(self.run_usages)} usage keys vs "
@@ -63,7 +64,7 @@ class ReportBuilder:
             assertion_values = self._get_assertion_values(case_result)
             duration_seconds = self._duration_seconds(case_result)
 
-            # /app/tmp/... inside Docker; agent/tmp/... on host for the display path.
+            # /app/tmp/... inside Docker; tmp/... on host for the display path.
             filename = output_dir / f"{safe_case_name}.json"
             display_filename = display_output_dir / f"{safe_case_name}.json"
 

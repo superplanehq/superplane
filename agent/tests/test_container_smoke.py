@@ -1,5 +1,5 @@
-import os
+from pathlib import Path
 
 
 def test_runs_inside_container() -> None:
-    assert os.getenv("IN_DOCKER") == "1"
+    assert Path("/.dockerenv").exists()
