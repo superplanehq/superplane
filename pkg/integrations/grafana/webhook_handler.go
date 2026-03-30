@@ -9,12 +9,14 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type GrafanaWebhookHandler struct{}
 
 type GrafanaWebhookMetadata struct {
-	ContactPointUID string `json:"contactPointUid" mapstructure:"contactPointUid"`
+	ContactPointUID  string `json:"contactPointUid" mapstructure:"contactPointUid"`
+	ContactPointName string `json:"contactPointName" mapstructure:"contactPointName"`
 }
 
 func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -23,8 +25,8 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
 	}
 
-	sharedSecret := strings.TrimSpace(config.SharedSecret)
-	if err := ctx.Webhook.SetSecret([]byte(sharedSecret)); err != nil {
+	sharedSecret, err := resolveOrCreateWebhookSecret(ctx.Webhook, config)
+	if err != nil {
 		return nil, fmt.Errorf("failed to persist shared secret in webhook storage: %w", err)
 	}
 
@@ -50,9 +52,40 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 		return nil, nil
 	}
 
+	if err := client.UpsertNotificationPolicyRoute(name, config.AlertNames); err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("grafana webhook setup: failed to upsert notification policy route: %v", err)
+		}
+	}
+
 	return GrafanaWebhookMetadata{
-		ContactPointUID: uid,
+		ContactPointUID:  uid,
+		ContactPointName: name,
 	}, nil
+}
+
+func resolveOrCreateWebhookSecret(webhook core.WebhookContext, config OnAlertFiringConfig) (string, error) {
+	secret, err := webhook.GetSecret()
+	if err != nil {
+		return "", err
+	}
+
+	sharedSecret := strings.TrimSpace(string(secret))
+	if sharedSecret == "" {
+		sharedSecret = strings.TrimSpace(config.SharedSecret)
+	}
+	if sharedSecret == "" {
+		sharedSecret, err = crypto.Base64String(32)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if err := webhook.SetSecret([]byte(sharedSecret)); err != nil {
+		return "", err
+	}
+
+	return sharedSecret, nil
 }
 
 func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
@@ -73,6 +106,16 @@ func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return err
+	}
+
+	contactPointName := strings.TrimSpace(metadata.ContactPointName)
+	if contactPointName == "" {
+		// Backward compat: recompute name from webhook ID if not stored.
+		contactPointName = buildContactPointName(ctx.Webhook.GetID())
+	}
+
+	if err := client.RemoveNotificationPolicyRoute(contactPointName); err != nil && ctx.Logger != nil {
+		ctx.Logger.Warnf("grafana webhook cleanup: failed to remove notification policy route: %v", err)
 	}
 
 	return client.DeleteContactPoint(contactPointUID)
