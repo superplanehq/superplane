@@ -1,21 +1,12 @@
-import { useState, type FC } from "react";
 import React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import type {
-  CustomFieldRenderer,
-  NodeInfo,
-  TriggerEventContext,
-  TriggerRenderer,
-  TriggerRendererContext,
-} from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import type { OnAlertFiringEventData } from "./types";
+import type { OnAlertFiringConfiguration, OnAlertFiringEventData } from "./types";
 import { stringOrDash } from "../utils";
-import { formatTimestamp } from "./utils";
-import { Icon } from "@/components/Icon";
-import { showErrorToast } from "@/lib/toast";
+import { formatOptionalIsoTimestamp } from "@/lib/timezone";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger
@@ -35,7 +26,7 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
-    const createdAt = formatTimestamp(context.event?.createdAt);
+    const createdAt = formatOptionalIsoTimestamp(context.event?.createdAt);
 
     return {
       "Triggered At": createdAt,
@@ -51,11 +42,25 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadataItems = [];
+    const configuration = node.configuration as OnAlertFiringConfiguration | undefined;
+
+    if (configuration?.alertNames?.length) {
+      const alertNames = configuration.alertNames.filter((p) => p.value.trim().length > 0);
+      if (alertNames.length > 0) {
+        metadataItems.push({
+          icon: "bell",
+          label:
+            alertNames.length > 3
+              ? `Alert Names: ${alertNames.length} selected`
+              : `Alert Names: ${alertNames.map((p) => p.value).join(", ")}`,
+        });
+      }
+    }
 
     if (lastEvent?.data) {
       const eventData = lastEvent.data as OnAlertFiringEventData;
       const alertName = getAlertName(eventData);
-      if (alertName) {
+      if (alertName && metadataItems.length === 0) {
         metadataItems.push({
           icon: "bell",
           label: alertName,
@@ -67,7 +72,7 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: grafanaIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: metadataItems.slice(0, 3),
     };
 
     if (lastEvent) {
@@ -86,72 +91,6 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
     }
 
     return props;
-  },
-};
-
-interface OnAlertFiringMetadata {
-  webhookUrl?: string;
-  webhook_url?: string;
-  url?: string;
-}
-
-const CopyWebhookUrlButton: FC<{ webhookUrl: string }> = ({ webhookUrl }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(webhookUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {
-      showErrorToast("Failed to copy webhook URL");
-    }
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 border-1 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
-      title={copied ? "Copied!" : "Copy webhook URL"}
-    >
-      <Icon name={copied ? "check" : "copy"} size="sm" />
-      {copied ? "Copied" : "Copy"}
-    </button>
-  );
-};
-
-export const onAlertFiringCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: NodeInfo) => {
-    const metadata = node.metadata as OnAlertFiringMetadata | undefined;
-    const webhookUrl =
-      metadata?.webhookUrl || metadata?.webhook_url || metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
-
-    return (
-      <div className="border-t-1 border-gray-200 pt-4">
-        <div className="space-y-3">
-          <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Grafana Contact Point Setup</span>
-            <div className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-              <ol className="list-decimal ml-4 space-y-1">
-                <li>Save the canvas to generate the webhook URL.</li>
-                <li>SuperPlane auto-provisions a Grafana webhook contact point in the background after save.</li>
-                <li>If it is not created immediately, wait a moment and re-open the node.</li>
-                <li>If provisioning still fails, create/update the contact point manually using the URL below.</li>
-              </ol>
-              <div className="mt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
-                  <CopyWebhookUrlButton webhookUrl={webhookUrl} />
-                </div>
-                <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
-                  {webhookUrl}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   },
 };
 
@@ -185,3 +124,4 @@ function buildSubtitle(status: string, createdAt?: string): string | React.React
   }
   return createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
 }
+
