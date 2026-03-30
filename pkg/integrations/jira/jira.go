@@ -75,8 +75,8 @@ func (j *Jira) Configuration() []configuration.Field {
 func (j *Jira) Components() []core.Component {
 	return []core.Component{
 		&CreateIssue{},
-		&TransitionIssue{},
-		&GetIssue{},
+		&ChangeJiraTicketStatus{},
+		&GetTicketData{},
 	}
 }
 

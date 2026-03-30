@@ -10,29 +10,29 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const TransitionIssuePayloadType = "jira.issue.transition"
+const ChangeJiraTicketStatusPayloadType = "jira.issue.transition"
 
-type TransitionIssue struct{}
+type ChangeJiraTicketStatus struct{}
 
-type TransitionIssueSpec struct {
-	IssueKey     string `json:"issueKey"`
+type ChangeJiraTicketStatusSpec struct {
+	TicketKey    string `json:"ticketKey"`
 	TransitionID string `json:"transitionId"`
 }
 
-func (t *TransitionIssue) Name() string {
-	return "jira.transitionIssue"
+func (t *ChangeJiraTicketStatus) Name() string {
+	return "jira.changeJiraTicketStatus"
 }
 
-func (t *TransitionIssue) Label() string {
-	return "Transition Issue"
+func (t *ChangeJiraTicketStatus) Label() string {
+	return "Change Ticket Status"
 }
 
-func (t *TransitionIssue) Description() string {
-	return "Move a Jira issue to a different workflow state"
+func (t *ChangeJiraTicketStatus) Description() string {
+	return "Move a Jira ticket to a different workflow status"
 }
 
-func (t *TransitionIssue) Documentation() string {
-	return `The Transition Issue component moves an existing Jira issue to a new workflow state.
+func (t *ChangeJiraTicketStatus) Documentation() string {
+	return `The Change Ticket Status component moves an existing Jira ticket to a new workflow state.
 
 ## Use Cases
 
@@ -53,26 +53,26 @@ To find transition IDs for your board, call:
 Returns the issue key and the transition ID that was applied.`
 }
 
-func (t *TransitionIssue) Icon() string {
+func (t *ChangeJiraTicketStatus) Icon() string {
 	return "jira"
 }
 
-func (t *TransitionIssue) Color() string {
+func (t *ChangeJiraTicketStatus) Color() string {
 	return "blue"
 }
 
-func (t *TransitionIssue) OutputChannels(configuration any) []core.OutputChannel {
+func (t *ChangeJiraTicketStatus) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (t *TransitionIssue) Configuration() []configuration.Field {
+func (t *ChangeJiraTicketStatus) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "issueKey",
-			Label:       "Issue Key",
+			Name:        "ticketKey",
+			Label:       "Ticket Key",
 			Type:        configuration.FieldTypeExpression,
 			Required:    true,
-			Description: "The Jira issue key to transition (e.g. APP-42)",
+			Description: "The Jira ticket key to transition (e.g. APP-42)",
 			Placeholder: "APP-42",
 		},
 		{
@@ -86,14 +86,14 @@ func (t *TransitionIssue) Configuration() []configuration.Field {
 	}
 }
 
-func (t *TransitionIssue) Setup(ctx core.SetupContext) error {
-	spec := TransitionIssueSpec{}
+func (t *ChangeJiraTicketStatus) Setup(ctx core.SetupContext) error {
+	spec := ChangeJiraTicketStatusSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
-	if spec.IssueKey == "" {
-		return fmt.Errorf("issueKey is required")
+	if spec.TicketKey == "" {
+		return fmt.Errorf("ticketKey is required")
 	}
 
 	if spec.TransitionID == "" {
@@ -103,8 +103,8 @@ func (t *TransitionIssue) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
-func (t *TransitionIssue) Execute(ctx core.ExecutionContext) error {
-	spec := TransitionIssueSpec{}
+func (t *ChangeJiraTicketStatus) Execute(ctx core.ExecutionContext) error {
+	spec := ChangeJiraTicketStatusSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
@@ -114,40 +114,40 @@ func (t *TransitionIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	if err := client.TransitionIssue(spec.IssueKey, spec.TransitionID); err != nil {
+	if err := client.TransitionIssue(spec.TicketKey, spec.TransitionID); err != nil {
 		return fmt.Errorf("failed to transition issue: %v", err)
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		TransitionIssuePayloadType,
+		ChangeJiraTicketStatusPayloadType,
 		[]any{map[string]string{
-			"issueKey":     spec.IssueKey,
+			"ticketKey":    spec.TicketKey,
 			"transitionId": spec.TransitionID,
 		}},
 	)
 }
 
-func (t *TransitionIssue) Cancel(ctx core.ExecutionContext) error {
+func (t *ChangeJiraTicketStatus) Cancel(ctx core.ExecutionContext) error {
 	return nil
 }
 
-func (t *TransitionIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (t *ChangeJiraTicketStatus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (t *TransitionIssue) Actions() []core.Action {
+func (t *ChangeJiraTicketStatus) Actions() []core.Action {
 	return []core.Action{}
 }
 
-func (t *TransitionIssue) HandleAction(ctx core.ActionContext) error {
+func (t *ChangeJiraTicketStatus) HandleAction(ctx core.ActionContext) error {
 	return nil
 }
 
-func (t *TransitionIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *ChangeJiraTicketStatus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
 }
 
-func (t *TransitionIssue) Cleanup(ctx core.SetupContext) error {
+func (t *ChangeJiraTicketStatus) Cleanup(ctx core.SetupContext) error {
 	return nil
 }

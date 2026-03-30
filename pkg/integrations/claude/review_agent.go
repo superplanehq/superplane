@@ -195,12 +195,7 @@ func (r *ReviewAgent) Execute(ctx core.ExecutionContext) error {
 
 	// 3. Post review to GitHub
 	ctx.Logger.Infof("[ReviewAgent] Posting %s review to PR #%d", decision, prNumber)
-	// GitHub doesn't allow approving your own PR — fall back to COMMENT
-	eventToPost := decision
-	if decision == "APPROVE" {
-		eventToPost = "COMMENT"
-	}
-	if err := ghClient.SubmitPRReview(owner, repo, prNumber, eventToPost, reviewText); err != nil {
+	if err := ghClient.SubmitPRReview(owner, repo, prNumber, decision, reviewText); err != nil {
 		return emitReviewFailure(ctx, fmt.Sprintf("failed to post review: %v", err))
 	}
 
