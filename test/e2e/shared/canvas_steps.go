@@ -178,10 +178,10 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
-	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(500)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.WaitForCanvasSaveStatusSaved(baseline)
 }
@@ -227,10 +227,10 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
-	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
 	s.session.Click(q.TestID("field-type-select"))
@@ -248,8 +248,8 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	startSource := q.TestID("building-block-start")
 	target := q.TestID("rf__wrapper")
 
-	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.WaitForCanvasSaveStatusSaved(baseline)
 }
@@ -260,10 +260,10 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	source := q.TestID("building-block-wait")
 	target := q.TestID("rf__wrapper")
 
-	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
 	modeSelector := q.TestID("field-mode-select")
@@ -286,10 +286,10 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	source := q.TestID("building-block-filter")
 	target := q.TestID("rf__wrapper")
 
-	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
 	s.WaitForCanvasSaveStatusSaved(baseline)
@@ -313,10 +313,10 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	source := q.TestID("building-block-timeGate")
 	target := q.TestID("rf__wrapper")
 
-	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
 	s.session.FillIn(q.TestID("time-field-timerange-end"), "23:59")
