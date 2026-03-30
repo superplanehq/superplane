@@ -109,6 +109,33 @@ func Test__OnAlertFires__Setup(t *testing.T) {
 		assert.Equal(t, checkAlertConnectorAction, requestCtx.Action)
 	})
 
+	t.Run("rule change -> stores previous rule ID in metadata", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"rule-456","name":"New rule"}`))},
+			},
+		}
+		metadataCtx := &contexts.MetadataContext{Metadata: OnAlertFiresMetadata{
+			RuleID:   "rule-123",
+			RuleName: "Old rule",
+		}}
+		requestCtx := &contexts.RequestContext{}
+		testIntegration := &contexts.IntegrationContext{Configuration: integrationCtx.Configuration}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{"rule": "rule-456"},
+			Integration:   testIntegration,
+			HTTP:          httpCtx,
+			Metadata:      metadataCtx,
+			Requests:      requestCtx,
+		})
+		require.NoError(t, err)
+
+		saved := metadataCtx.Metadata.(OnAlertFiresMetadata)
+		assert.Equal(t, "rule-456", saved.RuleID)
+		assert.Equal(t, "rule-123", saved.PreviousRuleID)
+	})
+
 	t.Run("unknown rule returns a validation error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -131,6 +158,87 @@ func Test__OnAlertFires__Setup(t *testing.T) {
 	})
 }
 
+func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
+	trigger := &OnAlertFires{}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":       "https://elastic.example.com",
+			"kibanaUrl": "https://kibana.example.com",
+			"apiKey":    "api-key",
+		},
+	}
+	const testWebhookURL = "https://superplane.test/api/v1/webhooks/test-123"
+	connectorsResponse := `[{"id":"conn-1","name":"SuperPlane Alert","connector_type_id":".webhook","config":{"url":"` + testWebhookURL + `"}}]`
+	ruleDetailsResponse := `{"id":"rule-123","name":"My rule","rule_type_id":".es-query","actions":[]}`
+	ruleTypesResponse := `[{"id":".es-query","default_action_group_id":"query matched"}]`
+
+	t.Run("no previous rule -> attaches connector and does not call detach", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			// FindKibanaWebhookConnector
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(connectorsResponse))},
+			// EnsureKibanaRuleHasConnector: GetKibanaRule
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleDetailsResponse))},
+			// EnsureKibanaRuleHasConnector: GetKibanaRuleDefaultActionGroupID
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleTypesResponse))},
+			// EnsureKibanaRuleHasConnector: updateKibanaRule (attach)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleDetailsResponse))},
+		}}
+		meta := &contexts.MetadataContext{Metadata: OnAlertFiresMetadata{RuleID: "rule-123"}}
+
+		_, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:        checkAlertConnectorAction,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Metadata:    meta,
+			Requests:    &contexts.RequestContext{},
+			Webhook:     &contexts.NodeWebhookContext{URL: testWebhookURL},
+		})
+		require.NoError(t, err)
+		assert.Len(t, httpCtx.Requests, 4)
+		saved := meta.Metadata.(OnAlertFiresMetadata)
+		assert.Empty(t, saved.PreviousRuleID)
+	})
+
+	t.Run("previous rule set -> attaches to new rule and detaches from old", func(t *testing.T) {
+		oldRuleDetailsResponse := `{"id":"rule-old","name":"Old rule","rule_type_id":".es-query","actions":[{"id":"conn-1","group":"query matched","params":{"body":"{}"}}]}`
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			// FindKibanaWebhookConnector
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(connectorsResponse))},
+			// EnsureKibanaRuleHasConnector: GetKibanaRule
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleDetailsResponse))},
+			// EnsureKibanaRuleHasConnector: GetKibanaRuleDefaultActionGroupID
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleTypesResponse))},
+			// EnsureKibanaRuleHasConnector: updateKibanaRule (attach)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleDetailsResponse))},
+			// RemoveKibanaRuleConnector: GetKibanaRule (old rule)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(oldRuleDetailsResponse))},
+			// RemoveKibanaRuleConnector: updateKibanaRule (detach)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(oldRuleDetailsResponse))},
+		}}
+		meta := &contexts.MetadataContext{Metadata: OnAlertFiresMetadata{
+			RuleID:         "rule-123",
+			PreviousRuleID: "rule-old",
+		}}
+
+		_, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:        checkAlertConnectorAction,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Metadata:    meta,
+			Requests:    &contexts.RequestContext{},
+			Webhook:     &contexts.NodeWebhookContext{URL: testWebhookURL},
+		})
+		require.NoError(t, err)
+
+		saved := meta.Metadata.(OnAlertFiresMetadata)
+		assert.Empty(t, saved.PreviousRuleID)
+
+		// Verify detach call targeted the old rule
+		assert.Len(t, httpCtx.Requests, 6)
+		assert.Contains(t, httpCtx.Requests[4].URL.Path, "rule-old")
+	})
+}
+
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 	trigger := &OnAlertFires{}
 	secret := "auto-generated-secret"
@@ -141,7 +249,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		"ruleId":   "rule-123",
 		"ruleName": "High error rate",
 		"spaceId":  "default",
-		"tags":     ["team:infra", "env:prod"],
+		"tags":     "team:infra,env:prod",
 		"status":   "active",
 		"severity": "critical"
 	}`)
@@ -260,7 +368,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 				"eventType": "alert_fired",
 				"ruleName": "High error rate",
 				"spaceId": "default",
-				"tags": ["team:infra", "env:prod"],
+				"tags": "team:infra,env:prod",
 				"status": "active",
 				"severity": "critical"
 			}`),

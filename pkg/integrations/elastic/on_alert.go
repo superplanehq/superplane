@@ -30,12 +30,13 @@ type OnAlertFiresConfiguration struct {
 }
 
 type OnAlertFiresMetadata struct {
-	RuleID   string   `json:"ruleId" mapstructure:"ruleId"`
-	RuleName string   `json:"ruleName" mapstructure:"ruleName"`
-	Spaces   []string `json:"spaces" mapstructure:"spaces"`
+	RuleID         string   `json:"ruleId" mapstructure:"ruleId"`
+	RuleName       string   `json:"ruleName" mapstructure:"ruleName"`
+	Spaces         []string `json:"spaces" mapstructure:"spaces"`
+	PreviousRuleID string   `json:"previousRuleId,omitempty" mapstructure:"previousRuleId"`
 }
 
-const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","severity":"{{context.severity}}","status":"{{rule.status}}"}`
+const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","tags":"{{rule.tags}}","severity":"{{context.severity}}","status":"{{rule.status}}"}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -212,10 +213,18 @@ func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
 		ruleName = config.Rule
 	}
 
+	var prevMeta OnAlertFiresMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &prevMeta)
+	previousRuleID := ""
+	if prevMeta.RuleID != "" && prevMeta.RuleID != config.Rule {
+		previousRuleID = prevMeta.RuleID
+	}
+
 	if err := ctx.Metadata.Set(OnAlertFiresMetadata{
-		RuleID:   config.Rule,
-		RuleName: ruleName,
-		Spaces:   resolvedSpaces,
+		RuleID:         config.Rule,
+		RuleName:       ruleName,
+		Spaces:         resolvedSpaces,
+		PreviousRuleID: previousRuleID,
 	}); err != nil {
 		return fmt.Errorf("failed to store rule metadata: %w", err)
 	}
@@ -286,7 +295,21 @@ func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerActionContext
 		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
 	}
 
-	return client.EnsureKibanaRuleHasConnector(meta.RuleID, connector.ID)
+	if err := client.EnsureKibanaRuleHasConnector(meta.RuleID, connector.ID); err != nil {
+		return err
+	}
+
+	if meta.PreviousRuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.PreviousRuleID, connector.ID); err != nil && ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to detach connector from old rule %s: %v", meta.PreviousRuleID, err)
+		}
+		meta.PreviousRuleID = ""
+		if err := ctx.Metadata.Set(meta); err != nil && ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to clear previous rule ID from metadata: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -409,22 +432,36 @@ func extractString(payload map[string]any, keys ...string) string {
 }
 
 // extractStringSlice returns a string slice from the payload for the given key.
+// Handles both a JSON array and a comma-separated string (Kibana renders {{rule.tags}} as the latter).
 func extractStringSlice(payload map[string]any, key string) []string {
 	v, ok := payload[key]
 	if !ok {
 		return nil
 	}
-	raw, ok := v.([]any)
-	if !ok {
+	switch val := v.(type) {
+	case []any:
+		result := make([]string, 0, len(val))
+		for _, item := range val {
+			if s, ok := item.(string); ok && s != "" {
+				result = append(result, s)
+			}
+		}
+		return result
+	case string:
+		if val == "" {
+			return nil
+		}
+		parts := strings.Split(val, ",")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if t := strings.TrimSpace(p); t != "" {
+				result = append(result, t)
+			}
+		}
+		return result
+	default:
 		return nil
 	}
-	result := make([]string, 0, len(raw))
-	for _, item := range raw {
-		if s, ok := item.(string); ok {
-			result = append(result, s)
-		}
-	}
-	return result
 }
 
 // containsIgnoreCase reports whether value is in list (case-insensitive).
