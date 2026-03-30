@@ -81,6 +81,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
       comments: false,
     },
     wordBasedSuggestions: "off" as const,
+    fixedOverflowWidgets: true,
   };
 
   return (
