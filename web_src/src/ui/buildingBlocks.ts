@@ -5,7 +5,6 @@ import {
   BlueprintsBlueprint,
   IntegrationsIntegrationDefinition,
 } from "@/api-client";
-import { mockBuildingBlockCategories } from "@/ui/CanvasPage/storybooks/buildingBlocks";
 
 // Flow control components that control workflow execution flow
 const FLOW_COMPONENT_NAMES = new Set(["if", "filter", "approval", "wait", "timeGate"]);
@@ -35,7 +34,7 @@ export function getComponentSubtype(block: BuildingBlock): "trigger" | "action" 
   return "action";
 }
 
-// Build categories of building blocks from live data and merge with mocks (deduped)
+// Build categories of building blocks from live data
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ComponentsComponent[],
@@ -58,7 +57,6 @@ export function buildBuildingBlockCategories(
         configuration: t.configuration,
         icon: t.icon,
         color: t.color,
-        isLive: true,
         exampleData: t.exampleData,
       };
       block.componentSubtype = getComponentSubtype(block);
@@ -74,7 +72,6 @@ export function buildBuildingBlockCategories(
         configuration: c.configuration,
         icon: c.icon,
         color: c.color,
-        isLive: true,
         exampleOutput: c.exampleOutput,
       };
       block.componentSubtype = getComponentSubtype(block);
@@ -99,7 +96,6 @@ export function buildBuildingBlockCategories(
           configuration: b.configuration,
           icon: "component",
           color: "gray",
-          isLive: true,
         };
         block.componentSubtype = getComponentSubtype(block);
         return block;
@@ -122,7 +118,6 @@ export function buildBuildingBlockCategories(
           configuration: t.configuration,
           icon: t.icon,
           color: t.color,
-          isLive: true,
           integrationName: integration.name,
           exampleData: t.exampleData,
         };
@@ -143,7 +138,6 @@ export function buildBuildingBlockCategories(
           configuration: c.configuration,
           icon: c.icon,
           color: c.color,
-          isLive: true,
           integrationName: integration.name,
           exampleOutput: c.exampleOutput,
         };
@@ -161,49 +155,9 @@ export function buildBuildingBlockCategories(
     }
   });
 
-  // Merge mock building blocks with live ones while avoiding duplicates
-  // Dedupe key: `${type}:${name}`
-  const byCategory = new Map<string, { blocks: Map<string, BuildingBlock>; order: string[] }>();
-
-  const addCategoryIfMissing = (name: string) => {
-    if (!byCategory.has(name)) {
-      byCategory.set(name, { blocks: new Map(), order: [] });
-    }
-  };
-
-  const addBlocks = (categoryName: string, blocks: BuildingBlock[]) => {
-    addCategoryIfMissing(categoryName);
-    const entry = byCategory.get(categoryName)!;
-    blocks.forEach((blk) => {
-      const key = `${blk.type}:${blk.name}`;
-      if (!entry.blocks.has(key)) {
-        // Ensure componentSubtype is set if not already present
-        if (!blk.componentSubtype) {
-          blk.componentSubtype = getComponentSubtype(blk);
-        }
-        entry.blocks.set(key, blk);
-        entry.order.push(key);
-      }
-    });
-  };
-
-  // Seed with live categories first to prioritize real components
-  liveCategories.forEach((cat) => addBlocks(cat.name, cat.blocks));
-  // Merge in mocks
-  mockBuildingBlockCategories.forEach((cat) => addBlocks(cat.name, cat.blocks));
-
-  // Materialize back to array with stable order (live-first, then mock additions)
-  const merged: BuildingBlockCategory[] = [];
-  byCategory.forEach((value, key) => {
-    merged.push({
-      name: key,
-      blocks: value.order.map((k) => value.blocks.get(k)!).filter(Boolean),
-    });
-  });
-
   // Move all memory blocks to a dedicated "memory" category.
   const memoryBlocksByKey = new Map<string, BuildingBlock>();
-  const categoriesWithoutMemory = merged
+  const categoriesWithoutMemory = liveCategories
     .map((category) => {
       const nonMemoryBlocks: BuildingBlock[] = [];
       category.blocks.forEach((block) => {

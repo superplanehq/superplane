@@ -30,12 +30,20 @@ button {
 }
 
 .react-flow.light {
-  --xy-background-pattern-dots-color-default: #96A0A6;
+  --xy-background-pattern-dots-color-default: #96a0a6;
   --xy-background-color-default: #f4f5f8;
 }
 
 div.monaco-editor {
   --vscode-focusBorder: transparent;
+}
+
+/* Canvas YAML preview: sky-100 current line; strip line-highlight border (Monaco applies these via DOM) */
+.canvas-yaml-monaco .monaco-editor .margin-view-overlays .current-line,
+.canvas-yaml-monaco .monaco-editor .view-overlays .current-line {
+  background-color: rgb(224 242 254) !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .canvas-conflict-current-line {

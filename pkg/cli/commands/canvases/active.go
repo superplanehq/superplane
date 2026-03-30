@@ -17,8 +17,8 @@ func (c *ActiveCommand) Execute(ctx core.CommandContext) error {
 		return c.setActiveByID(ctx, ctx.Args[0])
 	}
 
-	if !ctx.Renderer.IsText() {
-		return fmt.Errorf("interactive canvas selection requires text output")
+	if !ctx.IsInteractive() || !ctx.Renderer.IsText() {
+		return (&listCommand{}).Execute(ctx)
 	}
 
 	return c.setActiveInteractively(ctx)

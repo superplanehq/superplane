@@ -16,17 +16,15 @@ MODULES=(${1//,/ })
 PROTO_DIR="protos"
 
 generate_proto_definition() {
-  MODULE=$1
   FILE=$2
 
-  mkdir -p pkg/protos/$MODULE
   protoc --proto_path $PROTO_DIR/ \
         --proto_path $PROTO_DIR/include \
-        --go-grpc_out=pkg/protos/$MODULE \
-        --go-grpc_opt=paths=source_relative \
+        --go-grpc_out=. \
+        --go-grpc_opt=module=$MODULE_NAME \
         --go-grpc_opt=require_unimplemented_servers=false \
-        --go_out=pkg/protos/$MODULE \
-        --go_opt=paths=source_relative \
+        --go_out=. \
+        --go_opt=module=$MODULE_NAME \
         $FILE
 }
 

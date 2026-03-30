@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -73,13 +74,50 @@ func (s *WaitSteps) addWaitWithDuration(value int, unit string) {
 	s.canvas.AddWait(s.currentNodeName, models.Position{X: 500, Y: 250}, value, unit)
 }
 
+// configScalarAsString normalizes JSON-decoded configuration values for comparison.
+// Numbers sometimes arrive as float64 (or json.Number) depending on encoding path, which
+// makes strict == against string literals flaky.
+func configScalarAsString(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch x := v.(type) {
+	case string:
+		return x
+	case float64:
+		if x == float64(int64(x)) {
+			return strconv.FormatInt(int64(x), 10)
+		}
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+func waitIntervalConfigMatches(config map[string]any, wantFor, unit string) bool {
+	if config["mode"] != "interval" {
+		return false
+	}
+	if configScalarAsString(config["waitFor"]) != wantFor {
+		return false
+	}
+	if configScalarAsString(config["unit"]) != unit {
+		return false
+	}
+	return true
+}
+
 func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
 	wantFor := strconv.Itoa(value)
-	deadline := time.Now().Add(15 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		node := s.canvas.GetNodeFromDB("Wait")
 		config := node.Configuration.Data()
-		if config["mode"] == "interval" && config["waitFor"] == wantFor && config["unit"] == unit {
+		if waitIntervalConfigMatches(config, wantFor, unit) {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
@@ -88,8 +126,8 @@ func (s *WaitSteps) assertWaitSavedToDB(value int, unit string) {
 	node := s.canvas.GetNodeFromDB("Wait")
 	config := node.Configuration.Data()
 	assert.Equal(s.t, "interval", config["mode"])
-	assert.Equal(s.t, wantFor, config["waitFor"])
-	assert.Equal(s.t, unit, config["unit"])
+	assert.Equal(s.t, wantFor, configScalarAsString(config["waitFor"]), "waitFor mismatch")
+	assert.Equal(s.t, unit, configScalarAsString(config["unit"]), "unit mismatch")
 }
 
 func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {

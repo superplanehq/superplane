@@ -22,16 +22,16 @@ import type {
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
 import type { ApprovalItemProps } from "@/ui/approvalItem";
 import type { QueryClient } from "@tanstack/react-query";
 import { organizationKeys } from "@/hooks/useOrganizationData";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 type ApprovalConfiguration = {
   items: ApprovalItem[];
@@ -326,7 +326,7 @@ function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLa
   }
 
   if (record.type === "anyone") {
-    return "Any user";
+    return "Everyone";
   }
 
   return "Approver";
@@ -557,7 +557,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
           : record.type === "role" || record.type === "group"
             ? getApprovalDecisionLabel(record, labelMaps)
             : record.type === "anyone"
-              ? "Any user"
+              ? "Everyone"
               : "Unknown");
 
       return {

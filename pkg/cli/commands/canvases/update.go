@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -93,11 +94,41 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		body.SetAutoLayout(buildDefaultAutoLayout())
 	}
 
-	_, _, err = ctx.API.CanvasVersionAPI.
+	response, _, err := ctx.API.CanvasVersionAPI.
 		CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
 		Body(body).
 		Execute()
-	return err
+	if err != nil {
+		return err
+	}
+
+	version := response.GetVersion()
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(version)
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		metadata := version.GetMetadata()
+		spec := version.GetSpec()
+
+		if versioningContext.versioningEnabled {
+			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		}
+		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
+		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
+		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
+
+		integrations := make(map[string]struct{})
+		for _, node := range spec.GetNodes() {
+			if ref, ok := node.GetIntegrationOk(); ok && ref != nil {
+				if id := ref.GetId(); id != "" {
+					integrations[id] = struct{}{}
+				}
+			}
+		}
+		_, err := fmt.Fprintf(stdout, "Integrations: %d\n", len(integrations))
+		return err
+	})
 }
 
 func loadCanvasFromExisting(ctx core.CommandContext) (string, openapi_client.CanvasesCanvas, error) {

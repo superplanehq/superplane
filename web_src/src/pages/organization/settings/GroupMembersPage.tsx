@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 export function GroupMembersPage() {
   const { groupName: encodedGroupName } = useParams<{ groupName: string }>();

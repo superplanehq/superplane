@@ -17,7 +17,7 @@ import type {
   EventStateMap,
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";

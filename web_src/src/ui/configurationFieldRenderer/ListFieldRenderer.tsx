@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
   validationErrors?: ValidationError[] | Set<string>;
@@ -18,7 +18,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   onChange,
   domainId,
   domainType,
-  appInstallationId,
+  integrationId,
   organizationId,
   hasError: _,
   validationErrors,
@@ -146,7 +146,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                       allValues={nestedValues}
                       domainId={domainId}
                       domainType={domainType}
-                      appInstallationId={appInstallationId}
+                      integrationId={integrationId}
                       organizationId={organizationId}
                       hasError={hasNestedError}
                       autocompleteExampleObj={autocompleteExampleObj}
