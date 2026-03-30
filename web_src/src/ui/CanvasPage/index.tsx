@@ -1183,7 +1183,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onRunNodeSelect={props.onRunNodeSelect}
                 onRunExecutionSelect={props.onRunExecutionSelect}
                 onAcknowledgeErrors={props.onAcknowledgeErrors}
-                title={props.title}
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
                 canCreateIntegrations={props.canCreateIntegrations}
@@ -1938,7 +1937,6 @@ function CanvasContent({
     triggerEvent?: SidebarEvent;
   }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
-  title?: string;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
