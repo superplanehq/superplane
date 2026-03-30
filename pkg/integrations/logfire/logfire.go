@@ -2,11 +2,12 @@ package logfire
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"strings"
 )
 
 func init() {
@@ -152,7 +153,7 @@ func (l *Logfire) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 
 	// resourceType == "alert"
-	projectID := ctx.Parameters["projectId"]
+	projectID := ctx.Parameters["project"]
 	if isUnsetProjectID(projectID) {
 		// Project is selected in a separate dropdown. When it isn't selected yet,
 		// populate an empty alert dropdown instead of failing the resource load.

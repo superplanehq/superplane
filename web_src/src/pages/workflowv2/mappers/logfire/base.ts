@@ -39,7 +39,7 @@ export const baseMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
 
-    const projectName = nodeMetadata?.project?.name?.trim() || configuration?.projectId;
+    const projectName = nodeMetadata?.project?.name?.trim();
     if (projectName) {
       details["Project"] = projectName;
     }
@@ -67,7 +67,7 @@ export const baseMapper: ComponentBaseMapper = {
 
 type QueryLogfireNodeConfiguration = {
   sql?: string;
-  projectId?: string;
+  project?: string;
   timeWindow?: string;
   minTimestamp?: string;
   maxTimestamp?: string;
@@ -129,9 +129,11 @@ function buildTimeWindowMetadata(configuration?: QueryLogfireNodeConfiguration):
   return [{ icon: "clock", label }];
 }
 
-function buildProjectMetadata(projectId?: string, nodeMetadata?: QueryLogfireNodeMetadata): MetadataItem[] {
-  const projectName = nodeMetadata?.project?.name?.trim();
-  const label = projectName || projectId?.trim();
+function buildProjectMetadata(
+  configuration?: QueryLogfireNodeConfiguration,
+  nodeMetadata?: QueryLogfireNodeMetadata,
+): MetadataItem[] {
+  const label = nodeMetadata?.project?.name?.trim() || configuration?.project?.trim();
   if (!label) return [];
 
   return [
@@ -156,7 +158,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as QueryLogfireNodeMetadata | undefined;
 
   const metadata: MetadataItem[] = [
-    ...buildProjectMetadata(configuration?.projectId, nodeMetadata),
+    ...buildProjectMetadata(configuration, nodeMetadata),
     ...buildQueryMetadata(configuration),
     ...buildTimeWindowMetadata(configuration),
   ];

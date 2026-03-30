@@ -3,12 +3,13 @@ package logfire
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mitchellh/mapstructure"
-	"github.com/superplanehq/superplane/pkg/configuration"
-	"github.com/superplanehq/superplane/pkg/core"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type OnAlertReceived struct{}
@@ -24,8 +25,8 @@ type OnAlertReceivedNodeMetadata struct {
 }
 
 type onAlertReceivedConfiguration struct {
-	ProjectID string `json:"projectId" mapstructure:"projectId"`
-	AlertID   string `json:"alertId" mapstructure:"alertId"`
+	ProjectID string `json:"project" mapstructure:"project"`
+	AlertID   string `json:"alert" mapstructure:"alert"`
 }
 
 type onAlertReceivedWebhookConfiguration struct {
@@ -72,22 +73,10 @@ func (t *OnAlertReceived) Color() string {
 	return "gray"
 }
 
-func (t *OnAlertReceived) ExampleData() map[string]any {
-	return map[string]any{
-		"alertId":   "alt_123",
-		"alertName": "Latency spike",
-		"eventType": "firing",
-		"severity":  "warning",
-		"message":   "p95 latency exceeded threshold",
-		"url":       "https://logfire-us.pydantic.dev",
-		"timestamp": "2026-03-23T12:00:00Z",
-	}
-}
-
 func (t *OnAlertReceived) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectId",
+			Name:        "project",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -100,7 +89,7 @@ func (t *OnAlertReceived) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "alertId",
+			Name:        "alert",
 			Label:       "Alert",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -111,8 +100,8 @@ func (t *OnAlertReceived) Configuration() []configuration.Field {
 					UseNameAsValue: false,
 					Parameters: []configuration.ParameterRef{
 						{
-							Name:      "projectId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "projectId"},
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
 						},
 					},
 				},

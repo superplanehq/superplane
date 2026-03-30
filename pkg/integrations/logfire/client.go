@@ -385,7 +385,7 @@ func (c *Client) FindAssignedAlertChannelID(projectID, alertID, preferredLabel, 
 	var urlMatchID string
 	for _, ch := range channels {
 		if strings.EqualFold(ch.Label, preferredLabel) {
-			if ch.Config != nil && strings.TrimSpace(ch.Config.URL) != "" && strings.TrimSpace(ch.Config.URL) != webhookURL {
+			if ch.Config == nil || strings.TrimSpace(ch.Config.URL) == "" || strings.TrimSpace(ch.Config.URL) != webhookURL {
 				continue
 			}
 			preferredID = ch.ID
