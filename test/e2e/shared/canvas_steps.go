@@ -28,80 +28,73 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
+// GetSaveCount returns the current data-save-count from the canvas save
+// status indicator. Call this BEFORE the action that triggers a save, then
+// pass the result to WaitForCanvasSaveStatusSaved.
+func (s *CanvasSteps) GetSaveCount() string {
+	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if isVisible, _ := status.IsVisible(); !isVisible {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		c, _ := status.GetAttribute("data-save-count")
+		if c != "" {
+			return c
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return ""
+}
+
 // WaitForCanvasSaveStatusSaved waits until the canvas is durably saved.
-// It avoids returning on the initial stale "saved" state by giving autosave
-// one debounce window to start, but still accepts saves that completed before
-// the waiter began observing.
-func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
+// Pass a baseline from GetSaveCount() captured BEFORE the save-triggering
+// action to avoid race conditions. Without a baseline, it falls back to
+// observing the saving→saved state transition.
+func (s *CanvasSteps) WaitForCanvasSaveStatusSaved(baseline ...string) {
 	saveButton := q.TestID("save-canvas-button").Run(s.session)
-	clickedManualSave := false
 	if isVisible, _ := saveButton.IsVisible(); isVisible {
 		s.session.Click(q.TestID("save-canvas-button"))
-		clickedManualSave = true
 	}
 
 	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
 	deadline := time.Now().Add(20 * time.Second)
-	initialStateCaptured := false
-	initialState := ""
-	initialSavedLabel := ""
-	seenFreshCycle := clickedManualSave
+
+	initialCount := ""
+	if len(baseline) > 0 {
+		initialCount = baseline[0]
+	} else {
+		initialCount = s.GetSaveCount()
+	}
+
+	// Wait for save count to increase above the baseline, or for a
+	// saving→saved transition (fallback when save races the capture).
 	seenSaving := false
-	initialSavedStateStableUntil := time.Time{}
-	lastState := ""
 	for time.Now().Before(deadline) {
-		isVisible, _ := status.IsVisible()
-		if !isVisible {
+		if isVisible, _ := status.IsVisible(); !isVisible {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-
+		c, _ := status.GetAttribute("data-save-count")
 		state, _ := status.GetAttribute("data-state")
-		if state != "" {
-			lastState = state
-		}
-		savedLabel, _ := status.GetAttribute("data-saved-label")
 
-		if !initialStateCaptured {
-			initialState = lastState
-			initialSavedLabel = savedLabel
-			initialStateCaptured = true
-			if initialState == "saved" {
-				initialSavedStateStableUntil = time.Now().Add(1 * time.Second)
-			}
-			if initialState != "saved" {
-				seenFreshCycle = true
-			}
+		// Primary: save count changed since baseline.
+		if c != "" && initialCount != "" && c != initialCount {
+			return
 		}
 
-		if lastState == "saving" {
-			seenFreshCycle = true
+		// Fallback: observe a saving→saved transition.
+		if state == "saving" {
 			seenSaving = true
 		}
-
-		if lastState != "" && lastState != "saved" {
-			seenFreshCycle = true
-		}
-
-		if initialState == "saved" && initialSavedLabel != "visible" && savedLabel == "visible" {
-			seenFreshCycle = true
-		}
-
-		if lastState == "saved" && seenFreshCycle && (seenSaving || initialState != "saved") {
-			return
-		}
-
-		if savedLabel == "visible" && seenFreshCycle && initialSavedLabel != "visible" {
-			return
-		}
-
-		if initialState == "saved" && !seenFreshCycle && !initialSavedStateStableUntil.IsZero() && time.Now().After(initialSavedStateStableUntil) {
+		if seenSaving && state == "saved" {
 			return
 		}
 
 		time.Sleep(100 * time.Millisecond)
 	}
-	s.t.Fatalf("timed out waiting for canvas save status saved, last state=%q", lastState)
+	s.t.Fatalf("timed out waiting for canvas save (initial count=%q)", initialCount)
 }
 
 func (s *CanvasSteps) Create() {
@@ -188,9 +181,9 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(500)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
@@ -200,6 +193,7 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
 
+	baseline := s.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(500)
 
@@ -209,8 +203,7 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	generatedName, err := loc.InputValue()
 	require.NoError(s.t, err)
 
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 
 	return generatedName
 }
@@ -222,12 +215,10 @@ func (s *CanvasSteps) Save() {
 	if isVisible, _ := loc.IsVisible(); isVisible {
 		s.session.Click(saveButton)
 		s.session.AssertText("Canvas changes saved")
-		s.session.Sleep(500)
 		return
 	}
 
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -239,6 +230,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
 	s.session.Click(q.TestID("field-type-select"))
@@ -247,8 +239,7 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`button:has-text("Select user")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
@@ -258,9 +249,9 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	target := q.TestID("rf__wrapper")
 
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -271,6 +262,8 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
+
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 
 	modeSelector := q.TestID("field-mode-select")
@@ -284,8 +277,7 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(unitTrigger)
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
@@ -296,10 +288,11 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
+
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -323,6 +316,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
 
+	baseline := s.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("time-field-timerange-start"), "00:00")
 	s.session.FillIn(q.TestID("time-field-timerange-end"), "23:59")
@@ -330,8 +324,7 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.TestID("field-timezone-select"))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
-	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
