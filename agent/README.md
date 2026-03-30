@@ -3,8 +3,9 @@
 Built with [Pydantic AI](https://ai.pydantic.dev/).
 
 Starting points:
-- System prompt is in `agent/src/ai/agent.py`
-- Evals are in `agent/evals/runner.py`
+
+- System prompt is in `agent/src/ai/system_prompt.txt`
+- Evals are in `agent/evals/cases.py`
 - Patterns are in `agent/patterns`
 - Run evals with `make test.agent.evals`
 
