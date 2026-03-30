@@ -124,4 +124,3 @@ function buildSubtitle(status: string, createdAt?: string): string | React.React
   }
   return createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
 }
-
