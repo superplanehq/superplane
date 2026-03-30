@@ -706,7 +706,7 @@ const file_agents_proto_rawDesc = "" +
 	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xa6\x01\x92As\n" +
 	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/chats/{chat_id}/resumeB\xca\x01\x92A\x90\x01\x12f\n" +
 	"\x15SuperPlane Agents API\x12!API for SuperPlane agent sessions\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
 
 var (
 	file_agents_proto_rawDescOnce sync.Once

@@ -26,7 +26,7 @@ export function RunsFilterBar({
           type="button"
           onClick={() => onFilterChange(btn.key)}
           className={cn(
-            "rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors",
+            "rounded-md px-2 py-0.5 text-xs font-medium transition-colors",
             statusFilter === btn.key ? "bg-slate-900 text-white" : "text-gray-600 hover:bg-gray-100",
           )}
         >
@@ -54,12 +54,12 @@ export function LoadMoreButton({
   totalCount: number;
 }) {
   return (
-    <div className="px-4 py-2 text-center border-t border-gray-200">
+    <div className="px-4 pt-2 pb-8 text-center">
       <button
         type="button"
         onClick={onLoadMore}
         disabled={isFetchingNextPage}
-        className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:text-gray-400 transition-colors"
+        className="text-xs font-medium text-slate-500 hover:text-slate-700 disabled:text-gray-400 transition-colors"
       >
         {isFetchingNextPage ? (
           <span className="inline-flex items-center gap-1">

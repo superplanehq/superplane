@@ -19,8 +19,8 @@ function buildExecutionTabData(
   execution: CanvasesCanvasNodeExecution,
   workflowNode: ComponentsNode,
   workflowNodes: ComponentsNode[],
-): { current?: Record<string, any>; payload?: any } {
-  const tabData: { current?: Record<string, any>; payload?: any } = {};
+): { current?: Record<string, any>; payload?: any; configuration?: any } {
+  const tabData: { current?: Record<string, any>; payload?: any; configuration?: any } = {};
 
   let currentData: Record<string, any> = {};
 
@@ -79,6 +79,10 @@ function buildExecutionTabData(
   }
 
   tabData.payload = payload;
+
+  if (execution.configuration && Object.keys(execution.configuration).length > 0) {
+    tabData.configuration = execution.configuration;
+  }
 
   return tabData;
 }

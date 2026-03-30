@@ -81,12 +81,16 @@ func (c *GetLastMessage) Color() string {
 
 func (c *GetLastMessage) ExampleOutput() map[string]any {
 	return map[string]any{
-		"agentId": "bc_abc123",
-		"message": map[string]any{
-			"id":   "msg_005",
-			"type": "assistant_message",
-			"text": "I've added a troubleshooting section to the README.",
+		"data": map[string]any{
+			"agentId": "bc_abc123",
+			"message": map[string]any{
+				"id":   "msg_005",
+				"type": "assistant_message",
+				"text": "I've added a troubleshooting section to the README.",
+			},
 		},
+		"timestamp": "2026-03-26T19:29:35.841265352Z",
+		"type":      GetLastMessagePayloadType,
 	}
 }
 

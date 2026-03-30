@@ -1,4 +1,4 @@
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import React from "react";
 import type {
   CustomFieldRenderer,
@@ -11,7 +11,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import type { Repository, RepositoryMetadata } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimestampInUserTimezone } from "@/utils/timezone";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { Predicate } from "../utils";
 import { formatPredicate, stringOrDash } from "../utils";
 import type { MetadataItem } from "@/ui/metadataList";

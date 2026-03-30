@@ -13,8 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 
 interface ImportYamlDialogProps {
   open: boolean;

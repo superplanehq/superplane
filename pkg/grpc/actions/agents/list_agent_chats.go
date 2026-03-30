@@ -39,18 +39,18 @@ func ListAgentChats(ctx context.Context, agentURL string, orgID string, userID s
 
 func serializeAgentChats(in []*internalpb.ChatInfo) []*pb.AgentChatInfo {
 	out := make([]*pb.AgentChatInfo, 0, len(in))
-	for _, chat := range in {
-		if chat == nil {
+	for _, c := range in {
+		if c == nil {
 			continue
 		}
 
 		chat := &pb.AgentChatInfo{
-			Id:             chat.Id,
-			InitialMessage: chat.InitialMessage,
+			Id:             c.Id,
+			InitialMessage: c.InitialMessage,
 		}
 
-		if chat.CreatedAt != nil {
-			chat.CreatedAt = timestamppb.New(chat.CreatedAt.AsTime())
+		if c.CreatedAt != nil {
+			chat.CreatedAt = timestamppb.New(c.CreatedAt.AsTime())
 		}
 
 		out = append(out, chat)

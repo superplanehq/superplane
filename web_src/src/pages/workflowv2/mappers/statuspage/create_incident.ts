@@ -1,6 +1,6 @@
 import type { ComponentBaseProps, ComponentBaseSpec } from "@/ui/componentBase";
 import type React from "react";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";
 import type {
   ComponentBaseContext,

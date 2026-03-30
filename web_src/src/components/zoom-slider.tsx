@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect } from "react";
-import { Camera, Grid3X3, Maximize, Minus, Plus, SquareDot } from "lucide-react";
+import { Camera, CircleDot, CircleDotDashed, Eye, Minus, Plus } from "lucide-react";
 import { toPng } from "html-to-image";
 
 import {
@@ -121,7 +121,7 @@ export function ZoomSlider({
         fitView({ duration: 300 });
       }
       // Screenshot: Ctrl/Cmd + Shift + S
-      else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
+      else if (screenshotName && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "s") {
         e.preventDefault();
         handleScreenshot();
       }
@@ -129,10 +129,10 @@ export function ZoomSlider({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [zoomIn, zoomOut, zoomTo, fitView, handleScreenshot]);
+  }, [zoomIn, zoomOut, zoomTo, fitView, handleScreenshot, screenshotName]);
 
   const baseClassName = cn(
-    "bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8",
+    "bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-0.5 rounded-md p-0.5 h-8",
     orientation === "horizontal" ? "flex-row" : "flex-col",
     className,
   );
@@ -191,25 +191,27 @@ export function ZoomSlider({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => fitView({ duration: 300 })}>
-            <Maximize className="h-3 w-3" />
+            <Eye className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
       </Tooltip>
       {leadingContent}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>
-            <Camera className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
-      </Tooltip>
+      {screenshotName && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>
+              <Camera className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
+        </Tooltip>
+      )}
       {onSnapToGridToggle && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={onSnapToGridToggle}>
-              {isSnapToGridEnabled ? <SquareDot className="h-3 w-3" /> : <Grid3X3 className="h-3 w-3" />}
+              {isSnapToGridEnabled ? <CircleDot className="h-3 w-3" /> : <CircleDotDashed className="h-3 w-3" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>

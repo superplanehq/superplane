@@ -5,7 +5,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,8 +17,8 @@ import {
   useUpdateIntegration,
 } from "@/hooks/useIntegrations";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
-import { getApiErrorMessage } from "@/utils/errors";
-import { showErrorToast } from "@/utils/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { ChildEventsState } from "../composite";
@@ -134,6 +134,8 @@ interface ComponentSidebarProps {
   componentDescription?: string;
   componentExamplePayload?: Record<string, unknown>;
   componentPayloadLabel?: string;
+  /** Full URL to SuperPlane docs (e.g. docs.superplane.com/components/…#section). */
+  componentDocumentationUrl?: string;
   nodeConfigMode?: "create" | "edit";
   nodeName?: string;
   nodeLabel?: string;
@@ -245,6 +247,7 @@ export const ComponentSidebar = ({
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
+  componentDocumentationUrl,
   workflowNodes = [],
   components = [],
   triggers = [],
@@ -816,6 +819,7 @@ export const ComponentSidebar = ({
                   description={componentDescription}
                   examplePayload={componentExamplePayload}
                   payloadLabel={componentPayloadLabel}
+                  documentationUrl={componentDocumentationUrl}
                   configurationFields={nodeConfigurationFields}
                 />
               </TabsContent>
@@ -1030,7 +1034,7 @@ export const ComponentSidebar = ({
                         domainId={domainId ?? ""}
                         domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={domainId ?? ""}
-                        appInstallationId={configureIntegration.metadata?.id}
+                        integrationId={configureIntegration.metadata?.id}
                       />
                     );
                   })

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface RolesProps {

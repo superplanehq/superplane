@@ -1,0 +1,13 @@
+{
+  "data": {
+    "sourceBucket": "my-company-assets",
+    "sourceFilePath": "reports/daily.csv",
+    "destinationBucket": "my-company-archive",
+    "destinationFilePath": "archive/2026/daily.csv",
+    "endpoint": "https://my-company-archive.fra1.digitaloceanspaces.com/archive/2026/daily.csv",
+    "eTag": "a1b2c3d4ef567890a1b2c3d4ef567890",
+    "moved": false
+  },
+  "timestamp": "2026-03-25T09:00:00Z",
+  "type": "digitalocean.spaces.object.copied"
+}
