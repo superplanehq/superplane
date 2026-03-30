@@ -195,4 +195,3 @@ function getFrameRowCount(frame: Record<string, any>): number {
 
   return maxLength;
 }
-
