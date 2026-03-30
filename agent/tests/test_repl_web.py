@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
+from pydantic_ai.usage import RunUsage
 
 from ai.models import CanvasQuestionRequest
 import ai.repl_web as repl_web
@@ -35,10 +36,12 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_store.count_chat_model_messages.return_value = 0
     fake_store.load_agent_chat_message_history.return_value = []
     fake_store.set_initial_chat_message_if_missing.return_value = None
-    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message: SimpleNamespace(
+    fake_store.create_agent_chat_run.return_value = SimpleNamespace(id="run-123")
+    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message, run_id=None: SimpleNamespace(
         id="message-123",
     )
     fake_store.update_agent_chat_model_message.return_value = None
+    fake_store.update_agent_chat_run.return_value = None
     fake_store.replace_agent_chat_messages_after.return_value = None
     monkeypatch.setattr(repl_web, "SessionStore", MagicMock(return_value=fake_store))
     fake_grpc_server = MagicMock()
@@ -50,6 +53,41 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
     event = _parse_stream_event(b'data: {"type":"model_delta","content":"hello"}\n')
     assert event == {"type": "model_delta", "content": "hello"}
+
+
+def test_to_jsonable_serializes_run_usage_as_json_object() -> None:
+    payload = repl_web._to_jsonable(
+        RunUsage(
+            requests=2,
+            tool_calls=1,
+            input_tokens=6885,
+            output_tokens=351,
+            details={
+                "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "input_tokens": 6885,
+                "output_tokens": 351,
+            },
+        )
+    )
+
+    assert payload == {
+        "requests": 2,
+        "tool_calls": 1,
+        "input_tokens": 6885,
+        "output_tokens": 351,
+        "cache_write_tokens": 0,
+        "cache_read_tokens": 0,
+        "input_audio_tokens": 0,
+        "cache_audio_read_tokens": 0,
+        "output_audio_tokens": 0,
+        "details": {
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "input_tokens": 6885,
+            "output_tokens": 351,
+        },
+    }
 
 
 def test_resolve_stream_url_uses_agent_chat_stream_path() -> None:
@@ -154,7 +192,13 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
     store.load_agent_chat_message_history.side_effect = lambda chat_id: list(persisted_messages)
     store.set_initial_chat_message_if_missing.return_value = None
 
-    def fake_create_agent_chat_model_message(chat_id: str, message: ModelRequest) -> SimpleNamespace:
+    store.create_agent_chat_run.return_value = SimpleNamespace(id="run-123")
+
+    def fake_create_agent_chat_model_message(
+        chat_id: str,
+        message: ModelRequest,
+        run_id: str | None = None,
+    ) -> SimpleNamespace:
         persisted_messages.append(message)
         return SimpleNamespace(id=f"message-{len(persisted_messages)}")
 
@@ -198,6 +242,7 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
 
 def test_persisted_run_recorder_does_not_duplicate_final_assistant_message() -> None:
     store = MagicMock()
+    store.create_agent_chat_run.return_value = SimpleNamespace(id="run-123")
     store.count_chat_model_messages.return_value = 0
     store.create_agent_chat_model_message.side_effect = [
         SimpleNamespace(id="user-message-1"),
@@ -215,11 +260,33 @@ def test_persisted_run_recorder_does_not_duplicate_final_assistant_message() -> 
             content=None,
         )
     )
-    recorder.save_authoritative_messages([ModelResponse(parts=[TextPart("Final answer")])])
+    recorder.set_run_usage({"input_tokens": 10, "output_tokens": 4})
+    recorder.save_authoritative_messages(
+        [
+            ModelResponse(
+                parts=[TextPart("Final answer")],
+                model_name="claude-sonnet-4-6",
+                provider_name="anthropic",
+            )
+        ]
+    )
     recorder.set_assistant_content("Final answer")
 
     assert store.create_agent_chat_model_message.call_count == 2
+    assert store.create_agent_chat_model_message.call_args_list[0].kwargs["run_id"] == "run-123"
+    assert store.create_agent_chat_model_message.call_args_list[1].kwargs["run_id"] == "run-123"
     store.replace_agent_chat_messages_after.assert_called_once()
+    assert store.replace_agent_chat_messages_after.call_args.kwargs["run_id"] == "run-123"
+    assert store.update_agent_chat_run.call_count == 2
+    assert store.update_agent_chat_run.call_args_list[0].args == ("run-123",)
+    assert store.update_agent_chat_run.call_args_list[0].kwargs == {
+        "usage": {"input_tokens": 10, "output_tokens": 4}
+    }
+    assert store.update_agent_chat_run.call_args_list[1].args == ("run-123",)
+    assert store.update_agent_chat_run.call_args_list[1].kwargs == {
+        "model": "claude-sonnet-4-6",
+        "provider_name": "anthropic",
+    }
     store.update_agent_chat_model_message.assert_not_called()
 
 

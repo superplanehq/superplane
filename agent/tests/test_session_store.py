@@ -214,6 +214,48 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(monkeypa
     assert history[0].parts[0].content == "What is in my canvas?"
 
 
+def test_row_to_message_record_reads_request_usage() -> None:
+    now = datetime.now(UTC)
+    store = _build_store()
+
+    record = store._row_to_message_record(
+        {
+            "id": "record-123",
+            "chat_id": "chat-123",
+            "run_id": "run-123",
+            "message_index": 1,
+            "message": {
+                "kind": "response",
+                "parts": [{"content": "Done", "part_kind": "text"}],
+            },
+            "request_usage": {
+                "input_tokens": 100,
+                "output_tokens": 20,
+                "cache_read_tokens": 0,
+                "cache_write_tokens": 0,
+                "input_audio_tokens": 0,
+                "output_audio_tokens": 0,
+                "cache_audio_read_tokens": 0,
+                "details": {"input_tokens": 100, "output_tokens": 20},
+            },
+            "created_at": now,
+            "updated_at": now,
+        }
+    )
+
+    assert record.request_usage == {
+        "input_tokens": 100,
+        "output_tokens": 20,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "input_audio_tokens": 0,
+        "output_audio_tokens": 0,
+        "cache_audio_read_tokens": 0,
+        "details": {"input_tokens": 100, "output_tokens": 20},
+    }
+    assert record.run_id == "run-123"
+
+
 def test_connect_reuses_open_connection_until_closed(monkeypatch) -> None:
     store = _build_store()
     created_connections: list[object] = []

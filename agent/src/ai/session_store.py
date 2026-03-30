@@ -120,6 +120,13 @@ def _extract_output_tool_answer(payload: dict[str, Any]) -> str:
     return ""
 
 
+def _extract_request_usage(payload: dict[str, Any]) -> dict[str, Any] | None:
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+    return usage
+
+
 @dataclass(frozen=True)
 class StoredAgentChat:
     id: str
@@ -132,6 +139,18 @@ class StoredAgentChat:
 
 
 @dataclass(frozen=True)
+class StoredAgentChatRun:
+    id: str
+    chat_id: str
+    turn_index: int
+    model: str | None
+    provider_name: str | None
+    usage: dict[str, Any] | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
 class StoredAgentChatMessageRecord:
     id: str
     chat_id: str
@@ -139,6 +158,8 @@ class StoredAgentChatMessageRecord:
     message: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    request_usage: dict[str, Any] | None = None
+    run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -333,6 +354,96 @@ class SessionStore:
             row = cur.fetchone()
         return int(row["message_count"]) if row is not None else 0
 
+    def create_agent_chat_run(
+        self,
+        chat_id: str,
+        model: str | None = None,
+        provider_name: str | None = None,
+        usage: dict[str, Any] | None = None,
+        run_id: str | None = None,
+    ) -> StoredAgentChatRun:
+        now = _utcnow()
+        run = StoredAgentChatRun(
+            id=run_id or str(uuid.uuid4()),
+            chat_id=chat_id,
+            turn_index=0,
+            model=model,
+            provider_name=provider_name,
+            usage=usage,
+            created_at=now,
+            updated_at=now,
+        )
+
+        with self._cursor(transactional=True) as cur:
+            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
+            if cur.fetchone() is None:
+                raise AgentChatNotFoundError(chat_id)
+
+            turn_index = self._next_chat_run_turn_index(cur, chat_id)
+            run = StoredAgentChatRun(
+                id=run.id,
+                chat_id=chat_id,
+                turn_index=turn_index,
+                model=model,
+                provider_name=provider_name,
+                usage=usage,
+                created_at=now,
+                updated_at=now,
+            )
+            cur.execute(
+                """
+                INSERT INTO agent_chat_runs (
+                    id, chat_id, turn_index, model, provider_name, usage, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    run.id,
+                    run.chat_id,
+                    run.turn_index,
+                    run.model,
+                    run.provider_name,
+                    Jsonb(run.usage) if run.usage is not None else None,
+                    run.created_at,
+                    run.updated_at,
+                ),
+            )
+            cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
+
+        return run
+
+    def update_agent_chat_run(
+        self,
+        run_id: str,
+        *,
+        usage: dict[str, Any] | None = None,
+        model: str | None = None,
+        provider_name: str | None = None,
+    ) -> None:
+        now = _utcnow()
+        with self._cursor(transactional=True) as cur:
+            cur.execute(
+                """
+                UPDATE agent_chat_runs
+                SET
+                    usage = COALESCE(%s, usage),
+                    model = COALESCE(%s, model),
+                    provider_name = COALESCE(%s, provider_name),
+                    updated_at = %s
+                WHERE id = %s
+                RETURNING chat_id
+                """,
+                (
+                    Jsonb(usage) if usage is not None else None,
+                    model,
+                    provider_name,
+                    now,
+                    run_id,
+                ),
+            )
+            row = cur.fetchone()
+            if row is not None:
+                cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, row["chat_id"]))
+
     def list_agent_chat_message_records(self, chat_id: str) -> list[StoredAgentChatMessageRecord]:
         with self._cursor() as cur:
             cur.execute(
@@ -376,9 +487,15 @@ class SessionStore:
                 )
         return history
 
-    def create_agent_chat_model_message(self, chat_id: str, message: ModelMessage) -> StoredAgentChatMessageRecord:
+    def create_agent_chat_model_message(
+        self,
+        chat_id: str,
+        message: ModelMessage,
+        run_id: str | None = None,
+    ) -> StoredAgentChatMessageRecord:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
+        request_usage = _extract_request_usage(serialized_message)
         created_at = _message_timestamp(message)
         message_id = str(uuid.uuid4())
 
@@ -391,14 +508,16 @@ class SessionStore:
             cur.execute(
                 """
                 INSERT INTO agent_chat_messages (
-                    id, chat_id, message_index, message, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    id, chat_id, run_id, message_index, message, request_usage, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     message_id,
                     chat_id,
+                    run_id,
                     message_index,
                     Jsonb(serialized_message),
+                    Jsonb(request_usage) if request_usage is not None else None,
                     created_at,
                     now,
                 ),
@@ -410,25 +529,45 @@ class SessionStore:
                 message=serialized_message,
                 created_at=created_at,
                 updated_at=now,
+                request_usage=request_usage,
+                run_id=run_id,
             )
             cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, chat_id))
 
         return record
 
-    def update_agent_chat_model_message(self, message_id: str, message: ModelMessage) -> None:
+    def update_agent_chat_model_message(
+        self,
+        message_id: str,
+        message: ModelMessage,
+        run_id: str | None = None,
+    ) -> None:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
+        request_usage = _extract_request_usage(serialized_message)
         created_at = _message_timestamp(message)
 
         with self._cursor(transactional=True) as cur:
             cur.execute(
                 """
                 UPDATE agent_chat_messages
-                SET message = %s, created_at = %s, updated_at = %s
+                SET
+                    message = %s,
+                    request_usage = %s,
+                    run_id = COALESCE(%s, run_id),
+                    created_at = %s,
+                    updated_at = %s
                 WHERE id = %s
                 RETURNING chat_id
                 """,
-                (Jsonb(serialized_message), created_at, now, message_id),
+                (
+                    Jsonb(serialized_message),
+                    Jsonb(request_usage) if request_usage is not None else None,
+                    run_id,
+                    created_at,
+                    now,
+                    message_id,
+                ),
             )
             row = cur.fetchone()
             if row is not None:
@@ -439,6 +578,7 @@ class SessionStore:
         chat_id: str,
         preserved_message_count: int,
         messages: list[ModelMessage],
+        run_id: str | None = None,
     ) -> None:
         now = _utcnow()
         with self._cursor(transactional=True) as cur:
@@ -457,18 +597,21 @@ class SessionStore:
 
             for offset, message in enumerate(messages):
                 serialized_message = _serialize_model_message(message)
+                request_usage = _extract_request_usage(serialized_message)
                 created_at = _message_timestamp(message)
                 cur.execute(
                     """
                     INSERT INTO agent_chat_messages (
-                        id, chat_id, message_index, message, created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                        id, chat_id, run_id, message_index, message, request_usage, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         str(uuid.uuid4()),
                         chat_id,
+                        run_id,
                         preserved_message_count + offset,
                         Jsonb(serialized_message),
+                        Jsonb(request_usage) if request_usage is not None else None,
                         created_at,
                         now,
                     ),
@@ -590,6 +733,8 @@ class SessionStore:
             message=payload,
             created_at=_from_db_time(row["created_at"]),
             updated_at=_from_db_time(row["updated_at"]),
+            request_usage=row["request_usage"] if isinstance(row.get("request_usage"), dict) else None,
+            run_id=str(row["run_id"]) if row.get("run_id") is not None else None,
         )
 
     def _next_chat_message_index(self, cur: Any, chat_id: str) -> int:
@@ -605,3 +750,17 @@ class SessionStore:
         if row is None:
             return 0
         return int(row["next_index"])
+
+    def _next_chat_run_turn_index(self, cur: Any, chat_id: str) -> int:
+        cur.execute(
+            """
+            SELECT COALESCE(MAX(turn_index), -1) + 1 AS next_turn_index
+            FROM agent_chat_runs
+            WHERE chat_id = %s
+            """,
+            (chat_id,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return 0
+        return int(row["next_turn_index"])

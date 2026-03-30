@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import json
 import os
 import threading
@@ -117,6 +118,10 @@ def _to_jsonable(value: Any) -> Any:
         return {str(key): _to_jsonable(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_to_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_to_jsonable(item) for item in value]
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        return _to_jsonable(dataclasses.asdict(value))
     model_dump = getattr(value, "model_dump", None)
     if callable(model_dump):
         return model_dump(mode="json", by_alias=True)
@@ -232,6 +237,8 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
 
             if isinstance(event, AgentRunResultEvent):
                 result = event.result
+                usage = _to_jsonable(result.usage())
+                recorder.set_run_usage(usage)
                 recorder.save_authoritative_messages(result.new_messages())
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
@@ -239,7 +246,7 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
                 yield {
                     "type": "final_answer",
                     "output": output,
-                    "usage": _to_jsonable(result.usage()),
+                    "usage": usage,
                 }
 
         yield {
@@ -374,6 +381,8 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
+            usage = _to_jsonable(result.usage())
+            recorder.set_run_usage(usage)
             recorder.save_authoritative_messages(result.new_messages())
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
@@ -399,7 +408,7 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
             yield {
                 "type": "final_answer",
                 "output": output,
-                "usage": _to_jsonable(result.usage()),
+                "usage": usage,
             }
 
     yield {

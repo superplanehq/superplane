@@ -33,6 +33,24 @@ CREATE TABLE public.agent_chat_messages (
     message_index integer NOT NULL,
     message jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    run_id uuid,
+    request_usage jsonb
+);
+
+
+--
+-- Name: agent_chat_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_chat_runs (
+    id uuid NOT NULL,
+    chat_id uuid NOT NULL,
+    turn_index integer NOT NULL,
+    model text,
+    provider_name text,
+    usage jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -71,6 +89,14 @@ ALTER TABLE ONLY public.agent_chat_messages
 
 
 --
+-- Name: agent_chat_runs agent_chat_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_runs
+    ADD CONSTRAINT agent_chat_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: agent_chats agent_chats_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -94,6 +120,27 @@ CREATE UNIQUE INDEX idx_agent_chat_messages_chat_id_message_index ON public.agen
 
 
 --
+-- Name: idx_agent_chat_messages_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_chat_messages_run_id ON public.agent_chat_messages USING btree (run_id);
+
+
+--
+-- Name: idx_agent_chat_runs_chat_id_turn_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_agent_chat_runs_chat_id_turn_index ON public.agent_chat_runs USING btree (chat_id, turn_index);
+
+
+--
+-- Name: idx_agent_chat_runs_id_chat_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_agent_chat_runs_id_chat_id ON public.agent_chat_runs USING btree (id, chat_id);
+
+
+--
 -- Name: idx_agent_chats_owner_canvas_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -106,6 +153,22 @@ CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING bt
 
 ALTER TABLE ONLY public.agent_chat_messages
     ADD CONSTRAINT agent_chat_messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.agent_chats(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_chat_messages agent_chat_messages_run_id_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_messages
+    ADD CONSTRAINT agent_chat_messages_run_id_chat_id_fkey FOREIGN KEY (run_id, chat_id) REFERENCES public.agent_chat_runs(id, chat_id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_chat_runs agent_chat_runs_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_runs
+    ADD CONSTRAINT agent_chat_runs_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.agent_chats(id) ON DELETE CASCADE;
 
 
 --
@@ -140,7 +203,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260325205949	f
+20260330133114	f
 \.
 
 

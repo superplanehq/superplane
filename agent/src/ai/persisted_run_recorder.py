@@ -17,6 +17,7 @@ class PersistedRunRecorder:
     def __init__(self, store: SessionStore, chat_id: str, user_prompt: str) -> None:
         self._store = store
         self._chat_id = chat_id
+        self._run = self._store.create_agent_chat_run(chat_id)
         self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
         self._authoritative_messages_saved = False
         self._current_response_message_id: str | None = None
@@ -25,6 +26,7 @@ class PersistedRunRecorder:
         self._store.create_agent_chat_model_message(
             chat_id,
             ModelRequest(parts=[UserPromptPart(user_prompt)]),
+            run_id=self._run.id,
         )
 
     @property
@@ -36,22 +38,43 @@ class PersistedRunRecorder:
             return
 
         if self._current_response_message_id is None:
-            record = self._store.create_agent_chat_model_message(self._chat_id, self._current_response)
+            record = self._store.create_agent_chat_model_message(
+                self._chat_id,
+                self._current_response,
+                run_id=self._run.id,
+            )
             self._current_response_message_id = record.id
             return
 
-        self._store.update_agent_chat_model_message(self._current_response_message_id, self._current_response)
+        self._store.update_agent_chat_model_message(
+            self._current_response_message_id,
+            self._current_response,
+            run_id=self._run.id,
+        )
 
     def save_authoritative_messages(self, messages: Any) -> None:
         validated_messages = ModelMessagesTypeAdapter.validate_python(messages)
+        for message in reversed(validated_messages):
+            if not isinstance(message, ModelResponse):
+                continue
+            self._store.update_agent_chat_run(
+                self._run.id,
+                model=message.model_name,
+                provider_name=message.provider_name,
+            )
+            break
         self._store.replace_agent_chat_messages_after(
             self._chat_id,
             self._history_count_before_run,
             list(validated_messages),
+            run_id=self._run.id,
         )
         self._authoritative_messages_saved = True
         self._current_response_message_id = None
         self._current_response = None
+
+    def set_run_usage(self, usage: dict[str, Any]) -> None:
+        self._store.update_agent_chat_run(self._run.id, usage=usage)
 
     def append_assistant_content(self, chunk: str) -> None:
         if not chunk:
@@ -145,6 +168,7 @@ class PersistedRunRecorder:
         self._store.create_agent_chat_model_message(
             self._chat_id,
             ModelRequest(parts=parts),
+            run_id=self._run.id,
         )
         self._current_response_message_id = None
         self._current_response = None
