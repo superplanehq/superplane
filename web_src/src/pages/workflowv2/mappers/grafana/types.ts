@@ -26,12 +26,6 @@ export interface OnAlertFiringConfiguration {
   alertNames?: AlertNamePredicate[];
 }
 
-export interface OnAlertFiringMetadata {
-  webhookUrl?: string;
-  webhook_url?: string;
-  url?: string;
-}
-
 export interface QueryDataSourceConfiguration {
   dataSourceUid: string;
   query: string;

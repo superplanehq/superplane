@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 )
@@ -135,10 +137,13 @@ func (h *GrafanaWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	bindingKeyA := strings.TrimSpace(configA.WebhookBindingKey)
 	bindingKeyB := strings.TrimSpace(configB.WebhookBindingKey)
 	if bindingKeyA != "" || bindingKeyB != "" {
-		return bindingKeyA != "" && bindingKeyA == bindingKeyB, nil
+		if bindingKeyA == "" || bindingKeyB == "" || bindingKeyA != bindingKeyB {
+			return false, nil
+		}
 	}
 
-	return strings.TrimSpace(configA.SharedSecret) == strings.TrimSpace(configB.SharedSecret), nil
+	secretsMatch := strings.TrimSpace(configA.SharedSecret) == strings.TrimSpace(configB.SharedSecret)
+	return secretsMatch && predicatesSliceEqual(configA.AlertNames, configB.AlertNames), nil
 }
 
 func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error) {
@@ -154,9 +159,11 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 
 	sharedSecretProvided := false
 	webhookBindingKeyProvided := false
+	alertNamesProvided := false
 	if requestedMap, ok := requested.(map[string]any); ok {
 		_, sharedSecretProvided = requestedMap["sharedSecret"]
 		_, webhookBindingKeyProvided = requestedMap["webhookBindingKey"]
+		_, alertNamesProvided = requestedMap["alertNames"]
 	}
 
 	mergedSharedSecret := strings.TrimSpace(currentConfig.SharedSecret)
@@ -169,14 +176,28 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 		mergedWebhookBindingKey = strings.TrimSpace(requestedConfig.WebhookBindingKey)
 	}
 
+	mergedAlertNames := currentConfig.AlertNames
+	if alertNamesProvided {
+		mergedAlertNames = requestedConfig.AlertNames
+	}
+
 	merged := OnAlertFiringConfig{
 		SharedSecret:      mergedSharedSecret,
 		WebhookBindingKey: mergedWebhookBindingKey,
+		AlertNames:        mergedAlertNames,
 	}
 
 	changed := strings.TrimSpace(currentConfig.SharedSecret) != merged.SharedSecret ||
-		strings.TrimSpace(currentConfig.WebhookBindingKey) != merged.WebhookBindingKey
+		strings.TrimSpace(currentConfig.WebhookBindingKey) != merged.WebhookBindingKey ||
+		!predicatesSliceEqual(currentConfig.AlertNames, merged.AlertNames)
 	return merged, changed, nil
+}
+
+func predicatesSliceEqual(a, b []configuration.Predicate) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 func buildContactPointName(webhookID string) string {

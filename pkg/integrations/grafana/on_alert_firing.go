@@ -49,7 +49,6 @@ func (t *OnAlertFiring) Documentation() string {
 ## Configuration
 
 - **Alert Names**: Optional exact alert name filters
-- **Rule UIDs**: Optional exact Grafana rule UID filters
 
 ## Event Data
 

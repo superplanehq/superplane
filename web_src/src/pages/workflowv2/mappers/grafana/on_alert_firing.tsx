@@ -6,7 +6,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { OnAlertFiringConfiguration, OnAlertFiringEventData } from "./types";
 import { stringOrDash } from "../utils";
-import { formatTimestampInUserTimezone } from "@/lib/timezone";
+import { formatOptionalIsoTimestamp } from "@/lib/timezone";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger
@@ -26,7 +26,7 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
-    const createdAt = formatTimestamp(context.event?.createdAt);
+    const createdAt = formatOptionalIsoTimestamp(context.event?.createdAt);
 
     return {
       "Triggered At": createdAt,
@@ -125,15 +125,3 @@ function buildSubtitle(status: string, createdAt?: string): string | React.React
   return createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
 }
 
-function formatTimestamp(value?: string): string {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return formatTimestampInUserTimezone(date);
-}
