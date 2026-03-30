@@ -1,8 +1,8 @@
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext, NodeInfo, EventInfo } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
+import { formatTimeAgo } from "@/lib/date";
 import logfireIcon from "@/assets/icons/integrations/logfire.svg";
 import type { MetadataItem } from "@/ui/metadataList";
 
