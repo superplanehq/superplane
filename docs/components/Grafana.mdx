@@ -21,9 +21,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Instructions
 
 **Setup steps:**
-1. Create a Grafana service account token and copy it. On older Grafana versions, use an API key instead.
-2. Fill in **Base URL** and **API Token** below, then save.
-3. For **On Alert Firing**, route your alert rule to the webhook contact point that SuperPlane creates automatically.
+1. In Grafana, go to **Administration → Users and access → Service Accounts**, select **Add service account**. 
+
+   > **Service Account Role:**  
+   > While naming the service account, go to **Roles → Basic roles** and select **Admin**.
+
+	Navigate to the created service account and select **Add service account token**. Name it and set an expiration period then click **Generate token**. This is your **Service Account Token**.
+
+2. Use your Grafana root URL as **Base URL** (for example `https://grafana.example.com`).
+3. Fill in **Base URL** and **Service Account Token** below, then save.
 
 <a id="on-alert-firing"></a>
 
