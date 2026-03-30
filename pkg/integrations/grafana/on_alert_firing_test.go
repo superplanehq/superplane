@@ -406,7 +406,7 @@ func Test__OnAlertFiring__HandleWebhook__Filters(t *testing.T) {
 	t.Run("positive and notEquals predicates are ANDed", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body: payload,
+			Body:    payload,
 			Headers: headers,
 			Configuration: map[string]any{"alertNames": []any{
 				predicateEquals("HighErrorRate"),
@@ -421,7 +421,7 @@ func Test__OnAlertFiring__HandleWebhook__Filters(t *testing.T) {
 
 		eventContext2 := &contexts.EventContext{}
 		code2, _, err2 := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body: payload,
+			Body:    payload,
 			Headers: headers,
 			Configuration: map[string]any{"alertNames": []any{
 				predicateEquals("HighErrorRate"),
