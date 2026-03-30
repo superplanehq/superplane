@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const webRoot = path.resolve(__dirname, "..");
 const baselinePath = path.join(webRoot, ".eslint-budget-baseline.json");
 const isUpdateBaseline = process.argv.includes("--update-baseline");
-const ignoredPrefixes = ["src/api-client/"];
+const ignoredPrefixes = ["src/api-client/", "storybook-static/", "dist/", "dist-ssr/", "node_modules/"];
 const redStart = process.env.NO_COLOR ? "" : "\x1b[31m";
 const colorEnd = process.env.NO_COLOR ? "" : "\x1b[0m";
 
@@ -36,7 +36,8 @@ function extractIssues(results) {
     const filePath = toRelativeFilePath(result.filePath);
     const isIgnoredPath = ignoredPrefixes.some((prefix) => filePath.startsWith(prefix));
     const isStorybookStoryFile = filePath.endsWith(".stories.tsx");
-    if (isIgnoredPath || isStorybookStoryFile) {
+    const isStorybookSupportFile = filePath.includes("/storybooks/");
+    if (isIgnoredPath || isStorybookStoryFile || isStorybookSupportFile) {
       continue;
     }
 

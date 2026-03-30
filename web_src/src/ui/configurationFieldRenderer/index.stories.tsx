@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { TooltipProvider } from "@/ui/tooltip";
 import { ConfigurationFieldRenderer } from "./index";
 import {
