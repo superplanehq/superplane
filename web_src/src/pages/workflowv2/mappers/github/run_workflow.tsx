@@ -179,8 +179,18 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
   const configuration = node.configuration as any;
 
-  const inputs = configuration?.inputs as Array<{ name: string; value: string }> | undefined;
-  if (inputs && inputs.length > 0) {
+  const inputs = Array.isArray(configuration?.inputs)
+    ? configuration.inputs.filter((input: unknown): input is { name: string; value: string } => {
+        if (!input || typeof input !== "object") {
+          return false;
+        }
+
+        const maybeInput = input as { name?: unknown; value?: unknown };
+        return typeof maybeInput.name === "string" && typeof maybeInput.value === "string";
+      })
+    : [];
+
+  if (inputs.length > 0) {
     specs.push({
       title: "input",
       tooltipTitle: "inputs",
