@@ -374,10 +374,10 @@ def main() -> None:
     lines = [
         "",
         "# --- Agent evals (from scripts/bootstrap_eval_env.py) ---",
-        f'EVAL_ORG_ID="{org_id}"',
-        f'EVAL_CANVAS_ID="{canvas_id}"',
-        f'SUPERPLANE_API_TOKEN="{token}"',
-        f'SUPERPLANE_BASE_URL="{base}"',
+        f'EVAL_ORG_ID="{_escape_env_double_quoted(org_id)}"',
+        f'EVAL_CANVAS_ID="{_escape_env_double_quoted(canvas_id)}"',
+        f'SUPERPLANE_API_TOKEN="{_escape_env_double_quoted(token)}"',
+        f'SUPERPLANE_BASE_URL="{_escape_env_double_quoted(base)}"',
         "",
     ]
     text = "\n".join(lines)
