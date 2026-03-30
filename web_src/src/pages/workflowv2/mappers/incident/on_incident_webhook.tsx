@@ -14,8 +14,8 @@ import { Icon } from "@/components/Icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 
 interface OnIncidentConfig {

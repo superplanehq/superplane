@@ -30,9 +30,11 @@ from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
 from ai.grpc import InternalAgentServer
+from ai.models import CanvasAnswer
 from ai.jwt import JwtClaims, JwtValidator
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
+from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
@@ -373,7 +375,15 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
         if isinstance(event, AgentRunResultEvent):
             result = event.result
             recorder.save_authoritative_messages(result.new_messages())
-            output = _to_jsonable(result.output)
+            resolved_output = result.output
+            if isinstance(resolved_output, CanvasAnswer):
+                canvas_summary = deps.canvas_cache.get(deps.canvas_id)
+                resolved_output = coerce_canvas_answer_proposal(
+                    deps.client,
+                    resolved_output,
+                    canvas_summary,
+                )
+            output = _to_jsonable(resolved_output)
             if isinstance(output, dict) and not streamed_any_answer_delta:
                 answer = output.get("answer")
                 if isinstance(answer, str) and answer:

@@ -17,6 +17,7 @@ import {
 } from "react";
 import type { CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
+import { formatVersionLabel, formatVersionTimestamp } from "./lib/canvas-versions";
 
 const CANVAS_VERSION_CONTROL_WIDTH_STORAGE_KEY = "canvasVersionControlSidebarWidth";
 const DEFAULT_CANVAS_VERSION_CONTROL_WIDTH = 460;
@@ -50,28 +51,6 @@ interface CanvasVersionControlSidebarProps {
   loadMoreLiveVersionsDisabled?: boolean;
   loadMoreLiveVersionsPending?: boolean;
   changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
-}
-
-function formatVersionTimestamp(version?: CanvasesCanvasVersion): string | undefined {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.publishedAt || version?.metadata?.createdAt;
-  if (!raw) {
-    return undefined;
-  }
-
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) {
-    return undefined;
-  }
-
-  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-}
-
-function formatVersionLabel(version?: CanvasesCanvasVersion): string {
-  if (version?.metadata?.isPublished) {
-    return "Published version";
-  }
-
-  return "Draft version";
 }
 
 export function CanvasVersionControlSidebar({

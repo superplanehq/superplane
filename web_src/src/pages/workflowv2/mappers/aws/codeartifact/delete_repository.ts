@@ -9,11 +9,11 @@ import type {
 } from "../../types";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsCodeArtifactIcon from "@/assets/icons/integrations/aws.codeartifact.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimestampInUserTimezone } from "@/utils/timezone";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import type { MetadataItem } from "@/ui/metadataList";
 import { stringOrDash } from "../../utils";
 

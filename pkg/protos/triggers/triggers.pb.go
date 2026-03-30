@@ -311,7 +311,7 @@ const file_triggers_proto_rawDesc = "" +
 	"\x0fDescribeTrigger\x12+.Superplane.Triggers.DescribeTriggerRequest\x1a,.Superplane.Triggers.DescribeTriggerResponse\"\\\x92A:\n" +
 	"\aTrigger\x12\x10Describe trigger\x1a\x1dReturns a trigger by its name\x82\xd3\xe4\x93\x02\x19\x12\x17/api/v1/triggers/{name}B\xc8\x01\x92A\x8c\x01\x12b\n" +
 	"\x17Superplane Triggers API\x12\x1bAPI for Superplane Triggers\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/triggersb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/triggersb\x06proto3"
 
 var (
 	file_triggers_proto_rawDescOnce sync.Once

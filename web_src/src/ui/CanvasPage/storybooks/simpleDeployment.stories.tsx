@@ -9,7 +9,7 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "../Block";
-import { AiProps, CanvasNode, CanvasPage } from "../index";
+import { CanvasNode, CanvasPage } from "../index";
 import { mockBuildingBlockCategories } from "./buildingBlocks";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
@@ -529,8 +529,6 @@ export const SimpleDeployment: Story = {
 
     const getSidebarData = useMemo(() => createGetSidebarData(nodesWithHandlers), [nodesWithHandlers]);
 
-    const ai = useAi();
-
     const renderContent = () => {
       return (
         <CanvasPage
@@ -571,7 +569,6 @@ export const SimpleDeployment: Story = {
               alert(`Deleted node: ${nodeId}`);
             }
           }}
-          ai={ai}
         />
       );
     };
@@ -581,41 +578,3 @@ export const SimpleDeployment: Story = {
 };
 
 SimpleDeployment.storyName = "01 - Simple Deployment";
-
-function useAi(): AiProps {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({
-    "listen-code": "Filter out non-release branches to avoid unintended deployments when processing push events.",
-    approve: "Add the QA team to the approval step to ensure proper testing before deployment.",
-  });
-
-  const onApply = (nodeId: string) => {
-    setAiSuggestions((prev) => {
-      const newSuggestions = { ...prev };
-      delete newSuggestions[nodeId];
-      return newSuggestions;
-    });
-  };
-
-  const onDissmiss = (nodeId: string) => {
-    setAiSuggestions((prev) => {
-      const newSuggestions = { ...prev };
-      delete newSuggestions[nodeId];
-      return newSuggestions;
-    });
-  };
-
-  const suggestionCount = Object.keys(aiSuggestions).length;
-
-  return {
-    enabled: true,
-    sidebarOpen: isSidebarOpen,
-    setSidebarOpen: setIsSidebarOpen,
-    showNotifications: suggestionCount > 0,
-    notificationMessage: "Found " + suggestionCount + " improvements",
-    suggestions: aiSuggestions,
-    onApply: onApply,
-    onDismiss: onDissmiss,
-  };
-}

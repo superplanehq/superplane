@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { getUsageLimitNotice } from "@/utils/usageLimits";
+import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/AccountContext";
 
