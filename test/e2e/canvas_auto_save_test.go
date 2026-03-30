@@ -26,6 +26,28 @@ func TestCanvasAutoSave(t *testing.T) {
 		steps.moveNode("Auto Save Node", 100, 80)
 		steps.waitForSaved()
 	})
+
+	t.Run("node position preserved when moved again during autosave", func(t *testing.T) {
+		steps := &canvasAutoSaveSteps{t: t}
+		steps.start()
+		steps.givenCanvasWithVersioningEnabled("E2E Auto Save Race")
+		steps.enterEditMode()
+		steps.addNoopNode("Race Node", models.Position{X: 300, Y: 200})
+		steps.waitForSaved()
+		steps.dismissSidebar()
+
+		// First move triggers autosave (100ms debounce).
+		// Use moveNodeFast (no trailing sleep) so the second move
+		// happens while the first save is likely still in-flight.
+		steps.moveNodeFast("Race Node", 100, 0)
+		// Second move happens immediately — races with the first save response.
+		steps.moveNode("Race Node", 100, 0)
+
+		steps.waitForSaved()
+
+		// The persisted position must reflect BOTH moves.
+		steps.assertNodePositionInDB("Race Node", 500, 200)
+	})
 }
 
 type canvasAutoSaveSteps struct {
@@ -105,6 +127,60 @@ func (s *canvasAutoSaveSteps) moveNode(name string, deltaX, deltaY int) {
 	require.NoError(s.t, s.session.Page().Mouse().Up())
 
 	s.session.Sleep(300)
+}
+
+// moveNodeFast is like moveNode but without the trailing sleep,
+// allowing a subsequent move to race with the autosave triggered by this one.
+func (s *canvasAutoSaveSteps) moveNodeFast(name string, deltaX, deltaY int) {
+	loc := nodeHeaderSelector(name).Run(s.session)
+
+	err := loc.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(10000),
+	})
+	require.NoError(s.t, err)
+
+	box, err := loc.BoundingBox()
+	require.NoError(s.t, err)
+	require.NotNil(s.t, box)
+
+	startX := box.X + box.Width/2
+	startY := box.Y + box.Height/2
+
+	require.NoError(s.t, s.session.Page().Mouse().Move(startX, startY))
+	require.NoError(s.t, s.session.Page().Mouse().Down())
+	require.NoError(s.t, s.session.Page().Mouse().Move(
+		startX+float64(deltaX),
+		startY+float64(deltaY),
+		pw.MouseMoveOptions{Steps: pw.Int(10)},
+	))
+	require.NoError(s.t, s.session.Page().Mouse().Up())
+}
+
+// assertNodePositionInDB verifies that the persisted node position in the
+// draft version matches the expected coordinates.
+func (s *canvasAutoSaveSteps) assertNodePositionInDB(name string, expectedX, expectedY int) {
+	draft, err := models.FindCanvasDraftInTransaction(
+		database.Conn(), s.canvas.WorkflowID, s.session.Account.ID,
+	)
+	require.NoError(s.t, err, "finding user draft")
+
+	version, err := models.FindCanvasVersion(s.canvas.WorkflowID, draft.VersionID)
+	require.NoError(s.t, err, "finding canvas version")
+
+	var found bool
+	for _, node := range version.Nodes {
+		if node.Name != name {
+			continue
+		}
+		found = true
+		require.Equal(s.t, expectedX, node.Position.X,
+			"node %q X position: want %d, got %d", name, expectedX, node.Position.X)
+		require.Equal(s.t, expectedY, node.Position.Y,
+			"node %q Y position: want %d, got %d", name, expectedY, node.Position.Y)
+		break
+	}
+	require.True(s.t, found, "node %q not found in version nodes", name)
 }
 
 // waitForSaved polls the canvas save status indicator until it reports "saved".
