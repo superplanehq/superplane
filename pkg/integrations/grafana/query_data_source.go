@@ -110,18 +110,26 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 		{
 			Name:        "timeFrom",
 			Label:       "Time From",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "Start time (e.g. now-5m or 2024-01-01T00:00:00Z)",
-			Placeholder: "now-5m",
+			Description: "Start of the query time range",
+			TypeOptions: &configuration.TypeOptions{
+				DateTime: &configuration.DateTimeTypeOptions{
+					Format: "2006-01-02T15:04",
+				},
+			},
 		},
 		{
 			Name:        "timeTo",
 			Label:       "Time To",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "End time (e.g. now or 2024-01-01T01:00:00Z)",
-			Placeholder: "now",
+			Description: "End of the query time range",
+			TypeOptions: &configuration.TypeOptions{
+				DateTime: &configuration.DateTimeTypeOptions{
+					Format: "2006-01-02T15:04",
+				},
+			},
 		},
 		{
 			Name:        "format",

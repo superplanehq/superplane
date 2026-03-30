@@ -14,7 +14,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { QueryDataSourceConfiguration } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimestamp } from "./utils";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -107,4 +107,17 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventId: execution.rootEvent?.id || "",
     },
   ];
+}
+
+function formatTimestamp(value?: string): string {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return formatTimestampInUserTimezone(date);
 }
