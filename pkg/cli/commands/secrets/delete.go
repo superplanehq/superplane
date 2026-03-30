@@ -10,7 +10,7 @@ import (
 type deleteCommand struct{}
 
 func (c *deleteCommand) Execute(ctx core.CommandContext) error {
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
