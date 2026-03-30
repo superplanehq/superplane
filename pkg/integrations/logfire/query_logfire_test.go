@@ -50,7 +50,7 @@ func TestQueryLogfire_Setup(t *testing.T) {
 		require.ErrorContains(t, err, "limit must be greater than or equal to 0")
 	})
 
-	t.Run("missing projectId", func(t *testing.T) {
+	t.Run("missing project", func(t *testing.T) {
 		t.Parallel()
 
 		err := component.Setup(core.SetupContext{
@@ -100,7 +100,7 @@ func TestQueryLogfire_Setup_ValidatesProjectSelection(t *testing.T) {
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
 			"sql":         "SELECT message FROM records LIMIT 1",
-			"projectId":   "proj_123",
+			"project":     "proj_123",
 			"limit":       10,
 			"rowOriented": false,
 		},
@@ -147,8 +147,8 @@ func TestQueryLogfire_Setup_InvalidProject_ReturnsError(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"sql":       "SELECT message FROM records LIMIT 1",
-			"projectId": "proj_123",
+			"sql":     "SELECT message FROM records LIMIT 1",
+			"project": "proj_123",
 		},
 		HTTP:        httpCtx,
 		Integration: integrationCtx,
@@ -196,8 +196,8 @@ func TestQueryLogfire_Setup_ReusesExistingToken(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"sql":       "SELECT message FROM records LIMIT 1",
-			"projectId": "proj_123",
+			"sql":     "SELECT message FROM records LIMIT 1",
+			"project": "proj_123",
 		},
 		HTTP:        httpCtx,
 		Integration: integrationCtx,
@@ -255,8 +255,8 @@ func TestQueryLogfire_Setup_MigratesLegacyToken(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"sql":       "SELECT message FROM records LIMIT 1",
-			"projectId": "proj_123",
+			"sql":     "SELECT message FROM records LIMIT 1",
+			"project": "proj_123",
 		},
 		HTTP:        httpCtx,
 		Integration: integrationCtx,
@@ -310,8 +310,8 @@ func TestQueryLogfire_Execute_Success(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"sql":       "SELECT message FROM records",
-			"projectId": "proj_123",
+			"sql":     "SELECT message FROM records",
+			"project": "proj_123",
 		},
 		HTTP:           httpCtx,
 		ExecutionState: executionState,
@@ -359,8 +359,8 @@ func TestQueryLogfire_Execute_FallsBackToLegacyToken(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"sql":       "SELECT message FROM records",
-			"projectId": "proj_123",
+			"sql":     "SELECT message FROM records",
+			"project": "proj_123",
 		},
 		HTTP:           httpCtx,
 		ExecutionState: executionState,
@@ -398,8 +398,8 @@ func TestQueryLogfire_Execute_NoTokenAvailable(t *testing.T) {
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"sql":       "SELECT message FROM records",
-			"projectId": "proj_123",
+			"sql":     "SELECT message FROM records",
+			"project": "proj_123",
 		},
 		HTTP:           httpCtx,
 		ExecutionState: executionState,

@@ -7,8 +7,8 @@ import logfireIcon from "@/assets/icons/integrations/logfire.svg";
 import type { MetadataItem } from "@/ui/metadataList";
 
 type LogfireOnAlertReceivedConfiguration = {
-  projectId?: string;
-  alertId?: string;
+  project?: string;
+  alert?: string;
 };
 
 type LogfireOnAlertReceivedNodeMetadata = {
@@ -94,8 +94,8 @@ function buildTriggerMetadata(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as LogfireOnAlertReceivedConfiguration | undefined;
   const nodeMetadata = node.metadata as LogfireOnAlertReceivedNodeMetadata | undefined;
 
-  const projectLabel = nodeMetadata?.project?.name?.trim() || configuration?.projectId?.trim();
-  const alertLabel = nodeMetadata?.alert?.name?.trim() || configuration?.alertId?.trim();
+  const projectLabel = nodeMetadata?.project?.name?.trim() || configuration?.project?.trim();
+  const alertLabel = nodeMetadata?.alert?.name?.trim() || configuration?.alert?.trim();
 
   const metadata: MetadataItem[] = [];
   if (projectLabel) {

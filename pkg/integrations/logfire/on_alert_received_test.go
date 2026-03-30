@@ -45,8 +45,8 @@ func TestOnAlertReceived_Setup_RequestsStableWebhookConfiguration(t *testing.T) 
 		HTTP:        httpCtx,
 		Metadata:    metadataCtx,
 		Configuration: map[string]any{
-			"projectId": "proj_123",
-			"alertId":   "alt_456",
+			"project": "proj_123",
+			"alert":   "alt_456",
 		},
 	})
 	require.NoError(t, err)
@@ -78,8 +78,8 @@ func TestOnAlertReceived_Setup_MissingProjectId(t *testing.T) {
 		HTTP:     &contexts.HTTPContext{},
 		Metadata: &contexts.MetadataContext{},
 		Configuration: map[string]any{
-			"projectId": "",
-			"alertId":   "alt_456",
+			"project": "",
+			"alert":   "alt_456",
 		},
 	})
 	require.ErrorContains(t, err, "project is required")
@@ -96,8 +96,8 @@ func TestOnAlertReceived_Setup_MissingAlertId(t *testing.T) {
 		HTTP:     &contexts.HTTPContext{},
 		Metadata: &contexts.MetadataContext{},
 		Configuration: map[string]any{
-			"projectId": "proj_123",
-			"alertId":   "",
+			"project": "proj_123",
+			"alert":   "",
 		},
 	})
 	require.ErrorContains(t, err, "alert is required")
@@ -123,8 +123,8 @@ func TestOnAlertReceived_Setup_InvalidProject(t *testing.T) {
 		HTTP:     httpCtx,
 		Metadata: &contexts.MetadataContext{},
 		Configuration: map[string]any{
-			"projectId": "proj_123",
-			"alertId":   "alt_456",
+			"project": "proj_123",
+			"alert":   "alt_456",
 		},
 	})
 	require.ErrorContains(t, err, "invalid Logfire project selection")
@@ -154,8 +154,8 @@ func TestOnAlertReceived_Setup_InvalidAlert(t *testing.T) {
 		HTTP:     httpCtx,
 		Metadata: &contexts.MetadataContext{},
 		Configuration: map[string]any{
-			"projectId": "proj_123",
-			"alertId":   "alt_456",
+			"project": "proj_123",
+			"alert":   "alt_456",
 		},
 	})
 	require.ErrorContains(t, err, "invalid Logfire alert selection")

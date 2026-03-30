@@ -272,7 +272,7 @@ func Test__Logfire__ListResources__Alerts__WithProjectId(t *testing.T) {
 		HTTP:        httpCtx,
 		Integration: integrationCtx,
 		Parameters: map[string]string{
-			"projectId": "proj_123",
+			"project": "proj_123",
 		},
 	})
 	require.NoError(t, err)

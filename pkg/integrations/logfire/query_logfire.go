@@ -25,7 +25,7 @@ type QueryLogfireNodeMetadata struct {
 
 type QueryLogfireConfiguration struct {
 	SQL          string `json:"sql" mapstructure:"sql"`
-	ProjectID    string `json:"projectId" mapstructure:"projectId"`
+	ProjectID    string `json:"project" mapstructure:"project"`
 	TimeWindow   string `json:"timeWindow,omitempty" mapstructure:"timeWindow"`
 	MinTimestamp string `json:"minTimestamp,omitempty" mapstructure:"minTimestamp"`
 	MaxTimestamp string `json:"maxTimestamp,omitempty" mapstructure:"maxTimestamp"`
@@ -92,24 +92,6 @@ func (c *QueryLogfire) Color() string {
 	return "gray"
 }
 
-func (c *QueryLogfire) ExampleOutput() map[string]any {
-	return map[string]any{
-		"columns": []any{
-			map[string]any{
-				"name": "start_timestamp",
-				"type": "timestamp",
-			},
-			map[string]any{
-				"name": "message",
-				"type": "text",
-			},
-		},
-		"rows": []any{
-			[]any{"2026-01-01T00:00:00Z", "Example Logfire record"},
-		},
-	}
-}
-
 func (c *QueryLogfire) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
@@ -117,7 +99,7 @@ func (c *QueryLogfire) OutputChannels(configuration any) []core.OutputChannel {
 func (c *QueryLogfire) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "projectId",
+			Name:        "project",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
