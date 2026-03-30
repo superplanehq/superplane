@@ -29,79 +29,46 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 }
 
 // WaitForCanvasSaveStatusSaved waits until the canvas is durably saved.
-// It avoids returning on the initial stale "saved" state by giving autosave
-// one debounce window to start, but still accepts saves that completed before
-// the waiter began observing.
+// It captures the current data-save-count and waits for it to increase,
+// which happens as soon as the mutation succeeds — without waiting for
+// the 1-second UI display hold.
 func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 	saveButton := q.TestID("save-canvas-button").Run(s.session)
-	clickedManualSave := false
 	if isVisible, _ := saveButton.IsVisible(); isVisible {
 		s.session.Click(q.TestID("save-canvas-button"))
-		clickedManualSave = true
 	}
 
 	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
+
+	// Capture the current save count as the baseline.
+	initialCount := ""
 	deadline := time.Now().Add(20 * time.Second)
-	initialStateCaptured := false
-	initialState := ""
-	initialSavedLabel := ""
-	seenFreshCycle := clickedManualSave
-	seenSaving := false
-	initialSavedStateStableUntil := time.Time{}
-	lastState := ""
 	for time.Now().Before(deadline) {
-		isVisible, _ := status.IsVisible()
-		if !isVisible {
+		if isVisible, _ := status.IsVisible(); !isVisible {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
-
-		state, _ := status.GetAttribute("data-state")
-		if state != "" {
-			lastState = state
+		c, _ := status.GetAttribute("data-save-count")
+		if c != "" {
+			initialCount = c
+			break
 		}
-		savedLabel, _ := status.GetAttribute("data-saved-label")
-
-		if !initialStateCaptured {
-			initialState = lastState
-			initialSavedLabel = savedLabel
-			initialStateCaptured = true
-			if initialState == "saved" {
-				initialSavedStateStableUntil = time.Now().Add(1 * time.Second)
-			}
-			if initialState != "saved" {
-				seenFreshCycle = true
-			}
-		}
-
-		if lastState == "saving" {
-			seenFreshCycle = true
-			seenSaving = true
-		}
-
-		if lastState != "" && lastState != "saved" {
-			seenFreshCycle = true
-		}
-
-		if initialState == "saved" && initialSavedLabel != "visible" && savedLabel == "visible" {
-			seenFreshCycle = true
-		}
-
-		if lastState == "saved" && seenFreshCycle && (seenSaving || initialState != "saved") {
-			return
-		}
-
-		if savedLabel == "visible" && seenFreshCycle && initialSavedLabel != "visible" {
-			return
-		}
-
-		if initialState == "saved" && !seenFreshCycle && !initialSavedStateStableUntil.IsZero() && time.Now().After(initialSavedStateStableUntil) {
-			return
-		}
-
 		time.Sleep(100 * time.Millisecond)
 	}
-	s.t.Fatalf("timed out waiting for canvas save status saved, last state=%q", lastState)
+
+	// Wait for save count to increase above the baseline.
+	for time.Now().Before(deadline) {
+		if isVisible, _ := status.IsVisible(); !isVisible {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		c, _ := status.GetAttribute("data-save-count")
+		if c != "" && c != initialCount {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for canvas save (initial count=%q)", initialCount)
 }
 
 func (s *CanvasSteps) Create() {
@@ -190,7 +157,6 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
@@ -210,7 +176,6 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	require.NoError(s.t, err)
 
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 
 	return generatedName
 }
@@ -222,12 +187,10 @@ func (s *CanvasSteps) Save() {
 	if isVisible, _ := loc.IsVisible(); isVisible {
 		s.session.Click(saveButton)
 		s.session.AssertText("Canvas changes saved")
-		s.session.Sleep(500)
 		return
 	}
 
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -248,7 +211,6 @@ func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
@@ -260,7 +222,6 @@ func (s *CanvasSteps) AddManualTrigger(name string, pos models.Position) {
 	s.session.DragAndDrop(startSource, target, pos.X, pos.Y)
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, unit string) {
@@ -285,7 +246,6 @@ func (s *CanvasSteps) AddWait(name string, pos models.Position, duration int, un
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + unit + `")`))
 
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
@@ -299,7 +259,6 @@ func (s *CanvasSteps) AddFilter(name string, pos models.Position) {
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.FillIn(q.TestID("expression-field-expression"), "true")
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) StartAddingTimeGate(name string, pos models.Position) {
@@ -331,7 +290,6 @@ func (s *CanvasSteps) AddTimeGate(name string, pos models.Position) {
 	s.session.Click(q.Locator(`div[role="option"]:has-text("GMT+0 (London, Dublin, UTC)")`))
 
 	s.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
@@ -486,7 +444,7 @@ func (s *CanvasSteps) WaitForExecution(name string, state string, timeout time.D
 		}
 
 		s.t.Log("waiting for execution of node", name)
-		s.session.Sleep(1000)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	require.True(s.t, found, "timed out waiting for execution of node %s", name)
@@ -504,7 +462,7 @@ func (s *CanvasSteps) WaitForExecutionInStates(name string, states []string, tim
 		}
 
 		s.t.Log("waiting for execution of node", name)
-		s.session.Sleep(1000)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	require.True(s.t, found, "timed out waiting for execution of node %s", name)

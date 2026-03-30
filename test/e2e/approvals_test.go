@@ -226,7 +226,6 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
 	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
@@ -247,7 +246,6 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
 	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
@@ -268,7 +266,6 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
 	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
@@ -312,7 +309,6 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
 	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
@@ -320,7 +316,7 @@ func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"Approval",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		30*time.Second,
+		10*time.Second,
 	)
 }
 
@@ -401,7 +397,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")
