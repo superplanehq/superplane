@@ -287,9 +287,21 @@ export function SettingsTab({
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
     // Text-like editors save on blur; discrete/destructive controls save on change.
     if (!fieldType) {
-      return true;
+      return false;
     }
-    return !["string", "text", "xml", "expression", "number", "url", "date", "datetime", "time"].includes(fieldType);
+    return ![
+      "string",
+      "text",
+      "xml",
+      "expression",
+      "number",
+      "url",
+      "date",
+      "datetime",
+      "time",
+      "cron",
+      "git-ref",
+    ].includes(fieldType);
   }, []);
 
   const updateAutosaveBaseline = useCallback((snapshot: string) => {
