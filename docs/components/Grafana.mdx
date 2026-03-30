@@ -94,9 +94,10 @@ The Query Data Source component executes a query against a Grafana data source u
 
 ### Configuration
 
-- **Data Source UID**: The Grafana datasource UID to query
+- **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional time range (relative like "now-5m" or absolute)
+- **Time From / Time To**: Optional datetime picker values for the query range
+- If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
 ### Output
