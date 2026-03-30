@@ -81,32 +81,36 @@ func (c *GetDailyUsageData) Color() string {
 
 func (c *GetDailyUsageData) ExampleOutput() map[string]any {
 	return map[string]any{
-		"data": []map[string]any{
-			{
-				"date":                     1710720000000,
-				"isActive":                 true,
-				"totalLinesAdded":          1543,
-				"totalLinesDeleted":        892,
-				"acceptedLinesAdded":       1102,
-				"acceptedLinesDeleted":     645,
-				"totalApplies":             87,
-				"totalAccepts":             73,
-				"totalRejects":             14,
-				"totalTabsShown":           342,
-				"totalTabsAccepted":        289,
-				"composerRequests":         45,
-				"chatRequests":             128,
-				"agentRequests":            12,
-				"subscriptionIncludedReqs": 180,
-				"usageBasedReqs":           5,
-				"mostUsedModel":            "gpt-4",
-				"email":                    "developer@company.com",
+		"data": map[string]any{
+			"data": []map[string]any{
+				{
+					"date":                     1710720000000,
+					"isActive":                 true,
+					"totalLinesAdded":          1543,
+					"totalLinesDeleted":        892,
+					"acceptedLinesAdded":       1102,
+					"acceptedLinesDeleted":     645,
+					"totalApplies":             87,
+					"totalAccepts":             73,
+					"totalRejects":             14,
+					"totalTabsShown":           342,
+					"totalTabsAccepted":        289,
+					"composerRequests":         45,
+					"chatRequests":             128,
+					"agentRequests":            12,
+					"subscriptionIncludedReqs": 180,
+					"usageBasedReqs":           5,
+					"mostUsedModel":            "gpt-4",
+					"email":                    "developer@company.com",
+				},
+			},
+			"period": map[string]any{
+				"startDate": 1710720000000,
+				"endDate":   1710892800000,
 			},
 		},
-		"period": map[string]any{
-			"startDate": 1710720000000,
-			"endDate":   1710892800000,
-		},
+		"timestamp": "2026-03-26T19:29:35.841265352Z",
+		"type":      GetDailyUsageDataPayloadType,
 	}
 }
 

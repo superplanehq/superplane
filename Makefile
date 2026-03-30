@@ -1,4 +1,4 @@
-.PHONY: lint test test.license.check
+.PHONY: lint test test.coverage test.license.check test.agent.unit
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -8,6 +8,7 @@ export BUILDKIT_PROGRESS ?= plain
 
 PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
+AGENT_TEST_TARGETS ?= tests
 
 COMPOSE=docker compose -f docker-compose.dev.yml
 
@@ -39,6 +40,8 @@ test.setup:
 	$(COMPOSE) run --rm app go mod download
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
 	$(COMPOSE) up -d
@@ -63,6 +66,10 @@ test.e2e.single:
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
 
+test.coverage:
+	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
+	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
+
 test.license.check:
 	bash ./scripts/license-check.sh
 
@@ -71,6 +78,9 @@ test.watch:
 
 test.agent.evals:
 	$(COMPOSE) exec agent uv run python -m evals.runner
+
+test.agent.unit:
+	$(COMPOSE) run --rm -e DB_NAME=agents_test agent uv run --group dev python -m pytest $(AGENT_TEST_TARGETS)
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
@@ -107,6 +117,8 @@ dev.setup:
 	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.setup.app:
 	$(COMPOSE) run --rm app go mod download
@@ -121,6 +133,8 @@ dev.setup.no.cache:
 	$(COMPOSE) build --no-cache
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 
 dev.start.fg:
 	$(COMPOSE) up
@@ -224,6 +238,10 @@ db.migrate:
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 db.console:
 	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
@@ -235,10 +253,16 @@ db.recreate.all.dangerous:
 	$(MAKE) dev.down
 	-$(MAKE) db.delete DB_NAME=superplane_dev
 	-$(MAKE) db.delete DB_NAME=superplane_test
+	-$(MAKE) -C agent db.delete DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	-$(MAKE) -C agent db.delete DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
+	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 #
 # Protobuf compilation
@@ -319,10 +343,14 @@ cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
+AGENT_IMAGE?=superplane-agent
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
 image.build:
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+
+agent.image.build:
+	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f agent/Dockerfile --target runner --progress plain -t $(AGENT_IMAGE):$(IMAGE_TAG) agent
 
 image.auth:
 	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
@@ -330,6 +358,10 @@ image.auth:
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+
+agent.image.push:
+	docker tag $(AGENT_IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
+	docker push $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
 
 #
 # Tag creation

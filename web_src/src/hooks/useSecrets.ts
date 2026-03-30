@@ -9,7 +9,7 @@ import {
   secretsDeleteSecretKey,
   secretsUpdateSecretName,
 } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { AuthorizationDomainType, SecretsCreateSecretData, SecretsUpdateSecretData } from "@/api-client/types.gen";
 
 export const secretKeys = {
