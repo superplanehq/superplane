@@ -1,0 +1,33 @@
+{
+  "data": {
+    "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "release-v2-assistant",
+    "description": "AI assistant for release v2.0",
+    "instruction": "You are an assistant that helps with release v2.0 questions.",
+    "model": {
+      "uuid": "m1n2o3p4-q5r6-7890-stuv-wx1234567890",
+      "name": "llama3-70b-instruct",
+      "provider": "MODEL_PROVIDER_DIGITALOCEAN"
+    },
+    "deployment": {
+      "uuid": "d1e2f3a4-b5c6-7890-def0-123456789abc",
+      "status": "running",
+      "visibility": "VISIBILITY_PRIVATE",
+      "url": "https://agent-a1b2c3d4.agents.do-ai.run"
+    },
+    "workspace": {
+      "uuid": "w1x2y3z4-a5b6-7890-cdef-012345678901",
+      "name": "release-v2"
+    },
+    "tags": ["release", "v2"],
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "top_p": 0.9,
+    "k": 10,
+    "retrieval_method": "RETRIEVAL_METHOD_NONE",
+    "provide_citations": false,
+    "url": "https://agent-a1b2c3d4.agents.do-ai.run"
+  },
+  "timestamp": "2026-03-12T21:10:00.000000000Z",
+  "type": "digitalocean.gradientai.agent"
+}

@@ -229,3 +229,27 @@ export interface UpdateAppConfiguration {
   envVars?: string[];
   gitHubBranch?: string;
 }
+
+export interface CreateAgentConfiguration {
+  name?: string;
+  description?: string;
+  instruction?: string;
+  modelProvider?: string;
+  providerAPIKey?: string;
+  modelUUID?: string;
+  workspaceSource?: string;
+  workspaceUUID?: string;
+  workspaceName?: string;
+  region?: string;
+  tags?: string[];
+  useDefaultSettings?: boolean;
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  k?: number;
+  retrievalMethod?: string;
+  provideCitations?: boolean;
+  knowledgeBases?: string[];
+  guardrails?: string[];
+  agentRoutes?: string[];
+}

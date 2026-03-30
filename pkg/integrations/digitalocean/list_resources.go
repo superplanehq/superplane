@@ -1,7 +1,10 @@
 package digitalocean
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -36,6 +39,22 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
+	case "gradientai_model_provider":
+		return listGradientAIModelProviders(ctx)
+	case "gradientai_model":
+		return listGradientAIModels(ctx)
+	case "gradientai_workspace":
+		return listGradientAIWorkspaces(ctx)
+	case "gradientai_knowledge_base":
+		return listGradientAIKnowledgeBases(ctx)
+	case "gradientai_guardrail":
+		return listGradientAIGuardrails(ctx)
+	case "gradientai_agent":
+		return listGradientAIAgents(ctx)
+	case "gradientai_region":
+		return listGradientAIRegions(ctx)
+	case "do_project":
+		return listDOProjects(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -377,6 +396,229 @@ func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 			Type: "vpc",
 			Name: vpc.Name,
 			ID:   vpc.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGradientAIModelProviders(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	// Provider groups are top-level models with no parent_uuid.
+	providers, err := client.ListGradientAIModelProviders()
+	if err != nil {
+		return nil, fmt.Errorf("error listing model providers: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(providers))
+	for _, p := range providers {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_model_provider",
+			Name: p.Name,
+			ID:   p.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGradientAIModels(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	models, err := client.ListGradientAIModels()
+	if err != nil {
+		return nil, fmt.Errorf("error listing models: %w", err)
+	}
+
+	// Filter by provider key (lowercase first word of model name) when a provider
+	// has been selected. The provider key matches what ListGradientAIModelProviders
+	// stores as the UUID of each provider entry.
+	// Return empty when no provider is selected so the model dropdown stays disabled.
+	providerKey := strings.ToLower(ctx.Parameters["provider"])
+	if providerKey == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(models))
+	for _, m := range models {
+		if providerKey != "" && strings.ToLower(gradientAIProviderName(m.Name)) != providerKey {
+			continue
+		}
+		if !modelSupportsAgents(m) {
+			continue
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_model",
+			Name: m.Name,
+			ID:   m.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGradientAIWorkspaces(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	workspaces, err := client.ListGradientAIWorkspaces()
+	if err != nil {
+		return nil, fmt.Errorf("error listing workspaces: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(workspaces))
+	for _, w := range workspaces {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_workspace",
+			Name: w.Name,
+			ID:   w.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGradientAIKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	kbs, err := client.ListGradientAIKnowledgeBases()
+	if err != nil {
+		if isGradientAINotFound(err) {
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("error listing knowledge bases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(kbs))
+	for _, kb := range kbs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_knowledge_base",
+			Name: kb.Name,
+			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGradientAIGuardrails(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	guardrails, err := client.ListGradientAIGuardrails()
+	if err != nil {
+		if isGradientAINotFound(err) {
+			return []core.IntegrationResource{}, nil
+		}
+		return nil, fmt.Errorf("error listing guardrails: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(guardrails))
+	for _, g := range guardrails {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_guardrail",
+			Name: g.Name,
+			ID:   g.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+// isGradientAINotFound returns true when the DO API responded with 404 or 422.
+// Some GradientAI sub-resources (e.g. guardrails) may not be available on all
+// accounts or regions; we treat those as empty rather than a hard error so that
+// optional dropdowns show "No resources available" instead of a connection error.
+func isGradientAINotFound(err error) bool {
+	var apiErr *DOAPIError
+	if errors.As(err, &apiErr) {
+		return apiErr.StatusCode == http.StatusNotFound ||
+			apiErr.StatusCode == http.StatusUnprocessableEntity
+	}
+	return false
+}
+
+func listGradientAIAgents(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agents, err := client.ListGradientAIAgents()
+	if err != nil {
+		return nil, fmt.Errorf("error listing agents: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agents))
+	for _, a := range agents {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_agent",
+			Name: a.Name,
+			ID:   a.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listDOProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	projects, err := client.ListDOProjects()
+	if err != nil {
+		return nil, fmt.Errorf("error listing projects: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, p := range projects {
+		name := p.Name
+		if p.IsDefault {
+			name = fmt.Sprintf("%s (default)", p.Name)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "do_project",
+			Name: name,
+			ID:   p.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listGradientAIRegions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	regions, err := client.ListGradientAIDatacenterRegions()
+	if err != nil {
+		return nil, fmt.Errorf("error listing regions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(regions))
+	for _, r := range regions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "gradientai_region",
+			Name: r.Region,
+			ID:   r.Region,
 		})
 	}
 
