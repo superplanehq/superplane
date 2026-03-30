@@ -52,7 +52,7 @@ interface BlockProps extends ComponentActionsProps {
   onClick?: (e: React.MouseEvent) => void;
 }
 
-export function Block(props: BlockProps) {
+export const Block = React.memo(function Block(props: BlockProps) {
   const data = props.data;
 
   // Check if this node is highlighted (from execution chain)
@@ -69,7 +69,7 @@ export function Block(props: BlockProps) {
       <RightHandle data={data} nodeId={props.nodeId} />
     </div>
   );
-}
+});
 
 //
 // Handles are small connection points on the sides of blocks
