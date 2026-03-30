@@ -18,7 +18,7 @@ const unlimitedValue = "-1"
 type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
@@ -37,19 +37,6 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		return renderUsageText(stdout, response)
 	})
-}
-
-func resolveOrganizationID(ctx core.CommandContext) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-
-	if !me.HasOrganizationId() || strings.TrimSpace(me.GetOrganizationId()) == "" {
-		return "", fmt.Errorf("organization id not found for authenticated user")
-	}
-
-	return me.GetOrganizationId(), nil
 }
 
 func renderUsageText(stdout io.Writer, response *openapi_client.OrganizationsDescribeUsageResponse) error {
