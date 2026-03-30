@@ -1,11 +1,11 @@
 ---
 name: superplane-issue-logger
-description: When researching, classifying, drafting, or logging general SuperPlane issues (bug, enhancement, feature, papercut). Use for natural-language issue descriptions, tmp/pm_logger drafts, priority suggestions, and optional GitHub MCP logging with labels and Board Priority.
+description: When researching, classifying, drafting, or logging general SuperPlane issues (bug, enhancement, feature, papercut). Use for natural-language issue descriptions, tmp/pm_logger drafts, and optional GitHub MCP logging with labels.
 ---
 
 # SuperPlane Issue Logger
 
-Use this skill when a user describes an improvement, bug, or request in natural language. You will: (1) research and understand it in SuperPlane context, (2) classify issue type, (3) suggest priority (P1–P4), (4) propose title and body in `tmp/pm_logger`, and (5) optionally create the issue on GitHub with correct labels and Board Priority.
+Use this skill when a user describes an improvement, bug, or request in natural language. You will: (1) research and understand it in SuperPlane context, (2) classify issue type, (3) propose title and body in `tmp/pm_logger`, and (4) optionally create the issue on GitHub with correct labels.
 
 Reference: [docs/contributing/](docs/contributing/) (issue-tracking, quality, pull-requests, etc.), [https://docs.superplane.com/](https://docs.superplane.com/) when relevant.
 
@@ -37,26 +37,11 @@ Align with [issue-tracking](docs/contributing/issue-tracking.md) (Bugs, Papercut
 
 ---
 
-## 3. Priority suggestion (P1–P4)
-
-Suggest a single priority and brief rationale. Priorities are **P1–P4**. Obtain field and option ids via GitHub MCP `list_project_fields` for project 2 when logging to GitHub.
-
-**Rules:**
-
-- **P1**: Critical bug (product or core flow largely unusable, e.g. login broken, canvas won't load). Or flagship feature that defines a new product capability or segment.
-- **P2**: Major bug with significant impact; major enhancement that greatly improves core functionality; feature that majorly improves UX or adds clearly valuable new functionality for devops/development workflows.
-- **P3**: Normal bug (reproducible, meaningful impact, workaround exists); meaningful enhancement or feature that improves UX or workflows in a clear but not "major" way.
-- **P4**: Papercuts; small bugs with minimal impact; nice-to-have enhancements or features.
-
-Always **show the suggested priority and rationale** and ask the user to confirm or change before writing the draft (and before logging to GitHub).
-
----
-
-## 4. Title and body in `tmp/pm_logger`
+## 3. Title and body in `tmp/pm_logger`
 
 - **Location**: `tmp/pm_logger/` (create directory if missing). One file per issue draft (e.g. `bug-toolbar-copy-button.md`, `papercut-header-truncation.md`).
 - **Title**: Short — **max 40 characters**. One or two concrete concepts; not a full list of details, not too vague. Good: "Search canvas modal: layout and icons" (34), "Payload modal: drag-to-resize" (30). Too detailed: "Search canvas modal: long names/IDs rendering, icons, responsive width". Too vague: "Search canvas modal: polish". Put in the file as `### Title` (or a clear header) so the log step can reuse it.
-- **Body**: Use the short template below for the chosen type. Keep drafts efficient; avoid long sections or empty boilerplate. **Do not add Priority to the body** — Priority is set only via the Board Project field when logging to GitHub.
+- **Body**: Use the short template below for the chosen type. Keep drafts efficient; avoid long sections or empty boilerplate.
 - **Screenshot**: Screenshots are optional. For bug or papercut, if the user didn't provide one, ask in chat if they can share a screenshot (paste or attach). **Screenshots pasted in chat cannot be uploaded to the issue via MCP** (GitHub API accepts only text in the body). If the user shared a screenshot in chat: note in the body that they can paste it into the issue after creation (GitHub's issue/comment UI supports paste-to-upload), or omit and suggest they add it once the issue is open. Do not add an empty "Screenshot" section; do not put raw image data in the body.
 
 ### Bug (short)
@@ -115,17 +100,16 @@ ___
 
 ---
 
-## 5. Log issue via GitHub MCP (optional)
+## 4. Log issue via GitHub MCP (optional)
 
-**Do not log the issue to GitHub until the user has confirmed that the draft (title, body, type, priority) looks OK.** Show the draft, ask for verification, and only when the user explicitly approves (e.g. "looks good", "log it", "create the issue") proceed to create the issue.
+**Do not log the issue to GitHub until the user has confirmed that the draft (title, body, type) looks OK.** Show the draft, ask for verification, and only when the user explicitly approves (e.g. "looks good", "log it", "create the issue") proceed to create the issue.
 
 When the user has confirmed and asks to "log" or "create" the issue on GitHub:
 
-1. **Read draft**: From `tmp/pm_logger/<file>.md` get title and body. Strip `### Title` and the title line from the body when sending to API. Strip any `**Priority:**` line from the body — Priority is set only via the Board.
+1. **Read draft**: From `tmp/pm_logger/<file>.md` get title and body. Strip `### Title` and the title line from the body when sending to API.
 2. **Create issue**: `issue_write` (method `create`) with `owner`/`repo` (e.g. `superplanehq`/`superplane`), `title`, `body`.
 3. **Labels**: Set **one** type label: `bug`, `enhancement`, `feature`, or `papercut` (match repo labels; if repo uses different names, e.g. `kind: bug`, use those).
 4. **Board**: Add item to SuperPlane Board (project 2) via `projects_write` (`add_project_item` with `item_type: issue`, `issue_number`, `item_owner`, `item_repo`).
-5. **Priority**: Get project field id and option id for "Priority" via `list_project_fields` (project 2). Then `update_project_item` with `item_id` (from `list_project_items` for the new issue) and `updated_field` set to the chosen Priority (P1, P2, P3, or P4).
 
 Do **not** set Integration Status (that's for integration issues). Create issues sequentially to avoid rate limits. Optionally keep a small progress note in `tmp/pm_logger/log-progress.md` and, after user confirmation, delete only the progress file (keep draft files unless user asks to remove them).
 
@@ -137,6 +121,5 @@ Do **not** set Integration Status (that's for integration issues). Create issues
 
 - [ ] Research context (docs/contributing, docs.superplane.com); ask for clarification if vague.
 - [ ] Classify type: bug, enhancement, feature, or papercut.
-- [ ] Suggest P1–P4 and rationale; get user confirmation.
 - [ ] Write draft to `tmp/pm_logger/<slug>.md` using the correct template; ask for screenshot if bug/papercut and user didn't provide one.
-- [ ] If user wants to log: **only after user confirms the draft is OK** — create issue via GitHub MCP, add type label, add to Board, set Priority; then suggest user attach video to the issue.
+- [ ] If user wants to log: **only after user confirms the draft is OK** — create issue via GitHub MCP, add type label, add to Board; then suggest user attach video to the issue.
