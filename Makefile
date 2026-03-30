@@ -80,7 +80,7 @@ test.agent.evals:
 	$(COMPOSE) exec agent uv run python -m evals.runner
 
 agent.evals.bootstrap:
-	$(COMPOSE) run --rm -T --no-deps --user $$(id -u):$$(id -g) --env-from-file $(CURDIR)/agent/.env agent bash -lc "mkdir -p /tmp/uv-cache /tmp/agent-venv-compose && export UV_CACHE_DIR=/tmp/uv-cache UV_PROJECT_ENVIRONMENT=/tmp/agent-venv-compose && cd /app/agent && uv sync --group dev && uv run --group dev python scripts/bootstrap_eval_env.py --merge-env /app/agent/.env $(ARGS)"
+	bash "$(CURDIR)/agent/scripts/run_bootstrap_eval_env.sh" $(ARGS)
 
 test.agent.unit:
 	$(COMPOSE) run --rm -e DB_NAME=agents_test agent uv run --group dev python -m pytest $(AGENT_TEST_TARGETS)

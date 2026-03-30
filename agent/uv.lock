@@ -1720,6 +1720,7 @@ dependencies = [
     { name = "pydantic-evals" },
     { name = "pyjwt" },
     { name = "python-dateutil" },
+    { name = "python-dotenv" },
     { name = "urllib3" },
     { name = "uvicorn" },
 ]
@@ -1744,6 +1745,7 @@ requires-dist = [
     { name = "pydantic-evals", specifier = ">=0.1.0" },
     { name = "pyjwt", specifier = ">=2.10.1" },
     { name = "python-dateutil", specifier = ">=2.9.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "urllib3", specifier = ">=2.0.0" },
     { name = "uvicorn", specifier = ">=0.42.0" },
 ]
