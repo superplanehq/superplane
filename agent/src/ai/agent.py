@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic_ai import Agent, RunContext
@@ -19,6 +20,10 @@ class AgentDeps:
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
 
 
+def load_system_prompt() -> str:
+    return (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
+
+
 def build_prompt(payload: CanvasQuestionRequest) -> str:
     return payload.question
 
@@ -33,48 +38,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     agent: Agent[AgentDeps, CanvasAnswer] = Agent(
         model=resolved_model,
         output_type=CanvasAnswer,
-        system_prompt=(
-            "You answer questions about Superplane canvases. "
-            "Use tools to fetch real canvas and catalog data before answering. "
-            "Be concise and factual."
-            "Use list_available_integrations to verify provider availability when needed. "
-            "Do not block proposing provider nodes just because org integrations are missing; "
-            "it is valid to add nodes first and configure integration bindings later. "
-            "When integration is missing, still provide the node proposal and mention setup as a follow-up. "
-            "When a request sounds like a known workflow archetype, call list_decision_patterns or search_decision_patterns first. "
-            "After selecting a pattern, always call get_decision_pattern and follow the retrieved pattern content as closely as possible. "
-            "If a relevant pattern is found, follow it as closely as possible and only deviate when required by the user's explicit request or current canvas constraints. "
-            "Do not claim a provider is unavailable unless a catalog tool succeeds and clearly shows no matches. "
-            "If catalog tools fail, state that availability could not be verified and proceed with a best-effort proposal. "
-            "When the user asks for canvas edits, include a structured proposal with "
-            "operations that can be applied in the UI. Supported operation types are: "
-            "add_node, connect_nodes, disconnect_nodes, update_node_config, and delete_node. "
-            "Use exact block names from catalog tools, include node references by nodeId "
-            "for existing nodes, and keep operation order executable. "
-            "Do not invent unknown fields or operation types. "
-            "Node configuration JSON types must match the catalog field types from describe_component/describe_trigger: "
-            "for multi-select, list, any-predicate-list, and days-of-week fields, use a real JSON array "
-            '(e.g. "actions": ["opened"]), not a string that embeds JSON text. '
-            "For boolean fields, use JSON true/false, not the strings \"true\" or \"false\". "
-            "In proposals, expression fields use this model: $ is the message chain—"
-            "a map of upstream node outputs keyed by each node's name on the canvas. "
-            "To access data from any upstream node, use $['Exact node name']... (or "
-            "double quotes inside the brackets); the name must match that node's canvas "
-            "label. That form is not the run-start event object. "
-            "root() is the original event that started the run; "
-            "when that payload nests under data, "
-            "use root().data.... previous() refers to upstream output. "
-            "Never use $.data. for run-start payload fields; use root().data. or the correct path "
-            "under root() instead. "
-            "Use get_canvas at most once per answer unless the user asks to refresh or "
-            "use a different canvas. "
-            "Keep responses short by default (about 3-5 lines) unless the user asks for "
-            "deep analysis. "
-            "If a tool returns an error payload, continue with other tools and provide the "
-            "best-effort proposal instead of aborting. "
-            "Common patterns: "
-            "- if the user says 'pull-request comments' it maps to 'github.onPRComment'"
-        ),
+        system_prompt=load_system_prompt(),
     )
 
     def _tool_debug(message: str) -> None:
