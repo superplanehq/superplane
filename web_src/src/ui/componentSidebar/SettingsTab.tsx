@@ -425,6 +425,28 @@ export function SettingsTab({
     };
   }, []);
 
+  useEffect(() => {
+    if (configurationSaveMode !== "auto" || isReadOnly) {
+      return;
+    }
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    if (snapshot === autosaveBaselineSnapshotRef.current) {
+      return;
+    }
+    if (currentNodeName.trim() === "") {
+      return;
+    }
+
+    // Safety net for flows that do not blur inputs (e.g. scripted E2E interactions).
+    const fallbackTimer = window.setTimeout(() => {
+      void handleSaveRef.current();
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+    };
+  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+
   return (
     <div
       className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
@@ -455,7 +477,10 @@ export function SettingsTab({
             data-testid="node-name-input"
             type="text"
             value={currentNodeName}
-            onChange={(e) => setCurrentNodeName(e.target.value)}
+            onChange={(e) => {
+              setCurrentNodeName(e.target.value);
+              requestAutosave();
+            }}
             onBlur={requestAutosave}
             placeholder="Enter a name for this node"
             autoFocus
@@ -651,7 +676,8 @@ export function SettingsTab({
                       };
                       return filterVisibleFields(newConfig);
                     });
-                    if (shouldAutosaveOnChangeByFieldType(field.type)) {
+                    const fieldWasCleared = value === undefined || value === null || value === "";
+                    if (fieldWasCleared || shouldAutosaveOnChangeByFieldType(field.type)) {
                       requestAutosave();
                     }
                   }}
