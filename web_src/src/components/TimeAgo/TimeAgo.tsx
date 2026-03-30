@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { formatTimeAgo } from "@/utils/date";
+import { formatTimeAgo } from "@/lib/date";
 
 const globalListeners = new Set<() => void>();
 let globalIntervalId: ReturnType<typeof setInterval> | null = null;

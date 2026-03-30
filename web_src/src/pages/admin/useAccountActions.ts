@@ -1,4 +1,4 @@
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 interface AdminAccount {
   id: string;

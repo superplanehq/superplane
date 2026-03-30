@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
 import { Trash2 } from "lucide-react";
-import { NodeResizer, type ResizeParams } from "@xyflow/react";
+import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { SelectionWrapper } from "../selectionWrapper";
@@ -86,9 +86,6 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
 
   // Edit mode state - when true, show textarea; when false, show rendered markdown
   const [isEditing, setIsEditing] = useState(false);
-
-  // Hover state for showing resize handles
-  const [isHovered, setIsHovered] = useState(false);
 
   // Sync dimensions when props change (e.g., after save or on initial load)
   useEffect(() => {
@@ -224,17 +221,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
 
   return (
     <SelectionWrapper selected={selected}>
-      {/* Wrapper with padding to capture hover on resize handle area */}
-      <div className="px-2 py-1 -m-1" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
-        <NodeResizer
-          minWidth={MIN_WIDTH}
-          minHeight={MIN_HEIGHT}
-          onResize={handleResize}
-          onResizeEnd={handleResizeEnd}
-          isVisible={isHovered || selected}
-          lineClassName="!border-slate-400 !border-dashed"
-          handleClassName="!h-2 !w-2 !rounded-sm !border !border-slate-400 !bg-white"
-        />
+      <div className="px-2 py-1 -m-1">
         <div
           ref={containerRef}
           style={{ width: dimensions.width, height: dimensions.height }}
@@ -407,6 +394,31 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
               </div>
             )}
           </div>
+
+          <NodeResizeControl
+            minWidth={MIN_WIDTH}
+            minHeight={MIN_HEIGHT}
+            onResize={handleResize}
+            onResizeEnd={handleResizeEnd}
+            autoScale={false}
+            position="bottom-right"
+            className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
+          >
+            <span className="sr-only">Resize note</span>
+            <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 12 12"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="opacity-30"
+              >
+                <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
+                <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
+              </svg>
+            </span>
+          </NodeResizeControl>
         </div>
       </div>
     </SelectionWrapper>

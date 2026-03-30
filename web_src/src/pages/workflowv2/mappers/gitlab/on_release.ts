@@ -1,4 +1,4 @@
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import type { TriggerProps } from "@/ui/trigger";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";

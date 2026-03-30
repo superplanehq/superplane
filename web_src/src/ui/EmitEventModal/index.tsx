@@ -3,7 +3,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import Editor from "@monaco-editor/react";
 import { Play } from "lucide-react";
 import type { editor } from "monaco-editor";

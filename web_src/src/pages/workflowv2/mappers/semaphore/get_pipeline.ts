@@ -8,7 +8,7 @@ import type {
 } from "../types";
 import type { ComponentBaseProps, ComponentBaseSpec, EventSection } from "@/ui/componentBase";
 import type React from "react";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";

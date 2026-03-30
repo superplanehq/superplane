@@ -17,7 +17,7 @@ import type {
   EventStateMap,
 } from "@/ui/componentBase";
 import type React from "react";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getTriggerRenderer } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";

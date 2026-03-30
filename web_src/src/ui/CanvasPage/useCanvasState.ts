@@ -1,14 +1,13 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AiProps, CanvasPageProps } from ".";
+import { CanvasPageProps } from ".";
 import { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
   title: string;
   breadcrumbs: BreadcrumbItem[];
 
-  ai: AiProps;
   nodes: Node[];
   edges: Edge[];
 
@@ -261,27 +260,11 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
   const componentSidebar = useComponentSidebarState(props.initialSidebar, props.onSidebarChange);
 
-  // Memoize the default ai object to prevent unnecessary re-renders
-  const defaultAi = useMemo<AiProps>(
-    () => ({
-      enabled: false,
-      sidebarOpen: false,
-      setSidebarOpen: () => {},
-      showNotifications: false,
-      notificationMessage: undefined,
-      suggestions: {},
-      onApply: () => {},
-      onDismiss: () => {},
-    }),
-    [],
-  );
-
   return {
     title: props.title || "Untitled Workflow",
     breadcrumbs: props.breadcrumbs || [{ label: "Workflows" }, { label: props.title || "Untitled Workflow" }],
     nodes,
     componentSidebar,
-    ai: props.ai || defaultAi,
     edges,
     setNodes,
     setEdges,

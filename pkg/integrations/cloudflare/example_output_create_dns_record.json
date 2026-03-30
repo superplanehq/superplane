@@ -1,8 +1,12 @@
 {
-  "id": "record_abc123",
-  "type": "A",
-  "name": "api.example.com",
-  "content": "192.0.2.1",
-  "proxied": false,
-  "ttl": 1
+  "data": {
+    "id": "record_abc123",
+    "type": "A",
+    "name": "api.example.com",
+    "content": "192.0.2.1",
+    "proxied": false,
+    "ttl": 1
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.dnsRecord"
 }

@@ -9,8 +9,8 @@ import {
   organizationsDeleteIntegration,
 } from "@/api-client/sdk.gen";
 import type { IntegrationsIntegrationDefinition } from "@/api-client/types.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 
 export const integrationKeys = {
   all: ["integrations"] as const,

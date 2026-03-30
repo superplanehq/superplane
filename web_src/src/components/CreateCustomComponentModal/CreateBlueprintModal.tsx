@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { showErrorToast } from "../../utils/toast";
+import { showErrorToast } from "../../lib/toast";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
 import { Icon } from "../Icon";

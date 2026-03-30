@@ -1,4 +1,4 @@
-.PHONY: lint test test.license.check test.agent.unit
+.PHONY: lint test test.coverage test.license.check test.agent.unit
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -65,6 +65,10 @@ test.e2e.single:
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
+
+test.coverage:
+	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
+	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
 
 test.license.check:
 	bash ./scripts/license-check.sh

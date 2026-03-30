@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import { getBackgroundColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { getBackgroundColorClass } from "@/lib/colors";
+import { formatTimeAgo } from "@/lib/date";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import { addFormattedTimestamp, addOrderedDetails, buildEventSections, getProjectLabel } from "./utils";
 import type {

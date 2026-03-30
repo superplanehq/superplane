@@ -1,6 +1,6 @@
 import { useState, type FC } from "react";
 import React from "react";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type {
   CustomFieldRenderer,
@@ -15,7 +15,7 @@ import type { OnAlertFiringEventData } from "./types";
 import { stringOrDash } from "../utils";
 import { formatTimestamp } from "./utils";
 import { Icon } from "@/components/Icon";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger

@@ -467,17 +467,21 @@ The Copy Package Versions component copies one or more package versions from a s
 
 ```json
 {
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Published"
-    },
-    "1.0.1": {
-      "revision": "REVISION2",
-      "status": "Published"
+  "data": {
+    "failedVersions": {},
+    "successfulVersions": {
+      "1.0.0": {
+        "revision": "REVISION1",
+        "status": "Published"
+      },
+      "1.0.1": {
+        "revision": "REVISION2",
+        "status": "Published"
+      }
     }
-  }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.package.versions.copied"
 }
 ```
 
@@ -497,15 +501,19 @@ The Create Repository component creates a new repository in an AWS CodeArtifact 
 
 ```json
 {
-  "repository": {
-    "administratorAccount": "123456789012",
-    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
-    "createdTime": 1706961600,
-    "description": "Example repository created by workflow",
-    "domainName": "example-domain",
-    "domainOwner": "123456789012",
-    "name": "my-repo"
-  }
+  "data": {
+    "repository": {
+      "administratorAccount": "123456789012",
+      "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
+      "createdTime": 1706961600,
+      "description": "Example repository created by workflow",
+      "domainName": "example-domain",
+      "domainOwner": "123456789012",
+      "name": "my-repo"
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.repository"
 }
 ```
 
@@ -525,13 +533,17 @@ The Delete Package Versions component permanently removes package versions and t
 
 ```json
 {
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Deleted"
+  "data": {
+    "failedVersions": {},
+    "successfulVersions": {
+      "1.0.0": {
+        "revision": "REVISION1",
+        "status": "Deleted"
+      }
     }
-  }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.packageVersions"
 }
 ```
 
@@ -551,15 +563,19 @@ The Delete Repository component deletes a repository from an AWS CodeArtifact do
 
 ```json
 {
-  "repository": {
-    "administratorAccount": "123456789012",
-    "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
-    "createdTime": 1706961600,
-    "description": "Deleted repository",
-    "domainName": "example-domain",
-    "domainOwner": "123456789012",
-    "name": "my-repo"
-  }
+  "data": {
+    "repository": {
+      "administratorAccount": "123456789012",
+      "arn": "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/my-repo",
+      "createdTime": 1706961600,
+      "description": "Deleted repository",
+      "domainName": "example-domain",
+      "domainOwner": "123456789012",
+      "name": "my-repo"
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.repository"
 }
 ```
 
@@ -579,13 +595,17 @@ The Dispose Package Versions component deletes the assets of package versions an
 
 ```json
 {
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Disposed"
+  "data": {
+    "failedVersions": {},
+    "successfulVersions": {
+      "1.0.0": {
+        "revision": "REVISION1",
+        "status": "Disposed"
+      }
     }
-  }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.packageVersions"
 }
 ```
 
@@ -662,17 +682,21 @@ The Update Package Versions Status component sets the status of package versions
 
 ```json
 {
-  "failedVersions": {},
-  "successfulVersions": {
-    "1.0.0": {
-      "revision": "REVISION1",
-      "status": "Archived"
-    },
-    "1.0.1": {
-      "revision": "REVISION2",
-      "status": "Archived"
+  "data": {
+    "failedVersions": {},
+    "successfulVersions": {
+      "1.0.0": {
+        "revision": "REVISION1",
+        "status": "Archived"
+      },
+      "1.0.1": {
+        "revision": "REVISION2",
+        "status": "Archived"
+      }
     }
-  }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.codeartifact.packageVersions"
 }
 ```
 
@@ -1729,17 +1753,21 @@ The Run Lambda component invokes a Lambda function.
 
 ```json
 {
-  "payload": {
-    "message": "hello from lambda"
+  "data": {
+    "payload": {
+      "message": "hello from lambda"
+    },
+    "report": {
+      "billedDuration": "100 ms",
+      "duration": "89.81 ms",
+      "initDuration": "160.97 ms",
+      "maxMemoryUsed": "82 MB",
+      "memorySize": "128 MB"
+    },
+    "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
   },
-  "report": {
-    "billedDuration": "100 ms",
-    "duration": "89.81 ms",
-    "initDuration": "160.97 ms",
-    "maxMemoryUsed": "82 MB",
-    "memorySize": "128 MB"
-  },
-  "requestId": "9f8d2b5e-1c7a-4d62-8f1a-0f8b8e4f3a12"
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "aws.lambda.run"
 }
 ```
 
