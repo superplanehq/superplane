@@ -774,7 +774,7 @@ const file_blueprints_proto_rawDesc = "" +
 	"\x0fDeleteBlueprint\x12-.Superplane.Blueprints.DeleteBlueprintRequest\x1a..Superplane.Blueprints.DeleteBlueprintResponse\"^\x92A<\n" +
 	"\tBlueprint\x12\x10Delete blueprint\x1a\x1dDeletes an existing blueprint\x82\xd3\xe4\x93\x02\x19*\x17/api/v1/blueprints/{id}B\xce\x01\x92A\x90\x01\x12f\n" +
 	"\x19Superplane Blueprints API\x12\x1dAPI for Superplane blueprints\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/blueprintsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/blueprintsb\x06proto3"
 
 var (
 	file_blueprints_proto_rawDescOnce sync.Once
