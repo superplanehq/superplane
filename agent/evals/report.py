@@ -24,11 +24,13 @@ class ReportBuilder:
         model: str,
         run_usages: dict[str, RunUsage],
         evaluate_wall_seconds: float,
+        interaction_log_paths_by_case_name: dict[str, str] | None = None,
     ) -> None:
         self.report = report
         self.model = model
         self.run_usages = run_usages
         self.evaluate_wall_seconds = evaluate_wall_seconds
+        self.interaction_log_paths_by_case_name = interaction_log_paths_by_case_name or {}
 
     def render(self) -> None:
         display_output_dir = Path("tmp/agent/evals")
@@ -89,10 +91,13 @@ class ReportBuilder:
             print(f"{case_name} {self._format_duration(case_result)}")
             print(f"  input:        {case_input}")
             print(f"  output:       {display_filename}")
+            interaction_log_for_case = self.interaction_log_paths_by_case_name.get(case_name)
+            if interaction_log_for_case:
+                print(f"  log:          {interaction_log_for_case}")
             print(f"  toolCalls:    {run_usage.tool_calls}")
             print(f"  inputTokens:  {run_usage.input_tokens}")
             print(f"  outputTokens: {run_usage.output_tokens}")
-            print(f"  cost:         ${case_cost:.4f}")
+            print(f"  cost:         {self._format_cost(case_cost)}")
 
             print("  assertions:")
             assertion_lines = self._format_assertion_lines(case_result)
@@ -141,6 +146,7 @@ class ReportBuilder:
                 per_case=cost_per_case,
                 total=total_cost_usd,
             ),
+            "logs_by_case": self.interaction_log_paths_by_case_name,
         }
 
         print("================================================")
@@ -152,7 +158,7 @@ class ReportBuilder:
         time = task_time_sum_seconds + self.evaluate_wall_seconds
 
         print(f"totalTime:    {time:.1f}s ")
-        print(f"totalCost:    ${total_cost_usd:.4f} ")
+        print(f"totalCost:    {self._format_cost(total_cost_usd)} ")
         print(f"toolCalls:    {total_usage.tool_calls}")
         print(f"inputTokens:  {total_usage.input_tokens}")
         print(f"outputTokens: {total_usage.output_tokens}")
@@ -258,5 +264,10 @@ class ReportBuilder:
         if usage.details:
             parts.append(f"details={usage.details}")
         return " ".join(parts)
+
+    def _format_cost(self, value: float | None) -> str:
+        if value is None:
+            return "-"
+        return f"${value:.4f}"
 
   
