@@ -477,11 +477,7 @@ export function SettingsTab({
             data-testid="node-name-input"
             type="text"
             value={currentNodeName}
-            onChange={(e) => {
-              setCurrentNodeName(e.target.value);
-              requestAutosave();
-            }}
-            onBlur={requestAutosave}
+            onChange={(e) => setCurrentNodeName(e.target.value)}
             placeholder="Enter a name for this node"
             autoFocus
             className="shadow-none"
