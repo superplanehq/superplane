@@ -32,21 +32,21 @@ func Test__GrafanaWebhookHandler__Setup__ProvisionContactPoint(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`[]`)),
-			},
-			{
-				StatusCode: http.StatusCreated,
-				Body:       io.NopCloser(strings.NewReader(`{"uid":"cp_123","name":"ignored"}`)),
-			},
+			// list contact points
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			// create contact point
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"uid":"cp_123","name":"ignored"}`))},
+			// GET notification policies (for upsert)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default"}`))},
+			// PUT notification policies (for upsert)
+			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(`{}`))},
 		},
 	}
 
 	webhookCtx := &testWebhookContext{
 		id:            "wh_123",
 		url:           "https://example.com/webhook",
-		configuration: map[string]any{"sharedSecret": "top-secret"},
+		configuration: map[string]any{},
 	}
 
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
@@ -66,13 +66,18 @@ func Test__GrafanaWebhookHandler__Setup__ProvisionContactPoint(t *testing.T) {
 	result, ok := metadata.(GrafanaWebhookMetadata)
 	require.True(t, ok)
 	assert.Equal(t, "cp_123", result.ContactPointUID)
-	assert.Equal(t, []byte("top-secret"), webhookCtx.secret)
+	assert.NotEmpty(t, result.ContactPointName)
+	require.NotEmpty(t, webhookCtx.secret)
 
-	require.Len(t, httpCtx.Requests, 2)
+	require.Len(t, httpCtx.Requests, 4)
 	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
 	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.String(), "/api/v1/provisioning/contact-points"))
 	assert.Equal(t, http.MethodPost, httpCtx.Requests[1].Method)
 	assert.True(t, strings.HasSuffix(httpCtx.Requests[1].URL.String(), "/api/v1/provisioning/contact-points"))
+	assert.Equal(t, http.MethodGet, httpCtx.Requests[2].Method)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[2].URL.String(), "/api/v1/provisioning/policies"))
+	assert.Equal(t, http.MethodPut, httpCtx.Requests[3].Method)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[3].URL.String(), "/api/v1/provisioning/policies"))
 
 	body, err := io.ReadAll(httpCtx.Requests[1].Body)
 	require.NoError(t, err)
@@ -83,7 +88,55 @@ func Test__GrafanaWebhookHandler__Setup__ProvisionContactPoint(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "https://example.com/webhook", settings["url"])
 	assert.Equal(t, "Bearer", settings["authorization_scheme"])
-	assert.Equal(t, "top-secret", settings["authorization_credentials"])
+	assert.Equal(t, string(webhookCtx.secret), settings["authorization_credentials"])
+}
+
+func Test__GrafanaWebhookHandler__Setup__PolicyRouteHasAlertNameMatchers(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"uid":"cp_abc"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default"}`))},
+			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(`{}`))},
+		},
+	}
+	webhookCtx := &testWebhookContext{
+		id:  "wh_abc",
+		url: "https://example.com/webhook",
+		configuration: map[string]any{
+			"alertNames": []any{
+				map[string]any{"type": "equals", "value": "High CPU"},
+				map[string]any{"type": "matches", "value": "Low.*"},
+			},
+		},
+	}
+
+	_, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"},
+		},
+	})
+	require.NoError(t, err)
+
+	// Verify the PUT policies body includes the alertname matcher.
+	body, err := io.ReadAll(httpCtx.Requests[3].Body)
+	require.NoError(t, err)
+	var policyTree map[string]any
+	require.NoError(t, json.Unmarshal(body, &policyTree))
+	routes, ok := policyTree["routes"].([]any)
+	require.True(t, ok)
+	require.Len(t, routes, 1)
+	route := routes[0].(map[string]any)
+	matchers := route["object_matchers"].([]any)
+	require.Len(t, matchers, 1)
+	matcher := matchers[0].([]any)
+	assert.Equal(t, "alertname", matcher[0])
+	assert.Equal(t, "=~", matcher[1])
+	// "High CPU" (equals) is quoted with QuoteMeta (space is not a metachar), "Low.*" (matches) is kept as-is
+	assert.Equal(t, `High CPU|Low.*`, matcher[2])
 }
 
 func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *testing.T) {
@@ -91,7 +144,7 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *
 	webhookCtx := &testWebhookContext{
 		id:            "wh_123",
 		url:           "https://example.com/webhook",
-		configuration: map[string]any{"sharedSecret": "top-secret"},
+		configuration: map[string]any{},
 	}
 
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
@@ -105,7 +158,7 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *
 
 	require.NoError(t, err)
 	assert.Nil(t, metadata)
-	assert.Equal(t, []byte("top-secret"), webhookCtx.secret)
+	assert.NotEmpty(t, webhookCtx.secret)
 }
 
 func Test__GrafanaWebhookHandler__Setup__ManualFallbackOnNonRetriableProvisioningError(t *testing.T) {
@@ -121,7 +174,7 @@ func Test__GrafanaWebhookHandler__Setup__ManualFallbackOnNonRetriableProvisionin
 	webhookCtx := &testWebhookContext{
 		id:            "wh_123",
 		url:           "https://example.com/webhook",
-		configuration: map[string]any{"sharedSecret": "top-secret"},
+		configuration: map[string]any{},
 	}
 
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
@@ -154,7 +207,7 @@ func Test__GrafanaWebhookHandler__Setup__RetriesOnRetriableProvisioningError(t *
 	webhookCtx := &testWebhookContext{
 		id:            "wh_123",
 		url:           "https://example.com/webhook",
-		configuration: map[string]any{"sharedSecret": "top-secret"},
+		configuration: map[string]any{},
 	}
 
 	metadata, err := handler.Setup(core.WebhookHandlerContext{
@@ -174,18 +227,55 @@ func Test__GrafanaWebhookHandler__Setup__RetriesOnRetriableProvisioningError(t *
 	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
 }
 
-func Test__GrafanaWebhookHandler__Cleanup(t *testing.T) {
+func Test__GrafanaWebhookHandler__Setup__UsesLegacyConfiguredSecretWhenPresent(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusNoContent,
-				Body:       io.NopCloser(strings.NewReader(``)),
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"uid":"cp_legacy"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default"}`))},
+			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(`{}`))},
+		},
+	}
+
+	webhookCtx := &testWebhookContext{
+		id:            "wh_legacy",
+		url:           "https://example.com/webhook",
+		configuration: map[string]any{"sharedSecret": "legacy-secret"},
+	}
+
+	metadata, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
 			},
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, metadata)
+	assert.Equal(t, []byte("legacy-secret"), webhookCtx.secret)
+}
+
+func Test__GrafanaWebhookHandler__Cleanup(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	contactPointName := buildContactPointName("wh_123")
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			// GET policies (for route removal)
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default","routes":[{"receiver":"` + contactPointName + `","continue":true}]}`))},
+			// PUT policies (with route removed)
+			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(`{}`))},
+			// DELETE contact point
+			{StatusCode: http.StatusNoContent, Body: io.NopCloser(strings.NewReader(``))},
 		},
 	}
 	webhookCtx := &testWebhookContext{
-		metadata: map[string]any{"contactPointUid": "cp_123"},
+		id:       "wh_123",
+		metadata: map[string]any{"contactPointUid": "cp_123", "contactPointName": contactPointName},
 	}
 
 	err := handler.Cleanup(core.WebhookHandlerContext{
@@ -200,9 +290,20 @@ func Test__GrafanaWebhookHandler__Cleanup(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Len(t, httpCtx.Requests, 1)
-	assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
-	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.String(), "/api/v1/provisioning/contact-points/cp_123"))
+	require.Len(t, httpCtx.Requests, 3)
+	assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[0].URL.String(), "/api/v1/provisioning/policies"))
+	assert.Equal(t, http.MethodPut, httpCtx.Requests[1].Method)
+	assert.Equal(t, http.MethodDelete, httpCtx.Requests[2].Method)
+	assert.True(t, strings.HasSuffix(httpCtx.Requests[2].URL.String(), "/api/v1/provisioning/contact-points/cp_123"))
+
+	// Verify the PUT policies body has no routes (our route was removed).
+	body, err := io.ReadAll(httpCtx.Requests[1].Body)
+	require.NoError(t, err)
+	var policyTree map[string]any
+	require.NoError(t, json.Unmarshal(body, &policyTree))
+	routes, _ := policyTree["routes"].([]any)
+	assert.Empty(t, routes)
 }
 
 func Test__GrafanaWebhookHandler__Cleanup__NoContactPointUIDWithoutTokenIsNoOp(t *testing.T) {
