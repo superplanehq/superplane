@@ -220,6 +220,9 @@ func (t *OnCaseStatusChange) pollCaseStatus(ctx core.TriggerActionContext) error
 
 	var config OnCaseStatusChangeConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to decode configuration: %v", err)
+		}
 		return ctx.Requests.ScheduleActionCall(pollCaseStatusAction, map[string]any{}, pollCaseStatusInterval)
 	}
 
