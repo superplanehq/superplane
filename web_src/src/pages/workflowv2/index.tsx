@@ -182,6 +182,17 @@ export function WorkflowPageV2() {
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const holdSavingDisplay = useMinSavingDisplayHold(updateCanvasVersionMutation.isPending);
+  // Track completed saves for E2E: increment saveCount on pending→settled success.
+  useEffect(() => {
+    if (
+      wasMutationPendingRef.current &&
+      !updateCanvasVersionMutation.isPending &&
+      !updateCanvasVersionMutation.isError
+    ) {
+      setSaveCount((c) => c + 1);
+    }
+    wasMutationPendingRef.current = updateCanvasVersionMutation.isPending;
+  }, [updateCanvasVersionMutation.isPending, updateCanvasVersionMutation.isError]);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -605,6 +616,11 @@ export function WorkflowPageV2() {
   const [hasNonPositionalUnsavedChanges, setHasNonPositionalUnsavedChanges] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [lastCanvasSaveError, setLastCanvasSaveError] = useState<string | null>(null);
+  // Monotonic counter that increments on each successful save mutation.
+  // Exposed as data-save-count on the save-status indicator so E2E tests
+  // can detect save completion without waiting for the display-hold timer.
+  const [saveCount, setSaveCount] = useState(0);
+  const wasMutationPendingRef = useRef(false);
   const [isPositionAutoSaveQueued, setIsPositionAutoSaveQueued] = useState(false);
   const [isAnnotationAutoSaveQueued, setIsAnnotationAutoSaveQueued] = useState(false);
 
@@ -5383,6 +5399,7 @@ export function WorkflowPageV2() {
           saveErrorMessage={lastCanvasSaveError}
           headerMode={headerMode}
           saveState={headerSaveState}
+          saveCount={saveCount}
           onEnterEditMode={showVersioningUI ? handleToggleEditMode : undefined}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}

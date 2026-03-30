@@ -51,12 +51,11 @@ func (s *WebhookResetSteps) addWebhookTrigger(name string, pos models.Position) 
 	source := q.TestID("building-block-webhook")
 	target := q.TestID("rf__wrapper")
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(500)
-
 	s.session.FillIn(q.TestID("node-name-input"), name)
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *WebhookResetSteps) openWebhookConfiguration(nodeName string) {

@@ -69,6 +69,8 @@ interface HeaderProps {
   memoryItemCount?: number;
   mode?: HeaderMode;
   saveState?: SaveState;
+  /** Monotonic counter incremented on each successful save (for E2E tests). */
+  saveCount?: number;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -93,10 +95,12 @@ type SavedLabelStage = "off" | "on" | "exiting";
 
 function CanvasSaveStatusIndicator({
   saveState,
+  saveCount,
   lastSavedAt,
   saveErrorMessage,
 }: {
   saveState: SaveState;
+  saveCount?: number;
   lastSavedAt?: Date | string | null;
   saveErrorMessage?: string | null;
 }) {
@@ -123,6 +127,7 @@ function CanvasSaveStatusIndicator({
         className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 tabular-nums"
         data-testid="canvas-save-status"
         data-state="saving"
+        data-save-count={saveCount}
         aria-live="polite"
         aria-busy="true"
       >
@@ -140,6 +145,7 @@ function CanvasSaveStatusIndicator({
         className="inline-flex items-center gap-0.5 min-h-8"
         data-testid="canvas-save-status"
         data-state="saved"
+        data-save-count={saveCount}
         data-saved-label={savedLabelVisible ? "visible" : "hidden"}
       >
         {savedLabelVisible ? (
@@ -193,6 +199,7 @@ function CanvasSaveStatusIndicator({
             className="shrink-0 p-0 text-orange-600 hover:!bg-transparent hover:!text-orange-600 dark:hover:!bg-transparent dark:hover:!text-orange-600"
             data-testid="canvas-save-status"
             data-state="error"
+            data-save-count={saveCount}
             aria-label="Save failed"
           >
             <CloudAlert className="size-5" strokeWidth={2} aria-hidden />
@@ -209,6 +216,7 @@ function CanvasSaveStatusIndicator({
       className="text-xs font-medium text-amber-800 hidden sm:inline max-w-[5rem] truncate"
       data-testid="canvas-save-status"
       data-state="unsaved"
+      data-save-count={saveCount}
     >
       Unsaved
     </span>
@@ -240,6 +248,7 @@ export function Header({
   memoryItemCount,
   mode = "default",
   saveState = "saved",
+  saveCount,
   lastSavedAt = null,
   saveErrorMessage = null,
   onEnterEditMode,
@@ -554,6 +563,7 @@ export function Header({
                 {topViewMode === "canvas" || topViewMode === undefined ? (
                   <CanvasSaveStatusIndicator
                     saveState={saveState}
+                    saveCount={saveCount}
                     lastSavedAt={lastSavedAt}
                     saveErrorMessage={saveErrorMessage}
                   />
@@ -586,6 +596,7 @@ export function Header({
               <div className="flex items-center gap-2">
                 <CanvasSaveStatusIndicator
                   saveState={saveState}
+                  saveCount={saveCount}
                   lastSavedAt={lastSavedAt}
                   saveErrorMessage={saveErrorMessage}
                 />
