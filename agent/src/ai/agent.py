@@ -52,6 +52,10 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             "Use exact block names from catalog tools, include node references by nodeId "
             "for existing nodes, and keep operation order executable. "
             "Do not invent unknown fields or operation types. "
+            "Node configuration JSON types must match the catalog field types from describe_component/describe_trigger: "
+            "for multi-select, list, any-predicate-list, and days-of-week fields, use a real JSON array "
+            '(e.g. "actions": ["opened"]), not a string that embeds JSON text. '
+            "For boolean fields, use JSON true/false, not the strings \"true\" or \"false\". "
             "In proposals, expression fields use this model: $ is the message chain—"
             "a map of upstream node outputs keyed by each node's name on the canvas. "
             "To access data from any upstream node, use $['Exact node name']... (or "
