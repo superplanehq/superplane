@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Provision org-scoped eval resources and print env lines for agent/.env.
 
-Uses cookie-based session auth (owner setup or password login), then creates or
-reuses a canvas and service account via the public HTTP API.
+Uses cookie-based session auth (password login or optional owner setup), then
+creates or reuses a canvas and service account via the public HTTP API.
+
+By default prints EVAL_ORG_ID, EVAL_CANVAS_ID, SUPERPLANE_API_TOKEN, and
+SUPERPLANE_BASE_URL to stdout — copy them into agent/.env. Use --merge-env PATH
+to update a .env file in place instead.
 
 Typical use (inside the agent container, app reachable at http://app:8000):
 
@@ -22,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 
 DEFAULT_CANVAS_NAME = "Agent evals"
 DEFAULT_SA_NAME = "agent-evals"
@@ -315,6 +320,11 @@ def _ensure_service_account_token(
 
 
 def main() -> None:
+    # Compose only applies env_file when the container is created; reload disk .env for exec.
+    agent_env = Path(__file__).resolve().parent.parent / ".env"
+    if agent_env.is_file():
+        load_dotenv(agent_env, override=True)
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base-url",
@@ -382,6 +392,13 @@ def main() -> None:
     ]
     text = "\n".join(lines)
     print(text)
+
+    if not args.merge_env and not args.output_file:
+        print(
+            "Copy the lines above into agent/.env, or re-run with "
+            "--merge-env /app/agent/.env to update that file automatically.",
+            file=sys.stderr,
+        )
 
     updates = {
         "EVAL_ORG_ID": org_id,
