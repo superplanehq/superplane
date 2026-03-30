@@ -210,6 +210,11 @@ async def runner() -> None:
         case_names=case_names,
     )
 
+    raw_system_prompts = getattr(agent, "_system_prompts", ())
+    system_prompt_text = "\n\n".join(
+        prompt for prompt in raw_system_prompts if isinstance(prompt, str) and prompt
+    )
+
     def _wrap_text(value: str, *, indent: int, width: int = 120) -> str:
         if not value:
             return ""
@@ -257,6 +262,13 @@ async def runner() -> None:
 
     async def task(question: str) -> CanvasAnswer:
         case_name = question_to_case_name.get(question, "unknown_case")
+        if system_prompt_text:
+            wrapped_system_prompt = _wrap_text(system_prompt_text, indent=10)
+            if wrapped_system_prompt:
+                await interaction_logger.log_case(
+                    case_name,
+                    f"SYSTEM_PROMPT\n{wrapped_system_prompt}",
+                )
         await interaction_logger.log_case(case_name, f"CASE_STARTED question={question}")
         payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
         result: Any | None = None
