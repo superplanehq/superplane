@@ -207,28 +207,30 @@ func (t *OnDocumentIndexed) checkConnectorAndCreateRule(ctx core.TriggerActionCo
 		return ctx.Requests.ScheduleActionCall(checkConnectorAction, map[string]any{}, checkConnectorRetryInterval)
 	}
 
-	connectors, err := client.ListKibanaConnectors()
+	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
 		if ctx.Logger != nil {
-			ctx.Logger.Warnf("elastic onDocumentIndexed: failed to list connectors: %v", err)
+			ctx.Logger.Warnf("elastic onDocumentIndexed: failed to get webhook URL: %v", err)
 		}
 		return ctx.Requests.ScheduleActionCall(checkConnectorAction, map[string]any{}, checkConnectorRetryInterval)
 	}
 
-	var connectorID string
-	for _, c := range connectors {
-		if c.Name == KibanaConnectorName {
-			connectorID = c.ID
-			break
-		}
-	}
-
-	if connectorID == "" {
+	connector, err := client.FindKibanaWebhookConnector(webhookURL)
+	if err != nil {
 		if ctx.Logger != nil {
-			ctx.Logger.Infof("elastic onDocumentIndexed: connector %q not found yet, retrying", KibanaConnectorName)
+			ctx.Logger.Warnf("elastic onDocumentIndexed: failed to find connector: %v", err)
 		}
 		return ctx.Requests.ScheduleActionCall(checkConnectorAction, map[string]any{}, checkConnectorRetryInterval)
 	}
+
+	if connector == nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("elastic onDocumentIndexed: connector not found yet, retrying")
+		}
+		return ctx.Requests.ScheduleActionCall(checkConnectorAction, map[string]any{}, checkConnectorRetryInterval)
+	}
+
+	connectorID := connector.ID
 
 	rule, err := client.CreateKibanaQueryRule(config.Index, connectorID, meta.RouteKey)
 	if err != nil {

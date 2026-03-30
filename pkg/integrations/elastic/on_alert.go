@@ -7,10 +7,16 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+)
+
+const (
+	checkAlertConnectorAction        = "checkAlertConnectorAvailability"
+	checkAlertConnectorRetryInterval = 10 * time.Second
 )
 
 type OnAlertFires struct{}
@@ -29,15 +35,7 @@ type OnAlertFiresMetadata struct {
 	Spaces   []string `json:"spaces" mapstructure:"spaces"`
 }
 
-const kibanaAlertWebhookActionBody = `{
-  "eventType": "alert_fired",
-  "ruleId": "{{rule.id}}",
-  "ruleName": "{{rule.name}}",
-  "spaceId": "{{rule.spaceId}}",
-  "tags": {{rule.tags}},
-  "severity": "{{context.severity}}",
-  "status": "{{rule.status}}"
-}`
+const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","severity":"{{context.severity}}","status":"{{rule.status}}"}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -222,18 +220,73 @@ func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to store rule metadata: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(map[string]any{
+	if err := ctx.Integration.RequestWebhook(map[string]any{
 		"kibanaUrl": string(kibanaURL),
-		"ruleId":    config.Rule,
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to request webhook: %w", err)
+	}
+
+	return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
 }
 
 func (t *OnAlertFires) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           checkAlertConnectorAction,
+			Description:    "Find the Kibana connector and attach it to the alert rule",
+			UserAccessible: false,
+		},
+	}
 }
 
-func (t *OnAlertFires) HandleAction(_ core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+func (t *OnAlertFires) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	if ctx.Name == checkAlertConnectorAction {
+		return nil, t.checkConnectorAndAttachRule(ctx)
+	}
+	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerActionContext) error {
+	var meta OnAlertFiresMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	if meta.RuleID == "" {
+		return fmt.Errorf("no rule ID in metadata")
+	}
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to get webhook URL: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to create client: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	connector, err := client.FindKibanaWebhookConnector(webhookURL)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to find connector: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	if connector == nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("elastic onAlertFires: connector not found yet, retrying")
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	return client.EnsureKibanaRuleHasConnector(meta.RuleID, connector.ID)
 }
 
 func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -275,8 +328,28 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	return http.StatusOK, nil, nil
 }
 
-func (t *OnAlertFires) Cleanup(_ core.TriggerContext) error {
-	return nil
+func (t *OnAlertFires) Cleanup(ctx core.TriggerContext) error {
+	var meta OnAlertFiresMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil || meta.RuleID == "" {
+		return nil
+	}
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to get webhook URL: %w", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	connector, err := client.FindKibanaWebhookConnector(webhookURL)
+	if err != nil || connector == nil {
+		return nil
+	}
+
+	return client.RemoveKibanaRuleConnector(meta.RuleID, connector.ID)
 }
 
 // matchesFilters returns true if the alert payload satisfies all configured filters.

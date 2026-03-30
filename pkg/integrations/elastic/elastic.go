@@ -26,8 +26,7 @@ const installationInstructions = `
 To connect Elastic to SuperPlane:
 
 1. Paste your **Elasticsearch URL** and **Kibana URL**. In Elastic Cloud, open https://cloud.elastic.co/home and copy both endpoints from the same deployment under the manage section.
-2. In Kibana, go to **Stack Management → API Keys**, create a key, and paste the base64-encoded ` + "`id:api_key`" + ` value. The key must be able to access Elasticsearch, Kibana cases, and Kibana connectors.
-3. Save an Elastic trigger on the live workflow to create the Kibana connector and required rules.
+2. In Settings, create an API key and paste it into SuperPlane. The key must be able to access Elasticsearch, Kibana cases, and Kibana connectors.
 `
 
 func (e *Elastic) Name() string {
@@ -57,14 +56,14 @@ func (e *Elastic) Configuration() []configuration.Field {
 			Label:       "Elasticsearch URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Base URL used to send API requests to Elasticsearch, such as https://my-cluster.es.us-east-1.aws.found.io:9243.",
+			Description: "Base URL used to send API requests to Elasticsearch, such as https://my-cluster.es.us-east-1.aws.found.io.",
 		},
 		{
 			Name:        "kibanaUrl",
 			Label:       "Kibana URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Base URL of your Kibana instance, such as https://my-cluster.kb.us-east-1.aws.found.io:9243. In Elastic Cloud, get it from Deployments -> your deployment -> Manage.",
+			Description: "Base URL of your Kibana instance, such as https://my-cluster.kb.us-east-1.aws.found.io. In Elastic Cloud, get it from Deployments -> your deployment -> Manage.",
 		},
 		{
 			Name:        "apiKey",

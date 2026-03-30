@@ -112,7 +112,8 @@ func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 		"apiKey":    "test-api-key",
 	}}
 
-	connectorsResponse := `[{"id":"conn-123","name":"SuperPlane Alert"}]`
+	const testWebhookURL = "https://superplane.test/api/v1/webhooks/test-123"
+	connectorsResponse := `[{"id":"conn-123","name":"SuperPlane Alert","connector_type_id":".webhook","config":{"url":"` + testWebhookURL + `"}}]`
 	ruleResponse := `{"id":"rule-456","name":"SuperPlane • my-index"}`
 
 	t.Run("connector found -> creates rule and saves rule ID", func(t *testing.T) {
@@ -132,6 +133,7 @@ func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 			Integration:   integrationCtx,
 			Metadata:      meta,
 			Requests:      requests,
+			Webhook:       &contexts.NodeWebhookContext{URL: testWebhookURL},
 		})
 
 		require.NoError(t, err)
@@ -175,6 +177,7 @@ func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 			Integration:   integrationCtx,
 			Metadata:      meta,
 			Requests:      requests,
+			Webhook:       &contexts.NodeWebhookContext{URL: testWebhookURL},
 		})
 
 		require.NoError(t, err)
@@ -197,6 +200,7 @@ func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 			Integration:   integrationCtx,
 			Metadata:      meta,
 			Requests:      requests,
+			Webhook:       &contexts.NodeWebhookContext{URL: testWebhookURL},
 		})
 
 		require.NoError(t, err)
@@ -215,6 +219,7 @@ func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 			Integration:   integrationCtx,
 			Metadata:      meta,
 			Requests:      requests,
+			Webhook:       &contexts.NodeWebhookContext{URL: testWebhookURL},
 		})
 
 		require.NoError(t, err)
@@ -239,6 +244,7 @@ func Test__OnDocumentIndexed__CheckConnectorAndCreateRule(t *testing.T) {
 			Integration:   integrationCtx,
 			Metadata:      meta,
 			Requests:      requests,
+			Webhook:       &contexts.NodeWebhookContext{URL: testWebhookURL},
 		})
 
 		require.NoError(t, err)

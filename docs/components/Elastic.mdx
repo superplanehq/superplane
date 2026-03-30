@@ -30,8 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 To connect Elastic to SuperPlane:
 
 1. Paste your **Elasticsearch URL** and **Kibana URL**. In Elastic Cloud, open https://cloud.elastic.co/home and copy both endpoints from the same deployment under the manage section.
-2. In Kibana, go to **Stack Management → API Keys**, create a key, and paste the base64-encoded `id:api_key` value. The key must be able to access Elasticsearch, Kibana cases, and Kibana connectors.
-3. Save an Elastic trigger on the live workflow to create the Kibana connector and required rules.
+2. In Settings, create an API key and paste it into SuperPlane. The key must be able to access Elasticsearch, Kibana cases, and Kibana connectors.
 
 <a id="when-alert-fires"></a>
 
@@ -55,15 +54,7 @@ If canvas versioning is enabled, this provisioning happens when the live version
 SuperPlane configures the rule action body with these fields:
 
 ```json
-{
-  "eventType": "alert_fired",
-  "ruleId": "{{rule.id}}",
-  "ruleName": "{{rule.name}}",
-  "spaceId": "{{rule.spaceId}}",
-  "tags": {{rule.tags}},
-  "severity": "{{context.severity}}",
-  "status": "{{rule.status}}"
-}
+{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","severity":"{{context.severity}}","status":"{{rule.status}}"}
 ```
 
 The `eventType` field is required for routing. Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.

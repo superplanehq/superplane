@@ -336,18 +336,24 @@ func (c *Client) GetKibanaRule(ruleID string) (*KibanaRuleDetails, error) {
 
 func (c *Client) EnsureKibanaRuleHasConnector(ruleID, connectorID string) error {
 	return c.updateKibanaRuleWithRetry(ruleID, func(rule *KibanaRuleDetails) error {
-		for _, action := range rule.Actions {
-			if action.ID == connectorID {
-				return nil
-			}
-		}
-
 		actionGroupID, err := c.GetKibanaRuleDefaultActionGroupID(rule.RuleTypeID)
 		if err != nil {
 			return err
 		}
 
-		rule.Actions = append(rule.Actions, superPlaneKibanaRuleAction(connectorID, actionGroupID))
+		desired := superPlaneKibanaRuleAction(connectorID, actionGroupID)
+
+		for i, action := range rule.Actions {
+			if action.ID == connectorID {
+				if action.Group == desired.Group && fmt.Sprint(action.Params) == fmt.Sprint(desired.Params) {
+					return nil
+				}
+				rule.Actions[i] = desired
+				return c.updateKibanaRule(ruleID, rule)
+			}
+		}
+
+		rule.Actions = append(rule.Actions, desired)
 		return c.updateKibanaRule(ruleID, rule)
 	})
 }

@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	checkCaseConnectorAction        = "checkCaseConnectorAvailability"
-	checkCaseConnectorRetryInterval = 10 * time.Second
+	pollCaseStatusAction   = "pollCaseStatus"
+	pollCaseStatusInterval = 30 * time.Second
 )
 
 type OnCaseStatusChange struct{}
@@ -34,7 +34,8 @@ type OnCaseStatusChangeMetadata struct {
 	CaseNames    map[string]string `json:"caseNames,omitempty" mapstructure:"caseNames"`
 	CaseStatuses map[string]string `json:"caseStatuses,omitempty" mapstructure:"caseStatuses"`
 	RouteKey     string            `json:"routeKey,omitempty" mapstructure:"routeKey"`
-	RuleID       string            `json:"ruleId,omitempty" mapstructure:"ruleId"`
+	// Deprecated: kept for backward-compat cleanup only; new triggers do not create Kibana rules.
+	RuleID string `json:"ruleId,omitempty" mapstructure:"ruleId"`
 }
 
 func (t *OnCaseStatusChange) Name() string  { return "elastic.onCaseStatusChange" }
@@ -136,14 +137,11 @@ func (t *OnCaseStatusChange) Configuration() []configuration.Field {
 
 func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
-	changed := false
 	if meta.LastPollTime == "" {
 		meta.LastPollTime = time.Now().UTC().Format(time.RFC3339Nano)
-		changed = true
 	}
 	if meta.RouteKey == "" {
 		meta.RouteKey = uuid.NewString()
-		changed = true
 	}
 
 	var config OnCaseStatusChangeConfiguration
@@ -160,12 +158,9 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 	}
 	meta.CaseNames = names
 	meta.CaseStatuses = statuses
-	changed = true
 
-	if changed {
-		if err := ctx.Metadata.Set(meta); err != nil {
-			return fmt.Errorf("failed to save metadata: %w", err)
-		}
+	if err := ctx.Metadata.Set(meta); err != nil {
+		return fmt.Errorf("failed to save metadata: %w", err)
 	}
 
 	kibanaURL, err := ctx.Integration.GetConfig("kibanaUrl")
@@ -177,11 +172,7 @@ func (t *OnCaseStatusChange) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("failed to request webhook: %w", err)
 	}
 
-	if meta.RuleID != "" {
-		return nil
-	}
-
-	return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+	return ctx.Requests.ScheduleActionCall(pollCaseStatusAction, map[string]any{}, pollCaseStatusInterval)
 }
 
 func (t *OnCaseStatusChange) resolveCaseMetadata(ctx core.TriggerContext, caseIDs []string) (map[string]string, map[string]string, error) {
@@ -210,30 +201,26 @@ func (t *OnCaseStatusChange) resolveCaseMetadata(ctx core.TriggerContext, caseID
 func (t *OnCaseStatusChange) Actions() []core.Action {
 	return []core.Action{
 		{
-			Name:           checkCaseConnectorAction,
-			Description:    "Find the Kibana connector and create the case change rule",
+			Name:           pollCaseStatusAction,
+			Description:    "Poll the Kibana cases API for status changes and emit events",
 			UserAccessible: false,
 		},
 	}
 }
 
 func (t *OnCaseStatusChange) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
-	if ctx.Name == checkCaseConnectorAction {
-		return nil, t.checkConnectorAndCreateRule(ctx)
+	if ctx.Name == pollCaseStatusAction {
+		return nil, t.pollCaseStatus(ctx)
 	}
 	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
-func (t *OnCaseStatusChange) checkConnectorAndCreateRule(ctx core.TriggerActionContext) error {
+func (t *OnCaseStatusChange) pollCaseStatus(ctx core.TriggerActionContext) error {
 	meta := loadCaseStatusChangeMetadata(ctx.Metadata)
-	if meta.RuleID != "" {
-		return nil
-	}
-	if meta.RouteKey == "" {
-		meta.RouteKey = uuid.NewString()
-		if err := ctx.Metadata.Set(meta); err != nil {
-			return fmt.Errorf("failed to save metadata: %w", err)
-		}
+
+	var config OnCaseStatusChangeConfiguration
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return ctx.Requests.ScheduleActionCall(pollCaseStatusAction, map[string]any{}, pollCaseStatusInterval)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -241,42 +228,85 @@ func (t *OnCaseStatusChange) checkConnectorAndCreateRule(ctx core.TriggerActionC
 		if ctx.Logger != nil {
 			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to create client: %v", err)
 		}
-		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+		return ctx.Requests.ScheduleActionCall(pollCaseStatusAction, map[string]any{}, pollCaseStatusInterval)
 	}
 
-	connectors, err := client.ListKibanaConnectors()
+	cases, err := client.ListCasesUpdatedSince(meta.LastPollTime, nil, nil, nil)
 	if err != nil {
 		if ctx.Logger != nil {
-			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to list connectors: %v", err)
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to list cases: %v", err)
 		}
-		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
+		return ctx.Requests.ScheduleActionCall(pollCaseStatusAction, map[string]any{}, pollCaseStatusInterval)
 	}
 
-	var connectorID string
-	for _, connector := range connectors {
-		if connector.Name == KibanaConnectorName {
-			connectorID = connector.ID
-			break
+	if meta.CaseStatuses == nil {
+		meta.CaseStatuses = map[string]string{}
+	}
+
+	newLastPollTime := meta.LastPollTime
+	statusesChanged := false
+	for _, c := range cases {
+		currentStatus := strings.ToLower(c.Status)
+		previousStatus, hasPreviousStatus := meta.CaseStatuses[c.ID]
+		if previousStatus != currentStatus {
+			meta.CaseStatuses[c.ID] = currentStatus
+			statusesChanged = true
+		}
+		if c.UpdatedAt > newLastPollTime {
+			newLastPollTime = c.UpdatedAt
+		}
+
+		if !hasPreviousStatus || previousStatus == currentStatus {
+			continue
+		}
+		if len(config.Cases) > 0 && !slices.Contains(config.Cases, c.ID) {
+			continue
+		}
+		if len(config.Statuses) > 0 && !slices.Contains(config.Statuses, strings.ToLower(c.Status)) {
+			continue
+		}
+		if len(config.Severities) > 0 && !slices.Contains(config.Severities, strings.ToLower(c.Severity)) {
+			continue
+		}
+		if len(config.Tags) > 0 {
+			matched := false
+			for _, tag := range c.Tags {
+				if configuration.MatchesAnyPredicate(config.Tags, tag) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+
+		eventPayload := map[string]any{
+			"id":          c.ID,
+			"title":       c.Title,
+			"status":      c.Status,
+			"severity":    c.Severity,
+			"version":     c.Version,
+			"tags":        c.Tags,
+			"description": c.Description,
+			"createdAt":   c.CreatedAt,
+			"updatedAt":   c.UpdatedAt,
+		}
+		if err := ctx.Events.Emit("elastic.case.status.changed", eventPayload); err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("elastic onCaseStatusChange: failed to emit event for case %s: %v", c.ID, err)
+			}
 		}
 	}
 
-	if connectorID == "" {
-		if ctx.Logger != nil {
-			ctx.Logger.Infof("elastic onCaseStatusChange: connector %q not found yet, retrying", KibanaConnectorName)
+	if newLastPollTime != meta.LastPollTime || statusesChanged {
+		meta.LastPollTime = newLastPollTime
+		if err := ctx.Metadata.Set(meta); err != nil && ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to update metadata: %v", err)
 		}
-		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
 	}
 
-	rule, err := client.CreateKibanaCaseQueryRule(connectorID, meta.RouteKey)
-	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Warnf("elastic onCaseStatusChange: failed to create rule: %v", err)
-		}
-		return ctx.Requests.ScheduleActionCall(checkCaseConnectorAction, map[string]any{}, checkCaseConnectorRetryInterval)
-	}
-
-	meta.RuleID = rule.ID
-	return ctx.Metadata.Set(meta)
+	return ctx.Requests.ScheduleActionCall(pollCaseStatusAction, map[string]any{}, pollCaseStatusInterval)
 }
 
 func (t *OnCaseStatusChange) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
