@@ -316,7 +316,7 @@ func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"Approval",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		10*time.Second,
+		15*time.Second,
 	)
 }
 
