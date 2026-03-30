@@ -107,6 +107,7 @@ export function SettingsTab({
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
+  const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
@@ -283,6 +284,25 @@ export function SettingsTab({
   }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
+  const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
+    // Text-like editors save on blur; discrete/destructive controls save on change.
+    if (!fieldType) {
+      return false;
+    }
+    return ![
+      "string",
+      "text",
+      "xml",
+      "expression",
+      "number",
+      "url",
+      "date",
+      "datetime",
+      "time",
+      "cron",
+      "git-ref",
+    ].includes(fieldType);
+  }, []);
 
   const updateAutosaveBaseline = useCallback((snapshot: string) => {
     autosaveBaselineSnapshotRef.current = snapshot;
@@ -369,38 +389,82 @@ export function SettingsTab({
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
 
+  const requestAutosave = useCallback(() => {
+    if (configurationSaveMode !== "auto" || isReadOnly) {
+      return;
+    }
+
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      void handleSaveRef.current();
+    }, 300);
+  }, [configurationSaveMode, isReadOnly]);
+
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
     if (configurationSaveMode !== "auto") {
       return;
     }
     return () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
       void handleSaveRef.current();
     };
   }, [configurationSaveMode]);
 
   useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (configurationSaveMode !== "auto" || isReadOnly) {
       return;
     }
-    if (
-      buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration) ===
-      autosaveBaselineSnapshotRef.current
-    ) {
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    if (snapshot === autosaveBaselineSnapshotRef.current) {
       return;
     }
     if (currentNodeName.trim() === "") {
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    // Safety net for flows that do not blur inputs (e.g. scripted E2E interactions).
+    const fallbackTimer = window.setTimeout(() => {
       void handleSaveRef.current();
-    }, 500);
-    return () => window.clearTimeout(timer);
+    }, 1200);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+    };
   }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
   return (
-    <div className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`} style={{ maxHeight: "80vh" }}>
+    <div
+      className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`}
+      style={{ maxHeight: "80vh" }}
+      onBlurCapture={(event) => {
+        if (configurationSaveMode !== "auto" || isReadOnly) {
+          return;
+        }
+        const target = event.target as HTMLElement | null;
+        if (!target) {
+          return;
+        }
+
+        if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+          requestAutosave();
+        }
+      }}
+    >
       <div className={`space-y-6 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`} aria-disabled={isReadOnly}>
         {/* Node identification section — always visible */}
         <div className="flex flex-col gap-2">
@@ -477,6 +541,7 @@ export function SettingsTab({
                           id: integration.metadata?.id,
                           name: integration.metadata?.name,
                         });
+                        requestAutosave();
                       }
                     }}
                     disabled={isReadOnly}
@@ -607,6 +672,10 @@ export function SettingsTab({
                       };
                       return filterVisibleFields(newConfig);
                     });
+                    const fieldWasCleared = value === undefined || value === null || value === "";
+                    if (fieldWasCleared || shouldAutosaveOnChangeByFieldType(field.type)) {
+                      requestAutosave();
+                    }
                   }}
                   allValues={nodeConfiguration}
                   domainId={domainId}
