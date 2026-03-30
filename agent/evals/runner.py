@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Dataset
 
@@ -16,17 +19,41 @@ from evals.cases import dataset
 from evals.report import ReportBuilder
 
 
+def _reload_agent_dotenv() -> None:
+    """Compose applies env_file only when the container is created; reload disk for exec."""
+    path = Path(__file__).resolve().parent.parent / ".env"
+    if path.is_file():
+        load_dotenv(path, override=True)
+
+
+def _normalize_api_token(raw: str) -> str:
+    t = raw.strip().replace("\r", "").strip()
+    if t.lower().startswith("bearer "):
+        t = t[7:].strip()
+    return t
+
+
 def load_env() -> dict[str, str]:
+    base = (os.getenv("SUPERPLANE_BASE_URL") or "http://app:8000").strip().rstrip("/")
     return {
         "model": os.getenv("AI_MODEL", "").strip(),
-        "base_url": "http://app:8000",
-        "api_token": os.getenv("SUPERPLANE_API_TOKEN", "").strip(),
+        "base_url": base,
+        "api_token": _normalize_api_token(os.getenv("SUPERPLANE_API_TOKEN", "")),
         "organization_id": os.getenv("EVAL_ORG_ID", "").strip(),
         "canvas_id": os.getenv("EVAL_CANVAS_ID", "").strip(),
     }
 
+
 async def runner() -> None:
+    _reload_agent_dotenv()
     env = load_env()
+    if not env["api_token"]:
+        print(
+            "SUPERPLANE_API_TOKEN is empty after loading agent/.env. "
+            "Run make agent.evals.bootstrap, add the printed token to agent/.env, then retry.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     cases = list(dataset.cases)
     eval_dataset = Dataset(cases=cases)
 
