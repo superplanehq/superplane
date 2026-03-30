@@ -29,22 +29,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 To connect Elastic to SuperPlane:
 
-1. **Elasticsearch URL**:
-   - **Elastic Cloud**: Start at https://cloud.elastic.co/home. In **Hosted deployments**, find your deployment, click **Manage** (or open it from **Open**), then copy the **Elasticsearch endpoint** from the **Application endpoints, cluster and component IDs** section.
-   - **Self-managed Elastic**: Use your Elasticsearch server URL.
-   - Example: `https://my-cluster.es.us-east-1.aws.found.io:9243`.
-2. **Kibana URL**:
-   - **Elastic Cloud**: From the same deployment page opened from https://cloud.elastic.co/home, copy the **Kibana endpoint** from **Manage**.
-   - **Self-managed Elastic**: Use the base URL of your Kibana instance.
-   - Keep only the base URL: protocol, host, and port.
-   - Example: `https://my-cluster.kb.us-east-1.aws.found.io:9243`.
-3. **Auth Method**:
-   - **API Key** (recommended for Elastic Cloud): Go to Kibana → Stack Management → API Keys and create a new key. Paste the base64-encoded `id:api_key` value.
-   - Create an API key that can index documents in Elasticsearch, access Kibana cases, and manage Kibana connectors.
-   - **Username / Password**: Provide the credentials for a user with the required privileges.
-4. **Kibana webhook connector**: SuperPlane creates or reuses one shared Kibana Webhook connector per integration and uses it across the Elastic triggers.
-5. **Alert trigger**: For `When Alert Fires`, SuperPlane attaches the shared connector to the selected Kibana alert rule automatically.
-6. **Document and case triggers**: For `On Document Indexed` and `When Case Status Changes`, SuperPlane automatically provisions the Kibana Elasticsearch query rules needed for those triggers.
+1. Paste your **Elasticsearch URL** and **Kibana URL**. In Elastic Cloud, open https://cloud.elastic.co/home and copy both endpoints from the same deployment under the manage section.
+2. In Settings, create an API key and paste it into SuperPlane. The key must be able to access Elasticsearch, Kibana cases, and Kibana connectors.
 
 <a id="when-alert-fires"></a>
 
@@ -61,20 +47,14 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 1. Select the Kibana alert rule in SuperPlane and save the trigger.
 2. SuperPlane automatically creates or reuses the shared Kibana Webhook connector and attaches it to the selected rule if it is missing.
 
+If canvas versioning is enabled, this provisioning happens when the live version is published. Autosave on a draft version does not create the connector.
+
 #### Kibana action body
 
 SuperPlane configures the rule action body with these fields:
 
 ```json
-{
-  "eventType": "alert_fired",
-  "ruleId": "{{rule.id}}",
-  "ruleName": "{{rule.name}}",
-  "spaceId": "{{rule.spaceId}}",
-  "tags": {{rule.tags}},
-  "severity": "{{context.severity}}",
-  "status": "{{rule.status}}"
-}
+{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","severity":"{{context.severity}}","status":"{{rule.status}}"}
 ```
 
 The `eventType` field is required for routing. Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
@@ -141,6 +121,8 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 5. SuperPlane compares each returned case's current status to the last status stored in trigger metadata and only emits when the value changed.
 6. SuperPlane emits one `elastic.case.status.changed` event per matching case whose status actually changed.
 
+If canvas versioning is enabled, provisioning happens when the live version is published. Autosave on a draft version does not create the connector or rule.
+
 ### Configuration
 
 - **Cases**: Select one or more specific cases to monitor.
@@ -193,6 +175,8 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 1. When the trigger is saved, SuperPlane creates or reuses the shared Kibana Webhook connector and provisions a Kibana Elasticsearch query rule for the configured index.
 2. Every minute, the rule checks for documents with an `@timestamp` value within the current window. When matches are found, Kibana fires the connector.
 3. SuperPlane receives the webhook, queries Elasticsearch for all documents newer than its stored checkpoint, and emits one event per document.
+
+If canvas versioning is enabled, provisioning happens when the live version is published. Autosave on a draft version does not create the connector or rule.
 
 ### Configuration
 

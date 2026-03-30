@@ -29,6 +29,7 @@ func (e *EventContext) Count() int {
 
 type NodeWebhookContext struct {
 	Secret string
+	URL    string
 }
 
 func (w *NodeWebhookContext) GetSecret() ([]byte, error) {
@@ -45,6 +46,9 @@ func (w *NodeWebhookContext) SetSecret(secret []byte) error {
 }
 
 func (w *NodeWebhookContext) Setup() (string, error) {
+	if w.URL != "" {
+		return w.URL, nil
+	}
 	id := uuid.New()
 	return id.String(), nil
 }
