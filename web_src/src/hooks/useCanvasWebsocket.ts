@@ -61,6 +61,11 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const workflowEvent = payload as CanvasesCanvasEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
+
+            queryClient.invalidateQueries({
+              queryKey: canvasKeys.infiniteEvents(canvasId),
+            });
+
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
             onWorkflowEvent?.(workflowEvent, data.event);
           }
@@ -78,6 +83,10 @@ export function useCanvasWebsocket(
 
               nodeExecutionStore.updateNodeExecution(storeNodeId, execution);
 
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.infiniteEvents(canvasId),
+              });
+
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
                   queryKey: canvasKeys.eventExecution(canvasId, execution.rootEvent.id),
@@ -92,6 +101,11 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
+
+            queryClient.invalidateQueries({
+              queryKey: canvasKeys.infiniteEvents(canvasId),
+            });
+
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
@@ -99,6 +113,11 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
+
+            queryClient.invalidateQueries({
+              queryKey: canvasKeys.infiniteEvents(canvasId),
+            });
+
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;

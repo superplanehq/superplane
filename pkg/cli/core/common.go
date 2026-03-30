@@ -57,6 +57,19 @@ func FindIntegrationDefinition(ctx CommandContext, name string) (openapi_client.
 	return openapi_client.IntegrationsIntegrationDefinition{}, fmt.Errorf("integration %q not found", name)
 }
 
+func ResolveOrganizationID(ctx CommandContext) (string, error) {
+	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
+	if err != nil {
+		return "", err
+	}
+
+	if !me.HasOrganizationId() || strings.TrimSpace(me.GetOrganizationId()) == "" {
+		return "", fmt.Errorf("organization id not found for authenticated user")
+	}
+
+	return me.GetOrganizationId(), nil
+}
+
 func ResolveCanvasID(ctx CommandContext, canvasID string) (string, error) {
 	canvasID = strings.TrimSpace(canvasID)
 	if canvasID != "" {

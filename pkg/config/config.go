@@ -17,3 +17,11 @@ func RabbitMQURL() (string, error) {
 func UsageGRPCURL() string {
 	return os.Getenv("USAGE_GRPC_URL")
 }
+
+func AgentHTTPURL() string {
+	return os.Getenv("AGENT_HTTP_URL")
+}
+
+func AgentGRPCURL() string {
+	return os.Getenv("AGENT_GRPC_URL")
+}

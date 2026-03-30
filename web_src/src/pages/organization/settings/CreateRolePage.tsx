@@ -11,7 +11,7 @@ import { useCreateRole, useRole, useUpdateRole } from "../../../hooks/useOrganiz
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Checkbox } from "@/ui/checkbox";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface Permission {

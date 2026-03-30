@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfigurationField } from "@/api-client";
-import { isFieldRequired, isFieldVisible, validateFieldForSubmission } from "@/utils/components";
+import { isFieldRequired, isFieldVisible, validateFieldForSubmission } from "@/lib/components";
 
 interface ValidationError {
   field: string;

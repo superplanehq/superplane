@@ -313,53 +313,77 @@ func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) {
-	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
+	deadline := time.Now().Add(10 * time.Second)
+	lastCount := -1
 
-	nodes, err := models.FindCanvasNodes(canvas.ID)
-	require.NoError(s.t, err)
+	for time.Now().Before(deadline) {
+		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+		require.NoError(s.t, err)
 
-	var waitNode *models.CanvasNode
-	for _, n := range nodes {
-		if n.Name == nodeName {
-			waitNode = &n
-			break
+		nodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(s.t, err)
+
+		var waitNode *models.CanvasNode
+		for _, n := range nodes {
+			if n.Name == nodeName {
+				waitNode = &n
+				break
+			}
 		}
+		require.NotNil(s.t, waitNode, nodeName+" node not found")
+
+		queueItems, err := models.ListNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID, 100, nil)
+		require.NoError(s.t, err)
+
+		lastCount = len(queueItems)
+		if lastCount == expected {
+			return
+		}
+
+		time.Sleep(250 * time.Millisecond)
 	}
-	require.NotNil(s.t, waitNode, nodeName+" node not found")
 
-	queueItems, err := models.ListNodeQueueItems(waitNode.WorkflowID, waitNode.NodeID, 100, nil)
-	require.NoError(s.t, err)
-
-	require.Equal(s.t, expected, len(queueItems))
+	require.Equal(s.t, expected, lastCount)
 }
 
 func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int) {
-	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
-	require.NoError(s.t, err)
+	deadline := time.Now().Add(10 * time.Second)
+	lastCount := -1
 
-	nodes, err := models.FindCanvasNodes(canvas.ID)
-	require.NoError(s.t, err)
+	for time.Now().Before(deadline) {
+		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+		require.NoError(s.t, err)
 
-	var waitNode *models.CanvasNode
-	for _, n := range nodes {
-		if n.Name == nodeName {
-			waitNode = &n
-			break
+		nodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(s.t, err)
+
+		var waitNode *models.CanvasNode
+		for _, n := range nodes {
+			if n.Name == nodeName {
+				waitNode = &n
+				break
+			}
 		}
+		require.NotNil(s.t, waitNode, nodeName+" node not found")
+
+		var executions []models.CanvasNodeExecution
+		query := database.Conn().
+			Where("workflow_id = ?", waitNode.WorkflowID).
+			Where("node_id = ?", waitNode.NodeID).
+			Order("created_at DESC")
+
+		err = query.Find(&executions).Error
+		require.NoError(s.t, err)
+
+		lastCount = len(executions)
+		if lastCount == expected {
+			return
+		}
+
+		time.Sleep(250 * time.Millisecond)
 	}
-	require.NotNil(s.t, waitNode, nodeName+" node not found")
 
-	var executions []models.CanvasNodeExecution
-	query := database.Conn().
-		Where("workflow_id = ?", waitNode.WorkflowID).
-		Where("node_id = ?", waitNode.NodeID).
-		Order("created_at DESC")
-
-	err = query.Find(&executions).Error
-	require.NoError(s.t, err)
-
-	require.Equal(s.t, expected, len(executions))
+	require.Equal(s.t, expected, lastCount)
 }
 
 func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {

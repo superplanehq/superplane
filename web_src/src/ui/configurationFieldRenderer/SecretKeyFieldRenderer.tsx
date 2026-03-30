@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSecrets } from "@/hooks/useSecrets";
 import { secretKeys } from "@/hooks/useSecrets";
 import { secretsDescribeSecret } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import type { AuthorizationDomainType } from "@/api-client";
 
 const SECRET_KEY_DELIMITER = "::";

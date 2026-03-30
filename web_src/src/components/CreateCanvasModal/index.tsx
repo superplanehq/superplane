@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
-import { getApiErrorMessage } from "@/utils/errors";
-import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/utils/usageLimits";
+import { getApiErrorMessage } from "@/lib/errors";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
-import { showErrorToast } from "../../utils/toast";
+import { showErrorToast } from "../../lib/toast";
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from "../Dialog/dialog";
 import { Field, Label } from "../Fieldset/fieldset";
 import { Icon } from "../Icon";

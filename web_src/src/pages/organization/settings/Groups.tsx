@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "@/utils/timezone";
+import { formatRelativeTime } from "@/lib/timezone";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -16,7 +16,7 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 interface GroupsProps {
   organizationId: string;

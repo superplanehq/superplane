@@ -1,5 +1,5 @@
 import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import { MetadataItem } from "@/ui/metadataList";

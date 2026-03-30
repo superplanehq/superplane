@@ -13,8 +13,8 @@ import { useAvailableIntegrations, useConnectedIntegrations } from "../../hooks/
 import { BlockData } from "../../ui/CanvasPage/Block";
 import type { BreadcrumbItem, NewNodeData } from "../../ui/CustomComponentBuilderPage";
 import { CustomComponentBuilderPage } from "../../ui/CustomComponentBuilderPage";
-import { filterVisibleConfiguration } from "../../utils/components";
-import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import { filterVisibleConfiguration } from "../../lib/components";
+import { showErrorToast, showSuccessToast } from "../../lib/toast";
 import { getComponentBaseMapper } from "../workflowv2/mappers";
 import { buildComponentDefinition, buildNodeInfo, generateNodeId, generateUniqueNodeName } from "../workflowv2/utils";
 
@@ -71,7 +71,7 @@ const getBlockType = (componentName: string): BlockData["type"] => {
     semaphore: "component",
     wait: "component",
     timeGate: "component",
-    merge: "merge",
+    merge: "component",
   };
   return typeMap[componentName] || "component"; // Default to noop for unknown components
 };

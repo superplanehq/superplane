@@ -5924,7 +5924,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x13ListEventExecutions\x12/.Superplane.Canvases.ListEventExecutionsRequest\x1a0.Superplane.Canvases.ListEventExecutionsResponse\"\xa9\x01\x92Ae\n" +
 	"\vCanvasEvent\x12\x15List event executions\x1a?Returns a list of all node executions triggered by a root event\x82\xd3\xe4\x93\x02;\x129/api/v1/canvases/{canvas_id}/events/{event_id}/executionsB\xc8\x01\x92A\x8c\x01\x12b\n" +
 	"\x17Superplane Canvases API\x12\x1bAPI for Superplane canvases\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/canvasesb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/canvasesb\x06proto3"
 
 var (
 	file_canvases_proto_rawDescOnce sync.Once

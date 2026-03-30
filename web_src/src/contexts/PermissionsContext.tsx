@@ -2,7 +2,8 @@ import React, { createContext, useCallback, useContext, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { AuthorizationPermission, usersListUserPermissions } from "@/api-client";
-import { useOrganizationId, withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useMe } from "@/hooks/useMe";
 
 interface PermissionsContextType {

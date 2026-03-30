@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { FieldRendererProps } from "./types";
-import { toTestId } from "@/utils/testID";
+import { toTestId } from "@/lib/testID";
 
 export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
   field,
