@@ -15,19 +15,18 @@ import {
 } from "@xyflow/react";
 
 import {
+  ChevronsDownUp,
+  ChevronsUpDown,
   CircleX,
   GitBranch,
   Group,
+  LayoutDashboard,
   Loader2,
-  Map as MapIcon,
   Play,
-  ScanLine,
-  ScanText,
   Copy,
   LayoutGrid,
   Trash2,
   TriangleAlert,
-  Workflow,
 } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
@@ -63,14 +62,12 @@ import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import { GroupNode } from "../groupNode";
-import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
@@ -1836,7 +1833,6 @@ function CanvasContent({
   onRunNodeSelect,
   onRunExecutionSelect,
   onAcknowledgeErrors,
-  title,
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
@@ -2023,8 +2019,6 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
-
   useEffect(() => {
     if (showBottomStatusControls) {
       localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
@@ -2726,8 +2720,7 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
+            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />{" "}
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
@@ -2771,34 +2764,17 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  screenshotName={title}
                   isSnapToGridEnabled={isSnapToGridEnabled}
                   onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
-                  leadingContent={
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isMinimapVisible ? "secondary" : "ghost"}
-                          size="sm"
-                          className={`h-8 w-8 px-0 ${
-                            isMinimapVisible
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
-                          onClick={() => setIsMinimapVisible((prev: boolean) => !prev)}
-                          aria-pressed={isMinimapVisible}
-                        >
-                          <MapIcon className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{isMinimapVisible ? "Hide minimap" : "Show minimap"}</TooltipContent>
-                    </Tooltip>
-                  }
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                        {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                        {state.isCollapsed ? (
+                          <ChevronsUpDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronsDownUp className="h-3 w-3" />
+                        )}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -2811,18 +2787,18 @@ function CanvasContent({
                     <TooltipTrigger asChild>
                       <span className="inline-flex">
                         <Button
-                          variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
+                          variant="ghost"
                           size="sm"
-                          className={`h-8 w-8 px-0 ${
-                            isAutoLayoutOnUpdateEnabled
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
+                          className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
                           onClick={handleToggleAutoLayoutOnUpdate}
                           disabled={isAutoLayoutToggleDisabled}
                           aria-pressed={isAutoLayoutOnUpdateEnabled}
                         >
-                          <Workflow className="h-3 w-3" />
+                          {isAutoLayoutOnUpdateEnabled ? (
+                            <LayoutGrid className="h-3 w-3" />
+                          ) : (
+                            <LayoutDashboard className="h-3 w-3" />
+                          )}
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -2865,13 +2841,13 @@ function CanvasContent({
                           ) : (
                             <Play className="h-3 w-3" />
                           )}
-                          <span
-                            className={cn(
-                              "tabular-nums",
-                              runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800",
-                            )}
-                          >
-                            {runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total}
+                          <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
+                            Runs ·{" "}
+                            <span className="tabular-nums">
+                              {(runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total).toLocaleString(
+                                "de-DE",
+                              )}
+                            </span>
                           </span>
                         </Button>
                       </TooltipTrigger>
