@@ -135,8 +135,8 @@ func Test__GrafanaWebhookHandler__Setup__PolicyRouteHasAlertNameMatchers(t *test
 	matcher := matchers[0].([]any)
 	assert.Equal(t, "alertname", matcher[0])
 	assert.Equal(t, "=~", matcher[1])
-	// "High CPU" (equals) is quoted with QuoteMeta (space is not a metachar), "Low.*" (matches) is kept as-is
-	assert.Equal(t, `High CPU|Low.*`, matcher[2])
+	// Full-string =~ alternation (aligned with webhook-side filtering).
+	assert.Equal(t, `^(?:High CPU|Low.*)$`, matcher[2])
 }
 
 func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *testing.T) {

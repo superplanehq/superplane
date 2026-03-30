@@ -479,26 +479,41 @@ func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNam
 	return c.putNotificationPolicies(root)
 }
 
-// buildAlertNameMatchers converts predicates into Grafana object_matchers entries.
-// Positive predicates (equals, matches) are combined into a single =~ regex alternative.
-// Negative predicates (notEquals) become individual != matchers.
-func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
-	var positivePatterns []string
-	var matchers [][]string
-
+// combinedPositiveAlertNameRegex builds the =~ pattern Grafana uses for object_matchers on
+// alertname: full-string match with positive predicates OR'd inside one alternation.
+// Must stay aligned with alertLabelNameMatchesPredicates in on_alert_firing.go.
+func combinedPositiveAlertNameRegex(predicates []configuration.Predicate) (string, bool) {
+	var parts []string
 	for _, p := range predicates {
 		switch p.Type {
 		case configuration.PredicateTypeEquals:
-			positivePatterns = append(positivePatterns, regexp.QuoteMeta(p.Value))
+			parts = append(parts, regexp.QuoteMeta(p.Value))
 		case configuration.PredicateTypeMatches:
-			positivePatterns = append(positivePatterns, p.Value)
-		case configuration.PredicateTypeNotEquals:
+			parts = append(parts, p.Value)
+		}
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	// Grafana =~ applies the regex as a full-string match (same as anchoring the alternation).
+	return "^(?:" + strings.Join(parts, "|") + ")$", true
+}
+
+// buildAlertNameMatchers converts predicates into Grafana object_matchers entries.
+// Positive predicates (equals, matches) are combined into one =~ matcher (OR inside the regex);
+// negative predicates (notEquals) become separate != matchers. Grafana ANDs matchers together.
+func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
+	var matchers [][]string
+
+	for _, p := range predicates {
+		if p.Type == configuration.PredicateTypeNotEquals {
 			matchers = append(matchers, []string{"alertname", "!=", p.Value})
 		}
 	}
 
-	if len(positivePatterns) > 0 {
-		matchers = append([][]string{{"alertname", "=~", strings.Join(positivePatterns, "|")}}, matchers...)
+	combined, ok := combinedPositiveAlertNameRegex(predicates)
+	if ok {
+		matchers = append([][]string{{"alertname", "=~", combined}}, matchers...)
 	}
 
 	return matchers
