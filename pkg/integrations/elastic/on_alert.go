@@ -3,6 +3,7 @@ package elastic
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -36,7 +37,9 @@ type OnAlertFiresMetadata struct {
 	PreviousRuleID string   `json:"previousRuleId,omitempty" mapstructure:"previousRuleId"`
 }
 
-const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","tags":"{{rule.tags}}","severity":"{{context.severity}}","status":"{{rule.status}}"}`
+// Tags must use unquoted {{rule.tags}} so Kibana injects a JSON array; a string field
+// ("tags":"{{rule.tags}}") often yields an empty or non-JSON value and breaks tag filters.
+const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","tags":{{rule.tags}},"severity":"{{context.severity}}","status":"{{rule.status}}"}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -300,8 +303,11 @@ func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerActionContext
 	}
 
 	if meta.PreviousRuleID != "" {
-		if err := client.RemoveKibanaRuleConnector(meta.PreviousRuleID, connector.ID); err != nil && ctx.Logger != nil {
-			ctx.Logger.Warnf("elastic onAlertFires: failed to detach connector from old rule %s: %v", meta.PreviousRuleID, err)
+		if err := client.RemoveKibanaRuleConnector(meta.PreviousRuleID, connector.ID); err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("elastic onAlertFires: failed to detach connector from old rule %s: %v", meta.PreviousRuleID, err)
+			}
+			return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
 		}
 		meta.PreviousRuleID = ""
 		if err := ctx.Metadata.Set(meta); err != nil && ctx.Logger != nil {
@@ -353,7 +359,10 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 
 func (t *OnAlertFires) Cleanup(ctx core.TriggerContext) error {
 	var meta OnAlertFiresMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil || meta.RuleID == "" {
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
+		return nil
+	}
+	if meta.RuleID == "" && meta.PreviousRuleID == "" {
 		return nil
 	}
 
@@ -372,7 +381,18 @@ func (t *OnAlertFires) Cleanup(ctx core.TriggerContext) error {
 		return nil
 	}
 
-	return client.RemoveKibanaRuleConnector(meta.RuleID, connector.ID)
+	var detachErrs []error
+	if meta.RuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.RuleID, connector.ID); err != nil {
+			detachErrs = append(detachErrs, err)
+		}
+	}
+	if meta.PreviousRuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.PreviousRuleID, connector.ID); err != nil {
+			detachErrs = append(detachErrs, err)
+		}
+	}
+	return errors.Join(detachErrs...)
 }
 
 // matchesFilters returns true if the alert payload satisfies all configured filters.

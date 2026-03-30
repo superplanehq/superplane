@@ -237,6 +237,38 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 		assert.Len(t, httpCtx.Requests, 6)
 		assert.Contains(t, httpCtx.Requests[4].URL.Path, "rule-old")
 	})
+
+	t.Run("detach from old rule fails -> schedules retry and keeps previousRuleId", func(t *testing.T) {
+		oldRuleDetailsResponse := `{"id":"rule-old","name":"Old rule","rule_type_id":".es-query","actions":[{"id":"conn-1","group":"query matched","params":{"body":"{}"}}]}`
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(connectorsResponse))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleDetailsResponse))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleTypesResponse))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleDetailsResponse))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(oldRuleDetailsResponse))},
+			{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"message":"server error"}`))},
+		}}
+		meta := &contexts.MetadataContext{Metadata: OnAlertFiresMetadata{
+			RuleID:         "rule-123",
+			PreviousRuleID: "rule-old",
+		}}
+		requestCtx := &contexts.RequestContext{}
+
+		_, err := trigger.HandleAction(core.TriggerActionContext{
+			Name:        checkAlertConnectorAction,
+			HTTP:        httpCtx,
+			Integration: integrationCtx,
+			Metadata:    meta,
+			Requests:    requestCtx,
+			Webhook:     &contexts.NodeWebhookContext{URL: testWebhookURL},
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, checkAlertConnectorAction, requestCtx.Action)
+		assert.Equal(t, checkAlertConnectorRetryInterval, requestCtx.Duration)
+		saved := meta.Metadata.(OnAlertFiresMetadata)
+		assert.Equal(t, "rule-old", saved.PreviousRuleID)
+	})
 }
 
 func Test__OnAlertFires__HandleWebhook(t *testing.T) {
@@ -249,7 +281,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		"ruleId":   "rule-123",
 		"ruleName": "High error rate",
 		"spaceId":  "default",
-		"tags":     "team:infra,env:prod",
+		"tags":     ["team:infra", "env:prod"],
 		"status":   "active",
 		"severity": "critical"
 	}`)
@@ -368,7 +400,7 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 				"eventType": "alert_fired",
 				"ruleName": "High error rate",
 				"spaceId": "default",
-				"tags": "team:infra,env:prod",
+				"tags": ["team:infra", "env:prod"],
 				"status": "active",
 				"severity": "critical"
 			}`),
@@ -440,6 +472,29 @@ func Test__OnAlertFires__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Empty(t, eventsCtx.Payloads)
+	})
+
+	t.Run("tags as comma-separated string still matches (legacy payloads)", func(t *testing.T) {
+		legacyBody := []byte(`{
+			"eventType": "alert_fired",
+			"ruleId":   "rule-123",
+			"ruleName": "High error rate",
+			"spaceId":  "default",
+			"tags":     "team:infra,env:prod",
+			"status":   "active",
+			"severity": "critical"
+		}`)
+		eventsCtx := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          legacyBody,
+			Headers:       headersWithSecret(),
+			Configuration: map[string]any{"tags": []configuration.Predicate{eq("env:prod")}},
+			Events:        eventsCtx,
+			Webhook:       webhook,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Len(t, eventsCtx.Payloads, 1)
 	})
 
 	// --- severities / statuses ---
