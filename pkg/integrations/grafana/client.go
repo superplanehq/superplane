@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -324,6 +326,209 @@ func (c *Client) DeleteContactPoint(uid string) error {
 	}
 
 	return nil
+}
+
+// Notification policies are read and written as map[string]json.RawMessage so Grafana
+// fields we do not model (mute_time_intervals, matchers, nested route fields, etc.)
+// round-trip unchanged at the root and within each route object.
+
+func parseNotificationPolicyRoot(body []byte) (map[string]json.RawMessage, error) {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil, fmt.Errorf("error parsing notification policies: %v", err)
+	}
+	if root == nil {
+		root = map[string]json.RawMessage{}
+	}
+	return root, nil
+}
+
+func marshalNotificationPolicyRoot(root map[string]json.RawMessage) ([]byte, error) {
+	data, err := json.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling notification policies: %v", err)
+	}
+	return data, nil
+}
+
+func getChildRoutes(root map[string]json.RawMessage) ([]json.RawMessage, error) {
+	raw, ok := root["routes"]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var routes []json.RawMessage
+	if err := json.Unmarshal(raw, &routes); err != nil {
+		return nil, fmt.Errorf("error parsing routes array: %v", err)
+	}
+	return routes, nil
+}
+
+func setChildRoutes(root map[string]json.RawMessage, routes []json.RawMessage) error {
+	encoded, err := json.Marshal(routes)
+	if err != nil {
+		return err
+	}
+	root["routes"] = encoded
+	return nil
+}
+
+type routeReceiverField struct {
+	Receiver string `json:"receiver"`
+}
+
+func routeReceiverName(route json.RawMessage) (string, error) {
+	var r routeReceiverField
+	if err := json.Unmarshal(route, &r); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(r.Receiver), nil
+}
+
+func removeRoutesForReceiverRaw(routes []json.RawMessage, receiver string) ([]json.RawMessage, error) {
+	if len(routes) == 0 {
+		return nil, nil
+	}
+	out := make([]json.RawMessage, 0, len(routes))
+	for _, route := range routes {
+		name, err := routeReceiverName(route)
+		if err != nil {
+			return nil, err
+		}
+		if name != receiver {
+			out = append(out, route)
+		}
+	}
+	return out, nil
+}
+
+type superplaneNotificationRoute struct {
+	Receiver       string     `json:"receiver"`
+	Continue       bool       `json:"continue,omitempty"`
+	ObjectMatchers [][]string `json:"object_matchers,omitempty"`
+}
+
+func (c *Client) getNotificationPolicies() (map[string]json.RawMessage, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/policies", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting notification policies: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana get notification policies", status, responseBody)
+	}
+	return parseNotificationPolicyRoot(responseBody)
+}
+
+func (c *Client) putNotificationPolicies(root map[string]json.RawMessage) error {
+	data, err := marshalNotificationPolicyRoot(root)
+	if err != nil {
+		return err
+	}
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPut, "/api/v1/provisioning/policies",
+		bytes.NewReader(data), "application/json",
+		map[string]string{"X-Disable-Provenance": "true"},
+	)
+	if err != nil {
+		return fmt.Errorf("error updating notification policies: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return newAPIStatusError("grafana put notification policies", status, responseBody)
+	}
+	return nil
+}
+
+// UpsertNotificationPolicyRoute ensures a child route for contactPointName exists at the
+// root of the policy tree. If alertNamePredicates is non-empty, object_matchers are built
+// from the predicates: positive predicates (equals, matches) are combined into a single
+// =~ regex OR pattern; negative predicates (notEquals) become individual != matchers.
+// The route has continue=true so other routes still fire.
+func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNamePredicates []configuration.Predicate) error {
+	root, err := c.getNotificationPolicies()
+	if err != nil {
+		return err
+	}
+
+	routes, err := getChildRoutes(root)
+	if err != nil {
+		return err
+	}
+
+	filtered, err := removeRoutesForReceiverRaw(routes, contactPointName)
+	if err != nil {
+		return err
+	}
+
+	route := superplaneNotificationRoute{
+		Receiver: contactPointName,
+		Continue: true,
+	}
+	if len(alertNamePredicates) > 0 {
+		route.ObjectMatchers = buildAlertNameMatchers(alertNamePredicates)
+	}
+
+	routeBytes, err := json.Marshal(route)
+	if err != nil {
+		return fmt.Errorf("error marshaling notification route: %v", err)
+	}
+
+	// Prepend so our route takes priority over catch-alls.
+	newRoutes := append([]json.RawMessage{routeBytes}, filtered...)
+	if err := setChildRoutes(root, newRoutes); err != nil {
+		return err
+	}
+	return c.putNotificationPolicies(root)
+}
+
+// buildAlertNameMatchers converts predicates into Grafana object_matchers entries.
+// Positive predicates (equals, matches) are combined into a single =~ regex alternative.
+// Negative predicates (notEquals) become individual != matchers.
+func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
+	var positivePatterns []string
+	var matchers [][]string
+
+	for _, p := range predicates {
+		switch p.Type {
+		case configuration.PredicateTypeEquals:
+			positivePatterns = append(positivePatterns, regexp.QuoteMeta(p.Value))
+		case configuration.PredicateTypeMatches:
+			positivePatterns = append(positivePatterns, p.Value)
+		case configuration.PredicateTypeNotEquals:
+			matchers = append(matchers, []string{"alertname", "!=", p.Value})
+		}
+	}
+
+	if len(positivePatterns) > 0 {
+		matchers = append([][]string{{"alertname", "=~", strings.Join(positivePatterns, "|")}}, matchers...)
+	}
+
+	return matchers
+}
+
+// RemoveNotificationPolicyRoute removes any child route for contactPointName from the
+// root of the policy tree. No-op if no such route exists.
+func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
+	root, err := c.getNotificationPolicies()
+	if err != nil {
+		return err
+	}
+
+	routes, err := getChildRoutes(root)
+	if err != nil {
+		return err
+	}
+
+	filtered, err := removeRoutesForReceiverRaw(routes, contactPointName)
+	if err != nil {
+		return err
+	}
+	if len(filtered) == len(routes) {
+		return nil // nothing to remove
+	}
+
+	if err := setChildRoutes(root, filtered); err != nil {
+		return err
+	}
+	return c.putNotificationPolicies(root)
 }
 
 func (c *Client) ListDataSources() ([]DataSource, error) {
