@@ -62,9 +62,10 @@ func (q *QueryDataSource) Documentation() string {
 
 ## Configuration
 
-- **Data Source UID**: The Grafana datasource UID to query
+- **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional time range (relative like "now-5m" or absolute)
+- **Time From / Time To**: Optional datetime picker values for the query range
+- If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
 ## Output
@@ -89,10 +90,10 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "dataSourceUid",
-			Label:       "Data Source UID",
+			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Grafana datasource UID to query",
+			Description: "The Grafana data source to query",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: resourceTypeDataSource,
@@ -112,7 +113,7 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Label:       "Time From",
 			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "Start of the query time range",
+			Description: "Optional start of the query time range",
 			TypeOptions: &configuration.TypeOptions{
 				DateTime: &configuration.DateTimeTypeOptions{
 					Format: "2006-01-02T15:04",
@@ -124,7 +125,7 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Label:       "Time To",
 			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "End of the query time range",
+			Description: "Optional end of the query time range",
 			TypeOptions: &configuration.TypeOptions{
 				DateTime: &configuration.DateTimeTypeOptions{
 					Format: "2006-01-02T15:04",
