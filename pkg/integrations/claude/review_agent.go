@@ -129,7 +129,8 @@ func (r *ReviewAgent) Configuration() []configuration.Field {
 
 func (r *ReviewAgent) Setup(ctx core.SetupContext) error {
 	spec := ReviewAgentSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	decoder, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{WeaklyTypedInput: true, Result: &spec})
+	if err := decoder.Decode(ctx.Configuration); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 	if spec.Repository == "" {
@@ -143,7 +144,8 @@ func (r *ReviewAgent) Setup(ctx core.SetupContext) error {
 
 func (r *ReviewAgent) Execute(ctx core.ExecutionContext) error {
 	spec := ReviewAgentSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	decoder, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{WeaklyTypedInput: true, Result: &spec})
+	if err := decoder.Decode(ctx.Configuration); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 

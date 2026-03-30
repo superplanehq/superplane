@@ -28,7 +28,6 @@ type CodeAgentSpec struct {
 	IssueKey      string `json:"issueKey" mapstructure:"issueKey"`
 	BaseBranch    string `json:"baseBranch" mapstructure:"baseBranch"`
 	GitHubToken   string `json:"githubToken" mapstructure:"githubToken"`
-	ReviewComment string `json:"reviewComment" mapstructure:"reviewComment"`
 }
 
 type CodeAgentOutputPayload struct {
@@ -259,14 +258,6 @@ func (c *CodeAgent) Execute(ctx core.ExecutionContext) error {
 	}
 
 	ctx.Logger.Infof("[CodeAgent] PR created: %s (#%d)", pr.URL, pr.Number)
-
-	if spec.ReviewComment != "" {
-		if err := ghClient.CreatePRComment(owner, repo, pr.Number, spec.ReviewComment); err != nil {
-			ctx.Logger.Warnf("[CodeAgent] Failed to post review comment: %v", err)
-		} else {
-			ctx.Logger.Infof("[CodeAgent] Review comment posted on PR #%d", pr.Number)
-		}
-	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,

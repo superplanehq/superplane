@@ -111,7 +111,8 @@ func (m *MergeAgent) Configuration() []configuration.Field {
 
 func (m *MergeAgent) Setup(ctx core.SetupContext) error {
 	spec := MergeAgentSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	decoder, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{WeaklyTypedInput: true, Result: &spec})
+	if err := decoder.Decode(ctx.Configuration); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 	if spec.Repository == "" {
@@ -125,7 +126,8 @@ func (m *MergeAgent) Setup(ctx core.SetupContext) error {
 
 func (m *MergeAgent) Execute(ctx core.ExecutionContext) error {
 	spec := MergeAgentSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+	decoder, _ := mapstructure.NewDecoder(&mapstructure.DecoderConfig{WeaklyTypedInput: true, Result: &spec})
+	if err := decoder.Decode(ctx.Configuration); err != nil {
 		return fmt.Errorf("failed to decode configuration: %v", err)
 	}
 
