@@ -195,7 +195,7 @@ function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
       title: "input",
       tooltipTitle: "inputs",
       iconSlug: "settings",
-      values: inputs.map((param) => ({
+      values: inputs.map((param: { name: string; value: string }) => ({
         badges: [
           {
             label: param.name,
