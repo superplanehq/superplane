@@ -20,8 +20,8 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
       email: "support@superplane.com";
     };
   };
-  schemes: HTTP;
   schemes: HTTPS;
+  schemes: HTTP;
   consumes: "application/json";
   produces: "application/json";
 };
