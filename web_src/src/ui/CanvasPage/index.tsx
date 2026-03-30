@@ -2841,7 +2841,7 @@ function CanvasContent({
             style={{ opacity: isInitialized ? 1 : 0 }}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />{" "}
+            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
@@ -2966,7 +2966,7 @@ function CanvasContent({
                             Runs ·{" "}
                             <span className="tabular-nums">
                               {(runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total).toLocaleString(
-                                "de-DE",
+                                "en-US",
                               )}
                             </span>
                           </span>
