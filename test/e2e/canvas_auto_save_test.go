@@ -23,8 +23,9 @@ func TestCanvasAutoSave(t *testing.T) {
 		steps.addNoopNode("Auto Save Node", models.Position{X: 500, Y: 220})
 		steps.waitForSaved()
 		steps.dismissSidebar()
+		baseline := steps.canvas.GetSaveCount()
 		steps.moveNode("Auto Save Node", 100, 80)
-		steps.waitForSaved()
+		steps.waitForSaved(baseline)
 	})
 }
 
@@ -108,6 +109,6 @@ func (s *canvasAutoSaveSteps) moveNode(name string, deltaX, deltaY int) {
 }
 
 // waitForSaved polls the canvas save status indicator until it reports "saved".
-func (s *canvasAutoSaveSteps) waitForSaved() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
+func (s *canvasAutoSaveSteps) waitForSaved(baseline ...string) {
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline...)
 }

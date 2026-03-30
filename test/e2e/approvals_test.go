@@ -203,9 +203,9 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
-
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
 	s.session.Sleep(200)
@@ -225,8 +225,7 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 	}
 	s.session.Click(q.Locator(`div[role="option"]:has-text("e2e@superplane.local")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
@@ -235,9 +234,9 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
-
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
 	s.session.Click(q.TestID("field-type-select"))
@@ -246,8 +245,7 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 	s.session.Click(q.Locator(`button:has-text("Select role")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + roleLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
@@ -256,9 +254,9 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
-
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
 	s.session.Click(q.TestID("field-type-select"))
@@ -267,8 +265,7 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
@@ -277,9 +274,9 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	source := q.TestID("building-block-approval")
 	target := q.TestID("rf__wrapper")
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(300)
-
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 	s.session.Click(q.Locator(`button:has-text("Add Approver")`))
 	s.session.Sleep(400)
@@ -311,8 +308,7 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 	s.session.Click(q.Locator(`button:has-text("Select group")`))
 	s.session.Click(q.Locator(`div[role="option"]:has-text("` + groupLabel + `")`))
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
@@ -320,7 +316,7 @@ func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"Approval",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		30*time.Second,
+		10*time.Second,
 	)
 }
 
@@ -401,7 +397,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")

@@ -152,7 +152,7 @@ func (s *WaitSteps) runManualTrigger() {
 			models.CanvasNodeExecutionStatePending,
 			models.CanvasNodeExecutionStateStarted,
 		},
-		30*time.Second,
+		10*time.Second,
 	)
 }
 
@@ -169,7 +169,7 @@ func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
 	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`))
 	s.session.Sleep(300) // Wait for actions menu to open
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 }
 
 func (s *WaitSteps) assertWaitExecutionFinishedAndOutputNodeProcessed() {
