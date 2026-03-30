@@ -54,7 +54,7 @@ If canvas versioning is enabled, this provisioning happens when the live version
 SuperPlane configures the rule action body with these fields:
 
 ```json
-{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","severity":"{{context.severity}}","status":"{{rule.status}}"}
+{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","tags":{{rule.tags}},"severity":"{{context.severity}}","status":"{{rule.status}}"}
 ```
 
 The `eventType` field is required for routing. Kibana substitutes `{{rule.id}}` and `{{rule.name}}` at delivery time. Fields omitted from the body will not be filterable in SuperPlane.
