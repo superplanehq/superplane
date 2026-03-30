@@ -10,7 +10,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import {
@@ -18,7 +18,7 @@ import {
   isFieldRequired,
   parseDefaultValues,
   validateFieldForSubmission,
-} from "@/utils/components";
+} from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
@@ -326,7 +326,9 @@ export function SettingsTab({
       return;
     }
 
-    if (!validateNow() || currentNodeName.trim() === "") {
+    // Always run validation for UI feedback; only gate persistence in manual mode.
+    const isValid = validateNow();
+    if (currentNodeName.trim() === "" || (configurationSaveMode !== "auto" && !isValid)) {
       return;
     }
 
@@ -367,6 +369,16 @@ export function SettingsTab({
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
 
+  // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
+  useEffect(() => {
+    if (configurationSaveMode !== "auto") {
+      return;
+    }
+    return () => {
+      void handleSaveRef.current();
+    };
+  }, [configurationSaveMode]);
+
   useEffect(() => {
     if (configurationSaveMode !== "auto" || isReadOnly) {
       return;
@@ -377,10 +389,7 @@ export function SettingsTab({
     ) {
       return;
     }
-    if (hasNodeNameError) {
-      return;
-    }
-    if (integrationName && integrationsOfType.length > 0 && !selectedIntegration?.id) {
+    if (currentNodeName.trim() === "") {
       return;
     }
 
@@ -388,16 +397,7 @@ export function SettingsTab({
       void handleSaveRef.current();
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [
-    configurationSaveMode,
-    isReadOnly,
-    nodeConfiguration,
-    currentNodeName,
-    selectedIntegration,
-    hasNodeNameError,
-    integrationName,
-    integrationsOfType.length,
-  ]);
+  }, [configurationSaveMode, isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
 
   return (
     <div className={`p-4 overflow-y-auto ${showManualSaveFooter ? "pb-20" : "pb-24"}`} style={{ maxHeight: "80vh" }}>

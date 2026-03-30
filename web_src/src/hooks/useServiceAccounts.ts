@@ -7,7 +7,7 @@ import {
   serviceAccountsDeleteServiceAccount,
   serviceAccountsRegenerateServiceAccountToken,
 } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export const serviceAccountKeys = {
   all: ["serviceAccounts"] as const,

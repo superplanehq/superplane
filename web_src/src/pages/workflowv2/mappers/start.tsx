@@ -1,4 +1,4 @@
-import { getColorClass, getBackgroundColorClass } from "@/utils/colors";
+import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type {
   TriggerRenderer,
   CustomFieldRenderer,

@@ -1,9 +1,9 @@
 import type { SuperplaneComponentsOutputChannel } from "@/api-client";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 import { useState, type ReactNode } from "react";
-import type { BuildingBlock } from "./index";
 import { PayloadDialog } from "./PayloadDialog";
 import { PayloadPreview } from "./PayloadPreview";
+import type { BuildingBlock } from "./types";
 
 interface BuildingBlockPreviewProps {
   block: BuildingBlock;

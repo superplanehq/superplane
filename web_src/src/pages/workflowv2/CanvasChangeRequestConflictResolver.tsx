@@ -6,8 +6,19 @@ import Editor from "@monaco-editor/react";
 import type { Monaco } from "@monaco-editor/react";
 import { AlertTriangle, ArrowLeft, Check, CheckCircle2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import * as yaml from "js-yaml";
 import type { editor as MonacoEditor } from "monaco-editor";
+import {
+  buildConflictMarkerYAML,
+  buildNodeMap,
+  cloneJSON,
+  concatenateBothNodes,
+  concatenateConflictBlockLines,
+  localResolutionLabel,
+  parseNodeYAML,
+  prettyYAML,
+  pruneEdgesByNodes,
+  upsertNode,
+} from "./conflictResolverUtils";
 
 type CanvasNodeLike = Record<string, unknown>;
 type CanvasEdgeLike = Record<string, unknown>;
@@ -20,124 +31,6 @@ type ConflictMarkerBlock = {
   currentLabel: string;
   incomingLabel: string;
 };
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function normalizeForCompare(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => normalizeForCompare(item));
-  }
-
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
-  const normalized: Record<string, unknown> = {};
-  entries.forEach(([key, entryValue]) => {
-    normalized[key] = normalizeForCompare(entryValue);
-  });
-  return normalized;
-}
-
-function cloneJSON<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
-
-function prettyYAML(value: unknown): string {
-  const normalized = normalizeForCompare(value === undefined ? null : value);
-  return yaml.dump(normalized, {
-    noRefs: true,
-    lineWidth: 120,
-    sortKeys: true,
-  });
-}
-
-function parseNodeYAML(input: string, nodeID: string): { node: CanvasNodeLike | null; error?: string } {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return { node: null };
-  }
-
-  if (trimmed.includes("<<<<<<<") || trimmed.includes("=======") || trimmed.includes(">>>>>>>")) {
-    return { node: null, error: "Resolve conflict markers before applying YAML." };
-  }
-
-  try {
-    const parsed = yaml.load(trimmed);
-    if (parsed === null || parsed === undefined) {
-      return { node: null };
-    }
-
-    if (typeof parsed !== "object" || Array.isArray(parsed)) {
-      return { node: null, error: "Final Result must be a YAML object or null." };
-    }
-
-    return { node: { ...(parsed as CanvasNodeLike), id: nodeID } };
-  } catch {
-    return { node: null, error: "Invalid YAML format." };
-  }
-}
-
-function renderTopLevelFieldYAMLLines(key: string, value: unknown, hasKey: boolean): string[] {
-  if (!hasKey) {
-    return [`# ${key} is absent`];
-  }
-
-  const dumped = yaml.dump({ [key]: value }, { noRefs: true, lineWidth: 120, sortKeys: false }).trimEnd();
-  if (!dumped) {
-    return [];
-  }
-  return dumped.split("\n");
-}
-
-function buildConflictMarkerYAML(
-  currentNode: CanvasNodeLike | undefined,
-  incomingNode: CanvasNodeLike | undefined,
-  currentLabel: string,
-  incomingLabel: string,
-): string {
-  const currentObject = isPlainObject(currentNode) ? (normalizeForCompare(currentNode) as Record<string, unknown>) : {};
-  const incomingObject = isPlainObject(incomingNode)
-    ? (normalizeForCompare(incomingNode) as Record<string, unknown>)
-    : {};
-
-  const keys = Array.from(new Set([...Object.keys(currentObject), ...Object.keys(incomingObject)])).sort(
-    (left, right) => left.localeCompare(right),
-  );
-
-  const lines: string[] = [];
-  keys.forEach((key) => {
-    const currentHasKey = Object.prototype.hasOwnProperty.call(currentObject, key);
-    const incomingHasKey = Object.prototype.hasOwnProperty.call(incomingObject, key);
-
-    if (!currentHasKey && !incomingHasKey) {
-      return;
-    }
-
-    const currentValue = currentObject[key];
-    const incomingValue = incomingObject[key];
-    const valuesAreEqual =
-      currentHasKey &&
-      incomingHasKey &&
-      JSON.stringify(normalizeForCompare(currentValue)) === JSON.stringify(normalizeForCompare(incomingValue));
-
-    if (valuesAreEqual) {
-      lines.push(...renderTopLevelFieldYAMLLines(key, currentValue, true));
-      return;
-    }
-
-    lines.push(`<<<<<<< ${currentLabel}`);
-    lines.push(...renderTopLevelFieldYAMLLines(key, currentValue, currentHasKey));
-    lines.push("=======");
-    lines.push(...renderTopLevelFieldYAMLLines(key, incomingValue, incomingHasKey));
-    lines.push(`>>>>>>> ${incomingLabel}`);
-  });
-
-  return `${lines.join("\n").trimEnd()}\n`;
-}
 
 function findConflictMarkerBlocks(model: MonacoEditor.ITextModel): ConflictMarkerBlock[] {
   const blocks: ConflictMarkerBlock[] = [];
@@ -194,99 +87,6 @@ function findConflictMarkerBlocks(model: MonacoEditor.ITextModel): ConflictMarke
   }
 
   return blocks;
-}
-
-function deepMergeObjects(current: unknown, incoming: unknown): unknown {
-  if (!isPlainObject(current) || !isPlainObject(incoming)) {
-    return incoming;
-  }
-
-  const merged: Record<string, unknown> = {};
-  const keys = new Set([...Object.keys(current), ...Object.keys(incoming)]);
-  keys.forEach((key) => {
-    const currentValue = current[key];
-    const incomingValue = incoming[key];
-
-    if (incomingValue === undefined) {
-      merged[key] = currentValue;
-      return;
-    }
-
-    if (currentValue === undefined) {
-      merged[key] = incomingValue;
-      return;
-    }
-
-    merged[key] = deepMergeObjects(currentValue, incomingValue);
-  });
-  return merged;
-}
-
-function upsertNode(nodes: CanvasNodeLike[], nodeID: string, node: CanvasNodeLike | null): CanvasNodeLike[] {
-  const index = nodes.findIndex((item) => String(item.id || "") === nodeID);
-  if (!node) {
-    if (index < 0) {
-      return nodes;
-    }
-    const next = [...nodes];
-    next.splice(index, 1);
-    return next;
-  }
-
-  if (index < 0) {
-    return [...nodes, node];
-  }
-
-  const next = [...nodes];
-  next[index] = node;
-  return next;
-}
-
-function getNodeID(node: CanvasNodeLike | undefined): string {
-  return String(node?.id || "");
-}
-
-function buildNodeMap(nodes: CanvasNodeLike[]): Map<string, CanvasNodeLike> {
-  const result = new Map<string, CanvasNodeLike>();
-  nodes.forEach((node) => {
-    const id = getNodeID(node);
-    if (id) {
-      result.set(id, node);
-    }
-  });
-  return result;
-}
-
-function pruneEdgesByNodes(edges: CanvasEdgeLike[], nodes: CanvasNodeLike[]): CanvasEdgeLike[] {
-  const nodeIDSet = new Set(nodes.map((node) => getNodeID(node)).filter(Boolean));
-  return edges.filter((edge) => {
-    const sourceID = String(edge.sourceId || "");
-    const targetID = String(edge.targetId || "");
-    if (!sourceID || !targetID) {
-      return false;
-    }
-    return nodeIDSet.has(sourceID) && nodeIDSet.has(targetID);
-  });
-}
-
-function localResolutionLabel(
-  currentNode: CanvasNodeLike | undefined,
-  incomingNode: CanvasNodeLike | undefined,
-  finalNode: CanvasNodeLike | undefined,
-): string {
-  if (!finalNode) {
-    return "excluded";
-  }
-
-  if (JSON.stringify(normalizeForCompare(finalNode)) === JSON.stringify(normalizeForCompare(currentNode))) {
-    return "current";
-  }
-
-  if (JSON.stringify(normalizeForCompare(finalNode)) === JSON.stringify(normalizeForCompare(incomingNode))) {
-    return "incoming";
-  }
-
-  return "custom";
 }
 
 interface CanvasChangeRequestConflictResolverProps {
@@ -404,12 +204,8 @@ export function CanvasChangeRequestConflictResolver({
         replacementLines = currentLines;
       } else if (resolution === "incoming") {
         replacementLines = incomingLines;
-      } else if (currentLines.length === 0) {
-        replacementLines = incomingLines;
-      } else if (incomingLines.length === 0) {
-        replacementLines = currentLines;
       } else {
-        replacementLines = [...currentLines, ...incomingLines];
+        replacementLines = concatenateConflictBlockLines(currentLines, incomingLines);
       }
 
       editor.pushUndoStop();
@@ -422,7 +218,13 @@ export function CanvasChangeRequestConflictResolver({
       ]);
       editor.pushUndoStop();
       setFinalDraftYAML(model.getValue());
-      setFinalDraftError("");
+      if (resolution === "both") {
+        setFinalDraftError(
+          "Both changes were written. The resulting YAML has duplicate keys and is invalid — please edit it manually before marking as resolved.",
+        );
+      } else {
+        setFinalDraftError("");
+      }
       editor.focus();
     },
     [],
@@ -628,6 +430,7 @@ export function CanvasChangeRequestConflictResolver({
       return;
     }
 
+    const selectedNode = incomingNode || currentNode;
     if (!currentNode && !incomingNode) {
       setFinalNodes((current) => upsertNode(current, selectedNodeID, null));
       setResolvedNodeIDs((current) => new Set(current).add(selectedNodeID));
@@ -636,14 +439,19 @@ export function CanvasChangeRequestConflictResolver({
       return;
     }
 
-    const merged = cloneJSON(
-      deepMergeObjects(currentNode || {}, incomingNode || {}) as CanvasNodeLike,
-    ) as CanvasNodeLike;
-    merged.id = selectedNodeID;
-    setFinalNodes((current) => upsertNode(current, selectedNodeID, merged));
-    setResolvedNodeIDs((current) => new Set(current).add(selectedNodeID));
-    setFinalDraftYAML(prettyYAML(merged));
-    setFinalDraftError("");
+    const bothYAML = concatenateBothNodes(currentNode, incomingNode);
+    setFinalDraftYAML(bothYAML);
+
+    if (!currentNode || !incomingNode) {
+      setFinalNodes((current) => upsertNode(current, selectedNodeID, selectedNode ? cloneJSON(selectedNode) : null));
+      setResolvedNodeIDs((current) => new Set(current).add(selectedNodeID));
+      setFinalDraftError("");
+      return;
+    }
+
+    setFinalDraftError(
+      "Both changes were written. The resulting YAML has duplicate keys and is invalid — please edit it manually before marking as resolved.",
+    );
   };
 
   const onToggleIncludeNode = () => {

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { groupsListGroupUsers } from "@/api-client";
 import { organizationKeys } from "@/hooks/useOrganizationData";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export const useApprovalGroupUsersPrefetch = ({
   organizationId,

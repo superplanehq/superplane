@@ -1,5 +1,7 @@
 import type {
+  AdditionalDataBuilderContext,
   ComponentBaseContext,
+  ComponentAdditionalDataBuilder,
   ComponentBaseMapper,
   EventStateRegistry,
   ExecutionDetailsContext,
@@ -12,7 +14,7 @@ import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import type React from "react";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching backend
@@ -55,6 +57,14 @@ interface MergeExecutionMetadata {
 interface MergeAdditionalData {
   incomingSourcesCount?: number;
 }
+
+export const mergeDataBuilder: ComponentAdditionalDataBuilder = {
+  buildAdditionalData(context: AdditionalDataBuilderContext): MergeAdditionalData {
+    return {
+      incomingSourcesCount: context.edges?.filter((edge) => edge.targetId === context.node.id).length || 0,
+    };
+  },
+};
 
 /**
  * Determines which output channel has data, indicating the merge outcome.

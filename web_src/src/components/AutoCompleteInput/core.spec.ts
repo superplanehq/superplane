@@ -104,3 +104,45 @@ describe("getSuggestions", () => {
     expect(labels).toContain("sha");
   });
 });
+
+describe("getSuggestions config fields", () => {
+  it("suggests config fields for $['NodeName'].config.", () => {
+    const expression = '$["my-component"].config.';
+    const suggestions = getSuggestions(expression, expression.length, {
+      "my-component": { status: "ok", config: { url: "https://example.com", timeout: 30 } },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("url");
+    expect(labels).toContain("timeout");
+  });
+
+  it("suggests config as a field for previous()", () => {
+    const expression = "previous().";
+    const suggestions = getSuggestions(expression, expression.length, {
+      __previousByDepth: { "1": { result: "ok", config: { method: "POST" } } },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("result");
+    expect(labels).toContain("config");
+  });
+
+  it("suggests config nested fields for previous().config.", () => {
+    const expression = "previous().config.";
+    const suggestions = getSuggestions(expression, expression.length, {
+      __previousByDepth: { "1": { result: "ok", config: { method: "POST", endpoint: "/api" } } },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("method");
+    expect(labels).toContain("endpoint");
+  });
+
+  it("suggests config as a field for root()", () => {
+    const expression = "root().";
+    const suggestions = getSuggestions(expression, expression.length, {
+      __root: { user: "alice", config: { source: "github" } },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("user");
+    expect(labels).toContain("config");
+  });
+});

@@ -2,7 +2,7 @@ import { TriangleAlert } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { UsageLimitNotice } from "@/utils/usageLimits";
+import type { UsageLimitNotice } from "@/lib/usageLimits";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 
 interface UsageLimitAlertProps {

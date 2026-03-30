@@ -13,7 +13,7 @@ import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimeAgo } from "@/utils/date";
+import { formatTimeAgo } from "@/lib/date";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
@@ -110,6 +110,25 @@ export function mapTriggerEventToSidebarEvent(event: CanvasesCanvasEvent, node: 
     nodeId: node.id,
     originalEvent: event,
   };
+}
+
+export function buildTriggerSidebarEvent(
+  event: CanvasesCanvasEventWithExecutions,
+  triggerNode: ComponentsNode | undefined,
+): SidebarEvent | undefined {
+  if (!triggerNode || !event.id) return undefined;
+  return mapTriggerEventToSidebarEvent(
+    {
+      id: event.id,
+      canvasId: event.canvasId,
+      nodeId: event.nodeId,
+      channel: event.channel,
+      data: event.data,
+      createdAt: event.createdAt,
+      customName: event.customName,
+    },
+    triggerNode,
+  );
 }
 
 export function mapExecutionsToSidebarEvents(

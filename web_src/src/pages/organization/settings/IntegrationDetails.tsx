@@ -15,9 +15,9 @@ import { Alert, AlertDescription } from "@/ui/alert";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
-import { getApiErrorMessage } from "@/utils/errors";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Loader2, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -343,7 +343,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
                         domainId={organizationId}
                         domainType="DOMAIN_TYPE_ORGANIZATION"
                         organizationId={organizationId}
-                        appInstallationId={integration?.metadata?.id}
+                        integrationId={integration?.metadata?.id}
                       />
                     ))}
 

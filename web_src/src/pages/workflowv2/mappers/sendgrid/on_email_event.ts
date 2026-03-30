@@ -3,7 +3,7 @@ import type React from "react";
 import type { Predicate } from "../utils";
 import { formatPredicate } from "../utils";
 import type { TriggerProps } from "@/ui/trigger";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 

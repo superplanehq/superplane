@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
-import { getIntegrationTypeDisplayName } from "@/utils/integrationDisplayName";
+import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { AlertTriangle, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { IntegrationsIntegrationDefinition } from "@/api-client";

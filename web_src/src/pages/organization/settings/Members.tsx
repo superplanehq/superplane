@@ -19,8 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/ui/switch";
-import { getApiErrorMessage } from "@/utils/errors";
-import { showErrorToast, showSuccessToast } from "@/utils/toast";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useMe } from "@/hooks/useMe";
 

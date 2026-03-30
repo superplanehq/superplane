@@ -43,11 +43,6 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const handleMenuButtonClick = () => {
-    if (!organizationId) {
-      onLogoClick?.();
-      return;
-    }
-
     setIsMenuOpen((prev) => !prev);
   };
 
@@ -93,11 +88,15 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
   const usageEnabled = usageStatus?.enabled === true || !!usageError || isUsagePageForced();
 
   const sidebarUserLinks = [
-    {
-      label: "Profile",
-      href: organizationId ? `/${organizationId}/settings/profile` : "#",
-      Icon: CircleUser,
-    },
+    ...(organizationId
+      ? [
+          {
+            label: "Profile",
+            href: `/${organizationId}/settings/profile`,
+            Icon: CircleUser,
+          },
+        ]
+      : []),
     {
       label: "Sign Out",
       Icon: LogOut,
@@ -176,74 +175,78 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
           className="-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-slate-100 hover:text-gray-900 cursor-pointer"
           aria-label="Open organization menu"
           aria-expanded={isMenuOpen}
-          aria-haspopup={organizationId ? "menu" : undefined}
+          aria-haspopup="menu"
         >
           <Menu className="h-5 w-5" aria-hidden />
         </button>
-        {organizationId && isMenuOpen && (
+        {isMenuOpen && (
           <div className="absolute -left-2 top-0 z-50 w-full min-w-[15rem] animate-in fade-in-0 slide-in-from-left-4 rounded-md border border-slate-950/20 bg-white shadow-md duration-200">
-            <div className="px-4 py-2 border-b border-gray-300">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
-                Org
-              </p>
-              <div className="flex items-center gap-3 mt-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
+            {organizationId && (
+              <div className="px-4 py-2 border-b border-gray-300">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
+                  Org
+                </p>
+                <div className="flex items-center gap-3 mt-2">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-col">
+                  {sidebarOrganizationLinks.map((link) => {
+                    const MenuIcon = link.Icon;
+                    const allowed =
+                      !link.permission ||
+                      permissionsLoading ||
+                      canAct(link.permission.resource, link.permission.action);
+
+                    if (!allowed) {
+                      return (
+                        <PermissionTooltip
+                          key={link.label}
+                          allowed={false}
+                          message={`You don't have permission to view ${link.label.toLowerCase()}.`}
+                          className="w-full"
+                        >
+                          <button
+                            type="button"
+                            className={cn(
+                              "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
+                              "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                            )}
+                            disabled
+                          >
+                            <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                            <span>{link.label}</span>
+                            <Lock size={12} className="ml-auto text-gray-400" />
+                          </button>
+                        </PermissionTooltip>
+                      );
+                    }
+
+                    return link.href ? (
+                      <Link
+                        key={link.label}
+                        to={link.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                      >
+                        <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                        <span>{link.label}</span>
+                      </Link>
+                    ) : (
+                      <button
+                        key={link.label}
+                        type="button"
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                      >
+                        <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                        <span>{link.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="mt-2 flex flex-col">
-                {sidebarOrganizationLinks.map((link) => {
-                  const MenuIcon = link.Icon;
-                  const allowed =
-                    !link.permission || permissionsLoading || canAct(link.permission.resource, link.permission.action);
-
-                  if (!allowed) {
-                    return (
-                      <PermissionTooltip
-                        key={link.label}
-                        allowed={false}
-                        message={`You don't have permission to view ${link.label.toLowerCase()}.`}
-                        className="w-full"
-                      >
-                        <button
-                          type="button"
-                          className={cn(
-                            "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
-                            "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
-                          )}
-                          disabled
-                        >
-                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                          <span>{link.label}</span>
-                          <Lock size={12} className="ml-auto text-gray-400" />
-                        </button>
-                      </PermissionTooltip>
-                    );
-                  }
-
-                  return link.href ? (
-                    <Link
-                      key={link.label}
-                      to={link.href}
-                      onClick={() => setIsMenuOpen(false)}
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                    >
-                      <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                      <span>{link.label}</span>
-                    </Link>
-                  ) : (
-                    <button
-                      key={link.label}
-                      type="button"
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                    >
-                      <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                      <span>{link.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )}
             <div className="px-4 py-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
                 You

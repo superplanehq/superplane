@@ -10,7 +10,7 @@ import type {
   NodeInfo,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import launchdarklyIcon from "@/assets/icons/integrations/launchdarkly.svg";
 import { buildSubtitle } from "../utils";

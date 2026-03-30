@@ -2,6 +2,7 @@ import type {
   CanvasNodeExecutionResult,
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionState,
+  ComponentsEdge,
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
@@ -148,6 +149,7 @@ export interface ComponentAdditionalDataBuilder {
 export type AdditionalDataBuilderContext = {
   nodes: NodeInfo[];
   node: NodeInfo;
+  edges?: ComponentsEdge[];
   componentDefinition: ComponentDefinition;
   lastExecutions: ExecutionInfo[];
   canvasId: string;
