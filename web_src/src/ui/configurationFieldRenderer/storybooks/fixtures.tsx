@@ -22,6 +22,7 @@ export interface RendererExample {
   storyName: string;
   category: RendererCategory;
   source: "Basic field type" | "Special field type" | "Renderer-only route";
+  goType: string;
   docsDescription: string;
   field: ConfigurationField;
   initialValue: unknown;
@@ -89,6 +90,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "StringField",
     category: "Basic Inputs",
     source: "Basic field type",
+    goType: "FieldTypeString",
     docsDescription:
       "Use `string` for short single-line values such as names, identifiers, subjects, branch names, and other compact freeform text.",
     field: baseField({
@@ -107,6 +109,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "TextField",
     category: "Structured Content",
     source: "Basic field type",
+    goType: "FieldTypeText",
     docsDescription:
       "Use `text` when the value is still plain text, but users need a larger editor for prompts, long instructions, request bodies, or templates.",
     field: baseField({
@@ -124,17 +127,18 @@ export const rendererExamples: RendererExample[] = [
     storyName: "ExpressionField",
     category: "Structured Content",
     source: "Basic field type",
+    goType: "FieldTypeExpression",
     docsDescription:
       "Use `expression` when the field is intended to hold a computed value, template expression, or variable reference rather than only fixed text.",
     field: baseField({
       name: "subjectTemplate",
       label: "Subject template",
       type: "expression",
-      placeholder: '{{ $["trigger"].payload.issue.title }}',
+      placeholder: '$["trigger"].payload.issue.title',
       description:
         "Use for computed values and templates that are expected to reference workflow data instead of only fixed text.",
     }),
-    initialValue: '{{ $["trigger"].payload.issue.title }}',
+    initialValue: '$["trigger"].payload.issue.title',
     allowExpressions: true,
   },
   {
@@ -142,6 +146,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "XMLField",
     category: "Structured Content",
     source: "Basic field type",
+    goType: "FieldTypeXML",
     docsDescription:
       "Use `xml` for integrations or APIs that expect XML documents, SOAP envelopes, or XML templates that benefit from syntax-aware editing.",
     field: baseField({
@@ -157,6 +162,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "NumberField",
     category: "Basic Inputs",
     source: "Basic field type",
+    goType: "FieldTypeNumber",
     docsDescription:
       "Use `number` for thresholds, retry counts, durations, limits, and any numeric input with optional min and max constraints.",
     field: baseField({
@@ -178,6 +184,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "BooleanField",
     category: "Basic Inputs",
     source: "Basic field type",
+    goType: "FieldTypeBool",
     docsDescription:
       "Use `boolean` for binary on/off choices where the user is enabling or disabling a feature, condition, or optional behavior.",
     field: baseField({
@@ -193,6 +200,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "SelectField",
     category: "Basic Inputs",
     source: "Basic field type",
+    goType: "FieldTypeSelect",
     docsDescription:
       "Use `select` when the user must choose exactly one value from a fixed list declared in the field definition.",
     field: baseField({
@@ -217,6 +225,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "MultiSelectField",
     category: "Basic Inputs",
     source: "Basic field type",
+    goType: "FieldTypeMultiSelect",
     docsDescription:
       "Use `multi-select` when the field accepts several values from a fixed list and each selected value should remain individually visible.",
     field: baseField({
@@ -242,6 +251,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "ListField",
     category: "Structured Content",
     source: "Basic field type",
+    goType: "FieldTypeList",
     docsDescription:
       "Use `list` when a setting accepts zero-to-many repeated items, either primitive values or nested object entries with their own schema.",
     field: baseField({
@@ -284,6 +294,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "ObjectField",
     category: "Structured Content",
     source: "Basic field type",
+    goType: "FieldTypeObject",
     docsDescription:
       "Use `object` when several related settings belong together under a single nested value and should be edited as a sub-form.",
     field: baseField({
@@ -349,6 +360,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "TimeField",
     category: "Date & Scheduling",
     source: "Basic field type",
+    goType: "FieldTypeTime",
     docsDescription:
       "Use `time` for a time of day without any attached date, typically for cutoffs, business windows, or recurring daily schedules.",
     field: baseField({
@@ -369,6 +381,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "DateField",
     category: "Date & Scheduling",
     source: "Basic field type",
+    goType: "FieldTypeDate",
     docsDescription:
       "Use `date` when the setting is a calendar day only, such as a launch date, expiration date, or one-time schedule anchor.",
     field: baseField({
@@ -384,6 +397,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "DateTimeField",
     category: "Date & Scheduling",
     source: "Basic field type",
+    goType: "FieldTypeDateTime",
     docsDescription:
       "Use `datetime` when both a calendar date and a local time are required and the field should be edited together.",
     field: baseField({
@@ -399,6 +413,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "TimezoneField",
     category: "Date & Scheduling",
     source: "Basic field type",
+    goType: "FieldTypeTimezone",
     docsDescription:
       "Use `timezone` when another scheduled value needs an explicit timezone offset so the system can interpret it consistently.",
     field: baseField({
@@ -414,6 +429,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "DaysOfWeekField",
     category: "Date & Scheduling",
     source: "Basic field type",
+    goType: "FieldTypeDaysOfWeek",
     docsDescription:
       "Use `days-of-week` for recurring weekly schedules where the user picks one or more weekdays directly.",
     field: baseField({
@@ -429,6 +445,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "TimeRangeField",
     category: "Date & Scheduling",
     source: "Basic field type",
+    goType: "FieldTypeTimeRange",
     docsDescription:
       "Use `time-range` when the configuration represents a start and end window inside a single day, such as business hours or blackout periods.",
     field: baseField({
@@ -444,6 +461,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "DayInYearField",
     category: "Date & Scheduling",
     source: "Special field type",
+    goType: "FieldTypeDayInYear",
     docsDescription:
       "Use `day-in-year` for annual recurrences that care about month and day, but not the year, like renewals, anniversaries, or holidays.",
     field: baseField({
@@ -459,6 +477,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "CronField",
     category: "Date & Scheduling",
     source: "Special field type",
+    goType: "FieldTypeCron",
     docsDescription:
       "Use `cron` when the schedule is complex enough that power users should supply a cron expression instead of simpler scheduling controls.",
     field: baseField({
@@ -475,6 +494,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "UserField",
     category: "Context-Aware Inputs",
     source: "Special field type",
+    goType: "FieldTypeUser",
     docsDescription:
       "Use `user` when the setting must point to a concrete organization user, such as an assignee, owner, or explicit approver.",
     field: baseField({
@@ -490,6 +510,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "RoleField",
     category: "Context-Aware Inputs",
     source: "Special field type",
+    goType: "FieldTypeRole",
     docsDescription:
       "Use `role` when the config should target a reusable organization role instead of one specific user.",
     field: baseField({
@@ -505,6 +526,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "GroupField",
     category: "Context-Aware Inputs",
     source: "Special field type",
+    goType: "FieldTypeGroup",
     docsDescription: "Use `group` when approvals, notifications, or routing should target a named organization group.",
     field: baseField({
       name: "escalationGroup",
@@ -519,6 +541,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "IntegrationResourceField",
     category: "Context-Aware Inputs",
     source: "Special field type",
+    goType: "FieldTypeIntegrationResource",
     docsDescription:
       "Use `integration-resource` when the options must come from the connected integration instance, such as repositories, channels, projects, or boards.",
     field: baseField({
@@ -542,6 +565,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "AnyPredicateListField",
     category: "Structured Content",
     source: "Special field type",
+    goType: "FieldTypeAnyPredicateList",
     docsDescription:
       "Use `any-predicate-list` when the value is a repeated list of operator and value checks that behave like OR-style match predicates.",
     field: baseField({
@@ -571,6 +595,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "GitRefField",
     category: "Context-Aware Inputs",
     source: "Special field type",
+    goType: "FieldTypeGitRef",
     docsDescription:
       "Use `git-ref` when downstream integrations need a normalized Git reference in `refs/heads/*` or `refs/tags/*` form.",
     field: baseField({
@@ -586,6 +611,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "SecretKeyField",
     category: "Context-Aware Inputs",
     source: "Special field type",
+    goType: "FieldTypeSecretKey",
     docsDescription:
       "Use `secret-key` when the configuration should reference a stored credential key rather than collecting raw secret text in the form.",
     field: baseField({
@@ -605,6 +631,7 @@ export const rendererExamples: RendererExample[] = [
     storyName: "UrlField",
     category: "Compatibility",
     source: "Renderer-only route",
+    goType: "No matching Go constant",
     docsDescription:
       "Use `url` for fixed web endpoints. This renderer is routed in `ConfigurationFieldRenderer` even though `pkg/configuration/field.go` does not declare a `url` constant.",
     field: baseField({

@@ -68,6 +68,9 @@ function RendererPlayground({ example }: { example: RendererExample }) {
           <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-600">
             {example.source}
           </span>
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs text-blue-700">
+            Go: {example.goType}
+          </span>
         </div>
         <ConfigurationFieldRenderer
           allowExpressions={example.allowExpressions ?? false}
@@ -114,7 +117,7 @@ function RendererCatalog() {
               </p>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
               {categoryExamples.map((example) => {
                 const fieldName = example.field.name!;
                 const value = values[fieldName];
@@ -135,6 +138,7 @@ function RendererCatalog() {
                           {example.source}
                         </span>
                       </div>
+                      <p className="text-xs font-mono text-blue-700">Go type: {example.goType}</p>
                       <p className="text-sm text-gray-600">{example.docsDescription}</p>
                     </div>
 
@@ -174,7 +178,7 @@ function createExampleStory(exampleId: string): Story {
     parameters: {
       docs: {
         description: {
-          story: example.docsDescription,
+          story: `${example.docsDescription} Go type: ${example.goType}.`,
         },
       },
     },
