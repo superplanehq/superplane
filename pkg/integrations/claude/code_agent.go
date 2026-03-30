@@ -84,10 +84,11 @@ func (c *CodeAgent) ExampleOutput() map[string]any {
 	return map[string]any{
 		"type": CodeAgentPayloadType,
 		"data": map[string]any{
-			"status": "succeeded",
-			"prUrl":  "https://github.com/acme/my-app/pull/7",
-			"branch": "KAN-1",
-			"plan":   "1. Create landing page component\n2. Add routing\n3. Write tests",
+			"status":   "succeeded",
+			"prUrl":    "https://github.com/acme/my-app/pull/7",
+			"prNumber": 7,
+			"branch":   "KAN-1",
+			"plan":     "1. Create landing page component\n2. Add routing\n3. Write tests",
 		},
 	}
 }
@@ -310,12 +311,16 @@ IMPORTANT: Generate at most 2 files. Keep each file under 100 lines. Be concise 
 }
 
 func parseClaudeCodeResponse(text string) (*claudeCodeResponse, error) {
-	// Strip markdown code fences if present
 	text = strings.TrimSpace(text)
 	if strings.HasPrefix(text, "```") {
 		lines := strings.Split(text, "\n")
-		if len(lines) > 2 {
-			text = strings.Join(lines[1:len(lines)-1], "\n")
+		start := 1
+		end := len(lines)
+		if end > start && strings.TrimSpace(lines[end-1]) == "```" {
+			end = end - 1
+		}
+		if end > start {
+			text = strings.TrimSpace(strings.Join(lines[start:end], "\n"))
 		}
 	}
 
