@@ -202,10 +202,12 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 		webhookContext := &contexts.NodeWebhookContext{}
 
 		err := trigger.Setup(core.TriggerContext{
-			Configuration: map[string]any{"sharedSecret": "secret"},
-			Integration:   integrationContext,
-			Metadata:      metadataContext,
-			Webhook:       webhookContext,
+			Configuration: map[string]any{
+				"alertNames": []map[string]any{{"type": "equals", "value": "HighErrorRate"}},
+			},
+			Integration: integrationContext,
+			Metadata:    metadataContext,
+			Webhook:     webhookContext,
 		})
 
 		require.NoError(t, err)
@@ -213,7 +215,7 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 
 		requestConfig, ok := integrationContext.WebhookRequests[0].(OnAlertFiringConfig)
 		require.True(t, ok)
-		require.Equal(t, "secret", requestConfig.SharedSecret)
+		require.Empty(t, requestConfig.SharedSecret)
 		require.NotEmpty(t, requestConfig.WebhookBindingKey)
 
 		metadata, ok := metadataContext.Metadata.(map[string]any)
@@ -232,7 +234,7 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 		webhookContext := &contexts.NodeWebhookContext{}
 
 		err := trigger.Setup(core.TriggerContext{
-			Configuration: map[string]any{"sharedSecret": "secret"},
+			Configuration: map[string]any{},
 			Integration:   integrationContext,
 			Metadata:      metadataContext,
 			Webhook:       webhookContext,
@@ -264,4 +266,220 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "missing webhook context")
 		require.Len(t, integrationContext.WebhookRequests, 0)
 	})
+}
+
+func Test__OnAlertFiring__HandleWebhook__Filters(t *testing.T) {
+	trigger := &OnAlertFiring{}
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer managed-secret")
+
+	payload := []byte(`{
+		"status":"firing",
+		"title":"High error rate",
+		"ruleUid":"rule-1",
+		"commonLabels":{"alertname":"HighErrorRate"},
+		"alerts":[{"status":"firing","labels":{"alertname":"HighErrorRate"}}]
+	}`)
+
+	predicateEquals := func(value string) map[string]any {
+		return map[string]any{"type": "equals", "value": value}
+	}
+	predicateMatches := func(value string) map[string]any {
+		return map[string]any{"type": "matches", "value": value}
+	}
+	predicateNotEquals := func(value string) map[string]any {
+		return map[string]any{"type": "notEquals", "value": value}
+	}
+
+	t.Run("equals predicate matching alert name emits event", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateEquals("HighErrorRate")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("equals predicate non-matching alert name does not emit event", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateEquals("OtherAlert")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("matches predicate with regex emits event on matching name", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateMatches("High.*")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("matches predicate with non-matching regex does not emit event", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          payload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateMatches("Low.*")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("notEquals predicate emits when alertname label differs from excluded value", func(t *testing.T) {
+		otherNamePayload := []byte(`{
+			"status":"firing",
+			"title":"Some title",
+			"commonLabels":{"alertname":"OtherAlert"},
+			"alerts":[{"status":"firing","labels":{"alertname":"OtherAlert"}}]
+		}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          otherNamePayload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateNotEquals("HighErrorRate")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+	})
+
+	t.Run("matches predicate is full-string anchored like Grafana =~", func(t *testing.T) {
+		budgetPayload := []byte(`{
+			"status":"firing",
+			"commonLabels":{"alertname":"ErrorBudgetBurn"},
+			"alerts":[{"status":"firing","labels":{"alertname":"ErrorBudgetBurn"}}]
+		}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          budgetPayload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateMatches("Error")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+
+		eventContext2 := &contexts.EventContext{}
+		code2, _, err2 := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          budgetPayload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateMatches("Error.*")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext2,
+		})
+		require.Equal(t, http.StatusOK, code2)
+		require.NoError(t, err2)
+		require.Equal(t, 1, eventContext2.Count())
+	})
+
+	t.Run("positive and notEquals predicates are ANDed", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: payload,
+			Headers: headers,
+			Configuration: map[string]any{"alertNames": []any{
+				predicateEquals("HighErrorRate"),
+				predicateNotEquals("HighErrorRate"),
+			}},
+			Webhook: &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:  eventContext,
+		})
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+
+		eventContext2 := &contexts.EventContext{}
+		code2, _, err2 := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: payload,
+			Headers: headers,
+			Configuration: map[string]any{"alertNames": []any{
+				predicateEquals("HighErrorRate"),
+				predicateNotEquals("OtherAlert"),
+			}},
+			Webhook: &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:  eventContext2,
+		})
+		require.Equal(t, http.StatusOK, code2)
+		require.NoError(t, err2)
+		require.Equal(t, 1, eventContext2.Count())
+	})
+
+	t.Run("no alertname labels with filters does not emit", func(t *testing.T) {
+		titleOnly := []byte(`{"status":"firing","title":"Something happened"}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          titleOnly,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateEquals("Anything")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("notEquals predicate does not emit when all extracted names equal the excluded value", func(t *testing.T) {
+		// A payload where the only alert name is "HighErrorRate" — no other name to satisfy the predicate.
+		singleNamePayload := []byte(`{
+			"status":"firing",
+			"commonLabels":{"alertname":"HighErrorRate"},
+			"alerts":[{"status":"firing","labels":{"alertname":"HighErrorRate"}}]
+		}`)
+		eventContext := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:          singleNamePayload,
+			Headers:       headers,
+			Configuration: map[string]any{"alertNames": []any{predicateNotEquals("HighErrorRate")}},
+			Webhook:       &webhookSecretContext{secret: []byte("managed-secret")},
+			Events:        eventContext,
+		})
+
+		require.Equal(t, http.StatusOK, code)
+		require.NoError(t, err)
+		require.Equal(t, 0, eventContext.Count())
+	})
+
+}
+
+func Test__OnAlertFiring__HandleAction__Unsupported(t *testing.T) {
+	trigger := &OnAlertFiring{}
+
+	result, err := trigger.HandleAction(core.TriggerActionContext{
+		Name: "revealWebhookSecret",
+	})
+
+	require.Nil(t, result)
+	require.ErrorContains(t, err, "action revealWebhookSecret not supported")
 }
