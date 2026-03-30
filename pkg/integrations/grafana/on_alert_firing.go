@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -283,8 +284,15 @@ func matchesOnAlertFiringFilters(config OnAlertFiringConfig, payload map[string]
 		return true
 	}
 
-	for _, alertName := range extractAlertNames(payload) {
-		if configuration.MatchesAnyPredicate(config.AlertNames, alertName) {
+	names := extractAlertLabelNames(payload)
+	if len(names) == 0 {
+		// Grafana notification policies match on the alertname label only; without it we cannot
+		// align with the provisioned route, so do not emit when filters are configured.
+		return false
+	}
+
+	for _, name := range names {
+		if alertLabelNameMatchesPredicates(name, config.AlertNames) {
 			return true
 		}
 	}
@@ -292,12 +300,10 @@ func matchesOnAlertFiringFilters(config OnAlertFiringConfig, payload map[string]
 	return false
 }
 
-func extractAlertNames(payload map[string]any) []string {
+// extractAlertLabelNames returns distinct alertname label values (not the human title), matching
+// Grafana object_matchers on alertname.
+func extractAlertLabelNames(payload map[string]any) []string {
 	names := []string{}
-
-	if title := extractString(payload["title"]); title != "" {
-		names = append(names, title)
-	}
 
 	if commonLabels, ok := payload["commonLabels"].(map[string]any); ok {
 		if alertName := extractString(commonLabels["alertname"]); alertName != "" {
@@ -324,6 +330,30 @@ func extractAlertNames(payload map[string]any) []string {
 	}
 
 	return filterEmptyStrings(names)
+}
+
+// alertLabelNameMatchesPredicates mirrors Grafana notification policy semantics: all object_matchers
+// are ANDed — positive equals/matches are one =~ (OR inside the regex); each notEquals is a separate !=.
+func alertLabelNameMatchesPredicates(name string, predicates []configuration.Predicate) bool {
+	if len(predicates) == 0 {
+		return true
+	}
+
+	combined, hasPositive := combinedPositiveAlertNameRegex(predicates)
+	if hasPositive {
+		re, err := regexp.Compile(combined)
+		if err != nil || !re.MatchString(name) {
+			return false
+		}
+	}
+
+	for _, p := range predicates {
+		if p.Type == configuration.PredicateTypeNotEquals && p.Value == name {
+			return false
+		}
+	}
+
+	return true
 }
 
 func filterEmptyStrings(values []string) []string {
