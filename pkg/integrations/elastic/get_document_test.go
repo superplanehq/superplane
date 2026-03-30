@@ -39,9 +39,8 @@ func Test__GetDocument__Setup(t *testing.T) {
 	c := &GetDocument{}
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"url":      "https://elastic.example.com",
-			"authType": "apiKey",
-			"apiKey":   "test-api-key",
+			"url":    "https://elastic.example.com",
+			"apiKey": "test-api-key",
 		},
 	}
 
@@ -124,18 +123,11 @@ func Test__GetDocument__Setup(t *testing.T) {
 }
 
 func Test__GetDocument__Execute(t *testing.T) {
-	integrationCtx := func(authType string) *contexts.IntegrationContext {
-		cfg := map[string]any{
-			"url":      "https://elastic.example.com",
-			"authType": authType,
-		}
-		if authType == "apiKey" {
-			cfg["apiKey"] = "test-api-key"
-		} else {
-			cfg["username"] = "elastic"
-			cfg["password"] = "secret"
-		}
-		return &contexts.IntegrationContext{Configuration: cfg}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":    "https://elastic.example.com",
+			"apiKey": "test-api-key",
+		},
 	}
 
 	successResponse := func() *http.Response {
@@ -163,7 +155,7 @@ func Test__GetDocument__Execute(t *testing.T) {
 				"document": "doc-1",
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx,
 			ExecutionState: state,
 		})
 
@@ -184,30 +176,6 @@ func Test__GetDocument__Execute(t *testing.T) {
 		assert.NotNil(t, data["source"])
 	})
 
-	t.Run("uses basic auth when authType is basic", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{successResponse()},
-		}
-		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := (&GetDocument{}).Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"index":    "my-index",
-				"document": "doc-1",
-			},
-			HTTP:           httpCtx,
-			Integration:    integrationCtx("basic"),
-			ExecutionState: state,
-		})
-
-		require.NoError(t, err)
-		req := httpCtx.Requests[0]
-		user, pass, ok := req.BasicAuth()
-		require.True(t, ok)
-		assert.Equal(t, "elastic", user)
-		assert.Equal(t, "secret", pass)
-	})
-
 	t.Run("Elasticsearch error -> fails execution", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -225,7 +193,7 @@ func Test__GetDocument__Execute(t *testing.T) {
 				"document": "doc-1",
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx,
 			ExecutionState: state,
 		})
 
@@ -239,9 +207,8 @@ func Test__GetDocument__Execute(t *testing.T) {
 func Test__Elastic__ListResources__Document(t *testing.T) {
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"url":      "https://elastic.example.com",
-			"authType": "apiKey",
-			"apiKey":   "test-api-key",
+			"url":    "https://elastic.example.com",
+			"apiKey": "test-api-key",
 		},
 	}
 
