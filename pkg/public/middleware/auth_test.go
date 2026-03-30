@@ -20,7 +20,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
 	require.NoError(t, err)
 
-	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := OrganizationAuthMiddleware(signer, "")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 

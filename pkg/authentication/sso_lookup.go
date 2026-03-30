@@ -22,7 +22,7 @@ type ssoLookupResponse struct {
 
 // handleSSOLookup is a public (no auth required) endpoint.
 // GET /auth/sso/lookup?email=user@company.com
-// Returns the list of orgs that have Okta OIDC enabled for the given email.
+// Returns the list of orgs that have Okta SAML enabled for the given email.
 // Always returns HTTP 200 with an empty list on any failure — never reveals
 // whether an email exists.
 func (a *Handler) handleSSOLookup(w http.ResponseWriter, r *http.Request) {

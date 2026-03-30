@@ -52,3 +52,24 @@ func SaveOrganizationOktaIDPInTransaction(tx *gorm.DB, row *OrganizationOktaIDP)
 	row.UpdatedAt = time.Now()
 	return tx.Save(row).Error
 }
+
+// FindSamlEnabledOrgIDs returns the subset of the given org IDs that have SAML enabled.
+// Used to filter the org list shown to a user so that orgs requiring a specific
+// SAML session are hidden when the current session doesn't satisfy that requirement.
+func FindSamlEnabledOrgIDs(db *gorm.DB, orgIDs []string) (map[string]bool, error) {
+	if len(orgIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+	var rows []OrganizationOktaIDP
+	err := db.Select("organization_id").
+		Where("organization_id IN ? AND saml_enabled = true", orgIDs).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		result[row.OrganizationID.String()] = true
+	}
+	return result, nil
+}

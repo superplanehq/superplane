@@ -81,6 +81,7 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
+	forceSecureCookies    bool
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -105,7 +106,12 @@ func NewServer(
 
 	// Initialize OAuth providers from environment variables
 	passwordLoginEnabled := os.Getenv("ENABLE_PASSWORD_LOGIN") == "yes"
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, getBaseURL(), blockSignup, passwordLoginEnabled)
+	// FORCE_SECURE_COOKIES=yes must be set in production when running behind a
+	// TLS-terminating reverse proxy. Without it, session cookies are issued
+	// without the Secure flag because r.TLS is nil on the plain-HTTP hop from
+	// the proxy to the app, allowing browsers to send them over plain HTTP.
+	forceSecureCookies := os.Getenv("FORCE_SECURE_COOKIES") == "yes"
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv, templateDir, getBaseURL(), blockSignup, passwordLoginEnabled, forceSecureCookies)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -116,6 +122,7 @@ func NewServer(
 		wsHub:                 ws.NewHub(),
 		authHandler:           authHandler,
 		isDev:                 appEnv == "development",
+		forceSecureCookies:    forceSecureCookies,
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
@@ -247,10 +254,10 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}).Methods("GET")
 
 	// Protect the gRPC gateway routes with organization authentication
-	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt, getBaseURL())
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
-	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
+	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt, s.forceSecureCookies)
 	protectedAccountGRPCHandler := accountAuthMiddleware(s.grpcGatewayAccountHandler(grpcGatewayMux))
 
 	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
@@ -348,7 +355,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 	// WebSocket endpoint - protected by organization scoped authentication
 	s.Router.Handle(
 		"/ws/{workflowId}",
-		middleware.OrganizationAuthMiddleware(s.jwt).
+		middleware.OrganizationAuthMiddleware(s.jwt, getBaseURL()).
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
 
@@ -431,7 +438,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
-	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt, s.forceSecureCookies))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
@@ -688,6 +695,20 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 		orgIDs = append(orgIDs, organization.ID.String())
 	}
 
+	// Determine which orgs require SAML login for *this specific user*.
+	// Only orgs where the user is SCIM-provisioned (Okta-managed) require SAML;
+	// native users (org owners/admins created outside Okta) are never gated.
+	samlOrg := extractSamlOrgFromCookie(r, s.jwt)
+	scimSamlOrgs, err := models.FindOktaOrgsForEmail(database.Conn(), account.Email)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	scimSamlOrgIDs := make(map[string]bool, len(scimSamlOrgs))
+	for _, o := range scimSamlOrgs {
+		scimSamlOrgIDs[o.OrgID] = true
+	}
+
 	canvasCounts, err := models.CountCanvasesByOrganizationIDs(orgIDs)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -703,6 +724,11 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 	response := []Organization{}
 	for _, organization := range organizations {
 		orgID := organization.ID.String()
+		// Hide SAML-enabled orgs the current session has no access to.
+		// The user can gain access by visiting that org's SAML login URL.
+		if scimSamlOrgIDs[orgID] && samlOrg != orgID {
+			continue
+		}
 		response = append(response, Organization{
 			ID:          organization.ID.String(),
 			Name:        organization.Name,
@@ -714,6 +740,22 @@ func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// extractSamlOrgFromCookie parses the account_token cookie and returns the
+// saml_org claim, which identifies the org the session was authenticated
+// against via SAML. Returns an empty string for non-SAML sessions.
+func extractSamlOrgFromCookie(r *http.Request, jwtSigner *jwt.Signer) string {
+	cookie, err := r.Cookie("account_token")
+	if err != nil {
+		return ""
+	}
+	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
+	if err != nil {
+		return ""
+	}
+	samlOrg, _ := claims["saml_org"].(string)
+	return samlOrg
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {

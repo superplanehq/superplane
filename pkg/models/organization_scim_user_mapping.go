@@ -54,7 +54,7 @@ type OktaOrgForEmail struct {
 }
 
 // FindOktaOrgsForEmail returns all organizations where an active user with the
-// given email exists, has a SCIM mapping, and the org has Okta OIDC enabled.
+// given email exists, has a SCIM mapping, and the org has Okta SAML enabled.
 // Used by the SSO login-page lookup endpoint.
 func FindOktaOrgsForEmail(db *gorm.DB, email string) ([]OktaOrgForEmail, error) {
 	var results []OktaOrgForEmail
@@ -74,15 +74,29 @@ type UserWithScimMapping struct {
 	ExternalID *string `gorm:"column:external_id"`
 }
 
-// ListUsersWithScimMappingInOrganization returns all active, non-service-account
-// users in the org that have a SCIM mapping, in a single query.
-func ListUsersWithScimMappingInOrganization(db *gorm.DB, orgID string) ([]UserWithScimMapping, error) {
+// CountUsersWithScimMappingInOrganization returns the total number of active,
+// non-service-account users in the org that have a SCIM mapping.
+func CountUsersWithScimMappingInOrganization(db *gorm.DB, orgID string) (int, error) {
+	var count int64
+	err := db.Table("users u").
+		Joins("INNER JOIN organization_scim_user_mappings m ON m.user_id = u.id AND m.organization_id = ?", orgID).
+		Where("u.organization_id = ? AND u.deleted_at IS NULL AND u.type != ?", orgID, UserTypeServiceAccount).
+		Count(&count).Error
+	return int(count), err
+}
+
+// ListUsersWithScimMappingInOrganization returns a paginated slice of active,
+// non-service-account users in the org that have a SCIM mapping.
+// limit and offset are passed directly to the SQL query.
+func ListUsersWithScimMappingInOrganization(db *gorm.DB, orgID string, limit, offset int) ([]UserWithScimMapping, error) {
 	var results []UserWithScimMapping
 	err := db.Table("users u").
 		Select("u.*, m.external_id").
 		Joins("INNER JOIN organization_scim_user_mappings m ON m.user_id = u.id AND m.organization_id = ?", orgID).
 		Where("u.organization_id = ? AND u.deleted_at IS NULL AND u.type != ?", orgID, UserTypeServiceAccount).
 		Order("u.created_at ASC").
+		Limit(limit).
+		Offset(offset).
 		Scan(&results).Error
 	return results, err
 }

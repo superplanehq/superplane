@@ -210,24 +210,28 @@ func (h *UserHandler) GetAll(r *http.Request, params scim.ListRequestParams) (sc
 		return scim.Page{}, err
 	}
 
-	rows, err := models.ListUsersWithScimMappingInOrganization(database.Conn(), orgID)
+	total, err := models.CountUsersWithScimMappingInOrganization(database.Conn(), orgID)
 	if err != nil {
 		return scim.Page{}, err
 	}
 
-	total := len(rows)
-	start := params.StartIndex
-	if start < 1 {
-		start = 1
+	startIndex := params.StartIndex
+	if startIndex < 1 {
+		startIndex = 1
 	}
 	count := params.Count
 	if count <= 0 {
 		count = 100
 	}
+	offset := startIndex - 1
 
-	resources := make([]scim.Resource, 0)
-	for i := start - 1; i < total && len(resources) < count; i++ {
-		row := rows[i]
+	rows, err := models.ListUsersWithScimMappingInOrganization(database.Conn(), orgID, count, offset)
+	if err != nil {
+		return scim.Page{}, err
+	}
+
+	resources := make([]scim.Resource, 0, len(rows))
+	for _, row := range rows {
 		email := row.GetEmail()
 		resources = append(resources, scim.Resource{
 			ID:         row.ID.String(),
@@ -298,12 +302,6 @@ func (h *UserHandler) Replace(r *http.Request, id string, attributes scim.Resour
 			"name":       name,
 			"updated_at": time.Now(),
 		}).Error; e != nil {
-			return e
-		}
-
-		if e := tx.Model(&models.User{}).
-			Where("account_id = ? AND organization_id = ?", account.ID, orgID).
-			Updates(map[string]interface{}{"email": normalizedEmail, "updated_at": time.Now()}).Error; e != nil {
 			return e
 		}
 
@@ -406,7 +404,7 @@ func (h *UserHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
 
-	_, err = models.FindScimMappingByOrganizationAndUserID(database.Conn(), orgID, id)
+	mapping, err := models.FindScimMappingByOrganizationAndUserID(database.Conn(), orgID, id)
 	if err != nil {
 		return scim.Resource{}, scimerrors.ScimErrorResourceNotFound(id)
 	}
@@ -430,7 +428,16 @@ func (h *UserHandler) Patch(r *http.Request, id string, operations []scim.PatchO
 				if err != nil {
 					return scim.Resource{}, err
 				}
-				return scim.Resource{}, nil
+				now := time.Now()
+				return scim.Resource{
+					ID:         id,
+					ExternalID: externalIDOptional(mapping.ExternalID),
+					Attributes: userAttributes(user, user.GetEmail(), mapping.ExternalID, false),
+					Meta: scim.Meta{
+						LastModified: &now,
+						Version:      strconv.FormatInt(now.Unix(), 10),
+					},
+				}, nil
 			}
 		}
 	}

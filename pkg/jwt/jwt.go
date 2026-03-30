@@ -90,15 +90,23 @@ func (s *Signer) ValidateAndGetClaims(tokenString string) (jwt.MapClaims, error)
 	if !ok {
 		return nil, fmt.Errorf("invalid token claims")
 	}
-
-	// Check expiration
-	if exp, ok := claims["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
-			return nil, fmt.Errorf("token expired")
-		}
-	}
-
 	return claims, nil
+}
+
+// GenerateWithSAMLOrg issues a session token that records which org the account
+// authenticated against via SAML. The middleware uses this to enforce that
+// SAML-enabled orgs can only be accessed with a session that was established
+// through that specific org's SAML flow.
+func (s *Signer) GenerateWithSAMLOrg(accountID, samlOrgID string, duration time.Duration) (string, error) {
+	now := time.Now()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iat":      now.Unix(),
+		"nbf":      now.Unix(),
+		"exp":      now.Add(duration).Unix(),
+		"sub":      accountID,
+		"saml_org": samlOrgID,
+	})
+	return token.SignedString([]byte(s.Secret))
 }
 
 // SignOktaOAuthState returns an opaque value for the OIDC `state` parameter (CSRF + context).

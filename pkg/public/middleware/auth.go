@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -24,6 +25,15 @@ const AccountContextKey contextKey = "account"
 const UserContextKey contextKey = "user"
 const OrganizationNotFoundError string = "organization_not_found_error"
 const AccountNotFoundError string = "account_not_found_error"
+const SamlAuthRequiredError string = "saml_auth_required"
+
+// SamlAuthRequiredErr is returned when a request targets a SAML-enabled org
+// but the session cookie was not issued through that org's SAML flow.
+type SamlAuthRequiredErr struct {
+	OrgID string
+}
+
+func (e *SamlAuthRequiredErr) Error() string { return SamlAuthRequiredError }
 
 var ownerSetupEnabled = os.Getenv("OWNER_SETUP_ENABLED") == "yes"
 
@@ -77,7 +87,7 @@ func MarkOwnerSetupCompleted() {
 	ownerSetupMu.Unlock()
 }
 
-func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
+func AccountAuthMiddleware(jwtSigner *jwt.Signer, forceSecureCookies bool) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if IsOwnerSetupRequired() {
@@ -120,7 +130,7 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 					return
 				}
 
-				authentication.ClearAccountCookie(w, r)
+				authentication.ClearAccountCookie(w, r, forceSecureCookies)
 				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
@@ -132,7 +142,7 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 					return
 				}
 
-				authentication.ClearAccountCookie(w, r)
+				authentication.ClearAccountCookie(w, r, forceSecureCookies)
 				redirectToLoginWithOriginalURL(w, r)
 				return
 			}
@@ -144,7 +154,7 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	}
 }
 
-func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
+func OrganizationAuthMiddleware(jwtSigner *jwt.Signer, baseURL string) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -171,6 +181,17 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			//
 			user, err := authenticateUserByCookie(jwtSigner, r)
 			if err != nil {
+				var samlErr *SamlAuthRequiredErr
+				if errors.As(err, &samlErr) {
+					loginURL := baseURL + "/auth/okta/" + samlErr.OrgID + "/saml/login"
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusUnauthorized)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"error":     SamlAuthRequiredError,
+						"login_url": loginURL,
+					})
+					return
+				}
 				if err.Error() == OrganizationNotFoundError {
 					http.Error(w, "Not Found", http.StatusNotFound)
 					return
@@ -203,10 +224,23 @@ func authenticateUserByToken(r *http.Request) (*models.User, error) {
 }
 
 func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.User, error) {
-	accountID, err := getAccountFromCookie(r, jwtSigner)
+	cookie, err := r.Cookie("account_token")
 	if err != nil {
 		return nil, errors.New(AccountNotFoundError)
 	}
+
+	claims, err := jwtSigner.ValidateAndGetClaims(cookie.Value)
+	if err != nil {
+		return nil, errors.New(AccountNotFoundError)
+	}
+
+	accountID, _ := claims["sub"].(string)
+	if accountID == "" {
+		return nil, errors.New(AccountNotFoundError)
+	}
+
+	// saml_org is present only in tokens issued through a SAML ACS flow.
+	samlOrg, _ := claims["saml_org"].(string)
 
 	organizationID := findOrganizationID(r)
 	if organizationID == "" {
@@ -221,6 +255,24 @@ func authenticateUserByCookie(jwtSigner *jwt.Signer, r *http.Request) (*models.U
 	user, err := models.FindActiveUserByEmail(organizationID, account.Email)
 	if err != nil {
 		return nil, errors.New(OrganizationNotFoundError)
+	}
+
+	// If the session was authenticated via a different org's SAML (or not via
+	// SAML at all), check whether this org requires SAML. If it does, we reject
+	// the request so that each org's Okta security policies (MFA, device trust,
+	// conditional access) are actually enforced rather than bypassed by
+	// authenticating through a different, potentially weaker, Okta configuration.
+	//
+	// Exception: users without a SCIM mapping are native users (e.g. org owners
+	// or admins created outside of Okta) and are never subject to the SAML gate.
+	if samlOrg != organizationID {
+		idp, idpErr := models.FindOrganizationOktaIDPByOrganizationID(organizationID)
+		if idpErr == nil && idp.SamlEnabled {
+			_, scimErr := models.FindScimMappingByOrganizationAndUserID(database.Conn(), organizationID, user.ID.String())
+			if scimErr == nil {
+				return nil, &SamlAuthRequiredErr{OrgID: organizationID}
+			}
+		}
 	}
 
 	return user, nil

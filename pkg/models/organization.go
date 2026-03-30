@@ -44,6 +44,27 @@ func EnsureOrganizationAllowsProviderInTransaction(tx *gorm.DB, organizationID, 
 	return tx.Save(org).Error
 }
 
+// RemoveOrganizationProviderInTransaction removes provider from AllowedProviders if present.
+func RemoveOrganizationProviderInTransaction(tx *gorm.DB, organizationID, provider string) error {
+	org, err := FindOrganizationByIDInTransaction(tx, organizationID)
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(org.AllowedProviders, provider) {
+		return nil
+	}
+	next := make(datatypes.JSONSlice[string], 0, len(org.AllowedProviders))
+	for _, p := range org.AllowedProviders {
+		if p != provider {
+			next = append(next, p)
+		}
+	}
+	org.AllowedProviders = next
+	now := time.Now()
+	org.UpdatedAt = &now
+	return tx.Save(org).Error
+}
+
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 	var organizations []Organization
 

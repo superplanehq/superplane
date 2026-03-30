@@ -38,6 +38,11 @@ type Handler struct {
 	templateDir          string
 	blockSignup          bool
 	passwordLoginEnabled bool
+	// forceSecureCookies marks all session cookies with Secure=true regardless
+	// of whether the incoming request arrived over TLS. Set this when running
+	// behind a TLS-terminating reverse proxy so that browsers never transmit the
+	// session cookie over plain HTTP. Controlled by FORCE_SECURE_COOKIES=yes.
+	forceSecureCookies bool
 }
 
 type ProviderConfig struct {
@@ -55,6 +60,7 @@ func NewHandler(
 	publicAppBaseURL string,
 	blockSignup bool,
 	passwordLoginEnabled bool,
+	forceSecureCookies bool,
 ) *Handler {
 	return &Handler{
 		jwtSigner:            jwtSigner,
@@ -65,6 +71,7 @@ func NewHandler(
 		templateDir:          templateDir,
 		blockSignup:          blockSignup,
 		passwordLoginEnabled: passwordLoginEnabled,
+		forceSecureCookies:   forceSecureCookies,
 	}
 }
 
@@ -289,22 +296,41 @@ func (a *Handler) issueAccountSession(w http.ResponseWriter, r *http.Request, ac
 	if err != nil {
 		return err
 	}
+	a.setAccountCookie(w, r, token)
+	return nil
+}
+
+// issueAccountSessionForSAMLOrg issues a session token that carries the org ID
+// the account just authenticated against via SAML. The auth middleware uses this
+// claim to ensure SAML-enabled orgs can only be reached through their own SSO.
+func (a *Handler) issueAccountSessionForSAMLOrg(w http.ResponseWriter, r *http.Request, accountID, samlOrgID string) error {
+	token, err := a.jwtSigner.GenerateWithSAMLOrg(accountID, samlOrgID, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	a.setAccountCookie(w, r, token)
+	return nil
+}
+
+// setAccountCookie writes the account_token cookie. Secure is set when either
+// the connection is already TLS or FORCE_SECURE_COOKIES=yes (for deployments
+// behind a TLS-terminating reverse proxy where r.TLS is always nil).
+func (a *Handler) setAccountCookie(w http.ResponseWriter, r *http.Request, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "account_token",
 		Value:    token,
 		Path:     "/",
 		MaxAge:   int(24 * time.Hour.Seconds()),
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   a.forceSecureCookies || r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
-	return nil
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
-	ClearAccountCookie(w, r)
+	ClearAccountCookie(w, r, a.forceSecureCookies)
 
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
@@ -631,14 +657,14 @@ func isValidRedirectURL(redirectURL string) bool {
 	return true
 }
 
-func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
+func ClearAccountCookie(w http.ResponseWriter, r *http.Request, forceSecureCookies bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "account_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   forceSecureCookies || r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

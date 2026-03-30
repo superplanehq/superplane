@@ -95,6 +95,12 @@ func (a *Handler) handleOktaSAMLLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Force Okta to re-authenticate the user even if they have an active IdP
+	// session. Without this, logging out of the app and logging back in would
+	// silently reuse the Okta session without any credential or MFA prompt.
+	forceAuthn := true
+	authnReq.ForceAuthn = &forceAuthn
+
 	relayState, err := a.jwtSigner.SignOktaSAMLState(orgID, authnReq.ID, redirect, 15*time.Minute)
 	if err != nil {
 		log.Errorf("Okta SAML: sign relay state: %v", err)
@@ -226,7 +232,7 @@ func (a *Handler) handleOktaSAMLACS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
+	if err := a.issueAccountSessionForSAMLOrg(w, r, account.ID.String(), orgID); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

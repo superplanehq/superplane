@@ -225,7 +225,7 @@ func validateOktaSSOURL(raw string) error {
 
 func syncOktaProviderWhenSAMLEnabled(tx *gorm.DB, orgID string, row *models.OrganizationOktaIDP) error {
 	if !row.SamlEnabled {
-		return nil
+		return models.RemoveOrganizationProviderInTransaction(tx, orgID, models.ProviderOkta)
 	}
 	if row.SamlIdpCertificatePEM == "" {
 		return status.Error(codes.FailedPrecondition, "configure SAML certificate before enabling Okta SAML sign-in")
