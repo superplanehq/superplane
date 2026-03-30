@@ -21,7 +21,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("--file is required")
 	}
 
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
