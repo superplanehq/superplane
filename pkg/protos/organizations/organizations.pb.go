@@ -3553,7 +3553,7 @@ const file_organizations_proto_rawDesc = "" +
 	"\x11DeleteIntegration\x122.Superplane.Organizations.DeleteIntegrationRequest\x1a3.Superplane.Organizations.DeleteIntegrationResponse\"\x9f\x01\x92A\\\n" +
 	"\fOrganization\x12\x1fDelete organization integration\x1a+Deletes an integration from an organization\x82\xd3\xe4\x93\x02:*8/api/v1/organizations/{id}/integrations/{integration_id}B\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
 	"\x1cSuperplane Organizations API\x128API for managing organizations in the Superplane service\"%\n" +
-	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/organizationsb\x06proto3"
+	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/organizationsb\x06proto3"
 
 var (
 	file_organizations_proto_rawDescOnce sync.Once

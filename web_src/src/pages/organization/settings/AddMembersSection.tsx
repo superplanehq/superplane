@@ -5,7 +5,7 @@ import { Input } from "../../../components/Input/input";
 import { useAddUserToGroup, useOrganizationGroupUsers, useOrganizationUsers } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/ui/checkbox";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean;

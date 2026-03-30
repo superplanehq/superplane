@@ -10,7 +10,8 @@ import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { useOrganizationId, withOrganizationHeader } from "../../../utils/withOrganizationHeader";
+import { withOrganizationHeader } from "../../../lib/withOrganizationHeader";
+import { useOrganizationId } from "../../../hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
 
 export function Profile() {

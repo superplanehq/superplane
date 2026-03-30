@@ -7,7 +7,7 @@ import type {
   OrganizationsIntegration,
 } from "@/api-client";
 import type { AiCanvasOperation, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
-import { filterVisibleConfiguration } from "@/utils/components";
+import { filterVisibleConfiguration } from "@/lib/components";
 import { generateNodeId, generateUniqueNodeName } from "./utils";
 
 type ApplyAiOperationsToWorkflowInput = {

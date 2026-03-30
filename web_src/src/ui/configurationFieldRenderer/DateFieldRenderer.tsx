@@ -1,7 +1,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
-import { toTestId } from "@/utils/testID";
+import { toTestId } from "@/lib/testID";
 
 export const DateFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   // Calculate min/max dates based on other fields for components like time gates
