@@ -142,6 +142,7 @@ import { buildDraftNodeDiffSummary } from "./draftNodeDiff";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
+import { BlobScopePanel } from "@/components/blobs/BlobScopePanel";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -766,7 +767,7 @@ export function WorkflowPageV2() {
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
-  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings">("canvas");
+  const [topViewMode, setTopViewMode] = useState<"canvas" | "yaml" | "memory" | "settings" | "blobs">("canvas");
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() => {
     if (typeof window === "undefined") {
@@ -5524,6 +5525,8 @@ export function WorkflowPageV2() {
         availableRoles={canvasSettingsApproverRoles}
         onSave={handleSaveCanvasSettings}
       />
+    ) : topViewMode === "blobs" ? (
+      <BlobScopePanel organizationId={organizationId || ""} scopeType="SCOPE_TYPE_CANVAS" canvasId={canvasId} />
     ) : null;
 
   return (

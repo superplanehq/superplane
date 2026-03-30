@@ -364,6 +364,51 @@ service Canvases {
     };
   }
 
+  rpc StoreBlob(StoreBlobRequest) returns (StoreBlobResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/blobs"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Store blob";
+      description: "Stores a blob in the selected scope";
+      tags: "Blob";
+    };
+  }
+
+  rpc ListBlobs(ListBlobsRequest) returns (ListBlobsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/blobs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List blobs";
+      description: "Lists blobs in the selected scope";
+      tags: "Blob";
+    };
+  }
+
+  rpc DescribeBlob(DescribeBlobRequest) returns (DescribeBlobResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/blobs/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe blob";
+      description: "Describes a blob and returns its contents";
+      tags: "Blob";
+    };
+  }
+
+  rpc DeleteBlob(DeleteBlobRequest) returns (DeleteBlobResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/blobs/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete blob";
+      description: "Deletes a blob";
+      tags: "Blob";
+    };
+  }
+
 }
 
 message ListCanvasesRequest {
@@ -879,6 +924,72 @@ message ResolveExecutionErrorsRequest {
 }
 
 message ResolveExecutionErrorsResponse {}
+
+message Blob {
+  enum ScopeType {
+    SCOPE_TYPE_UNSPECIFIED = 0;
+    SCOPE_TYPE_ORGANIZATION = 1;
+    SCOPE_TYPE_CANVAS = 2;
+    SCOPE_TYPE_NODE = 3;
+    SCOPE_TYPE_EXECUTION = 4;
+  }
+
+  string id = 1;
+  string organization_id = 2;
+  ScopeType scope_type = 3;
+  string canvas_id = 4;
+  string node_id = 5;
+  string execution_id = 6;
+  string path = 7;
+  string object_key = 8;
+  int64 size_bytes = 9;
+  string content_type = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message StoreBlobRequest {
+  Blob.ScopeType scope_type = 1;
+  string canvas_id = 2;
+  string node_id = 3;
+  string execution_id = 4;
+  string path = 5;
+  bytes content = 6;
+  string content_type = 7;
+}
+
+message StoreBlobResponse {
+  Blob blob = 1;
+}
+
+message ListBlobsRequest {
+  Blob.ScopeType scope_type = 1;
+  string canvas_id = 2;
+  string node_id = 3;
+  string execution_id = 4;
+  uint32 limit = 5;
+  google.protobuf.Timestamp before = 6;
+}
+
+message ListBlobsResponse {
+  repeated Blob blobs = 1;
+  bool has_next_page = 2;
+  google.protobuf.Timestamp last_timestamp = 3;
+}
+
+message DescribeBlobRequest {
+  string id = 1;
+}
+
+message DescribeBlobResponse {
+  Blob blob = 1;
+  bytes content = 2;
+}
+
+message DeleteBlobRequest {
+  string id = 1;
+}
+
+message DeleteBlobResponse {}
 
 //
 // Standalone messages

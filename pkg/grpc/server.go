@@ -11,6 +11,7 @@ import (
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/blobstorage"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -64,6 +65,7 @@ func RunServer(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	blobStorage blobstorage.BlobStorage,
 	port int,
 ) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
@@ -143,7 +145,7 @@ func RunServer(
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
+	canvasService := NewCanvasService(authService, registry, encryptor, blobStorage, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	integrationService := NewIntegrationService(encryptor, registry)

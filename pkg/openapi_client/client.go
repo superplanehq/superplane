@@ -51,6 +51,8 @@ type APIClient struct {
 
 	AgentAPI *AgentAPIService
 
+	BlobAPI *BlobAPIService
+
 	BlueprintAPI *BlueprintAPIService
 
 	CanvasAPI *CanvasAPIService
@@ -105,6 +107,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 
 	// API Services
 	c.AgentAPI = (*AgentAPIService)(&c.common)
+	c.BlobAPI = (*BlobAPIService)(&c.common)
 	c.BlueprintAPI = (*BlueprintAPIService)(&c.common)
 	c.CanvasAPI = (*CanvasAPIService)(&c.common)
 	c.CanvasChangeRequestAPI = (*CanvasChangeRequestAPIService)(&c.common)
@@ -557,9 +560,8 @@ func addFile(w *multipart.Writer, fieldName, path string) error {
 
 // Set request body from an interface{}
 func setBody(body interface{}, contentType string) (bodyBuf *bytes.Buffer, err error) {
-	if bodyBuf == nil {
-		bodyBuf = &bytes.Buffer{}
-	}
+	// Always initialize the buffer; the named return value starts as nil.
+	bodyBuf = &bytes.Buffer{}
 
 	if reader, ok := body.(io.Reader); ok {
 		_, err = bodyBuf.ReadFrom(reader)

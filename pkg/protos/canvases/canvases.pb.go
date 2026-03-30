@@ -488,6 +488,61 @@ func (CanvasNodeExecution_ResultReason) EnumDescriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{51, 2}
 }
 
+type Blob_ScopeType int32
+
+const (
+	Blob_SCOPE_TYPE_UNSPECIFIED  Blob_ScopeType = 0
+	Blob_SCOPE_TYPE_ORGANIZATION Blob_ScopeType = 1
+	Blob_SCOPE_TYPE_CANVAS       Blob_ScopeType = 2
+	Blob_SCOPE_TYPE_NODE         Blob_ScopeType = 3
+	Blob_SCOPE_TYPE_EXECUTION    Blob_ScopeType = 4
+)
+
+// Enum value maps for Blob_ScopeType.
+var (
+	Blob_ScopeType_name = map[int32]string{
+		0: "SCOPE_TYPE_UNSPECIFIED",
+		1: "SCOPE_TYPE_ORGANIZATION",
+		2: "SCOPE_TYPE_CANVAS",
+		3: "SCOPE_TYPE_NODE",
+		4: "SCOPE_TYPE_EXECUTION",
+	}
+	Blob_ScopeType_value = map[string]int32{
+		"SCOPE_TYPE_UNSPECIFIED":  0,
+		"SCOPE_TYPE_ORGANIZATION": 1,
+		"SCOPE_TYPE_CANVAS":       2,
+		"SCOPE_TYPE_NODE":         3,
+		"SCOPE_TYPE_EXECUTION":    4,
+	}
+)
+
+func (x Blob_ScopeType) Enum() *Blob_ScopeType {
+	p := new(Blob_ScopeType)
+	*p = x
+	return p
+}
+
+func (x Blob_ScopeType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Blob_ScopeType) Descriptor() protoreflect.EnumDescriptor {
+	return file_canvases_proto_enumTypes[9].Descriptor()
+}
+
+func (Blob_ScopeType) Type() protoreflect.EnumType {
+	return &file_canvases_proto_enumTypes[9]
+}
+
+func (x Blob_ScopeType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Blob_ScopeType.Descriptor instead.
+func (Blob_ScopeType) EnumDescriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{72, 0}
+}
+
 type ListCanvasesRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	IncludeTemplates bool                   `protobuf:"varint,1,opt,name=include_templates,json=includeTemplates,proto3" json:"include_templates,omitempty"`
@@ -4632,6 +4687,586 @@ func (*ResolveExecutionErrorsResponse) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{71}
 }
 
+type Blob struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	ScopeType      Blob_ScopeType         `protobuf:"varint,3,opt,name=scope_type,json=scopeType,proto3,enum=Superplane.Canvases.Blob_ScopeType" json:"scope_type,omitempty"`
+	CanvasId       string                 `protobuf:"bytes,4,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	NodeId         string                 `protobuf:"bytes,5,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ExecutionId    string                 `protobuf:"bytes,6,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	Path           string                 `protobuf:"bytes,7,opt,name=path,proto3" json:"path,omitempty"`
+	ObjectKey      string                 `protobuf:"bytes,8,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`
+	SizeBytes      int64                  `protobuf:"varint,9,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	ContentType    string                 `protobuf:"bytes,10,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *Blob) Reset() {
+	*x = Blob{}
+	mi := &file_canvases_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Blob) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Blob) ProtoMessage() {}
+
+func (x *Blob) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Blob.ProtoReflect.Descriptor instead.
+func (*Blob) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *Blob) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Blob) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
+func (x *Blob) GetScopeType() Blob_ScopeType {
+	if x != nil {
+		return x.ScopeType
+	}
+	return Blob_SCOPE_TYPE_UNSPECIFIED
+}
+
+func (x *Blob) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *Blob) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *Blob) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *Blob) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *Blob) GetObjectKey() string {
+	if x != nil {
+		return x.ObjectKey
+	}
+	return ""
+}
+
+func (x *Blob) GetSizeBytes() int64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *Blob) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+func (x *Blob) GetCreatedAt() *timestamp.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+type StoreBlobRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScopeType     Blob_ScopeType         `protobuf:"varint,1,opt,name=scope_type,json=scopeType,proto3,enum=Superplane.Canvases.Blob_ScopeType" json:"scope_type,omitempty"`
+	CanvasId      string                 `protobuf:"bytes,2,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,4,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	Path          string                 `protobuf:"bytes,5,opt,name=path,proto3" json:"path,omitempty"`
+	Content       []byte                 `protobuf:"bytes,6,opt,name=content,proto3" json:"content,omitempty"`
+	ContentType   string                 `protobuf:"bytes,7,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StoreBlobRequest) Reset() {
+	*x = StoreBlobRequest{}
+	mi := &file_canvases_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StoreBlobRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StoreBlobRequest) ProtoMessage() {}
+
+func (x *StoreBlobRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StoreBlobRequest.ProtoReflect.Descriptor instead.
+func (*StoreBlobRequest) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *StoreBlobRequest) GetScopeType() Blob_ScopeType {
+	if x != nil {
+		return x.ScopeType
+	}
+	return Blob_SCOPE_TYPE_UNSPECIFIED
+}
+
+func (x *StoreBlobRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *StoreBlobRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *StoreBlobRequest) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *StoreBlobRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *StoreBlobRequest) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+func (x *StoreBlobRequest) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
+type StoreBlobResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blob          *Blob                  `protobuf:"bytes,1,opt,name=blob,proto3" json:"blob,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StoreBlobResponse) Reset() {
+	*x = StoreBlobResponse{}
+	mi := &file_canvases_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StoreBlobResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StoreBlobResponse) ProtoMessage() {}
+
+func (x *StoreBlobResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StoreBlobResponse.ProtoReflect.Descriptor instead.
+func (*StoreBlobResponse) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *StoreBlobResponse) GetBlob() *Blob {
+	if x != nil {
+		return x.Blob
+	}
+	return nil
+}
+
+type ListBlobsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScopeType     Blob_ScopeType         `protobuf:"varint,1,opt,name=scope_type,json=scopeType,proto3,enum=Superplane.Canvases.Blob_ScopeType" json:"scope_type,omitempty"`
+	CanvasId      string                 `protobuf:"bytes,2,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	NodeId        string                 `protobuf:"bytes,3,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ExecutionId   string                 `protobuf:"bytes,4,opt,name=execution_id,json=executionId,proto3" json:"execution_id,omitempty"`
+	Limit         uint32                 `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	Before        *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=before,proto3" json:"before,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlobsRequest) Reset() {
+	*x = ListBlobsRequest{}
+	mi := &file_canvases_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlobsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlobsRequest) ProtoMessage() {}
+
+func (x *ListBlobsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlobsRequest.ProtoReflect.Descriptor instead.
+func (*ListBlobsRequest) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *ListBlobsRequest) GetScopeType() Blob_ScopeType {
+	if x != nil {
+		return x.ScopeType
+	}
+	return Blob_SCOPE_TYPE_UNSPECIFIED
+}
+
+func (x *ListBlobsRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+func (x *ListBlobsRequest) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ListBlobsRequest) GetExecutionId() string {
+	if x != nil {
+		return x.ExecutionId
+	}
+	return ""
+}
+
+func (x *ListBlobsRequest) GetLimit() uint32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListBlobsRequest) GetBefore() *timestamp.Timestamp {
+	if x != nil {
+		return x.Before
+	}
+	return nil
+}
+
+type ListBlobsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blobs         []*Blob                `protobuf:"bytes,1,rep,name=blobs,proto3" json:"blobs,omitempty"`
+	HasNextPage   bool                   `protobuf:"varint,2,opt,name=has_next_page,json=hasNextPage,proto3" json:"has_next_page,omitempty"`
+	LastTimestamp *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=last_timestamp,json=lastTimestamp,proto3" json:"last_timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlobsResponse) Reset() {
+	*x = ListBlobsResponse{}
+	mi := &file_canvases_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlobsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlobsResponse) ProtoMessage() {}
+
+func (x *ListBlobsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlobsResponse.ProtoReflect.Descriptor instead.
+func (*ListBlobsResponse) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *ListBlobsResponse) GetBlobs() []*Blob {
+	if x != nil {
+		return x.Blobs
+	}
+	return nil
+}
+
+func (x *ListBlobsResponse) GetHasNextPage() bool {
+	if x != nil {
+		return x.HasNextPage
+	}
+	return false
+}
+
+func (x *ListBlobsResponse) GetLastTimestamp() *timestamp.Timestamp {
+	if x != nil {
+		return x.LastTimestamp
+	}
+	return nil
+}
+
+type DescribeBlobRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeBlobRequest) Reset() {
+	*x = DescribeBlobRequest{}
+	mi := &file_canvases_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeBlobRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeBlobRequest) ProtoMessage() {}
+
+func (x *DescribeBlobRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeBlobRequest.ProtoReflect.Descriptor instead.
+func (*DescribeBlobRequest) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *DescribeBlobRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DescribeBlobResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blob          *Blob                  `protobuf:"bytes,1,opt,name=blob,proto3" json:"blob,omitempty"`
+	Content       []byte                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DescribeBlobResponse) Reset() {
+	*x = DescribeBlobResponse{}
+	mi := &file_canvases_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DescribeBlobResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DescribeBlobResponse) ProtoMessage() {}
+
+func (x *DescribeBlobResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DescribeBlobResponse.ProtoReflect.Descriptor instead.
+func (*DescribeBlobResponse) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *DescribeBlobResponse) GetBlob() *Blob {
+	if x != nil {
+		return x.Blob
+	}
+	return nil
+}
+
+func (x *DescribeBlobResponse) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
+type DeleteBlobRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBlobRequest) Reset() {
+	*x = DeleteBlobRequest{}
+	mi := &file_canvases_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBlobRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBlobRequest) ProtoMessage() {}
+
+func (x *DeleteBlobRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBlobRequest.ProtoReflect.Descriptor instead.
+func (*DeleteBlobRequest) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{79}
+}
+
+func (x *DeleteBlobRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DeleteBlobResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteBlobResponse) Reset() {
+	*x = DeleteBlobResponse{}
+	mi := &file_canvases_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteBlobResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteBlobResponse) ProtoMessage() {}
+
+func (x *DeleteBlobResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteBlobResponse.ProtoReflect.Descriptor instead.
+func (*DeleteBlobResponse) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{80}
+}
+
 type CanvasNodeEventMessage struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -4645,7 +5280,7 @@ type CanvasNodeEventMessage struct {
 
 func (x *CanvasNodeEventMessage) Reset() {
 	*x = CanvasNodeEventMessage{}
-	mi := &file_canvases_proto_msgTypes[72]
+	mi := &file_canvases_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4657,7 +5292,7 @@ func (x *CanvasNodeEventMessage) String() string {
 func (*CanvasNodeEventMessage) ProtoMessage() {}
 
 func (x *CanvasNodeEventMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[72]
+	mi := &file_canvases_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4670,7 +5305,7 @@ func (x *CanvasNodeEventMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanvasNodeEventMessage.ProtoReflect.Descriptor instead.
 func (*CanvasNodeEventMessage) Descriptor() ([]byte, []int) {
-	return file_canvases_proto_rawDescGZIP(), []int{72}
+	return file_canvases_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *CanvasNodeEventMessage) GetId() string {
@@ -4720,7 +5355,7 @@ type CanvasNodeExecutionMessage struct {
 
 func (x *CanvasNodeExecutionMessage) Reset() {
 	*x = CanvasNodeExecutionMessage{}
-	mi := &file_canvases_proto_msgTypes[73]
+	mi := &file_canvases_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4732,7 +5367,7 @@ func (x *CanvasNodeExecutionMessage) String() string {
 func (*CanvasNodeExecutionMessage) ProtoMessage() {}
 
 func (x *CanvasNodeExecutionMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[73]
+	mi := &file_canvases_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4745,7 +5380,7 @@ func (x *CanvasNodeExecutionMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanvasNodeExecutionMessage.ProtoReflect.Descriptor instead.
 func (*CanvasNodeExecutionMessage) Descriptor() ([]byte, []int) {
-	return file_canvases_proto_rawDescGZIP(), []int{73}
+	return file_canvases_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *CanvasNodeExecutionMessage) GetId() string {
@@ -4788,7 +5423,7 @@ type CanvasNodeQueueItemMessage struct {
 
 func (x *CanvasNodeQueueItemMessage) Reset() {
 	*x = CanvasNodeQueueItemMessage{}
-	mi := &file_canvases_proto_msgTypes[74]
+	mi := &file_canvases_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4800,7 +5435,7 @@ func (x *CanvasNodeQueueItemMessage) String() string {
 func (*CanvasNodeQueueItemMessage) ProtoMessage() {}
 
 func (x *CanvasNodeQueueItemMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[74]
+	mi := &file_canvases_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4813,7 +5448,7 @@ func (x *CanvasNodeQueueItemMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanvasNodeQueueItemMessage.ProtoReflect.Descriptor instead.
 func (*CanvasNodeQueueItemMessage) Descriptor() ([]byte, []int) {
-	return file_canvases_proto_rawDescGZIP(), []int{74}
+	return file_canvases_proto_rawDescGZIP(), []int{83}
 }
 
 func (x *CanvasNodeQueueItemMessage) GetId() string {
@@ -4856,7 +5491,7 @@ type CanvasMessage struct {
 
 func (x *CanvasMessage) Reset() {
 	*x = CanvasMessage{}
-	mi := &file_canvases_proto_msgTypes[75]
+	mi := &file_canvases_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4868,7 +5503,7 @@ func (x *CanvasMessage) String() string {
 func (*CanvasMessage) ProtoMessage() {}
 
 func (x *CanvasMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[75]
+	mi := &file_canvases_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4881,7 +5516,7 @@ func (x *CanvasMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanvasMessage.ProtoReflect.Descriptor instead.
 func (*CanvasMessage) Descriptor() ([]byte, []int) {
-	return file_canvases_proto_rawDescGZIP(), []int{75}
+	return file_canvases_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *CanvasMessage) GetId() string {
@@ -4923,7 +5558,7 @@ type CanvasVersionMessage struct {
 
 func (x *CanvasVersionMessage) Reset() {
 	*x = CanvasVersionMessage{}
-	mi := &file_canvases_proto_msgTypes[76]
+	mi := &file_canvases_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4935,7 +5570,7 @@ func (x *CanvasVersionMessage) String() string {
 func (*CanvasVersionMessage) ProtoMessage() {}
 
 func (x *CanvasVersionMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[76]
+	mi := &file_canvases_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4948,7 +5583,7 @@ func (x *CanvasVersionMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CanvasVersionMessage.ProtoReflect.Descriptor instead.
 func (*CanvasVersionMessage) Descriptor() ([]byte, []int) {
-	return file_canvases_proto_rawDescGZIP(), []int{76}
+	return file_canvases_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *CanvasVersionMessage) GetCanvasId() string {
@@ -4990,7 +5625,7 @@ type Canvas_Metadata struct {
 
 func (x *Canvas_Metadata) Reset() {
 	*x = Canvas_Metadata{}
-	mi := &file_canvases_proto_msgTypes[77]
+	mi := &file_canvases_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5002,7 +5637,7 @@ func (x *Canvas_Metadata) String() string {
 func (*Canvas_Metadata) ProtoMessage() {}
 
 func (x *Canvas_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[77]
+	mi := &file_canvases_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5098,7 +5733,7 @@ type Canvas_Spec struct {
 
 func (x *Canvas_Spec) Reset() {
 	*x = Canvas_Spec{}
-	mi := &file_canvases_proto_msgTypes[78]
+	mi := &file_canvases_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5110,7 +5745,7 @@ func (x *Canvas_Spec) String() string {
 func (*Canvas_Spec) ProtoMessage() {}
 
 func (x *Canvas_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[78]
+	mi := &file_canvases_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5151,7 +5786,7 @@ type Canvas_Status struct {
 
 func (x *Canvas_Status) Reset() {
 	*x = Canvas_Status{}
-	mi := &file_canvases_proto_msgTypes[79]
+	mi := &file_canvases_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5163,7 +5798,7 @@ func (x *Canvas_Status) String() string {
 func (*Canvas_Status) ProtoMessage() {}
 
 func (x *Canvas_Status) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[79]
+	mi := &file_canvases_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5215,7 +5850,7 @@ type CanvasVersion_Metadata struct {
 
 func (x *CanvasVersion_Metadata) Reset() {
 	*x = CanvasVersion_Metadata{}
-	mi := &file_canvases_proto_msgTypes[80]
+	mi := &file_canvases_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5227,7 +5862,7 @@ func (x *CanvasVersion_Metadata) String() string {
 func (*CanvasVersion_Metadata) ProtoMessage() {}
 
 func (x *CanvasVersion_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[80]
+	mi := &file_canvases_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5312,7 +5947,7 @@ type CanvasChangeRequest_Metadata struct {
 
 func (x *CanvasChangeRequest_Metadata) Reset() {
 	*x = CanvasChangeRequest_Metadata{}
-	mi := &file_canvases_proto_msgTypes[81]
+	mi := &file_canvases_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5324,7 +5959,7 @@ func (x *CanvasChangeRequest_Metadata) String() string {
 func (*CanvasChangeRequest_Metadata) ProtoMessage() {}
 
 func (x *CanvasChangeRequest_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[81]
+	mi := &file_canvases_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5830,7 +6465,61 @@ const file_canvases_proto_rawDesc = "" +
 	"\x1dResolveExecutionErrorsRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12#\n" +
 	"\rexecution_ids\x18\x02 \x03(\tR\fexecutionIds\" \n" +
-	"\x1eResolveExecutionErrorsResponse\"\xc1\x01\n" +
+	"\x1eResolveExecutionErrorsResponse\"\x99\x04\n" +
+	"\x04Blob\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
+	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12B\n" +
+	"\n" +
+	"scope_type\x18\x03 \x01(\x0e2#.Superplane.Canvases.Blob.ScopeTypeR\tscopeType\x12\x1b\n" +
+	"\tcanvas_id\x18\x04 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\anode_id\x18\x05 \x01(\tR\x06nodeId\x12!\n" +
+	"\fexecution_id\x18\x06 \x01(\tR\vexecutionId\x12\x12\n" +
+	"\x04path\x18\a \x01(\tR\x04path\x12\x1d\n" +
+	"\n" +
+	"object_key\x18\b \x01(\tR\tobjectKey\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\t \x01(\x03R\tsizeBytes\x12!\n" +
+	"\fcontent_type\x18\n" +
+	" \x01(\tR\vcontentType\x129\n" +
+	"\n" +
+	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x8a\x01\n" +
+	"\tScopeType\x12\x1a\n" +
+	"\x16SCOPE_TYPE_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17SCOPE_TYPE_ORGANIZATION\x10\x01\x12\x15\n" +
+	"\x11SCOPE_TYPE_CANVAS\x10\x02\x12\x13\n" +
+	"\x0fSCOPE_TYPE_NODE\x10\x03\x12\x18\n" +
+	"\x14SCOPE_TYPE_EXECUTION\x10\x04\"\x80\x02\n" +
+	"\x10StoreBlobRequest\x12B\n" +
+	"\n" +
+	"scope_type\x18\x01 \x01(\x0e2#.Superplane.Canvases.Blob.ScopeTypeR\tscopeType\x12\x1b\n" +
+	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12!\n" +
+	"\fexecution_id\x18\x04 \x01(\tR\vexecutionId\x12\x12\n" +
+	"\x04path\x18\x05 \x01(\tR\x04path\x12\x18\n" +
+	"\acontent\x18\x06 \x01(\fR\acontent\x12!\n" +
+	"\fcontent_type\x18\a \x01(\tR\vcontentType\"B\n" +
+	"\x11StoreBlobResponse\x12-\n" +
+	"\x04blob\x18\x01 \x01(\v2\x19.Superplane.Canvases.BlobR\x04blob\"\xf9\x01\n" +
+	"\x10ListBlobsRequest\x12B\n" +
+	"\n" +
+	"scope_type\x18\x01 \x01(\x0e2#.Superplane.Canvases.Blob.ScopeTypeR\tscopeType\x12\x1b\n" +
+	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
+	"\anode_id\x18\x03 \x01(\tR\x06nodeId\x12!\n" +
+	"\fexecution_id\x18\x04 \x01(\tR\vexecutionId\x12\x14\n" +
+	"\x05limit\x18\x05 \x01(\rR\x05limit\x122\n" +
+	"\x06before\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x06before\"\xab\x01\n" +
+	"\x11ListBlobsResponse\x12/\n" +
+	"\x05blobs\x18\x01 \x03(\v2\x19.Superplane.Canvases.BlobR\x05blobs\x12\"\n" +
+	"\rhas_next_page\x18\x02 \x01(\bR\vhasNextPage\x12A\n" +
+	"\x0elast_timestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\rlastTimestamp\"%\n" +
+	"\x13DescribeBlobRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"_\n" +
+	"\x14DescribeBlobResponse\x12-\n" +
+	"\x04blob\x18\x01 \x01(\v2\x19.Superplane.Canvases.BlobR\x04blob\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\fR\acontent\"#\n" +
+	"\x11DeleteBlobRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x14\n" +
+	"\x12DeleteBlobResponse\"\xc1\x01\n" +
 	"\x16CanvasNodeEventMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
@@ -5856,7 +6545,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
 	"\n" +
 	"version_id\x18\x02 \x01(\tR\tversionId\x128\n" +
-	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xad>\n" +
+	"\ttimestamp\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xf1C\n" +
 	"\bCanvases\x12\xb7\x01\n" +
 	"\fListCanvases\x12(.Superplane.Canvases.ListCanvasesRequest\x1a).Superplane.Canvases.ListCanvasesResponse\"R\x92A7\n" +
 	"\x06Canvas\x12\rList canvases\x1a\x1eReturns a list of all canvases\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/canvases\x12\xb0\x01\n" +
@@ -5922,7 +6611,18 @@ const file_canvases_proto_rawDesc = "" +
 	"\x12DeleteCanvasMemory\x12..Superplane.Canvases.DeleteCanvasMemoryRequest\x1a/.Superplane.Canvases.DeleteCanvasMemoryResponse\"\x8d\x01\x92AS\n" +
 	"\x06Canvas\x12\x1aDelete canvas memory entry\x1a-Deletes one memory record by ID from a canvas\x82\xd3\xe4\x93\x021*//api/v1/canvases/{canvas_id}/memory/{memory_id}\x12\xa4\x02\n" +
 	"\x13ListEventExecutions\x12/.Superplane.Canvases.ListEventExecutionsRequest\x1a0.Superplane.Canvases.ListEventExecutionsResponse\"\xa9\x01\x92Ae\n" +
-	"\vCanvasEvent\x12\x15List event executions\x1a?Returns a list of all node executions triggered by a root event\x82\xd3\xe4\x93\x02;\x129/api/v1/canvases/{canvas_id}/events/{event_id}/executionsB\xc8\x01\x92A\x8c\x01\x12b\n" +
+	"\vCanvasEvent\x12\x15List event executions\x1a?Returns a list of all node executions triggered by a root event\x82\xd3\xe4\x93\x02;\x129/api/v1/canvases/{canvas_id}/events/{event_id}/executions\x12\xae\x01\n" +
+	"\tStoreBlob\x12%.Superplane.Canvases.StoreBlobRequest\x1a&.Superplane.Canvases.StoreBlobResponse\"R\x92A7\n" +
+	"\x04Blob\x12\n" +
+	"Store blob\x1a#Stores a blob in the selected scope\x82\xd3\xe4\x93\x02\x12:\x01*\"\r/api/v1/blobs\x12\xa9\x01\n" +
+	"\tListBlobs\x12%.Superplane.Canvases.ListBlobsRequest\x1a&.Superplane.Canvases.ListBlobsResponse\"M\x92A5\n" +
+	"\x04Blob\x12\n" +
+	"List blobs\x1a!Lists blobs in the selected scope\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/blobs\x12\xc2\x01\n" +
+	"\fDescribeBlob\x12(.Superplane.Canvases.DescribeBlobRequest\x1a).Superplane.Canvases.DescribeBlobResponse\"]\x92A@\n" +
+	"\x04Blob\x12\rDescribe blob\x1a)Describes a blob and returns its contents\x82\xd3\xe4\x93\x02\x14\x12\x12/api/v1/blobs/{id}\x12\x9f\x01\n" +
+	"\n" +
+	"DeleteBlob\x12&.Superplane.Canvases.DeleteBlobRequest\x1a'.Superplane.Canvases.DeleteBlobResponse\"@\x92A#\n" +
+	"\x04Blob\x12\vDelete blob\x1a\x0eDeletes a blob\x82\xd3\xe4\x93\x02\x14*\x12/api/v1/blobs/{id}B\xc8\x01\x92A\x8c\x01\x12b\n" +
 	"\x17Superplane Canvases API\x12\x1bAPI for Superplane canvases\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ6github.com/superplanehq/superplane/pkg/protos/canvasesb\x06proto3"
 
@@ -5938,8 +6638,8 @@ func file_canvases_proto_rawDescGZIP() []byte {
 	return file_canvases_proto_rawDescData
 }
 
-var file_canvases_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_canvases_proto_msgTypes = make([]protoimpl.MessageInfo, 82)
+var file_canvases_proto_enumTypes = make([]protoimpl.EnumInfo, 10)
+var file_canvases_proto_msgTypes = make([]protoimpl.MessageInfo, 91)
 var file_canvases_proto_goTypes = []any{
 	(CanvasAutoLayout_Algorithm)(0),             // 0: Superplane.Canvases.CanvasAutoLayout.Algorithm
 	(CanvasAutoLayout_Scope)(0),                 // 1: Superplane.Canvases.CanvasAutoLayout.Scope
@@ -5950,268 +6650,295 @@ var file_canvases_proto_goTypes = []any{
 	(CanvasNodeExecution_State)(0),              // 6: Superplane.Canvases.CanvasNodeExecution.State
 	(CanvasNodeExecution_Result)(0),             // 7: Superplane.Canvases.CanvasNodeExecution.Result
 	(CanvasNodeExecution_ResultReason)(0),       // 8: Superplane.Canvases.CanvasNodeExecution.ResultReason
-	(*ListCanvasesRequest)(nil),                 // 9: Superplane.Canvases.ListCanvasesRequest
-	(*ListCanvasesResponse)(nil),                // 10: Superplane.Canvases.ListCanvasesResponse
-	(*DescribeCanvasRequest)(nil),               // 11: Superplane.Canvases.DescribeCanvasRequest
-	(*DescribeCanvasResponse)(nil),              // 12: Superplane.Canvases.DescribeCanvasResponse
-	(*UpdateCanvasRequest)(nil),                 // 13: Superplane.Canvases.UpdateCanvasRequest
-	(*UpdateCanvasResponse)(nil),                // 14: Superplane.Canvases.UpdateCanvasResponse
-	(*CreateCanvasRequest)(nil),                 // 15: Superplane.Canvases.CreateCanvasRequest
-	(*CreateCanvasResponse)(nil),                // 16: Superplane.Canvases.CreateCanvasResponse
-	(*CanvasAutoLayout)(nil),                    // 17: Superplane.Canvases.CanvasAutoLayout
-	(*CreateCanvasVersionRequest)(nil),          // 18: Superplane.Canvases.CreateCanvasVersionRequest
-	(*CreateCanvasVersionResponse)(nil),         // 19: Superplane.Canvases.CreateCanvasVersionResponse
-	(*ListCanvasVersionsRequest)(nil),           // 20: Superplane.Canvases.ListCanvasVersionsRequest
-	(*ListCanvasVersionsResponse)(nil),          // 21: Superplane.Canvases.ListCanvasVersionsResponse
-	(*DescribeCanvasVersionRequest)(nil),        // 22: Superplane.Canvases.DescribeCanvasVersionRequest
-	(*DescribeCanvasVersionResponse)(nil),       // 23: Superplane.Canvases.DescribeCanvasVersionResponse
-	(*UpdateCanvasVersionRequest)(nil),          // 24: Superplane.Canvases.UpdateCanvasVersionRequest
-	(*UpdateCanvasVersionResponse)(nil),         // 25: Superplane.Canvases.UpdateCanvasVersionResponse
-	(*CreateCanvasChangeRequestRequest)(nil),    // 26: Superplane.Canvases.CreateCanvasChangeRequestRequest
-	(*CreateCanvasChangeRequestResponse)(nil),   // 27: Superplane.Canvases.CreateCanvasChangeRequestResponse
-	(*ListCanvasChangeRequestsRequest)(nil),     // 28: Superplane.Canvases.ListCanvasChangeRequestsRequest
-	(*ListCanvasChangeRequestsResponse)(nil),    // 29: Superplane.Canvases.ListCanvasChangeRequestsResponse
-	(*DescribeCanvasChangeRequestRequest)(nil),  // 30: Superplane.Canvases.DescribeCanvasChangeRequestRequest
-	(*DescribeCanvasChangeRequestResponse)(nil), // 31: Superplane.Canvases.DescribeCanvasChangeRequestResponse
-	(*ActOnCanvasChangeRequestRequest)(nil),     // 32: Superplane.Canvases.ActOnCanvasChangeRequestRequest
-	(*ActOnCanvasChangeRequestResponse)(nil),    // 33: Superplane.Canvases.ActOnCanvasChangeRequestResponse
-	(*ResolveCanvasChangeRequestRequest)(nil),   // 34: Superplane.Canvases.ResolveCanvasChangeRequestRequest
-	(*ResolveCanvasChangeRequestResponse)(nil),  // 35: Superplane.Canvases.ResolveCanvasChangeRequestResponse
-	(*DeleteCanvasRequest)(nil),                 // 36: Superplane.Canvases.DeleteCanvasRequest
-	(*DeleteCanvasResponse)(nil),                // 37: Superplane.Canvases.DeleteCanvasResponse
-	(*UserRef)(nil),                             // 38: Superplane.Canvases.UserRef
-	(*Canvas)(nil),                              // 39: Superplane.Canvases.Canvas
-	(*CanvasVersion)(nil),                       // 40: Superplane.Canvases.CanvasVersion
-	(*CanvasChangeRequestDiff)(nil),             // 41: Superplane.Canvases.CanvasChangeRequestDiff
-	(*CanvasChangeRequestApprover)(nil),         // 42: Superplane.Canvases.CanvasChangeRequestApprover
-	(*CanvasChangeRequestApprovalConfig)(nil),   // 43: Superplane.Canvases.CanvasChangeRequestApprovalConfig
-	(*CanvasChangeRequestApproval)(nil),         // 44: Superplane.Canvases.CanvasChangeRequestApproval
-	(*CanvasChangeRequest)(nil),                 // 45: Superplane.Canvases.CanvasChangeRequest
-	(*ListNodeEventsRequest)(nil),               // 46: Superplane.Canvases.ListNodeEventsRequest
-	(*ListNodeEventsResponse)(nil),              // 47: Superplane.Canvases.ListNodeEventsResponse
-	(*EmitNodeEventRequest)(nil),                // 48: Superplane.Canvases.EmitNodeEventRequest
-	(*EmitNodeEventResponse)(nil),               // 49: Superplane.Canvases.EmitNodeEventResponse
-	(*ListNodeQueueItemsRequest)(nil),           // 50: Superplane.Canvases.ListNodeQueueItemsRequest
-	(*ListNodeQueueItemsResponse)(nil),          // 51: Superplane.Canvases.ListNodeQueueItemsResponse
-	(*DeleteNodeQueueItemRequest)(nil),          // 52: Superplane.Canvases.DeleteNodeQueueItemRequest
-	(*DeleteNodeQueueItemResponse)(nil),         // 53: Superplane.Canvases.DeleteNodeQueueItemResponse
-	(*UpdateNodePauseRequest)(nil),              // 54: Superplane.Canvases.UpdateNodePauseRequest
-	(*UpdateNodePauseResponse)(nil),             // 55: Superplane.Canvases.UpdateNodePauseResponse
-	(*ListNodeExecutionsRequest)(nil),           // 56: Superplane.Canvases.ListNodeExecutionsRequest
-	(*ListNodeExecutionsResponse)(nil),          // 57: Superplane.Canvases.ListNodeExecutionsResponse
-	(*ListChildExecutionsRequest)(nil),          // 58: Superplane.Canvases.ListChildExecutionsRequest
-	(*ListChildExecutionsResponse)(nil),         // 59: Superplane.Canvases.ListChildExecutionsResponse
-	(*CanvasNodeExecution)(nil),                 // 60: Superplane.Canvases.CanvasNodeExecution
-	(*CanvasNodeQueueItem)(nil),                 // 61: Superplane.Canvases.CanvasNodeQueueItem
-	(*InvokeNodeExecutionActionRequest)(nil),    // 62: Superplane.Canvases.InvokeNodeExecutionActionRequest
-	(*InvokeNodeExecutionActionResponse)(nil),   // 63: Superplane.Canvases.InvokeNodeExecutionActionResponse
-	(*InvokeNodeTriggerActionRequest)(nil),      // 64: Superplane.Canvases.InvokeNodeTriggerActionRequest
-	(*InvokeNodeTriggerActionResponse)(nil),     // 65: Superplane.Canvases.InvokeNodeTriggerActionResponse
-	(*ListCanvasEventsRequest)(nil),             // 66: Superplane.Canvases.ListCanvasEventsRequest
-	(*ListCanvasEventsResponse)(nil),            // 67: Superplane.Canvases.ListCanvasEventsResponse
-	(*CanvasMemory)(nil),                        // 68: Superplane.Canvases.CanvasMemory
-	(*ListCanvasMemoriesRequest)(nil),           // 69: Superplane.Canvases.ListCanvasMemoriesRequest
-	(*ListCanvasMemoriesResponse)(nil),          // 70: Superplane.Canvases.ListCanvasMemoriesResponse
-	(*DeleteCanvasMemoryRequest)(nil),           // 71: Superplane.Canvases.DeleteCanvasMemoryRequest
-	(*DeleteCanvasMemoryResponse)(nil),          // 72: Superplane.Canvases.DeleteCanvasMemoryResponse
-	(*CanvasEvent)(nil),                         // 73: Superplane.Canvases.CanvasEvent
-	(*CanvasEventWithExecutions)(nil),           // 74: Superplane.Canvases.CanvasEventWithExecutions
-	(*ListEventExecutionsRequest)(nil),          // 75: Superplane.Canvases.ListEventExecutionsRequest
-	(*ListEventExecutionsResponse)(nil),         // 76: Superplane.Canvases.ListEventExecutionsResponse
-	(*CancelExecutionRequest)(nil),              // 77: Superplane.Canvases.CancelExecutionRequest
-	(*CancelExecutionResponse)(nil),             // 78: Superplane.Canvases.CancelExecutionResponse
-	(*ResolveExecutionErrorsRequest)(nil),       // 79: Superplane.Canvases.ResolveExecutionErrorsRequest
-	(*ResolveExecutionErrorsResponse)(nil),      // 80: Superplane.Canvases.ResolveExecutionErrorsResponse
-	(*CanvasNodeEventMessage)(nil),              // 81: Superplane.Canvases.CanvasNodeEventMessage
-	(*CanvasNodeExecutionMessage)(nil),          // 82: Superplane.Canvases.CanvasNodeExecutionMessage
-	(*CanvasNodeQueueItemMessage)(nil),          // 83: Superplane.Canvases.CanvasNodeQueueItemMessage
-	(*CanvasMessage)(nil),                       // 84: Superplane.Canvases.CanvasMessage
-	(*CanvasVersionMessage)(nil),                // 85: Superplane.Canvases.CanvasVersionMessage
-	(*Canvas_Metadata)(nil),                     // 86: Superplane.Canvases.Canvas.Metadata
-	(*Canvas_Spec)(nil),                         // 87: Superplane.Canvases.Canvas.Spec
-	(*Canvas_Status)(nil),                       // 88: Superplane.Canvases.Canvas.Status
-	(*CanvasVersion_Metadata)(nil),              // 89: Superplane.Canvases.CanvasVersion.Metadata
-	(*CanvasChangeRequest_Metadata)(nil),        // 90: Superplane.Canvases.CanvasChangeRequest.Metadata
-	(*timestamp.Timestamp)(nil),                 // 91: google.protobuf.Timestamp
-	(*_struct.Struct)(nil),                      // 92: google.protobuf.Struct
-	(*components.Node)(nil),                     // 93: Superplane.Components.Node
-	(*_struct.Value)(nil),                       // 94: google.protobuf.Value
-	(*components.Edge)(nil),                     // 95: Superplane.Components.Edge
+	(Blob_ScopeType)(0),                         // 9: Superplane.Canvases.Blob.ScopeType
+	(*ListCanvasesRequest)(nil),                 // 10: Superplane.Canvases.ListCanvasesRequest
+	(*ListCanvasesResponse)(nil),                // 11: Superplane.Canvases.ListCanvasesResponse
+	(*DescribeCanvasRequest)(nil),               // 12: Superplane.Canvases.DescribeCanvasRequest
+	(*DescribeCanvasResponse)(nil),              // 13: Superplane.Canvases.DescribeCanvasResponse
+	(*UpdateCanvasRequest)(nil),                 // 14: Superplane.Canvases.UpdateCanvasRequest
+	(*UpdateCanvasResponse)(nil),                // 15: Superplane.Canvases.UpdateCanvasResponse
+	(*CreateCanvasRequest)(nil),                 // 16: Superplane.Canvases.CreateCanvasRequest
+	(*CreateCanvasResponse)(nil),                // 17: Superplane.Canvases.CreateCanvasResponse
+	(*CanvasAutoLayout)(nil),                    // 18: Superplane.Canvases.CanvasAutoLayout
+	(*CreateCanvasVersionRequest)(nil),          // 19: Superplane.Canvases.CreateCanvasVersionRequest
+	(*CreateCanvasVersionResponse)(nil),         // 20: Superplane.Canvases.CreateCanvasVersionResponse
+	(*ListCanvasVersionsRequest)(nil),           // 21: Superplane.Canvases.ListCanvasVersionsRequest
+	(*ListCanvasVersionsResponse)(nil),          // 22: Superplane.Canvases.ListCanvasVersionsResponse
+	(*DescribeCanvasVersionRequest)(nil),        // 23: Superplane.Canvases.DescribeCanvasVersionRequest
+	(*DescribeCanvasVersionResponse)(nil),       // 24: Superplane.Canvases.DescribeCanvasVersionResponse
+	(*UpdateCanvasVersionRequest)(nil),          // 25: Superplane.Canvases.UpdateCanvasVersionRequest
+	(*UpdateCanvasVersionResponse)(nil),         // 26: Superplane.Canvases.UpdateCanvasVersionResponse
+	(*CreateCanvasChangeRequestRequest)(nil),    // 27: Superplane.Canvases.CreateCanvasChangeRequestRequest
+	(*CreateCanvasChangeRequestResponse)(nil),   // 28: Superplane.Canvases.CreateCanvasChangeRequestResponse
+	(*ListCanvasChangeRequestsRequest)(nil),     // 29: Superplane.Canvases.ListCanvasChangeRequestsRequest
+	(*ListCanvasChangeRequestsResponse)(nil),    // 30: Superplane.Canvases.ListCanvasChangeRequestsResponse
+	(*DescribeCanvasChangeRequestRequest)(nil),  // 31: Superplane.Canvases.DescribeCanvasChangeRequestRequest
+	(*DescribeCanvasChangeRequestResponse)(nil), // 32: Superplane.Canvases.DescribeCanvasChangeRequestResponse
+	(*ActOnCanvasChangeRequestRequest)(nil),     // 33: Superplane.Canvases.ActOnCanvasChangeRequestRequest
+	(*ActOnCanvasChangeRequestResponse)(nil),    // 34: Superplane.Canvases.ActOnCanvasChangeRequestResponse
+	(*ResolveCanvasChangeRequestRequest)(nil),   // 35: Superplane.Canvases.ResolveCanvasChangeRequestRequest
+	(*ResolveCanvasChangeRequestResponse)(nil),  // 36: Superplane.Canvases.ResolveCanvasChangeRequestResponse
+	(*DeleteCanvasRequest)(nil),                 // 37: Superplane.Canvases.DeleteCanvasRequest
+	(*DeleteCanvasResponse)(nil),                // 38: Superplane.Canvases.DeleteCanvasResponse
+	(*UserRef)(nil),                             // 39: Superplane.Canvases.UserRef
+	(*Canvas)(nil),                              // 40: Superplane.Canvases.Canvas
+	(*CanvasVersion)(nil),                       // 41: Superplane.Canvases.CanvasVersion
+	(*CanvasChangeRequestDiff)(nil),             // 42: Superplane.Canvases.CanvasChangeRequestDiff
+	(*CanvasChangeRequestApprover)(nil),         // 43: Superplane.Canvases.CanvasChangeRequestApprover
+	(*CanvasChangeRequestApprovalConfig)(nil),   // 44: Superplane.Canvases.CanvasChangeRequestApprovalConfig
+	(*CanvasChangeRequestApproval)(nil),         // 45: Superplane.Canvases.CanvasChangeRequestApproval
+	(*CanvasChangeRequest)(nil),                 // 46: Superplane.Canvases.CanvasChangeRequest
+	(*ListNodeEventsRequest)(nil),               // 47: Superplane.Canvases.ListNodeEventsRequest
+	(*ListNodeEventsResponse)(nil),              // 48: Superplane.Canvases.ListNodeEventsResponse
+	(*EmitNodeEventRequest)(nil),                // 49: Superplane.Canvases.EmitNodeEventRequest
+	(*EmitNodeEventResponse)(nil),               // 50: Superplane.Canvases.EmitNodeEventResponse
+	(*ListNodeQueueItemsRequest)(nil),           // 51: Superplane.Canvases.ListNodeQueueItemsRequest
+	(*ListNodeQueueItemsResponse)(nil),          // 52: Superplane.Canvases.ListNodeQueueItemsResponse
+	(*DeleteNodeQueueItemRequest)(nil),          // 53: Superplane.Canvases.DeleteNodeQueueItemRequest
+	(*DeleteNodeQueueItemResponse)(nil),         // 54: Superplane.Canvases.DeleteNodeQueueItemResponse
+	(*UpdateNodePauseRequest)(nil),              // 55: Superplane.Canvases.UpdateNodePauseRequest
+	(*UpdateNodePauseResponse)(nil),             // 56: Superplane.Canvases.UpdateNodePauseResponse
+	(*ListNodeExecutionsRequest)(nil),           // 57: Superplane.Canvases.ListNodeExecutionsRequest
+	(*ListNodeExecutionsResponse)(nil),          // 58: Superplane.Canvases.ListNodeExecutionsResponse
+	(*ListChildExecutionsRequest)(nil),          // 59: Superplane.Canvases.ListChildExecutionsRequest
+	(*ListChildExecutionsResponse)(nil),         // 60: Superplane.Canvases.ListChildExecutionsResponse
+	(*CanvasNodeExecution)(nil),                 // 61: Superplane.Canvases.CanvasNodeExecution
+	(*CanvasNodeQueueItem)(nil),                 // 62: Superplane.Canvases.CanvasNodeQueueItem
+	(*InvokeNodeExecutionActionRequest)(nil),    // 63: Superplane.Canvases.InvokeNodeExecutionActionRequest
+	(*InvokeNodeExecutionActionResponse)(nil),   // 64: Superplane.Canvases.InvokeNodeExecutionActionResponse
+	(*InvokeNodeTriggerActionRequest)(nil),      // 65: Superplane.Canvases.InvokeNodeTriggerActionRequest
+	(*InvokeNodeTriggerActionResponse)(nil),     // 66: Superplane.Canvases.InvokeNodeTriggerActionResponse
+	(*ListCanvasEventsRequest)(nil),             // 67: Superplane.Canvases.ListCanvasEventsRequest
+	(*ListCanvasEventsResponse)(nil),            // 68: Superplane.Canvases.ListCanvasEventsResponse
+	(*CanvasMemory)(nil),                        // 69: Superplane.Canvases.CanvasMemory
+	(*ListCanvasMemoriesRequest)(nil),           // 70: Superplane.Canvases.ListCanvasMemoriesRequest
+	(*ListCanvasMemoriesResponse)(nil),          // 71: Superplane.Canvases.ListCanvasMemoriesResponse
+	(*DeleteCanvasMemoryRequest)(nil),           // 72: Superplane.Canvases.DeleteCanvasMemoryRequest
+	(*DeleteCanvasMemoryResponse)(nil),          // 73: Superplane.Canvases.DeleteCanvasMemoryResponse
+	(*CanvasEvent)(nil),                         // 74: Superplane.Canvases.CanvasEvent
+	(*CanvasEventWithExecutions)(nil),           // 75: Superplane.Canvases.CanvasEventWithExecutions
+	(*ListEventExecutionsRequest)(nil),          // 76: Superplane.Canvases.ListEventExecutionsRequest
+	(*ListEventExecutionsResponse)(nil),         // 77: Superplane.Canvases.ListEventExecutionsResponse
+	(*CancelExecutionRequest)(nil),              // 78: Superplane.Canvases.CancelExecutionRequest
+	(*CancelExecutionResponse)(nil),             // 79: Superplane.Canvases.CancelExecutionResponse
+	(*ResolveExecutionErrorsRequest)(nil),       // 80: Superplane.Canvases.ResolveExecutionErrorsRequest
+	(*ResolveExecutionErrorsResponse)(nil),      // 81: Superplane.Canvases.ResolveExecutionErrorsResponse
+	(*Blob)(nil),                                // 82: Superplane.Canvases.Blob
+	(*StoreBlobRequest)(nil),                    // 83: Superplane.Canvases.StoreBlobRequest
+	(*StoreBlobResponse)(nil),                   // 84: Superplane.Canvases.StoreBlobResponse
+	(*ListBlobsRequest)(nil),                    // 85: Superplane.Canvases.ListBlobsRequest
+	(*ListBlobsResponse)(nil),                   // 86: Superplane.Canvases.ListBlobsResponse
+	(*DescribeBlobRequest)(nil),                 // 87: Superplane.Canvases.DescribeBlobRequest
+	(*DescribeBlobResponse)(nil),                // 88: Superplane.Canvases.DescribeBlobResponse
+	(*DeleteBlobRequest)(nil),                   // 89: Superplane.Canvases.DeleteBlobRequest
+	(*DeleteBlobResponse)(nil),                  // 90: Superplane.Canvases.DeleteBlobResponse
+	(*CanvasNodeEventMessage)(nil),              // 91: Superplane.Canvases.CanvasNodeEventMessage
+	(*CanvasNodeExecutionMessage)(nil),          // 92: Superplane.Canvases.CanvasNodeExecutionMessage
+	(*CanvasNodeQueueItemMessage)(nil),          // 93: Superplane.Canvases.CanvasNodeQueueItemMessage
+	(*CanvasMessage)(nil),                       // 94: Superplane.Canvases.CanvasMessage
+	(*CanvasVersionMessage)(nil),                // 95: Superplane.Canvases.CanvasVersionMessage
+	(*Canvas_Metadata)(nil),                     // 96: Superplane.Canvases.Canvas.Metadata
+	(*Canvas_Spec)(nil),                         // 97: Superplane.Canvases.Canvas.Spec
+	(*Canvas_Status)(nil),                       // 98: Superplane.Canvases.Canvas.Status
+	(*CanvasVersion_Metadata)(nil),              // 99: Superplane.Canvases.CanvasVersion.Metadata
+	(*CanvasChangeRequest_Metadata)(nil),        // 100: Superplane.Canvases.CanvasChangeRequest.Metadata
+	(*timestamp.Timestamp)(nil),                 // 101: google.protobuf.Timestamp
+	(*_struct.Struct)(nil),                      // 102: google.protobuf.Struct
+	(*components.Node)(nil),                     // 103: Superplane.Components.Node
+	(*_struct.Value)(nil),                       // 104: google.protobuf.Value
+	(*components.Edge)(nil),                     // 105: Superplane.Components.Edge
 }
 var file_canvases_proto_depIdxs = []int32{
-	39,  // 0: Superplane.Canvases.ListCanvasesResponse.canvases:type_name -> Superplane.Canvases.Canvas
-	39,  // 1: Superplane.Canvases.DescribeCanvasResponse.canvas:type_name -> Superplane.Canvases.Canvas
-	43,  // 2: Superplane.Canvases.UpdateCanvasRequest.change_request_approval_config:type_name -> Superplane.Canvases.CanvasChangeRequestApprovalConfig
-	39,  // 3: Superplane.Canvases.UpdateCanvasResponse.canvas:type_name -> Superplane.Canvases.Canvas
-	39,  // 4: Superplane.Canvases.CreateCanvasRequest.canvas:type_name -> Superplane.Canvases.Canvas
-	17,  // 5: Superplane.Canvases.CreateCanvasRequest.auto_layout:type_name -> Superplane.Canvases.CanvasAutoLayout
-	39,  // 6: Superplane.Canvases.CreateCanvasResponse.canvas:type_name -> Superplane.Canvases.Canvas
+	40,  // 0: Superplane.Canvases.ListCanvasesResponse.canvases:type_name -> Superplane.Canvases.Canvas
+	40,  // 1: Superplane.Canvases.DescribeCanvasResponse.canvas:type_name -> Superplane.Canvases.Canvas
+	44,  // 2: Superplane.Canvases.UpdateCanvasRequest.change_request_approval_config:type_name -> Superplane.Canvases.CanvasChangeRequestApprovalConfig
+	40,  // 3: Superplane.Canvases.UpdateCanvasResponse.canvas:type_name -> Superplane.Canvases.Canvas
+	40,  // 4: Superplane.Canvases.CreateCanvasRequest.canvas:type_name -> Superplane.Canvases.Canvas
+	18,  // 5: Superplane.Canvases.CreateCanvasRequest.auto_layout:type_name -> Superplane.Canvases.CanvasAutoLayout
+	40,  // 6: Superplane.Canvases.CreateCanvasResponse.canvas:type_name -> Superplane.Canvases.Canvas
 	0,   // 7: Superplane.Canvases.CanvasAutoLayout.algorithm:type_name -> Superplane.Canvases.CanvasAutoLayout.Algorithm
 	1,   // 8: Superplane.Canvases.CanvasAutoLayout.scope:type_name -> Superplane.Canvases.CanvasAutoLayout.Scope
-	40,  // 9: Superplane.Canvases.CreateCanvasVersionResponse.version:type_name -> Superplane.Canvases.CanvasVersion
-	91,  // 10: Superplane.Canvases.ListCanvasVersionsRequest.before:type_name -> google.protobuf.Timestamp
-	40,  // 11: Superplane.Canvases.ListCanvasVersionsResponse.versions:type_name -> Superplane.Canvases.CanvasVersion
-	91,  // 12: Superplane.Canvases.ListCanvasVersionsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	40,  // 13: Superplane.Canvases.DescribeCanvasVersionResponse.version:type_name -> Superplane.Canvases.CanvasVersion
-	39,  // 14: Superplane.Canvases.UpdateCanvasVersionRequest.canvas:type_name -> Superplane.Canvases.Canvas
-	17,  // 15: Superplane.Canvases.UpdateCanvasVersionRequest.auto_layout:type_name -> Superplane.Canvases.CanvasAutoLayout
-	40,  // 16: Superplane.Canvases.UpdateCanvasVersionResponse.version:type_name -> Superplane.Canvases.CanvasVersion
-	45,  // 17: Superplane.Canvases.CreateCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
-	91,  // 18: Superplane.Canvases.ListCanvasChangeRequestsRequest.before:type_name -> google.protobuf.Timestamp
-	45,  // 19: Superplane.Canvases.ListCanvasChangeRequestsResponse.change_requests:type_name -> Superplane.Canvases.CanvasChangeRequest
-	91,  // 20: Superplane.Canvases.ListCanvasChangeRequestsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	45,  // 21: Superplane.Canvases.DescribeCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
+	41,  // 9: Superplane.Canvases.CreateCanvasVersionResponse.version:type_name -> Superplane.Canvases.CanvasVersion
+	101, // 10: Superplane.Canvases.ListCanvasVersionsRequest.before:type_name -> google.protobuf.Timestamp
+	41,  // 11: Superplane.Canvases.ListCanvasVersionsResponse.versions:type_name -> Superplane.Canvases.CanvasVersion
+	101, // 12: Superplane.Canvases.ListCanvasVersionsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	41,  // 13: Superplane.Canvases.DescribeCanvasVersionResponse.version:type_name -> Superplane.Canvases.CanvasVersion
+	40,  // 14: Superplane.Canvases.UpdateCanvasVersionRequest.canvas:type_name -> Superplane.Canvases.Canvas
+	18,  // 15: Superplane.Canvases.UpdateCanvasVersionRequest.auto_layout:type_name -> Superplane.Canvases.CanvasAutoLayout
+	41,  // 16: Superplane.Canvases.UpdateCanvasVersionResponse.version:type_name -> Superplane.Canvases.CanvasVersion
+	46,  // 17: Superplane.Canvases.CreateCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
+	101, // 18: Superplane.Canvases.ListCanvasChangeRequestsRequest.before:type_name -> google.protobuf.Timestamp
+	46,  // 19: Superplane.Canvases.ListCanvasChangeRequestsResponse.change_requests:type_name -> Superplane.Canvases.CanvasChangeRequest
+	101, // 20: Superplane.Canvases.ListCanvasChangeRequestsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	46,  // 21: Superplane.Canvases.DescribeCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
 	2,   // 22: Superplane.Canvases.ActOnCanvasChangeRequestRequest.action:type_name -> Superplane.Canvases.ActOnCanvasChangeRequestRequest.Action
-	45,  // 23: Superplane.Canvases.ActOnCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
-	39,  // 24: Superplane.Canvases.ResolveCanvasChangeRequestRequest.canvas:type_name -> Superplane.Canvases.Canvas
-	17,  // 25: Superplane.Canvases.ResolveCanvasChangeRequestRequest.auto_layout:type_name -> Superplane.Canvases.CanvasAutoLayout
-	40,  // 26: Superplane.Canvases.ResolveCanvasChangeRequestResponse.version:type_name -> Superplane.Canvases.CanvasVersion
-	45,  // 27: Superplane.Canvases.ResolveCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
-	86,  // 28: Superplane.Canvases.Canvas.metadata:type_name -> Superplane.Canvases.Canvas.Metadata
-	87,  // 29: Superplane.Canvases.Canvas.spec:type_name -> Superplane.Canvases.Canvas.Spec
-	88,  // 30: Superplane.Canvases.Canvas.status:type_name -> Superplane.Canvases.Canvas.Status
-	89,  // 31: Superplane.Canvases.CanvasVersion.metadata:type_name -> Superplane.Canvases.CanvasVersion.Metadata
-	87,  // 32: Superplane.Canvases.CanvasVersion.spec:type_name -> Superplane.Canvases.Canvas.Spec
+	46,  // 23: Superplane.Canvases.ActOnCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
+	40,  // 24: Superplane.Canvases.ResolveCanvasChangeRequestRequest.canvas:type_name -> Superplane.Canvases.Canvas
+	18,  // 25: Superplane.Canvases.ResolveCanvasChangeRequestRequest.auto_layout:type_name -> Superplane.Canvases.CanvasAutoLayout
+	41,  // 26: Superplane.Canvases.ResolveCanvasChangeRequestResponse.version:type_name -> Superplane.Canvases.CanvasVersion
+	46,  // 27: Superplane.Canvases.ResolveCanvasChangeRequestResponse.change_request:type_name -> Superplane.Canvases.CanvasChangeRequest
+	96,  // 28: Superplane.Canvases.Canvas.metadata:type_name -> Superplane.Canvases.Canvas.Metadata
+	97,  // 29: Superplane.Canvases.Canvas.spec:type_name -> Superplane.Canvases.Canvas.Spec
+	98,  // 30: Superplane.Canvases.Canvas.status:type_name -> Superplane.Canvases.Canvas.Status
+	99,  // 31: Superplane.Canvases.CanvasVersion.metadata:type_name -> Superplane.Canvases.CanvasVersion.Metadata
+	97,  // 32: Superplane.Canvases.CanvasVersion.spec:type_name -> Superplane.Canvases.Canvas.Spec
 	3,   // 33: Superplane.Canvases.CanvasChangeRequestApprover.type:type_name -> Superplane.Canvases.CanvasChangeRequestApprover.Type
-	42,  // 34: Superplane.Canvases.CanvasChangeRequestApprovalConfig.items:type_name -> Superplane.Canvases.CanvasChangeRequestApprover
-	38,  // 35: Superplane.Canvases.CanvasChangeRequestApproval.actor:type_name -> Superplane.Canvases.UserRef
-	42,  // 36: Superplane.Canvases.CanvasChangeRequestApproval.approver:type_name -> Superplane.Canvases.CanvasChangeRequestApprover
+	43,  // 34: Superplane.Canvases.CanvasChangeRequestApprovalConfig.items:type_name -> Superplane.Canvases.CanvasChangeRequestApprover
+	39,  // 35: Superplane.Canvases.CanvasChangeRequestApproval.actor:type_name -> Superplane.Canvases.UserRef
+	43,  // 36: Superplane.Canvases.CanvasChangeRequestApproval.approver:type_name -> Superplane.Canvases.CanvasChangeRequestApprover
 	4,   // 37: Superplane.Canvases.CanvasChangeRequestApproval.state:type_name -> Superplane.Canvases.CanvasChangeRequestApproval.State
-	91,  // 38: Superplane.Canvases.CanvasChangeRequestApproval.created_at:type_name -> google.protobuf.Timestamp
-	91,  // 39: Superplane.Canvases.CanvasChangeRequestApproval.invalidated_at:type_name -> google.protobuf.Timestamp
-	90,  // 40: Superplane.Canvases.CanvasChangeRequest.metadata:type_name -> Superplane.Canvases.CanvasChangeRequest.Metadata
-	40,  // 41: Superplane.Canvases.CanvasChangeRequest.version:type_name -> Superplane.Canvases.CanvasVersion
-	41,  // 42: Superplane.Canvases.CanvasChangeRequest.diff:type_name -> Superplane.Canvases.CanvasChangeRequestDiff
-	44,  // 43: Superplane.Canvases.CanvasChangeRequest.approvals:type_name -> Superplane.Canvases.CanvasChangeRequestApproval
-	91,  // 44: Superplane.Canvases.ListNodeEventsRequest.before:type_name -> google.protobuf.Timestamp
-	73,  // 45: Superplane.Canvases.ListNodeEventsResponse.events:type_name -> Superplane.Canvases.CanvasEvent
-	91,  // 46: Superplane.Canvases.ListNodeEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	92,  // 47: Superplane.Canvases.EmitNodeEventRequest.data:type_name -> google.protobuf.Struct
-	91,  // 48: Superplane.Canvases.ListNodeQueueItemsRequest.before:type_name -> google.protobuf.Timestamp
-	61,  // 49: Superplane.Canvases.ListNodeQueueItemsResponse.items:type_name -> Superplane.Canvases.CanvasNodeQueueItem
-	91,  // 50: Superplane.Canvases.ListNodeQueueItemsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	93,  // 51: Superplane.Canvases.UpdateNodePauseResponse.node:type_name -> Superplane.Components.Node
+	101, // 38: Superplane.Canvases.CanvasChangeRequestApproval.created_at:type_name -> google.protobuf.Timestamp
+	101, // 39: Superplane.Canvases.CanvasChangeRequestApproval.invalidated_at:type_name -> google.protobuf.Timestamp
+	100, // 40: Superplane.Canvases.CanvasChangeRequest.metadata:type_name -> Superplane.Canvases.CanvasChangeRequest.Metadata
+	41,  // 41: Superplane.Canvases.CanvasChangeRequest.version:type_name -> Superplane.Canvases.CanvasVersion
+	42,  // 42: Superplane.Canvases.CanvasChangeRequest.diff:type_name -> Superplane.Canvases.CanvasChangeRequestDiff
+	45,  // 43: Superplane.Canvases.CanvasChangeRequest.approvals:type_name -> Superplane.Canvases.CanvasChangeRequestApproval
+	101, // 44: Superplane.Canvases.ListNodeEventsRequest.before:type_name -> google.protobuf.Timestamp
+	74,  // 45: Superplane.Canvases.ListNodeEventsResponse.events:type_name -> Superplane.Canvases.CanvasEvent
+	101, // 46: Superplane.Canvases.ListNodeEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	102, // 47: Superplane.Canvases.EmitNodeEventRequest.data:type_name -> google.protobuf.Struct
+	101, // 48: Superplane.Canvases.ListNodeQueueItemsRequest.before:type_name -> google.protobuf.Timestamp
+	62,  // 49: Superplane.Canvases.ListNodeQueueItemsResponse.items:type_name -> Superplane.Canvases.CanvasNodeQueueItem
+	101, // 50: Superplane.Canvases.ListNodeQueueItemsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	103, // 51: Superplane.Canvases.UpdateNodePauseResponse.node:type_name -> Superplane.Components.Node
 	6,   // 52: Superplane.Canvases.ListNodeExecutionsRequest.states:type_name -> Superplane.Canvases.CanvasNodeExecution.State
 	7,   // 53: Superplane.Canvases.ListNodeExecutionsRequest.results:type_name -> Superplane.Canvases.CanvasNodeExecution.Result
-	91,  // 54: Superplane.Canvases.ListNodeExecutionsRequest.before:type_name -> google.protobuf.Timestamp
-	60,  // 55: Superplane.Canvases.ListNodeExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	91,  // 56: Superplane.Canvases.ListNodeExecutionsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	60,  // 57: Superplane.Canvases.ListChildExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	101, // 54: Superplane.Canvases.ListNodeExecutionsRequest.before:type_name -> google.protobuf.Timestamp
+	61,  // 55: Superplane.Canvases.ListNodeExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	101, // 56: Superplane.Canvases.ListNodeExecutionsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	61,  // 57: Superplane.Canvases.ListChildExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
 	6,   // 58: Superplane.Canvases.CanvasNodeExecution.state:type_name -> Superplane.Canvases.CanvasNodeExecution.State
 	7,   // 59: Superplane.Canvases.CanvasNodeExecution.result:type_name -> Superplane.Canvases.CanvasNodeExecution.Result
 	8,   // 60: Superplane.Canvases.CanvasNodeExecution.result_reason:type_name -> Superplane.Canvases.CanvasNodeExecution.ResultReason
-	92,  // 61: Superplane.Canvases.CanvasNodeExecution.input:type_name -> google.protobuf.Struct
-	92,  // 62: Superplane.Canvases.CanvasNodeExecution.outputs:type_name -> google.protobuf.Struct
-	91,  // 63: Superplane.Canvases.CanvasNodeExecution.created_at:type_name -> google.protobuf.Timestamp
-	91,  // 64: Superplane.Canvases.CanvasNodeExecution.updated_at:type_name -> google.protobuf.Timestamp
-	92,  // 65: Superplane.Canvases.CanvasNodeExecution.metadata:type_name -> google.protobuf.Struct
-	92,  // 66: Superplane.Canvases.CanvasNodeExecution.configuration:type_name -> google.protobuf.Struct
-	60,  // 67: Superplane.Canvases.CanvasNodeExecution.child_executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	73,  // 68: Superplane.Canvases.CanvasNodeExecution.root_event:type_name -> Superplane.Canvases.CanvasEvent
-	38,  // 69: Superplane.Canvases.CanvasNodeExecution.cancelled_by:type_name -> Superplane.Canvases.UserRef
-	92,  // 70: Superplane.Canvases.CanvasNodeQueueItem.input:type_name -> google.protobuf.Struct
-	73,  // 71: Superplane.Canvases.CanvasNodeQueueItem.root_event:type_name -> Superplane.Canvases.CanvasEvent
-	91,  // 72: Superplane.Canvases.CanvasNodeQueueItem.created_at:type_name -> google.protobuf.Timestamp
-	92,  // 73: Superplane.Canvases.InvokeNodeExecutionActionRequest.parameters:type_name -> google.protobuf.Struct
-	92,  // 74: Superplane.Canvases.InvokeNodeTriggerActionRequest.parameters:type_name -> google.protobuf.Struct
-	92,  // 75: Superplane.Canvases.InvokeNodeTriggerActionResponse.result:type_name -> google.protobuf.Struct
-	91,  // 76: Superplane.Canvases.ListCanvasEventsRequest.before:type_name -> google.protobuf.Timestamp
-	74,  // 77: Superplane.Canvases.ListCanvasEventsResponse.events:type_name -> Superplane.Canvases.CanvasEventWithExecutions
-	91,  // 78: Superplane.Canvases.ListCanvasEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
-	94,  // 79: Superplane.Canvases.CanvasMemory.values:type_name -> google.protobuf.Value
-	68,  // 80: Superplane.Canvases.ListCanvasMemoriesResponse.items:type_name -> Superplane.Canvases.CanvasMemory
-	92,  // 81: Superplane.Canvases.CanvasEvent.data:type_name -> google.protobuf.Struct
-	91,  // 82: Superplane.Canvases.CanvasEvent.created_at:type_name -> google.protobuf.Timestamp
-	92,  // 83: Superplane.Canvases.CanvasEventWithExecutions.data:type_name -> google.protobuf.Struct
-	91,  // 84: Superplane.Canvases.CanvasEventWithExecutions.created_at:type_name -> google.protobuf.Timestamp
-	60,  // 85: Superplane.Canvases.CanvasEventWithExecutions.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	60,  // 86: Superplane.Canvases.ListEventExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	91,  // 87: Superplane.Canvases.CanvasNodeEventMessage.timestamp:type_name -> google.protobuf.Timestamp
-	91,  // 88: Superplane.Canvases.CanvasNodeExecutionMessage.timestamp:type_name -> google.protobuf.Timestamp
-	91,  // 89: Superplane.Canvases.CanvasNodeQueueItemMessage.timestamp:type_name -> google.protobuf.Timestamp
-	91,  // 90: Superplane.Canvases.CanvasMessage.timestamp:type_name -> google.protobuf.Timestamp
-	91,  // 91: Superplane.Canvases.CanvasVersionMessage.timestamp:type_name -> google.protobuf.Timestamp
-	91,  // 92: Superplane.Canvases.Canvas.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	91,  // 93: Superplane.Canvases.Canvas.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	38,  // 94: Superplane.Canvases.Canvas.Metadata.created_by:type_name -> Superplane.Canvases.UserRef
-	43,  // 95: Superplane.Canvases.Canvas.Metadata.change_request_approval_config:type_name -> Superplane.Canvases.CanvasChangeRequestApprovalConfig
-	93,  // 96: Superplane.Canvases.Canvas.Spec.nodes:type_name -> Superplane.Components.Node
-	95,  // 97: Superplane.Canvases.Canvas.Spec.edges:type_name -> Superplane.Components.Edge
-	60,  // 98: Superplane.Canvases.Canvas.Status.last_executions:type_name -> Superplane.Canvases.CanvasNodeExecution
-	61,  // 99: Superplane.Canvases.Canvas.Status.next_queue_items:type_name -> Superplane.Canvases.CanvasNodeQueueItem
-	73,  // 100: Superplane.Canvases.Canvas.Status.last_events:type_name -> Superplane.Canvases.CanvasEvent
-	38,  // 101: Superplane.Canvases.CanvasVersion.Metadata.owner:type_name -> Superplane.Canvases.UserRef
-	91,  // 102: Superplane.Canvases.CanvasVersion.Metadata.published_at:type_name -> google.protobuf.Timestamp
-	91,  // 103: Superplane.Canvases.CanvasVersion.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	91,  // 104: Superplane.Canvases.CanvasVersion.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	38,  // 105: Superplane.Canvases.CanvasChangeRequest.Metadata.owner:type_name -> Superplane.Canvases.UserRef
-	5,   // 106: Superplane.Canvases.CanvasChangeRequest.Metadata.status:type_name -> Superplane.Canvases.CanvasChangeRequest.Status
-	91,  // 107: Superplane.Canvases.CanvasChangeRequest.Metadata.published_at:type_name -> google.protobuf.Timestamp
-	91,  // 108: Superplane.Canvases.CanvasChangeRequest.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	91,  // 109: Superplane.Canvases.CanvasChangeRequest.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	9,   // 110: Superplane.Canvases.Canvases.ListCanvases:input_type -> Superplane.Canvases.ListCanvasesRequest
-	15,  // 111: Superplane.Canvases.Canvases.CreateCanvas:input_type -> Superplane.Canvases.CreateCanvasRequest
-	11,  // 112: Superplane.Canvases.Canvases.DescribeCanvas:input_type -> Superplane.Canvases.DescribeCanvasRequest
-	13,  // 113: Superplane.Canvases.Canvases.UpdateCanvas:input_type -> Superplane.Canvases.UpdateCanvasRequest
-	18,  // 114: Superplane.Canvases.Canvases.CreateCanvasVersion:input_type -> Superplane.Canvases.CreateCanvasVersionRequest
-	20,  // 115: Superplane.Canvases.Canvases.ListCanvasVersions:input_type -> Superplane.Canvases.ListCanvasVersionsRequest
-	22,  // 116: Superplane.Canvases.Canvases.DescribeCanvasVersion:input_type -> Superplane.Canvases.DescribeCanvasVersionRequest
-	24,  // 117: Superplane.Canvases.Canvases.UpdateCanvasVersion:input_type -> Superplane.Canvases.UpdateCanvasVersionRequest
-	26,  // 118: Superplane.Canvases.Canvases.CreateCanvasChangeRequest:input_type -> Superplane.Canvases.CreateCanvasChangeRequestRequest
-	28,  // 119: Superplane.Canvases.Canvases.ListCanvasChangeRequests:input_type -> Superplane.Canvases.ListCanvasChangeRequestsRequest
-	30,  // 120: Superplane.Canvases.Canvases.DescribeCanvasChangeRequest:input_type -> Superplane.Canvases.DescribeCanvasChangeRequestRequest
-	32,  // 121: Superplane.Canvases.Canvases.ActOnCanvasChangeRequest:input_type -> Superplane.Canvases.ActOnCanvasChangeRequestRequest
-	34,  // 122: Superplane.Canvases.Canvases.ResolveCanvasChangeRequest:input_type -> Superplane.Canvases.ResolveCanvasChangeRequestRequest
-	36,  // 123: Superplane.Canvases.Canvases.DeleteCanvas:input_type -> Superplane.Canvases.DeleteCanvasRequest
-	50,  // 124: Superplane.Canvases.Canvases.ListNodeQueueItems:input_type -> Superplane.Canvases.ListNodeQueueItemsRequest
-	52,  // 125: Superplane.Canvases.Canvases.DeleteNodeQueueItem:input_type -> Superplane.Canvases.DeleteNodeQueueItemRequest
-	54,  // 126: Superplane.Canvases.Canvases.UpdateNodePause:input_type -> Superplane.Canvases.UpdateNodePauseRequest
-	56,  // 127: Superplane.Canvases.Canvases.ListNodeExecutions:input_type -> Superplane.Canvases.ListNodeExecutionsRequest
-	46,  // 128: Superplane.Canvases.Canvases.ListNodeEvents:input_type -> Superplane.Canvases.ListNodeEventsRequest
-	48,  // 129: Superplane.Canvases.Canvases.EmitNodeEvent:input_type -> Superplane.Canvases.EmitNodeEventRequest
-	62,  // 130: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:input_type -> Superplane.Canvases.InvokeNodeExecutionActionRequest
-	64,  // 131: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:input_type -> Superplane.Canvases.InvokeNodeTriggerActionRequest
-	58,  // 132: Superplane.Canvases.Canvases.ListChildExecutions:input_type -> Superplane.Canvases.ListChildExecutionsRequest
-	77,  // 133: Superplane.Canvases.Canvases.CancelExecution:input_type -> Superplane.Canvases.CancelExecutionRequest
-	79,  // 134: Superplane.Canvases.Canvases.ResolveExecutionErrors:input_type -> Superplane.Canvases.ResolveExecutionErrorsRequest
-	66,  // 135: Superplane.Canvases.Canvases.ListCanvasEvents:input_type -> Superplane.Canvases.ListCanvasEventsRequest
-	69,  // 136: Superplane.Canvases.Canvases.ListCanvasMemories:input_type -> Superplane.Canvases.ListCanvasMemoriesRequest
-	71,  // 137: Superplane.Canvases.Canvases.DeleteCanvasMemory:input_type -> Superplane.Canvases.DeleteCanvasMemoryRequest
-	75,  // 138: Superplane.Canvases.Canvases.ListEventExecutions:input_type -> Superplane.Canvases.ListEventExecutionsRequest
-	10,  // 139: Superplane.Canvases.Canvases.ListCanvases:output_type -> Superplane.Canvases.ListCanvasesResponse
-	16,  // 140: Superplane.Canvases.Canvases.CreateCanvas:output_type -> Superplane.Canvases.CreateCanvasResponse
-	12,  // 141: Superplane.Canvases.Canvases.DescribeCanvas:output_type -> Superplane.Canvases.DescribeCanvasResponse
-	14,  // 142: Superplane.Canvases.Canvases.UpdateCanvas:output_type -> Superplane.Canvases.UpdateCanvasResponse
-	19,  // 143: Superplane.Canvases.Canvases.CreateCanvasVersion:output_type -> Superplane.Canvases.CreateCanvasVersionResponse
-	21,  // 144: Superplane.Canvases.Canvases.ListCanvasVersions:output_type -> Superplane.Canvases.ListCanvasVersionsResponse
-	23,  // 145: Superplane.Canvases.Canvases.DescribeCanvasVersion:output_type -> Superplane.Canvases.DescribeCanvasVersionResponse
-	25,  // 146: Superplane.Canvases.Canvases.UpdateCanvasVersion:output_type -> Superplane.Canvases.UpdateCanvasVersionResponse
-	27,  // 147: Superplane.Canvases.Canvases.CreateCanvasChangeRequest:output_type -> Superplane.Canvases.CreateCanvasChangeRequestResponse
-	29,  // 148: Superplane.Canvases.Canvases.ListCanvasChangeRequests:output_type -> Superplane.Canvases.ListCanvasChangeRequestsResponse
-	31,  // 149: Superplane.Canvases.Canvases.DescribeCanvasChangeRequest:output_type -> Superplane.Canvases.DescribeCanvasChangeRequestResponse
-	33,  // 150: Superplane.Canvases.Canvases.ActOnCanvasChangeRequest:output_type -> Superplane.Canvases.ActOnCanvasChangeRequestResponse
-	35,  // 151: Superplane.Canvases.Canvases.ResolveCanvasChangeRequest:output_type -> Superplane.Canvases.ResolveCanvasChangeRequestResponse
-	37,  // 152: Superplane.Canvases.Canvases.DeleteCanvas:output_type -> Superplane.Canvases.DeleteCanvasResponse
-	51,  // 153: Superplane.Canvases.Canvases.ListNodeQueueItems:output_type -> Superplane.Canvases.ListNodeQueueItemsResponse
-	53,  // 154: Superplane.Canvases.Canvases.DeleteNodeQueueItem:output_type -> Superplane.Canvases.DeleteNodeQueueItemResponse
-	55,  // 155: Superplane.Canvases.Canvases.UpdateNodePause:output_type -> Superplane.Canvases.UpdateNodePauseResponse
-	57,  // 156: Superplane.Canvases.Canvases.ListNodeExecutions:output_type -> Superplane.Canvases.ListNodeExecutionsResponse
-	47,  // 157: Superplane.Canvases.Canvases.ListNodeEvents:output_type -> Superplane.Canvases.ListNodeEventsResponse
-	49,  // 158: Superplane.Canvases.Canvases.EmitNodeEvent:output_type -> Superplane.Canvases.EmitNodeEventResponse
-	63,  // 159: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:output_type -> Superplane.Canvases.InvokeNodeExecutionActionResponse
-	65,  // 160: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:output_type -> Superplane.Canvases.InvokeNodeTriggerActionResponse
-	59,  // 161: Superplane.Canvases.Canvases.ListChildExecutions:output_type -> Superplane.Canvases.ListChildExecutionsResponse
-	78,  // 162: Superplane.Canvases.Canvases.CancelExecution:output_type -> Superplane.Canvases.CancelExecutionResponse
-	80,  // 163: Superplane.Canvases.Canvases.ResolveExecutionErrors:output_type -> Superplane.Canvases.ResolveExecutionErrorsResponse
-	67,  // 164: Superplane.Canvases.Canvases.ListCanvasEvents:output_type -> Superplane.Canvases.ListCanvasEventsResponse
-	70,  // 165: Superplane.Canvases.Canvases.ListCanvasMemories:output_type -> Superplane.Canvases.ListCanvasMemoriesResponse
-	72,  // 166: Superplane.Canvases.Canvases.DeleteCanvasMemory:output_type -> Superplane.Canvases.DeleteCanvasMemoryResponse
-	76,  // 167: Superplane.Canvases.Canvases.ListEventExecutions:output_type -> Superplane.Canvases.ListEventExecutionsResponse
-	139, // [139:168] is the sub-list for method output_type
-	110, // [110:139] is the sub-list for method input_type
-	110, // [110:110] is the sub-list for extension type_name
-	110, // [110:110] is the sub-list for extension extendee
-	0,   // [0:110] is the sub-list for field type_name
+	102, // 61: Superplane.Canvases.CanvasNodeExecution.input:type_name -> google.protobuf.Struct
+	102, // 62: Superplane.Canvases.CanvasNodeExecution.outputs:type_name -> google.protobuf.Struct
+	101, // 63: Superplane.Canvases.CanvasNodeExecution.created_at:type_name -> google.protobuf.Timestamp
+	101, // 64: Superplane.Canvases.CanvasNodeExecution.updated_at:type_name -> google.protobuf.Timestamp
+	102, // 65: Superplane.Canvases.CanvasNodeExecution.metadata:type_name -> google.protobuf.Struct
+	102, // 66: Superplane.Canvases.CanvasNodeExecution.configuration:type_name -> google.protobuf.Struct
+	61,  // 67: Superplane.Canvases.CanvasNodeExecution.child_executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	74,  // 68: Superplane.Canvases.CanvasNodeExecution.root_event:type_name -> Superplane.Canvases.CanvasEvent
+	39,  // 69: Superplane.Canvases.CanvasNodeExecution.cancelled_by:type_name -> Superplane.Canvases.UserRef
+	102, // 70: Superplane.Canvases.CanvasNodeQueueItem.input:type_name -> google.protobuf.Struct
+	74,  // 71: Superplane.Canvases.CanvasNodeQueueItem.root_event:type_name -> Superplane.Canvases.CanvasEvent
+	101, // 72: Superplane.Canvases.CanvasNodeQueueItem.created_at:type_name -> google.protobuf.Timestamp
+	102, // 73: Superplane.Canvases.InvokeNodeExecutionActionRequest.parameters:type_name -> google.protobuf.Struct
+	102, // 74: Superplane.Canvases.InvokeNodeTriggerActionRequest.parameters:type_name -> google.protobuf.Struct
+	102, // 75: Superplane.Canvases.InvokeNodeTriggerActionResponse.result:type_name -> google.protobuf.Struct
+	101, // 76: Superplane.Canvases.ListCanvasEventsRequest.before:type_name -> google.protobuf.Timestamp
+	75,  // 77: Superplane.Canvases.ListCanvasEventsResponse.events:type_name -> Superplane.Canvases.CanvasEventWithExecutions
+	101, // 78: Superplane.Canvases.ListCanvasEventsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	104, // 79: Superplane.Canvases.CanvasMemory.values:type_name -> google.protobuf.Value
+	69,  // 80: Superplane.Canvases.ListCanvasMemoriesResponse.items:type_name -> Superplane.Canvases.CanvasMemory
+	102, // 81: Superplane.Canvases.CanvasEvent.data:type_name -> google.protobuf.Struct
+	101, // 82: Superplane.Canvases.CanvasEvent.created_at:type_name -> google.protobuf.Timestamp
+	102, // 83: Superplane.Canvases.CanvasEventWithExecutions.data:type_name -> google.protobuf.Struct
+	101, // 84: Superplane.Canvases.CanvasEventWithExecutions.created_at:type_name -> google.protobuf.Timestamp
+	61,  // 85: Superplane.Canvases.CanvasEventWithExecutions.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	61,  // 86: Superplane.Canvases.ListEventExecutionsResponse.executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	9,   // 87: Superplane.Canvases.Blob.scope_type:type_name -> Superplane.Canvases.Blob.ScopeType
+	101, // 88: Superplane.Canvases.Blob.created_at:type_name -> google.protobuf.Timestamp
+	9,   // 89: Superplane.Canvases.StoreBlobRequest.scope_type:type_name -> Superplane.Canvases.Blob.ScopeType
+	82,  // 90: Superplane.Canvases.StoreBlobResponse.blob:type_name -> Superplane.Canvases.Blob
+	9,   // 91: Superplane.Canvases.ListBlobsRequest.scope_type:type_name -> Superplane.Canvases.Blob.ScopeType
+	101, // 92: Superplane.Canvases.ListBlobsRequest.before:type_name -> google.protobuf.Timestamp
+	82,  // 93: Superplane.Canvases.ListBlobsResponse.blobs:type_name -> Superplane.Canvases.Blob
+	101, // 94: Superplane.Canvases.ListBlobsResponse.last_timestamp:type_name -> google.protobuf.Timestamp
+	82,  // 95: Superplane.Canvases.DescribeBlobResponse.blob:type_name -> Superplane.Canvases.Blob
+	101, // 96: Superplane.Canvases.CanvasNodeEventMessage.timestamp:type_name -> google.protobuf.Timestamp
+	101, // 97: Superplane.Canvases.CanvasNodeExecutionMessage.timestamp:type_name -> google.protobuf.Timestamp
+	101, // 98: Superplane.Canvases.CanvasNodeQueueItemMessage.timestamp:type_name -> google.protobuf.Timestamp
+	101, // 99: Superplane.Canvases.CanvasMessage.timestamp:type_name -> google.protobuf.Timestamp
+	101, // 100: Superplane.Canvases.CanvasVersionMessage.timestamp:type_name -> google.protobuf.Timestamp
+	101, // 101: Superplane.Canvases.Canvas.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	101, // 102: Superplane.Canvases.Canvas.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	39,  // 103: Superplane.Canvases.Canvas.Metadata.created_by:type_name -> Superplane.Canvases.UserRef
+	44,  // 104: Superplane.Canvases.Canvas.Metadata.change_request_approval_config:type_name -> Superplane.Canvases.CanvasChangeRequestApprovalConfig
+	103, // 105: Superplane.Canvases.Canvas.Spec.nodes:type_name -> Superplane.Components.Node
+	105, // 106: Superplane.Canvases.Canvas.Spec.edges:type_name -> Superplane.Components.Edge
+	61,  // 107: Superplane.Canvases.Canvas.Status.last_executions:type_name -> Superplane.Canvases.CanvasNodeExecution
+	62,  // 108: Superplane.Canvases.Canvas.Status.next_queue_items:type_name -> Superplane.Canvases.CanvasNodeQueueItem
+	74,  // 109: Superplane.Canvases.Canvas.Status.last_events:type_name -> Superplane.Canvases.CanvasEvent
+	39,  // 110: Superplane.Canvases.CanvasVersion.Metadata.owner:type_name -> Superplane.Canvases.UserRef
+	101, // 111: Superplane.Canvases.CanvasVersion.Metadata.published_at:type_name -> google.protobuf.Timestamp
+	101, // 112: Superplane.Canvases.CanvasVersion.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	101, // 113: Superplane.Canvases.CanvasVersion.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	39,  // 114: Superplane.Canvases.CanvasChangeRequest.Metadata.owner:type_name -> Superplane.Canvases.UserRef
+	5,   // 115: Superplane.Canvases.CanvasChangeRequest.Metadata.status:type_name -> Superplane.Canvases.CanvasChangeRequest.Status
+	101, // 116: Superplane.Canvases.CanvasChangeRequest.Metadata.published_at:type_name -> google.protobuf.Timestamp
+	101, // 117: Superplane.Canvases.CanvasChangeRequest.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	101, // 118: Superplane.Canvases.CanvasChangeRequest.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	10,  // 119: Superplane.Canvases.Canvases.ListCanvases:input_type -> Superplane.Canvases.ListCanvasesRequest
+	16,  // 120: Superplane.Canvases.Canvases.CreateCanvas:input_type -> Superplane.Canvases.CreateCanvasRequest
+	12,  // 121: Superplane.Canvases.Canvases.DescribeCanvas:input_type -> Superplane.Canvases.DescribeCanvasRequest
+	14,  // 122: Superplane.Canvases.Canvases.UpdateCanvas:input_type -> Superplane.Canvases.UpdateCanvasRequest
+	19,  // 123: Superplane.Canvases.Canvases.CreateCanvasVersion:input_type -> Superplane.Canvases.CreateCanvasVersionRequest
+	21,  // 124: Superplane.Canvases.Canvases.ListCanvasVersions:input_type -> Superplane.Canvases.ListCanvasVersionsRequest
+	23,  // 125: Superplane.Canvases.Canvases.DescribeCanvasVersion:input_type -> Superplane.Canvases.DescribeCanvasVersionRequest
+	25,  // 126: Superplane.Canvases.Canvases.UpdateCanvasVersion:input_type -> Superplane.Canvases.UpdateCanvasVersionRequest
+	27,  // 127: Superplane.Canvases.Canvases.CreateCanvasChangeRequest:input_type -> Superplane.Canvases.CreateCanvasChangeRequestRequest
+	29,  // 128: Superplane.Canvases.Canvases.ListCanvasChangeRequests:input_type -> Superplane.Canvases.ListCanvasChangeRequestsRequest
+	31,  // 129: Superplane.Canvases.Canvases.DescribeCanvasChangeRequest:input_type -> Superplane.Canvases.DescribeCanvasChangeRequestRequest
+	33,  // 130: Superplane.Canvases.Canvases.ActOnCanvasChangeRequest:input_type -> Superplane.Canvases.ActOnCanvasChangeRequestRequest
+	35,  // 131: Superplane.Canvases.Canvases.ResolveCanvasChangeRequest:input_type -> Superplane.Canvases.ResolveCanvasChangeRequestRequest
+	37,  // 132: Superplane.Canvases.Canvases.DeleteCanvas:input_type -> Superplane.Canvases.DeleteCanvasRequest
+	51,  // 133: Superplane.Canvases.Canvases.ListNodeQueueItems:input_type -> Superplane.Canvases.ListNodeQueueItemsRequest
+	53,  // 134: Superplane.Canvases.Canvases.DeleteNodeQueueItem:input_type -> Superplane.Canvases.DeleteNodeQueueItemRequest
+	55,  // 135: Superplane.Canvases.Canvases.UpdateNodePause:input_type -> Superplane.Canvases.UpdateNodePauseRequest
+	57,  // 136: Superplane.Canvases.Canvases.ListNodeExecutions:input_type -> Superplane.Canvases.ListNodeExecutionsRequest
+	47,  // 137: Superplane.Canvases.Canvases.ListNodeEvents:input_type -> Superplane.Canvases.ListNodeEventsRequest
+	49,  // 138: Superplane.Canvases.Canvases.EmitNodeEvent:input_type -> Superplane.Canvases.EmitNodeEventRequest
+	63,  // 139: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:input_type -> Superplane.Canvases.InvokeNodeExecutionActionRequest
+	65,  // 140: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:input_type -> Superplane.Canvases.InvokeNodeTriggerActionRequest
+	59,  // 141: Superplane.Canvases.Canvases.ListChildExecutions:input_type -> Superplane.Canvases.ListChildExecutionsRequest
+	78,  // 142: Superplane.Canvases.Canvases.CancelExecution:input_type -> Superplane.Canvases.CancelExecutionRequest
+	80,  // 143: Superplane.Canvases.Canvases.ResolveExecutionErrors:input_type -> Superplane.Canvases.ResolveExecutionErrorsRequest
+	67,  // 144: Superplane.Canvases.Canvases.ListCanvasEvents:input_type -> Superplane.Canvases.ListCanvasEventsRequest
+	70,  // 145: Superplane.Canvases.Canvases.ListCanvasMemories:input_type -> Superplane.Canvases.ListCanvasMemoriesRequest
+	72,  // 146: Superplane.Canvases.Canvases.DeleteCanvasMemory:input_type -> Superplane.Canvases.DeleteCanvasMemoryRequest
+	76,  // 147: Superplane.Canvases.Canvases.ListEventExecutions:input_type -> Superplane.Canvases.ListEventExecutionsRequest
+	83,  // 148: Superplane.Canvases.Canvases.StoreBlob:input_type -> Superplane.Canvases.StoreBlobRequest
+	85,  // 149: Superplane.Canvases.Canvases.ListBlobs:input_type -> Superplane.Canvases.ListBlobsRequest
+	87,  // 150: Superplane.Canvases.Canvases.DescribeBlob:input_type -> Superplane.Canvases.DescribeBlobRequest
+	89,  // 151: Superplane.Canvases.Canvases.DeleteBlob:input_type -> Superplane.Canvases.DeleteBlobRequest
+	11,  // 152: Superplane.Canvases.Canvases.ListCanvases:output_type -> Superplane.Canvases.ListCanvasesResponse
+	17,  // 153: Superplane.Canvases.Canvases.CreateCanvas:output_type -> Superplane.Canvases.CreateCanvasResponse
+	13,  // 154: Superplane.Canvases.Canvases.DescribeCanvas:output_type -> Superplane.Canvases.DescribeCanvasResponse
+	15,  // 155: Superplane.Canvases.Canvases.UpdateCanvas:output_type -> Superplane.Canvases.UpdateCanvasResponse
+	20,  // 156: Superplane.Canvases.Canvases.CreateCanvasVersion:output_type -> Superplane.Canvases.CreateCanvasVersionResponse
+	22,  // 157: Superplane.Canvases.Canvases.ListCanvasVersions:output_type -> Superplane.Canvases.ListCanvasVersionsResponse
+	24,  // 158: Superplane.Canvases.Canvases.DescribeCanvasVersion:output_type -> Superplane.Canvases.DescribeCanvasVersionResponse
+	26,  // 159: Superplane.Canvases.Canvases.UpdateCanvasVersion:output_type -> Superplane.Canvases.UpdateCanvasVersionResponse
+	28,  // 160: Superplane.Canvases.Canvases.CreateCanvasChangeRequest:output_type -> Superplane.Canvases.CreateCanvasChangeRequestResponse
+	30,  // 161: Superplane.Canvases.Canvases.ListCanvasChangeRequests:output_type -> Superplane.Canvases.ListCanvasChangeRequestsResponse
+	32,  // 162: Superplane.Canvases.Canvases.DescribeCanvasChangeRequest:output_type -> Superplane.Canvases.DescribeCanvasChangeRequestResponse
+	34,  // 163: Superplane.Canvases.Canvases.ActOnCanvasChangeRequest:output_type -> Superplane.Canvases.ActOnCanvasChangeRequestResponse
+	36,  // 164: Superplane.Canvases.Canvases.ResolveCanvasChangeRequest:output_type -> Superplane.Canvases.ResolveCanvasChangeRequestResponse
+	38,  // 165: Superplane.Canvases.Canvases.DeleteCanvas:output_type -> Superplane.Canvases.DeleteCanvasResponse
+	52,  // 166: Superplane.Canvases.Canvases.ListNodeQueueItems:output_type -> Superplane.Canvases.ListNodeQueueItemsResponse
+	54,  // 167: Superplane.Canvases.Canvases.DeleteNodeQueueItem:output_type -> Superplane.Canvases.DeleteNodeQueueItemResponse
+	56,  // 168: Superplane.Canvases.Canvases.UpdateNodePause:output_type -> Superplane.Canvases.UpdateNodePauseResponse
+	58,  // 169: Superplane.Canvases.Canvases.ListNodeExecutions:output_type -> Superplane.Canvases.ListNodeExecutionsResponse
+	48,  // 170: Superplane.Canvases.Canvases.ListNodeEvents:output_type -> Superplane.Canvases.ListNodeEventsResponse
+	50,  // 171: Superplane.Canvases.Canvases.EmitNodeEvent:output_type -> Superplane.Canvases.EmitNodeEventResponse
+	64,  // 172: Superplane.Canvases.Canvases.InvokeNodeExecutionAction:output_type -> Superplane.Canvases.InvokeNodeExecutionActionResponse
+	66,  // 173: Superplane.Canvases.Canvases.InvokeNodeTriggerAction:output_type -> Superplane.Canvases.InvokeNodeTriggerActionResponse
+	60,  // 174: Superplane.Canvases.Canvases.ListChildExecutions:output_type -> Superplane.Canvases.ListChildExecutionsResponse
+	79,  // 175: Superplane.Canvases.Canvases.CancelExecution:output_type -> Superplane.Canvases.CancelExecutionResponse
+	81,  // 176: Superplane.Canvases.Canvases.ResolveExecutionErrors:output_type -> Superplane.Canvases.ResolveExecutionErrorsResponse
+	68,  // 177: Superplane.Canvases.Canvases.ListCanvasEvents:output_type -> Superplane.Canvases.ListCanvasEventsResponse
+	71,  // 178: Superplane.Canvases.Canvases.ListCanvasMemories:output_type -> Superplane.Canvases.ListCanvasMemoriesResponse
+	73,  // 179: Superplane.Canvases.Canvases.DeleteCanvasMemory:output_type -> Superplane.Canvases.DeleteCanvasMemoryResponse
+	77,  // 180: Superplane.Canvases.Canvases.ListEventExecutions:output_type -> Superplane.Canvases.ListEventExecutionsResponse
+	84,  // 181: Superplane.Canvases.Canvases.StoreBlob:output_type -> Superplane.Canvases.StoreBlobResponse
+	86,  // 182: Superplane.Canvases.Canvases.ListBlobs:output_type -> Superplane.Canvases.ListBlobsResponse
+	88,  // 183: Superplane.Canvases.Canvases.DescribeBlob:output_type -> Superplane.Canvases.DescribeBlobResponse
+	90,  // 184: Superplane.Canvases.Canvases.DeleteBlob:output_type -> Superplane.Canvases.DeleteBlobResponse
+	152, // [152:185] is the sub-list for method output_type
+	119, // [119:152] is the sub-list for method input_type
+	119, // [119:119] is the sub-list for extension type_name
+	119, // [119:119] is the sub-list for extension extendee
+	0,   // [0:119] is the sub-list for field type_name
 }
 
 func init() { file_canvases_proto_init() }
@@ -6225,8 +6952,8 @@ func file_canvases_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_canvases_proto_rawDesc), len(file_canvases_proto_rawDesc)),
-			NumEnums:      9,
-			NumMessages:   82,
+			NumEnums:      10,
+			NumMessages:   91,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

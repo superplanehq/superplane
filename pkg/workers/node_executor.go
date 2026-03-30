@@ -15,6 +15,7 @@ import (
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blobstorage"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -40,9 +41,10 @@ type NodeExecutor struct {
 
 	rabbitMQURL string
 	consumer    *tackle.Consumer
+	blobStorage blobstorage.BlobStorage
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, blobStore blobstorage.BlobStorage) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
@@ -51,6 +53,7 @@ func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, ba
 		semaphore:      semaphore.NewWeighted(25),
 		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
 		rabbitMQURL:    rabbitMQURL,
+		blobStorage:    blobStore,
 	}
 }
 
@@ -379,6 +382,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
+		Blobs:          contexts.NewBlobContext(w.blobStorage),
 	}
 	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
 		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).

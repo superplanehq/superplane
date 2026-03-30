@@ -167,6 +167,28 @@ CREATE TABLE public.app_installations (
 
 
 --
+-- Name: blobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.blobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    scope_type character varying(32) NOT NULL,
+    canvas_id uuid,
+    node_id character varying(255),
+    execution_id uuid,
+    path text NOT NULL,
+    object_key text NOT NULL,
+    size_bytes bigint NOT NULL,
+    content_type text,
+    created_by_user_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT blobs_scope_type_check CHECK (((scope_type)::text = ANY ((ARRAY['organization'::character varying, 'canvas'::character varying, 'node'::character varying, 'execution'::character varying])::text[])))
+);
+
+
+--
 -- Name: blueprints; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -763,6 +785,14 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: blobs blobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.blobs
+    ADD CONSTRAINT blobs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: blueprints blueprints_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1177,6 +1207,41 @@ CREATE UNIQUE INDEX idx_app_installations_org_name_unique ON public.app_installa
 --
 
 CREATE INDEX idx_app_installations_organization_id ON public.app_installations USING btree (organization_id);
+
+
+--
+-- Name: idx_blobs_canvas_scope; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_blobs_canvas_scope ON public.blobs USING btree (organization_id, canvas_id, created_at DESC);
+
+
+--
+-- Name: idx_blobs_execution_scope; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_blobs_execution_scope ON public.blobs USING btree (organization_id, execution_id, created_at DESC);
+
+
+--
+-- Name: idx_blobs_node_scope; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_blobs_node_scope ON public.blobs USING btree (organization_id, canvas_id, node_id, created_at DESC);
+
+
+--
+-- Name: idx_blobs_object_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_blobs_object_key ON public.blobs USING btree (object_key);
+
+
+--
+-- Name: idx_blobs_org_scope_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_blobs_org_scope_created_at ON public.blobs USING btree (organization_id, scope_type, created_at DESC);
 
 
 --
@@ -1980,7 +2045,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260324120000	f
+20260326165158	f
 \.
 
 

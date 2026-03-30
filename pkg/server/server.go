@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/blobstorage"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
@@ -89,7 +90,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/widgets/group"
 )
 
-func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
+func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization, blobStore blobstorage.BlobStorage) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -112,7 +113,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, blobStore)
 		go w.Start(context.Background())
 	}
 
@@ -236,6 +237,7 @@ func startInternalAPI(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	blobStore blobstorage.BlobStorage,
 ) {
 	log.Println("Starting Internal API")
 	grpc.RunServer(
@@ -247,6 +249,7 @@ func startInternalAPI(
 		authService,
 		registry,
 		oidcProvider,
+		blobStore,
 		lookupInternalAPIPort(),
 	)
 }
@@ -444,6 +447,11 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 
+	blobStore, err := blobstorage.NewFromEnv()
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize blob storage: %v", err))
+	}
+
 	templates.Setup(registry)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
@@ -451,10 +459,10 @@ func Start() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider, blobStore)
 	}
 
-	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
+	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService, blobStore)
 
 	log.Println("SuperPlane is UP.")
 

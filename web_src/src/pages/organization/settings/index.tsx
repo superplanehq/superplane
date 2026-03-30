@@ -18,6 +18,7 @@ import { SecretDetail } from "./SecretDetail";
 import { ServiceAccounts } from "./ServiceAccounts";
 import { ServiceAccountDetail } from "./ServiceAccountDetail";
 import { Usage } from "./Usage";
+import { BlobsSettings } from "./Blobs";
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
@@ -33,6 +34,7 @@ import {
   Plug,
   Settings,
   Shield,
+  Database,
   User as UserIcon,
   Users,
 } from "lucide-react";
@@ -108,6 +110,7 @@ export function OrganizationSettings() {
     "secrets",
     "service-accounts",
     "billing",
+    "blobs",
   ];
   const pathSegments = location.pathname?.split("/").filter(Boolean) || [];
   const settingsIndex = pathSegments.indexOf("settings");
@@ -176,6 +179,13 @@ export function OrganizationSettings() {
       href: `/${organizationId}/settings/integrations`,
       Icon: Plug,
       permission: { resource: "integrations", action: "read" },
+    },
+    {
+      id: "blobs",
+      label: "Blobs",
+      href: `/${organizationId}/settings/blobs`,
+      Icon: Database,
+      permission: { resource: "canvases", action: "read" },
     },
     {
       id: "secrets",
@@ -257,6 +267,10 @@ export function OrganizationSettings() {
     billing: {
       title: "Usage",
       description: "Review organization limits and tracked usage for this organization.",
+    },
+    blobs: {
+      title: "Blobs",
+      description: "Store and manage organization-level blobs.",
     },
     secrets: {
       title: "Secrets",
@@ -542,6 +556,14 @@ export function OrganizationSettings() {
               element={
                 <RequirePermission resource="org" action="read">
                   <Usage organizationId={organizationId || ""} />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="blobs"
+              element={
+                <RequirePermission resource="canvases" action="read">
+                  <BlobsSettings organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />

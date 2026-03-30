@@ -7,6 +7,7 @@ import {
   ArrowRightLeft,
   Bot,
   CircleUser,
+  Database,
   Gauge,
   Key,
   Lock,
@@ -141,6 +142,12 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       href: organizationId ? `/${organizationId}/settings/integrations` : "#",
       Icon: Plug,
       permission: { resource: "integrations", action: "read" },
+    },
+    {
+      label: "Blobs",
+      href: organizationId ? `/${organizationId}/settings/blobs` : "#",
+      Icon: Database,
+      permission: { resource: "canvases", action: "read" },
     },
     ...(usageEnabled
       ? [

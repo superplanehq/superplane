@@ -43,6 +43,7 @@ import { EventState, EventStateMap } from "../componentBase";
 import { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import { BlobScopePanel } from "@/components/blobs/BlobScopePanel";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
 const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
@@ -127,8 +128,9 @@ interface ComponentSidebarProps {
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
   hideDocsTab?: boolean; // Hide the "Info" tab (e.g. for annotation nodes)
   hideNodeId?: boolean; // Hide the node ID with copy functionality
-  currentTab?: "latest" | "settings" | "docs";
-  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  currentTab?: "latest" | "settings" | "docs" | "blobs";
+  onTabChange?: (tab: "latest" | "settings" | "docs" | "blobs") => void;
+  canvasId?: string;
 
   // Docs tab props
   componentDescription?: string;
@@ -223,6 +225,7 @@ export const ComponentSidebar = ({
   hideNodeId = false,
   currentTab = "latest",
   onTabChange,
+  canvasId,
   nodeConfigMode = "edit",
   nodeName = "",
   nodeLabel,
@@ -704,7 +707,7 @@ export const ComponentSidebar = ({
         >
           <Tabs
             value={activeTab}
-            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
+            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs" | "blobs")}
             className="flex-1"
           >
             {showSettingsTab && (
@@ -747,6 +750,16 @@ export const ComponentSidebar = ({
                       Info
                     </button>
                   )}
+                  <button
+                    onClick={() => onTabChange?.("blobs")}
+                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                      activeTab === "blobs"
+                        ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Blobs
+                  </button>
                 </div>
               </div>
             )}
@@ -777,6 +790,7 @@ export const ComponentSidebar = ({
                 getExecutionState={getExecutionState}
                 workflowNodes={workflowNodes}
                 components={components}
+                organizationId={domainId}
               />
             </TabsContent>
 
@@ -818,6 +832,21 @@ export const ComponentSidebar = ({
                   payloadLabel={componentPayloadLabel}
                   configurationFields={nodeConfigurationFields}
                 />
+              </TabsContent>
+            )}
+            {showSettingsTab && (
+              <TabsContent value="blobs" className="mt-0 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
+                {domainId && canvasId && nodeId ? (
+                  <BlobScopePanel
+                    organizationId={domainId}
+                    scopeType="SCOPE_TYPE_NODE"
+                    canvasId={canvasId}
+                    nodeId={nodeId}
+                    compact
+                  />
+                ) : (
+                  <div className="p-4 text-sm text-gray-500">Select a node to view blobs.</div>
+                )}
               </TabsContent>
             )}
           </Tabs>
@@ -885,6 +914,7 @@ export const ComponentSidebar = ({
                       onLoadMoreItems={handleLoadMoreItems}
                       searchQuery={searchQuery}
                       statusFilter={statusFilter}
+                      organizationId={domainId}
                     />
                   )}
                 </div>

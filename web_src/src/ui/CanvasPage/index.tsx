@@ -280,8 +280,8 @@ export interface CanvasPageProps {
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "blobs";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "blobs") => void;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
@@ -563,7 +563,7 @@ function CanvasPage(props: CanvasPageProps) {
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs" | "blobs">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1328,6 +1328,7 @@ function CanvasPage(props: CanvasPageProps) {
               currentTab={currentTab}
               onTabChange={setCurrentTab}
               organizationId={props.organizationId}
+              canvasId={props.canvasId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
               workflowNodes={props.workflowNodes}
@@ -1404,6 +1405,7 @@ function Sidebar({
   currentTab,
   onTabChange,
   organizationId,
+  canvasId,
   getCustomField,
   integrations,
   workflowNodes,
@@ -1459,9 +1461,10 @@ function Sidebar({
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
   onEdit?: (nodeId: string) => void;
-  currentTab?: "latest" | "settings" | "docs";
-  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  currentTab?: "latest" | "settings" | "docs" | "blobs";
+  onTabChange?: (tab: "latest" | "settings" | "docs" | "blobs") => void;
   organizationId?: string;
+  canvasId?: string;
   getCustomField?: (
     nodeId: string,
     onRun?: (initialData?: string) => void,
@@ -1649,6 +1652,7 @@ function Sidebar({
       componentPayloadLabel={componentDocsData?.payloadLabel}
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
+      canvasId={canvasId}
       workflowNodes={workflowNodes}
       components={components}
       triggers={triggers}
@@ -1745,8 +1749,8 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "blobs";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "blobs") => void;
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
@@ -1993,7 +1997,7 @@ function CanvasContent({
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
-  setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
+  setCurrentTab?: (tab: "latest" | "settings" | "docs" | "blobs") => void;
   onUndo?: () => void;
   canUndo?: boolean;
   organizationId?: string;

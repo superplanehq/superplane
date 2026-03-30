@@ -66,8 +66,8 @@ interface HeaderProps {
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
   autoSaveDisabledTooltip?: string;
-  topViewMode?: "canvas" | "yaml" | "memory" | "settings";
-  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings") => void;
+  topViewMode?: "canvas" | "yaml" | "memory" | "settings" | "blobs";
+  onTopViewModeChange?: (mode: "canvas" | "yaml" | "memory" | "settings" | "blobs") => void;
   canvasId?: string;
   onExportYamlCopy?: () => void;
   onExportYamlDownload?: () => void;
@@ -477,6 +477,15 @@ export function Header({
                   }`}
                 >
                   Settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onTopViewModeChange("blobs")}
+                  className={`rounded-sm px-2 py-0.5 ${
+                    topViewMode === "blobs" ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  Blobs
                 </button>
               </div>
             )}

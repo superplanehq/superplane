@@ -8,6 +8,7 @@ import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
 import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { CanvasesCanvasNodeExecution } from "@/api-client";
+import { BlobScopePanel } from "@/components/blobs/BlobScopePanel";
 
 export interface ExecutionChainItem extends EventStateStyle {
   name: string;
@@ -50,6 +51,7 @@ interface SidebarEventItemProps {
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
+  organizationId?: string;
 }
 
 export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
@@ -68,9 +70,10 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onReEmit,
   loadExecutionChain,
   getExecutionState,
+  organizationId,
 }) => {
   // Determine default active tab based on available data
-  const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" => {
+  const getDefaultActiveTab = useCallback((): "current" | "root" | "payload" | "executionChain" | "blobs" => {
     if (!tabData) return "current";
     if (tabData.current) return "current";
     if (tabData.root) return "root";
@@ -79,7 +82,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     return "current";
   }, [tabData]);
 
-  const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
+  const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain" | "blobs">(
+    getDefaultActiveTab(),
+  );
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [copiedExecutions, setCopiedExecutions] = useState<Set<string>>(new Set());
@@ -104,6 +109,8 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     );
     return map[state];
   }, [event.nodeId, event.originalExecution, getExecutionState, event.kind, event.state]);
+
+  const executionID = event.executionId || event.originalExecution?.id;
 
   // Function to load execution chain data lazily
   const loadExecutionChainData = useCallback(
@@ -466,6 +473,18 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   Payload
                 </button>
               )}
+              {organizationId && executionID && (
+                <button
+                  onClick={() => setActiveTab("blobs")}
+                  className={`px-3 py-1 text-sm font-medium rounded-tr-md flex items-center gap-1 ${
+                    activeTab === "blobs"
+                      ? "text-gray-800 border-b-1 border-black bg-gray-100"
+                      : "text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-l-1 border-gray-200"
+                  }`}
+                >
+                  Blobs
+                </button>
+              )}
             </div>
           )}
 
@@ -687,6 +706,17 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                   <div className="text-sm text-gray-500">No execution chain data available</div>
                 </div>
               )}
+            </div>
+          )}
+          {activeTab === "blobs" && organizationId && executionID && (
+            <div className="w-full px-2 py-2">
+              <BlobScopePanel
+                organizationId={organizationId}
+                scopeType="SCOPE_TYPE_EXECUTION"
+                executionId={executionID}
+                compact
+                enabled={isOpen}
+              />
             </div>
           )}
 

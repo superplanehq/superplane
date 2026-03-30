@@ -39,6 +39,7 @@ interface HistoryQueuePageProps {
   // Search and filter state
   searchQuery: string;
   statusFilter: string;
+  organizationId?: string;
 }
 
 export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
@@ -61,6 +62,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   onLoadMoreItems,
   searchQuery,
   statusFilter,
+  organizationId,
 }) => {
   return (
     <div className="flex-1 overflow-y-auto p-4 min-h-0">
@@ -93,6 +95,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 onReEmit={onReEmit}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
+                organizationId={organizationId}
               />
             ))}
             {hasMoreItems && !searchQuery && statusFilter === "all" && (

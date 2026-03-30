@@ -35,6 +35,7 @@ interface LatestTabProps {
   ) => { map: EventStateMap; state: EventState };
   workflowNodes?: ComponentsNode[]; // Workflow spec nodes for metadata lookup
   components?: ComponentsComponent[]; // Component metadata
+  organizationId?: string;
 }
 
 export const LatestTab = ({
@@ -57,6 +58,7 @@ export const LatestTab = ({
   loadExecutionChain,
   getExecutionState,
   workflowNodes,
+  organizationId,
 }: LatestTabProps) => {
   const handleSeeQueue = () => {
     onSeeQueue?.();
@@ -113,6 +115,7 @@ export const LatestTab = ({
                     onReEmit={onReEmit}
                     loadExecutionChain={loadExecutionChain}
                     getExecutionState={getExecutionState}
+                    organizationId={organizationId}
                   />
                 );
               })}
@@ -157,6 +160,7 @@ export const LatestTab = ({
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}
+                      organizationId={organizationId}
                     />
                   );
                 })}

@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"time"
 
@@ -157,6 +158,7 @@ type ExecutionContext struct {
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
 	Webhook        NodeWebhookContext
+	Blobs          BlobContext
 }
 
 /*
@@ -198,6 +200,12 @@ type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
+}
+
+type BlobContext interface {
+	Put(key string, body io.Reader, size int64, contentType string) (string, error)
+	Get(key string) (io.ReadCloser, int64, string, error)
+	Delete(key string) error
 }
 
 /*

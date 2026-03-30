@@ -48,6 +48,10 @@ const (
 	Canvases_ListCanvasMemories_FullMethodName          = "/Superplane.Canvases.Canvases/ListCanvasMemories"
 	Canvases_DeleteCanvasMemory_FullMethodName          = "/Superplane.Canvases.Canvases/DeleteCanvasMemory"
 	Canvases_ListEventExecutions_FullMethodName         = "/Superplane.Canvases.Canvases/ListEventExecutions"
+	Canvases_StoreBlob_FullMethodName                   = "/Superplane.Canvases.Canvases/StoreBlob"
+	Canvases_ListBlobs_FullMethodName                   = "/Superplane.Canvases.Canvases/ListBlobs"
+	Canvases_DescribeBlob_FullMethodName                = "/Superplane.Canvases.Canvases/DescribeBlob"
+	Canvases_DeleteBlob_FullMethodName                  = "/Superplane.Canvases.Canvases/DeleteBlob"
 )
 
 // CanvasesClient is the client API for Canvases service.
@@ -83,6 +87,10 @@ type CanvasesClient interface {
 	ListCanvasMemories(ctx context.Context, in *ListCanvasMemoriesRequest, opts ...grpc.CallOption) (*ListCanvasMemoriesResponse, error)
 	DeleteCanvasMemory(ctx context.Context, in *DeleteCanvasMemoryRequest, opts ...grpc.CallOption) (*DeleteCanvasMemoryResponse, error)
 	ListEventExecutions(ctx context.Context, in *ListEventExecutionsRequest, opts ...grpc.CallOption) (*ListEventExecutionsResponse, error)
+	StoreBlob(ctx context.Context, in *StoreBlobRequest, opts ...grpc.CallOption) (*StoreBlobResponse, error)
+	ListBlobs(ctx context.Context, in *ListBlobsRequest, opts ...grpc.CallOption) (*ListBlobsResponse, error)
+	DescribeBlob(ctx context.Context, in *DescribeBlobRequest, opts ...grpc.CallOption) (*DescribeBlobResponse, error)
+	DeleteBlob(ctx context.Context, in *DeleteBlobRequest, opts ...grpc.CallOption) (*DeleteBlobResponse, error)
 }
 
 type canvasesClient struct {
@@ -383,6 +391,46 @@ func (c *canvasesClient) ListEventExecutions(ctx context.Context, in *ListEventE
 	return out, nil
 }
 
+func (c *canvasesClient) StoreBlob(ctx context.Context, in *StoreBlobRequest, opts ...grpc.CallOption) (*StoreBlobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StoreBlobResponse)
+	err := c.cc.Invoke(ctx, Canvases_StoreBlob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) ListBlobs(ctx context.Context, in *ListBlobsRequest, opts ...grpc.CallOption) (*ListBlobsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBlobsResponse)
+	err := c.cc.Invoke(ctx, Canvases_ListBlobs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DescribeBlob(ctx context.Context, in *DescribeBlobRequest, opts ...grpc.CallOption) (*DescribeBlobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeBlobResponse)
+	err := c.cc.Invoke(ctx, Canvases_DescribeBlob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DeleteBlob(ctx context.Context, in *DeleteBlobRequest, opts ...grpc.CallOption) (*DeleteBlobResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteBlobResponse)
+	err := c.cc.Invoke(ctx, Canvases_DeleteBlob_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CanvasesServer is the server API for Canvases service.
 // All implementations should embed UnimplementedCanvasesServer
 // for forward compatibility.
@@ -416,6 +464,10 @@ type CanvasesServer interface {
 	ListCanvasMemories(context.Context, *ListCanvasMemoriesRequest) (*ListCanvasMemoriesResponse, error)
 	DeleteCanvasMemory(context.Context, *DeleteCanvasMemoryRequest) (*DeleteCanvasMemoryResponse, error)
 	ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error)
+	StoreBlob(context.Context, *StoreBlobRequest) (*StoreBlobResponse, error)
+	ListBlobs(context.Context, *ListBlobsRequest) (*ListBlobsResponse, error)
+	DescribeBlob(context.Context, *DescribeBlobRequest) (*DescribeBlobResponse, error)
+	DeleteBlob(context.Context, *DeleteBlobRequest) (*DeleteBlobResponse, error)
 }
 
 // UnimplementedCanvasesServer should be embedded to have
@@ -511,6 +563,18 @@ func (UnimplementedCanvasesServer) DeleteCanvasMemory(context.Context, *DeleteCa
 }
 func (UnimplementedCanvasesServer) ListEventExecutions(context.Context, *ListEventExecutionsRequest) (*ListEventExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListEventExecutions not implemented")
+}
+func (UnimplementedCanvasesServer) StoreBlob(context.Context, *StoreBlobRequest) (*StoreBlobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StoreBlob not implemented")
+}
+func (UnimplementedCanvasesServer) ListBlobs(context.Context, *ListBlobsRequest) (*ListBlobsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBlobs not implemented")
+}
+func (UnimplementedCanvasesServer) DescribeBlob(context.Context, *DescribeBlobRequest) (*DescribeBlobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeBlob not implemented")
+}
+func (UnimplementedCanvasesServer) DeleteBlob(context.Context, *DeleteBlobRequest) (*DeleteBlobResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteBlob not implemented")
 }
 func (UnimplementedCanvasesServer) testEmbeddedByValue() {}
 
@@ -1054,6 +1118,78 @@ func _Canvases_ListEventExecutions_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Canvases_StoreBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StoreBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).StoreBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_StoreBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).StoreBlob(ctx, req.(*StoreBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_ListBlobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBlobsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).ListBlobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_ListBlobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).ListBlobs(ctx, req.(*ListBlobsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DescribeBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DescribeBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DescribeBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DescribeBlob(ctx, req.(*DescribeBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DeleteBlob_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBlobRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DeleteBlob(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DeleteBlob_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DeleteBlob(ctx, req.(*DeleteBlobRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Canvases_ServiceDesc is the grpc.ServiceDesc for Canvases service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1176,6 +1312,22 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListEventExecutions",
 			Handler:    _Canvases_ListEventExecutions_Handler,
+		},
+		{
+			MethodName: "StoreBlob",
+			Handler:    _Canvases_StoreBlob_Handler,
+		},
+		{
+			MethodName: "ListBlobs",
+			Handler:    _Canvases_ListBlobs_Handler,
+		},
+		{
+			MethodName: "DescribeBlob",
+			Handler:    _Canvases_DescribeBlob_Handler,
+		},
+		{
+			MethodName: "DeleteBlob",
+			Handler:    _Canvases_DeleteBlob_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

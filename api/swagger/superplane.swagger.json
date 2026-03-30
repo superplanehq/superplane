@@ -98,6 +98,172 @@
         ]
       }
     },
+    "/api/v1/blobs": {
+      "get": {
+        "summary": "List blobs",
+        "description": "Lists blobs in the selected scope",
+        "operationId": "Canvases_ListBlobs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesListBlobsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "scopeType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "SCOPE_TYPE_UNSPECIFIED",
+              "SCOPE_TYPE_ORGANIZATION",
+              "SCOPE_TYPE_CANVAS",
+              "SCOPE_TYPE_NODE",
+              "SCOPE_TYPE_EXECUTION"
+            ],
+            "default": "SCOPE_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "canvasId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "nodeId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "executionId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "format": "int64"
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Blob"
+        ]
+      },
+      "post": {
+        "summary": "Store blob",
+        "description": "Stores a blob in the selected scope",
+        "operationId": "Canvases_StoreBlob",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesStoreBlobResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesStoreBlobRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Blob"
+        ]
+      }
+    },
+    "/api/v1/blobs/{id}": {
+      "get": {
+        "summary": "Describe blob",
+        "description": "Describes a blob and returns its contents",
+        "operationId": "Canvases_DescribeBlob",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDescribeBlobResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blob"
+        ]
+      },
+      "delete": {
+        "summary": "Delete blob",
+        "description": "Deletes a blob",
+        "operationId": "Canvases_DeleteBlob",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDeleteBlobResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Blob"
+        ]
+      }
+    },
     "/api/v1/blueprints": {
       "get": {
         "summary": "List blueprints",
@@ -3984,6 +4150,17 @@
       },
       "title": "Common data structures"
     },
+    "BlobScopeType": {
+      "type": "string",
+      "enum": [
+        "SCOPE_TYPE_UNSPECIFIED",
+        "SCOPE_TYPE_ORGANIZATION",
+        "SCOPE_TYPE_CANVAS",
+        "SCOPE_TYPE_NODE",
+        "SCOPE_TYPE_EXECUTION"
+      ],
+      "default": "SCOPE_TYPE_UNSPECIFIED"
+    },
     "BlueprintsBlueprint": {
       "type": "object",
       "properties": {
@@ -4150,6 +4327,46 @@
       "properties": {
         "changeRequest": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequest"
+        }
+      }
+    },
+    "CanvasesBlob": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "scopeType": {
+          "$ref": "#/definitions/BlobScopeType"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "executionId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "objectKey": {
+          "type": "string"
+        },
+        "sizeBytes": {
+          "type": "string",
+          "format": "int64"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4696,6 +4913,9 @@
         }
       }
     },
+    "CanvasesDeleteBlobResponse": {
+      "type": "object"
+    },
     "CanvasesDeleteCanvasMemoryResponse": {
       "type": "object"
     },
@@ -4704,6 +4924,18 @@
     },
     "CanvasesDeleteNodeQueueItemResponse": {
       "type": "object"
+    },
+    "CanvasesDescribeBlobResponse": {
+      "type": "object",
+      "properties": {
+        "blob": {
+          "$ref": "#/definitions/CanvasesBlob"
+        },
+        "content": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
     },
     "CanvasesDescribeCanvasChangeRequestResponse": {
       "type": "object",
@@ -4772,6 +5004,25 @@
       "properties": {
         "result": {
           "type": "object"
+        }
+      }
+    },
+    "CanvasesListBlobsResponse": {
+      "type": "object",
+      "properties": {
+        "blobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesBlob"
+          }
+        },
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "lastTimestamp": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -4999,6 +5250,41 @@
     },
     "CanvasesResolveExecutionErrorsResponse": {
       "type": "object"
+    },
+    "CanvasesStoreBlobRequest": {
+      "type": "object",
+      "properties": {
+        "scopeType": {
+          "$ref": "#/definitions/BlobScopeType"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "executionId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string",
+          "format": "byte"
+        },
+        "contentType": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesStoreBlobResponse": {
+      "type": "object",
+      "properties": {
+        "blob": {
+          "$ref": "#/definitions/CanvasesBlob"
+        }
+      }
     },
     "CanvasesUpdateCanvasBody": {
       "type": "object",

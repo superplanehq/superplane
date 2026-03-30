@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/blobstorage"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -18,6 +19,7 @@ type CanvasService struct {
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
+	blobStorage    blobstorage.BlobStorage
 	webhookBaseURL string
 	usageService   usage.Service
 }
@@ -26,6 +28,7 @@ func NewCanvasService(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
+	blobStorage blobstorage.BlobStorage,
 	webhookBaseURL string,
 	usageService usage.Service,
 ) *CanvasService {
@@ -33,6 +36,7 @@ func NewCanvasService(
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
+		blobStorage:    blobStorage,
 		webhookBaseURL: webhookBaseURL,
 		usageService:   usageService,
 	}
@@ -353,4 +357,28 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 	}
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
+}
+
+func (s *CanvasService) StoreBlob(ctx context.Context, req *pb.StoreBlobRequest) (*pb.StoreBlobResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.StoreBlob(ctx, s.blobStorage, organizationID, req, "")
+}
+
+func (s *CanvasService) ListBlobs(ctx context.Context, req *pb.ListBlobsRequest) (*pb.ListBlobsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListBlobs(ctx, organizationID, req)
+}
+
+func (s *CanvasService) DescribeBlob(ctx context.Context, req *pb.DescribeBlobRequest) (*pb.DescribeBlobResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DescribeBlob(ctx, s.blobStorage, organizationID, req.Id)
+}
+
+func (s *CanvasService) DeleteBlob(ctx context.Context, req *pb.DeleteBlobRequest) (*pb.DeleteBlobResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	err := canvases.DeleteBlob(ctx, s.blobStorage, organizationID, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DeleteBlobResponse{}, nil
 }

@@ -324,6 +324,26 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
+		pbCanvases.Canvases_StoreBlob_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_ListBlobs_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_DescribeBlob_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_DeleteBlob_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 
 		// Service Accounts rules
 		pbServiceAccounts.ServiceAccounts_CreateServiceAccount_FullMethodName:          {Resource: "service_accounts", Action: "create", DomainType: models.DomainTypeOrganization},

@@ -1,9 +1,9 @@
 .gitignore
-.openapi-generator-ignore
 .travis.yml
 README.md
 api/openapi.yaml
 api_agent.go
+api_blob.go
 api_blueprint.go
 api_canvas.go
 api_canvas_change_request.go
@@ -30,6 +30,8 @@ docs/AgentsGenerateAgentChatTokenRequest.md
 docs/AgentsGenerateAgentChatTokenResponse.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationPermission.md
+docs/BlobAPI.md
+docs/BlobScopeType.md
 docs/BlueprintAPI.md
 docs/BlueprintsBlueprint.md
 docs/BlueprintsCreateBlueprintRequest.md
@@ -50,6 +52,7 @@ docs/CanvasNodeExecutionResultReason.md
 docs/CanvasVersionAPI.md
 docs/CanvasesActOnCanvasChangeRequestBody.md
 docs/CanvasesActOnCanvasChangeRequestResponse.md
+docs/CanvasesBlob.md
 docs/CanvasesCanvas.md
 docs/CanvasesCanvasAutoLayout.md
 docs/CanvasesCanvasChangeRequest.md
@@ -77,6 +80,7 @@ docs/CanvasesCreateCanvasChangeRequestResponse.md
 docs/CanvasesCreateCanvasRequest.md
 docs/CanvasesCreateCanvasResponse.md
 docs/CanvasesCreateCanvasVersionResponse.md
+docs/CanvasesDescribeBlobResponse.md
 docs/CanvasesDescribeCanvasChangeRequestResponse.md
 docs/CanvasesDescribeCanvasResponse.md
 docs/CanvasesDescribeCanvasVersionResponse.md
@@ -85,6 +89,7 @@ docs/CanvasesEmitNodeEventResponse.md
 docs/CanvasesInvokeNodeExecutionActionBody.md
 docs/CanvasesInvokeNodeTriggerActionBody.md
 docs/CanvasesInvokeNodeTriggerActionResponse.md
+docs/CanvasesListBlobsResponse.md
 docs/CanvasesListCanvasChangeRequestsResponse.md
 docs/CanvasesListCanvasEventsResponse.md
 docs/CanvasesListCanvasMemoriesResponse.md
@@ -98,6 +103,8 @@ docs/CanvasesListNodeQueueItemsResponse.md
 docs/CanvasesResolveCanvasChangeRequestBody.md
 docs/CanvasesResolveCanvasChangeRequestResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
+docs/CanvasesStoreBlobRequest.md
+docs/CanvasesStoreBlobResponse.md
 docs/CanvasesUpdateCanvasBody.md
 docs/CanvasesUpdateCanvasResponse.md
 docs/CanvasesUpdateCanvasVersionBody.md
@@ -268,6 +275,7 @@ model_agents_generate_agent_chat_token_request.go
 model_agents_generate_agent_chat_token_response.go
 model_authorization_domain_type.go
 model_authorization_permission.go
+model_blob_scope_type.go
 model_blueprints_blueprint.go
 model_blueprints_create_blueprint_request.go
 model_blueprints_create_blueprint_response.go
@@ -281,6 +289,7 @@ model_canvas_node_execution_result.go
 model_canvas_node_execution_result_reason.go
 model_canvases_act_on_canvas_change_request_body.go
 model_canvases_act_on_canvas_change_request_response.go
+model_canvases_blob.go
 model_canvases_canvas.go
 model_canvases_canvas_auto_layout.go
 model_canvases_canvas_change_request.go
@@ -308,6 +317,7 @@ model_canvases_create_canvas_change_request_response.go
 model_canvases_create_canvas_request.go
 model_canvases_create_canvas_response.go
 model_canvases_create_canvas_version_response.go
+model_canvases_describe_blob_response.go
 model_canvases_describe_canvas_change_request_response.go
 model_canvases_describe_canvas_response.go
 model_canvases_describe_canvas_version_response.go
@@ -316,6 +326,7 @@ model_canvases_emit_node_event_response.go
 model_canvases_invoke_node_execution_action_body.go
 model_canvases_invoke_node_trigger_action_body.go
 model_canvases_invoke_node_trigger_action_response.go
+model_canvases_list_blobs_response.go
 model_canvases_list_canvas_change_requests_response.go
 model_canvases_list_canvas_events_response.go
 model_canvases_list_canvas_memories_response.go
@@ -329,6 +340,8 @@ model_canvases_list_node_queue_items_response.go
 model_canvases_resolve_canvas_change_request_body.go
 model_canvases_resolve_canvas_change_request_response.go
 model_canvases_resolve_execution_errors_body.go
+model_canvases_store_blob_request.go
+model_canvases_store_blob_response.go
 model_canvases_update_canvas_body.go
 model_canvases_update_canvas_response.go
 model_canvases_update_canvas_version_body.go
@@ -483,23 +496,4 @@ model_widgets_describe_widget_response.go
 model_widgets_list_widgets_response.go
 model_widgets_widget.go
 response.go
-test/api_agent_test.go
-test/api_blueprint_test.go
-test/api_canvas_change_request_test.go
-test/api_canvas_event_test.go
-test/api_canvas_node_execution_test.go
-test/api_canvas_node_test.go
-test/api_canvas_test.go
-test/api_canvas_version_test.go
-test/api_component_test.go
-test/api_groups_test.go
-test/api_integration_test.go
-test/api_me_test.go
-test/api_organization_test.go
-test/api_roles_test.go
-test/api_secret_test.go
-test/api_service_accounts_test.go
-test/api_trigger_test.go
-test/api_users_test.go
-test/api_widget_test.go
 utils.go
