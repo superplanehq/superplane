@@ -28,12 +28,7 @@ import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyField
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
-import {
-  isFieldVisible,
-  isFieldRequired,
-  parseDefaultValues,
-  validateFieldForSubmission,
-} from "../../utils/components";
+import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
 import type { AuthorizationDomainType } from "@/api-client";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {

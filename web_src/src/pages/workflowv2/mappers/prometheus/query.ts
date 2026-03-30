@@ -1,7 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";

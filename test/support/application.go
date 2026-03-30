@@ -1,6 +1,7 @@
 package support
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -8,6 +9,127 @@ import (
 //
 // Dummy application implementation for testing
 //
+
+type DummyComponentOptions struct {
+	SetupFunc         func(ctx core.SetupContext) error
+	ProcessQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
+	ExecuteFunc       func(ctx core.ExecutionContext) error
+	HandleActionFunc  func(ctx core.ActionContext) error
+	HandleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
+	CancelFunc        func(ctx core.ExecutionContext) error
+	CleanupFunc       func(ctx core.SetupContext) error
+}
+
+type DummyComponent struct {
+	setupFunc         func(ctx core.SetupContext) error
+	processQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
+	executeFunc       func(ctx core.ExecutionContext) error
+	handleActionFunc  func(ctx core.ActionContext) error
+	handleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
+	cancelFunc        func(ctx core.ExecutionContext) error
+	cleanupFunc       func(ctx core.SetupContext) error
+}
+
+func NewDummyComponent(options DummyComponentOptions) *DummyComponent {
+	return &DummyComponent{
+		setupFunc:         options.SetupFunc,
+		processQueueFunc:  options.ProcessQueueFunc,
+		executeFunc:       options.ExecuteFunc,
+		handleActionFunc:  options.HandleActionFunc,
+		handleWebhookFunc: options.HandleWebhookFunc,
+		cancelFunc:        options.CancelFunc,
+		cleanupFunc:       options.CleanupFunc,
+	}
+}
+
+func (t *DummyComponent) Name() string {
+	return "dummy"
+}
+
+func (t *DummyComponent) Label() string {
+	return "dummy"
+}
+
+func (t *DummyComponent) Description() string {
+	return "Just a dummy component used in unit tests"
+}
+
+func (t *DummyComponent) Documentation() string {
+	return ""
+}
+
+func (t *DummyComponent) Icon() string {
+	return "dummy"
+}
+
+func (t *DummyComponent) Color() string {
+	return "dummy"
+}
+
+func (t *DummyComponent) ExampleOutput() map[string]any {
+	return nil
+}
+
+func (t *DummyComponent) OutputChannels(any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (t *DummyComponent) Configuration() []configuration.Field {
+	return nil
+}
+
+func (t *DummyComponent) Setup(ctx core.SetupContext) error {
+	if t.setupFunc == nil {
+		return nil
+	}
+	return t.setupFunc(ctx)
+}
+
+func (t *DummyComponent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	if t.processQueueFunc == nil {
+		return nil, nil
+	}
+	return t.processQueueFunc(ctx)
+}
+
+func (t *DummyComponent) Execute(ctx core.ExecutionContext) error {
+	if t.executeFunc == nil {
+		return nil
+	}
+	return t.executeFunc(ctx)
+}
+
+func (t *DummyComponent) Actions() []core.Action {
+	return nil
+}
+
+func (t *DummyComponent) HandleAction(ctx core.ActionContext) error {
+	if t.handleActionFunc == nil {
+		return nil
+	}
+	return t.handleActionFunc(ctx)
+}
+
+func (t *DummyComponent) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	if t.handleWebhookFunc == nil {
+		return 200, nil, nil
+	}
+	return t.handleWebhookFunc(ctx)
+}
+
+func (t *DummyComponent) Cancel(ctx core.ExecutionContext) error {
+	if t.cancelFunc == nil {
+		return nil
+	}
+	return t.cancelFunc(ctx)
+}
+
+func (t *DummyComponent) Cleanup(ctx core.SetupContext) error {
+	if t.cleanupFunc == nil {
+		return nil
+	}
+	return t.cleanupFunc(ctx)
+}
 
 type DummyIntegration struct {
 	components   []core.Component

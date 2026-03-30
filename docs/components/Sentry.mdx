@@ -2,7 +2,7 @@
 title: "Sentry"
 ---
 
-React to issue events and update issues in Sentry
+React to issue events and manage issues and metric alerts in Sentry
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -15,11 +15,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Alert" href="#create-alert" description="Create a Sentry metric alert rule with thresholds, conditions, and notification targets" />
   <LinkCard title="Create Deploy" href="#create-deploy" description="Mark a deploy against an existing Sentry release" />
   <LinkCard title="Create Release" href="#create-release" description="Register a new release in Sentry after a deploy or build step" />
+  <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Sentry metric alert rule" />
   <LinkCard title="Get Alert" href="#get-alert" description="Retrieve a Sentry metric alert rule with its thresholds, projects, and actions" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Sentry issue with tags, frequency, assignee, and recent events" />
   <LinkCard title="List Alerts" href="#list-alerts" description="List Sentry metric alert rules for the connected organization or a selected project" />
+  <LinkCard title="Update Alert" href="#update-alert" description="Update a Sentry metric alert rule with new thresholds, conditions, or notification targets" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update a Sentry issue status, priority, assignee, or visibility flags" />
 </CardGrid>
 
@@ -31,8 +34,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    > **Token Permissions:**  
    > Project -> `Read` · Releases -> `Read & Write` (`project:releases`) · Team -> `Read` · Issue & Event -> `Read & Write` · Organization -> `Read & Write`
 
-2. In Sentry, go to **Settings → Developer Settings → Custom Integrations → Create New Integration → Internal Integration**.
-   Custom Integrations may also be available under **Settings → Integrations** on some Sentry accounts.
+2. In Sentry, go to **Settings → Integrations → Custom Integrations → Create New Integration → Internal Integration**.
 3. Name it (e.g. `SuperPlane`), leave **Webhook URL** empty, and save. Copy the **Client Secret** shown on the bottom of the integration page.
 4. Fill in **Sentry URL**, **User Token**, **Integration Name**, and **Client Secret** below, then save. SuperPlane configures the webhook and subscribes to issue events automatically.
 
@@ -108,6 +110,91 @@ This trigger uses the webhook URL configured on your Sentry internal integration
   },
   "timestamp": "2022-04-04T18:17:18.320000Z",
   "type": "sentry.issue"
+}
+```
+
+<a id="create-alert"></a>
+
+## Create Alert
+
+The Create Alert component creates a Sentry metric alert rule for a selected project.
+
+### Use Cases
+
+- **Coverage automation**: create alert rules automatically after provisioning a service
+- **Policy enforcement**: ensure critical projects always have baseline metric alerts
+- **Release safety**: create release-specific alert rules after deploy workflows
+
+### Configuration
+
+- **Project**: Sentry project that owns the metric alert rule
+- **Name**: Alert rule name shown in Sentry
+- **Aggregate**: Metric expression such as `count()`
+- **Query**: Optional event search query to narrow the alert
+- **Time Window**: Evaluation window in minutes
+- **Threshold Type**: Whether the threshold fires above or below the configured value
+- **Environment**: Optional environment filter
+- **Event Types**: Event types included in the alert evaluation
+- **Critical / Warning**: Thresholds and notification targets for each trigger level. Select the target type first, then choose a Sentry user or team.
+
+### Output
+
+Returns the created Sentry metric alert rule, including triggers, actions, and project association.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "aggregate": "count()",
+    "dataset": "events",
+    "dateCreated": "2026-03-26T09:15:00Z",
+    "dateModified": "2026-03-26T09:15:00Z",
+    "environment": "production",
+    "eventTypes": [
+      "default",
+      "error"
+    ],
+    "id": "19436",
+    "name": "SuperPlane metric alert example",
+    "organizationId": "4511070267441152",
+    "owner": null,
+    "projects": [
+      "go-gin"
+    ],
+    "query": "environment:production",
+    "queryType": 0,
+    "resolveThreshold": null,
+    "thresholdType": 0,
+    "timeWindow": 60,
+    "triggers": [
+      {
+        "actions": [
+          {
+            "alertRuleTriggerId": "28750",
+            "dateCreated": "2026-03-26T09:15:00Z",
+            "id": "26870",
+            "inputChannelId": null,
+            "integrationId": null,
+            "priority": null,
+            "sentryAppId": null,
+            "targetIdentifier": "4346509",
+            "targetType": "user",
+            "type": "email"
+          }
+        ],
+        "alertRuleId": "19436",
+        "alertThreshold": 5,
+        "dateCreated": "2026-03-26T09:15:00Z",
+        "id": "28750",
+        "label": "critical",
+        "resolveThreshold": 2,
+        "thresholdType": 0
+      }
+    ]
+  },
+  "timestamp": "2026-03-26T09:15:00Z",
+  "type": "sentry.alertRule"
 }
 ```
 
@@ -207,6 +294,41 @@ Returns the created Sentry release object, including version, associated project
   },
   "timestamp": "2026-03-25T10:15:00.000Z",
   "type": "sentry.release"
+}
+```
+
+<a id="delete-alert"></a>
+
+## Delete Alert
+
+The Delete Alert component deletes an existing Sentry metric alert rule.
+
+### Use Cases
+
+- **Alert cleanup**: remove obsolete rules after a service is retired
+- **Policy rotation**: delete temporary alert rules after a rollout is complete
+- **CRUD completion**: pair with alert listing and update workflows
+
+### Configuration
+
+- **Project**: Optional project to narrow alert rule selection
+- **Alert Rule**: Metric alert rule to delete
+
+### Output
+
+Returns the deleted alert ID and name so downstream steps can record the removal.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "19436",
+    "name": "SuperPlane metric alert example"
+  },
+  "timestamp": "2026-03-26T09:25:00Z",
+  "type": "sentry.alertDeleted"
 }
 ```
 
@@ -429,6 +551,85 @@ Returns an object containing the list of matching metric alert rules and their c
   },
   "timestamp": "2026-03-25T10:05:00Z",
   "type": "sentry.alertRules"
+}
+```
+
+<a id="update-alert"></a>
+
+## Update Alert
+
+The Update Alert component updates an existing Sentry metric alert rule.
+
+### Use Cases
+
+- **Threshold tuning**: adjust thresholds after an incident review
+- **Ownership updates**: redirect alert notifications to a different user or team
+- **Environment changes**: tighten or loosen alert conditions for a new rollout
+
+### Configuration
+
+- **Project**: Optional project to narrow alert rule selection or replace the rule's project
+- **Alert Rule**: Existing Sentry alert rule to update
+- **Name / Aggregate / Query / Time Window / Threshold Type / Environment / Event Types**: Optional overrides for the existing rule
+- **Critical / Warning**: Optional updates to trigger thresholds and notification targets. Select the target type first, then choose a Sentry user or team.
+
+### Output
+
+Returns the updated Sentry metric alert rule after the change is applied.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "aggregate": "count()",
+    "dataset": "events",
+    "dateCreated": "2026-03-26T09:15:00Z",
+    "dateModified": "2026-03-26T09:25:00Z",
+    "environment": "production",
+    "eventTypes": [
+      "error"
+    ],
+    "id": "19436",
+    "name": "SuperPlane metric alert example",
+    "organizationId": "4511070267441152",
+    "owner": null,
+    "projects": [
+      "go-gin"
+    ],
+    "query": "environment:production level:error",
+    "queryType": 0,
+    "resolveThreshold": null,
+    "thresholdType": 0,
+    "timeWindow": 30,
+    "triggers": [
+      {
+        "actions": [
+          {
+            "alertRuleTriggerId": "28750",
+            "dateCreated": "2026-03-26T09:15:00Z",
+            "id": "26870",
+            "inputChannelId": null,
+            "integrationId": null,
+            "priority": null,
+            "sentryAppId": null,
+            "targetIdentifier": "4346509",
+            "targetType": "user",
+            "type": "email"
+          }
+        ],
+        "alertRuleId": "19436",
+        "alertThreshold": 10,
+        "dateCreated": "2026-03-26T09:15:00Z",
+        "id": "28750",
+        "label": "critical",
+        "resolveThreshold": 3,
+        "thresholdType": 0
+      }
+    ]
+  },
+  "timestamp": "2026-03-26T09:25:00Z",
+  "type": "sentry.alertRule"
 }
 ```
 

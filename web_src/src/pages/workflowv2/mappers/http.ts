@@ -16,7 +16,7 @@ import type {
   EventState,
 } from "@/ui/componentBase";
 import type React from "react";
-import { getColorClass } from "@/utils/colors";
+import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";

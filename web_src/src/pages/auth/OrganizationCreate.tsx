@@ -4,8 +4,8 @@ import { Text } from "../../components/Text/text";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { getUsageLimitNotice } from "@/utils/usageLimits";
-import { getResponseErrorMessage } from "@/utils/errors";
+import { getUsageLimitNotice } from "@/lib/usageLimits";
+import { getResponseErrorMessage } from "@/lib/errors";
 
 const OrganizationCreate: React.FC = () => {
   const [name, setName] = useState("");

@@ -56,7 +56,7 @@ func Test__Sentry__Sync(t *testing.T) {
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Create New Integration")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "User Token")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, SentryPersonalTokensURL)
-		assert.Contains(t, integrationCtx.BrowserAction.Description, "Settings → Developer Settings → Custom Integrations")
+		assert.Contains(t, integrationCtx.BrowserAction.Description, "Settings → Integrations → Custom Integrations")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Token Permissions")
 		assert.Contains(t, integrationCtx.BrowserAction.Description, "Issue & Event -> Read & Write")
 	})
@@ -730,6 +730,117 @@ func Test__Sentry__ListResources(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), releaseScope)
 	})
+
+	t.Run("lists alert notification targets for users", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"7","name":"Alice Jones","email":"alice@example.com","user":{"id":"7","name":"Alice Jones","email":"alice@example.com","username":"alice"}},{"id":"8","name":"","email":"bob@example.com","user":{"id":"8","name":"","email":"bob@example.com","username":"bob"}}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeAlertTarget, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"targetType": "user",
+				"project":    "backend",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeAlertTarget, ID: "7", Name: "User · Alice Jones"},
+			{Type: ResourceTypeAlertTarget, ID: "8", Name: "User · bob@example.com"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/members/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("lists alert notification targets for teams", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `[{"id":"42","slug":"platform","name":"Platform"}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeAlertTarget, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"targetType": "team",
+				"project":    "backend",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeAlertTarget, ID: "42", Name: "Team · Platform"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/teams/", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("derives alert notification targets from selected alert rule when project is omitted", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl":   "https://sentry.io",
+				"userToken": "user-token",
+			},
+			Metadata: Metadata{
+				Organization: &OrganizationSummary{
+					Slug: "example",
+				},
+			},
+		}
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				sentryMockResponse(http.StatusOK, `{"id":"7","name":"High error rate","projects":["backend"]}`),
+				sentryMockResponse(http.StatusOK, `[{"id":"42","slug":"platform","name":"Platform"}]`),
+			},
+		}
+
+		resources, err := impl.ListResources(ResourceTypeAlertTarget, core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+			Parameters: map[string]string{
+				"targetType": "team",
+				"alertId":    "7",
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, []core.IntegrationResource{
+			{Type: ResourceTypeAlertTarget, ID: "42", Name: "Team · Platform"},
+		}, resources)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t, "https://sentry.io/api/0/organizations/example/alert-rules/7/", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://sentry.io/api/0/projects/example/backend/teams/", httpContext.Requests[1].URL.String())
+	})
 }
 
 func Test__Sentry__Configuration(t *testing.T) {
@@ -757,7 +868,7 @@ func Test__Sentry__Instructions(t *testing.T) {
 	assert.Contains(t, instructions, "Token Permissions")
 	assert.Contains(t, instructions, "project:releases")
 	assert.Contains(t, instructions, "Issue & Event -> `Read & Write`")
-	assert.Contains(t, instructions, "Settings → Developer Settings → Custom Integrations")
+	assert.Contains(t, instructions, "Settings → Integrations → Custom Integrations")
 }
 
 func Test__nextCursorPath__NoTrailingQuestionWhenQueryEmpty(t *testing.T) {

@@ -7,7 +7,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useChildExecutions, useCanvas } from "@/hooks/useCanvasData";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { buildEventInfo } from "../workflowv2/utils";
 
 export function NodeRunPage() {

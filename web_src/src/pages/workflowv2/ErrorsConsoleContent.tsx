@@ -108,7 +108,7 @@ function ErrorItemRow({
       <div className="flex flex-1 items-center gap-2 min-w-0">
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
         <div
-          className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${badgeColor}`}
+          className={`uppercase text-[10px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${badgeColor}`}
         >
           <span>{label}</span>
         </div>

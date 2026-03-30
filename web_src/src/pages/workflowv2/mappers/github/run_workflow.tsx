@@ -18,7 +18,7 @@ import type {
   EventStateMap,
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import githubIcon from "@/assets/icons/integrations/github.svg";

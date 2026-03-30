@@ -2,98 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import os
-import evals.evaluators as evals
+import time
+from datetime import datetime, timezone
 
-from pydantic_evals import Case, Dataset
+from pydantic_ai.usage import RunUsage
+from pydantic_evals import Dataset
 
-from ai.agent import AgentDeps, build_agent, build_prompt
-from ai.models import CanvasAnswer, CanvasQuestionRequest
+from ai.agent import AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
+from evals.case_logger import CaseLogger
+from evals.cases import dataset
 from evals.report import ReportBuilder
 
-dataset = Dataset(
-    cases=[
-        Case(
-            name="manual_run_then_two_noops",
-            inputs=(
-                "Build me a basic workflow that starts with a manual run and runs two noop actions"
-            ),
-            evaluators=[
-              evals.CanvasHasTrigger("start"),
-              evals.CanvasHasNode("noop", count=2),
-              evals.CanvasTotalNodeCount(count=3),
-            ],
-        ),
-
-        Case(
-            name="github_and_slack",
-            inputs=(
-                "Listen to pull-request comments and send a slack message when "
-                "a comment is made"
-            ),
-            evaluators=[
-                evals.CanvasHasTrigger("github.onPRComment"),
-                evals.CanvasHasNode("slack.sendTextMessage", count=1),
-                evals.CanvasTotalNodeCount(count=2),
-            ],
-        ),
-        Case(
-            name="github_issue_opened_to_discord",
-            inputs=(
-                "When a GitHub issue is opened, post a Discord message "
-                "that includes the issue title"
-            ),
-            evaluators=[
-                evals.CanvasHasTrigger("github.onIssue"),
-                evals.CanvasHasNode("discord.sendTextMessage"),
-                evals.CanvasTotalNodeCount(count=2),
-                evals.NoDollarDataAsRoot(),
-            ],
-        ),
-        Case(
-            name="pr_comment_filter_slack_message_chain",
-            inputs=(
-                "When a GitHub PR receives a comment, run the filter component then Slack "
-                "send text message; the Slack message body should contain the name of the PR and the time the filter node was executed"
-            ),
-            evaluators=[
-                evals.CanvasHasTrigger("github.onPRComment"),
-                evals.CanvasHasNode("filter"),
-                evals.CanvasHasNode("slack.sendTextMessage"),
-                evals.CanvasTotalNodeCount(count=3),
-                evals.BracketSelectorsMatchCanvasNames(
-                    scan_scope="all",
-                    require_at_least_one_selector=True,
-                    target_block_name="slack.sendTextMessage",
-                ),
-            ],
-        ),
-        Case(
-            name="ephemeral_pr_preview_machines",
-            inputs=(
-                "Build a workflow that creates ephemeral preview machines for pull requests. "
-                "On PR open, create infra and post the preview URL to the PR. "
-                "On PR close or after 48 hours, tear it down."
-            ),
-            evaluators=[
-              evals.CanvasHasTrigger("github.onPullRequest"),
-              evals.CanvasHasNode("daytona.createRepositorySandbox"),
-              evals.CanvasHasNode("wait"),
-              evals.CanvasHasNode("daytona.deleteSandbox", count=2),
-              evals.CanvasHasWorkflow("github.onPullRequest", "...", "daytona.createRepositorySandbox", "...", "wait", "...", "daytona.deleteSandbox"),
-              evals.CanvasHasWorkflow("github.onPullRequest", "...", "readMemory", "...", "daytona.deleteSandbox"),
-            ],
-        ),
-        Case(
-            name="agent_labeled_issue_auto_resolve",
-            inputs="Build a workflow that auto-resolves GitHub issues",
-            evaluators=[
-              evals.CanvasHasTrigger("github.onIssue"),
-              evals.CanvasHasWorkflow("github.onIssue", "...", "github.createIssueComment", "...", "daytona.executeCode", "...", "github.createIssueComment"),
-            ],
-        ),
-    ],
-)
 
 def load_env() -> dict[str, str]:
     return {
@@ -106,6 +27,8 @@ def load_env() -> dict[str, str]:
 
 async def runner() -> None:
     env = load_env()
+    cases = list(dataset.cases)
+    eval_dataset = Dataset(cases=cases)
 
     deps = AgentDeps(
         client=SuperplaneClient(
@@ -118,14 +41,40 @@ async def runner() -> None:
         canvas_id=env["canvas_id"],
     )
     agent = build_agent(env["model"])
+    # Keyed by case ``inputs`` string so usage matches when cases run concurrently.
+    # Duplicate prompts across cases are not supported (detected under a lock).
+    run_usages: dict[str, RunUsage] = {}
+    usage_lock = asyncio.Lock()
+    question_to_case_name, case_names = build_case_name_index(cases)
 
-    async def task(question: str) -> CanvasAnswer:
-        payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
-        result = await agent.run(build_prompt(payload), deps=deps)
-        return result.output
+    case_logger = CaseLogger(
+        run_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"),
+        case_names=case_names,
+    )
 
-    report = await dataset.evaluate(task, progress=True)
-    ReportBuilder(report).render()
+    task = build_case_task(
+        agent=agent,
+        deps=deps,
+        question_to_case_name=question_to_case_name,
+        system_prompt_text=read_agent_system_prompt(agent),
+        case_logger=case_logger,
+        run_usages=run_usages,
+        usage_lock=usage_lock,
+    )
+
+    wall_start = time.perf_counter()
+    try:
+        report = await eval_dataset.evaluate(task, progress=True)
+        evaluate_wall_seconds = time.perf_counter() - wall_start
+        ReportBuilder(
+            report,
+            model=env["model"],
+            run_usages=run_usages,
+            evaluate_wall_seconds=evaluate_wall_seconds,
+            interaction_log_paths_by_case_name=case_logger.display_paths_by_case_name,
+        ).render()
+    finally:
+        case_logger.close()
 
 def main() -> None:
     asyncio.run(runner())

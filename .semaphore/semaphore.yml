@@ -40,7 +40,7 @@ blocks:
             - make lint
         - name: Unit Tests
           commands:
-            - make test
+            - make test.coverage
         - name: E2E Tests
           parallelism: 10
           commands:
@@ -97,7 +97,7 @@ blocks:
             - cd web_src
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
-            - "npm run test:run"
+            - "npm run test:coverage"
         - name: Format Check
           commands:
             - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
