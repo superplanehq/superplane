@@ -366,11 +366,39 @@ func Test__GrafanaWebhookHandler__CompareConfig(t *testing.T) {
 	assert.False(t, equal)
 
 	equal, err = handler.CompareConfig(
+		map[string]any{
+			"webhookBindingKey": "node-1",
+			"sharedSecret":      "secret-a",
+			"alertNames":        []any{map[string]any{"type": "equals", "value": "A"}},
+		},
+		map[string]any{
+			"webhookBindingKey": "node-1",
+			"sharedSecret":      "secret-a",
+			"alertNames":        []any{map[string]any{"type": "equals", "value": "B"}},
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, equal)
+
+	equal, err = handler.CompareConfig(
 		map[string]any{"sharedSecret": "secret"},
 		map[string]any{"sharedSecret": " secret "},
 	)
 	require.NoError(t, err)
 	assert.True(t, equal)
+
+	equal, err = handler.CompareConfig(
+		map[string]any{
+			"sharedSecret": "secret",
+			"alertNames":   []any{map[string]any{"type": "equals", "value": "A"}},
+		},
+		map[string]any{
+			"sharedSecret": "secret",
+			"alertNames":   []any{map[string]any{"type": "equals", "value": "B"}},
+		},
+	)
+	require.NoError(t, err)
+	assert.False(t, equal)
 }
 
 func Test__GrafanaWebhookHandler__Merge(t *testing.T) {
@@ -399,4 +427,34 @@ func Test__GrafanaWebhookHandler__Merge(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, changed)
 	assert.Equal(t, OnAlertFiringConfig{SharedSecret: "keep-existing", WebhookBindingKey: "node-1"}, merged)
+
+	mergedAny, changed, err := handler.Merge(
+		map[string]any{
+			"sharedSecret": "s", "webhookBindingKey": "node-1",
+			"alertNames": []any{map[string]any{"type": "equals", "value": "A"}},
+		},
+		map[string]any{
+			"sharedSecret": "s", "webhookBindingKey": "node-1",
+			"alertNames": []any{map[string]any{"type": "equals", "value": "B"}},
+		},
+	)
+	require.NoError(t, err)
+	require.True(t, changed)
+	mergedCfg := mergedAny.(OnAlertFiringConfig)
+	require.Len(t, mergedCfg.AlertNames, 1)
+	assert.Equal(t, "equals", mergedCfg.AlertNames[0].Type)
+	assert.Equal(t, "B", mergedCfg.AlertNames[0].Value)
+
+	mergedAny, changed, err = handler.Merge(
+		map[string]any{
+			"sharedSecret": "s", "webhookBindingKey": "node-1",
+			"alertNames": []any{map[string]any{"type": "equals", "value": "Keep"}},
+		},
+		map[string]any{"sharedSecret": "s", "webhookBindingKey": "node-1"},
+	)
+	require.NoError(t, err)
+	require.False(t, changed)
+	mergedCfg = mergedAny.(OnAlertFiringConfig)
+	require.Len(t, mergedCfg.AlertNames, 1)
+	assert.Equal(t, "Keep", mergedCfg.AlertNames[0].Value)
 }
