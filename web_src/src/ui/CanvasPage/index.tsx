@@ -162,6 +162,8 @@ export interface CanvasPageProps {
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
+  /** Monotonic counter incremented on each successful save (for E2E tests). */
+  saveCount?: number;
   lastSavedAt?: Date | string | null;
   saveErrorMessage?: string | null;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
@@ -974,6 +976,7 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
           saveState={props.saveState}
+          saveCount={props.saveCount}
           lastSavedAt={props.lastSavedAt}
           saveErrorMessage={props.saveErrorMessage}
           onEnterEditMode={props.onEnterEditMode}
@@ -1152,6 +1155,7 @@ function CanvasPage(props: CanvasPageProps) {
                 discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
+                saveCount={props.saveCount}
                 lastSavedAt={props.lastSavedAt}
                 saveErrorMessage={props.saveErrorMessage}
                 onEnterEditMode={props.onEnterEditMode}
@@ -1599,6 +1603,7 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip,
   headerMode,
   saveState,
+  saveCount,
   lastSavedAt,
   saveErrorMessage,
   onEnterEditMode,
@@ -1633,6 +1638,7 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
+  saveCount?: number;
   lastSavedAt?: Date | string | null;
   saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
@@ -1697,6 +1703,7 @@ function CanvasContentHeader({
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
       saveState={saveState}
+      saveCount={saveCount}
       lastSavedAt={lastSavedAt}
       saveErrorMessage={saveErrorMessage}
       onEnterEditMode={onEnterEditMode}
@@ -1802,6 +1809,7 @@ function CanvasContent({
   discardVersionDisabledTooltip,
   headerMode,
   saveState,
+  saveCount,
   lastSavedAt,
   saveErrorMessage,
   onEnterEditMode,
@@ -1901,6 +1909,7 @@ function CanvasContent({
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
+  saveCount?: number;
   lastSavedAt?: Date | string | null;
   saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
@@ -2659,6 +2668,7 @@ function CanvasContent({
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
           mode={headerMode}
           saveState={saveState}
+          saveCount={saveCount}
           lastSavedAt={lastSavedAt}
           saveErrorMessage={saveErrorMessage}
           onEnterEditMode={onEnterEditMode}

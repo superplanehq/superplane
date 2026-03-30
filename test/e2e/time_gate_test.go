@@ -23,10 +23,11 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Weekday Work Hours Gate")
 		steps.addTimeGate()
+		baseline := steps.canvas.GetSaveCount()
 		steps.setDaysTo(weekendDays)
 		steps.setTimeWindow("00:00", "23:59")
 		steps.setTimezone("0")
-		steps.saveTimeGate()
+		steps.saveTimeGate(baseline)
 		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
 	})
 
@@ -34,10 +35,11 @@ func TestTimeGateComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasExists("Work Hours Gate")
 		steps.addTimeGate()
+		baseline := steps.canvas.GetSaveCount()
 		steps.setDaysTo(workweekDays)
 		steps.setTimeWindow("09:00", "17:00")
 		steps.setTimezone("-5")
-		steps.saveTimeGate()
+		steps.saveTimeGate(baseline)
 		steps.assertTimeGateSavedToDB("09:00 - 17:00", "-5", workweekDays)
 	})
 
@@ -116,9 +118,8 @@ func (s *TimeGateSteps) setTimezone(timezone string) {
 	s.session.Click(q.Locator(offsetSelector))
 }
 
-func (s *TimeGateSteps) saveTimeGate() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
-	s.session.Sleep(300)
+func (s *TimeGateSteps) saveTimeGate(baseline ...string) {
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline...)
 }
 
 func (s *TimeGateSteps) openNodeSettings(node string) {
@@ -152,13 +153,14 @@ func (s *TimeGateSteps) givenACanvasWithManualTriggerTimeGateAndOutput(days []st
 	s.canvas.AddNoop("Output", models.Position{X: 1400, Y: 200})
 
 	s.openNodeSettings("timeGate")
+	baseline := s.canvas.GetSaveCount()
 	s.setDaysTo(days)
 	parts := strings.SplitN(timeRange, "-", 2)
 	if len(parts) == 2 {
 		s.setTimeWindow(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
 	}
 	s.setTimezone(timezone)
-	s.saveTimeGate()
+	s.saveTimeGate(baseline)
 
 	s.canvas.Connect("Start", "timeGate")
 	s.canvas.Connect("timeGate", "Output")
@@ -171,7 +173,7 @@ func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		30*time.Second,
+		10*time.Second,
 	)
 }
 
@@ -189,7 +191,7 @@ func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
 	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"] button[aria-label="Open actions"]`))
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {
