@@ -27,7 +27,6 @@ type TestSession struct {
 
 	BaseURL string
 	OrgID   uuid.UUID
-	UserID  uuid.UUID
 	Account *models.Account
 }
 
@@ -202,7 +201,6 @@ func (s *TestSession) setupUserAndOrganization() {
 	}
 
 	s.OrgID = organization.ID
-	s.UserID = user.ID
 	s.Account = account
 }
 
