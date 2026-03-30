@@ -48,10 +48,9 @@ import {
   ComponentsIntegrationRef,
   OrganizationsIntegration,
 } from "@/api-client";
-import { buildSidebarComponentDocsPayload } from "@/utils/componentDocsUrl";
-import { parseDefaultValues } from "@/utils/components";
+import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
+import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
-import { AiSidebar } from "../ai";
 import {
   AiCanvasOperation,
   BuildingBlock,
@@ -63,11 +62,11 @@ import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
-import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET } from "../groupNode/constants";
 import { GroupNode } from "../groupNode";
 import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
+import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
@@ -95,96 +94,6 @@ export interface CanvasNode extends ReactFlowNode {
   __simulation?: Simulation;
 }
 
-function clampGroupChildNodePositionChanges(changes: NodeChange[], nodes: CanvasNode[]): NodeChange[] {
-  const nodesById = new Map(nodes.map((n) => [n.id, n]));
-
-  return changes.map((change) => {
-    if (change.type !== "position") return change;
-    const posChange = change as { id: string; type: "position"; position?: { x: number; y: number } };
-    if (!posChange.position) return change;
-    const node = nodesById.get(posChange.id);
-    if (!node?.parentId) return change;
-    const parent = nodesById.get(node.parentId);
-    if (!parent || (parent.data as { type?: string })?.type !== "group") return change;
-
-    const x = Math.max(posChange.position.x, GROUP_CHILD_EDGE_PADDING);
-    const y = Math.max(posChange.position.y, GROUP_CHILD_MIN_Y_OFFSET);
-
-    if (x === posChange.position.x && y === posChange.position.y) return change;
-    return {
-      ...posChange,
-      position: { ...posChange.position, x, y },
-    };
-  });
-}
-
-const DEFAULT_GROUP_MIN_WIDTH = 480;
-const DEFAULT_GROUP_MIN_HEIGHT = 320;
-const GROUP_RESIZE_PADDING = 30;
-
-function computeGroupSizeFromChildren(groupId: string, nodes: CanvasNode[]): { width: number; height: number } | null {
-  const children = nodes.filter((n) => n.parentId === groupId);
-  if (children.length === 0) return null;
-
-  let maxRight = 0;
-  let maxBottom = 0;
-
-  for (const child of children) {
-    const cx = child.position?.x ?? 0;
-    const cy = child.position?.y ?? 0;
-    const cw = child.measured?.width ?? child.width ?? 240;
-    const ch = child.measured?.height ?? child.height ?? 80;
-    maxRight = Math.max(maxRight, cx + cw);
-    maxBottom = Math.max(maxBottom, cy + ch);
-  }
-
-  return {
-    width: Math.max(DEFAULT_GROUP_MIN_WIDTH, Math.round(maxRight + GROUP_RESIZE_PADDING)),
-    height: Math.max(DEFAULT_GROUP_MIN_HEIGHT, Math.round(maxBottom + GROUP_RESIZE_PADDING)),
-  };
-}
-
-function resizeGroupsAfterChildChanges(
-  changes: NodeChange[],
-  nodes: CanvasNode[],
-  setNodes: (updater: (nodes: CanvasNode[]) => CanvasNode[]) => void,
-) {
-  const childChangedIds = new Set(
-    changes.filter((c) => c.type === "dimensions" || c.type === "position").map((c) => c.id),
-  );
-  if (childChangedIds.size === 0) return;
-
-  const affectedGroupIds = new Set<string>();
-  for (const node of nodes) {
-    if (node.parentId && childChangedIds.has(node.id)) {
-      affectedGroupIds.add(node.parentId);
-    }
-  }
-  if (affectedGroupIds.size === 0) return;
-
-  setNodes((currentNodes) => {
-    let changed = false;
-    const updated = currentNodes.map((node) => {
-      if (!affectedGroupIds.has(node.id)) return node;
-      const size = computeGroupSizeFromChildren(node.id, currentNodes);
-      if (!size) return node;
-
-      const currentW = node.width ?? 0;
-      const currentH = node.height ?? 0;
-      if (Math.abs(currentW - size.width) < 1 && Math.abs(currentH - size.height) < 1) return node;
-
-      changed = true;
-      return {
-        ...node,
-        width: size.width,
-        height: size.height,
-        style: { ...node.style, width: size.width, height: size.height, zIndex: -1 },
-      };
-    });
-    return changed ? updated : currentNodes;
-  });
-}
-
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
   targetHandle?: string | null;
@@ -199,17 +108,6 @@ interface FocusRequest {
     executionId?: string | null;
     triggerEvent?: SidebarEvent | null;
   };
-}
-
-export interface AiProps {
-  enabled: boolean;
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  showNotifications: boolean;
-  notificationMessage?: string;
-  suggestions: Record<string, string>;
-  onApply: (suggestionId: string) => void;
-  onDismiss: (suggestionId: string) => void;
 }
 
 export interface NodeEditData {
@@ -381,8 +279,6 @@ export interface CanvasPageProps {
   onToggleCollapse?: () => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
-  ai?: AiProps;
-
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
@@ -526,12 +422,6 @@ function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: an
           : undefined
       }
       onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
-      ai={{
-        show: callbacks.aiState.sidebarOpen,
-        suggestion: callbacks.aiState.suggestions[nodeProps.id] || null,
-        onApply: () => callbacks.aiState.onApply(nodeProps.id),
-        onDismiss: () => callbacks.aiState.onDismiss(nodeProps.id),
-      }}
     />
   );
 }
@@ -928,7 +818,6 @@ function CanvasPage(props: CanvasPageProps) {
       name: "annotation",
       label: "Annotation",
       type: "component",
-      isLive: true,
     };
 
     await props.onNodeAdd({
@@ -1303,14 +1192,6 @@ function CanvasPage(props: CanvasPageProps) {
                 canCreateIntegrations={props.canCreateIntegrations}
               />
             </ReactFlowProvider>
-
-            <AiSidebar
-              enabled={state.ai.enabled}
-              isOpen={state.ai.sidebarOpen}
-              setIsOpen={state.ai.setSidebarOpen}
-              showNotifications={state.ai.showNotifications}
-              notificationMessage={state.ai.notificationMessage}
-            />
 
             <Sidebar
               state={state}
@@ -2540,7 +2421,6 @@ function CanvasContent({
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
     onUngroupNodes: onUngroupNodesRef,
-    aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2561,7 +2441,6 @@ function CanvasContent({
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
     onUngroupNodes: onUngroupNodesRef,
-    aiState: state.ai,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -3076,82 +2955,115 @@ function CanvasContent({
                     >
                       {onGroupNodes &&
                         multiSelectedNodes.filter((n) => n.data?.type !== "group" && !n.parentId).length >= 2 && (
-                          <button
-                            type="button"
-                            data-testid="multi-select-group"
-                            onPointerDown={stopCanvasPointerEvent}
-                            onMouseDown={stopCanvasPointerEvent}
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              const groupable = multiSelectedNodes.filter(
-                                (n) => n.data?.type !== "group" && !n.parentId,
-                              );
-                              const { bounds, nodePositions } = computeSelectionBounds(groupable);
-                              onGroupNodes(bounds, nodePositions);
-                              setMultiSelectedNodes([]);
-                            }}
-                            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                          >
-                            <Group className="h-4 w-4" />
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                data-testid="multi-select-group"
+                                aria-label="Group"
+                                onPointerDown={stopCanvasPointerEvent}
+                                onMouseDown={stopCanvasPointerEvent}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  const groupable = multiSelectedNodes.filter(
+                                    (n) => n.data?.type !== "group" && !n.parentId,
+                                  );
+                                  const { bounds, nodePositions } = computeSelectionBounds(groupable);
+                                  onGroupNodes(bounds, nodePositions);
+                                  setMultiSelectedNodes([]);
+                                }}
+                                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                              >
+                                <Group className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Group</TooltipContent>
+                          </Tooltip>
                         )}
                       {onAutoLayoutNodes && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-auto-layout"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <LayoutGrid className="h-4 w-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="multi-select-auto-layout"
+                              aria-label="Tidy"
+                              onPointerDown={stopCanvasPointerEvent}
+                              onMouseDown={stopCanvasPointerEvent}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onAutoLayoutNodes(multiSelectedNodes.map((n) => n.id));
+                              }}
+                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                            >
+                              <LayoutGrid className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Tidy</TooltipContent>
+                        </Tooltip>
                       )}
                       {onDuplicateNodes && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-duplicate"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="multi-select-duplicate"
+                              aria-label="Copy"
+                              onPointerDown={stopCanvasPointerEvent}
+                              onMouseDown={stopCanvasPointerEvent}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onDuplicateNodes(multiSelectedNodes.map((n) => n.id));
+                              }}
+                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copy</TooltipContent>
+                        </Tooltip>
                       )}
                       {(onNodesDelete || onNodeDelete) && (
-                        <button
-                          type="button"
-                          data-testid="multi-select-delete"
-                          onPointerDown={stopCanvasPointerEvent}
-                          onMouseDown={stopCanvasPointerEvent}
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            const nodeIds = multiSelectedNodes.map((n) => n.id);
-                            if (onNodesDelete) {
-                              onNodesDelete(nodeIds);
-                            } else {
-                              for (const id of nodeIds) {
-                                onNodeDelete?.(id);
-                              }
-                            }
-                            stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
-                            setMultiSelectedNodes([]);
-                          }}
-                          className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              data-testid="multi-select-delete"
+                              aria-label="Delete Selected"
+                              onPointerDown={stopCanvasPointerEvent}
+                              onMouseDown={stopCanvasPointerEvent}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (
+                                  !window.confirm(
+                                    "Are you sure you want to delete the selected nodes? This action cannot be undone.",
+                                  )
+                                ) {
+                                  return;
+                                }
+                                const nodeIds = multiSelectedNodes.map((n) => n.id);
+                                if (onNodesDelete) {
+                                  onNodesDelete(nodeIds);
+                                } else {
+                                  for (const id of nodeIds) {
+                                    onNodeDelete?.(id);
+                                  }
+                                }
+                                stateRef.current.setNodes((nodes) =>
+                                  nodes.map((node) => ({ ...node, selected: false })),
+                                );
+                                setMultiSelectedNodes([]);
+                              }}
+                              className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete Selected</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </div>

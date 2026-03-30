@@ -29,8 +29,8 @@ import {
   canvasesListEventExecutions,
   canvasesUpdateCanvasVersion2,
 } from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
-import { showErrorToast } from "@/utils/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { showErrorToast } from "@/lib/toast";
 import { useAccount } from "@/contexts/AccountContext";
 import { useMe } from "@/hooks/useMe";
 import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";

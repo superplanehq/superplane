@@ -27,7 +27,7 @@ import {
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { getApiErrorMessage } from "@/utils/errors";
+import { getApiErrorMessage } from "@/lib/errors";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;

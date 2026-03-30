@@ -1,4 +1,4 @@
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import type { TriggerProps } from "@/ui/trigger";

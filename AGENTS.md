@@ -50,6 +50,7 @@
 - When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names
 - When writing tests that require specific timestamps to be used, always use timestamps based off of `time.Now()`, instead of absolute times created with `time.Date`
 - The name of the application is "SuperPlane", not "Superplane" in all user-facing text (user interfaces, emails, notifications, documentation, etc.).
+- Frontend: do not create or use `web_src/src/utils/*` or `utils.ts` files. Put shared non-React helpers in `web_src/src/lib/`, and put React-specific reusable logic in `web_src/src/hooks/`.
 
 ## Database Transaction Guidelines
 
