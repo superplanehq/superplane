@@ -1,423 +1,222 @@
+import React, { useMemo, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react";
-import { useState } from "react";
+import { TooltipProvider } from "@/ui/tooltip";
 import { ConfigurationFieldRenderer } from "./index";
-import { ComponentsConfigurationField } from "../../api-client";
-import { TooltipProvider } from "../tooltip";
-import React from "react";
+import {
+  ConfigurationStorySeed,
+  STORY_AUTOCOMPLETE_CONTEXT,
+  STORY_DOMAIN_ID,
+  STORY_DOMAIN_TYPE,
+  STORY_INTEGRATION_ID,
+  rendererCategoryOrder,
+  rendererExampleMap,
+  rendererExamples,
+  type RendererExample,
+} from "./storybooks/fixtures";
 
-const meta: Meta<typeof ConfigurationFieldRenderer> = {
+const meta = {
   title: "ui/ConfigurationFieldRenderer",
   component: ConfigurationFieldRenderer,
   tags: ["autodocs"],
   parameters: {
     layout: "padded",
+    docs: {
+      description: {
+        component:
+          "A Storybook catalog for every field renderer routed by `ConfigurationFieldRenderer`. The stories mirror the type mapping in `pkg/configuration/field.go` and `web_src/src/ui/configurationFieldRenderer/index.tsx`, including the renderer-only `url` route.",
+      },
+    },
   },
   decorators: [
     (Story) => (
-      <TooltipProvider delayDuration={150}>
-        <div className="max-w-2xl">
-          <Story />
-        </div>
-      </TooltipProvider>
+      <ConfigurationStorySeed>
+        <TooltipProvider delayDuration={150}>
+          <div className="max-w-5xl">
+            <Story />
+          </div>
+        </TooltipProvider>
+      </ConfigurationStorySeed>
     ),
   ],
-};
+} satisfies Meta<typeof ConfigurationFieldRenderer>;
 
 export default meta;
-type Story = StoryObj<typeof ConfigurationFieldRenderer>;
 
-const Wrapper = ({ field, initialValue }: { field: ComponentsConfigurationField; initialValue?: any }) => {
-  const [value, setValue] = useState(initialValue);
+type Story = StoryObj<typeof meta>;
+
+function RendererPlayground({ example }: { example: RendererExample }) {
+  const [value, setValue] = useState<unknown>(example.initialValue);
+  const allValues = useMemo(() => {
+    const fieldName = example.field.name;
+    if (!fieldName) {
+      return example.allValues ?? {};
+    }
+
+    return {
+      ...(example.allValues ?? {}),
+      [fieldName]: value,
+    };
+  }, [example.allValues, example.field.name, value]);
+
   return (
     <div className="space-y-4">
-      <ConfigurationFieldRenderer field={field} value={value} onChange={setValue} />
-      <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-        <p className="text-xs font-mono">Current value:</p>
-        <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-gray-900 px-2.5 py-1 text-xs font-semibold text-white">
+            {example.field.type}
+          </span>
+          <span className="rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-600">
+            {example.source}
+          </span>
+        </div>
+        <ConfigurationFieldRenderer
+          allowExpressions={example.allowExpressions ?? false}
+          field={example.field}
+          value={value}
+          onChange={setValue}
+          allValues={allValues}
+          domainId={STORY_DOMAIN_ID}
+          domainType={STORY_DOMAIN_TYPE}
+          organizationId={STORY_DOMAIN_ID}
+          integrationId={STORY_INTEGRATION_ID}
+          autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
+        />
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Current value</p>
+        <pre className="overflow-x-auto text-xs text-gray-700">{JSON.stringify(value, null, 2)}</pre>
       </div>
     </div>
   );
-};
+}
 
-export const StringField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "username",
-        label: "Username",
-        type: "string",
-        description: "Enter your username",
-        required: true,
-      }}
-      initialValue=""
-    />
-  ),
-};
+function RendererCatalog() {
+  const [values, setValues] = useState<Record<string, unknown>>(() =>
+    Object.fromEntries(
+      rendererExamples
+        .filter((example) => example.field.name)
+        .map((example) => [example.field.name!, example.initialValue]),
+    ),
+  );
 
-export const NumberField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "age",
-        label: "Age",
-        type: "number",
-        description: "Enter your age",
-        typeOptions: {
-          number: {
-            min: 0,
-            max: 120,
-          },
-        },
-      }}
-      initialValue={25}
-    />
-  ),
-};
+  return (
+    <div className="space-y-8">
+      {rendererCategoryOrder.map((category) => {
+        const categoryExamples = rendererExamples.filter((example) => example.category === category);
 
-export const BooleanField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "enabled",
-        label: "Enable Feature",
-        type: "boolean",
-        description: "Toggle to enable or disable this feature",
-      }}
-      initialValue={false}
-    />
-  ),
-};
+        return (
+          <section key={category} className="space-y-4">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-gray-900">{category}</h2>
+              <p className="text-sm text-gray-600">
+                Stories in this section are grouped by how the renderer is typically used in component configuration.
+              </p>
+            </div>
 
-export const SelectField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "priority",
-        label: "Priority",
-        type: "select",
-        description: "Select the priority level",
-        typeOptions: {
-          select: {
-            options: [
-              { label: "Low", value: "low" },
-              { label: "Medium", value: "medium" },
-              { label: "High", value: "high" },
-              { label: "Critical", value: "critical" },
-            ],
-          },
-        },
-      }}
-      initialValue="medium"
-    />
-  ),
-};
+            <div className="grid gap-4 lg:grid-cols-2">
+              {categoryExamples.map((example) => {
+                const fieldName = example.field.name!;
+                const value = values[fieldName];
+                const allValues = {
+                  ...(example.allValues ?? {}),
+                  [fieldName]: value,
+                };
 
-export const MultiSelectField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "tags",
-        label: "Tags",
-        type: "multi-select",
-        description: "Select multiple tags",
-        typeOptions: {
-          multiSelect: {
-            options: [
-              { label: "Bug", value: "bug" },
-              { label: "Feature", value: "feature" },
-              { label: "Documentation", value: "docs" },
-              { label: "Testing", value: "testing" },
-            ],
-          },
-        },
-      }}
-      initialValue={["bug", "feature"]}
-    />
-  ),
-};
+                return (
+                  <div key={example.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-semibold text-gray-900">{example.field.label}</h3>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                          {example.field.type}
+                        </span>
+                        <span className="rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-500">
+                          {example.source}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600">{example.docsDescription}</p>
+                    </div>
 
-export const DateField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "dueDate",
-        label: "Due Date",
-        type: "date",
-        description: "Select a due date",
-      }}
-      initialValue={new Date().toISOString()}
-    />
-  ),
-};
+                    <ConfigurationFieldRenderer
+                      allowExpressions={example.allowExpressions ?? false}
+                      field={example.field}
+                      value={value}
+                      onChange={(nextValue) =>
+                        setValues((currentValues) => ({
+                          ...currentValues,
+                          [fieldName]: nextValue,
+                        }))
+                      }
+                      allValues={allValues}
+                      domainId={STORY_DOMAIN_ID}
+                      domainType={STORY_DOMAIN_TYPE}
+                      organizationId={STORY_DOMAIN_ID}
+                      integrationId={STORY_INTEGRATION_ID}
+                      autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
-export const UrlField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "website",
-        label: "Website URL",
-        type: "url",
-        description: "Enter a valid URL",
-      }}
-      initialValue="https://example.com"
-    />
-  ),
-};
+function createExampleStory(exampleId: string): Story {
+  const example = rendererExampleMap[exampleId];
 
-export const TimeField: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "meetingTime",
-        label: "Meeting Time",
-        type: "time",
-        description: "Select a meeting time",
-      }}
-      initialValue="14:30"
-    />
-  ),
-};
-
-export const ListFieldSimple: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "emails",
-        label: "Email Addresses",
-        type: "list",
-        description: "Add multiple email addresses",
-        typeOptions: {
-          list: {
-            itemDefinition: {
-              type: "string",
-            },
-          },
-        },
-      }}
-      initialValue={["user@example.com", "admin@example.com"]}
-    />
-  ),
-};
-
-export const ListFieldWithObjects: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "contacts",
-        label: "Contacts",
-        type: "list",
-        description: "Add contact information",
-        typeOptions: {
-          list: {
-            itemDefinition: {
-              type: "object",
-              schema: [
-                {
-                  name: "name",
-                  label: "Name",
-                  type: "string",
-                  required: true,
-                },
-                {
-                  name: "email",
-                  label: "Email",
-                  type: "string",
-                },
-                {
-                  name: "role",
-                  label: "Role",
-                  type: "select",
-                  typeOptions: {
-                    select: {
-                      options: [
-                        { label: "Developer", value: "dev" },
-                        { label: "Designer", value: "designer" },
-                        { label: "Manager", value: "manager" },
-                      ],
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      }}
-      initialValue={[
-        { name: "John Doe", email: "john@example.com", role: "dev" },
-        { name: "Jane Smith", email: "jane@example.com", role: "designer" },
-      ]}
-    />
-  ),
-};
-
-export const ObjectFieldWithSchema: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "address",
-        label: "Address",
-        type: "object",
-        description: "Enter address information",
-        typeOptions: {
-          object: {
-            schema: [
-              {
-                name: "street",
-                label: "Street",
-                type: "string",
-                required: true,
-              },
-              {
-                name: "city",
-                label: "City",
-                type: "string",
-                required: true,
-              },
-              {
-                name: "state",
-                label: "State",
-                type: "string",
-              },
-              {
-                name: "zipCode",
-                label: "Zip Code",
-                type: "string",
-              },
-              {
-                name: "isPrimary",
-                label: "Primary Address",
-                type: "boolean",
-              },
-            ],
-          },
-        },
-      }}
-      initialValue={{
-        street: "123 Main St",
-        city: "San Francisco",
-        state: "CA",
-        zipCode: "94102",
-        isPrimary: true,
-      }}
-    />
-  ),
-};
-
-export const ObjectFieldWithJSON: Story = {
-  render: () => (
-    <Wrapper
-      field={{
-        name: "metadata",
-        label: "Metadata",
-        type: "object",
-        description: "Enter custom metadata as JSON",
-      }}
-      initialValue={{
-        version: "1.0",
-        author: "John Doe",
-        tags: ["important", "draft"],
-      }}
-    />
-  ),
-};
-
-export const ComplexForm: Story = {
-  render: () => {
-    const [values, setValues] = useState<Record<string, any>>({
-      projectName: "My Project",
-      description: "A sample project",
-      priority: "high",
-      enabled: true,
-      teamMembers: [
-        { name: "Alice", role: "lead" },
-        { name: "Bob", role: "developer" },
-      ],
-    });
-
-    const fields: ComponentsConfigurationField[] = [
-      {
-        name: "projectName",
-        label: "Project Name",
-        type: "string",
-        required: true,
-        description: "Enter the project name",
-      },
-      {
-        name: "description",
-        label: "Description",
-        type: "string",
-        description: "Describe your project",
-      },
-      {
-        name: "priority",
-        label: "Priority",
-        type: "select",
-        typeOptions: {
-          select: {
-            options: [
-              { label: "Low", value: "low" },
-              { label: "Medium", value: "medium" },
-              { label: "High", value: "high" },
-            ],
-          },
+  return {
+    name: example.storyName.replace(/Field$/, ""),
+    parameters: {
+      docs: {
+        description: {
+          story: example.docsDescription,
         },
       },
-      {
-        name: "enabled",
-        label: "Active",
-        type: "boolean",
-      },
-      {
-        name: "teamMembers",
-        label: "Team Members",
-        type: "list",
-        typeOptions: {
-          list: {
-            itemDefinition: {
-              type: "object",
-              schema: [
-                {
-                  name: "name",
-                  label: "Name",
-                  type: "string",
-                },
-                {
-                  name: "role",
-                  label: "Role",
-                  type: "select",
-                  typeOptions: {
-                    select: {
-                      options: [
-                        { label: "Lead", value: "lead" },
-                        { label: "Developer", value: "developer" },
-                        { label: "Designer", value: "designer" },
-                      ],
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      },
-    ];
+    },
+    render: () => <RendererPlayground example={example} />,
+  };
+}
 
-    return (
-      <div className="space-y-6">
-        {fields.map((field) => (
-          <ConfigurationFieldRenderer
-            key={field.name}
-            field={field}
-            value={values[field.name!]}
-            onChange={(value) => setValues({ ...values, [field.name!]: value })}
-            allValues={values}
-          />
-        ))}
-        <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-md">
-          <p className="text-xs font-mono mb-2">Form Values:</p>
-          <pre className="text-xs">{JSON.stringify(values, null, 2)}</pre>
-        </div>
-      </div>
-    );
+export const Catalog: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "A grouped overview for the full renderer surface area, including context-backed inputs and the compatibility `url` route.",
+      },
+    },
   },
+  render: () => <RendererCatalog />,
 };
+
+export const StringField = createExampleStory("string");
+export const TextField = createExampleStory("text");
+export const ExpressionField = createExampleStory("expression");
+export const XMLField = createExampleStory("xml");
+export const NumberField = createExampleStory("number");
+export const BooleanField = createExampleStory("boolean");
+export const SelectField = createExampleStory("select");
+export const MultiSelectField = createExampleStory("multi-select");
+export const ListField = createExampleStory("list");
+export const ObjectField = createExampleStory("object");
+export const TimeField = createExampleStory("time");
+export const DateField = createExampleStory("date");
+export const DateTimeField = createExampleStory("datetime");
+export const TimezoneField = createExampleStory("timezone");
+export const DaysOfWeekField = createExampleStory("days-of-week");
+export const TimeRangeField = createExampleStory("time-range");
+export const DayInYearField = createExampleStory("day-in-year");
+export const CronField = createExampleStory("cron");
+export const UserField = createExampleStory("user");
+export const RoleField = createExampleStory("role");
+export const GroupField = createExampleStory("group");
+export const IntegrationResourceField = createExampleStory("integration-resource");
+export const AnyPredicateListField = createExampleStory("any-predicate-list");
+export const GitRefField = createExampleStory("git-ref");
+export const SecretKeyField = createExampleStory("secret-key");
+export const UrlField = createExampleStory("url");
