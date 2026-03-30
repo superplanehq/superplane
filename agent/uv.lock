@@ -1720,12 +1720,14 @@ dependencies = [
     { name = "pydantic-evals" },
     { name = "pyjwt" },
     { name = "python-dateutil" },
+    { name = "python-dotenv" },
     { name = "urllib3" },
     { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-watch" },
@@ -1743,12 +1745,14 @@ requires-dist = [
     { name = "pydantic-evals", specifier = ">=0.1.0" },
     { name = "pyjwt", specifier = ">=2.10.1" },
     { name = "python-dateutil", specifier = ">=2.9.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "urllib3", specifier = ">=2.0.0" },
     { name = "uvicorn", specifier = ">=0.42.0" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "httpx", specifier = ">=0.28.0" },
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "pytest", specifier = ">=8.3.0" },
     { name = "pytest-watch", specifier = ">=4.2.0" },

@@ -13,12 +13,14 @@ dependencies = [
   "pydantic>=2.11.0",
   "pydantic-ai>=0.4.0",
   "pydantic-evals>=0.1.0",
+  "python-dotenv>=1.0.0",
   "urllib3>=2.0.0",
   "uvicorn>=0.42.0",
 ]
 
 [dependency-groups]
 dev = [
+  "httpx>=0.28.0",
   "mypy>=1.15.0",
   "pytest>=8.3.0",
   "pytest-watch>=4.2.0",
