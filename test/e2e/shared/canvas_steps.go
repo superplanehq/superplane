@@ -479,7 +479,7 @@ func (s *CanvasSteps) WaitForExecution(name string, state string, timeout time.D
 		}
 
 		s.t.Log("waiting for execution of node", name)
-		time.Sleep(200 * time.Millisecond)
+		s.session.Sleep(1000)
 	}
 
 	require.True(s.t, found, "timed out waiting for execution of node %s", name)
@@ -497,7 +497,7 @@ func (s *CanvasSteps) WaitForExecutionInStates(name string, states []string, tim
 		}
 
 		s.t.Log("waiting for execution of node", name)
-		time.Sleep(200 * time.Millisecond)
+		s.session.Sleep(1000)
 	}
 
 	require.True(s.t, found, "timed out waiting for execution of node %s", name)

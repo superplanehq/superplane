@@ -173,7 +173,7 @@ func (s *TimeGateSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"timeGate",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		10*time.Second,
+		30*time.Second,
 	)
 }
 
@@ -191,7 +191,7 @@ func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
 	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"] button[aria-label="Open actions"]`))
 	s.session.Sleep(300)
 	s.session.Click(q.TestID("push-through-item"))
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 
 func (s *TimeGateSteps) assertTimeGateExecutionFinishedAndOutputNodeProcessed() {

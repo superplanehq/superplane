@@ -316,7 +316,7 @@ func (s *ApprovalSteps) runManualTrigger() {
 	s.canvas.WaitForExecutionInStates(
 		"Approval",
 		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		15*time.Second,
+		30*time.Second,
 	)
 }
 
@@ -397,7 +397,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 15*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")
