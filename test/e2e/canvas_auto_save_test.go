@@ -157,16 +157,31 @@ func (s *canvasAutoSaveSteps) moveNodeFast(name string, deltaX, deltaY int) {
 	require.NoError(s.t, s.session.Page().Mouse().Up())
 }
 
-// assertNodePositionInDB verifies that the persisted node position in the
-// draft version matches the expected coordinates.
+// assertNodePositionInDB verifies that the persisted node position matches
+// the expected coordinates (draft version when versioning is enabled, live
+// version when versioning is disabled).
 func (s *canvasAutoSaveSteps) assertNodePositionInDB(name string, expectedX, expectedY int) {
-	draft, err := models.FindCanvasDraftInTransaction(
-		database.Conn(), s.canvas.WorkflowID, s.session.Account.ID,
-	)
-	require.NoError(s.t, err, "finding user draft")
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+	require.NoError(s.t, err, "finding canvas")
 
-	version, err := models.FindCanvasVersion(s.canvas.WorkflowID, draft.VersionID)
-	require.NoError(s.t, err, "finding canvas version")
+	organizationVersioningEnabled, err := models.IsCanvasVersioningEnabled(s.session.OrgID)
+	require.NoError(s.t, err, "finding organization versioning state")
+
+	isVersioningEnabled := organizationVersioningEnabled || canvas.VersioningEnabled
+
+	var version *models.CanvasVersion
+	if isVersioningEnabled {
+		draft, draftErr := models.FindCanvasDraftInTransaction(
+			database.Conn(), s.canvas.WorkflowID, s.session.UserID,
+		)
+		require.NoError(s.t, draftErr, "finding user draft")
+
+		version, err = models.FindCanvasVersion(s.canvas.WorkflowID, draft.VersionID)
+		require.NoError(s.t, err, "finding canvas version")
+	} else {
+		version, err = models.FindLiveCanvasVersionInTransaction(database.Conn(), s.canvas.WorkflowID)
+		require.NoError(s.t, err, "finding live canvas version")
+	}
 
 	var found bool
 	for _, node := range version.Nodes {
