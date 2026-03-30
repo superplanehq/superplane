@@ -331,14 +331,14 @@ func (c *Client) DeleteContactPoint(uid string) error {
 // NotificationPolicyRoute represents one node in Grafana's notification policy tree.
 // We only model the fields we read/write; unknown fields are preserved via RawFields.
 type NotificationPolicyRoute struct {
-	Receiver       string                     `json:"receiver"`
-	GroupBy        []string                   `json:"group_by,omitempty"`
-	ObjectMatchers [][]string                 `json:"object_matchers,omitempty"`
-	Continue       bool                       `json:"continue,omitempty"`
-	GroupWait      string                     `json:"group_wait,omitempty"`
-	GroupInterval  string                     `json:"group_interval,omitempty"`
-	RepeatInterval string                     `json:"repeat_interval,omitempty"`
-	Routes         []NotificationPolicyRoute  `json:"routes,omitempty"`
+	Receiver       string                    `json:"receiver"`
+	GroupBy        []string                  `json:"group_by,omitempty"`
+	ObjectMatchers [][]string                `json:"object_matchers,omitempty"`
+	Continue       bool                      `json:"continue,omitempty"`
+	GroupWait      string                    `json:"group_wait,omitempty"`
+	GroupInterval  string                    `json:"group_interval,omitempty"`
+	RepeatInterval string                    `json:"repeat_interval,omitempty"`
+	Routes         []NotificationPolicyRoute `json:"routes,omitempty"`
 }
 
 func (c *Client) getNotificationPolicies() (*NotificationPolicyRoute, error) {
