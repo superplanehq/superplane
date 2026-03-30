@@ -5120,11 +5120,7 @@ export function WorkflowPageV2() {
     (canAutoSave && isAutoSaveQueued);
   const saveIsPrimary = hasUnsavedChanges && !isTemplate && canUpdateCanvas && !(canAutoSave && isAutoSaveQueued);
   const canUndo =
-    !isTemplate &&
-    canUpdateCanvas &&
-    hasEditableVersion &&
-    initialWorkflowSnapshot !== null &&
-    !(canAutoSave && isAutoSaveQueued);
+    !isTemplate && canUpdateCanvas && hasEditableVersion && hasUnsavedChanges && initialWorkflowSnapshot !== null;
   const versioningDisabledTooltip = "Versioning is disabled. Enable canvas versioning in canvas settings.";
   const toggleEditModeDisabled =
     isVersioningDisabled ||

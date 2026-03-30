@@ -559,7 +559,7 @@ export function Header({
                   />
                 ) : null}
                 {onUndo && canUndo ? (
-                  <Button onClick={onUndo} size="sm" variant="outline">
+                  <Button onClick={onUndo} size="sm" variant="outline" disabled={saveState === "saving"}>
                     <Undo2 />
                     Revert
                   </Button>
