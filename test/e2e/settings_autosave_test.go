@@ -19,8 +19,9 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.givenACanvasExists("Autosave Partial")
 		steps.addFilterNode("FilterPartial")
 		steps.assertExpressionFieldEquals("FilterPartial", "true")
+		baseline := steps.canvas.GetSaveCount()
 		steps.clearExpressionField()
-		steps.waitForAutoSave()
+		steps.waitForAutoSave(baseline)
 		steps.assertExpressionFieldCleared("FilterPartial")
 	})
 
@@ -30,8 +31,9 @@ func TestSettingsAutoSave(t *testing.T) {
 		steps.givenACanvasExists("Autosave Tab Switch")
 		steps.addFilterNode("FilterSwitch")
 		steps.assertExpressionFieldEquals("FilterSwitch", "true")
+		baseline := steps.canvas.GetSaveCount()
 		steps.clearExpressionField()
-		steps.waitForAutoSave()
+		steps.waitForAutoSave(baseline)
 		steps.switchToRunsTab()
 		steps.switchToConfigurationTab()
 		steps.assertExpressionInputEquals("")
@@ -67,8 +69,8 @@ func (s *settingsAutoSaveSteps) clearExpressionField() {
 	s.session.FillIn(expressionInput, "")
 }
 
-func (s *settingsAutoSaveSteps) waitForAutoSave() {
-	s.canvas.WaitForCanvasSaveStatusSaved()
+func (s *settingsAutoSaveSteps) waitForAutoSave(baseline ...string) {
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline...)
 }
 
 func (s *settingsAutoSaveSteps) switchToRunsTab() {

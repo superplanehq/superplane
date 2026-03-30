@@ -66,6 +66,7 @@ func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 	s.session.DragAndDrop(source, target, 500, 250)
 	s.session.Sleep(500)
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
 	s.session.Click(q.TestID("field-type-select"))
@@ -78,7 +79,7 @@ func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
 
 	s.typeIntoMonacoEditor(body)
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *SendEmailSteps) typeIntoMonacoEditor(text string) {
@@ -130,6 +131,7 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 	s.session.Sleep(500)
 
+	baseline := s.canvas.GetSaveCount()
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
 
 	s.session.Click(q.TestID("field-type-select"))
@@ -142,7 +144,7 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 
 	s.typeIntoMonacoEditor("This is a test email body")
 
-	s.canvas.WaitForCanvasSaveStatusSaved()
+	s.canvas.WaitForCanvasSaveStatusSaved(baseline)
 }
 
 func (s *SendEmailSteps) runManualTrigger() {

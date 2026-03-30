@@ -183,7 +183,6 @@ export function WorkflowPageV2() {
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const holdSavingDisplay = useMinSavingDisplayHold(updateCanvasVersionMutation.isPending);
   // Track completed saves for E2E: increment saveCount on pending→settled success.
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional ref tracking
   useEffect(() => {
     if (
       wasMutationPendingRef.current &&
