@@ -127,7 +127,13 @@ func writeComponentSection(buf *bytes.Buffer, components []core.Component) {
 	}
 
 	for _, component := range components {
-		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", slugify(component.Label())))
+		anchor := slugify(component.Label())
+		buf.WriteString(fmt.Sprintf("<a id=\"%s\"></a>\n\n", anchor))
+		// Backward-compatible anchor for renamed core components.
+		// This preserves existing links like /components/core#merge even after renaming "Merge" → "Join".
+		if component.Name() == "merge" && anchor != "merge" {
+			buf.WriteString("<a id=\"merge\"></a>\n\n")
+		}
 		buf.WriteString(fmt.Sprintf("## %s\n\n", component.Label()))
 
 		// Write documentation if available, otherwise fall back to description
@@ -182,9 +188,15 @@ func writeCardGridComponents(buf *bytes.Buffer, components []core.Component) {
 	buf.WriteString("<CardGrid>\n")
 	for _, component := range components {
 		description := strings.TrimSpace(component.Description())
+		hrefAnchor := slugify(component.Label())
+		// Backward-compatible link for renamed core components.
+		// This preserves in-page navigation to #merge even after renaming "Merge" → "Join".
+		if component.Name() == "merge" && hrefAnchor != "merge" {
+			hrefAnchor = "merge"
+		}
 		buf.WriteString(fmt.Sprintf("  <LinkCard title=\"%s\" href=\"#%s\" description=\"%s\" />\n",
 			escapeQuotes(component.Label()),
-			slugify(component.Label()),
+			hrefAnchor,
 			escapeQuotes(description),
 		))
 	}

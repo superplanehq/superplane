@@ -172,7 +172,7 @@ export const mergeMapper: ComponentBaseMapper = {
       iconColor: getColorClass(context.componentDefinition?.color || "gray"),
       collapsedBackground: getBackgroundColorClass("white"),
       collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition?.label || "Merge",
+      title: context.node.name || context.componentDefinition?.label || "Join",
       eventSections: lastExecution
         ? getMergeEventSections(context.nodes, lastExecution, context.additionalData)
         : undefined,

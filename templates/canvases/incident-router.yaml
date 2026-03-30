@@ -154,7 +154,7 @@ spec:
       configuration:
         color: "yellow"
         height: 168
-        text: "### 3. Use AI to generate a title and description\n\nThe OpenAI component can access payloads from upstream nodes. Here, it generates a title and description used to create a PagerDuty incident and a GitHub issue. A Merge component waits for both outputs before continuing.\n\n___\n- See how the OpenAI component references upstream data\n- Explore how the [Merge component](https://docs.superplane.com/components/core/#merge) works\n"
+        text: "### 3. Use AI to generate a title and description\n\nThe OpenAI component can access payloads from upstream nodes. Here, it generates a title and description used to create a PagerDuty incident and a GitHub issue. A Join component waits for both outputs before continuing.\n\n___\n- See how the OpenAI component references upstream data\n- Explore how the [Join component](https://docs.superplane.com/components/core/#join) works\n"
         width: 759
       metadata: null
       position:

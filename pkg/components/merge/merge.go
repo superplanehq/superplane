@@ -16,9 +16,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-// Merge is a component that passes its input downstream on
-// different channels based on execution outcome. The queue/worker
-// layer is responsible for aggregating inputs from multiple parents.
+// Merge is a fan-in/barrier component that waits for all distinct upstream
+// source nodes to reach it before continuing. The queue/worker layer is
+// responsible for aggregating arrivals from multiple parents.
 
 // Output channel names for Merge component
 const (
@@ -34,23 +34,26 @@ func init() {
 type Merge struct{}
 
 func (m *Merge) Name() string        { return "merge" }
-func (m *Merge) Label() string       { return "Merge" }
-func (m *Merge) Description() string { return "Merge multiple upstream inputs and forward" }
+func (m *Merge) Label() string       { return "Join" }
+func (m *Merge) Description() string { return "Wait for all upstream nodes before continuing (fan-in)" }
 func (m *Merge) Documentation() string {
-	return `The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
+	return `The Join component (internal name: ` + "`merge`" + `) waits for events from all upstream nodes before continuing (fan-in / barrier).
 
 ## Use Cases
 
 - **Parallel processing**: Wait for multiple parallel operations to complete
-- **Data aggregation**: Combine results from multiple sources
 - **Synchronization**: Synchronize multiple workflow branches
 - **Fan-in patterns**: Collect outputs from multiple upstream nodes
 
 ## How It Works
 
-1. The Merge component waits for events from all distinct upstream source nodes
-2. Once all inputs are received, it emits the combined data to the Success channel
+1. Join waits for events from all distinct upstream source nodes
+2. Once all inputs are received, it emits a success event downstream
 3. Optional timeout and conditional stop features allow early completion
+
+## Output Payload
+
+Join does **not** merge upstream payload bodies into a single combined payload. Its output is metadata about what arrived (e.g., source node IDs and event IDs).
 
 ## Configuration Options
 
@@ -66,7 +69,7 @@ func (m *Merge) Documentation() string {
 ## Behavior
 
 - Tracks distinct source nodes (ignoring multiple channels from the same source)
-- Combines all received event data into the output
+- Emits metadata describing what arrived
 - Supports timeout to prevent indefinite waiting
 - Supports conditional early stop based on expression evaluation`
 }

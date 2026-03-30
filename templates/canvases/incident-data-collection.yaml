@@ -226,7 +226,7 @@ spec:
       configuration:
         color: "yellow"
         height: 265
-        text: "### 3. Collect metrics and health data\n\nThis step uses Dash0 to collect health signals from multiple sources and prepare data for a summary. The Dash0 List Issues component retrieves all failing checks, while Prometheus Query components fetch database memory and CPU usage metrics.\n\nA Merge component waits for all three data collection nodes to complete before the workflow continues.\n\n___\n\n**To use this with your dash0 instance:**   \n- Ensure check rules are configured in Dash0\n- Review the queries used for database memory and CPU usage\n- Update the queries to match your environment\n"
+        text: "### 3. Collect metrics and health data\n\nThis step uses Dash0 to collect health signals from multiple sources and prepare data for a summary. The Dash0 List Issues component retrieves all failing checks, while Prometheus Query components fetch database memory and CPU usage metrics.\n\nA Join component waits for all three data collection nodes to complete before the workflow continues.\n\n___\n\n**To use this with your dash0 instance:**   \n- Ensure check rules are configured in Dash0\n- Review the queries used for database memory and CPU usage\n- Update the queries to match your environment\n"
         width: 977
       metadata: null
       position:
