@@ -4,8 +4,8 @@ Built with [Pydantic AI](https://ai.pydantic.dev/).
 
 Starting points:
 
-- System prompt is in `agent/src/ai/agent.py`
-- Evals are in `agent/evals/runner.py`
+- System prompt is in `agent/src/ai/system_prompt.txt`
+- Evals are in `agent/evals/cases.py`
 - Patterns are in `agent/patterns`
 
 ## Canvas agent evals
@@ -20,15 +20,15 @@ With the dev stack up (`docker compose -f docker-compose.dev.yml up -d`), provis
 make agent.evals.bootstrap
 ```
 
-The Make target uses `docker compose run --user $$(id -u):$$(id -g) --env-from-file agent/.env` so merged **`agent/.env` stays owned by your host user** (avoids root-owned files from the default container user). `UV_CACHE_DIR=/tmp/uv-cache` is set so `uv sync` works without writing to `/root/.cache`.
+The Make target uses `docker compose run --user $(id -u):$(id -g) --env-from-file agent/.env` so merged **`agent/.env` stays owned by your host user** (avoids root-owned files from the default container user). `UV_CACHE_DIR=/tmp/uv-cache` and **`UV_PROJECT_ENVIRONMENT=/tmp/agent-venv-compose`** keep `uv sync` off the bind-mounted `agent/.venv` (which may contain root-owned files from other container runs and would cause “Permission denied” under `--user`).
 
 The script prints those values to stdout and, by default, **merges** them into `agent/.env` inside the container (`--merge-env /app/agent/.env`): existing keys are updated in place; missing keys are appended under a short comment. Duplicate keys are collapsed to a single updated line.
 
 To **only print** (no file write), run the script yourself without `--merge-env`, for example:
 
 ```bash
-docker compose -f docker-compose.dev.yml run --rm -T --no-deps --env-from-file agent/.env agent \
-  bash -lc "cd /app/agent && uv sync --group dev && uv run --group dev python scripts/bootstrap_eval_env.py"
+docker compose -f docker-compose.dev.yml run --rm -T --no-deps --user $(id -u):$(id -g) --env-from-file agent/.env agent \
+  bash -lc "mkdir -p /tmp/uv-cache /tmp/agent-venv-compose && export UV_CACHE_DIR=/tmp/uv-cache UV_PROJECT_ENVIRONMENT=/tmp/agent-venv-compose && cd /app/agent && uv sync --group dev && uv run --group dev python scripts/bootstrap_eval_env.py"
 ```
 
 To **append** a block instead of merging, run the script with `-o /path` only (no `--merge-env`); the default `make agent.evals.bootstrap` always merges, so use a one-off `docker compose run ... python scripts/bootstrap_eval_env.py -o /app/agent/.env` if you need append behavior.
