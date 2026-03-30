@@ -159,6 +159,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
       suggestOnTriggerCharacters: true,
       quickSuggestions: false,
       wordBasedSuggestions: "off" as const,
+      fixedOverflowWidgets: true,
       suggest: {
         showWords: false,
         showSnippets: false,

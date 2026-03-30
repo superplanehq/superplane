@@ -55,6 +55,7 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
       comments: false,
     },
     wordBasedSuggestions: "off" as const,
+    fixedOverflowWidgets: true,
   };
 
   return (
