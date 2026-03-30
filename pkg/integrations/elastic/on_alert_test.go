@@ -81,6 +81,7 @@ func Test__OnAlertFires__Setup(t *testing.T) {
 			},
 		}
 		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
 		testIntegration := &contexts.IntegrationContext{
 			Configuration: integrationCtx.Configuration,
 		}
@@ -93,6 +94,7 @@ func Test__OnAlertFires__Setup(t *testing.T) {
 			Integration: testIntegration,
 			HTTP:        httpCtx,
 			Metadata:    metadataCtx,
+			Requests:    requestCtx,
 		})
 		require.NoError(t, err)
 		assert.Equal(t, OnAlertFiresMetadata{
@@ -103,8 +105,8 @@ func Test__OnAlertFires__Setup(t *testing.T) {
 		require.Len(t, testIntegration.WebhookRequests, 1)
 		assert.Equal(t, map[string]any{
 			"kibanaUrl": "https://kibana.example.com",
-			"ruleId":    "rule-123",
 		}, testIntegration.WebhookRequests[0])
+		assert.Equal(t, checkAlertConnectorAction, requestCtx.Action)
 	})
 
 	t.Run("unknown rule returns a validation error", func(t *testing.T) {

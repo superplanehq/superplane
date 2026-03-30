@@ -1,7 +1,6 @@
 package elastic
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -68,7 +67,7 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least one case is required")
 	})
 
-	t.Run("new trigger -> initializes metadata, baseline statuses, requests webhook, and schedules provisioning", func(t *testing.T) {
+	t.Run("new trigger -> initializes metadata, baseline statuses, requests webhook, and schedules poll", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{
 			"url":       "https://elastic.example.com",
 			"kibanaUrl": "https://kibana.example.com",
@@ -109,16 +108,15 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		require.True(t, ok)
 		assert.NotEmpty(t, saved.LastPollTime)
 		assert.NotEmpty(t, saved.RouteKey)
-		assert.Empty(t, saved.RuleID)
 		assert.Equal(t, map[string]string{"case-1": "Production incident", "case-2": "DB issue"}, saved.CaseNames)
 		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 		require.Len(t, integration.WebhookRequests, 1)
 		cfg := integration.WebhookRequests[0].(map[string]any)
 		assert.Equal(t, "https://kibana.example.com", cfg["kibanaUrl"])
-		assert.Equal(t, checkCaseConnectorAction, requests.Action)
+		assert.Equal(t, pollCaseStatusAction, requests.Action)
 	})
 
-	t.Run("re-save with existing rule -> refreshes baseline and skips provisioning", func(t *testing.T) {
+	t.Run("re-save -> refreshes baseline and schedules poll", func(t *testing.T) {
 		integration := &contexts.IntegrationContext{Configuration: map[string]any{
 			"url":       "https://elastic.example.com",
 			"kibanaUrl": "https://kibana.example.com",
@@ -128,7 +126,6 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
 			LastPollTime: "2024-01-01T00:00:00Z",
 			RouteKey:     "route-123",
-			RuleID:       "existing-rule-id",
 		}}
 		requests := &contexts.RequestContext{}
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
@@ -163,11 +160,10 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "2024-01-01T00:00:00Z", saved.LastPollTime)
 		assert.Equal(t, "route-123", saved.RouteKey)
-		assert.Equal(t, "existing-rule-id", saved.RuleID)
 		assert.Equal(t, map[string]string{"case-1": "Production incident", "case-2": "DB issue"}, saved.CaseNames)
 		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 		require.Len(t, integration.WebhookRequests, 1)
-		assert.Empty(t, requests.Action)
+		assert.Equal(t, pollCaseStatusAction, requests.Action)
 	})
 
 	t.Run("cases configured -> resolves and stores case names and baseline statuses", func(t *testing.T) {
@@ -199,11 +195,11 @@ func Test__OnCaseStatusChange__Setup(t *testing.T) {
 		assert.Equal(t, "DB issue", saved.CaseNames["case-2"])
 		assert.Equal(t, map[string]string{"case-1": "open", "case-2": "closed"}, saved.CaseStatuses)
 		assert.NotEmpty(t, saved.RouteKey)
-		assert.Equal(t, checkCaseConnectorAction, requests.Action)
+		assert.Equal(t, pollCaseStatusAction, requests.Action)
 	})
 }
 
-func Test__OnCaseStatusChange__CheckConnectorAndCreateRule(t *testing.T) {
+func Test__OnCaseStatusChange__PollCaseStatus(t *testing.T) {
 	integrationCtx := &contexts.IntegrationContext{Configuration: map[string]any{
 		"url":       "https://elastic.example.com",
 		"kibanaUrl": "https://kibana.example.com",
@@ -211,104 +207,108 @@ func Test__OnCaseStatusChange__CheckConnectorAndCreateRule(t *testing.T) {
 		"apiKey":    "test-api-key",
 	}}
 
-	connectorsResponse := `[{"id":"conn-123","name":"SuperPlane Alert"}]`
-	ruleResponse := `{"id":"rule-456","name":"SuperPlane • Cases"}`
-
-	t.Run("connector found -> creates rule and saves rule ID", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(connectorsResponse))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(ruleResponse))},
-		}}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{RouteKey: "route-123", LastPollTime: "2024-06-01T12:00:00Z"}}
-		requests := &contexts.RequestContext{}
-
-		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:        checkCaseConnectorAction,
-			HTTP:        httpCtx,
-			Integration: integrationCtx,
-			Metadata:    meta,
-			Requests:    requests,
-		})
-		require.NoError(t, err)
-
-		saved, ok := meta.Metadata.(OnCaseStatusChangeMetadata)
-		require.True(t, ok)
-		assert.Equal(t, "rule-456", saved.RuleID)
-		assert.Equal(t, "route-123", saved.RouteKey)
-		assert.Empty(t, requests.Action)
-
-		require.Len(t, httpCtx.Requests, 2)
-		body, err := io.ReadAll(httpCtx.Requests[1].Body)
-		require.NoError(t, err)
-
-		var payload map[string]any
-		require.NoError(t, json.Unmarshal(body, &payload))
-		params := payload["params"].(map[string]any)
-		assert.Equal(t, "cases.updated_at", params["timeField"])
-		assert.Equal(t, []any{".kibana_alerting_cases"}, params["index"])
-
-		actions := payload["actions"].([]any)
-		action := actions[0].(map[string]any)
-		bodyParams := action["params"].(map[string]any)
-		var actionBody map[string]any
-		require.NoError(t, json.Unmarshal([]byte(bodyParams["body"].(string)), &actionBody))
-		assert.Equal(t, "case_status_changed", actionBody["eventType"])
-		assert.Equal(t, "route-123", actionBody["routeKey"])
-	})
-
-	t.Run("connector not found yet -> reschedules", func(t *testing.T) {
+	t.Run("cases with changed status -> emits events and reschedules", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: http.StatusOK,
-			Body:       io.NopCloser(strings.NewReader(`[]`)),
+			Body:       io.NopCloser(strings.NewReader(casesResponse)),
 		}}}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{RouteKey: "route-123"}}
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			CaseStatuses: map[string]string{"case-1": "open", "case-2": "in-progress"},
+		}}
+		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}
 
 		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:        checkCaseConnectorAction,
-			HTTP:        httpCtx,
-			Integration: integrationCtx,
-			Metadata:    meta,
-			Requests:    requests,
+			Name:          pollCaseStatusAction,
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Events:        events,
+			Requests:      requests,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, checkCaseConnectorAction, requests.Action)
+		assert.Equal(t, 2, events.Count())
+		assert.Equal(t, pollCaseStatusAction, requests.Action)
+
+		saved := meta.Metadata.(OnCaseStatusChangeMetadata)
+		assert.Equal(t, "2024-06-01T12:02:00.000Z", saved.LastPollTime)
+		assert.Equal(t, map[string]string{"case-1": "in-progress", "case-2": "closed"}, saved.CaseStatuses)
 	})
 
-	t.Run("Kibana error listing connectors -> reschedules", func(t *testing.T) {
+	t.Run("no status changes -> no events but reschedules", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(casesResponse)),
+		}}}
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			CaseStatuses: map[string]string{"case-1": "in-progress", "case-2": "closed"},
+		}}
+		events := &contexts.EventContext{}
+		requests := &contexts.RequestContext{}
+
+		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
+			Name:          pollCaseStatusAction,
+			Configuration: map[string]any{"cases": []string{"case-1", "case-2"}},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Events:        events,
+			Requests:      requests,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, events.Payloads)
+		assert.Equal(t, pollCaseStatusAction, requests.Action)
+	})
+
+	t.Run("Kibana API error -> reschedules without error", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
 			StatusCode: http.StatusInternalServerError,
 			Body:       io.NopCloser(strings.NewReader(`{"error":"internal"}`)),
 		}}}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{RouteKey: "route-123"}}
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{LastPollTime: "2024-06-01T12:00:00.000Z"}}
 		requests := &contexts.RequestContext{}
 
 		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:        checkCaseConnectorAction,
-			HTTP:        httpCtx,
-			Integration: integrationCtx,
-			Metadata:    meta,
-			Requests:    requests,
+			Name:          pollCaseStatusAction,
+			Configuration: map[string]any{"cases": []string{"case-1"}},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Events:        &contexts.EventContext{},
+			Requests:      requests,
 		})
 		require.NoError(t, err)
-		assert.Equal(t, checkCaseConnectorAction, requests.Action)
+		assert.Equal(t, pollCaseStatusAction, requests.Action)
 	})
 
-	t.Run("rule already provisioned -> no-op", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{}
-		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{RuleID: "existing-rule-id", RouteKey: "route-123"}}
+	t.Run("case filter -> only matching case emitted", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(casesResponse)),
+		}}}
+		meta := &contexts.MetadataContext{Metadata: OnCaseStatusChangeMetadata{
+			LastPollTime: "2024-06-01T12:00:00.000Z",
+			CaseStatuses: map[string]string{"case-1": "open", "case-2": "in-progress"},
+		}}
+		events := &contexts.EventContext{}
 		requests := &contexts.RequestContext{}
 
 		_, err := (&OnCaseStatusChange{}).HandleAction(core.TriggerActionContext{
-			Name:        checkCaseConnectorAction,
-			HTTP:        httpCtx,
-			Integration: integrationCtx,
-			Metadata:    meta,
-			Requests:    requests,
+			Name:          pollCaseStatusAction,
+			Configuration: map[string]any{"cases": []string{"case-2"}},
+			HTTP:          httpCtx,
+			Integration:   integrationCtx,
+			Metadata:      meta,
+			Events:        events,
+			Requests:      requests,
 		})
 		require.NoError(t, err)
-		assert.Empty(t, requests.Action)
-		assert.Empty(t, httpCtx.Requests)
+		require.Equal(t, 1, events.Count())
+		data := events.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "case-2", data["id"])
 	})
 }
 
