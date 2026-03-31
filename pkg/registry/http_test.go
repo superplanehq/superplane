@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -100,10 +101,10 @@ func Test__HTTPContext__ValidateURL__DefaultConfiguration(t *testing.T) {
 }
 
 func Test__HTTPContext__ValidateURL_AllowsNonBlockedHost(t *testing.T) {
-	ctx := &HTTPContext{
-		blockedHosts:    []string{"example.com"},
-		privateIPRanges: nil,
-	}
+	ctx, err := NewHTTPContext(HTTPOptions{
+		BlockedHosts: []string{"example.com"},
+	})
+	require.NoError(t, err)
 
 	parsed, err := url.Parse("https://example.org")
 	require.NoError(t, err)
@@ -347,6 +348,34 @@ func Test__HTTPContext__ValidateIP__DefaultConfiguration(t *testing.T) {
 			assert.Contains(t, err.Error(), "access to private IP address "+test.ipAddr+" is not allowed")
 		})
 	}
+}
+
+func Test__HTTPContext__PolicyResolver(t *testing.T) {
+	var blocked atomic.Bool
+	blocked.Store(true)
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			if blocked.Load() {
+				return HTTPPolicy{BlockedHosts: []string{"example.com"}}, nil
+			}
+
+			return HTTPPolicy{}, nil
+		},
+		PolicyCacheTTL: time.Hour,
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse("https://example.com")
+	require.NoError(t, err)
+
+	require.ErrorContains(t, ctx.validateURL(parsed), "access to example.com is not allowed")
+
+	blocked.Store(false)
+	require.ErrorContains(t, ctx.validateURL(parsed), "access to example.com is not allowed")
+
+	ctx.InvalidatePolicyCache()
+	require.NoError(t, ctx.validateURL(parsed))
 }
 
 func defaultHTTPOptions() HTTPOptions {
