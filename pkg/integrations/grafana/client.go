@@ -7,8 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -30,6 +32,16 @@ type contactPoint struct {
 type DataSource struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
+}
+
+type Folder struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type AlertRuleSummary struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
 }
 
 type apiStatusError struct {
@@ -326,6 +338,322 @@ func (c *Client) DeleteContactPoint(uid string) error {
 	return nil
 }
 
+// Notification policies are read and written as map[string]json.RawMessage so Grafana
+// fields we do not model (mute_time_intervals, matchers, nested route fields, etc.)
+// round-trip unchanged at the root and within each route object.
+
+func parseNotificationPolicyRoot(body []byte) (map[string]json.RawMessage, error) {
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil, fmt.Errorf("error parsing notification policies: %v", err)
+	}
+	if root == nil {
+		root = map[string]json.RawMessage{}
+	}
+	return root, nil
+}
+
+func marshalNotificationPolicyRoot(root map[string]json.RawMessage) ([]byte, error) {
+	data, err := json.Marshal(root)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling notification policies: %v", err)
+	}
+	return data, nil
+}
+
+func getChildRoutes(root map[string]json.RawMessage) ([]json.RawMessage, error) {
+	raw, ok := root["routes"]
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var routes []json.RawMessage
+	if err := json.Unmarshal(raw, &routes); err != nil {
+		return nil, fmt.Errorf("error parsing routes array: %v", err)
+	}
+	return routes, nil
+}
+
+func setChildRoutes(root map[string]json.RawMessage, routes []json.RawMessage) error {
+	encoded, err := json.Marshal(routes)
+	if err != nil {
+		return err
+	}
+	root["routes"] = encoded
+	return nil
+}
+
+type routeReceiverField struct {
+	Receiver string `json:"receiver"`
+}
+
+func routeReceiverName(route json.RawMessage) (string, error) {
+	var r routeReceiverField
+	if err := json.Unmarshal(route, &r); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(r.Receiver), nil
+}
+
+func removeRoutesForReceiverRaw(routes []json.RawMessage, receiver string) ([]json.RawMessage, error) {
+	if len(routes) == 0 {
+		return nil, nil
+	}
+	out := make([]json.RawMessage, 0, len(routes))
+	for _, route := range routes {
+		name, err := routeReceiverName(route)
+		if err != nil {
+			return nil, err
+		}
+		if name != receiver {
+			out = append(out, route)
+		}
+	}
+	return out, nil
+}
+
+type superplaneNotificationRoute struct {
+	Receiver       string     `json:"receiver"`
+	Continue       bool       `json:"continue,omitempty"`
+	ObjectMatchers [][]string `json:"object_matchers,omitempty"`
+}
+
+func (c *Client) getNotificationPolicies() (map[string]json.RawMessage, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/policies", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting notification policies: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana get notification policies", status, responseBody)
+	}
+	return parseNotificationPolicyRoot(responseBody)
+}
+
+func (c *Client) putNotificationPolicies(root map[string]json.RawMessage) error {
+	data, err := marshalNotificationPolicyRoot(root)
+	if err != nil {
+		return err
+	}
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPut, "/api/v1/provisioning/policies",
+		bytes.NewReader(data), "application/json",
+		map[string]string{"X-Disable-Provenance": "true"},
+	)
+	if err != nil {
+		return fmt.Errorf("error updating notification policies: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return newAPIStatusError("grafana put notification policies", status, responseBody)
+	}
+	return nil
+}
+
+// UpsertNotificationPolicyRoute ensures a child route for contactPointName exists at the
+// root of the policy tree. If alertNamePredicates is non-empty, object_matchers are built
+// from the predicates: positive predicates (equals, matches) are combined into a single
+// =~ regex OR pattern; negative predicates (notEquals) become individual != matchers.
+// The route has continue=true so other routes still fire.
+func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNamePredicates []configuration.Predicate) error {
+	root, err := c.getNotificationPolicies()
+	if err != nil {
+		return err
+	}
+
+	routes, err := getChildRoutes(root)
+	if err != nil {
+		return err
+	}
+
+	filtered, err := removeRoutesForReceiverRaw(routes, contactPointName)
+	if err != nil {
+		return err
+	}
+
+	route := superplaneNotificationRoute{
+		Receiver: contactPointName,
+		Continue: true,
+	}
+	if len(alertNamePredicates) > 0 {
+		route.ObjectMatchers = buildAlertNameMatchers(alertNamePredicates)
+	}
+
+	routeBytes, err := json.Marshal(route)
+	if err != nil {
+		return fmt.Errorf("error marshaling notification route: %v", err)
+	}
+
+	// Prepend so our route takes priority over catch-alls.
+	newRoutes := append([]json.RawMessage{routeBytes}, filtered...)
+	if err := setChildRoutes(root, newRoutes); err != nil {
+		return err
+	}
+	return c.putNotificationPolicies(root)
+}
+
+func (c *Client) ListAlertRules() ([]AlertRuleSummary, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/alert-rules", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing alert rules: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule list", status, responseBody)
+	}
+
+	var rules []AlertRuleSummary
+	if err := json.Unmarshal(responseBody, &rules); err != nil {
+		return nil, fmt.Errorf("error parsing alert rules response: %v", err)
+	}
+
+	return rules, nil
+}
+
+func (c *Client) GetAlertRule(uid string) (map[string]any, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule get", status, responseBody)
+	}
+
+	var rule map[string]any
+	if err := json.Unmarshal(responseBody, &rule); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return rule, nil
+}
+
+func (c *Client) CreateAlertRule(rule map[string]any) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPost,
+		"/api/v1/provisioning/alert-rules",
+		bytes.NewReader(body),
+		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule create", status, responseBody)
+	}
+
+	var created map[string]any
+	if err := json.Unmarshal(responseBody, &created); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return created, nil
+}
+
+func (c *Client) UpdateAlertRule(uid string, rule map[string]any) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPut,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid),
+		bytes.NewReader(body),
+		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error updating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule update", status, responseBody)
+	}
+
+	var updated map[string]any
+	if err := json.Unmarshal(responseBody, &updated); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return updated, nil
+}
+
+// combinedPositiveAlertNameRegex builds the =~ pattern Grafana uses for object_matchers on
+// alertname: full-string match with positive predicates OR'd inside one alternation.
+// Must stay aligned with alertLabelNameMatchesPredicates in on_alert_firing.go.
+func combinedPositiveAlertNameRegex(predicates []configuration.Predicate) (string, bool) {
+	var parts []string
+	for _, p := range predicates {
+		switch p.Type {
+		case configuration.PredicateTypeEquals:
+			parts = append(parts, regexp.QuoteMeta(p.Value))
+		case configuration.PredicateTypeMatches:
+			parts = append(parts, p.Value)
+		}
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	// Grafana =~ applies the regex as a full-string match (same as anchoring the alternation).
+	return "^(?:" + strings.Join(parts, "|") + ")$", true
+}
+
+// buildAlertNameMatchers converts predicates into Grafana object_matchers entries.
+// Positive predicates (equals, matches) are combined into one =~ matcher (OR inside the regex);
+// negative predicates (notEquals) become separate != matchers. Grafana ANDs matchers together.
+func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
+	var matchers [][]string
+
+	for _, p := range predicates {
+		if p.Type == configuration.PredicateTypeNotEquals {
+			matchers = append(matchers, []string{"alertname", "!=", p.Value})
+		}
+	}
+
+	combined, ok := combinedPositiveAlertNameRegex(predicates)
+	if ok {
+		matchers = append([][]string{{"alertname", "=~", combined}}, matchers...)
+	}
+
+	return matchers
+}
+
+// RemoveNotificationPolicyRoute removes any child route for contactPointName from the
+// root of the policy tree. No-op if no such route exists.
+func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
+	root, err := c.getNotificationPolicies()
+	if err != nil {
+		return err
+	}
+
+	routes, err := getChildRoutes(root)
+	if err != nil {
+		return err
+	}
+
+	filtered, err := removeRoutesForReceiverRaw(routes, contactPointName)
+	if err != nil {
+		return err
+	}
+	if len(filtered) == len(routes) {
+		return nil // nothing to remove
+	}
+
+	if err := setChildRoutes(root, filtered); err != nil {
+		return err
+	}
+	return c.putNotificationPolicies(root)
+}
+
 func (c *Client) ListDataSources() ([]DataSource, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/datasources", nil, "")
 	if err != nil {
@@ -342,4 +670,22 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	}
 
 	return sources, nil
+}
+
+func (c *Client) ListFolders() ([]Folder, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing folders: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana folder list", status, responseBody)
+	}
+
+	var folders []Folder
+	if err := json.Unmarshal(responseBody, &folders); err != nil {
+		return nil, fmt.Errorf("error parsing folders response: %v", err)
+	}
+
+	return folders, nil
 }

@@ -10,6 +10,7 @@ import (
 )
 
 const resourceTypeDataSource = "data-source"
+const resourceTypeAlertRule = "alert-rule"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -30,23 +31,22 @@ func (g *Grafana) Icon() string {
 }
 
 func (g *Grafana) Description() string {
-	return "Connect Grafana alerts and data queries to SuperPlane workflows"
+	return "Connect Grafana alerts, alert rules, and data queries to SuperPlane workflows"
 }
 
 func (g *Grafana) Instructions() string {
 	return `
-To connect Grafana:
-1. In Grafana, go to Administration > Users and access > Service accounts.
-2. Create a Service Account and assign a role (Viewer/Editor/Admin as needed).
-3. Open the Service Account and create a token. Copy it immediately.
-4. (Legacy Grafana) If Service Accounts are unavailable, use an API key.
-5. Set the Base URL to your Grafana instance (e.g. https://grafana.example.com).
-6. Paste the token into SuperPlane and save.
 
-For the alert trigger:
-1. SuperPlane will attempt to automatically create/update a Grafana Webhook contact point.
-2. Route your alert rule to the contact point created by SuperPlane.
-3. If auto-provisioning is not available (permissions/API limitations), create a Webhook contact point manually using the webhook URL from SuperPlane.
+**Setup steps:**
+1. In Grafana, go to **Administration → Users and access → Service Accounts**, select **Add service account**. 
+
+   > **Service Account Role:**  
+   > While naming the service account, go to **Roles → Basic roles** and select **Admin**.
+
+	Navigate to the created service account and select **Add service account token**. Name it and set an expiration period then click **Generate token**. This is your **Service Account Token**.
+
+2. Use your Grafana root URL as **Base URL** (for example ` + "`https://grafana.example.com`" + `).
+3. Fill in **Base URL** and **Service Account Token** below, then save.
 `
 }
 
@@ -56,14 +56,14 @@ func (g *Grafana) Configuration() []configuration.Field {
 			Name:        "baseURL",
 			Label:       "Base URL",
 			Type:        configuration.FieldTypeString,
-			Description: "Your Grafana base URL (e.g. https://grafana.example.com)",
+			Description: "Your Grafana base URL (e.g. https://grafana.example.com or https://example.grafana.net)",
 			Required:    true,
 		},
 		{
 			Name:        "apiToken",
-			Label:       "API Token",
+			Label:       "Service Account Token",
 			Type:        configuration.FieldTypeString,
-			Description: "Grafana API key or service account token",
+			Description: "Grafana service account token with access to query data sources and manage alerting webhooks",
 			Sensitive:   true,
 			Required:    false,
 		},
@@ -80,7 +80,10 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
+		&CreateAlertRule{},
+		&GetAlertRule{},
 		&QueryDataSource{},
+		&UpdateAlertRule{},
 	}
 }
 
@@ -108,38 +111,91 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeDataSource {
-		return []core.IntegrationResource{}, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	dataSources, err := client.ListDataSources()
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(dataSources))
-	for _, source := range dataSources {
-		id := strings.TrimSpace(source.UID)
-		if id == "" {
-			continue
+	switch resourceType {
+	case resourceTypeFolder:
+		folders, err := client.ListFolders()
+		if err != nil {
+			return nil, err
 		}
 
-		name := strings.TrimSpace(source.Name)
-		if name == "" {
-			name = id
+		resources := make([]core.IntegrationResource, 0, len(folders))
+		for _, folder := range folders {
+			id := strings.TrimSpace(folder.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(folder.Title)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeFolder,
+				Name: name,
+				ID:   id,
+			})
 		}
 
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceTypeDataSource,
-			Name: name,
-			ID:   id,
-		})
-	}
+		return resources, nil
+	case resourceTypeDataSource:
+		dataSources, err := client.ListDataSources()
+		if err != nil {
+			return nil, err
+		}
 
-	return resources, nil
+		resources := make([]core.IntegrationResource, 0, len(dataSources))
+		for _, source := range dataSources {
+			id := strings.TrimSpace(source.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(source.Name)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeDataSource,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+	case resourceTypeAlertRule:
+		alertRules, err := client.ListAlertRules()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(alertRules))
+		for _, rule := range alertRules {
+			id := strings.TrimSpace(rule.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(rule.Title)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeAlertRule,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+	default:
+		return []core.IntegrationResource{}, nil
+	}
 }
