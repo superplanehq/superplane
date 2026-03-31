@@ -38,8 +38,8 @@ func Test__UpdateOktaIdpSettings_CreateAndPatch(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, st.Code())
 
 	resp, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		SamlIdpSsoUrl:        &ssoURL,
-		SamlIdpIssuer:        &issuer,
+		SamlIdpSsoUrl:         &ssoURL,
+		SamlIdpIssuer:         &issuer,
 		SamlIdpCertificatePem: &cert,
 	})
 	require.NoError(t, err)
@@ -117,10 +117,10 @@ func Test__UpdateOktaIdpSettings_SAMLEnablesOrgProvider(t *testing.T) {
 	cert := "-----BEGIN CERTIFICATE-----\nMIICmDCCAYAC\n-----END CERTIFICATE-----"
 	samlOn := true
 	_, err := UpdateOktaIdpSettings(r.Organization.ID.String(), &pb.UpdateOktaIdpSettingsRequest{
-		SamlIdpSsoUrl:        &ssoURL,
-		SamlIdpIssuer:        &issuer,
+		SamlIdpSsoUrl:         &ssoURL,
+		SamlIdpIssuer:         &issuer,
 		SamlIdpCertificatePem: &cert,
-		SamlEnabled:          &samlOn,
+		SamlEnabled:           &samlOn,
 	})
 	require.NoError(t, err)
 
