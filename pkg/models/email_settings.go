@@ -52,3 +52,11 @@ func FindEmailSettingsInTransaction(tx *gorm.DB, provider string) (*EmailSetting
 
 	return &settings, nil
 }
+
+func DeleteEmailSettings(provider string) error {
+	return DeleteEmailSettingsInTransaction(database.Conn(), provider)
+}
+
+func DeleteEmailSettingsInTransaction(tx *gorm.DB, provider string) error {
+	return tx.Where("provider = ?", provider).Delete(&EmailSettings{}).Error
+}

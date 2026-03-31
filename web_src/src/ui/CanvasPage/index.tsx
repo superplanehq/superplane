@@ -15,26 +15,25 @@ import {
 } from "@xyflow/react";
 
 import {
+  ChevronsDownUp,
+  ChevronsUpDown,
   CircleX,
   GitBranch,
   Group,
+  LayoutDashboard,
   Loader2,
-  Map as MapIcon,
   Play,
-  ScanLine,
-  ScanText,
   Copy,
   LayoutGrid,
   Trash2,
   TriangleAlert,
-  Workflow,
 } from "lucide-react";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 
 import {
   ConfigurationField,
@@ -63,14 +62,12 @@ import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
 import { Block, BlockData } from "./Block";
 import { GroupNode } from "../groupNode";
-import { CanvasMiniMap } from "./CanvasMiniMap";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
 import { Simulation } from "./storybooks/useSimulation";
 import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { useMinimapVisibility } from "./useMinimapVisibility";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
@@ -385,7 +382,11 @@ const MIN_CANVAS_ZOOM = 0.1;
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
  */
-function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) {
+const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
+  data: BlockData & { _callbacksRef?: any };
+  id: string;
+  selected?: boolean;
+}) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
 
@@ -424,9 +425,9 @@ function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: an
       onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
     />
   );
-}
+});
 
-function GroupNodeRenderer(nodeProps: {
+const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
   data: BlockData & { _callbacksRef?: any };
   id: string;
   selected?: boolean;
@@ -460,7 +461,7 @@ function GroupNodeRenderer(nodeProps: {
       />
     </div>
   );
-}
+});
 
 const nodeTypes = {
   default: DefaultNodeRenderer,
@@ -1186,7 +1187,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onRunNodeSelect={props.onRunNodeSelect}
                 onRunExecutionSelect={props.onRunExecutionSelect}
                 onAcknowledgeErrors={props.onAcknowledgeErrors}
-                title={props.title}
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
                 canCreateIntegrations={props.canCreateIntegrations}
@@ -1836,7 +1836,6 @@ function CanvasContent({
   onRunNodeSelect,
   onRunExecutionSelect,
   onAcknowledgeErrors,
-  title,
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
@@ -1942,7 +1941,6 @@ function CanvasContent({
     triggerEvent?: SidebarEvent;
   }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
-  title?: string;
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
@@ -2023,8 +2021,6 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const { isMinimapVisible, setIsMinimapVisible } = useMinimapVisibility(false);
-
   useEffect(() => {
     if (showBottomStatusControls) {
       localStorage.setItem(CONSOLE_OPEN_STORAGE_KEY, String(isLogSidebarOpen));
@@ -2534,12 +2530,18 @@ function CanvasContent({
         _hasHighlightedNodes: hasHighlightedNodes,
       },
     }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, hasMultiSelection]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
 
   const edgeTypes = useMemo(
     () => ({
       custom: CustomEdge,
     }),
+    [],
+  );
+  const onEdgesChangeRef = useRef(state.onEdgesChange);
+  onEdgesChangeRef.current = state.onEdgesChange;
+  const stableEdgeDelete = useCallback(
+    (edgeId: string) => onEdgesChangeRef.current([{ id: edgeId, type: "remove" }]),
     [],
   );
   const styledEdges = useMemo(
@@ -2550,11 +2552,11 @@ function CanvasContent({
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
-          onDelete: isReadOnly ? undefined : (edgeId: string) => state.onEdgesChange([{ id: edgeId, type: "remove" }]),
+          onDelete: isReadOnly ? undefined : stableEdgeDelete,
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, state.onEdgesChange, isReadOnly],
+    [state.edges, hoveredEdgeId, stableEdgeDelete, isReadOnly],
   );
 
   const handleNodesChange = useCallback(
@@ -2584,7 +2586,7 @@ function CanvasContent({
 
       resizeGroupsAfterChildChanges(changes, stateRef.current.nodes ?? [], state.setNodes);
     },
-    [isReadOnly, state],
+    [isReadOnly, state.onNodesChange, state.setNodes],
   );
 
   const handleEdgesChange = useCallback(
@@ -2599,7 +2601,7 @@ function CanvasContent({
         state.onEdgesChange(filteredChanges);
       }
     },
-    [isReadOnly, state],
+    [isReadOnly, state.onEdgesChange],
   );
 
   const logCounts = useMemo(() => {
@@ -2727,7 +2729,6 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-            <CanvasMiniMap nodes={state.nodes} edges={state.edges} isVisible={isMinimapVisible} />
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
@@ -2771,34 +2772,17 @@ function CanvasContent({
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
-                  screenshotName={title}
                   isSnapToGridEnabled={isSnapToGridEnabled}
                   onSnapToGridToggle={() => setIsSnapToGridEnabled((prev) => !prev)}
-                  leadingContent={
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={isMinimapVisible ? "secondary" : "ghost"}
-                          size="sm"
-                          className={`h-8 w-8 px-0 ${
-                            isMinimapVisible
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
-                          onClick={() => setIsMinimapVisible((prev: boolean) => !prev)}
-                          aria-pressed={isMinimapVisible}
-                        >
-                          <MapIcon className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>{isMinimapVisible ? "Hide minimap" : "Show minimap"}</TooltipContent>
-                    </Tooltip>
-                  }
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button variant="ghost" size="icon-sm" onClick={handleToggleCollapse}>
-                        {state.isCollapsed ? <ScanText className="h-3 w-3" /> : <ScanLine className="h-3 w-3" />}
+                        {state.isCollapsed ? (
+                          <ChevronsUpDown className="h-3 w-3" />
+                        ) : (
+                          <ChevronsDownUp className="h-3 w-3" />
+                        )}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -2811,18 +2795,18 @@ function CanvasContent({
                     <TooltipTrigger asChild>
                       <span className="inline-flex">
                         <Button
-                          variant={isAutoLayoutOnUpdateEnabled ? "secondary" : "ghost"}
+                          variant="ghost"
                           size="sm"
-                          className={`h-8 w-8 px-0 ${
-                            isAutoLayoutOnUpdateEnabled
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "text-slate-600 hover:text-slate-900"
-                          }`}
+                          className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
                           onClick={handleToggleAutoLayoutOnUpdate}
                           disabled={isAutoLayoutToggleDisabled}
                           aria-pressed={isAutoLayoutOnUpdateEnabled}
                         >
-                          <Workflow className="h-3 w-3" />
+                          {isAutoLayoutOnUpdateEnabled ? (
+                            <LayoutGrid className="h-3 w-3" />
+                          ) : (
+                            <LayoutDashboard className="h-3 w-3" />
+                          )}
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -2865,13 +2849,13 @@ function CanvasContent({
                           ) : (
                             <Play className="h-3 w-3" />
                           )}
-                          <span
-                            className={cn(
-                              "tabular-nums",
-                              runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800",
-                            )}
-                          >
-                            {runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total}
+                          <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
+                            Runs ·{" "}
+                            <span className="tabular-nums">
+                              {(runsCountInfo.running > 0 ? runsCountInfo.running : runsCountInfo.total).toLocaleString(
+                                "en-US",
+                              )}
+                            </span>
                           </span>
                         </Button>
                       </TooltipTrigger>
