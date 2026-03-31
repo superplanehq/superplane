@@ -56,9 +56,15 @@ func (c *ListEventsCommand) listNodeEvents(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		events := response.GetEvents()
+		if len(events) == 0 {
+			_, err := fmt.Fprintln(stdout, "No events found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tCHANNEL\tCREATED_AT")
-		for _, event := range response.GetEvents() {
+		for _, event := range events {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\n",
@@ -104,9 +110,15 @@ func (c *ListEventsCommand) listCanvasEvents(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		events := response.GetEvents()
+		if len(events) == 0 {
+			_, err := fmt.Fprintln(stdout, "No events found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tNODE_ID\tCHANNEL\tEXECUTIONS\tCREATED_AT")
-		for _, event := range response.GetEvents() {
+		for _, event := range events {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%d\t%s\n",
