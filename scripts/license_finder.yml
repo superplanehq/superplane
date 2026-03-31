@@ -74,7 +74,7 @@
     :versions: []
     :when: 2025-12-23 15:02:58.461300000 Z
 - - :approve
-  - beevik/etree
+  - github.com/beevik/etree
   - :who: Igor Sarcevic
     :why: It is BSD, 2-clause
     :versions: []
