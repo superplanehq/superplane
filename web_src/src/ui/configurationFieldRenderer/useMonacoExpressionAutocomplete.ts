@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Monaco } from "@monaco-editor/react";
-import type { editor as MonacoEditor, IDisposable, languages as MonacoLanguages } from "monaco-editor";
+import type { editor as MonacoEditor, IDisposable, IPosition, languages as MonacoLanguages } from "monaco-editor";
 import { getSuggestions } from "@/components/AutoCompleteInput/core";
 
 type ModelContext = {
@@ -200,7 +200,7 @@ export const useMonacoExpressionAutocomplete = ({
       if (!providerRegistry.has(languageId)) {
         const disposable = monaco.languages.registerCompletionItemProvider(languageId, {
           triggerCharacters: ["$", ".", "[", "'", '"'],
-          provideCompletionItems: (completionModel, position) => {
+          provideCompletionItems: (completionModel: MonacoEditor.ITextModel, position: IPosition) => {
             const context = modelContextMap.get(completionModel);
             if (!context) {
               return { suggestions: [] };
