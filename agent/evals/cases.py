@@ -106,5 +106,22 @@ dataset = Dataset(
                 ),
             ],
         ),
+        Case(
+            name="github_pr_close_long_open_filter",
+            inputs=(
+                "When a GitHub pull request is closed, add a filter so the workflow only continues "
+                "if that PR had been open for more than an hour."
+            ),
+            evaluators=[
+                evals.CanvasHasTrigger("github.onPullRequest"),
+                evals.CanvasHasNode("filter", count=1),
+                evals.CanvasHasWorkflow(
+                    "github.onPullRequest",
+                    "...",
+                    "filter",
+                ),
+                evals.ContainsDatetimeExpression(),
+            ],
+        ),
     ],
 )
