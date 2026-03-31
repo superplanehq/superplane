@@ -9,7 +9,12 @@ import {
   CanvasesListNodeQueueItemsResponse,
   CanvasesListNodeEventsResponse,
 } from "@/api-client";
-import { nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, nodeEventsQueryOptions } from "@/hooks/useCanvasData";
+import {
+  NODE_EXECUTION_HISTORY_PAGE_SIZE,
+  nodeExecutionsQueryOptions,
+  nodeQueueItemsQueryOptions,
+  nodeEventsQueryOptions,
+} from "@/hooks/useCanvasData";
 
 interface NodeExecutionData {
   executions: CanvasesCanvasNodeExecution[];
@@ -161,7 +166,9 @@ async function fetchNodeData(
 ): Promise<[CanvasesListNodeExecutionsResponse, CanvasesListNodeQueueItemsResponse, CanvasesListNodeEventsResponse]> {
   return await Promise.all([
     nodeType !== "TYPE_TRIGGER"
-      ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
+      ? queryClient.fetchQuery(
+          nodeExecutionsQueryOptions(workflowId, nodeId, { limit: NODE_EXECUTION_HISTORY_PAGE_SIZE }),
+        )
       : Promise.resolve({ executions: [] }),
     nodeType !== "TYPE_TRIGGER"
       ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
@@ -291,7 +298,9 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         CanvasesListNodeEventsResponse,
       ] = await Promise.all([
         nodeType !== "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
+          ? queryClient.fetchQuery(
+              nodeExecutionsQueryOptions(workflowId, nodeId, { limit: NODE_EXECUTION_HISTORY_PAGE_SIZE }),
+            )
           : Promise.resolve({ executions: [] }),
         nodeType !== "TYPE_TRIGGER"
           ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
