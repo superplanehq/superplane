@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
-import { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { canvasKeys } from "./useCanvasData";
 

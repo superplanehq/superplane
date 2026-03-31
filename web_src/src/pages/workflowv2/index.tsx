@@ -4081,7 +4081,7 @@ export function WorkflowPageV2() {
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
         showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
       } catch (error) {
-        let parsedError = error as { message: string };
+        const parsedError = error as { message: string };
         if (parsedError?.message) {
           showErrorToast(parsedError.message);
         } else {
