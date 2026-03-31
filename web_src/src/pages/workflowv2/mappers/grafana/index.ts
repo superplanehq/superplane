@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, CustomFieldRenderer, TriggerRenderer, EventStateRegistry } from "../types";
+import type { ComponentBaseMapper, CustomFieldRenderer, TriggerRenderer, EventStateRegistry } from "../types";
 import { buildActionStateRegistry } from "../utils";
 import { onAlertFiringTriggerRenderer } from "./on_alert_firing";
 import { queryDataSourceMapper } from "./query_data_source";
