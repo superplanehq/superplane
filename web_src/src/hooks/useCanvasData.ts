@@ -453,6 +453,8 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       nodes?: any[];
       edges?: any[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+      preserveLocalCanvasState?: boolean;
+      invalidateRelatedQueries?: boolean;
     }) => {
       const body = {
         canvas: {
@@ -518,40 +520,44 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         return next;
       });
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
-        if (!current) {
-          return current;
-        }
-
-        // When the server computed a new layout (autoLayout), accept the
-        // server positions as authoritative.  Otherwise preserve current
-        // local node positions to avoid overwriting positions that changed
-        // while the save was in flight.
-        if (variables.autoLayout) {
-          return { ...current, spec: version.spec };
-        }
-
-        const currentPositionsByNodeId = new Map(
-          (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
-        );
-
-        const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
-          const localPosition = currentPositionsByNodeId.get(serverNode.id);
-          if (localPosition) {
-            return { ...serverNode, position: localPosition };
+      if (!variables.preserveLocalCanvasState) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
+          if (!current) {
+            return current;
           }
-          return serverNode;
+
+          // When the server computed a new layout (autoLayout), accept the
+          // server positions as authoritative. Otherwise preserve current
+          // local node positions to avoid overwriting positions that changed
+          // while the save was in flight.
+          if (variables.autoLayout) {
+            return { ...current, spec: version.spec };
+          }
+
+          const currentPositionsByNodeId = new Map(
+            (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
+          );
+
+          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
+            const localPosition = currentPositionsByNodeId.get(serverNode.id);
+            if (localPosition) {
+              return { ...serverNode, position: localPosition };
+            }
+            return serverNode;
+          });
+
+          return {
+            ...current,
+            spec: { ...version.spec, nodes: mergedNodes },
+          };
         });
+      }
 
-        return {
-          ...current,
-          spec: { ...version.spec, nodes: mergedNodes },
-        };
-      });
-
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      if (variables.invalidateRelatedQueries !== false) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      }
     },
   });
 };
