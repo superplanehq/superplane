@@ -10,6 +10,24 @@ export const setupApiInterceptor = (): void => {
     const response = await originalFetch(input, init);
 
     if (response.status === 401 && isApiRequest(input)) {
+      // Check for a SAML-specific 401 before falling back to the generic login redirect.
+      // When the server returns {"error":"saml_auth_required","login_url":"..."} it means
+      // the target org requires authentication via its own Okta SSO, not a generic login.
+      let samlLoginUrl: string | null = null;
+      try {
+        const body = await response.clone().json();
+        if (body?.error === "saml_auth_required" && body?.login_url) {
+          samlLoginUrl = body.login_url;
+        }
+      } catch {
+        // Not JSON — fall through to normal 401 handling
+      }
+
+      if (samlLoginUrl) {
+        window.location.href = samlLoginUrl;
+        throw new Error("SAMLAuthRequired");
+      }
+
       if (!isAuthRoute(window.location.pathname)) {
         const redirectTarget = `${window.location.pathname}${window.location.search}`;
         const redirectParam = encodeURIComponent(redirectTarget);
