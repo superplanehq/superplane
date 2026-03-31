@@ -1151,17 +1151,6 @@ export function WorkflowPageV2() {
     return release;
   }, []);
 
-  const registerIgnoredCanvasUpdatedEchoIfNeeded = useCallback(
-    (savingVersionId?: string) => {
-      if (savingVersionId) {
-        return () => undefined;
-      }
-
-      return registerIgnoredCanvasUpdatedEcho();
-    },
-    [registerIgnoredCanvasUpdatedEcho],
-  );
-
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
     if (!release) {
@@ -1268,7 +1257,7 @@ export function WorkflowPageV2() {
 
       const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
       const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
-      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEchoIfNeeded(request.savingVersionId);
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEcho();
 
       try {
         const response = await updateCanvasVersionMutation.mutateAsync({
@@ -1310,7 +1299,7 @@ export function WorkflowPageV2() {
     },
     [
       liveCanvasVersionId,
-      registerIgnoredCanvasUpdatedEchoIfNeeded,
+      registerIgnoredCanvasUpdatedEcho,
       registerIgnoredCanvasVersionUpdatedEcho,
       saveMatchesCurrentCanvas,
       syncCurrentCanvasWithSavedVersion,
