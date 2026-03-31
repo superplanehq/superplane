@@ -804,6 +804,18 @@ export function WorkflowPageV2() {
   }, [canvas]);
 
   useEffect(() => {
+    const queuedRequest = queuedCanvasSaveRef.current;
+    if (queuedRequest) {
+      queuedCanvasSaveRef.current = null;
+      queuedRequest.resolve({
+        status: "replaced",
+        workflow: queuedRequest.workflow,
+        savingVersionId: queuedRequest.savingVersionId,
+        matchesCurrentCanvas: false,
+        hasQueuedFollowUp: false,
+      });
+    }
+
     setHasUnsavedChanges(false);
     setHasNonPositionalUnsavedChanges(false);
     setInitialWorkflowSnapshot(null);
@@ -813,7 +825,6 @@ export function WorkflowPageV2() {
     lastSavedWorkflowRef.current = null;
     ignoredCanvasUpdatedEventsRef.current = 0;
     ignoredCanvasVersionUpdatedEventsRef.current.clear();
-    queuedCanvasSaveRef.current = null;
     isDrainingCanvasSaveQueueRef.current = false;
     setIsCanvasSaveInFlight(false);
     setIsCanvasSaveQueued(false);
