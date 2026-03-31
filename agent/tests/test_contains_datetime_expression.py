@@ -60,6 +60,30 @@ def test_contains_datetime_expression_passes_date_and_duration_without_subtracti
     assert ev.evaluate(_ctx(_answer_with_expression(expr))).value is True
 
 
+def test_contains_datetime_expression_passes_two_iso_dates_compared() -> None:
+    ev = ContainsDatetimeExpression()
+    expr = 'date("2024-01-01") > date("2024-02-01")'
+    assert ev.evaluate(_ctx(_answer_with_expression(expr))).value is True
+
+
+def test_contains_datetime_expression_passes_two_dates_equality() -> None:
+    ev = ContainsDatetimeExpression()
+    expr = "date(a) == date(b)"
+    assert ev.evaluate(_ctx(_answer_with_expression(expr))).value is True
+
+
+def test_contains_datetime_expression_fails_two_dates_without_infix_between() -> None:
+    ev = ContainsDatetimeExpression()
+    expr = "date(a) && date(b)"
+    assert ev.evaluate(_ctx(_answer_with_expression(expr))).value is False
+
+
+def test_contains_datetime_expression_passes_iso_strings_with_actual_subtraction() -> None:
+    ev = ContainsDatetimeExpression()
+    expr = 'date("2024-02-01") - date("2024-01-01") > duration("1h")'
+    assert ev.evaluate(_ctx(_answer_with_expression(expr))).value is True
+
+
 def test_contains_datetime_expression_fails_plain_expression() -> None:
     ev = ContainsDatetimeExpression()
     expr = "payload.action == \"closed\""
