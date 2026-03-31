@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
@@ -20,6 +22,14 @@ type paginatedResponse struct {
 	Total  int64 `json:"total"`
 	Limit  int   `json:"limit"`
 	Offset int   `json:"offset"`
+}
+
+type installationNetworkSettingsResponse struct {
+	AllowPrivateNetworkAccess  bool     `json:"allow_private_network_access"`
+	EffectiveBlockedHTTPHosts  []string `json:"effective_blocked_http_hosts"`
+	EffectivePrivateIPRanges   []string `json:"effective_private_ip_ranges"`
+	BlockedHTTPHostsOverridden bool     `json:"blocked_http_hosts_overridden"`
+	PrivateIPRangesOverridden  bool     `json:"private_ip_ranges_overridden"`
 }
 
 func parsePagination(r *http.Request) (search string, limit, offset int) {
@@ -38,6 +48,67 @@ func parsePagination(r *http.Request) (search string, limit, offset int) {
 	}
 
 	return search, limit, offset
+}
+
+func (s *Server) adminGetInstallationNetworkSettings(w http.ResponseWriter, r *http.Request) {
+	policy, err := networkpolicy.ResolveHTTPPolicy()
+	if err != nil {
+		log.Errorf("admin: failed to load installation network settings: %v", err)
+		http.Error(w, "Failed to load installation network settings", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, installationNetworkSettingsResponse{
+		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
+		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
+		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
+		BlockedHTTPHostsOverridden: policy.BlockedHostsOverridden,
+		PrivateIPRangesOverridden:  policy.PrivateIPRangesOverridden,
+	})
+}
+
+func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AllowPrivateNetworkAccess bool `json:"allow_private_network_access"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	metadata, err := models.GetInstallationMetadata()
+	if err != nil {
+		log.Errorf("admin: failed to load installation metadata: %v", err)
+		http.Error(w, "Failed to update installation network settings", http.StatusInternalServerError)
+		return
+	}
+
+	metadata.AllowPrivateNetworkAccess = req.AllowPrivateNetworkAccess
+	metadata.UpdatedAt = time.Now()
+
+	if err := models.UpdateInstallationMetadata(metadata); err != nil {
+		log.Errorf("admin: failed to update installation network settings: %v", err)
+		http.Error(w, "Failed to update installation network settings", http.StatusInternalServerError)
+		return
+	}
+
+	s.registry.HTTPContext().InvalidatePolicyCache()
+
+	policy, err := networkpolicy.ResolveHTTPPolicy()
+	if err != nil {
+		log.Errorf("admin: failed to load updated installation network settings: %v", err)
+		http.Error(w, "Failed to update installation network settings", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, installationNetworkSettingsResponse{
+		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
+		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
+		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
+		BlockedHTTPHostsOverridden: policy.BlockedHostsOverridden,
+		PrivateIPRangesOverridden:  policy.PrivateIPRangesOverridden,
+	})
 }
 
 // adminListOrganizations returns paginated organizations in the installation.
