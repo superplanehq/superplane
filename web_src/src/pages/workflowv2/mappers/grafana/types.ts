@@ -39,6 +39,7 @@ export interface GrafanaAlertRule {
   uid?: string;
   title?: string;
   folderUID?: string;
+  folderTitle?: string;
   ruleGroup?: string;
   condition?: string;
   noDataState?: string;
@@ -50,9 +51,19 @@ export interface GrafanaAlertRule {
   data?: Array<Record<string, unknown>>;
 }
 
+export interface GrafanaAlertRuleSummary {
+  uid?: string;
+  title?: string;
+}
+
 export interface AlertRuleKeyValuePair {
   key?: string;
   value?: string;
+}
+
+export interface AlertRuleNodeMetadata {
+  alertRuleTitle?: string;
+  folderTitle?: string;
 }
 
 export interface CreateAlertRuleConfiguration {
@@ -76,4 +87,18 @@ export interface GetAlertRuleConfiguration {
 
 export interface UpdateAlertRuleConfiguration extends CreateAlertRuleConfiguration {
   alertRuleUid: string;
+}
+
+export interface DeleteAlertRuleConfiguration {
+  alertRuleUid: string;
+}
+
+export interface DeleteAlertRuleOutput {
+  uid?: string;
+  title?: string;
+  deleted?: boolean;
+}
+
+export interface ListAlertRulesOutput {
+  alertRules?: GrafanaAlertRuleSummary[];
 }

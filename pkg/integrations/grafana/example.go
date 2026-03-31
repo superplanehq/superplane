@@ -19,6 +19,12 @@ var exampleOutputGetAlertRuleBytes []byte
 //go:embed example_output_update_alert_rule.json
 var exampleOutputUpdateAlertRuleBytes []byte
 
+//go:embed example_output_delete_alert_rule.json
+var exampleOutputDeleteAlertRuleBytes []byte
+
+//go:embed example_output_list_alert_rules.json
+var exampleOutputListAlertRulesBytes []byte
+
 //go:embed example_data_on_alert_firing.json
 var exampleDataOnAlertFiringBytes []byte
 
@@ -33,6 +39,12 @@ var exampleOutputGetAlertRule map[string]any
 
 var exampleOutputUpdateAlertRuleOnce sync.Once
 var exampleOutputUpdateAlertRule map[string]any
+
+var exampleOutputDeleteAlertRuleOnce sync.Once
+var exampleOutputDeleteAlertRule map[string]any
+
+var exampleOutputListAlertRulesOnce sync.Once
+var exampleOutputListAlertRules map[string]any
 
 var exampleDataOnAlertFiringOnce sync.Once
 var exampleDataOnAlertFiring map[string]any
@@ -62,6 +74,22 @@ func (c *UpdateAlertRule) ExampleOutput() map[string]any {
 		&exampleOutputUpdateAlertRuleOnce,
 		exampleOutputUpdateAlertRuleBytes,
 		&exampleOutputUpdateAlertRule,
+	)
+}
+
+func (c *DeleteAlertRule) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteAlertRuleOnce,
+		exampleOutputDeleteAlertRuleBytes,
+		&exampleOutputDeleteAlertRule,
+	)
+}
+
+func (c *ListAlertRules) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputListAlertRulesOnce,
+		exampleOutputListAlertRulesBytes,
+		&exampleOutputListAlertRules,
 	)
 }
 

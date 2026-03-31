@@ -10,11 +10,10 @@ import (
 )
 
 const (
-	defaultAlertRuleCondition     = "A"
-	defaultAlertRuleLookback      = 300
-	defaultAlertRuleIntervalMS    = 1000
-	defaultAlertRuleMaxDataPoints = 43200
-	resourceTypeFolder            = "folder"
+	alertRuleConditionRefID  = "A"
+	alertRuleQueryIntervalMS = 1000
+	alertRuleMaxDataPoints   = 43200
+	resourceTypeFolder       = "folder"
 )
 
 type AlertRuleKeyValuePair struct {
@@ -42,18 +41,24 @@ type GetAlertRuleSpec struct {
 }
 
 type UpdateAlertRuleSpec struct {
-	AlertRuleUID        string `json:"alertRuleUid" mapstructure:"alertRuleUid"`
-	CreateAlertRuleSpec `mapstructure:",squash"`
+	AlertRuleUID    string                   `json:"alertRuleUid" mapstructure:"alertRuleUid"`
+	Title           *string                  `json:"title,omitempty" mapstructure:"title"`
+	FolderUID       *string                  `json:"folderUID,omitempty" mapstructure:"folderUID"`
+	RuleGroup       *string                  `json:"ruleGroup,omitempty" mapstructure:"ruleGroup"`
+	DataSourceUID   *string                  `json:"dataSourceUid,omitempty" mapstructure:"dataSourceUid"`
+	Query           *string                  `json:"query,omitempty" mapstructure:"query"`
+	LookbackSeconds *int                     `json:"lookbackSeconds,omitempty" mapstructure:"lookbackSeconds"`
+	For             *string                  `json:"for,omitempty" mapstructure:"for"`
+	NoDataState     *string                  `json:"noDataState,omitempty" mapstructure:"noDataState"`
+	ExecErrState    *string                  `json:"execErrState,omitempty" mapstructure:"execErrState"`
+	Labels          *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
+	Annotations     *[]AlertRuleKeyValuePair `json:"annotations,omitempty" mapstructure:"annotations"`
+	IsPaused        *bool                    `json:"isPaused,omitempty" mapstructure:"isPaused"`
 }
 
 func decodeCreateAlertRuleSpec(input any) (CreateAlertRuleSpec, error) {
-	spec := CreateAlertRuleSpec{
-		LookbackSeconds: defaultAlertRuleLookback,
-		For:             "5m",
-		NoDataState:     "NoData",
-		ExecErrState:    "Alerting",
-	}
-	if err := mapstructure.Decode(input, &spec); err != nil {
+	spec := CreateAlertRuleSpec{}
+	if err := decodeAlertRuleSpec(input, &spec); err != nil {
 		return CreateAlertRuleSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
@@ -62,7 +67,7 @@ func decodeCreateAlertRuleSpec(input any) (CreateAlertRuleSpec, error) {
 
 func decodeGetAlertRuleSpec(input any) (GetAlertRuleSpec, error) {
 	spec := GetAlertRuleSpec{}
-	if err := mapstructure.Decode(input, &spec); err != nil {
+	if err := decodeAlertRuleSpec(input, &spec); err != nil {
 		return GetAlertRuleSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
@@ -71,21 +76,25 @@ func decodeGetAlertRuleSpec(input any) (GetAlertRuleSpec, error) {
 }
 
 func decodeUpdateAlertRuleSpec(input any) (UpdateAlertRuleSpec, error) {
-	spec := UpdateAlertRuleSpec{
-		CreateAlertRuleSpec: CreateAlertRuleSpec{
-			LookbackSeconds: defaultAlertRuleLookback,
-			For:             "5m",
-			NoDataState:     "NoData",
-			ExecErrState:    "Alerting",
-		},
-	}
-	if err := mapstructure.Decode(input, &spec); err != nil {
+	spec := UpdateAlertRuleSpec{}
+	if err := decodeAlertRuleSpec(input, &spec); err != nil {
 		return UpdateAlertRuleSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	spec.AlertRuleUID = strings.TrimSpace(spec.AlertRuleUID)
-	spec.CreateAlertRuleSpec = sanitizeCreateAlertRuleSpec(spec.CreateAlertRuleSpec)
-	return spec, nil
+	return sanitizeUpdateAlertRuleSpec(spec), nil
+}
+
+func decodeAlertRuleSpec(input any, result any) error {
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           result,
+		TagName:          "mapstructure",
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	return decoder.Decode(input)
 }
 
 func sanitizeCreateAlertRuleSpec(spec CreateAlertRuleSpec) CreateAlertRuleSpec {
@@ -98,21 +107,29 @@ func sanitizeCreateAlertRuleSpec(spec CreateAlertRuleSpec) CreateAlertRuleSpec {
 	spec.NoDataState = strings.TrimSpace(spec.NoDataState)
 	spec.ExecErrState = strings.TrimSpace(spec.ExecErrState)
 
-	if spec.LookbackSeconds <= 0 {
-		spec.LookbackSeconds = defaultAlertRuleLookback
+	if spec.Labels != nil {
+		normalized := normalizeAlertRuleKeyValuePairs(*spec.Labels)
+		spec.Labels = &normalized
 	}
 
-	if spec.For == "" {
-		spec.For = "5m"
+	if spec.Annotations != nil {
+		normalized := normalizeAlertRuleKeyValuePairs(*spec.Annotations)
+		spec.Annotations = &normalized
 	}
 
-	if spec.NoDataState == "" {
-		spec.NoDataState = "NoData"
-	}
+	return spec
+}
 
-	if spec.ExecErrState == "" {
-		spec.ExecErrState = "Alerting"
-	}
+func sanitizeUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) UpdateAlertRuleSpec {
+	spec.AlertRuleUID = strings.TrimSpace(spec.AlertRuleUID)
+	spec.Title = sanitizeOptionalAlertRuleString(spec.Title)
+	spec.FolderUID = sanitizeOptionalAlertRuleString(spec.FolderUID)
+	spec.RuleGroup = sanitizeOptionalAlertRuleString(spec.RuleGroup)
+	spec.DataSourceUID = sanitizeOptionalAlertRuleString(spec.DataSourceUID)
+	spec.Query = sanitizeOptionalAlertRuleString(spec.Query)
+	spec.For = sanitizeOptionalAlertRuleString(spec.For)
+	spec.NoDataState = sanitizeOptionalAlertRuleString(spec.NoDataState)
+	spec.ExecErrState = sanitizeOptionalAlertRuleString(spec.ExecErrState)
 
 	if spec.Labels != nil {
 		normalized := normalizeAlertRuleKeyValuePairs(*spec.Labels)
@@ -125,6 +142,35 @@ func sanitizeCreateAlertRuleSpec(spec CreateAlertRuleSpec) CreateAlertRuleSpec {
 	}
 
 	return spec
+}
+
+func sanitizeOptionalAlertRuleString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil
+	}
+
+	return &trimmed
+}
+
+func validateAlertRuleUpdateSupport(rule map[string]any) error {
+	provenance, _ := rule["provenance"].(string)
+	provenance = strings.TrimSpace(provenance)
+	if provenance == "" || strings.EqualFold(provenance, "api") {
+		return nil
+	}
+
+	if strings.EqualFold(provenance, "file") {
+		return errors.New(
+			"file-provisioned Grafana alert rules cannot be updated via the provisioning API; update the provisioning file or recreate the rule as an API-managed rule",
+		)
+	}
+
+	return fmt.Errorf("Grafana alert rules with provenance %q cannot be updated via the provisioning API", provenance)
 }
 
 func validateCreateAlertRuleSpec(spec CreateAlertRuleSpec) error {
@@ -162,8 +208,29 @@ func validateUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) error {
 	if spec.AlertRuleUID == "" {
 		return errors.New("alertRuleUid is required")
 	}
+	if !spec.HasUpdates() {
+		return errors.New("at least one field to update must be provided")
+	}
+	if spec.LookbackSeconds != nil && *spec.LookbackSeconds <= 0 {
+		return errors.New("lookbackSeconds must be greater than 0")
+	}
 
-	return validateCreateAlertRuleSpec(spec.CreateAlertRuleSpec)
+	return nil
+}
+
+func (spec UpdateAlertRuleSpec) HasUpdates() bool {
+	return spec.Title != nil ||
+		spec.FolderUID != nil ||
+		spec.RuleGroup != nil ||
+		spec.DataSourceUID != nil ||
+		spec.Query != nil ||
+		spec.LookbackSeconds != nil ||
+		spec.For != nil ||
+		spec.NoDataState != nil ||
+		spec.ExecErrState != nil ||
+		spec.Labels != nil ||
+		spec.Annotations != nil ||
+		spec.IsPaused != nil
 }
 
 func alertRuleStateOptions() []configuration.FieldOption {
@@ -192,7 +259,9 @@ func alertRuleKeyValueListSchema() []configuration.Field {
 	}
 }
 
-func alertRuleFieldConfiguration(includeAlertRuleSelector bool) []configuration.Field {
+func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bool) []configuration.Field {
+	fieldRequired := !partialUpdate
+
 	fields := make([]configuration.Field, 0, 12)
 	if includeAlertRuleSelector {
 		fields = append(fields, configuration.Field{
@@ -214,15 +283,14 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool) []configuration.
 			Name:        "title",
 			Label:       "Title",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Default:     "High error rate",
+			Required:    fieldRequired,
 			Description: "Human-readable alert rule title shown in Grafana",
 		},
 		configuration.Field{
 			Name:        "folderUID",
 			Label:       "Folder",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    fieldRequired,
 			Description: "The Grafana folder that will contain the alert rule",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -234,15 +302,14 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool) []configuration.
 			Name:        "ruleGroup",
 			Label:       "Rule Group",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Default:     "service-health",
+			Required:    fieldRequired,
 			Description: "The Grafana rule group to create or update",
 		},
 		configuration.Field{
 			Name:        "dataSourceUid",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
+			Required:    fieldRequired,
 			Description: "The Grafana data source the alert query should use",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -254,32 +321,28 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool) []configuration.
 			Name:        "query",
 			Label:       "Query",
 			Type:        configuration.FieldTypeText,
-			Required:    true,
-			Default:     `sum(rate(http_requests_total{status=~"5.."}[5m]))`,
+			Required:    fieldRequired,
 			Description: "The alert query expression Grafana should evaluate",
 		},
 		configuration.Field{
 			Name:        "lookbackSeconds",
 			Label:       "Lookback Window (Seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    true,
-			Default:     defaultAlertRuleLookback,
+			Required:    fieldRequired,
 			Description: "How far back Grafana should query when evaluating the rule",
 		},
 		configuration.Field{
 			Name:        "for",
 			Label:       "For",
 			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Default:     "5m",
+			Required:    fieldRequired,
 			Description: "How long the condition must remain true before the alert fires",
 		},
 		configuration.Field{
 			Name:     "noDataState",
 			Label:    "No Data State",
 			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "NoData",
+			Required: fieldRequired,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: alertRuleStateOptions(),
@@ -291,8 +354,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool) []configuration.
 			Name:     "execErrState",
 			Label:    "Execution Error State",
 			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "Alerting",
+			Required: fieldRequired,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: alertRuleStateOptions(),
@@ -338,8 +400,8 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool) []configuration.
 			Name:        "isPaused",
 			Label:       "Paused",
 			Type:        configuration.FieldTypeBool,
-			Required:    true,
-			Default:     false,
+			Required:    false,
+			Togglable:   false,
 			Description: "Whether the alert rule should be created or updated in a paused state",
 		},
 	)
@@ -352,7 +414,7 @@ func buildAlertRulePayload(spec CreateAlertRuleSpec) map[string]any {
 		"title":        spec.Title,
 		"folderUID":    spec.FolderUID,
 		"ruleGroup":    spec.RuleGroup,
-		"condition":    defaultAlertRuleCondition,
+		"condition":    alertRuleConditionRefID,
 		"data":         buildAlertRuleQueryData(spec),
 		"noDataState":  spec.NoDataState,
 		"execErrState": spec.ExecErrState,
@@ -363,24 +425,75 @@ func buildAlertRulePayload(spec CreateAlertRuleSpec) map[string]any {
 	}
 }
 
-func mergeAlertRulePayload(existing map[string]any, spec CreateAlertRuleSpec, uid string) map[string]any {
-	updated := make(map[string]any, len(existing)+10)
-	for key, value := range existing {
-		updated[key] = value
+func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (map[string]any, error) {
+	updated := sanitizeExistingAlertRulePayload(existing)
+
+	if spec.Title != nil {
+		updated["title"] = *spec.Title
+	}
+	if spec.FolderUID != nil {
+		updated["folderUID"] = *spec.FolderUID
+	}
+	if spec.RuleGroup != nil {
+		updated["ruleGroup"] = *spec.RuleGroup
+	}
+	if spec.For != nil {
+		updated["for"] = *spec.For
+	}
+	if spec.NoDataState != nil {
+		updated["noDataState"] = *spec.NoDataState
+	}
+	if spec.ExecErrState != nil {
+		updated["execErrState"] = *spec.ExecErrState
+	}
+	if spec.Labels != nil && len(*spec.Labels) > 0 {
+		updated["labels"] = keyValuePairsToMap(spec.Labels)
+	}
+	if spec.Annotations != nil && len(*spec.Annotations) > 0 {
+		updated["annotations"] = keyValuePairsToMap(spec.Annotations)
+	}
+	if spec.IsPaused != nil {
+		updated["isPaused"] = *spec.IsPaused
+	}
+	if spec.DataSourceUID != nil || spec.Query != nil || spec.LookbackSeconds != nil {
+		queryData, err := mergeAlertRuleQueryData(existing["data"], spec)
+		if err != nil {
+			return nil, err
+		}
+		updated["data"] = queryData
 	}
 
-	for key, value := range buildAlertRulePayload(spec) {
-		updated[key] = value
+	updated["uid"] = spec.AlertRuleUID
+	return updated, nil
+}
+
+func sanitizeExistingAlertRulePayload(existing map[string]any) map[string]any {
+	sanitized := cloneAlertRuleMap(existing)
+	delete(sanitized, "updated")
+	delete(sanitized, "provenance")
+
+	copyAlertRuleOrganizationFields(sanitized, existing)
+
+	return sanitized
+}
+
+func copyAlertRuleOrganizationFields(destination map[string]any, source map[string]any) {
+	if value, exists := source["orgID"]; exists {
+		destination["orgID"] = value
+		destination["orgId"] = value
+		return
 	}
 
-	updated["uid"] = uid
-	return updated
+	if value, exists := source["orgId"]; exists {
+		destination["orgID"] = value
+		destination["orgId"] = value
+	}
 }
 
 func buildAlertRuleQueryData(spec CreateAlertRuleSpec) []map[string]any {
 	return []map[string]any{
 		{
-			"refId":     defaultAlertRuleCondition,
+			"refId":     alertRuleConditionRefID,
 			"queryType": "",
 			"relativeTimeRange": map[string]any{
 				"from": spec.LookbackSeconds,
@@ -391,12 +504,102 @@ func buildAlertRuleQueryData(spec CreateAlertRuleSpec) []map[string]any {
 				"editorMode":    "code",
 				"expr":          spec.Query,
 				"query":         spec.Query,
-				"intervalMs":    defaultAlertRuleIntervalMS,
-				"maxDataPoints": defaultAlertRuleMaxDataPoints,
-				"refId":         defaultAlertRuleCondition,
+				"intervalMs":    alertRuleQueryIntervalMS,
+				"maxDataPoints": alertRuleMaxDataPoints,
+				"refId":         alertRuleConditionRefID,
 			},
 		},
 	}
+}
+
+func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any, error) {
+	data, ok := existingData.([]any)
+	if !ok || len(data) == 0 {
+		return nil, errors.New("existing alert rule is missing query data")
+	}
+
+	firstQuery, ok := data[0].(map[string]any)
+	if !ok {
+		return nil, errors.New("existing alert rule query data is invalid")
+	}
+
+	updatedData := make([]any, len(data))
+	copy(updatedData, data)
+
+	updatedQuery := cloneAlertRuleMap(firstQuery)
+	model := cloneAlertRuleMapFromValue(updatedQuery["model"])
+
+	if spec.DataSourceUID != nil {
+		updatedQuery["datasourceUid"] = *spec.DataSourceUID
+
+		datasource := cloneAlertRuleMapFromValue(model["datasource"])
+		if len(datasource) > 0 {
+			datasource["uid"] = *spec.DataSourceUID
+			model["datasource"] = datasource
+		}
+	}
+
+	if spec.LookbackSeconds != nil {
+		relativeTimeRange := cloneAlertRuleMapFromValue(updatedQuery["relativeTimeRange"])
+		relativeTimeRange["from"] = *spec.LookbackSeconds
+		if _, exists := relativeTimeRange["to"]; !exists {
+			relativeTimeRange["to"] = 0
+		}
+		updatedQuery["relativeTimeRange"] = relativeTimeRange
+	}
+
+	if spec.Query != nil {
+		if _, exists := updatedQuery["refId"]; !exists {
+			updatedQuery["refId"] = alertRuleConditionRefID
+		}
+
+		model["editorMode"] = "code"
+		model["expr"] = *spec.Query
+		model["query"] = *spec.Query
+		if _, exists := model["expression"]; exists {
+			model["expression"] = *spec.Query
+		}
+		if _, exists := model["intervalMs"]; !exists {
+			model["intervalMs"] = alertRuleQueryIntervalMS
+		}
+		if _, exists := model["maxDataPoints"]; !exists {
+			model["maxDataPoints"] = alertRuleMaxDataPoints
+		}
+		if _, exists := model["refId"]; !exists {
+			model["refId"] = updatedQuery["refId"]
+		}
+
+		updatedQuery["model"] = model
+	}
+
+	if spec.DataSourceUID != nil && spec.Query == nil {
+		updatedQuery["model"] = model
+	}
+
+	updatedData[0] = updatedQuery
+	return updatedData, nil
+}
+
+func cloneAlertRuleMap(value map[string]any) map[string]any {
+	cloned := make(map[string]any, len(value))
+	for key, entry := range value {
+		cloned[key] = entry
+	}
+
+	return cloned
+}
+
+func cloneAlertRuleMapFromValue(value any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+
+	record, ok := value.(map[string]any)
+	if !ok {
+		return map[string]any{}
+	}
+
+	return cloneAlertRuleMap(record)
 }
 
 func normalizeAlertRuleKeyValuePairs(pairs []AlertRuleKeyValuePair) []AlertRuleKeyValuePair {

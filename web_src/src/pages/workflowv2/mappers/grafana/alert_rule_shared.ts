@@ -4,7 +4,12 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatOptionalIsoTimestamp } from "@/lib/timezone";
 import { getState, getTriggerRenderer } from "..";
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import type { CreateAlertRuleConfiguration, GrafanaAlertRule, UpdateAlertRuleConfiguration } from "./types";
+import type {
+  AlertRuleNodeMetadata,
+  CreateAlertRuleConfiguration,
+  GrafanaAlertRule,
+  UpdateAlertRuleConfiguration,
+} from "./types";
 
 export function buildAlertRuleMetadata(
   node: NodeInfo,
@@ -18,20 +23,24 @@ export function buildAlertRuleMetadata(
     | (CreateAlertRuleConfiguration & { alertRuleUid?: string })
     | UpdateAlertRuleConfiguration
     | undefined;
+  const nodeMetadata = node.metadata as AlertRuleNodeMetadata | undefined;
 
   const primaryItem =
     configuration?.title != null
       ? { icon: "bell", label: configuration.title }
-      : buildAlertRuleUidItem(configuration?.alertRuleUid, options?.includeUid);
+      : buildAlertRuleTitleItem(nodeMetadata?.alertRuleTitle) ||
+        buildAlertRuleUidItem(configuration?.alertRuleUid, options?.includeUid);
 
   return [
     primaryItem,
-    configuration?.folderUID ? { icon: "folder", label: configuration.folderUID } : undefined,
+    nodeMetadata?.folderTitle ? { icon: "folder", label: nodeMetadata.folderTitle } : undefined,
+    buildPausedStateItem(configuration?.isPaused, options?.includePausedState),
     configuration?.ruleGroup && options?.includeGroup
       ? { icon: "layers-3", label: configuration.ruleGroup }
       : undefined,
-    buildPausedStateItem(configuration?.isPaused, options?.includePausedState),
-  ].filter(isMetadataItem);
+  ]
+    .filter(isMetadataItem)
+    .slice(0, 3);
 }
 
 export function buildAlertRuleExecutionDetails(
@@ -49,22 +58,16 @@ export function buildAlertRuleExecutionDetails(
   if (!alertRule) {
     return { Response: "No data returned" };
   }
+  const nodeMetadata = context.node.metadata as AlertRuleNodeMetadata | undefined;
 
   const details: Record<string, string> = {
     [actionLabel]: formatOptionalIsoTimestamp(payload?.timestamp ?? context.execution.createdAt),
   };
 
   addOptionalDetail(details, "Title", alertRule.title);
-  addOptionalDetail(details, "UID", alertRule.uid);
-  addOptionalDetail(details, "Folder", alertRule.folderUID);
+  addOptionalDetail(details, "Folder", alertRule.folderTitle || nodeMetadata?.folderTitle);
   addOptionalDetail(details, "Rule Group", alertRule.ruleGroup);
-  addOptionalDetail(details, "Condition", alertRule.condition);
   addOptionalDetail(details, "For", alertRule.for);
-  addOptionalDetail(details, "No Data State", alertRule.noDataState);
-  addOptionalDetail(details, "Exec Error State", alertRule.execErrState);
-  addOptionalDetail(details, "Queries", alertRule.data ? String(alertRule.data.length) : undefined);
-  addOptionalDetail(details, "Labels", formatOptionalRecord(alertRule.labels));
-  addOptionalDetail(details, "Annotations", formatOptionalRecord(alertRule.annotations));
   addOptionalDetail(details, "Paused", formatPausedState(alertRule.isPaused));
 
   return details;
@@ -108,6 +111,7 @@ export function asAlertRule(value: unknown): GrafanaAlertRule | undefined {
     uid: asString(record.uid),
     title: asString(record.title),
     folderUID: asString(record.folderUID),
+    folderTitle: asString(record.folderTitle),
     ruleGroup: asString(record.ruleGroup),
     condition: asString(record.condition),
     noDataState: asString(record.noDataState),
@@ -137,20 +141,18 @@ function asStringRecord(value: unknown): Record<string, string> | undefined {
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
-function formatRecord(value: Record<string, string>): string {
-  return Object.entries(value)
-    .map(([key, entryValue]) => `${key}=${entryValue}`)
-    .join(", ");
-}
-
-function formatOptionalRecord(value: Record<string, string> | undefined): string | undefined {
-  return value && Object.keys(value).length > 0 ? formatRecord(value) : undefined;
-}
-
 function addOptionalDetail(details: Record<string, string>, key: string, value: string | undefined): void {
   if (value) {
     details[key] = value;
   }
+}
+
+function buildAlertRuleTitleItem(title: string | undefined): MetadataItem | undefined {
+  if (!title) {
+    return undefined;
+  }
+
+  return { icon: "bell", label: title };
 }
 
 function buildAlertRuleUidItem(uid: string | undefined, includeUid?: boolean): MetadataItem | undefined {
@@ -162,13 +164,13 @@ function buildAlertRuleUidItem(uid: string | undefined, includeUid?: boolean): M
 }
 
 function buildPausedStateItem(isPaused: boolean | undefined, includePausedState?: boolean): MetadataItem | undefined {
-  if (!includePausedState || isPaused === undefined) {
+  if (!includePausedState || isPaused !== true) {
     return undefined;
   }
 
   return {
-    icon: isPaused ? "pause-circle" : "play-circle",
-    label: isPaused ? "Paused" : "Active",
+    icon: "pause-circle",
+    label: "Paused",
   };
 }
 

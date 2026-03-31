@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,6 +18,10 @@ import (
 const (
 	maxResponseSize = 2 * 1024 * 1024 // 2MB
 )
+
+// notificationPolicyTreeMutex serializes read-modify-write on the Grafana notification
+// policy tree so concurrent webhook setup/cleanup cannot drop each other's routes.
+var notificationPolicyTreeMutex sync.Mutex
 
 type Client struct {
 	BaseURL  string
@@ -453,6 +458,9 @@ func (c *Client) putNotificationPolicies(root map[string]json.RawMessage) error 
 // =~ regex OR pattern; negative predicates (notEquals) become individual != matchers.
 // The route has continue=true so other routes still fire.
 func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNamePredicates []configuration.Predicate) error {
+	notificationPolicyTreeMutex.Lock()
+	defer notificationPolicyTreeMutex.Unlock()
+
 	root, err := c.getNotificationPolicies()
 	if err != nil {
 		return err
@@ -556,10 +564,15 @@ func (c *Client) CreateAlertRule(rule map[string]any) (map[string]any, error) {
 	return created, nil
 }
 
-func (c *Client) UpdateAlertRule(uid string, rule map[string]any) (map[string]any, error) {
+func (c *Client) UpdateAlertRule(uid string, rule map[string]any, disableProvenance bool) (map[string]any, error) {
 	body, err := json.Marshal(rule)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	headers := map[string]string{}
+	if disableProvenance {
+		headers["X-Disable-Provenance"] = "true"
 	}
 
 	responseBody, status, err := c.execRequestWithHeaders(
@@ -567,9 +580,7 @@ func (c *Client) UpdateAlertRule(uid string, rule map[string]any) (map[string]an
 		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid),
 		bytes.NewReader(body),
 		"application/json",
-		map[string]string{
-			"X-Disable-Provenance": "true",
-		},
+		headers,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error updating alert rule: %v", err)
@@ -585,6 +596,19 @@ func (c *Client) UpdateAlertRule(uid string, rule map[string]any) (map[string]an
 	}
 
 	return updated, nil
+}
+
+func (c *Client) DeleteAlertRule(uid string) error {
+	responseBody, status, err := c.execRequest(http.MethodDelete, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	if err != nil {
+		return fmt.Errorf("error deleting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return newAPIStatusError("grafana alert rule delete", status, responseBody)
+	}
+
+	return nil
 }
 
 // combinedPositiveAlertNameRegex builds the =~ pattern Grafana uses for object_matchers on
@@ -630,6 +654,9 @@ func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
 // RemoveNotificationPolicyRoute removes any child route for contactPointName from the
 // root of the policy tree. No-op if no such route exists.
 func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
+	notificationPolicyTreeMutex.Lock()
+	defer notificationPolicyTreeMutex.Unlock()
+
 	root, err := c.getNotificationPolicies()
 	if err != nil {
 		return err

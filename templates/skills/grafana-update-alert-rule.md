@@ -9,7 +9,7 @@ Good fits:
 
 Expected input:
 - a Grafana alert rule UID
-- a complete Grafana alert rule object to send in the update request
+- one or more structured alert rule fields to change, such as `title`, `folderUID`, `ruleGroup`, `dataSourceUid`, `query`, or labels
 
 Expected output:
 - the updated Grafana alert rule object returned by the provisioning API

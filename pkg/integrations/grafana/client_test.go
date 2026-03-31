@@ -341,7 +341,7 @@ func Test__Client__CreateAlertRule(t *testing.T) {
 	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules"))
 }
 
-func Test__Client__UpdateAlertRule(t *testing.T) {
+func Test__Client__UpdateAlertRule__SendsDisableProvenanceHeader(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -358,18 +358,64 @@ func Test__Client__UpdateAlertRule(t *testing.T) {
 	}
 
 	alertRule, err := client.UpdateAlertRule("rule-1", map[string]any{
-		"uid":       "rule-1",
-		"title":     "High error rate",
-		"folderUID": "infra",
-		"ruleGroup": "service-health",
-		"condition": "A",
-		"data":      []any{map[string]any{"refId": "A"}},
-	})
+		"uid":   "rule-1",
+		"title": "High error rate",
+	}, true)
 	require.NoError(t, err)
 	require.Equal(t, "rule-1", alertRule["uid"])
 	require.Len(t, httpContext.Requests, 1)
 	require.Equal(t, "true", httpContext.Requests[0].Header.Get("X-Disable-Provenance"))
 	require.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/rule-1"))
+}
+
+func Test__Client__UpdateAlertRule__OmitsDisableProvenanceHeader(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"rule-1","title":"High error rate"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	alertRule, err := client.UpdateAlertRule("rule-1", map[string]any{
+		"uid":   "rule-1",
+		"title": "High error rate",
+	}, false)
+	require.NoError(t, err)
+	require.Equal(t, "rule-1", alertRule["uid"])
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, "", httpContext.Requests[0].Header.Get("X-Disable-Provenance"))
+	require.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+}
+
+func Test__Client__DeleteAlertRule(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNoContent,
+				Body:       io.NopCloser(strings.NewReader("")),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	err := client.DeleteAlertRule("rule-1")
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
 	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/rule-1"))
 }
 

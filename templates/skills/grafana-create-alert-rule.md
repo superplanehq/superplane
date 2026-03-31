@@ -1,6 +1,6 @@
 # Grafana Create Alert Rule
 
-Use this component when a workflow needs to create a Grafana-managed alert rule from a full provisioning API definition.
+Use this component when a workflow needs to create a Grafana-managed alert rule from structured alert settings.
 
 Good fits:
 - creating baseline monitoring during service onboarding
@@ -8,7 +8,7 @@ Good fits:
 - creating temporary alert rules during an incident or rollout
 
 Expected input:
-- a complete Grafana alert rule object, including fields such as `title`, `folderUID`, `ruleGroup`, `condition`, and `data`
+- structured alert rule fields such as `title`, `folderUID`, `ruleGroup`, `dataSourceUid`, `query`, and evaluation settings
 
 Expected output:
 - the created Grafana alert rule object with identifiers like `uid`

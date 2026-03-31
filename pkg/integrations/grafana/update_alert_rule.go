@@ -35,8 +35,9 @@ func (c *UpdateAlertRule) Documentation() string {
 ## Configuration
 
 - **Alert Rule**: The Grafana alert rule UID to update
-- **Folder / Rule Group**: Target location for the rule in Grafana
-- **Data Source / Query**: Query details Grafana evaluates
+- **All other fields are optional**: only the values you provide will be changed
+- **Folder / Rule Group**: Optional location changes for the rule in Grafana
+- **Data Source / Query**: Optional query details Grafana evaluates
 - **Labels / Annotations**: Optional metadata to update alongside the rule
 
 ## Output
@@ -57,7 +58,7 @@ func (c *UpdateAlertRule) OutputChannels(configuration any) []core.OutputChannel
 }
 
 func (c *UpdateAlertRule) Configuration() []configuration.Field {
-	return alertRuleFieldConfiguration(true)
+	return alertRuleFieldConfiguration(true, true)
 }
 
 func (c *UpdateAlertRule) Setup(ctx core.SetupContext) error {
@@ -66,7 +67,17 @@ func (c *UpdateAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return validateUpdateAlertRuleSpec(spec)
+	if err := validateUpdateAlertRuleSpec(spec); err != nil {
+		return err
+	}
+
+	folderUID := ""
+	if spec.FolderUID != nil {
+		folderUID = *spec.FolderUID
+	}
+
+	storeAlertRuleNodeMetadata(ctx, spec.AlertRuleUID, folderUID)
+	return nil
 }
 
 func (c *UpdateAlertRule) Execute(ctx core.ExecutionContext) error {
@@ -87,8 +98,17 @@ func (c *UpdateAlertRule) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("error getting existing alert rule: %w", err)
 	}
+	if err := validateAlertRuleUpdateSupport(existingRule); err != nil {
+		return err
+	}
 
-	rule, err := client.UpdateAlertRule(spec.AlertRuleUID, mergeAlertRulePayload(existingRule, spec.CreateAlertRuleSpec, spec.AlertRuleUID))
+	payload, err := mergeAlertRulePayload(existingRule, spec)
+	if err != nil {
+		return fmt.Errorf("error building updated alert rule payload: %w", err)
+	}
+
+	existingProvenance, _ := existingRule["provenance"].(string)
+	rule, err := client.UpdateAlertRule(spec.AlertRuleUID, payload, existingProvenance == "")
 	if err != nil {
 		return fmt.Errorf("error updating alert rule: %w", err)
 	}

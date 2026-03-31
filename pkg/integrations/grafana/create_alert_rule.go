@@ -59,7 +59,7 @@ func (c *CreateAlertRule) OutputChannels(configuration any) []core.OutputChannel
 }
 
 func (c *CreateAlertRule) Configuration() []configuration.Field {
-	return alertRuleFieldConfiguration(false)
+	return alertRuleFieldConfiguration(false, false)
 }
 
 func (c *CreateAlertRule) Setup(ctx core.SetupContext) error {
@@ -68,7 +68,12 @@ func (c *CreateAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return validateCreateAlertRuleSpec(spec)
+	if err := validateCreateAlertRuleSpec(spec); err != nil {
+		return err
+	}
+
+	storeAlertRuleNodeMetadata(ctx, "", spec.FolderUID)
+	return nil
 }
 
 func (c *CreateAlertRule) Execute(ctx core.ExecutionContext) error {
