@@ -152,7 +152,7 @@ const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
-const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 15000;
+const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 
 type UnsavedChangeKind = "position" | "structural";
 
@@ -172,7 +172,6 @@ type CanvasSaveResult = {
 };
 
 type QueuedCanvasSaveRequest = {
-  id: number;
   workflow: CanvasesCanvas;
   savingVersionId?: string;
   resolve: (result: CanvasSaveResult) => void;
@@ -732,7 +731,6 @@ export function WorkflowPageV2() {
   const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
-  const nextCanvasSaveRequestIdRef = useRef(0);
   const ignoredCanvasUpdatedEventsRef = useRef(0);
   const ignoredCanvasVersionUpdatedEventsRef = useRef<Map<string, number>>(new Map());
   const clearQueuedAutoSaveFlags = useCallback(() => {
@@ -1071,19 +1069,40 @@ export function WorkflowPageV2() {
     [initialWorkflowSnapshot],
   );
 
-  const registerLocalCanvasSaveEcho = useCallback((savingVersionId?: string) => {
+  const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
     ignoredCanvasUpdatedEventsRef.current += 1;
-    window.setTimeout(() => {
+    let released = false;
+    const timeoutId = window.setTimeout(() => {
+      if (released) {
+        return;
+      }
+      released = true;
       ignoredCanvasUpdatedEventsRef.current = Math.max(0, ignoredCanvasUpdatedEventsRef.current - 1);
     }, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
 
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      window.clearTimeout(timeoutId);
+      ignoredCanvasUpdatedEventsRef.current = Math.max(0, ignoredCanvasUpdatedEventsRef.current - 1);
+    };
+  }, []);
+
+  const registerIgnoredCanvasVersionUpdatedEcho = useCallback((savingVersionId?: string) => {
     if (!savingVersionId) {
-      return;
+      return () => undefined;
     }
 
     const current = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
     ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, current + 1);
-    window.setTimeout(() => {
+    let released = false;
+    const timeoutId = window.setTimeout(() => {
+      if (released) {
+        return;
+      }
+      released = true;
       const count = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
       if (count <= 1) {
         ignoredCanvasVersionUpdatedEventsRef.current.delete(savingVersionId);
@@ -1091,7 +1110,60 @@ export function WorkflowPageV2() {
       }
       ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, count - 1);
     }, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
+
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      window.clearTimeout(timeoutId);
+      const count = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
+      if (count <= 1) {
+        ignoredCanvasVersionUpdatedEventsRef.current.delete(savingVersionId);
+        return;
+      }
+      ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, count - 1);
+    };
   }, []);
+
+  const syncCurrentCanvasWithSavedVersion = useCallback(
+    (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
+      if (!organizationId || !canvasId || !version?.spec) {
+        return;
+      }
+
+      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+        if (!current || getWorkflowSaveSignature(current) !== getWorkflowSaveSignature(workflow)) {
+          return current;
+        }
+
+        const currentPositionsByNodeId = new Map(
+          (current.spec?.nodes ?? [])
+            .filter((node) => node.id && node.position)
+            .map((node) => [node.id, node.position]),
+        );
+
+        const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
+          const localPosition = currentPositionsByNodeId.get(serverNode.id);
+          if (localPosition) {
+            return { ...serverNode, position: localPosition };
+          }
+          return serverNode;
+        });
+
+        return {
+          ...current,
+          metadata: {
+            ...current.metadata,
+            name: workflow.metadata?.name ?? current.metadata?.name,
+            description: workflow.metadata?.description ?? current.metadata?.description,
+          },
+          spec: { ...version.spec, nodes: mergedNodes },
+        };
+      });
+    },
+    [organizationId, canvasId, queryClient],
+  );
 
   const saveMatchesCurrentCanvas = useCallback(
     (workflow: CanvasesCanvas) => {
@@ -1126,9 +1198,11 @@ export function WorkflowPageV2() {
           continue;
         }
 
-        try {
-          registerLocalCanvasSaveEcho(request.savingVersionId);
+        const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
+        const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
+        const releaseCanvasUpdatedEcho = request.savingVersionId ? () => undefined : registerIgnoredCanvasUpdatedEcho();
 
+        try {
           const response = await updateCanvasVersionMutation.mutateAsync({
             versionId: request.savingVersionId,
             name: request.workflow.metadata?.name ?? "",
@@ -1139,6 +1213,8 @@ export function WorkflowPageV2() {
             invalidateRelatedQueries: false,
           });
 
+          syncCurrentCanvasWithSavedVersion(request.workflow, response?.data?.version);
+
           request.resolve({
             status: "saved",
             workflow: request.workflow,
@@ -1148,6 +1224,8 @@ export function WorkflowPageV2() {
             hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
           });
         } catch (error) {
+          releaseCanvasUpdatedEcho();
+          releaseCanvasVersionUpdatedEcho();
           request.reject(error);
         }
       }
@@ -1159,7 +1237,16 @@ export function WorkflowPageV2() {
         void drainCanvasSaveQueue();
       }
     }
-  }, [organizationId, canvasId, registerLocalCanvasSaveEcho, saveMatchesCurrentCanvas, updateCanvasVersionMutation]);
+  }, [
+    organizationId,
+    canvasId,
+    liveCanvasVersionId,
+    registerIgnoredCanvasUpdatedEcho,
+    registerIgnoredCanvasVersionUpdatedEcho,
+    saveMatchesCurrentCanvas,
+    syncCurrentCanvasWithSavedVersion,
+    updateCanvasVersionMutation,
+  ]);
 
   const enqueueCanvasSave = useCallback(
     (workflow: CanvasesCanvas, savingVersionId?: string) =>
@@ -1175,13 +1262,7 @@ export function WorkflowPageV2() {
           });
         }
 
-        queuedCanvasSaveRef.current = {
-          id: ++nextCanvasSaveRequestIdRef.current,
-          workflow,
-          savingVersionId,
-          resolve,
-          reject,
-        };
+        queuedCanvasSaveRef.current = { workflow, savingVersionId, resolve, reject };
         setIsCanvasSaveQueued(true);
         void drainCanvasSaveQueue();
       }),
