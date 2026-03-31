@@ -125,7 +125,7 @@ func validateAndPrintCreateResponse(
 	}
 
 	if resp == nil || resp.Canvas == nil || resp.Canvas.Metadata == nil || resp.Canvas.Metadata.GetId() == "" {
-		return fmt.Errorf("canvas create returned success but no canvas was returned — the request may not have reached the server (check your context URL scheme)")
+		return fmt.Errorf("failed to create canvas: the server returned an empty response")
 	}
 
 	canvas := *resp.Canvas
