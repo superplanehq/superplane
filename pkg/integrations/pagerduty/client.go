@@ -472,22 +472,37 @@ type Service struct {
 }
 
 func (c *Client) ListServices() ([]Service, error) {
-	apiURL := fmt.Sprintf("%s/services", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
+	var allServices []Service
+	offset := 0
+	limit := 100
+
+	for {
+		apiURL := fmt.Sprintf("%s/services?limit=%d&offset=%d", c.BaseURL, limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Services []Service `json:"services"`
+			More     bool      `json:"more"`
+		}
+
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		allServices = append(allServices, response.Services...)
+
+		if !response.More {
+			break
+		}
+
+		offset += limit
 	}
 
-	var response struct {
-		Services []Service `json:"services"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Services, nil
+	return allServices, nil
 }
 
 func (c *Client) GetService(id string) (*Service, error) {
@@ -542,22 +557,37 @@ type User struct {
 }
 
 func (c *Client) ListUsers() ([]User, error) {
-	apiURL := fmt.Sprintf("%s/users", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
+	var allUsers []User
+	offset := 0
+	limit := 100
+
+	for {
+		apiURL := fmt.Sprintf("%s/users?limit=%d&offset=%d", c.BaseURL, limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Users []User `json:"users"`
+			More  bool   `json:"more"`
+		}
+
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		allUsers = append(allUsers, response.Users...)
+
+		if !response.More {
+			break
+		}
+
+		offset += limit
 	}
 
-	var response struct {
-		Users []User `json:"users"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Users, nil
+	return allUsers, nil
 }
 
 type EscalationPolicy struct {
@@ -567,22 +597,37 @@ type EscalationPolicy struct {
 }
 
 func (c *Client) ListEscalationPolicies() ([]EscalationPolicy, error) {
-	apiURL := fmt.Sprintf("%s/escalation_policies", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
+	var allPolicies []EscalationPolicy
+	offset := 0
+	limit := 100
+
+	for {
+		apiURL := fmt.Sprintf("%s/escalation_policies?limit=%d&offset=%d", c.BaseURL, limit, offset)
+		responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			EscalationPolicies []EscalationPolicy `json:"escalation_policies"`
+			More               bool               `json:"more"`
+		}
+
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		allPolicies = append(allPolicies, response.EscalationPolicies...)
+
+		if !response.More {
+			break
+		}
+
+		offset += limit
 	}
 
-	var response struct {
-		EscalationPolicies []EscalationPolicy `json:"escalation_policies"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.EscalationPolicies, nil
+	return allPolicies, nil
 }
 
 // Incident represents a PagerDuty incident returned from the API
@@ -633,28 +678,43 @@ type PriorityRef struct {
 // ListIncidents retrieves incidents from PagerDuty filtered by status and optionally by service IDs.
 // By default, it returns open incidents (triggered and acknowledged).
 func (c *Client) ListIncidents(serviceIDs []string) ([]Incident, error) {
-	apiURL := fmt.Sprintf("%s/incidents?statuses[]=triggered&statuses[]=acknowledged", c.BaseURL)
+	var allIncidents []Incident
+	offset := 0
+	limit := 100
 
-	// Add service ID filters if provided
-	for _, serviceID := range serviceIDs {
-		apiURL += fmt.Sprintf("&service_ids[]=%s", serviceID)
+	for {
+		apiURL := fmt.Sprintf("%s/incidents?statuses[]=triggered&statuses[]=acknowledged&limit=%d&offset=%d", c.BaseURL, limit, offset)
+
+		// Add service ID filters if provided
+		for _, serviceID := range serviceIDs {
+			apiURL += fmt.Sprintf("&service_ids[]=%s", serviceID)
+		}
+
+		responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Incidents []Incident `json:"incidents"`
+			More      bool       `json:"more"`
+		}
+
+		err = json.Unmarshal(responseBody, &response)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		allIncidents = append(allIncidents, response.Incidents...)
+
+		if !response.More {
+			break
+		}
+
+		offset += limit
 	}
 
-	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Incidents []Incident `json:"incidents"`
-	}
-
-	err = json.Unmarshal(responseBody, &response)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.Incidents, nil
+	return allIncidents, nil
 }
 
 type SnoozeIncidentRequest struct {
