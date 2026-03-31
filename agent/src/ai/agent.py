@@ -235,24 +235,17 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         type: str,
         parameters: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
-        """List selectable resources for an org integration resource type."""
+        """List selectable resources for an org integration resource type.
+
+        Returns [] without calling the API when integration_id or type is missing or blank. For results, both must be set: use describe_component / describe_trigger to
+        read integration-resource field metadata for the correct type string.
+        """
         if not isinstance(integration_id, str) or not integration_id.strip():
-            return [
-                _tool_error_entry(
-                    "list_integration_resources",
-                    ValueError("integration_id is required (non-empty)."),
-                )
-            ]
+            _tool_debug("list_integration_resources skipped: empty integration_id")
+            return []
         if not isinstance(type, str) or not type.strip():
-            return [
-                _tool_error_entry(
-                    "list_integration_resources",
-                    ValueError(
-                        "Resource type is required (non-empty string, e.g. from describe_component "
-                        "integration-resource fields). Retry with the correct type for this integration."
-                    ),
-                )
-            ]
+            _tool_debug("list_integration_resources skipped: empty type (resource type is required by API)")
+            return []
         try:
             return ctx.deps.client.list_integration_resources(
                 integration_id=integration_id,

@@ -45,6 +45,7 @@ Two different triggers; do not confuse them.
 - When integration is missing, still provide the node proposal and mention setup as a follow-up.
 - Do not claim a provider is unavailable unless a catalog tool succeeds and clearly shows no matches.
 - If catalog tools fail, state that availability could not be verified and proceed with a best-effort proposal.
+- For **list_integration_resources**, supply a real org **integration_id** (from list_org_integrations) and the **resource type** string from **describe_component** / **describe_trigger** integration-resource fields; without both, the tool returns no rows—avoid calling it until you have those values.
 
 ## Pattern-Driven Workflow Guidance
 
