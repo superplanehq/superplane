@@ -5,9 +5,20 @@ from ai.agent import (
     _put_cached_catalog_list,
     build_agent,
     build_prompt,
+    load_system_prompt,
 )
 from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasProposal, CanvasQuestionRequest
+
+
+def test_load_system_prompt_covers_expr_datetime_semantics() -> None:
+    text = load_system_prompt()
+    assert "expr-lang" in text
+    assert "now()" in text
+    assert "duration(" in text
+    assert "three-argument" in text
+    assert "date(str, format, timezone)" in text
+    assert "root().data" in text
 
 
 def test_build_prompt_contains_question() -> None:
