@@ -80,7 +80,7 @@ func TestCreateCommandFailsOnEmptyResponse(t *testing.T) {
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no canvas was returned")
+	require.Contains(t, err.Error(), "server returned an empty response")
 }
 
 func TestCreateCommandFailsOnEmptyCanvasID(t *testing.T) {
@@ -96,7 +96,7 @@ func TestCreateCommandFailsOnEmptyCanvasID(t *testing.T) {
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no canvas was returned")
+	require.Contains(t, err.Error(), "server returned an empty response")
 }
 
 func TestCreateCommandFailsOnServerError(t *testing.T) {
@@ -148,7 +148,7 @@ func TestCreateFromFileFailsOnEmptyResponse(t *testing.T) {
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "no canvas was returned")
+	require.Contains(t, err.Error(), "server returned an empty response")
 }
 
 func TestCreateFromFileReturnsJSONOutput(t *testing.T) {
