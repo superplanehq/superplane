@@ -190,6 +190,9 @@ check.build.ui:
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 
+check.lint.ui.knip:
+	$(COMPOSE) exec app bash -c "cd web_src && npm ci && npm run lint:knip"
+
 check.lint.ui.baseline.update:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:baseline:update"
 
