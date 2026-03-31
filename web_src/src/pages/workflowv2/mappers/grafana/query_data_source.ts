@@ -58,7 +58,7 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const responseData = payload?.data as Record<string, any> | undefined;
+    const responseData = payload?.data as Record<string, unknown> | undefined;
     const payloadTimestamp = formatOptionalIsoTimestamp(payload?.timestamp);
     if (payloadTimestamp !== "-") {
       details["Queried At"] = payloadTimestamp;
@@ -119,7 +119,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
   ];
 }
 
-function buildQueryResultSummary(responseData: Record<string, any>): Record<string, string> {
+function buildQueryResultSummary(responseData: Record<string, unknown>): Record<string, string> {
   const details: Record<string, string> = {};
   const results = responseData.results;
 
@@ -137,40 +137,13 @@ function buildQueryResultSummary(responseData: Record<string, any>): Record<stri
   details["Result Ref IDs"] = refIds.join(", ");
   details.Results = String(refIds.length);
 
-  let frameCount = 0;
-  let rowCount = 0;
   const fieldNames = new Set<string>();
+  const summary = summarizeQueryResults(results, refIds, fieldNames);
 
-  for (const refId of refIds) {
-    const result = results[refId];
-    if (!result || typeof result !== "object" || Array.isArray(result)) {
-      continue;
-    }
+  details["Frame Count"] = String(summary.frameCount);
 
-    const frames = Array.isArray(result.frames) ? result.frames : [];
-    frameCount += frames.length;
-
-    for (const frame of frames) {
-      if (!frame || typeof frame !== "object" || Array.isArray(frame)) {
-        continue;
-      }
-
-      const nextRowCount = getFrameRowCount(frame);
-      rowCount += nextRowCount;
-
-      const schemaFields = Array.isArray(frame.schema?.fields) ? frame.schema.fields : [];
-      for (const field of schemaFields) {
-        if (field?.name && typeof field.name === "string") {
-          fieldNames.add(field.name);
-        }
-      }
-    }
-  }
-
-  details["Frame Count"] = String(frameCount);
-
-  if (rowCount > 0) {
-    details["Row Count"] = String(rowCount);
+  if (summary.rowCount > 0) {
+    details["Row Count"] = String(summary.rowCount);
   }
 
   if (fieldNames.size > 0) {
@@ -180,8 +153,52 @@ function buildQueryResultSummary(responseData: Record<string, any>): Record<stri
   return details;
 }
 
-function getFrameRowCount(frame: Record<string, any>): number {
-  const values = frame.data?.values;
+function summarizeQueryResults(
+  results: object,
+  refIds: string[],
+  fieldNames: Set<string>,
+): { frameCount: number; rowCount: number } {
+  let frameCount = 0;
+  let rowCount = 0;
+
+  for (const refId of refIds) {
+    const result = asRecord((results as Record<string, unknown>)[refId]);
+    if (!result) {
+      continue;
+    }
+
+    const frames = Array.isArray(result.frames) ? result.frames : [];
+    frameCount += frames.length;
+
+    for (const frameValue of frames) {
+      const frame = asRecord(frameValue);
+      if (!frame) {
+        continue;
+      }
+
+      rowCount += getFrameRowCount(frame);
+      collectFieldNames(frame, fieldNames);
+    }
+  }
+
+  return { frameCount, rowCount };
+}
+
+function collectFieldNames(frame: Record<string, unknown>, fieldNames: Set<string>): void {
+  const schema = asRecord(frame.schema);
+  const schemaFields = Array.isArray(schema?.fields) ? schema.fields : [];
+
+  for (const fieldValue of schemaFields) {
+    const field = asRecord(fieldValue);
+    if (typeof field?.name === "string") {
+      fieldNames.add(field.name);
+    }
+  }
+}
+
+function getFrameRowCount(frame: Record<string, unknown>): number {
+  const data = asRecord(frame.data);
+  const values = data?.values;
   if (!Array.isArray(values)) {
     return 0;
   }
@@ -194,4 +211,12 @@ function getFrameRowCount(frame: Record<string, any>): number {
   }
 
   return maxLength;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value as Record<string, unknown>;
 }
