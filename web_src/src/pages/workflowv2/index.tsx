@@ -151,12 +151,47 @@ import { deleteNodesFromWorkflow, groupWorkflowNodes, ungroupWorkflowNode } from
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
-const LOCAL_CANVAS_UPDATE_SUPPRESSION_MS = 2000;
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
+const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 
 type UnsavedChangeKind = "position" | "structural";
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
+
+type CanvasSaveResult = {
+  status: "saved" | "replaced" | "stale";
+  workflow: CanvasesCanvas;
+  savingVersionId?: string;
+  matchesCurrentCanvas: boolean;
+  hasQueuedFollowUp: boolean;
+  response?: {
+    data?: {
+      version?: CanvasesCanvasVersion;
+    };
+  };
+};
+
+type QueuedCanvasSaveRequest = {
+  workflow: CanvasesCanvas;
+  savingVersionId?: string;
+  resolve: (result: CanvasSaveResult) => void;
+  reject: (error: unknown) => void;
+};
+
+type CanvasEchoRelease = () => void;
+
+function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
+  if (!workflow) {
+    return "";
+  }
+
+  return JSON.stringify({
+    name: workflow.metadata?.name ?? "",
+    description: workflow.metadata?.description ?? "",
+    nodes: workflow.spec?.nodes ?? [],
+    edges: workflow.spec?.edges ?? [],
+  });
+}
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
@@ -181,7 +216,9 @@ export function WorkflowPageV2() {
   const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
-  const holdSavingDisplay = useMinSavingDisplayHold(updateCanvasVersionMutation.isPending);
+  const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
+  const [isCanvasSaveQueued, setIsCanvasSaveQueued] = useState(false);
+  const holdSavingDisplay = useMinSavingDisplayHold(isCanvasSaveInFlight || isCanvasSaveQueued);
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
@@ -610,6 +647,8 @@ export function WorkflowPageV2() {
 
   const canAutoSave = !isTemplate && hasEditableVersion;
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
+  const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
+  const hasPendingLocalCanvasState = hasUnsavedChanges || hasLocalSaveActivity;
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY);
@@ -691,8 +730,12 @@ export function WorkflowPageV2() {
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
   const lastAppliedVersionSnapshotRef = useRef("");
   const canvasRef = useRef<CanvasesCanvas | null>(canvas ?? null);
-  const lastLocalCanvasSaveAtRef = useRef<number>(0);
   const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
+  const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
+  const isDrainingCanvasSaveQueueRef = useRef(false);
+  const canvasSaveSessionRef = useRef(0);
+  const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
+  const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
   const clearQueuedAutoSaveFlags = useCallback(() => {
     setIsPositionAutoSaveQueued(false);
     setIsAnnotationAutoSaveQueued(false);
@@ -764,6 +807,20 @@ export function WorkflowPageV2() {
   }, [canvas]);
 
   useEffect(() => {
+    canvasSaveSessionRef.current += 1;
+
+    const queuedRequest = queuedCanvasSaveRef.current;
+    if (queuedRequest) {
+      queuedCanvasSaveRef.current = null;
+      queuedRequest.resolve({
+        status: "replaced",
+        workflow: queuedRequest.workflow,
+        savingVersionId: queuedRequest.savingVersionId,
+        matchesCurrentCanvas: false,
+        hasQueuedFollowUp: false,
+      });
+    }
+
     setHasUnsavedChanges(false);
     setHasNonPositionalUnsavedChanges(false);
     setInitialWorkflowSnapshot(null);
@@ -771,7 +828,11 @@ export function WorkflowPageV2() {
     setSelectedChangeRequestId("");
     hasSyncedVersionFromURLRef.current = false;
     lastSavedWorkflowRef.current = null;
-    lastLocalCanvasSaveAtRef.current = 0;
+    ignoredCanvasUpdatedEchoReleasesRef.current = [];
+    ignoredCanvasVersionUpdatedEchoReleasesRef.current.clear();
+    isDrainingCanvasSaveQueueRef.current = false;
+    setIsCanvasSaveInFlight(false);
+    setIsCanvasSaveQueued(false);
     hasInitializedStoreRef.current = null;
     pendingStoreReinitRef.current = true;
   }, [canvasId]);
@@ -889,7 +950,13 @@ export function WorkflowPageV2() {
   }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
 
   useEffect(() => {
-    if (!organizationId || !canvasId || !activeCanvasVersionId || !loadedCanvasVersion?.spec) {
+    if (
+      !organizationId ||
+      !canvasId ||
+      !activeCanvasVersionId ||
+      !loadedCanvasVersion?.spec ||
+      hasPendingLocalCanvasState
+    ) {
       return;
     }
 
@@ -915,10 +982,16 @@ export function WorkflowPageV2() {
     });
 
     lastAppliedVersionSnapshotRef.current = snapshotKey;
-  }, [organizationId, canvasId, activeCanvasVersionId, loadedCanvasVersion, queryClient]);
+  }, [organizationId, canvasId, activeCanvasVersionId, loadedCanvasVersion, queryClient, hasPendingLocalCanvasState]);
 
   useEffect(() => {
-    if (!remoteCanvasUpdatePending || hasUnsavedChanges || canvasDeletedRemotely || !organizationId || !canvasId) {
+    if (
+      !remoteCanvasUpdatePending ||
+      hasPendingLocalCanvasState ||
+      canvasDeletedRemotely ||
+      !organizationId ||
+      !canvasId
+    ) {
       return;
     }
 
@@ -933,7 +1006,7 @@ export function WorkflowPageV2() {
     setRemoteCanvasUpdatePending(false);
   }, [
     remoteCanvasUpdatePending,
-    hasUnsavedChanges,
+    hasPendingLocalCanvasState,
     canvasDeletedRemotely,
     organizationId,
     canvasId,
@@ -1011,6 +1084,304 @@ export function WorkflowPageV2() {
     },
     [initialWorkflowSnapshot],
   );
+
+  const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
+    const saveSession = canvasSaveSessionRef.current;
+    let released = false;
+    let timeoutId = 0;
+    const release = () => {
+      if (released) {
+        return;
+      }
+
+      released = true;
+      window.clearTimeout(timeoutId);
+      const releaseIndex = ignoredCanvasUpdatedEchoReleasesRef.current.indexOf(release);
+      if (releaseIndex >= 0) {
+        ignoredCanvasUpdatedEchoReleasesRef.current.splice(releaseIndex, 1);
+      }
+
+      if (canvasSaveSessionRef.current !== saveSession) {
+        return;
+      }
+    };
+
+    ignoredCanvasUpdatedEchoReleasesRef.current.push(release);
+    timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
+
+    return release;
+  }, []);
+
+  const registerIgnoredCanvasVersionUpdatedEcho = useCallback((savingVersionId?: string) => {
+    if (!savingVersionId) {
+      return () => undefined;
+    }
+
+    const saveSession = canvasSaveSessionRef.current;
+    const currentReleases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(savingVersionId) || [];
+    let released = false;
+    let timeoutId = 0;
+    const release = () => {
+      if (released) {
+        return;
+      }
+
+      released = true;
+      window.clearTimeout(timeoutId);
+      const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(savingVersionId);
+      if (releases) {
+        const releaseIndex = releases.indexOf(release);
+        if (releaseIndex >= 0) {
+          releases.splice(releaseIndex, 1);
+        }
+        if (releases.length === 0) {
+          ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(savingVersionId);
+        }
+      }
+
+      if (canvasSaveSessionRef.current !== saveSession) {
+        return;
+      }
+    };
+
+    currentReleases.push(release);
+    ignoredCanvasVersionUpdatedEchoReleasesRef.current.set(savingVersionId, currentReleases);
+    timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
+
+    return release;
+  }, []);
+
+  const registerIgnoredCanvasUpdatedEchoIfNeeded = useCallback(
+    (savingVersionId?: string) => {
+      if (savingVersionId) {
+        return () => undefined;
+      }
+
+      return registerIgnoredCanvasUpdatedEcho();
+    },
+    [registerIgnoredCanvasUpdatedEcho],
+  );
+
+  const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
+    const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
+    if (!release) {
+      return false;
+    }
+
+    release();
+    return true;
+  }, []);
+
+  const consumeIgnoredCanvasVersionUpdatedEcho = useCallback((versionId?: string) => {
+    if (!versionId) {
+      return false;
+    }
+
+    const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(versionId);
+    if (!releases) {
+      return false;
+    }
+
+    const release = releases.pop();
+    if (!release) {
+      return false;
+    }
+
+    if (releases.length === 0) {
+      ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(versionId);
+    }
+
+    release();
+    return true;
+  }, []);
+
+  const syncCurrentCanvasWithSavedVersion = useCallback(
+    (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
+      if (!organizationId || !canvasId || !version?.spec) {
+        return;
+      }
+
+      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+        if (!current || getWorkflowSaveSignature(current) !== getWorkflowSaveSignature(workflow)) {
+          return current;
+        }
+
+        const currentPositionsByNodeId = new Map(
+          (current.spec?.nodes ?? [])
+            .filter((node) => node.id && node.position)
+            .map((node) => [node.id, node.position]),
+        );
+
+        const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
+          const localPosition = currentPositionsByNodeId.get(serverNode.id);
+          if (localPosition) {
+            return { ...serverNode, position: localPosition };
+          }
+          return serverNode;
+        });
+
+        return {
+          ...current,
+          metadata: {
+            ...current.metadata,
+            name: workflow.metadata?.name ?? current.metadata?.name,
+            description: workflow.metadata?.description ?? current.metadata?.description,
+          },
+          spec: { ...version.spec, nodes: mergedNodes },
+        };
+      });
+    },
+    [organizationId, canvasId, queryClient],
+  );
+
+  const saveMatchesCurrentCanvas = useCallback(
+    (workflow: CanvasesCanvas) => {
+      const currentWorkflow = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId!, canvasId!));
+      return getWorkflowSaveSignature(currentWorkflow) === getWorkflowSaveSignature(workflow);
+    },
+    [organizationId, canvasId, queryClient],
+  );
+
+  const processQueuedCanvasSave = useCallback(
+    async (saveSession: number, request: QueuedCanvasSaveRequest) => {
+      if (canvasSaveSessionRef.current !== saveSession) {
+        request.resolve({
+          status: "stale",
+          workflow: request.workflow,
+          savingVersionId: request.savingVersionId,
+          matchesCurrentCanvas: false,
+          hasQueuedFollowUp: false,
+        });
+        return;
+      }
+
+      if (activeCanvasVersionIdRef.current !== (request.savingVersionId || "")) {
+        request.resolve({
+          status: "stale",
+          workflow: request.workflow,
+          savingVersionId: request.savingVersionId,
+          matchesCurrentCanvas: false,
+          hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
+        });
+        return;
+      }
+
+      const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
+      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEchoIfNeeded(request.savingVersionId);
+
+      try {
+        const response = await updateCanvasVersionMutation.mutateAsync({
+          versionId: request.savingVersionId,
+          name: request.workflow.metadata?.name ?? "",
+          description: request.workflow.metadata?.description,
+          nodes: request.workflow.spec?.nodes,
+          edges: request.workflow.spec?.edges,
+          preserveLocalCanvasState: true,
+          invalidateRelatedQueries: false,
+        });
+
+        if (canvasSaveSessionRef.current !== saveSession) {
+          request.resolve({
+            status: "stale",
+            workflow: request.workflow,
+            savingVersionId: request.savingVersionId,
+            matchesCurrentCanvas: false,
+            hasQueuedFollowUp: false,
+          });
+          return;
+        }
+
+        syncCurrentCanvasWithSavedVersion(request.workflow, response?.data?.version);
+
+        request.resolve({
+          status: "saved",
+          workflow: request.workflow,
+          savingVersionId: request.savingVersionId,
+          response,
+          matchesCurrentCanvas: saveMatchesCurrentCanvas(request.workflow),
+          hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
+        });
+      } catch (error) {
+        releaseCanvasUpdatedEcho();
+        releaseCanvasVersionUpdatedEcho();
+        request.reject(error);
+      }
+    },
+    [
+      liveCanvasVersionId,
+      registerIgnoredCanvasUpdatedEchoIfNeeded,
+      registerIgnoredCanvasVersionUpdatedEcho,
+      saveMatchesCurrentCanvas,
+      syncCurrentCanvasWithSavedVersion,
+      updateCanvasVersionMutation,
+    ],
+  );
+
+  const drainCanvasSaveQueue = useCallback(async () => {
+    if (isDrainingCanvasSaveQueueRef.current || !organizationId || !canvasId) {
+      return;
+    }
+
+    const saveSession = canvasSaveSessionRef.current;
+    isDrainingCanvasSaveQueueRef.current = true;
+    setIsCanvasSaveInFlight(true);
+
+    try {
+      while (queuedCanvasSaveRef.current && canvasSaveSessionRef.current === saveSession) {
+        const request = queuedCanvasSaveRef.current;
+        queuedCanvasSaveRef.current = null;
+        setIsCanvasSaveQueued(false);
+        await processQueuedCanvasSave(saveSession, request);
+      }
+    } finally {
+      if (canvasSaveSessionRef.current === saveSession) {
+        setIsCanvasSaveInFlight(false);
+        isDrainingCanvasSaveQueueRef.current = false;
+        if (queuedCanvasSaveRef.current) {
+          void drainCanvasSaveQueue();
+        }
+      }
+    }
+  }, [organizationId, canvasId, processQueuedCanvasSave]);
+
+  const enqueueCanvasSave = useCallback(
+    (workflow: CanvasesCanvas, savingVersionId?: string) =>
+      new Promise<CanvasSaveResult>((resolve, reject) => {
+        const replacedRequest = queuedCanvasSaveRef.current;
+        if (replacedRequest) {
+          replacedRequest.resolve({
+            status: "replaced",
+            workflow: replacedRequest.workflow,
+            savingVersionId: replacedRequest.savingVersionId,
+            matchesCurrentCanvas: false,
+            hasQueuedFollowUp: true,
+          });
+        }
+
+        queuedCanvasSaveRef.current = { workflow, savingVersionId, resolve, reject };
+        setIsCanvasSaveQueued(true);
+        void drainCanvasSaveQueue();
+      }),
+    [drainCanvasSaveQueue],
+  );
+
+  const clearQueuedCanvasSave = useCallback(() => {
+    const queuedRequest = queuedCanvasSaveRef.current;
+    if (!queuedRequest) {
+      return;
+    }
+
+    queuedCanvasSaveRef.current = null;
+    setIsCanvasSaveQueued(false);
+    queuedRequest.resolve({
+      status: "replaced",
+      workflow: queuedRequest.workflow,
+      savingVersionId: queuedRequest.savingVersionId,
+      matchesCurrentCanvas: false,
+      hasQueuedFollowUp: false,
+    });
+  }, []);
 
   // Revert to initial state
   const markUnsavedChange = useCallback((kind: UnsavedChangeKind) => {
@@ -1234,20 +1605,16 @@ export function WorkflowPageV2() {
             }
             const savingVersionID = activeCanvasVersionId || undefined;
 
-            lastLocalCanvasSaveAtRef.current = Date.now();
-            const updateResponse = await updateCanvasVersionMutation.mutateAsync({
-              versionId: savingVersionID,
-              name: latestWorkflow.metadata?.name!,
-              description: latestWorkflow.metadata?.description,
-              nodes: updatedNodes,
-              edges: latestWorkflow.spec?.edges,
-            });
+            const saveResult = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
+            if (saveResult.status !== "saved") {
+              return;
+            }
             if (
-              updateResponse?.data?.version &&
+              saveResult.response?.data?.version &&
               savingVersionID &&
               activeCanvasVersionIdRef.current === savingVersionID
             ) {
-              setActiveCanvasVersion(updateResponse.data.version);
+              setActiveCanvasVersion(saveResult.response.data.version);
             }
             if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
               return;
@@ -1322,13 +1689,13 @@ export function WorkflowPageV2() {
     [
       organizationId,
       canvasId,
-      updateCanvasVersionMutation,
       activeCanvasVersionId,
       queryClient,
       hasNonPositionalUnsavedChanges,
       canAutoSave,
       isTemplate,
       isVersioningDisabled,
+      enqueueCanvasSave,
     ],
   );
 
@@ -1358,7 +1725,7 @@ export function WorkflowPageV2() {
   // Warn user before leaving page with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (hasPendingLocalCanvasState) {
         e.preventDefault();
         e.returnValue = "Your work isn't saved, unsaved changes will be lost. Are you sure you want to leave?";
       }
@@ -1366,7 +1733,7 @@ export function WorkflowPageV2() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [hasPendingLocalCanvasState]);
 
   // Merge triggers and components from applications into the main arrays
   const allTriggers = useMemo(() => {
@@ -1683,49 +2050,58 @@ export function WorkflowPageV2() {
     (payload: { canvasId: string; versionId?: string }, eventName: string) => {
       if (eventName === "canvas_deleted") {
         setCanvasDeletedRemotely(true);
-        return;
+        return true;
       }
 
-      const isLocalEcho =
-        (eventName === "canvas_updated" || eventName === "canvas_version_updated") &&
-        Date.now() - lastLocalCanvasSaveAtRef.current < LOCAL_CANVAS_UPDATE_SUPPRESSION_MS;
-      if (isLocalEcho) {
-        return;
+      if (eventName === "canvas_updated" && consumeIgnoredCanvasUpdatedEcho()) {
+        return false;
+      }
+
+      if (eventName === "canvas_version_updated" && consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId)) {
+        return false;
       }
 
       if (!canvasId) {
-        return;
+        return true;
       }
 
       if (eventName === "canvas_version_updated") {
         invalidateCanvasVersionData(canvasId);
         if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
-          if (hasUnsavedChanges) {
+          if (hasPendingLocalCanvasState) {
             setRemoteCanvasUpdatePending(true);
-            return;
+            return true;
           }
           invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
         }
-        return;
+        return true;
       }
 
       if (eventName !== "canvas_updated") {
-        return;
+        return true;
       }
 
-      if (hasUnsavedChanges) {
+      if (hasPendingLocalCanvasState) {
         setRemoteCanvasUpdatePending(true);
-        return;
+        return true;
       }
 
       invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
+      return true;
     },
-    [hasUnsavedChanges, invalidateCanvasVersionData, canvasId, activeCanvasVersionId],
+    [
+      activeCanvasVersionId,
+      canvasId,
+      consumeIgnoredCanvasUpdatedEcho,
+      consumeIgnoredCanvasVersionUpdatedEcho,
+      hasPendingLocalCanvasState,
+      invalidateCanvasVersionData,
+    ],
   );
 
   const shouldApplyCanvasUpdate = useCallback(
-    () => isViewingLiveVersion && !hasUnsavedChanges && !canvasDeletedRemotely,
-    [isViewingLiveVersion, hasUnsavedChanges, canvasDeletedRemotely],
+    () => isViewingLiveVersion && !hasPendingLocalCanvasState && !canvasDeletedRemotely,
+    [isViewingLiveVersion, hasPendingLocalCanvasState, canvasDeletedRemotely],
   );
 
   useCanvasWebsocket(
@@ -2196,31 +2572,29 @@ export function WorkflowPageV2() {
       }
       const shouldRestoreFocus = options?.showToast === false;
       const focusedNoteId = shouldRestoreFocus ? getActiveNoteId() : null;
-      const changeSummary = summarizeWorkflowChanges({
-        before: lastSavedWorkflowRef.current,
-        after: targetWorkflow,
-        onNodeSelect: handleLogNodeSelect,
-      });
-      const changeMessage = changeSummary.changeCount
-        ? `${changeSummary.changeCount} Canvas changes saved`
-        : "Canvas changes saved";
 
       try {
         setLastCanvasSaveError(null);
         const savingVersionID = activeCanvasVersionId || undefined;
-        lastLocalCanvasSaveAtRef.current = Date.now();
-        const updateResponse = await updateCanvasVersionMutation.mutateAsync({
-          versionId: savingVersionID,
-          name: targetWorkflow.metadata?.name!,
-          description: targetWorkflow.metadata?.description,
-          nodes: targetWorkflow.spec?.nodes,
-          edges: targetWorkflow.spec?.edges,
+        const result = await enqueueCanvasSave(targetWorkflow, savingVersionID);
+        if (result.status !== "saved") {
+          return result;
+        }
+
+        const changeSummary = summarizeWorkflowChanges({
+          before: lastSavedWorkflowRef.current,
+          after: targetWorkflow,
+          onNodeSelect: handleLogNodeSelect,
         });
-        if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-          setActiveCanvasVersion(updateResponse.data.version);
+        const changeMessage = changeSummary.changeCount
+          ? `${changeSummary.changeCount} Canvas changes saved`
+          : "Canvas changes saved";
+
+        if (result.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
+          setActiveCanvasVersion(result.response.data.version);
         }
         if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
-          return;
+          return result;
         }
 
         setLiveCanvasEntries((prev) => [
@@ -2237,13 +2611,16 @@ export function WorkflowPageV2() {
         if (options?.showToast !== false) {
           showSuccessToast("Canvas changes saved");
         }
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
         setLastSavedAt(new Date());
-
-        // Clear the snapshot since changes are now saved
-        setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
+
+        if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
+          setHasUnsavedChanges(false);
+          setHasNonPositionalUnsavedChanges(false);
+          setInitialWorkflowSnapshot(null);
+        }
+
+        return result;
       } catch (error: any) {
         console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
@@ -2259,6 +2636,7 @@ export function WorkflowPageV2() {
           }),
           ...prev,
         ]);
+        return undefined;
       } finally {
         if (focusedNoteId) {
           requestAnimationFrame(() => {
@@ -2270,11 +2648,12 @@ export function WorkflowPageV2() {
     [
       organizationId,
       canvasId,
-      updateCanvasVersionMutation,
       activeCanvasVersionId,
       isTemplate,
       canUpdateCanvas,
       isVersioningDisabled,
+      enqueueCanvasSave,
+      handleLogNodeSelect,
     ],
   );
 
@@ -2597,7 +2976,10 @@ export function WorkflowPageV2() {
               nodes: updatedNodes,
             },
           };
-          await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+          const saveResult = await handleSaveWorkflow(updatedWorkflow, { showToast: false });
+          if (saveResult?.status !== "saved") {
+            return;
+          }
 
           annotationUpdates.forEach((updates, nodeId) => {
             if (pendingAnnotationUpdatesRef.current.get(nodeId) === updates) {
@@ -2629,8 +3011,9 @@ export function WorkflowPageV2() {
     debouncedAnnotationAutoSave.cancel();
     pendingPositionUpdatesRef.current.clear();
     pendingAnnotationUpdatesRef.current.clear();
+    clearQueuedCanvasSave();
     clearQueuedAutoSaveFlags();
-  }, [clearQueuedAutoSaveFlags, debouncedAnnotationAutoSave, debouncedAutoSave]);
+  }, [clearQueuedAutoSaveFlags, clearQueuedCanvasSave, debouncedAnnotationAutoSave, debouncedAutoSave]);
 
   const handleAnnotationUpdate = useCallback(
     (
@@ -3940,16 +4323,12 @@ export function WorkflowPageV2() {
 
       try {
         const savingVersionID = activeCanvasVersionId || undefined;
-        lastLocalCanvasSaveAtRef.current = Date.now();
-        const updateResponse = await updateCanvasVersionMutation.mutateAsync({
-          versionId: savingVersionID,
-          name: canvas.metadata?.name!,
-          description: canvas.metadata?.description,
-          nodes: updatedNodes,
-          edges: canvas.spec?.edges,
-        });
-        if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-          setActiveCanvasVersion(updateResponse.data.version);
+        const result = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
+        if (result.status !== "saved") {
+          return;
+        }
+        if (result.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
+          setActiveCanvasVersion(result.response.data.version);
         }
         if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
           return;
@@ -3967,27 +4346,21 @@ export function WorkflowPageV2() {
           ...prev,
         ]);
         showSuccessToast("Canvas changes saved");
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
-
-        // Clear the snapshot since changes are now saved
-        setInitialWorkflowSnapshot(null);
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
+        setLastSavedAt(new Date());
+
+        if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
+          setHasUnsavedChanges(false);
+          setHasNonPositionalUnsavedChanges(false);
+          setInitialWorkflowSnapshot(null);
+        }
       } catch (error) {
         console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }
     },
-    [
-      canvas,
-      organizationId,
-      canvasId,
-      updateCanvasVersionMutation,
-      activeCanvasVersionId,
-      isTemplate,
-      isVersioningDisabled,
-    ],
+    [canvas, organizationId, canvasId, activeCanvasVersionId, isTemplate, isVersioningDisabled, enqueueCanvasSave],
   );
 
   const handleCreateChangeRequest = useCallback(async () => {
@@ -4915,36 +5288,28 @@ export function WorkflowPageV2() {
       };
 
       const savingVersionID = activeCanvasVersionId || undefined;
-      lastLocalCanvasSaveAtRef.current = Date.now();
-      const updateResponse = await updateCanvasVersionMutation.mutateAsync({
-        versionId: savingVersionID,
-        name: updatedWorkflow.metadata?.name ?? "",
-        description: updatedWorkflow.metadata?.description,
-        nodes: updatedWorkflow.spec?.nodes,
-        edges: updatedWorkflow.spec?.edges,
-      });
-      if (updateResponse?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-        setActiveCanvasVersion(updateResponse.data.version);
+      const result = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
+      if (result.status !== "saved") {
+        return;
+      }
+      if (result.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
+        setActiveCanvasVersion(result.response.data.version);
       }
       if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
         return;
       }
       queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-      setInitialWorkflowSnapshot(null);
       lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
+      setLastSavedAt(new Date());
+
+      if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+        setInitialWorkflowSnapshot(null);
+      }
       showSuccessToast("Canvas changes saved");
     },
-    [
-      importYamlGuardError,
-      canvas,
-      activeCanvasVersionId,
-      updateCanvasVersionMutation,
-      organizationId,
-      canvasId,
-      queryClient,
-    ],
+    [importYamlGuardError, canvas, activeCanvasVersionId, enqueueCanvasSave, organizationId, canvasId, queryClient],
   );
 
   const isInitialCanvasBootstrapLoading =
@@ -5012,21 +5377,22 @@ export function WorkflowPageV2() {
   };
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
-  const remoteUpdateBanner = remoteCanvasUpdatePending ? (
-    <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-900">Canvas updated elsewhere</p>
-        <p className="text-[13px] text-black/60">
-          A newer canvas version is available. Reloading will discard your unsaved local changes.
-        </p>
+  const remoteUpdateBanner =
+    remoteCanvasUpdatePending && !hasLocalSaveActivity ? (
+      <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-900">Canvas updated elsewhere</p>
+          <p className="text-[13px] text-black/60">
+            A newer canvas version is available. Reloading will discard your unsaved local changes.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={handleReloadRemoteCanvas}>
+            Reload remote
+          </Button>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={handleReloadRemoteCanvas}>
-          Reload remote
-        </Button>
-      </div>
-    </div>
-  ) : null;
+    ) : null;
   const templateIntegrations = isTemplate ? extractIntegrations(canvas?.spec?.nodes) : [];
   const templateTags = isTemplate ? getTemplateTags(canvas?.metadata?.name) : [];
   const templateNodeCounts = isTemplate ? countNodesByType(canvas?.spec?.nodes) : { components: 0, triggers: 0 };
@@ -5140,7 +5506,7 @@ export function WorkflowPageV2() {
     !canUpdateCanvas ||
     canvasDeletedRemotely ||
     createCanvasVersionMutation.isPending ||
-    updateCanvasVersionMutation.isPending ||
+    hasLocalSaveActivity ||
     isResetDraftPending ||
     !activeCanvasVersionId ||
     !liveCanvasVersion?.spec;
@@ -5160,7 +5526,7 @@ export function WorkflowPageV2() {
   const createChangeRequestDisabled =
     isVersioningDisabled ||
     !hasEditableVersion ||
-    hasUnsavedChanges ||
+    hasPendingLocalCanvasState ||
     createCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely;
   const createChangeRequestDisabledTooltip = canvasDeletedRemotely
@@ -5169,16 +5535,18 @@ export function WorkflowPageV2() {
       ? versioningDisabledTooltip
       : !hasEditableVersion
         ? "Enable edit mode before creating a change request."
-        : hasUnsavedChanges
-          ? "Save your version before creating a change request."
-          : undefined;
+        : hasLocalSaveActivity
+          ? "Wait for the current save to finish."
+          : hasUnsavedChanges
+            ? "Save your version before creating a change request."
+            : undefined;
   const headerMode = isVersioningDisabled
     ? "versioning-disabled"
     : hasEditableVersion
       ? "version-edit"
       : "version-live";
   const headerSaveState =
-    updateCanvasVersionMutation.isPending || holdSavingDisplay || (canAutoSave && isAutoSaveQueued)
+    hasLocalSaveActivity || holdSavingDisplay
       ? "saving"
       : lastCanvasSaveError
         ? "error"
@@ -5236,7 +5604,7 @@ export function WorkflowPageV2() {
         onCopy={handleYamlViewCopy}
         onDownload={handleYamlViewDownload}
         onImport={!isReadOnly ? handleImportYaml : undefined}
-        isImporting={updateCanvasVersionMutation.isPending}
+        isImporting={hasLocalSaveActivity}
       />
     ) : topViewMode === "cli" ? (
       <CanvasCliView canvasId={canvasId} organizationId={organizationId} />
