@@ -237,6 +237,142 @@ func Test__Client__ListDataSources(t *testing.T) {
 	require.Equal(t, "Prometheus", dataSources[0].Name)
 }
 
+func Test__Client__ListFolders(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"uid":"folder-1","title":"Infrastructure"},{"uid":"folder-2","title":"Services"}]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	folders, err := client.ListFolders()
+	require.NoError(t, err)
+	require.Len(t, folders, 2)
+	require.Equal(t, "folder-1", folders[0].UID)
+	require.Equal(t, "Infrastructure", folders[0].Title)
+}
+
+func Test__Client__ListAlertRules(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"uid":"rule-1","title":"High error rate"},
+					{"uid":"rule-2","title":"Latency spike"}
+				]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	alertRules, err := client.ListAlertRules()
+	require.NoError(t, err)
+	require.Len(t, alertRules, 2)
+	require.Equal(t, "rule-1", alertRules[0].UID)
+	require.Equal(t, "High error rate", alertRules[0].Title)
+}
+
+func Test__Client__GetAlertRule(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"rule-1","title":"High error rate"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	alertRule, err := client.GetAlertRule("rule-1")
+	require.NoError(t, err)
+	require.Equal(t, "rule-1", alertRule["uid"])
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/rule-1"))
+}
+
+func Test__Client__CreateAlertRule(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusCreated,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"rule-1","title":"High error rate"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	alertRule, err := client.CreateAlertRule(map[string]any{
+		"title":     "High error rate",
+		"folderUID": "infra",
+		"ruleGroup": "service-health",
+		"condition": "A",
+		"data":      []any{map[string]any{"refId": "A"}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "rule-1", alertRule["uid"])
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, "true", httpContext.Requests[0].Header.Get("X-Disable-Provenance"))
+	require.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules"))
+}
+
+func Test__Client__UpdateAlertRule(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"rule-1","title":"High error rate"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	alertRule, err := client.UpdateAlertRule("rule-1", map[string]any{
+		"uid":       "rule-1",
+		"title":     "High error rate",
+		"folderUID": "infra",
+		"ruleGroup": "service-health",
+		"condition": "A",
+		"data":      []any{map[string]any{"refId": "A"}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "rule-1", alertRule["uid"])
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, "true", httpContext.Requests[0].Header.Get("X-Disable-Provenance"))
+	require.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
+	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/rule-1"))
+}
+
 func Test__Grafana__ListResources(t *testing.T) {
 	g := &Grafana{}
 
@@ -281,6 +417,66 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, "Prometheus", resources[0].Name)
 		require.Equal(t, "prom", resources[0].ID)
 		require.Equal(t, resourceTypeDataSource, resources[0].Type)
+	})
+
+	t.Run("folder returns grafana folders", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"uid":"folder-1","title":"Infrastructure"},
+						{"uid":"folder-2","title":"Services"},
+						{"uid":"","title":"Missing UID"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypeFolder, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		require.Equal(t, "Infrastructure", resources[0].Name)
+		require.Equal(t, "folder-1", resources[0].ID)
+		require.Equal(t, resourceTypeFolder, resources[0].Type)
+	})
+
+	t.Run("alert-rule returns grafana alert rules", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"uid":"rule-1","title":"High error rate"},
+						{"uid":"rule-2","title":"Latency spike"},
+						{"uid":"","title":"Missing UID"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypeAlertRule, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		require.Equal(t, "High error rate", resources[0].Name)
+		require.Equal(t, "rule-1", resources[0].ID)
+		require.Equal(t, resourceTypeAlertRule, resources[0].Type)
 	})
 }
 
