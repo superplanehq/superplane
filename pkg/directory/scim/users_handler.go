@@ -419,7 +419,7 @@ func (h *UserHandler) Delete(r *http.Request, id string) error {
 		return scimerrors.ScimErrorResourceNotFound(id)
 	}
 
-	log.Infof("SCIM [%s] Delete: deprovisioning user id=%s email=%s", orgID, id, user.Email)
+	log.Infof("SCIM [%s] Delete: deprovisioning user id=%s email=%s", orgID, id, *user.Email)
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if e := models.DeleteOrganizationScimUserMappingInTransaction(tx, orgID, id); e != nil {
 			log.Errorf("SCIM [%s] Delete: failed to delete SCIM mapping for user id=%s: %v", orgID, id, e)
@@ -429,7 +429,7 @@ func (h *UserHandler) Delete(r *http.Request, id string) error {
 			log.Errorf("SCIM [%s] Delete: failed to soft-delete user id=%s: %v", orgID, id, e)
 			return e
 		}
-		log.Infof("SCIM [%s] Delete: successfully deprovisioned user id=%s email=%s", orgID, id, user.Email)
+		log.Infof("SCIM [%s] Delete: successfully deprovisioned user id=%s email=%s", orgID, id, *user.Email)
 		return nil
 	})
 }

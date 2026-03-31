@@ -26,6 +26,24 @@ import {
 import { withOrganizationHeader } from "../../../lib/withOrganizationHeader";
 import type { OrganizationsOktaIdpSettings } from "../../../api-client/types.gen";
 
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function flashMessage(setter: (msg: string | null) => void, message: string, duration = 3000) {
+  setter(message);
+  setTimeout(() => setter(null), duration);
+}
+
+function getOktaURLs(baseURL: string, orgId: string) {
+  return {
+    acsURL: `${baseURL}/auth/okta/${orgId}/saml/acs`,
+    entityID: `${baseURL}/auth/okta/${orgId}`,
+    loginURL: `${baseURL}/auth/okta/${orgId}/saml/login`,
+    scimBaseURL: `${baseURL}/api/v1/scim/${orgId}/v2`,
+  };
+}
+
 export function OktaSSO() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -52,10 +70,7 @@ export function OktaSSO() {
   const [rotatingToken, setRotatingToken] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
 
-  const acsURL = `${publicBaseURL}/auth/okta/${organizationId}/saml/acs`;
-  const entityID = `${publicBaseURL}/auth/okta/${organizationId}`;
-  const loginURL = `${publicBaseURL}/auth/okta/${organizationId}/saml/login`;
-  const scimBaseURL = `${publicBaseURL}/api/v1/scim/${organizationId}/v2`;
+  const { acsURL, entityID, loginURL, scimBaseURL } = getOktaURLs(publicBaseURL, organizationId ?? "");
 
   useEffect(() => {
     if (!organizationId) return;
@@ -72,15 +87,6 @@ export function OktaSSO() {
       })
       .catch(() => setLoadError("Failed to load SSO settings."));
   }, [organizationId]);
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {});
-  };
-
-  const flashMessage = (setter: (msg: string | null) => void, message: string, duration = 3000) => {
-    setter(message);
-    setTimeout(() => setter(null), duration);
-  };
 
   const handleSamlSave = async () => {
     if (!canUpdate || !organizationId) return;

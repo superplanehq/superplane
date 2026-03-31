@@ -72,7 +72,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 
-	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	handler := OrganizationAuthMiddleware(signer, "")(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		user, ok := GetUserFromContext(req.Context())
 		require.True(t, ok)
 		assert.Equal(t, r.User, user.ID)

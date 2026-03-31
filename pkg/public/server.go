@@ -85,9 +85,9 @@ type Server struct {
 	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
-	isDev              bool
-	forceSecureCookies bool
-	usageService       usage.Service
+	isDev                 bool
+	forceSecureCookies    bool
+	usageService          usage.Service
 }
 
 // WebsocketHub returns the websocket hub for this server

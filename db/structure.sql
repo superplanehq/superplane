@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -354,14 +354,14 @@ CREATE TABLE public.organization_invite_links (
 CREATE TABLE public.organization_okta_idp (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
-    issuer_base_url character varying(512) NOT NULL,
-    oauth_client_id character varying(512) NOT NULL,
-    oauth_client_secret_ciphertext bytea,
-    oidc_enabled boolean DEFAULT false NOT NULL,
     scim_bearer_token_hash character varying(64),
     scim_enabled boolean DEFAULT false NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    saml_idp_sso_url text DEFAULT ''::text NOT NULL,
+    saml_idp_issuer text DEFAULT ''::text NOT NULL,
+    saml_idp_certificate_pem text DEFAULT ''::text NOT NULL,
+    saml_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -2085,7 +2085,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2104,7 +2104,6 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260319221953	f
 20260327195840	f
 \.
 
@@ -2122,7 +2121,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.8 (Ubuntu 17.8-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
