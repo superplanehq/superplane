@@ -178,6 +178,8 @@ type QueuedCanvasSaveRequest = {
   reject: (error: unknown) => void;
 };
 
+type CanvasEchoRelease = () => void;
+
 function getWorkflowSaveSignature(workflow: CanvasesCanvas | null | undefined): string {
   if (!workflow) {
     return "";
@@ -732,8 +734,8 @@ export function WorkflowPageV2() {
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
   const canvasSaveSessionRef = useRef(0);
-  const ignoredCanvasUpdatedEventsRef = useRef(0);
-  const ignoredCanvasVersionUpdatedEventsRef = useRef<Map<string, number>>(new Map());
+  const ignoredCanvasUpdatedEchoReleasesRef = useRef<Array<CanvasEchoRelease>>([]);
+  const ignoredCanvasVersionUpdatedEchoReleasesRef = useRef<Map<string, Array<CanvasEchoRelease>>>(new Map());
   const clearQueuedAutoSaveFlags = useCallback(() => {
     setIsPositionAutoSaveQueued(false);
     setIsAnnotationAutoSaveQueued(false);
@@ -826,8 +828,8 @@ export function WorkflowPageV2() {
     setSelectedChangeRequestId("");
     hasSyncedVersionFromURLRef.current = false;
     lastSavedWorkflowRef.current = null;
-    ignoredCanvasUpdatedEventsRef.current = 0;
-    ignoredCanvasVersionUpdatedEventsRef.current.clear();
+    ignoredCanvasUpdatedEchoReleasesRef.current = [];
+    ignoredCanvasVersionUpdatedEchoReleasesRef.current.clear();
     isDrainingCanvasSaveQueueRef.current = false;
     setIsCanvasSaveInFlight(false);
     setIsCanvasSaveQueued(false);
@@ -1085,27 +1087,29 @@ export function WorkflowPageV2() {
 
   const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
     const saveSession = canvasSaveSessionRef.current;
-    ignoredCanvasUpdatedEventsRef.current += 1;
     let released = false;
-    const timeoutId = window.setTimeout(() => {
-      if (released || canvasSaveSessionRef.current !== saveSession) {
-        return;
-      }
-      released = true;
-      ignoredCanvasUpdatedEventsRef.current = Math.max(0, ignoredCanvasUpdatedEventsRef.current - 1);
-    }, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
-
-    return () => {
+    let timeoutId = 0;
+    const release = () => {
       if (released) {
         return;
       }
+
       released = true;
       window.clearTimeout(timeoutId);
+      const releaseIndex = ignoredCanvasUpdatedEchoReleasesRef.current.indexOf(release);
+      if (releaseIndex >= 0) {
+        ignoredCanvasUpdatedEchoReleasesRef.current.splice(releaseIndex, 1);
+      }
+
       if (canvasSaveSessionRef.current !== saveSession) {
         return;
       }
-      ignoredCanvasUpdatedEventsRef.current = Math.max(0, ignoredCanvasUpdatedEventsRef.current - 1);
     };
+
+    ignoredCanvasUpdatedEchoReleasesRef.current.push(release);
+    timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
+
+    return release;
   }, []);
 
   const registerIgnoredCanvasVersionUpdatedEcho = useCallback((savingVersionId?: string) => {
@@ -1114,38 +1118,37 @@ export function WorkflowPageV2() {
     }
 
     const saveSession = canvasSaveSessionRef.current;
-    const current = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
-    ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, current + 1);
+    const currentReleases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(savingVersionId) || [];
     let released = false;
-    const timeoutId = window.setTimeout(() => {
-      if (released || canvasSaveSessionRef.current !== saveSession) {
-        return;
-      }
-      released = true;
-      const count = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
-      if (count <= 1) {
-        ignoredCanvasVersionUpdatedEventsRef.current.delete(savingVersionId);
-        return;
-      }
-      ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, count - 1);
-    }, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
-
-    return () => {
+    let timeoutId = 0;
+    const release = () => {
       if (released) {
         return;
       }
+
       released = true;
       window.clearTimeout(timeoutId);
+      const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(savingVersionId);
+      if (releases) {
+        const releaseIndex = releases.indexOf(release);
+        if (releaseIndex >= 0) {
+          releases.splice(releaseIndex, 1);
+        }
+        if (releases.length === 0) {
+          ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(savingVersionId);
+        }
+      }
+
       if (canvasSaveSessionRef.current !== saveSession) {
         return;
       }
-      const count = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
-      if (count <= 1) {
-        ignoredCanvasVersionUpdatedEventsRef.current.delete(savingVersionId);
-        return;
-      }
-      ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, count - 1);
     };
+
+    currentReleases.push(release);
+    ignoredCanvasVersionUpdatedEchoReleasesRef.current.set(savingVersionId, currentReleases);
+    timeoutId = window.setTimeout(release, LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS);
+
+    return release;
   }, []);
 
   const registerIgnoredCanvasUpdatedEchoIfNeeded = useCallback(
@@ -1158,6 +1161,39 @@ export function WorkflowPageV2() {
     },
     [registerIgnoredCanvasUpdatedEcho],
   );
+
+  const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
+    const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
+    if (!release) {
+      return false;
+    }
+
+    release();
+    return true;
+  }, []);
+
+  const consumeIgnoredCanvasVersionUpdatedEcho = useCallback((versionId?: string) => {
+    if (!versionId) {
+      return false;
+    }
+
+    const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(versionId);
+    if (!releases) {
+      return false;
+    }
+
+    const release = releases.pop();
+    if (!release) {
+      return false;
+    }
+
+    if (releases.length === 0) {
+      ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(versionId);
+    }
+
+    release();
+    return true;
+  }, []);
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
@@ -2017,21 +2053,12 @@ export function WorkflowPageV2() {
         return true;
       }
 
-      if (eventName === "canvas_updated" && ignoredCanvasUpdatedEventsRef.current > 0) {
-        ignoredCanvasUpdatedEventsRef.current -= 1;
+      if (eventName === "canvas_updated" && consumeIgnoredCanvasUpdatedEcho()) {
         return false;
       }
 
-      if (eventName === "canvas_version_updated" && payload.versionId) {
-        const ignoredCount = ignoredCanvasVersionUpdatedEventsRef.current.get(payload.versionId) || 0;
-        if (ignoredCount > 0) {
-          if (ignoredCount === 1) {
-            ignoredCanvasVersionUpdatedEventsRef.current.delete(payload.versionId);
-          } else {
-            ignoredCanvasVersionUpdatedEventsRef.current.set(payload.versionId, ignoredCount - 1);
-          }
-          return false;
-        }
+      if (eventName === "canvas_version_updated" && consumeIgnoredCanvasVersionUpdatedEcho(payload.versionId)) {
+        return false;
       }
 
       if (!canvasId) {
@@ -2062,7 +2089,14 @@ export function WorkflowPageV2() {
       invalidateCanvasVersionData(canvasId, activeCanvasVersionId);
       return true;
     },
-    [hasPendingLocalCanvasState, invalidateCanvasVersionData, canvasId, activeCanvasVersionId],
+    [
+      activeCanvasVersionId,
+      canvasId,
+      consumeIgnoredCanvasUpdatedEcho,
+      consumeIgnoredCanvasVersionUpdatedEcho,
+      hasPendingLocalCanvasState,
+      invalidateCanvasVersionData,
+    ],
   );
 
   const shouldApplyCanvasUpdate = useCallback(
