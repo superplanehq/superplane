@@ -71,6 +71,11 @@ export const Login: React.FC = () => {
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [ssoMode, setSsoMode] = useState(false);
+  const [ssoEmail, setSsoEmail] = useState("");
+  const [ssoLoading, setSsoLoading] = useState(false);
+  const [ssoError, setSsoError] = useState<string | null>(null);
+  const [ssoOrgs, setSsoOrgs] = useState<{ id: string; name: string; login_url: string }[]>([]);
 
   const [magicCodeStep, setMagicCodeStep] = useState<MagicCodeStep>("email");
   const [magicCodeEmail, setMagicCodeEmail] = useState("");
@@ -422,6 +427,33 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handleSSOSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSsoError(null);
+    setSsoOrgs([]);
+    const email = ssoEmail.trim();
+    if (!email) return;
+    setSsoLoading(true);
+    try {
+      const res = await fetch(`/auth/sso/lookup?email=${encodeURIComponent(email)}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("lookup failed");
+      const data = (await res.json()) as { orgs: { id: string; name: string; login_url: string }[] };
+      if (!data.orgs || data.orgs.length === 0) {
+        setSsoError("No Enterprise SSO found for this email address.");
+      } else if (data.orgs.length === 1) {
+        window.location.href = data.orgs[0].login_url;
+      } else {
+        setSsoOrgs(data.orgs);
+      }
+    } catch {
+      setSsoError("Something went wrong. Please try again.");
+    } finally {
+      setSsoLoading(false);
+    }
+  };
+
   const hasAnyFormMethod = canLoginWithPassword || canSignupWithPassword || showProviderButtons || useMagicCodePrimary;
 
   const getHeading = () => {
@@ -710,6 +742,79 @@ export const Login: React.FC = () => {
                   </a>
                 </Button>
               ))}
+            </div>
+          )}
+
+          {!configLoading && !isSignupMode && (
+            <div className="mt-3">
+              {!ssoMode ? (
+                <Button
+                  variant="outline"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    setSsoMode(true);
+                    setSsoError(null);
+                    setSsoOrgs([]);
+                  }}
+                >
+                  Sign in with Enterprise SSO
+                </Button>
+              ) : ssoOrgs.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Select your organization:</p>
+                  {ssoOrgs.map((org) => (
+                    <Button
+                      key={org.id}
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        window.location.href = org.login_url;
+                      }}
+                    >
+                      {org.name}
+                    </Button>
+                  ))}
+                  <button
+                    type="button"
+                    className="text-xs text-gray-400 underline"
+                    onClick={() => {
+                      setSsoOrgs([]);
+                      setSsoEmail("");
+                    }}
+                  >
+                    Try a different email
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleSSOSubmit} className="space-y-2">
+                  <Input
+                    type="email"
+                    placeholder="Work email"
+                    value={ssoEmail}
+                    onChange={(e) => setSsoEmail(e.target.value)}
+                    autoFocus
+                    required
+                  />
+                  {ssoError && <p className="text-xs text-red-500">{ssoError}</p>}
+                  <div className="flex gap-2">
+                    <LoadingButton type="submit" loading={ssoLoading} loadingText="Looking up..." className="flex-1">
+                      Continue
+                    </LoadingButton>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setSsoMode(false);
+                        setSsoError(null);
+                        setSsoEmail("");
+                        setSsoOrgs([]);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              )}
             </div>
           )}
 
