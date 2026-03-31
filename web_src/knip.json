@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "project": [
+    "src/**/*.{ts,tsx}",
+    ".storybook/**/*.{ts,tsx}",
+    "scripts/**/*.mjs"
+  ],
+  "ignoreDependencies": ["@storybook/react", "monaco-editor", "tippy.js"],
+  "ignore": [],
+  "rules": {
+    "nsTypes": "off"
+  }
+}
