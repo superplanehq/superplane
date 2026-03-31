@@ -256,21 +256,19 @@ export function CanvasLogSidebar({
   return (
     <aside className="absolute left-0 right-0 bottom-0 z-31 pointer-events-auto">
       <div
-        className="bg-white outline outline-slate-950/15 flex flex-col"
+        className="bg-white outline outline-1 outline-offset-0 outline-slate-950/10 flex flex-col"
         style={{ height: sidebarHeight, minHeight, maxHeight }}
       >
         <div
           onMouseDown={handleResizeStart}
-          className={cn(
-            "absolute left-0 right-0 top-0 h-4 cursor-ns-resize hover:bg-gray-100 transition-colors flex items-center justify-center group z-30",
-            isResizing && "bg-blue-50",
-          )}
+          className="group absolute left-0 right-0 top-0 z-30 h-4 cursor-ns-resize bg-transparent"
           style={{ marginTop: "-8px" }}
         >
           <div
+            aria-hidden
             className={cn(
-              "h-1 w-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors",
-              isResizing && "bg-blue-500",
+              "pointer-events-none absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50",
+              isResizing && "bg-slate-950/50",
             )}
           />
         </div>
@@ -280,7 +278,7 @@ export function CanvasLogSidebar({
               type="button"
               onClick={() => setActiveTab("runs")}
               className={cn(
-                "flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                "flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
                 activeTab === "runs"
                   ? "border-gray-800 text-gray-800"
                   : "border-transparent text-gray-500 hover:text-gray-800",
@@ -293,7 +291,7 @@ export function CanvasLogSidebar({
               type="button"
               onClick={() => setActiveTab("errors")}
               className={cn(
-                "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                "group flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
                 activeTab === "errors"
                   ? "border-gray-800 text-gray-800"
                   : "border-transparent text-gray-500 hover:text-gray-800",
@@ -311,7 +309,7 @@ export function CanvasLogSidebar({
               />
               <span
                 className={cn(
-                  "tabular-nums",
+                  "tabular-nums !text-[13px]",
                   unacknowledgedCount > 0
                     ? "text-red-500"
                     : activeTab === "errors"
@@ -326,7 +324,7 @@ export function CanvasLogSidebar({
               type="button"
               onClick={() => setActiveTab("warnings")}
               className={cn(
-                "group flex items-center gap-2 pb-2 text-[13px] font-medium leading-none border-b transition-colors",
+                "group flex items-center gap-2 pb-2 !text-[13px] font-medium leading-none border-b transition-colors",
                 activeTab === "warnings"
                   ? "border-gray-800 text-gray-800"
                   : "border-transparent text-gray-500 hover:text-gray-800",
@@ -344,7 +342,7 @@ export function CanvasLogSidebar({
               />
               <span
                 className={cn(
-                  "tabular-nums",
+                  "tabular-nums !text-[13px]",
                   counts.warning > 0
                     ? "text-orange-500"
                     : activeTab === "warnings"
@@ -356,20 +354,20 @@ export function CanvasLogSidebar({
               </span>
             </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex h-full items-center justify-end">
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={onClose}
-              className="size-5 rounded hover:bg-gray-100 -mt-0.5"
+              className="size-5 shrink-0 rounded hover:bg-gray-100"
             >
               <X className="h-3 w-3" />
             </Button>
           </div>
         </div>
         <div className="px-2 border-b border-slate-200 h-8">
-          <InputGroup className="h-8 border-0 shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0">
-            <InputGroupAddon className="border-0 shadow-none">
+          <InputGroup className="h-8 border-0 shadow-none !ring-0 !focus-within:ring-0 focus-within:ring-offset-0 [&_[data-slot=input-group-control]]:!text-[13px]">
+            <InputGroupAddon className="border-0 shadow-none !text-[13px]">
               <Search className="h-4 w-4 -ml-1 text-gray-500" />
             </InputGroupAddon>
             <InputGroupInput

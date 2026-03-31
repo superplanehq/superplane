@@ -18,7 +18,7 @@ import { useBlueprints, useDeleteBlueprint } from "../../hooks/useBlueprintData"
 import { useDeleteCanvas, useCanvases, canvasKeys } from "../../hooks/useCanvasData";
 import { cn, resolveIcon } from "../../lib/utils";
 import { isCustomComponentsEnabled } from "../../lib/env";
-import { showErrorToast, showSuccessToast } from "../../utils/toast";
+import { showErrorToast, showSuccessToast } from "../../lib/toast";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";

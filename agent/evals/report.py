@@ -7,7 +7,6 @@ from typing import Any
 
 from pydantic_ai.usage import RunUsage
 from pydantic_evals.reporting import EvaluationReport
-from rich.console import Console
 
 from ai.jsonutil import to_jsonable
 from ai.llm_cost_estimate import (
@@ -25,17 +24,19 @@ class ReportBuilder:
         model: str,
         run_usages: dict[str, RunUsage],
         evaluate_wall_seconds: float,
+        interaction_log_paths_by_case_name: dict[str, str] | None = None,
     ) -> None:
         self.report = report
         self.model = model
         self.run_usages = run_usages
         self.evaluate_wall_seconds = evaluate_wall_seconds
-        self.console = Console()
+        self.interaction_log_paths_by_case_name = interaction_log_paths_by_case_name or {}
 
     def render(self) -> None:
-        display_output_dir = Path("agent/tmp/eval_outputs")
-        output_dir = Path("/app/tmp/eval_outputs")
+        display_output_dir = Path("tmp/agent/evals")
+        output_dir = Path("/app/tmp/agent/evals")
         output_dir.mkdir(parents=True, exist_ok=True)
+
         if len(self.run_usages) != len(self.report.cases):
             raise RuntimeError(
                 f"usage/case count mismatch: {len(self.run_usages)} usage keys vs "
@@ -51,8 +52,8 @@ class ReportBuilder:
         total_cost_usd: float | None = None
         pricing_match = matched_claude_pricing_key(self.model)
 
-        self.console.print()
-        self.console.print()
+        print()
+        print()
 
         for i, case_result in enumerate(self.report.cases):
             case_name = getattr(case_result, "name", None) or f"case_{i}"
@@ -63,7 +64,7 @@ class ReportBuilder:
             assertion_values = self._get_assertion_values(case_result)
             duration_seconds = self._duration_seconds(case_result)
 
-            # /app/tmp/... inside Docker; agent/tmp/... on host for the display path.
+            # /app/tmp/... inside Docker; tmp/... on host for the display path.
             filename = output_dir / f"{safe_case_name}.json"
             display_filename = display_output_dir / f"{safe_case_name}.json"
 
@@ -87,20 +88,23 @@ class ReportBuilder:
                     total_cost_usd = 0.0
                 total_cost_usd += case_cost
 
-            self.console.print(f"{case_name} {self._format_duration(case_result)}")
-            self.console.print(f"  input:        {case_input}")
-            self.console.print(f"  output:       {display_filename}")
-            self.console.print(f"  toolCalls:    {run_usage.tool_calls}")
-            self.console.print(f"  inputTokens:  {run_usage.input_tokens}")
-            self.console.print(f"  outputTokens: {run_usage.output_tokens}")
-            self.console.print(f"  cost:         ${case_cost:.4f}")
+            print(f"{case_name} {self._format_duration(case_result)}")
+            print(f"  input:        {case_input}")
+            print(f"  output:       {display_filename}")
+            interaction_log_for_case = self.interaction_log_paths_by_case_name.get(case_name)
+            if interaction_log_for_case:
+                print(f"  log:          {interaction_log_for_case}")
+            print(f"  toolCalls:    {run_usage.tool_calls}")
+            print(f"  inputTokens:  {run_usage.input_tokens}")
+            print(f"  outputTokens: {run_usage.output_tokens}")
+            print(f"  cost:         {self._format_cost(case_cost)}")
 
-            self.console.print("  assertions:")
+            print("  assertions:")
             assertion_lines = self._format_assertion_lines(case_result)
             if not assertion_lines:
-                self.console.print("    - none")
+                print("    - none")
             for assertion_line in assertion_lines:
-                self.console.print(f"    - {assertion_line}")
+                print(f"    - {assertion_line}")
 
             total_assertions += len(assertion_values)
             passed_assertions += sum(
@@ -113,18 +117,17 @@ class ReportBuilder:
                 case_count_with_duration += 1
 
             if i < len(self.report.cases) - 1:
-                self.console.print()
-                self.console.print()
+                print()
+                print()
 
-        self.console.print()
-        self.console.print()
+        print()
+        print()
 
         total_usage = RunUsage()
         for usage in self.run_usages.values():
             total_usage = total_usage + usage
 
         summary_path = output_dir / "usage_summary.json"
-        display_summary = display_output_dir / "usage_summary.json"
         summary_payload: dict[str, Any] = {
             "model": self.model,
             "cases": usage_by_case,
@@ -143,25 +146,26 @@ class ReportBuilder:
                 per_case=cost_per_case,
                 total=total_cost_usd,
             ),
+            "logs_by_case": self.interaction_log_paths_by_case_name,
         }
 
-        self.console.print("================================================")
-        self.console.print("")
+        print("================================================")
+        print("")
 
         with summary_path.open("w", encoding="utf-8") as summary_file:
             json.dump(summary_payload, summary_file, indent=2)
 
         time = task_time_sum_seconds + self.evaluate_wall_seconds
 
-        self.console.print(f"totalTime:    {time:.1f}s ")
-        self.console.print(f"totalCost:    ${total_cost_usd:.4f} ")
-        self.console.print(f"toolCalls:    {total_usage.tool_calls}")
-        self.console.print(f"inputTokens:  {total_usage.input_tokens}")
-        self.console.print(f"outputTokens: {total_usage.output_tokens}")
+        print(f"totalTime:    {time:.1f}s ")
+        print(f"totalCost:    {self._format_cost(total_cost_usd)} ")
+        print(f"toolCalls:    {total_usage.tool_calls}")
+        print(f"inputTokens:  {total_usage.input_tokens}")
+        print(f"outputTokens: {total_usage.output_tokens}")
 
-        self.console.print("")
+        print("")
 
-        self.console.print(f"{passed_assertions}/{total_assertions} assertions passed")
+        print(f"{passed_assertions}/{total_assertions} assertions passed")
 
     def _inputs_key(self, case_result: Any, *, case_index: int) -> str:
         raw = getattr(case_result, "inputs", getattr(case_result, "input", None))
@@ -198,7 +202,7 @@ class ReportBuilder:
             name = getattr(assertion, "name", "assertion")
             passed = bool(getattr(assertion, "value", False))
             reason = getattr(assertion, "reason", None)
-            status = "[green]passed[/]" if passed else "[red]failed[/]"
+            status = "passed" if passed else "failed"
             line = f"{name}: {status}"
             if reason:
                 line = f"{line} - {reason}"
@@ -260,5 +264,10 @@ class ReportBuilder:
         if usage.details:
             parts.append(f"details={usage.details}")
         return " ".join(parts)
+
+    def _format_cost(self, value: float | None) -> str:
+        if value is None:
+            return "-"
+        return f"${value:.4f}"
 
   

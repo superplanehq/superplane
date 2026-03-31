@@ -121,7 +121,6 @@ services:
     env_file:
       - agent/.env
     environment:
-      IN_DOCKER: "1"
       APP_PORT: ${APP_PORT:-8000}
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
@@ -149,6 +148,7 @@ services:
       - ${AGENT_REPL_WEB_PORT:-8090}:8090
     volumes:
       - .:/app
+      - ./tmp/agent/evals:/app/tmp/agent/evals
       - uv-cache:/root/.cache/uv
     healthcheck:
       test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]

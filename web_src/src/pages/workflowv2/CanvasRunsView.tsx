@@ -26,11 +26,14 @@ import {
 import { getTriggerRenderer } from "./mappers";
 import { buildEventInfo, buildTriggerSidebarEvent } from "./utils";
 
+/** Fixed width so status badges align across rows (9rem: enough for long labels at 10px; narrower than the old 11rem). */
+const RUNS_CONSOLE_BADGE_COL = "flex w-36 flex-shrink-0 items-center justify-start gap-1.5";
+
 function StatusBadge({ status }: { status: string }) {
   const { badgeColor, label } = getStatusBadgeProps(status);
   return (
     <div
-      className={`uppercase text-[11px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${badgeColor}`}
+      className={`shrink-0 uppercase text-[10px] py-[1.5px] px-[5px] font-semibold rounded flex items-center tracking-wide justify-center text-white ${badgeColor}`}
     >
       <span>{label}</span>
     </div>
@@ -115,8 +118,10 @@ function ExecutionRow({
         <NodeIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={nodeName} size={13} className="text-gray-400" />
       </div>
       <div className="flex flex-1 items-center gap-2 min-w-0">
+        <div className={RUNS_CONSOLE_BADGE_COL}>
+          <StatusBadge status={status} />
+        </div>
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
-        <StatusBadge status={status} />
         {duration && <span className="text-xs text-gray-500 tabular-nums">{duration}</span>}
       </div>
       {errorMessage && <span className="text-xs text-red-600 truncate max-w-[300px]">{errorMessage}</span>}
@@ -159,8 +164,10 @@ function QueueItemRow({
         <NodeIcon iconSrc={iconSrc} iconSlug={iconSlug} alt={nodeName} size={13} className="text-gray-400" />
       </div>
       <div className="flex flex-1 items-center gap-2 min-w-0">
+        <div className={RUNS_CONSOLE_BADGE_COL}>
+          <StatusBadge status="queued" />
+        </div>
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
-        <StatusBadge status="queued" />
       </div>
       <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
         {item.createdAt ? formatRunTimestamp(item.createdAt) : ""}
@@ -225,31 +232,33 @@ function RunRowHeader({
     <button
       type="button"
       onClick={onToggle}
-      className="flex w-full items-center gap-3 px-4 py-1.5 text-left hover:bg-gray-50 transition-colors min-h-8"
+      className="flex h-8 w-full items-center gap-3 px-4 text-left hover:bg-gray-50 transition-colors"
       aria-expanded={isExpanded}
     >
       <div className="text-gray-400">
         {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
       </div>
       <div className="flex flex-1 items-center gap-2 min-w-0">
+        <div className={RUNS_CONSOLE_BADGE_COL}>
+          <StatusBadge status={aggregateStatus} />
+          {errorAckLabel && (
+            <span
+              className={cn(
+                "shrink-0 text-[10px] font-medium rounded px-1.5 py-0.5",
+                errorAckLabel === "new" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500",
+              )}
+            >
+              {errorAckLabel === "new" ? "New" : "Acknowledged"}
+            </span>
+          )}
+        </div>
         <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
           <NodeIcon iconSrc={triggerIconSrc} iconSlug={triggerIconSlug || "bolt"} alt={triggerName} />
         </div>
         <span className="text-xs text-gray-600 truncate flex-shrink-0">{triggerName}</span>
         <span className="text-gray-300">·</span>
-        <span className="font-mono text-[10px] text-gray-400">#{event.id?.slice(0, 4)}</span>
+        <span className="font-mono text-xs text-gray-500">#{event.id?.slice(0, 4)}</span>
         <span className="text-xs font-medium text-gray-900 truncate">{title}</span>
-        <StatusBadge status={aggregateStatus} />
-        {errorAckLabel && (
-          <span
-            className={cn(
-              "text-[10px] font-medium rounded px-1.5 py-0.5",
-              errorAckLabel === "new" ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500",
-            )}
-          >
-            {errorAckLabel === "new" ? "New" : "Acknowledged"}
-          </span>
-        )}
         {totalSteps > 0 && (
           <span className="text-xs text-gray-400 whitespace-nowrap">
             {totalSteps} {totalSteps === 1 ? "step" : "steps"}

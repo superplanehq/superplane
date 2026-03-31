@@ -24,7 +24,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("update does not accept positional arguments")
 	}
 
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}

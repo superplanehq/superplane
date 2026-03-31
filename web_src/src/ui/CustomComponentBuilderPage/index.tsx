@@ -381,7 +381,7 @@ function CanvasContent({
       elementsSelectable={true}
     >
       <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
-      <ZoomSlider position="bottom-left" orientation="horizontal">
+      <ZoomSlider position="bottom-left" orientation="horizontal" screenshotName="Component Builder">
         <NodeSearch />
       </ZoomSlider>
     </ReactFlow>

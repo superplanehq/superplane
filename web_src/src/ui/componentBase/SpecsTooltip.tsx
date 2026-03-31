@@ -31,22 +31,31 @@ export function SpecsTooltip({ children, specTitle, specValues, tooltipTitle, hi
               className={`flex flex-wrap max-w-[800px] items-start gap-2 p-2 ${index === specValues.length - 1 ? "border-b-0" : "border-b"}`}
             >
               {value.badges.flatMap((badge, badgeIndex) => {
+                if (!badge) {
+                  return [];
+                }
+
+                const badgeLabel = typeof badge.label === "string" ? badge.label : "";
+                if (badgeLabel.trim().length === 0) {
+                  return [];
+                }
+
                 const maxChunkLength = 120;
-                if (badge.label.length <= maxChunkLength) {
+                if (badgeLabel.length <= maxChunkLength) {
                   return (
                     <span
                       key={`${badgeIndex}-0`}
                       className={`px-2 py-1 rounded text-xs font-mono break-words ${badge.bgColor} ${badge.textColor}`}
                       style={{ wordBreak: "break-word", overflowWrap: "break-word" }}
                     >
-                      {badge.label}
+                      {badgeLabel}
                     </span>
                   );
                 }
 
                 const separatorRegex = /[\s,()[\]{}<>:+\-*/=|&.!?]/;
                 const chunks: string[] = [];
-                let remaining = badge.label;
+                let remaining = badgeLabel;
 
                 while (remaining.length > maxChunkLength) {
                   let splitAt = -1;

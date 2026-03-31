@@ -1,8 +1,8 @@
-import { CSSProperties, useCallback } from "react";
+import React, { CSSProperties, useCallback } from "react";
 import { BaseEdge, EdgeLabelRenderer, EdgeProps, getBezierPath, useReactFlow } from "@xyflow/react";
 import { CircleX } from "lucide-react";
 
-export function CustomEdge({
+export const CustomEdge = React.memo(function CustomEdge({
   id,
   sourceX,
   sourceY,
@@ -81,4 +81,4 @@ export function CustomEdge({
       </EdgeLabelRenderer>
     </>
   );
-}
+});

@@ -8,7 +8,7 @@ import {
   componentsListComponents,
   componentsDescribeComponent,
 } from "../api-client/sdk.gen";
-import { withOrganizationHeader } from "../utils/withOrganizationHeader";
+import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
 export const blueprintKeys = {

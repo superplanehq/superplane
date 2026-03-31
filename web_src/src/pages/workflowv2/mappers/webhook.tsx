@@ -1,7 +1,7 @@
 import { useState } from "react";
 import React from "react";
 import { canvasesInvokeNodeTriggerAction } from "@/api-client";
-import { getColorClass } from "@/utils/colors";
+import { getColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type {
   TriggerRenderer,
@@ -14,9 +14,9 @@ import type { TriggerProps } from "@/ui/trigger";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { withOrganizationHeader } from "@/utils/withOrganizationHeader";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { showErrorToast } from "@/utils/toast";
+import { showErrorToast } from "@/lib/toast";
 
 const DEFAULT_HEADER_TOKEN_NAME = "X-Webhook-Token";
 

@@ -1,7 +1,7 @@
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
-import { formatTimeAgo } from "@/utils/date";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
+import { formatTimeAgo } from "@/lib/date";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { addDetail, addFormattedTimestamp, getProjectLabel, splitSentryIssueTitle } from "./utils";
 

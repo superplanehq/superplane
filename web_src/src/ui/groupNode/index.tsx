@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import debounce from "lodash.debounce";
 import { Trash2, Ungroup } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { normalizeGroupColor } from "./constants";
+import { CONFIRM_DELETE_GROUP_MESSAGE, normalizeGroupColor } from "./constants";
 import type { GroupColor } from "./constants";
 
 type GroupColorStyles = {
   label: string;
   bgTint: string;
   border: string;
-  glow: string;
   labelBg: string;
   labelText: string;
   dot: string;
@@ -19,65 +19,58 @@ const GROUP_COLORS: Record<GroupColor, GroupColorStyles> = {
   purple: {
     label: "Purple",
     bgTint: "bg-purple-500/5",
-    border: "border-purple-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(168,85,247,0.14),0_0_10px_-4px_rgba(147,51,234,0.12)]",
-    labelBg: "bg-purple-50",
-    labelText: "text-purple-900",
-    dot: "bg-purple-300 border-purple-500/70",
+    border: "border-purple-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-purple-600",
+    dot: "bg-purple-200 border-purple-500",
   },
   blue: {
     label: "Blue",
     bgTint: "bg-sky-500/5",
-    border: "border-sky-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(14,165,233,0.14),0_0_10px_-4px_rgba(2,132,199,0.12)]",
-    labelBg: "bg-sky-50",
-    labelText: "text-sky-900",
-    dot: "bg-sky-300 border-sky-500/70",
+    border: "border-sky-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-sky-600",
+    dot: "bg-sky-200 border-sky-500",
   },
   green: {
     label: "Green",
-    bgTint: "bg-emerald-500/5",
-    border: "border-emerald-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(52,211,153,0.14),0_0_10px_-4px_rgba(16,185,129,0.12)]",
-    labelBg: "bg-emerald-50",
-    labelText: "text-emerald-900",
-    dot: "bg-emerald-300 border-emerald-500/70",
+    bgTint: "bg-green-500/5",
+    border: "border-green-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-green-600",
+    dot: "bg-green-200 border-green-500",
   },
   cyan: {
     label: "Cyan",
     bgTint: "bg-cyan-500/5",
-    border: "border-cyan-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(34,211,238,0.14),0_0_10px_-4px_rgba(6,182,212,0.12)]",
-    labelBg: "bg-cyan-50",
-    labelText: "text-cyan-900",
-    dot: "bg-cyan-300 border-cyan-500/70",
+    border: "border-cyan-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-cyan-600",
+    dot: "bg-cyan-200 border-cyan-500",
   },
   orange: {
     label: "Orange",
     bgTint: "bg-orange-500/5",
-    border: "border-orange-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(251,146,60,0.14),0_0_10px_-4px_rgba(234,88,12,0.12)]",
-    labelBg: "bg-orange-50",
-    labelText: "text-orange-900",
-    dot: "bg-orange-300 border-orange-500/70",
+    border: "border-orange-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-orange-600",
+    dot: "bg-orange-200 border-orange-500",
   },
   rose: {
     label: "Rose",
     bgTint: "bg-rose-500/5",
-    border: "border-rose-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(251,113,133,0.14),0_0_10px_-4px_rgba(225,29,72,0.12)]",
-    labelBg: "bg-rose-50",
-    labelText: "text-rose-900",
-    dot: "bg-rose-300 border-rose-500/70",
+    border: "border-rose-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-rose-600",
+    dot: "bg-rose-200 border-rose-500",
   },
   amber: {
     label: "Amber",
     bgTint: "bg-amber-500/5",
-    border: "border-amber-300/90",
-    glow: "shadow-[inset_0_0_0_1px_rgba(251,191,36,0.14),0_0_10px_-4px_rgba(217,119,6,0.12)]",
-    labelBg: "bg-amber-50",
-    labelText: "text-amber-900",
-    dot: "bg-amber-300 border-amber-500/70",
+    border: "border-amber-500/90",
+    labelBg: "bg-transparent",
+    labelText: "text-amber-600",
+    dot: "bg-amber-200 border-amber-500",
   },
 };
 
@@ -114,10 +107,16 @@ function GroupActionsToolbar({
 }) {
   return (
     <>
-      <div className="absolute -top-12 right-0 z-20 h-12 w-44 opacity-0" aria-hidden />
-      <div className="nodrag absolute -top-8 right-0 z-30 hidden flex-nowrap items-center justify-start gap-2 rounded-md border border-slate-200/80 bg-white/95 px-1.5 py-1 shadow-md group-hover:flex">
-        <div className="group/swatch flex shrink-0 items-center gap-2 px-0.5 py-0.5">
-          <div className="hidden shrink-0 flex-nowrap items-center gap-2 group-hover/swatch:flex">
+      <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" aria-hidden />
+      <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+        <div className="group/swatch relative flex items-center px-0.5 py-0.5">
+          <button
+            type="button"
+            onClick={stopEvent}
+            className={cn("h-4 w-4 rounded-full border transition", GROUP_COLORS[activeColor].dot)}
+            aria-label={`Current group color: ${GROUP_COLORS[activeColor].label}`}
+          />
+          <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
             {colorOptions.map((option) => (
               <button
                 key={option.value}
@@ -126,43 +125,50 @@ function GroupActionsToolbar({
                   stopEvent(event);
                   onGroupUpdate?.({ color: option.value });
                 }}
-                className={cn("h-4 w-4 shrink-0 rounded-full border-2 transition", option.dot)}
+                className={cn("h-4 w-4 rounded-full border transition", option.dot)}
                 aria-label={`Set group color to ${GROUP_COLORS[option.value].label}`}
               />
             ))}
           </div>
-          <button
-            type="button"
-            onClick={stopEvent}
-            className={cn("h-4 w-4 shrink-0 rounded-full border-2 transition", GROUP_COLORS[activeColor].dot)}
-            aria-label={`Current group color: ${GROUP_COLORS[activeColor].label}`}
-          />
         </div>
         {onUngroup && (
-          <button
-            type="button"
-            onClick={(event: React.MouseEvent) => {
-              stopEvent(event);
-              onUngroup();
-            }}
-            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-            aria-label="Ungroup nodes"
-          >
-            <Ungroup size={16} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(event: React.MouseEvent) => {
+                  stopEvent(event);
+                  onUngroup();
+                }}
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                aria-label="Ungroup"
+              >
+                <Ungroup size={16} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Ungroup</TooltipContent>
+          </Tooltip>
         )}
         {onDelete && (
-          <button
-            type="button"
-            onClick={(event: React.MouseEvent) => {
-              stopEvent(event);
-              onDelete();
-            }}
-            className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-            aria-label="Delete group and contained nodes"
-          >
-            <Trash2 size={16} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(event: React.MouseEvent) => {
+                  stopEvent(event);
+                  if (!window.confirm(CONFIRM_DELETE_GROUP_MESSAGE)) {
+                    return;
+                  }
+                  onDelete();
+                }}
+                className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                aria-label="Delete Group"
+              >
+                <Trash2 size={16} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Delete Group</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </>
@@ -320,10 +326,9 @@ const GroupNodeBase: React.FC<GroupNodeProps> = ({
     <div className="h-full w-full">
       <div
         className={cn(
-          "group relative flex h-full w-full flex-col rounded-lg border-2",
+          "group relative flex h-full w-full flex-col rounded-lg border",
           colorStyles.border,
           colorStyles.bgTint,
-          colorStyles.glow,
           selected && "ring-[3px] ring-sky-400/80 ring-offset-2 ring-offset-white",
         )}
       >

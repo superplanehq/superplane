@@ -1,5 +1,6 @@
 import { BookOpen, ExternalLink, KeyRound, Loader2 } from "lucide-react";
-import { detectPlatform, getInstallCommand, useConnectCommand } from "@/utils/cli";
+import { detectPlatform, getInstallCommand } from "@/lib/cli";
+import { useConnectCommand } from "@/hooks/useConnectCommand";
 import { CopyButton } from "@/ui/CopyButton";
 
 function CommandRow({ label, command }: { label: string; command: string }) {

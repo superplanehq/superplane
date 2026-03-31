@@ -1,4 +1,4 @@
-.PHONY: lint test test.license.check test.agent.unit
+.PHONY: lint test test.coverage test.license.check test.agent.unit
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -65,6 +65,10 @@ test.e2e.single:
 
 test:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1
+
+test.coverage:
+	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
+	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
 
 test.license.check:
 	bash ./scripts/license-check.sh
@@ -339,10 +343,14 @@ cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
+AGENT_IMAGE?=superplane-agent
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
 image.build:
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+
+agent.image.build:
+	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f agent/Dockerfile --target runner --progress plain -t $(AGENT_IMAGE):$(IMAGE_TAG) agent
 
 image.auth:
 	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
@@ -350,6 +358,10 @@ image.auth:
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+
+agent.image.push:
+	docker tag $(AGENT_IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
+	docker push $(REGISTRY_HOST)/$(AGENT_IMAGE):$(IMAGE_TAG)
 
 #
 # Tag creation

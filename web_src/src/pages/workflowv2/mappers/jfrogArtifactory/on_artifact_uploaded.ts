@@ -3,7 +3,7 @@ import type React from "react";
 import jfrogIcon from "@/assets/icons/integrations/jfrog-artifactory.svg";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 
 interface OnArtifactUploadedConfiguration {
   repository?: string;

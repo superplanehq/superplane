@@ -3,7 +3,7 @@ import type React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
 import awsCloudwatchIcon from "@/assets/icons/integrations/aws.cloudwatch.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../../types";
 import type { Predicate } from "../../utils";
 import { formatPredicate, stringOrDash } from "../../utils";

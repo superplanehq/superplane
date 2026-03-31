@@ -16,7 +16,7 @@ import { getState, getStateMap, getTriggerRenderer } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
 import discordIcon from "@/assets/icons/integrations/discord.svg";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { defaultStateFunction } from "../stateRegistry";
 
 interface GetLastMentionConfiguration {

@@ -84,6 +84,6 @@ func (s *CanvasGroupSteps) assertChildNodeNamesVisible(names ...string) {
 func (s *CanvasGroupSteps) hoverGroupNodeAndUngroup() {
 	s.session.HoverOver(q.TestID("canvas", "group", "node"))
 	s.session.Sleep(250)
-	s.session.Click(q.Locator(`button[aria-label="Ungroup nodes"]`))
+	s.session.Click(q.Locator(`button[aria-label="Ungroup"]`))
 	s.session.Sleep(800)
 }

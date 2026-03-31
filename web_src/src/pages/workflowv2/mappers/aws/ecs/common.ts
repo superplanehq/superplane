@@ -1,7 +1,7 @@
 import type { ComponentBaseContext, ExecutionInfo, NodeInfo, SubtitleContext } from "../../types";
 import type React from "react";
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getBackgroundColorClass, getColorClass } from "@/utils/colors";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "../..";
 import awsEcsIcon from "@/assets/icons/integrations/aws.ecs.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
