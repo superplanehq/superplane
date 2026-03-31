@@ -38,6 +38,10 @@ import { useNavigate } from "react-router-dom";
 
 const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
 
+/** Quick start runs one tick against status/200, then saves status/500 before opening the canvas. */
+const QUICK_START_HTTP_URL_SERVER1 = "https://httpbin.org/status/200";
+const QUICK_START_HTTP_URL_SERVER2 = "https://httpbin.org/status/500";
+
 type Mode = "ui" | "cli" | "agent";
 
 const PERSONAS = [
@@ -127,8 +131,28 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
             },
           };
         }
+        if (node.component?.name === "http") {
+          return {
+            ...node,
+            configuration: {
+              ...node.configuration,
+              url: QUICK_START_HTTP_URL_SERVER1,
+            },
+          };
+        }
         return node;
       });
+      const nodesWithServer2Url = nodes.map((node: any) =>
+        node.component?.name === "http"
+          ? {
+              ...node,
+              configuration: {
+                ...node.configuration,
+                url: QUICK_START_HTTP_URL_SERVER2,
+              },
+            }
+          : node,
+      );
       const edges = template.spec?.edges || [];
       const description = template.metadata?.description || "";
 
@@ -152,7 +176,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
           body: {
             canvas: {
               metadata: { name: QUICK_START_TEMPLATE_NAME, description },
-              spec: { nodes, edges },
+              spec: { nodes: nodesWithServer2Url, edges },
             },
           },
         }),
@@ -190,7 +214,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
           );
           emittedEventId = emitResponse.data?.eventId;
         } catch {
-          // Best-effort; the regular schedule will fire within a minute.
+          // Best-effort; the regular schedule will fire within ten minutes.
         }
       }
 
@@ -359,8 +383,8 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                         </Badge>
                       </div>
                       <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                        Pings your endpoint every minute and alerts only on healthy-to-failing transitions, including
-                        approximately how long it stayed healthy.
+                        Pings your endpoint every ten minutes and alerts only on healthy-to-failing transitions,
+                        including approximately how long it stayed healthy.
                       </p>
                     </div>
                     {isLaunchingQuickStart ? (
