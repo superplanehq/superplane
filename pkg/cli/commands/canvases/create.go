@@ -66,8 +66,21 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		request.SetAutoLayout(buildDefaultAutoLayout())
 	}
 
-	_, _, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-	return err
+	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
+	if err != nil {
+		return err
+	}
+
+	if httpResp != nil && (httpResp.StatusCode < 200 || httpResp.StatusCode >= 300) {
+		return fmt.Errorf("unexpected response status: %s", httpResp.Status)
+	}
+
+	if resp == nil || resp.Canvas == nil || resp.Canvas.Metadata == nil || resp.Canvas.Metadata.GetId() == "" {
+		return fmt.Errorf("canvas create returned success but no canvas was returned — the request may not have reached the server (check your context URL scheme)")
+	}
+
+	fmt.Fprintf(ctx.Cmd.OutOrStdout(), "Canvas %q created (ID: %s)\n", resp.Canvas.Metadata.GetName(), resp.Canvas.Metadata.GetId())
+	return nil
 }
 
 func (c *createCommand) createFromFile(
@@ -104,6 +117,19 @@ func (c *createCommand) createFromFile(
 		}
 	}
 
-	_, _, err = ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-	return err
+	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
+	if err != nil {
+		return err
+	}
+
+	if httpResp != nil && (httpResp.StatusCode < 200 || httpResp.StatusCode >= 300) {
+		return fmt.Errorf("unexpected response status: %s", httpResp.Status)
+	}
+
+	if resp == nil || resp.Canvas == nil || resp.Canvas.Metadata == nil || resp.Canvas.Metadata.GetId() == "" {
+		return fmt.Errorf("canvas create returned success but no canvas was returned — the request may not have reached the server (check your context URL scheme)")
+	}
+
+	fmt.Fprintf(ctx.Cmd.OutOrStdout(), "Canvas %q created (ID: %s)\n", resp.Canvas.Metadata.GetName(), resp.Canvas.Metadata.GetId())
+	return nil
 }
