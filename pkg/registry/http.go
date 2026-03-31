@@ -8,38 +8,56 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
 
+type HTTPPolicy struct {
+	BlockedHosts    []string
+	PrivateIPRanges []string
+}
+
 type HTTPContext struct {
 	client           *http.Client
 	dialer           *net.Dialer
-	blockedHosts     []string
-	privateIPRanges  []*net.IPNet
 	maxResponseBytes int64
+	policyResolver   func() (HTTPPolicy, error)
+	policyCacheTTL   time.Duration
+	policyMu         sync.RWMutex
+	policy           compiledHTTPPolicy
+	policyExpiresAt  time.Time
 }
 
 type HTTPOptions struct {
 	BlockedHosts     []string
 	PrivateIPRanges  []string
 	MaxResponseBytes int64
+	PolicyResolver   func() (HTTPPolicy, error)
+	PolicyCacheTTL   time.Duration
+}
+
+type compiledHTTPPolicy struct {
+	blockedHosts    []string
+	privateIPRanges []*net.IPNet
 }
 
 func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 	httpCtx := &HTTPContext{
-		blockedHosts:     options.BlockedHosts,
-		privateIPRanges:  make([]*net.IPNet, 0),
 		maxResponseBytes: options.MaxResponseBytes,
+		policyResolver:   options.PolicyResolver,
+		policyCacheTTL:   options.PolicyCacheTTL,
 	}
 
-	for _, cidr := range options.PrivateIPRanges {
-		_, ipNet, err := net.ParseCIDR(cidr)
+	if httpCtx.policyResolver == nil {
+		compiledPolicy, err := compileHTTPPolicy(HTTPPolicy{
+			BlockedHosts:    options.BlockedHosts,
+			PrivateIPRanges: options.PrivateIPRanges,
+		})
 		if err != nil {
-			return nil, fmt.Errorf("invalid private IP range: %w", err)
+			return nil, err
 		}
-
-		httpCtx.privateIPRanges = append(httpCtx.privateIPRanges, ipNet)
+		httpCtx.policy = compiledPolicy
 	}
 
 	//
@@ -60,7 +78,12 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 				return fmt.Errorf("invalid IP address: %s", host)
 			}
 
-			if err := httpCtx.validateIP(ip); err != nil {
+			policy, err := httpCtx.activePolicy()
+			if err != nil {
+				return err
+			}
+
+			if err := httpCtx.validateIPWithPolicy(policy, ip); err != nil {
 				return fmt.Errorf("connection blocked: %w", err)
 			}
 
@@ -85,7 +108,12 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 				return fmt.Errorf("stopped after 10 redirects")
 			}
 
-			if err := httpCtx.validateURL(req.URL); err != nil {
+			policy, err := httpCtx.activePolicy()
+			if err != nil {
+				return err
+			}
+
+			if err := httpCtx.validateURLWithPolicy(policy, req.URL); err != nil {
 				return fmt.Errorf("redirect blocked: %w", err)
 			}
 
@@ -93,20 +121,35 @@ func NewHTTPContext(options HTTPOptions) (*HTTPContext, error) {
 		},
 	}
 
+	if _, err := httpCtx.activePolicy(); err != nil {
+		return nil, err
+	}
+
 	return httpCtx, nil
 }
 
 func (c *HTTPContext) Do(request *http.Request) (*http.Response, error) {
-	if len(c.privateIPRanges) == 0 && len(c.blockedHosts) == 0 {
-		return c.do(request)
-	}
-
-	err := c.validateURL(request.URL)
+	policy, err := c.activePolicy()
 	if err != nil {
 		return nil, err
 	}
 
+	if len(policy.privateIPRanges) == 0 && len(policy.blockedHosts) == 0 {
+		return c.do(request)
+	}
+
+	if err := c.validateURLWithPolicy(policy, request.URL); err != nil {
+		return nil, err
+	}
+
 	return c.do(request)
+}
+
+func (c *HTTPContext) InvalidatePolicyCache() {
+	c.policyMu.Lock()
+	defer c.policyMu.Unlock()
+
+	c.policyExpiresAt = time.Time{}
 }
 
 func (c *HTTPContext) do(request *http.Request) (*http.Response, error) {
@@ -176,6 +219,15 @@ func (r *LimitedReadCloser) Close() error {
  * to prevent DNS rebinding attacks.
  */
 func (c *HTTPContext) validateURL(URL *url.URL) error {
+	policy, err := c.activePolicy()
+	if err != nil {
+		return err
+	}
+
+	return c.validateURLWithPolicy(policy, URL)
+}
+
+func (c *HTTPContext) validateURLWithPolicy(policy compiledHTTPPolicy, URL *url.URL) error {
 	scheme := strings.ToLower(URL.Scheme)
 	if scheme != "http" && scheme != "https" {
 		return fmt.Errorf("only http and https schemes are allowed")
@@ -190,7 +242,7 @@ func (c *HTTPContext) validateURL(URL *url.URL) error {
 	// Check blocked hostnames
 	//
 	hostLower := strings.ToLower(host)
-	for _, blocked := range c.blockedHosts {
+	for _, blocked := range policy.blockedHosts {
 		if hostLower == blocked || strings.HasSuffix(hostLower, "."+blocked) {
 			return fmt.Errorf("access to %s is not allowed", host)
 		}
@@ -201,7 +253,7 @@ func (c *HTTPContext) validateURL(URL *url.URL) error {
 	// For hostnames, IP validation happens at connection time via the dialer.
 	//
 	if ip := net.ParseIP(host); ip != nil {
-		if err := c.validateIP(ip); err != nil {
+		if err := c.validateIPWithPolicy(policy, ip); err != nil {
 			return err
 		}
 	}
@@ -210,6 +262,15 @@ func (c *HTTPContext) validateURL(URL *url.URL) error {
 }
 
 func (c *HTTPContext) validateIP(ip net.IP) error {
+	policy, err := c.activePolicy()
+	if err != nil {
+		return err
+	}
+
+	return c.validateIPWithPolicy(policy, ip)
+}
+
+func (c *HTTPContext) validateIPWithPolicy(policy compiledHTTPPolicy, ip net.IP) error {
 	//
 	// Handle IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1)
 	//
@@ -217,11 +278,76 @@ func (c *HTTPContext) validateIP(ip net.IP) error {
 		ip = v4
 	}
 
-	for _, ipNet := range c.privateIPRanges {
+	for _, ipNet := range policy.privateIPRanges {
 		if ipNet.Contains(ip) {
 			return fmt.Errorf("access to private IP address %s is not allowed", ip.String())
 		}
 	}
 
 	return nil
+}
+
+func (c *HTTPContext) activePolicy() (compiledHTTPPolicy, error) {
+	if c.policyResolver == nil {
+		return c.policy, nil
+	}
+
+	now := time.Now()
+
+	c.policyMu.RLock()
+	if !c.policyExpiresAt.IsZero() && now.Before(c.policyExpiresAt) {
+		policy := c.policy
+		c.policyMu.RUnlock()
+		return policy, nil
+	}
+	c.policyMu.RUnlock()
+
+	c.policyMu.Lock()
+	defer c.policyMu.Unlock()
+
+	now = time.Now()
+	if !c.policyExpiresAt.IsZero() && now.Before(c.policyExpiresAt) {
+		return c.policy, nil
+	}
+
+	policy, err := c.policyResolver()
+	if err != nil {
+		return compiledHTTPPolicy{}, err
+	}
+
+	compiledPolicy, err := compileHTTPPolicy(policy)
+	if err != nil {
+		return compiledHTTPPolicy{}, err
+	}
+
+	c.policy = compiledPolicy
+	if c.policyCacheTTL <= 0 {
+		c.policyExpiresAt = time.Time{}
+	} else {
+		c.policyExpiresAt = now.Add(c.policyCacheTTL)
+	}
+
+	return c.policy, nil
+}
+
+func compileHTTPPolicy(policy HTTPPolicy) (compiledHTTPPolicy, error) {
+	compiledPolicy := compiledHTTPPolicy{
+		blockedHosts:    make([]string, 0, len(policy.BlockedHosts)),
+		privateIPRanges: make([]*net.IPNet, 0, len(policy.PrivateIPRanges)),
+	}
+
+	for _, host := range policy.BlockedHosts {
+		compiledPolicy.blockedHosts = append(compiledPolicy.blockedHosts, strings.ToLower(host))
+	}
+
+	for _, cidr := range policy.PrivateIPRanges {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return compiledHTTPPolicy{}, fmt.Errorf("invalid private IP range: %w", err)
+		}
+
+		compiledPolicy.privateIPRanges = append(compiledPolicy.privateIPRanges, ipNet)
+	}
+
+	return compiledPolicy, nil
 }
