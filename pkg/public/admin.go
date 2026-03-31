@@ -1,15 +1,21 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"gorm.io/gorm"
 )
 
 const defaultPageSize = 50
@@ -20,6 +26,34 @@ type paginatedResponse struct {
 	Total  int64 `json:"total"`
 	Limit  int   `json:"limit"`
 	Offset int   `json:"offset"`
+}
+
+type installationSettingsResponse struct {
+	AllowPrivateNetworkAccess  bool     `json:"allow_private_network_access"`
+	EffectiveBlockedHTTPHosts  []string `json:"effective_blocked_http_hosts"`
+	EffectivePrivateIPRanges   []string `json:"effective_private_ip_ranges"`
+	BlockedHTTPHostsOverridden bool     `json:"blocked_http_hosts_overridden"`
+	PrivateIPRangesOverridden  bool     `json:"private_ip_ranges_overridden"`
+	SMTPEnabled                bool     `json:"smtp_enabled"`
+	SMTPHost                   string   `json:"smtp_host"`
+	SMTPPort                   int      `json:"smtp_port"`
+	SMTPUsername               string   `json:"smtp_username"`
+	SMTPFromName               string   `json:"smtp_from_name"`
+	SMTPFromEmail              string   `json:"smtp_from_email"`
+	SMTPUseTLS                 bool     `json:"smtp_use_tls"`
+	SMTPPasswordConfigured     bool     `json:"smtp_password_configured"`
+}
+
+type installationSettingsRequest struct {
+	AllowPrivateNetworkAccess *bool   `json:"allow_private_network_access"`
+	SMTPEnabled               *bool   `json:"smtp_enabled"`
+	SMTPHost                  *string `json:"smtp_host"`
+	SMTPPort                  *int    `json:"smtp_port"`
+	SMTPUsername              *string `json:"smtp_username"`
+	SMTPPassword              *string `json:"smtp_password"`
+	SMTPFromName              *string `json:"smtp_from_name"`
+	SMTPFromEmail             *string `json:"smtp_from_email"`
+	SMTPUseTLS                *bool   `json:"smtp_use_tls"`
 }
 
 func parsePagination(r *http.Request) (search string, limit, offset int) {
@@ -38,6 +72,204 @@ func parsePagination(r *http.Request) (search string, limit, offset int) {
 	}
 
 	return search, limit, offset
+}
+
+func (s *Server) adminGetInstallationNetworkSettings(w http.ResponseWriter, r *http.Request) {
+	response, err := s.buildInstallationSettingsResponse()
+	if err != nil {
+		log.Errorf("admin: failed to load installation settings: %v", err)
+		http.Error(w, "Failed to load installation settings", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, response)
+}
+
+func (s *Server) adminUpdateInstallationNetworkSettings(w http.ResponseWriter, r *http.Request) {
+	var req installationSettingsRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.updateInstallationSettings(r.Context(), req); err != nil {
+		log.Errorf("admin: failed to update installation settings: %v", err)
+
+		statusCode := http.StatusInternalServerError
+		if errors.Is(err, errInvalidInstallationSettingsRequest) {
+			statusCode = http.StatusBadRequest
+		}
+
+		http.Error(w, err.Error(), statusCode)
+		return
+	}
+
+	if req.AllowPrivateNetworkAccess != nil {
+		s.registry.HTTPContext().InvalidatePolicyCache()
+	}
+
+	response, err := s.buildInstallationSettingsResponse()
+	if err != nil {
+		log.Errorf("admin: failed to load updated installation settings: %v", err)
+		http.Error(w, "Failed to update installation settings", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, response)
+}
+
+var errInvalidInstallationSettingsRequest = errors.New("invalid installation settings request")
+
+func (s *Server) updateInstallationSettings(ctx context.Context, req installationSettingsRequest) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if req.AllowPrivateNetworkAccess != nil {
+			metadata, err := models.GetInstallationMetadataInTransaction(tx)
+			if err != nil {
+				return err
+			}
+
+			metadata.AllowPrivateNetworkAccess = *req.AllowPrivateNetworkAccess
+			metadata.UpdatedAt = time.Now()
+
+			if err := models.UpdateInstallationMetadataInTransaction(tx, metadata); err != nil {
+				return err
+			}
+		}
+
+		if !shouldUpdateSMTPSettings(req) {
+			return nil
+		}
+
+		return s.updateInstallationSMTPSettingsInTransaction(ctx, tx, req)
+	})
+}
+
+func (s *Server) buildInstallationSettingsResponse() (installationSettingsResponse, error) {
+	policy, err := networkpolicy.ResolveHTTPPolicy()
+	if err != nil {
+		return installationSettingsResponse{}, err
+	}
+
+	response := installationSettingsResponse{
+		AllowPrivateNetworkAccess:  policy.AllowPrivateNetworkAccess,
+		EffectiveBlockedHTTPHosts:  policy.BlockedHosts,
+		EffectivePrivateIPRanges:   policy.PrivateIPRanges,
+		BlockedHTTPHostsOverridden: policy.BlockedHostsOverridden,
+		PrivateIPRangesOverridden:  policy.PrivateIPRangesOverridden,
+	}
+
+	emailSettings, err := models.FindEmailSettings(models.EmailProviderSMTP)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return installationSettingsResponse{}, err
+	}
+
+	if emailSettings != nil {
+		response.SMTPEnabled = true
+		response.SMTPHost = emailSettings.SMTPHost
+		response.SMTPPort = emailSettings.SMTPPort
+		response.SMTPUsername = emailSettings.SMTPUsername
+		response.SMTPFromName = emailSettings.SMTPFromName
+		response.SMTPFromEmail = emailSettings.SMTPFromEmail
+		response.SMTPUseTLS = emailSettings.SMTPUseTLS
+		response.SMTPPasswordConfigured = len(emailSettings.SMTPPassword) > 0
+	}
+
+	return response, nil
+}
+
+func shouldUpdateSMTPSettings(req installationSettingsRequest) bool {
+	return req.SMTPEnabled != nil ||
+		req.SMTPHost != nil ||
+		req.SMTPPort != nil ||
+		req.SMTPUsername != nil ||
+		req.SMTPPassword != nil ||
+		req.SMTPFromName != nil ||
+		req.SMTPFromEmail != nil ||
+		req.SMTPUseTLS != nil
+}
+
+func (s *Server) updateInstallationSMTPSettingsInTransaction(ctx context.Context, tx *gorm.DB, req installationSettingsRequest) error {
+	existingSettings, err := models.FindEmailSettingsInTransaction(tx, models.EmailProviderSMTP)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
+	smtpEnabled := existingSettings != nil
+	if req.SMTPEnabled != nil {
+		smtpEnabled = *req.SMTPEnabled
+	}
+
+	if !smtpEnabled {
+		return models.DeleteEmailSettingsInTransaction(tx, models.EmailProviderSMTP)
+	}
+
+	settings := &models.EmailSettings{Provider: models.EmailProviderSMTP}
+	if existingSettings != nil {
+		settings = existingSettings
+	}
+
+	settings.SMTPHost = resolveStringField(req.SMTPHost, settings.SMTPHost)
+	settings.SMTPPort = resolveIntField(req.SMTPPort, settings.SMTPPort)
+	settings.SMTPUsername = resolveStringField(req.SMTPUsername, settings.SMTPUsername)
+	settings.SMTPFromName = resolveStringField(req.SMTPFromName, settings.SMTPFromName)
+	settings.SMTPFromEmail = resolveStringField(req.SMTPFromEmail, settings.SMTPFromEmail)
+	settings.SMTPUseTLS = resolveBoolField(req.SMTPUseTLS, settings.SMTPUseTLS)
+
+	if req.SMTPPassword != nil {
+		if *req.SMTPPassword == "" {
+			settings.SMTPPassword = nil
+		} else {
+			encryptedPassword, err := s.encryptor.Encrypt(
+				ctx,
+				[]byte(*req.SMTPPassword),
+				[]byte("smtp_password"),
+			)
+			if err != nil {
+				return err
+			}
+
+			settings.SMTPPassword = encryptedPassword
+		}
+	}
+
+	if settings.SMTPHost == "" || settings.SMTPPort == 0 || settings.SMTPFromEmail == "" {
+		return errors.Join(errInvalidInstallationSettingsRequest, errors.New("SMTP host, port, and from email are required"))
+	}
+
+	if settings.SMTPUsername != "" && len(settings.SMTPPassword) == 0 {
+		return errors.Join(errInvalidInstallationSettingsRequest, errors.New("SMTP password is required when username is provided"))
+	}
+
+	if settings.SMTPUsername == "" {
+		settings.SMTPPassword = nil
+	}
+
+	return models.UpsertEmailSettingsInTransaction(tx, settings)
+}
+
+func resolveStringField(value *string, fallback string) string {
+	if value == nil {
+		return fallback
+	}
+
+	return *value
+}
+
+func resolveIntField(value *int, fallback int) int {
+	if value == nil {
+		return fallback
+	}
+
+	return *value
+}
+
+func resolveBoolField(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+
+	return *value
 }
 
 // adminListOrganizations returns paginated organizations in the installation.
