@@ -2246,7 +2246,7 @@ export function WorkflowPageV2() {
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(targetWorkflow));
       } catch (error: any) {
         console.error("Failed to save canvas", error);
-        const errorMessage = error?.response?.data?.message || error?.message || "Failed to save changes to the canvas";
+        const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         setLastCanvasSaveError(displayMessage);
         showErrorToast(displayMessage);
@@ -3975,10 +3975,7 @@ export function WorkflowPageV2() {
         lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(updatedWorkflow));
       } catch (error) {
         console.error("Failed to save canvas", error);
-        const errorMessage =
-          (error as { response?: { data?: { message: string } } })?.response?.data?.message ||
-          (error as { message: string })?.message ||
-          "Failed to save changes to the canvas";
+        const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }
     },
