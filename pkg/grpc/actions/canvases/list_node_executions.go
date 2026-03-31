@@ -2,7 +2,6 @@ package canvases
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -146,9 +145,33 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 		return nil, fmt.Errorf("error finding cancelled-by users: %v", cancelledByUsersErr)
 	}
 
+	//
+	// Build lookup map for resources,
+	// so we don't have to iterate over the list on every loop iteration below.
+	//
+
 	cancelledByUsersByID := make(map[uuid.UUID]models.User, len(cancelledByUsers))
 	for _, user := range cancelledByUsers {
 		cancelledByUsersByID[user.ID] = user
+	}
+
+	inputEventsByID := make(map[string]models.CanvasEvent, len(inputEvents))
+	for _, inputEvent := range inputEvents {
+		inputEventsByID[inputEvent.ID.String()] = inputEvent
+	}
+
+	rootEventsByID := make(map[string]models.CanvasEvent, len(rootEvents))
+	for _, rootEvent := range rootEvents {
+		rootEventsByID[rootEvent.ID.String()] = rootEvent
+	}
+
+	outputEventsByExecutionID := make(map[string][]models.CanvasEvent, len(outputEvents))
+	for _, outputEvent := range outputEvents {
+		if _, ok := outputEventsByExecutionID[outputEvent.ExecutionID.String()]; !ok {
+			outputEventsByExecutionID[outputEvent.ExecutionID.String()] = []models.CanvasEvent{outputEvent}
+		} else {
+			outputEventsByExecutionID[outputEvent.ExecutionID.String()] = append(outputEventsByExecutionID[outputEvent.ExecutionID.String()], outputEvent)
+		}
 	}
 
 	//
@@ -156,17 +179,17 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 	//
 	result := make([]*pb.CanvasNodeExecution, 0, len(executions))
 	for _, execution := range executions {
-		rootEvent, err := getRootEventForExecution(execution, rootEvents)
+		rootEvent, err := getRootEventForExecution(execution, rootEventsByID)
 		if err != nil {
 			return nil, err
 		}
 
-		input, err := getInputForExecution(execution, inputEvents)
+		input, err := getInputForExecution(execution, inputEventsByID)
 		if err != nil {
 			return nil, err
 		}
 
-		outputs, err := getOutputsForExecution(execution, outputEvents)
+		outputs, err := getOutputsForExecution(execution, outputEventsByExecutionID)
 		if err != nil {
 			return nil, err
 		}
@@ -411,75 +434,80 @@ func cancelledByRef(id *uuid.UUID, users map[uuid.UUID]models.User) *pb.UserRef 
 	return &pb.UserRef{Id: id.String(), Name: name}
 }
 
-func getInputForExecution(execution models.CanvasNodeExecution, events []models.CanvasEvent) (*structpb.Struct, error) {
-	for _, event := range events {
-		if event.ID.String() == execution.EventID.String() {
-			eventData, ok := event.Data.Data().(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("event data cannot be turned into input for execution %s", execution.ID.String())
-			}
-
-			data, err := structpb.NewStruct(eventData)
-			if err != nil {
-				return nil, err
-			}
-
-			return data, nil
-		}
+func getInputForExecution(execution models.CanvasNodeExecution, events map[string]models.CanvasEvent) (*structpb.Struct, error) {
+	event, ok := events[execution.EventID.String()]
+	if !ok {
+		return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
 	}
 
-	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
-}
-
-func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents []models.CanvasEvent) (*pb.CanvasEvent, error) {
-	for _, rootEvent := range rootEvents {
-		if rootEvent.ID.String() == execution.RootEventID.String() {
-			data, ok := rootEvent.Data.Data().(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("event data is not a map[string]any")
-			}
-
-			s, err := structpb.NewStruct(data)
-			if err != nil {
-				return nil, err
-			}
-
-			return &pb.CanvasEvent{
-				Id:         rootEvent.ID.String(),
-				CanvasId:   rootEvent.WorkflowID.String(),
-				NodeId:     rootEvent.NodeID,
-				Channel:    rootEvent.Channel,
-				CustomName: valueOrEmpty(rootEvent.CustomName),
-				Data:       s,
-				CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
-			}, nil
-		}
+	eventData, ok := event.Data.Data().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("event data cannot be turned into input for execution %s", execution.ID.String())
 	}
 
-	return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
+	data, err := structpb.NewStruct(eventData)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
-func getOutputsForExecution(execution models.CanvasNodeExecution, events []models.CanvasEvent) (*structpb.Struct, error) {
+func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents map[string]models.CanvasEvent) (*pb.CanvasEvent, error) {
+	rootEvent, ok := rootEvents[execution.RootEventID.String()]
+	if !ok {
+		return nil, fmt.Errorf("root event not found for execution %s", execution.ID.String())
+	}
+
+	data, ok := rootEvent.Data.Data().(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("event data is not a map[string]any")
+	}
+
+	s, err := structpb.NewStruct(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CanvasEvent{
+		Id:         rootEvent.ID.String(),
+		CanvasId:   rootEvent.WorkflowID.String(),
+		NodeId:     rootEvent.NodeID,
+		Channel:    rootEvent.Channel,
+		CustomName: valueOrEmpty(rootEvent.CustomName),
+		Data:       s,
+		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
+	}, nil
+}
+
+func getOutputsForExecution(execution models.CanvasNodeExecution, events map[string][]models.CanvasEvent) (*structpb.Struct, error) {
+	outputEvents, ok := events[execution.ID.String()]
+
+	//
+	// If no output events are found, return an empty struct,
+	// since some executions may not have outputs.
+	//
+	if !ok {
+		data, err := structpb.NewStruct(map[string]any{})
+		if err != nil {
+			return nil, err
+		}
+
+		return data, nil
+	}
+
 	outputMap := map[string][]any{}
-	for _, event := range events {
-		if event.ExecutionID.String() == execution.ID.String() {
-			if _, ok := outputMap[event.Channel]; !ok {
-				outputMap[event.Channel] = []any{event.Data.Data()}
-			} else {
-				outputMap[event.Channel] = append(outputMap[event.Channel], event.Data.Data())
-			}
+	for _, event := range outputEvents {
+		if _, ok := outputMap[event.Channel]; !ok {
+			outputMap[event.Channel] = []any{event.Data.Data()}
+		} else {
+			outputMap[event.Channel] = append(outputMap[event.Channel], event.Data.Data())
 		}
 	}
 
-	m, err := json.Marshal(outputMap)
-	if err != nil {
-		return nil, err
-	}
-
-	var outputs map[string]any
-	err = json.Unmarshal(m, &outputs)
-	if err != nil {
-		return nil, err
+	outputs := make(map[string]any, len(outputMap))
+	for k, v := range outputMap {
+		outputs[k] = v
 	}
 
 	data, err := structpb.NewStruct(outputs)
