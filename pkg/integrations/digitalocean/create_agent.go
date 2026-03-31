@@ -538,26 +538,24 @@ func (c *CreateAgent) Execute(ctx core.ExecutionContext) (err error) {
 		}
 	}
 
-	// 8. Attach guardrails
+	// 5. Attach guardrails
 	for _, guardrailUUID := range spec.Guardrails {
 		if err := client.AttachGradientAIGuardrail(agent.UUID, guardrailUUID); err != nil {
 			return fmt.Errorf("failed to attach guardrail %s: %v", guardrailUUID, err)
 		}
 	}
 
-	// 9. Add agent routes
+	// 6. Add agent routes
 	for _, childAgentUUID := range spec.AgentRoutes {
 		if err := client.AddGradientAIAgentRoute(agent.UUID, childAgentUUID); err != nil {
 			return fmt.Errorf("failed to add agent route %s: %v", childAgentUUID, err)
 		}
 	}
 
-	// 10. Deploy the agent
-	if err := client.UpdateGradientAIAgentStatus(agent.UUID, true); err != nil {
-		return fmt.Errorf("failed to deploy agent: %v", err)
-	}
-
-	// 11. Store metadata and start polling
+	// 7. Store metadata and start polling.
+	// GradientAI agents auto-deploy on creation — there is no separate
+	// deploy endpoint. We poll GET /v2/gen-ai/agents/{uuid} until the
+	// deployment status becomes running.
 	if err := ctx.Metadata.Set(CreateAgentExecutionMetadata{
 		AgentUUID: agent.UUID,
 		StartedAt: time.Now().UnixNano(),

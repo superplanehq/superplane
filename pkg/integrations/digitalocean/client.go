@@ -2025,18 +2025,6 @@ func (c *Client) UpdateGradientAIAgent(agentUUID string, req UpdateGradientAIAge
 	return &response.Agent, nil
 }
 
-func (c *Client) UpdateGradientAIAgentStatus(agentUUID string, isEnabled bool) error {
-	url := fmt.Sprintf("%s/agents/%s/deployment", genAIBaseURL, agentUUID)
-
-	body, err := json.Marshal(map[string]any{"is_enabled": isEnabled})
-	if err != nil {
-		return fmt.Errorf("error marshaling request: %v", err)
-	}
-
-	_, err = c.execRequest(http.MethodPut, url, bytes.NewReader(body))
-	return err
-}
-
 func (c *Client) CreateGradientAIAgentAPIKey(agentUUID string) (*GradientAIAgentAPIKey, error) {
 	url := fmt.Sprintf("%s/agents/%s/api_keys", genAIBaseURL, agentUUID)
 

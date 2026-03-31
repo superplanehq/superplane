@@ -111,8 +111,6 @@ func Test__CreateAgent__Execute(t *testing.T) {
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
 					"agent": {"uuid": "agent-uuid-123", "name": "my-agent"}
 				}`))},
-				// 2. PUT /v2/gen-ai/agents/{uuid}/deployment
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			},
 		}
 
@@ -131,8 +129,8 @@ func Test__CreateAgent__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 
-		// Verify exactly 2 HTTP requests: create agent + deploy
-		require.Len(t, httpCtx.Requests, 2)
+		// Verify exactly 1 HTTP request: create agent (no deploy — agents auto-deploy)
+		require.Len(t, httpCtx.Requests, 1)
 
 		// Check agent create request — workspace_uuid must be embedded
 		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
@@ -146,10 +144,6 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		assert.Equal(t, "test-project-id", createReq["project_id"])
 		assert.Equal(t, "test-workspace-uuid", createReq["workspace_uuid"], "workspace_uuid must be in create request")
 		assert.Nil(t, createReq["anthropic_key_uuid"], "should not send provider key when not configured")
-
-		// Check deployment request
-		assert.Equal(t, http.MethodPut, httpCtx.Requests[1].Method)
-		assert.Contains(t, httpCtx.Requests[1].URL.String(), "/agents/agent-uuid-123/deployment")
 
 		// Verify metadata stored
 		metadata, ok := metadataCtx.Metadata.(CreateAgentExecutionMetadata)
@@ -174,8 +168,6 @@ func Test__CreateAgent__Execute(t *testing.T) {
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
 					"agent": {"uuid": "agent-uuid-123", "name": "my-agent"}
 				}`))},
-				// 3. PUT /v2/gen-ai/agents/{uuid}/deployment
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			},
 		}
 
@@ -202,7 +194,7 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 3)
+		require.Len(t, httpCtx.Requests, 2)
 
 		// First request: create workspace
 		assert.Equal(t, "https://api.digitalocean.com/v2/gen-ai/workspaces", httpCtx.Requests[0].URL.String())
@@ -229,8 +221,6 @@ func Test__CreateAgent__Execute(t *testing.T) {
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
 					"agent": {"uuid": "agent-uuid-123", "name": "my-agent"}
 				}`))},
-				// 3. PUT /v2/gen-ai/agents/{uuid}/deployment
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			},
 		}
 
@@ -259,9 +249,8 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		// 3 requests: POST anthropic/keys, POST agents, PUT deployment
-		// (no extra GET /models — provider is read directly from spec.ModelProvider)
-		require.Len(t, httpCtx.Requests, 3)
+		// 2 requests: POST anthropic/keys, POST agents (no deploy — agents auto-deploy)
+		require.Len(t, httpCtx.Requests, 2)
 
 		// First request: register Anthropic key
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/anthropic/keys")
@@ -289,8 +278,6 @@ func Test__CreateAgent__Execute(t *testing.T) {
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
 					"agent": {"uuid": "agent-uuid-456", "name": "my-agent"}
 				}`))},
-				// 3. PUT /v2/gen-ai/agents/{uuid}/deployment
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
 			},
 		}
 
@@ -319,7 +306,8 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpCtx.Requests, 3)
+		// 2 requests: POST openai/keys, POST agents (no deploy — agents auto-deploy)
+		require.Len(t, httpCtx.Requests, 2)
 
 		// First request: register OpenAI key
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/openai/keys")
