@@ -1,3 +1,9 @@
+approval_defaults:
+  options:
+    request_review:
+      enabled: true
+      mode: all-users
+
 policy:
   approval:
     - db_changes_require_core_reviewer
