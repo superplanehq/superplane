@@ -131,8 +131,28 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
             },
           };
         }
+        if (node.component?.name === "http") {
+          return {
+            ...node,
+            configuration: {
+              ...node.configuration,
+              url: QUICK_START_HTTP_URL_SERVER1,
+            },
+          };
+        }
         return node;
       });
+      const nodesWithServer2Url = nodes.map((node: any) =>
+        node.component?.name === "http"
+          ? {
+              ...node,
+              configuration: {
+                ...node.configuration,
+                url: QUICK_START_HTTP_URL_SERVER2,
+              },
+            }
+          : node,
+      );
       const edges = template.spec?.edges || [];
       const description = template.metadata?.description || "";
 
@@ -156,7 +176,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
           body: {
             canvas: {
               metadata: { name: QUICK_START_TEMPLATE_NAME, description },
-              spec: { nodes, edges },
+              spec: { nodes: nodesWithServer2Url, edges },
             },
           },
         }),
