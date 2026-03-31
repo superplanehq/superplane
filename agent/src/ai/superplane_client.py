@@ -1,4 +1,5 @@
 import os
+import re
 import warnings
 from dataclasses import dataclass
 from typing import Any
@@ -195,6 +196,69 @@ class SuperplaneClient:
         provider = name.split(".", 1)[0].strip()
         return provider or None
 
+    _QUERY_STOPWORDS: frozenset[str] = frozenset(
+        {
+            "a",
+            "an",
+            "and",
+            "are",
+            "as",
+            "at",
+            "be",
+            "but",
+            "by",
+            "for",
+            "from",
+            "has",
+            "he",
+            "if",
+            "in",
+            "is",
+            "it",
+            "its",
+            "of",
+            "on",
+            "or",
+            "that",
+            "the",
+            "to",
+            "was",
+            "when",
+            "will",
+            "with",
+        }
+    )
+
+    @staticmethod
+    def _split_identifier_tokens(identifier: str) -> list[str]:
+        """Lowercase tokens from a block id segment (camelCase / acronym aware)."""
+        if not identifier.strip():
+            return []
+        spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", identifier)
+        spaced = re.sub(r"([A-Z])([A-Z][a-z])", r"\1 \2", spaced)
+        return [m.lower() for m in re.findall(r"[A-Za-z0-9]+", spaced) if m]
+
+    @staticmethod
+    def _catalog_entry_haystack(name: str | None, label: str | None, description: str | None) -> str:
+        parts: list[str] = []
+        for field in (name, label, description):
+            if isinstance(field, str) and field.strip():
+                parts.append(field)
+        if isinstance(name, str) and name.strip():
+            for segment in name.split("."):
+                segment = segment.strip()
+                if segment:
+                    parts.extend(SuperplaneClient._split_identifier_tokens(segment))
+        return " ".join(parts).lower()
+
+    @staticmethod
+    def _significant_query_tokens(resolved_query_lower: str) -> list[str]:
+        return [
+            t
+            for t in re.findall(r"[a-z0-9]+", resolved_query_lower)
+            if len(t) >= 2 and t not in SuperplaneClient._QUERY_STOPWORDS
+        ]
+
     @staticmethod
     def _matches_filters(
         *,
@@ -212,9 +276,13 @@ class SuperplaneClient:
         if not resolved_query:
             return True
 
-        haystack_parts = [name, label, description]
-        haystack = " ".join(part for part in haystack_parts if isinstance(part, str)).lower()
-        return resolved_query in haystack
+        haystack = SuperplaneClient._catalog_entry_haystack(name, label, description)
+        if resolved_query in haystack:
+            return True
+        tokens = SuperplaneClient._significant_query_tokens(resolved_query)
+        if not tokens:
+            return False
+        return all(token in haystack for token in tokens)
 
     @staticmethod
     def _serialize_configuration_fields(fields: list[ConfigurationField] | None) -> list[dict[str, Any]]:
@@ -251,6 +319,36 @@ class SuperplaneClient:
                 }
             )
         return serialized
+
+    @staticmethod
+    def _serialize_component_list_item(component: ComponentsComponent) -> dict[str, Any]:
+        """Compact shape for list_components only; use describe_component for full schema."""
+        output_channels = component.output_channels or []
+        names: list[str] = []
+        for channel in output_channels:
+            if channel is not None and isinstance(channel.name, str) and channel.name:
+                names.append(channel.name)
+        return {
+            "name": component.name,
+            "provider": SuperplaneClient._provider_from_name(component.name),
+            "label": component.label,
+            "description": component.description,
+            "icon": component.icon,
+            "color": component.color,
+            "output_channel_names": names,
+        }
+
+    @staticmethod
+    def _serialize_trigger_list_item(trigger: TriggersTrigger) -> dict[str, Any]:
+        """Compact shape for list_triggers only; use describe_trigger for full schema."""
+        return {
+            "name": trigger.name,
+            "provider": SuperplaneClient._provider_from_name(trigger.name),
+            "label": trigger.label,
+            "description": trigger.description,
+            "icon": trigger.icon,
+            "color": trigger.color,
+        }
 
     @staticmethod
     def _serialize_component(component: ComponentsComponent) -> dict[str, Any]:
@@ -380,7 +478,10 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_component(component) for component in sorted(matches, key=lambda item: item.name or "")]
+        return [
+            self._serialize_component_list_item(component)
+            for component in sorted(matches, key=lambda item: item.name or "")
+        ]
 
     def describe_component(self, name: str) -> dict[str, Any]:
         response = self._api_request(
@@ -442,7 +543,10 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_trigger(trigger) for trigger in sorted(matches, key=lambda item: item.name or "")]
+        return [
+            self._serialize_trigger_list_item(trigger)
+            for trigger in sorted(matches, key=lambda item: item.name or "")
+        ]
 
     def list_available_integrations(self) -> list[dict[str, Any]]:
         integrations = self._list_available_integrations_raw()

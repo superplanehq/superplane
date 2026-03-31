@@ -33,7 +33,7 @@ import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 
 import {
   ConfigurationField,
@@ -382,7 +382,11 @@ const MIN_CANVAS_ZOOM = 0.1;
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
  */
-function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: any }; id: string; selected?: boolean }) {
+const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
+  data: BlockData & { _callbacksRef?: any };
+  id: string;
+  selected?: boolean;
+}) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
 
@@ -421,9 +425,9 @@ function DefaultNodeRenderer(nodeProps: { data: BlockData & { _callbacksRef?: an
       onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
     />
   );
-}
+});
 
-function GroupNodeRenderer(nodeProps: {
+const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
   data: BlockData & { _callbacksRef?: any };
   id: string;
   selected?: boolean;
@@ -457,7 +461,7 @@ function GroupNodeRenderer(nodeProps: {
       />
     </div>
   );
-}
+});
 
 const nodeTypes = {
   default: DefaultNodeRenderer,
@@ -2526,12 +2530,18 @@ function CanvasContent({
         _hasHighlightedNodes: hasHighlightedNodes,
       },
     }));
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, hasMultiSelection]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds]);
 
   const edgeTypes = useMemo(
     () => ({
       custom: CustomEdge,
     }),
+    [],
+  );
+  const onEdgesChangeRef = useRef(state.onEdgesChange);
+  onEdgesChangeRef.current = state.onEdgesChange;
+  const stableEdgeDelete = useCallback(
+    (edgeId: string) => onEdgesChangeRef.current([{ id: edgeId, type: "remove" }]),
     [],
   );
   const styledEdges = useMemo(
@@ -2542,11 +2552,11 @@ function CanvasContent({
         data: {
           ...e.data,
           isHovered: e.id === hoveredEdgeId,
-          onDelete: isReadOnly ? undefined : (edgeId: string) => state.onEdgesChange([{ id: edgeId, type: "remove" }]),
+          onDelete: isReadOnly ? undefined : stableEdgeDelete,
         },
         zIndex: e.id === hoveredEdgeId ? 1000 : 0,
       })),
-    [state.edges, hoveredEdgeId, state.onEdgesChange, isReadOnly],
+    [state.edges, hoveredEdgeId, stableEdgeDelete, isReadOnly],
   );
 
   const handleNodesChange = useCallback(
@@ -2576,7 +2586,7 @@ function CanvasContent({
 
       resizeGroupsAfterChildChanges(changes, stateRef.current.nodes ?? [], state.setNodes);
     },
-    [isReadOnly, state],
+    [isReadOnly, state.onNodesChange, state.setNodes],
   );
 
   const handleEdgesChange = useCallback(
@@ -2591,7 +2601,7 @@ function CanvasContent({
         state.onEdgesChange(filteredChanges);
       }
     },
-    [isReadOnly, state],
+    [isReadOnly, state.onEdgesChange],
   );
 
   const logCounts = useMemo(() => {

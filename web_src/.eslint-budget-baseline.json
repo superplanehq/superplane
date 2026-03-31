@@ -1,29 +1,27 @@
 {
-  "maxAllowedTotalIssues": 1669,
+  "maxAllowedTotalIssues": 1362,
   "maxAllowedByRule": {
-    "@typescript-eslint/no-explicit-any": 580,
+    "@typescript-eslint/no-explicit-any": 361,
     "complexity": 274,
-    "@typescript-eslint/consistent-type-imports": 219,
-    "max-lines-per-function": 103,
+    "@typescript-eslint/consistent-type-imports": 212,
     "max-statements": 104,
-    "@typescript-eslint/no-non-null-asserted-optional-chain": 102,
+    "max-lines-per-function": 101,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 101,
     "react-hooks/exhaustive-deps": 60,
-    "@typescript-eslint/no-unused-vars": 46,
-    "react-hooks/rules-of-hooks": 4,
-    "max-lines": 27,
+    "@typescript-eslint/no-unused-vars": 43,
     "react-refresh/only-export-components": 27,
+    "max-lines": 26,
     "eqeqeq": 15,
     "max-depth": 11,
     "max-params": 8,
     "jsx-a11y/label-has-associated-control": 6,
-    "no-empty": 4,
-    "no-console": 2,
+    "react-hooks/rules-of-hooks": 4,
+    "no-empty": 2,
     "no-case-declarations": 2,
     "no-constant-binary-expression": 2,
-    "@typescript-eslint/no-namespace": 2,
+    "no-console": 1,
     "prefer-const": 1,
-    "@typescript-eslint/no-empty-object-type": 1,
-    "no-async-promise-executor": 1
+    "@typescript-eslint/no-empty-object-type": 1
   },
-  "updatedAt": "2026-03-26T12:57:42.224Z"
+  "updatedAt": "2026-03-31T15:31:22.514Z"
 }
