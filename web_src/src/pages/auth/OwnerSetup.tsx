@@ -18,6 +18,7 @@ const OwnerSetup: React.FC = () => {
   const [smtpFromName, setSmtpFromName] = useState("");
   const [smtpFromEmail, setSmtpFromEmail] = useState("");
   const [smtpUseTLS, setSmtpUseTLS] = useState(true);
+  const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
   const [step, setStep] = useState<"owner" | "smtpPrompt" | "smtpConfig">("owner");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +121,7 @@ const OwnerSetup: React.FC = () => {
           smtp_from_name: enableSMTP ? smtpFromName.trim() : "",
           smtp_from_email: enableSMTP ? smtpFromEmail.trim() : "",
           smtp_use_tls: enableSMTP ? smtpUseTLS : false,
+          allow_private_network_access: allowPrivateNetworkAccess,
         }),
       });
 
@@ -283,6 +285,27 @@ const OwnerSetup: React.FC = () => {
               {fieldErrors.confirmPassword && (
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
               )}
+            </div>
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
+              <div>
+                <h5 className="text-sm font-medium text-gray-800">Private network access</h5>
+                <Text className="mt-1 text-sm text-gray-600">
+                  Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or another
+                  closed network. This reduces SSRF protection for private addresses.
+                </Text>
+              </div>
+
+              <Label htmlFor="allow-private-network-access" className="mt-4 inline-flex items-start gap-3 text-sm">
+                <input
+                  id="allow-private-network-access"
+                  type="checkbox"
+                  checked={allowPrivateNetworkAccess}
+                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
+                  className="mt-1"
+                />
+                <span className="text-gray-800">Allow connections to private network tools</span>
+              </Label>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>

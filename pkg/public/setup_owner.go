@@ -20,18 +20,19 @@ import (
 )
 
 type SetupOwnerRequest struct {
-	Email         string `json:"email"`
-	FirstName     string `json:"first_name"`
-	LastName      string `json:"last_name"`
-	Password      string `json:"password"`
-	SMTPEnabled   bool   `json:"smtp_enabled"`
-	SMTPHost      string `json:"smtp_host"`
-	SMTPPort      int    `json:"smtp_port"`
-	SMTPUsername  string `json:"smtp_username"`
-	SMTPPassword  string `json:"smtp_password"`
-	SMTPFromName  string `json:"smtp_from_name"`
-	SMTPFromEmail string `json:"smtp_from_email"`
-	SMTPUseTLS    bool   `json:"smtp_use_tls"`
+	Email                     string `json:"email"`
+	FirstName                 string `json:"first_name"`
+	LastName                  string `json:"last_name"`
+	Password                  string `json:"password"`
+	SMTPEnabled               bool   `json:"smtp_enabled"`
+	SMTPHost                  string `json:"smtp_host"`
+	SMTPPort                  int    `json:"smtp_port"`
+	SMTPUsername              string `json:"smtp_username"`
+	SMTPPassword              string `json:"smtp_password"`
+	SMTPFromName              string `json:"smtp_from_name"`
+	SMTPFromEmail             string `json:"smtp_from_email"`
+	SMTPUseTLS                bool   `json:"smtp_use_tls"`
+	AllowPrivateNetworkAccess bool   `json:"allow_private_network_access"`
 }
 
 type SetupOwnerResponse struct {
@@ -152,7 +153,15 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		return nil
+		installationMetadata, err := models.GetInstallationMetadataInTransaction(tx)
+		if err != nil {
+			return err
+		}
+
+		installationMetadata.AllowPrivateNetworkAccess = req.AllowPrivateNetworkAccess
+		installationMetadata.UpdatedAt = time.Now()
+
+		return models.UpdateInstallationMetadataInTransaction(tx, installationMetadata)
 	})
 
 	if err != nil {
@@ -168,6 +177,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 
 	// Mark setup as completed so we stop redirecting to /setup
 	middleware.MarkOwnerSetupCompleted()
+	s.registry.HTTPContext().InvalidatePolicyCache()
 
 	// Create account cookie so the owner is signed in
 	organizationCreatedMessage := messages.NewOrganizationCreatedMessage(organization.ID.String())
