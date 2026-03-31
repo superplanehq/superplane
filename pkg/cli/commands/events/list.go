@@ -105,7 +105,7 @@ func (c *ListEventsCommand) listCanvasEvents(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
-		_, _ = fmt.Fprintln(writer, "ID\tNODE_ID\tCHANNEL\tEXECUTIONS\tCREATED_AT")
+		_, _ = fmt.Fprintln(writer, "ID\tNODE_ID\tCHANNEL\tRUNS\tCREATED_AT")
 		for _, event := range response.GetEvents() {
 			_, _ = fmt.Fprintf(
 				writer,

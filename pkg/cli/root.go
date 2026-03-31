@@ -12,11 +12,11 @@ import (
 	"github.com/spf13/viper"
 	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
 	events "github.com/superplanehq/superplane/pkg/cli/commands/events"
-	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
 	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
+	runs "github.com/superplanehq/superplane/pkg/cli/commands/runs"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	usage "github.com/superplanehq/superplane/pkg/cli/commands/usage"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -54,7 +54,7 @@ func init() {
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(canvases.NewCommand(options))
-	RootCmd.AddCommand(executions.NewCommand(options))
+	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(events.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
