@@ -28,7 +28,7 @@ spec:
       type: "TYPE_COMPONENT"
       configuration:
         method: "GET"
-        url: "https://app.superplane.com/server2"
+        url: "https://httpbin.org/status/500"
         successCodes: "2xx"
         timeoutSeconds: 10
       metadata: null

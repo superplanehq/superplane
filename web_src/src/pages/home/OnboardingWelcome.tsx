@@ -38,9 +38,9 @@ import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
 
 const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
 
-/** Quick start runs one tick against server1, then saves server2 before opening the canvas. */
-const QUICK_START_HTTP_URL_SERVER1 = "https://app.superplane.com/server1";
-const QUICK_START_HTTP_URL_SERVER2 = "https://app.superplane.com/server2";
+/** Quick start runs one tick against status/200, then saves status/500 before opening the canvas. */
+const QUICK_START_HTTP_URL_SERVER1 = "https://httpbin.org/status/200";
+const QUICK_START_HTTP_URL_SERVER2 = "https://httpbin.org/status/500";
 
 type Mode = "ui" | "cli" | "agent";
 
