@@ -31,22 +31,6 @@ export function formatTimestampInUserTimezone(timestamp: string | Date, userTime
 }
 
 /**
- * Format an optional ISO timestamp for execution/event detail rows; returns "-" when missing or invalid.
- */
-export function formatOptionalIsoTimestamp(value?: string): string {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return formatTimestampInUserTimezone(date);
-}
-
-/**
  * Format a date string as relative time from now
  * @param dateString - ISO date string or undefined
  * @param abbreviated - Whether to use abbreviated format (e.g., "5m ago" vs "5 minutes ago")

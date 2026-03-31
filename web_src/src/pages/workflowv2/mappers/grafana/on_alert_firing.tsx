@@ -6,8 +6,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { OnAlertFiringConfiguration, OnAlertFiringEventData } from "./types";
-import { stringOrDash } from "../utils";
-import { formatOptionalIsoTimestamp } from "@/lib/timezone";
+import { stringOrDash, formatTimestamp } from "../utils";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger
@@ -27,7 +26,7 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const eventData = context.event?.data as OnAlertFiringEventData | undefined;
-    const createdAt = formatOptionalIsoTimestamp(context.event?.createdAt);
+    const createdAt = formatTimestamp(context.event?.createdAt);
 
     return {
       "Triggered At": createdAt,

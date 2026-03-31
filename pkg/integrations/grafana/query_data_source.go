@@ -177,11 +177,15 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From = strings.TrimSpace(*spec.TimeFrom)
+		if t, err := time.Parse("2006-01-02T15:04", strings.TrimSpace(*spec.TimeFrom)); err == nil {
+			request.From = fmt.Sprintf("%d", t.UTC().UnixMilli())
+		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To = strings.TrimSpace(*spec.TimeTo)
+		if t, err := time.Parse("2006-01-02T15:04", strings.TrimSpace(*spec.TimeTo)); err == nil {
+			request.To = fmt.Sprintf("%d", t.UTC().UnixMilli())
+		}
 	}
 
 	if request.From == "" || request.To == "" {

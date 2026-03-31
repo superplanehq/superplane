@@ -14,7 +14,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { QueryDataSourceConfiguration } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatOptionalIsoTimestamp } from "@/lib/timezone";
+import { formatTimestamp } from "../utils";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -37,7 +37,7 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const configuration = context.node.configuration as QueryDataSourceConfiguration | undefined;
     const details: Record<string, string> = {
-      "Queried At": formatOptionalIsoTimestamp(context.execution.createdAt),
+      "Queried At": formatTimestamp(context.execution.createdAt),
     };
 
     if (configuration?.dataSourceUid) {
@@ -59,7 +59,7 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
 
     const payload = outputs.default[0];
     const responseData = payload?.data as Record<string, unknown> | undefined;
-    const payloadTimestamp = formatOptionalIsoTimestamp(payload?.timestamp);
+    const payloadTimestamp = formatTimestamp(payload?.timestamp);
     if (payloadTimestamp !== "-") {
       details["Queried At"] = payloadTimestamp;
     }

@@ -329,7 +329,7 @@ func extractAlertLabelNames(payload map[string]any) []string {
 		}
 	}
 
-	return filterEmptyStrings(names)
+	return uniqueNonEmpty(names)
 }
 
 // alertLabelNameMatchesPredicates mirrors Grafana notification policy semantics: all object_matchers
@@ -356,7 +356,7 @@ func alertLabelNameMatchesPredicates(name string, predicates []configuration.Pre
 	return true
 }
 
-func filterEmptyStrings(values []string) []string {
+func uniqueNonEmpty(values []string) []string {
 	filtered := make([]string, 0, len(values))
 	for _, value := range values {
 		if value == "" || slices.Contains(filtered, value) {
