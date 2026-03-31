@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -23,19 +22,6 @@ type secretResource struct {
 	Kind       string                                `json:"kind"`
 	Metadata   *openapi_client.SecretsSecretMetadata `json:"metadata,omitempty"`
 	Spec       *openapi_client.SecretsSecretSpec     `json:"spec,omitempty"`
-}
-
-func resolveOrganizationID(ctx core.CommandContext) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-
-	if !me.HasOrganizationId() || strings.TrimSpace(me.GetOrganizationId()) == "" {
-		return "", fmt.Errorf("organization id not found for authenticated user")
-	}
-
-	return me.GetOrganizationId(), nil
 }
 
 func organizationDomainType() openapi_client.AuthorizationDomainType {

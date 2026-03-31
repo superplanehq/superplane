@@ -66,6 +66,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/claude/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/claude.svg" alt="Claude"/><br/>Claude</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/cursor/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/cursor.svg" alt="Cursor"/><br/>Cursor</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/openai/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/openai.svg" alt="OpenAI"/><br/>OpenAI</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/perplexity/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/perplexity.svg" alt="Perplexity"/><br/>Perplexity</a></td>
 </tr>
 </table>
 
@@ -104,6 +105,7 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <tr>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/dockerhub/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/docker.svg" alt="DockerHub"/><br/>DockerHub</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/hetzner-cloud/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/hetzner.svg" alt="Hetzner Cloud"/><br/>Hetzner Cloud</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/azure/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/azure.svg" alt="Azure"/><br/>Azure</a></td>
 </tr>
 </table>
 
@@ -117,6 +119,10 @@ SuperPlane integrates with the tools you already use. Each integration provides 
 <td align="center" width="150"><a href="https://docs.superplane.com/components/honeycomb/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/honeycomb.svg" alt="Honeycomb"/><br/>Honeycomb</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/newrelic/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/newrelic.svg" alt="New Relic"/><br/>New Relic</a></td>
 <td align="center" width="150"><a href="https://docs.superplane.com/components/prometheus/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/prometheus.svg" alt="Prometheus"/><br/>Prometheus</a></td>
+</tr>
+<tr>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/elastic/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/elastic.svg" alt="Elastic"/><br/>Elastic</a></td>
+<td align="center" width="150"><a href="https://docs.superplane.com/components/sentry/" target="_blank"><img width="40" src="https://raw.githubusercontent.com/superplanehq/superplane/main/web_src/src/assets/icons/integrations/sentry.svg" alt="Sentry"/><br/>Sentry</a></td>
 </tr>
 </table>
 
@@ -170,6 +176,8 @@ You can deploy SuperPlane on a single host or on Kubernetes:
 
 - **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
 - **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
+
+Installation admins can enable private network access during owner setup or later in `/admin/settings` when SuperPlane needs to reach tools inside a VPC, private Kubernetes cluster, or another closed network. Environment variables still take precedence: set `BLOCKED_HTTP_HOSTS` or `BLOCKED_PRIVATE_IP_RANGES` to override the UI-controlled policy, and set either variable to an empty value to disable that specific block list entirely.
 
 
 ## Contributing
