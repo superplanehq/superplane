@@ -97,6 +97,7 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
           },
         ]
       : []),
+    ...(account?.installation_admin ? [{ label: "Installation Admin", href: "/admin", Icon: Shield }] : []),
     {
       label: "Sign Out",
       Icon: LogOut,
@@ -158,7 +159,6 @@ export function OrganizationMenuButton({ organizationId, onLogoClick, className 
       permission: { resource: "secrets", action: "read" },
     },
     { label: "Change Organization", href: "/", Icon: ArrowRightLeft },
-    ...(account?.installation_admin ? [{ label: "Installation Admin", href: "/admin", Icon: Shield }] : []),
   ];
 
   const handleSignOut = () => {
