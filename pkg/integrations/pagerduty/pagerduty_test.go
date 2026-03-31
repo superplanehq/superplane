@@ -265,7 +265,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		assert.Nil(t, integrationCtx.Metadata)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://identity.pagerduty.com/oauth/token", httpContext.Requests[0].URL.String())
-		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[1].URL.String())
+		assert.Equal(t, "https://api.pagerduty.com/services?limit=100&offset=0", httpContext.Requests[1].URL.String())
 	})
 
 	t.Run("app oauth -> success creates access token, moves to ready, and sets metadata", func(t *testing.T) {
