@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "project": [
+    "src/**/*.{ts,tsx}",
+    ".storybook/**/*.{ts,tsx}",
+    "scripts/**/*.mjs"
+  ],
+  "ignore": [],
+  "rules": {
+    "nsTypes": "off"
+  }
+}
