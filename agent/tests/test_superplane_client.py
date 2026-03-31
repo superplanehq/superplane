@@ -286,3 +286,44 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
     assert triggers[0]["name"] == "github.onPullRequestReviewComment"
     assert triggers[0]["provider"] == "github"
     assert "configuration_fields" not in triggers[0]
+
+
+def test_matches_filters_natural_language_query_matches_block_name() -> None:
+    assert SuperplaneClient._matches_filters(
+        name="slack.sendTextMessage",
+        label="Send Text Message",
+        description="",
+        provider=None,
+        query="slack send text message",
+    )
+
+
+def test_matches_filters_partial_query_tokens() -> None:
+    assert SuperplaneClient._matches_filters(
+        name="slack.sendTextMessage",
+        label="Send Text Message",
+        description="",
+        provider=None,
+        query="slack text",
+    )
+
+
+def test_matches_filters_contiguous_phrase_still_matches() -> None:
+    assert SuperplaneClient._matches_filters(
+        name="filter",
+        label="Filter",
+        description="Filter events based on content",
+        provider=None,
+        query="filter events",
+    )
+
+
+def test_matches_filters_excludes_unrelated_block() -> None:
+    assert not SuperplaneClient._matches_filters(
+        name="noop",
+        label="Noop",
+        description="",
+        provider=None,
+        query="slack",
+    )
+

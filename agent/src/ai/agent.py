@@ -177,6 +177,23 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         parameters: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         """List selectable resources for an org integration resource type."""
+        if not isinstance(integration_id, str) or not integration_id.strip():
+            return [
+                _tool_error_entry(
+                    "list_integration_resources",
+                    ValueError("integration_id is required (non-empty)."),
+                )
+            ]
+        if not isinstance(type, str) or not type.strip():
+            return [
+                _tool_error_entry(
+                    "list_integration_resources",
+                    ValueError(
+                        "Resource type is required (non-empty string, e.g. from describe_component "
+                        "integration-resource fields). Retry with the correct type for this integration."
+                    ),
+                )
+            ]
         try:
             return ctx.deps.client.list_integration_resources(
                 integration_id=integration_id,
