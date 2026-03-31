@@ -229,3 +229,63 @@ export interface UpdateAppConfiguration {
   envVars?: string[];
   gitHubBranch?: string;
 }
+
+export interface GetGPUDropletConfiguration {
+  droplet: string;
+}
+
+export interface UpdateGPUDropletConfiguration {
+  droplet: string;
+  name?: string;
+  size?: string;
+}
+
+export interface DeleteGPUDropletConfiguration {
+  droplet: string;
+}
+
+export interface CreateGPUDropletConfiguration {
+  name?: string;
+  region?: string;
+  size?: string;
+  imageType?: string;
+  oneClickImage?: string;
+  baseImage?: string;
+}
+
+export interface NetworkV4 {
+  ip_address?: string;
+  netmask?: string;
+  gateway?: string;
+  type?: string;
+}
+
+export interface DropletRegion {
+  name?: string;
+  slug?: string;
+}
+
+export interface DropletImage {
+  name?: string;
+  slug?: string;
+}
+
+export interface DropletData {
+  id?: number;
+  name?: string;
+  status?: string;
+  region?: DropletRegion;
+  size_slug?: string;
+  image?: DropletImage;
+  memory?: number;
+  vcpus?: number;
+  disk?: number;
+  networks?: {
+    v4?: NetworkV4[];
+  };
+  tags?: string[];
+}
+
+export interface DeleteGPUDropletResult {
+  dropletId?: number;
+}
