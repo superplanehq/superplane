@@ -46,11 +46,7 @@ function getOktaURLs(baseURL: string, orgId: string) {
 
 function StatusMessage({ message }: { message: string | null }) {
   if (!message) return null;
-  return (
-    <span className={`text-sm ${message.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
-      {message}
-    </span>
-  );
+  return <span className={`text-sm ${message.includes("Failed") ? "text-red-600" : "text-green-600"}`}>{message}</span>;
 }
 
 function CertificateField({
