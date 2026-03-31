@@ -17,6 +17,32 @@ func eq(value string) configuration.Predicate {
 	return configuration.Predicate{Type: configuration.PredicateTypeEquals, Value: value}
 }
 
+type staticWebhookContext struct {
+	secret string
+	url    string
+}
+
+func (w *staticWebhookContext) Setup() (string, error) {
+	return w.url, nil
+}
+
+func (w *staticWebhookContext) GetSecret() ([]byte, error) {
+	return []byte(w.secret), nil
+}
+
+func (w *staticWebhookContext) SetSecret(secret []byte) error {
+	w.secret = string(secret)
+	return nil
+}
+
+func (w *staticWebhookContext) ResetSecret() ([]byte, []byte, error) {
+	return []byte(w.secret), []byte(w.secret), nil
+}
+
+func (w *staticWebhookContext) GetBaseURL() string {
+	return "http://localhost:3000/api/v1"
+}
+
 func Test__OnAlertFires__Configuration(t *testing.T) {
 	fields := (&OnAlertFires{}).Configuration()
 	require.NotEmpty(t, fields)
@@ -191,7 +217,7 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 			Integration: integrationCtx,
 			Metadata:    meta,
 			Requests:    &contexts.RequestContext{},
-			Webhook:     &contexts.NodeWebhookContext{URL: testWebhookURL},
+			Webhook:     &staticWebhookContext{url: testWebhookURL},
 		})
 		require.NoError(t, err)
 		assert.Len(t, httpCtx.Requests, 4)
@@ -226,7 +252,7 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 			Integration: integrationCtx,
 			Metadata:    meta,
 			Requests:    &contexts.RequestContext{},
-			Webhook:     &contexts.NodeWebhookContext{URL: testWebhookURL},
+			Webhook:     &staticWebhookContext{url: testWebhookURL},
 		})
 		require.NoError(t, err)
 
@@ -260,7 +286,7 @@ func Test__OnAlertFires__CheckConnectorAndAttachRule(t *testing.T) {
 			Integration: integrationCtx,
 			Metadata:    meta,
 			Requests:    requestCtx,
-			Webhook:     &contexts.NodeWebhookContext{URL: testWebhookURL},
+			Webhook:     &staticWebhookContext{url: testWebhookURL},
 		})
 		require.NoError(t, err)
 
