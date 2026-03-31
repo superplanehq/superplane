@@ -37,6 +37,7 @@ const (
 	Organizations_GetOktaIdpSettings_FullMethodName        = "/Superplane.Organizations.Organizations/GetOktaIdpSettings"
 	Organizations_UpdateOktaIdpSettings_FullMethodName     = "/Superplane.Organizations.Organizations/UpdateOktaIdpSettings"
 	Organizations_RotateOktaScimBearerToken_FullMethodName = "/Superplane.Organizations.Organizations/RotateOktaScimBearerToken"
+	Organizations_DescribeUsage_FullMethodName             = "/Superplane.Organizations.Organizations/DescribeUsage"
 	Organizations_AcceptInviteLink_FullMethodName          = "/Superplane.Organizations.Organizations/AcceptInviteLink"
 	Organizations_ListIntegrations_FullMethodName          = "/Superplane.Organizations.Organizations/ListIntegrations"
 	Organizations_DescribeIntegration_FullMethodName       = "/Superplane.Organizations.Organizations/DescribeIntegration"
@@ -44,7 +45,6 @@ const (
 	Organizations_CreateIntegration_FullMethodName         = "/Superplane.Organizations.Organizations/CreateIntegration"
 	Organizations_UpdateIntegration_FullMethodName         = "/Superplane.Organizations.Organizations/UpdateIntegration"
 	Organizations_DeleteIntegration_FullMethodName         = "/Superplane.Organizations.Organizations/DeleteIntegration"
-	Organizations_DescribeUsage_FullMethodName             = "/Superplane.Organizations.Organizations/DescribeUsage"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -65,10 +65,10 @@ type OrganizationsClient interface {
 	UpdateAgentSettings(ctx context.Context, in *UpdateAgentSettingsRequest, opts ...grpc.CallOption) (*UpdateAgentSettingsResponse, error)
 	SetAgentOpenAIKey(ctx context.Context, in *SetAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*SetAgentOpenAIKeyResponse, error)
 	DeleteAgentOpenAIKey(ctx context.Context, in *DeleteAgentOpenAIKeyRequest, opts ...grpc.CallOption) (*DeleteAgentOpenAIKeyResponse, error)
-	DescribeUsage(ctx context.Context, in *DescribeUsageRequest, opts ...grpc.CallOption) (*DescribeUsageResponse, error)
 	GetOktaIdpSettings(ctx context.Context, in *GetOktaIdpSettingsRequest, opts ...grpc.CallOption) (*GetOktaIdpSettingsResponse, error)
 	UpdateOktaIdpSettings(ctx context.Context, in *UpdateOktaIdpSettingsRequest, opts ...grpc.CallOption) (*UpdateOktaIdpSettingsResponse, error)
 	RotateOktaScimBearerToken(ctx context.Context, in *RotateOktaScimBearerTokenRequest, opts ...grpc.CallOption) (*RotateOktaScimBearerTokenResponse, error)
+	DescribeUsage(ctx context.Context, in *DescribeUsageRequest, opts ...grpc.CallOption) (*DescribeUsageResponse, error)
 	AcceptInviteLink(ctx context.Context, in *InviteLink, opts ...grpc.CallOption) (*_struct.Struct, error)
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
@@ -354,10 +354,10 @@ type OrganizationsServer interface {
 	UpdateAgentSettings(context.Context, *UpdateAgentSettingsRequest) (*UpdateAgentSettingsResponse, error)
 	SetAgentOpenAIKey(context.Context, *SetAgentOpenAIKeyRequest) (*SetAgentOpenAIKeyResponse, error)
 	DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error)
-	DescribeUsage(context.Context, *DescribeUsageRequest) (*DescribeUsageResponse, error)
 	GetOktaIdpSettings(context.Context, *GetOktaIdpSettingsRequest) (*GetOktaIdpSettingsResponse, error)
 	UpdateOktaIdpSettings(context.Context, *UpdateOktaIdpSettingsRequest) (*UpdateOktaIdpSettingsResponse, error)
 	RotateOktaScimBearerToken(context.Context, *RotateOktaScimBearerTokenRequest) (*RotateOktaScimBearerTokenResponse, error)
+	DescribeUsage(context.Context, *DescribeUsageRequest) (*DescribeUsageResponse, error)
 	AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error)
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
@@ -416,9 +416,6 @@ func (UnimplementedOrganizationsServer) SetAgentOpenAIKey(context.Context, *SetA
 func (UnimplementedOrganizationsServer) DeleteAgentOpenAIKey(context.Context, *DeleteAgentOpenAIKeyRequest) (*DeleteAgentOpenAIKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAgentOpenAIKey not implemented")
 }
-func (UnimplementedOrganizationsServer) DescribeUsage(context.Context, *DescribeUsageRequest) (*DescribeUsageResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method DescribeUsage not implemented")
-}
 func (UnimplementedOrganizationsServer) GetOktaIdpSettings(context.Context, *GetOktaIdpSettingsRequest) (*GetOktaIdpSettingsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetOktaIdpSettings not implemented")
 }
@@ -427,6 +424,9 @@ func (UnimplementedOrganizationsServer) UpdateOktaIdpSettings(context.Context, *
 }
 func (UnimplementedOrganizationsServer) RotateOktaScimBearerToken(context.Context, *RotateOktaScimBearerTokenRequest) (*RotateOktaScimBearerTokenResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RotateOktaScimBearerToken not implemented")
+}
+func (UnimplementedOrganizationsServer) DescribeUsage(context.Context, *DescribeUsageRequest) (*DescribeUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeUsage not implemented")
 }
 func (UnimplementedOrganizationsServer) AcceptInviteLink(context.Context, *InviteLink) (*_struct.Struct, error) {
 	return nil, status.Error(codes.Unimplemented, "method AcceptInviteLink not implemented")
@@ -983,10 +983,6 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Organizations_DeleteAgentOpenAIKey_Handler,
 		},
 		{
-			MethodName: "DescribeUsage",
-			Handler:    _Organizations_DescribeUsage_Handler,
-		},
-		{
 			MethodName: "GetOktaIdpSettings",
 			Handler:    _Organizations_GetOktaIdpSettings_Handler,
 		},
@@ -997,6 +993,10 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RotateOktaScimBearerToken",
 			Handler:    _Organizations_RotateOktaScimBearerToken_Handler,
+		},
+		{
+			MethodName: "DescribeUsage",
+			Handler:    _Organizations_DescribeUsage_Handler,
 		},
 		{
 			MethodName: "AcceptInviteLink",

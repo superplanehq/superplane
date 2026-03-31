@@ -1548,7 +1548,6 @@ func RegisterOrganizationsHandlerServer(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Organizations_DescribeUsage_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-
 	mux.Handle(http.MethodPost, pattern_Organizations_AcceptInviteLink_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2035,7 +2034,6 @@ func RegisterOrganizationsHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Organizations_DescribeUsage_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-
 	mux.Handle(http.MethodPost, pattern_Organizations_AcceptInviteLink_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -2176,6 +2174,7 @@ var (
 	pattern_Organizations_GetOktaIdpSettings_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "okta-idp"}, ""))
 	pattern_Organizations_UpdateOktaIdpSettings_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "okta-idp"}, ""))
 	pattern_Organizations_RotateOktaScimBearerToken_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "organizations", "id", "okta-idp", "rotate-scim-token"}, ""))
+	pattern_Organizations_DescribeUsage_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "usage"}, ""))
 	pattern_Organizations_AcceptInviteLink_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "invite-links", "token", "accept"}, ""))
 	pattern_Organizations_ListIntegrations_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "integrations"}, ""))
 	pattern_Organizations_DescribeIntegration_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id"}, ""))
@@ -2183,7 +2182,6 @@ var (
 	pattern_Organizations_CreateIntegration_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "integrations"}, ""))
 	pattern_Organizations_UpdateIntegration_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id"}, ""))
 	pattern_Organizations_DeleteIntegration_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "organizations", "id", "integrations", "integration_id"}, ""))
-	pattern_Organizations_DescribeUsage_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "organizations", "id", "usage"}, ""))
 )
 
 var (
@@ -2204,6 +2202,7 @@ var (
 	forward_Organizations_GetOktaIdpSettings_0        = runtime.ForwardResponseMessage
 	forward_Organizations_UpdateOktaIdpSettings_0     = runtime.ForwardResponseMessage
 	forward_Organizations_RotateOktaScimBearerToken_0 = runtime.ForwardResponseMessage
+	forward_Organizations_DescribeUsage_0             = runtime.ForwardResponseMessage
 	forward_Organizations_AcceptInviteLink_0          = runtime.ForwardResponseMessage
 	forward_Organizations_ListIntegrations_0          = runtime.ForwardResponseMessage
 	forward_Organizations_DescribeIntegration_0       = runtime.ForwardResponseMessage
@@ -2211,5 +2210,4 @@ var (
 	forward_Organizations_CreateIntegration_0         = runtime.ForwardResponseMessage
 	forward_Organizations_UpdateIntegration_0         = runtime.ForwardResponseMessage
 	forward_Organizations_DeleteIntegration_0         = runtime.ForwardResponseMessage
-	forward_Organizations_DescribeUsage_0             = runtime.ForwardResponseMessage
 )

@@ -102,6 +102,47 @@ func (h *UserHandler) Create(r *http.Request, attributes scim.ResourceAttributes
 			return nil
 		}
 
+		// Check for a previously deprovisioned (soft-deleted) user with the same email.
+		// The unique index on users doesn't exclude deleted rows, so we must restore the
+		// existing record rather than trying to INSERT a new one.
+		deletedUser, deletedErr := models.FindMaybeDeletedUserByEmailInTransaction(tx, orgID, email)
+		if deletedErr == nil && deletedUser != nil && deletedUser.DeletedAt.Valid {
+			log.Infof("SCIM [%s] Create: restoring previously deprovisioned user id=%s email=%s", orgID, deletedUser.ID, email)
+			orgUUID, e := uuid.Parse(orgID)
+			if e != nil {
+				return scimerrors.ScimErrorBadRequest("invalid organization id")
+			}
+			if e := deletedUser.RestoreInTransaction(tx); e != nil {
+				log.Errorf("SCIM [%s] Create: failed to restore user id=%s: %v", orgID, deletedUser.ID, e)
+				return e
+			}
+			// Remove any stale SCIM mapping from the previous provisioning cycle.
+			if e := models.DeleteOrganizationScimUserMappingInTransaction(tx, orgID, deletedUser.ID.String()); e != nil {
+				log.Warnf("SCIM [%s] Create: failed to remove stale SCIM mapping for user id=%s: %v", orgID, deletedUser.ID, e)
+			}
+			if e := models.CreateOrganizationScimUserMappingInTransaction(tx, orgUUID, deletedUser.ID, ext); e != nil {
+				log.Errorf("SCIM [%s] Create: failed to create SCIM mapping for restored user id=%s: %v", orgID, deletedUser.ID, e)
+				return e
+			}
+			if e := h.Auth.AssignRole(deletedUser.ID.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization); e != nil {
+				log.Errorf("SCIM [%s] Create: failed to assign role for restored user id=%s: %v", orgID, deletedUser.ID, e)
+				return e
+			}
+			log.Infof("SCIM [%s] Create: successfully reprovisioned user id=%s email=%s", orgID, deletedUser.ID, email)
+			now := time.Now()
+			out = scim.Resource{
+				ID:         deletedUser.ID.String(),
+				ExternalID: externalIDOptional(ext),
+				Attributes: userAttributes(deletedUser, email, ext, true),
+				Meta: scim.Meta{
+					Created:      &now,
+					LastModified: &now,
+					Version:      strconv.FormatInt(now.Unix(), 10),
+				},
+			}
+			return nil
+		}
+
 		if ext != nil {
 			var m int64
 			if e := tx.Model(&models.OrganizationScimUserMapping{}).

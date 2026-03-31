@@ -23,7 +23,7 @@ import {
   organizationsUpdateOktaIdpSettings,
   organizationsRotateOktaScimBearerToken,
 } from "../../../api-client/sdk.gen";
-import { withOrganizationHeader } from "../../../utils/withOrganizationHeader";
+import { withOrganizationHeader } from "../../../lib/withOrganizationHeader";
 import type { OrganizationsOktaIdpSettings } from "../../../api-client/types.gen";
 
 export function OktaSSO() {
