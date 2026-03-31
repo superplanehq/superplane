@@ -256,6 +256,8 @@ def test_list_components_includes_integration_scoped_components() -> None:
     assert len(components) == 1
     assert components[0]["name"] == "slack.sendTextMessage"
     assert components[0]["provider"] == "slack"
+    assert "configuration_fields" not in components[0]
+    assert components[0].get("output_channel_names") == []
 
 
 def test_list_triggers_includes_integration_scoped_triggers() -> None:
@@ -283,3 +285,4 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
     assert len(triggers) == 1
     assert triggers[0]["name"] == "github.onPullRequestReviewComment"
     assert triggers[0]["provider"] == "github"
+    assert "configuration_fields" not in triggers[0]

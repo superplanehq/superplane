@@ -105,7 +105,11 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List available components; optionally filter by provider or text query."""
+        """List components (compact catalog rows: name, label, description, provider, output_channel_names).
+
+        For configuration fields and types needed in proposals, call describe_component on the chosen name.
+        Prefer a single list call per request with provider/query; reuse prior results when possible.
+        """
         try:
             return ctx.deps.client.list_components(provider=provider, query=query)
         except Exception as error:
@@ -127,7 +131,11 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List available triggers; optionally filter by provider or text query."""
+        """List triggers (compact catalog rows: name, label, description, provider).
+
+        For configuration fields and types needed in proposals, call describe_trigger on the chosen name.
+        Prefer a single list call per request with provider/query; reuse prior results when possible.
+        """
         try:
             return ctx.deps.client.list_triggers(provider=provider, query=query)
         except Exception as error:

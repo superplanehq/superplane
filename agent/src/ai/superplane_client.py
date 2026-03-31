@@ -253,6 +253,36 @@ class SuperplaneClient:
         return serialized
 
     @staticmethod
+    def _serialize_component_list_item(component: ComponentsComponent) -> dict[str, Any]:
+        """Compact shape for list_components only; use describe_component for full schema."""
+        output_channels = component.output_channels or []
+        names: list[str] = []
+        for channel in output_channels:
+            if channel is not None and isinstance(channel.name, str) and channel.name:
+                names.append(channel.name)
+        return {
+            "name": component.name,
+            "provider": SuperplaneClient._provider_from_name(component.name),
+            "label": component.label,
+            "description": component.description,
+            "icon": component.icon,
+            "color": component.color,
+            "output_channel_names": names,
+        }
+
+    @staticmethod
+    def _serialize_trigger_list_item(trigger: TriggersTrigger) -> dict[str, Any]:
+        """Compact shape for list_triggers only; use describe_trigger for full schema."""
+        return {
+            "name": trigger.name,
+            "provider": SuperplaneClient._provider_from_name(trigger.name),
+            "label": trigger.label,
+            "description": trigger.description,
+            "icon": trigger.icon,
+            "color": trigger.color,
+        }
+
+    @staticmethod
     def _serialize_component(component: ComponentsComponent) -> dict[str, Any]:
         output_channels = component.output_channels or []
         configuration_fields = SuperplaneClient._serialize_configuration_fields(component.configuration)
@@ -380,7 +410,10 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_component(component) for component in sorted(matches, key=lambda item: item.name or "")]
+        return [
+            self._serialize_component_list_item(component)
+            for component in sorted(matches, key=lambda item: item.name or "")
+        ]
 
     def describe_component(self, name: str) -> dict[str, Any]:
         response = self._api_request(
@@ -442,7 +475,10 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [self._serialize_trigger(trigger) for trigger in sorted(matches, key=lambda item: item.name or "")]
+        return [
+            self._serialize_trigger_list_item(trigger)
+            for trigger in sorted(matches, key=lambda item: item.name or "")
+        ]
 
     def list_available_integrations(self) -> list[dict[str, Any]]:
         integrations = self._list_available_integrations_raw()
