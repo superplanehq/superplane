@@ -28,6 +28,7 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
+import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import ImpersonationBanner from "./components/ImpersonationBanner";
 
 // Create a client
@@ -83,6 +84,7 @@ function AppRouter() {
           <Route path="admin" element={<AdminLayout />}>
             <Route index element={<OrganizationsListAdmin />} />
             <Route path="accounts" element={<AccountsListAdmin />} />
+            <Route path="settings" element={<InstallationSettingsAdmin />} />
             <Route path="organizations/:orgId" element={<OrganizationDetailAdmin />} />
           </Route>
 
