@@ -34,6 +34,16 @@ type DataSource struct {
 	Name string `json:"name"`
 }
 
+type Folder struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type AlertRuleSummary struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
 type apiStatusError struct {
 	Operation    string
 	StatusCode   int
@@ -479,6 +489,104 @@ func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNam
 	return c.putNotificationPolicies(root)
 }
 
+func (c *Client) ListAlertRules() ([]AlertRuleSummary, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/alert-rules", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing alert rules: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule list", status, responseBody)
+	}
+
+	var rules []AlertRuleSummary
+	if err := json.Unmarshal(responseBody, &rules); err != nil {
+		return nil, fmt.Errorf("error parsing alert rules response: %v", err)
+	}
+
+	return rules, nil
+}
+
+func (c *Client) GetAlertRule(uid string) (map[string]any, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule get", status, responseBody)
+	}
+
+	var rule map[string]any
+	if err := json.Unmarshal(responseBody, &rule); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return rule, nil
+}
+
+func (c *Client) CreateAlertRule(rule map[string]any) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPost,
+		"/api/v1/provisioning/alert-rules",
+		bytes.NewReader(body),
+		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule create", status, responseBody)
+	}
+
+	var created map[string]any
+	if err := json.Unmarshal(responseBody, &created); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return created, nil
+}
+
+func (c *Client) UpdateAlertRule(uid string, rule map[string]any) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPut,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid),
+		bytes.NewReader(body),
+		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error updating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule update", status, responseBody)
+	}
+
+	var updated map[string]any
+	if err := json.Unmarshal(responseBody, &updated); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return updated, nil
+}
+
 // combinedPositiveAlertNameRegex builds the =~ pattern Grafana uses for object_matchers on
 // alertname: full-string match with positive predicates OR'd inside one alternation.
 // Must stay aligned with alertLabelNameMatchesPredicates in on_alert_firing.go.
@@ -562,4 +670,22 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	}
 
 	return sources, nil
+}
+
+func (c *Client) ListFolders() ([]Folder, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing folders: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana folder list", status, responseBody)
+	}
+
+	var folders []Folder
+	if err := json.Unmarshal(responseBody, &folders); err != nil {
+		return nil, fmt.Errorf("error parsing folders response: %v", err)
+	}
+
+	return folders, nil
 }
