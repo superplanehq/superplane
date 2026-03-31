@@ -1173,6 +1173,60 @@ export function WorkflowPageV2() {
     [organizationId, canvasId, queryClient],
   );
 
+  const processQueuedCanvasSave = useCallback(
+    async (request: QueuedCanvasSaveRequest) => {
+      if (activeCanvasVersionIdRef.current !== (request.savingVersionId || "")) {
+        request.resolve({
+          status: "stale",
+          workflow: request.workflow,
+          savingVersionId: request.savingVersionId,
+          matchesCurrentCanvas: false,
+          hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
+        });
+        return;
+      }
+
+      const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
+      const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
+      const releaseCanvasUpdatedEcho = request.savingVersionId ? () => undefined : registerIgnoredCanvasUpdatedEcho();
+
+      try {
+        const response = await updateCanvasVersionMutation.mutateAsync({
+          versionId: request.savingVersionId,
+          name: request.workflow.metadata?.name ?? "",
+          description: request.workflow.metadata?.description,
+          nodes: request.workflow.spec?.nodes,
+          edges: request.workflow.spec?.edges,
+          preserveLocalCanvasState: true,
+          invalidateRelatedQueries: false,
+        });
+
+        syncCurrentCanvasWithSavedVersion(request.workflow, response?.data?.version);
+
+        request.resolve({
+          status: "saved",
+          workflow: request.workflow,
+          savingVersionId: request.savingVersionId,
+          response,
+          matchesCurrentCanvas: saveMatchesCurrentCanvas(request.workflow),
+          hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
+        });
+      } catch (error) {
+        releaseCanvasUpdatedEcho();
+        releaseCanvasVersionUpdatedEcho();
+        request.reject(error);
+      }
+    },
+    [
+      liveCanvasVersionId,
+      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasVersionUpdatedEcho,
+      saveMatchesCurrentCanvas,
+      syncCurrentCanvasWithSavedVersion,
+      updateCanvasVersionMutation,
+    ],
+  );
+
   const drainCanvasSaveQueue = useCallback(async () => {
     if (isDrainingCanvasSaveQueueRef.current || !organizationId || !canvasId) {
       return;
@@ -1186,48 +1240,7 @@ export function WorkflowPageV2() {
         const request = queuedCanvasSaveRef.current;
         queuedCanvasSaveRef.current = null;
         setIsCanvasSaveQueued(false);
-
-        if (activeCanvasVersionIdRef.current !== (request.savingVersionId || "")) {
-          request.resolve({
-            status: "stale",
-            workflow: request.workflow,
-            savingVersionId: request.savingVersionId,
-            matchesCurrentCanvas: false,
-            hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
-          });
-          continue;
-        }
-
-        const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
-        const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
-        const releaseCanvasUpdatedEcho = request.savingVersionId ? () => undefined : registerIgnoredCanvasUpdatedEcho();
-
-        try {
-          const response = await updateCanvasVersionMutation.mutateAsync({
-            versionId: request.savingVersionId,
-            name: request.workflow.metadata?.name ?? "",
-            description: request.workflow.metadata?.description,
-            nodes: request.workflow.spec?.nodes,
-            edges: request.workflow.spec?.edges,
-            preserveLocalCanvasState: true,
-            invalidateRelatedQueries: false,
-          });
-
-          syncCurrentCanvasWithSavedVersion(request.workflow, response?.data?.version);
-
-          request.resolve({
-            status: "saved",
-            workflow: request.workflow,
-            savingVersionId: request.savingVersionId,
-            response,
-            matchesCurrentCanvas: saveMatchesCurrentCanvas(request.workflow),
-            hasQueuedFollowUp: !!queuedCanvasSaveRef.current,
-          });
-        } catch (error) {
-          releaseCanvasUpdatedEcho();
-          releaseCanvasVersionUpdatedEcho();
-          request.reject(error);
-        }
+        await processQueuedCanvasSave(request);
       }
     } finally {
       setIsCanvasSaveInFlight(false);
@@ -1237,16 +1250,7 @@ export function WorkflowPageV2() {
         void drainCanvasSaveQueue();
       }
     }
-  }, [
-    organizationId,
-    canvasId,
-    liveCanvasVersionId,
-    registerIgnoredCanvasUpdatedEcho,
-    registerIgnoredCanvasVersionUpdatedEcho,
-    saveMatchesCurrentCanvas,
-    syncCurrentCanvasWithSavedVersion,
-    updateCanvasVersionMutation,
-  ]);
+  }, [organizationId, canvasId, processQueuedCanvasSave]);
 
   const enqueueCanvasSave = useCallback(
     (workflow: CanvasesCanvas, savingVersionId?: string) =>
