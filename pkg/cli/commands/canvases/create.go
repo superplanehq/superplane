@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -127,6 +128,14 @@ func validateAndPrintCreateResponse(
 		return fmt.Errorf("canvas create returned success but no canvas was returned — the request may not have reached the server (check your context URL scheme)")
 	}
 
-	fmt.Fprintf(ctx.Cmd.OutOrStdout(), "Canvas %q created (ID: %s)\n", resp.Canvas.Metadata.GetName(), resp.Canvas.Metadata.GetId())
-	return nil
+	canvas := *resp.Canvas
+	resource := models.CanvasResourceFromCanvas(canvas)
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(resource)
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId())
+		return err
+	})
 }
