@@ -9,7 +9,7 @@ export function MultiCombobox<T extends { id: string }>({
   options,
   displayValue,
   filter,
-  anchor = "bottom",
+  anchor: _anchor = "bottom",
   className,
   placeholder,
   autoFocus,
