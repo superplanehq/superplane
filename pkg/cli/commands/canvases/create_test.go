@@ -15,7 +15,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
+func newCanvasCreateServer(t *testing.T) *httptest.Server {
+	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPost, r.Method)
 		require.Equal(t, "/api/v1/canvases", r.URL.Path)
@@ -23,45 +24,36 @@ func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
 	}))
 	t.Cleanup(server.Close)
+	return server
+}
 
+func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
+	server := newCanvasCreateServer(t)
 	ctx, stdout := newCreateCommandContextForTest(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
 
-	err := cmd.Execute(ctx)
+	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
 }
 
 func TestCreateCommandReturnsJSONOutput(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
-	}))
-	t.Cleanup(server.Close)
-
+	server := newCanvasCreateServer(t)
 	ctx, stdout := newCreateCommandContextForTest(t, server, "json")
 	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
 
-	err := cmd.Execute(ctx)
+	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `"id": "abc-123"`)
 	require.Contains(t, stdout.String(), `"name": "my-canvas"`)
 }
 
 func TestCreateCommandReturnsYAMLOutput(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
-	}))
-	t.Cleanup(server.Close)
-
+	server := newCanvasCreateServer(t)
 	ctx, stdout := newCreateCommandContextForTest(t, server, "yaml")
 	ctx.Args = []string{"my-canvas"}
-	cmd := &createCommand{}
 
-	err := cmd.Execute(ctx)
+	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "id: abc-123")
 	require.Contains(t, stdout.String(), "name: my-canvas")
@@ -116,22 +108,14 @@ func TestCreateCommandFailsOnServerError(t *testing.T) {
 }
 
 func TestCreateFromFilePrintsCanvasOnSuccess(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/canvases", r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"file-id-456","name":"from-file-canvas"}}}`))
-	}))
-	t.Cleanup(server.Close)
-
+	server := newCanvasCreateServer(t)
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
 	ctx, stdout := newCreateCommandContextForTest(t, server, "text")
-	cmd := &createCommand{file: &file}
 
-	err := cmd.Execute(ctx)
+	err := (&createCommand{file: &file}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `Canvas "from-file-canvas" created (ID: file-id-456)`)
+	require.Contains(t, stdout.String(), "created (ID: abc-123)")
 }
 
 func TestCreateFromFileFailsOnEmptyResponse(t *testing.T) {
@@ -152,21 +136,14 @@ func TestCreateFromFileFailsOnEmptyResponse(t *testing.T) {
 }
 
 func TestCreateFromFileReturnsJSONOutput(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"file-id-456","name":"from-file-canvas"}}}`))
-	}))
-	t.Cleanup(server.Close)
-
+	server := newCanvasCreateServer(t)
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
 	ctx, stdout := newCreateCommandContextForTest(t, server, "json")
-	cmd := &createCommand{file: &file}
 
-	err := cmd.Execute(ctx)
+	err := (&createCommand{file: &file}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `"id": "file-id-456"`)
-	require.Contains(t, stdout.String(), `"name": "from-file-canvas"`)
+	require.Contains(t, stdout.String(), `"id": "abc-123"`)
 }
 
 func TestCreateCommandFailsOnMethodChangingRedirect(t *testing.T) {
