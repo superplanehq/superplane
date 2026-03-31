@@ -154,7 +154,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
         configuration: configValues,
       });
       showSuccessToast("Integration saved");
-    } catch (_error) {
+    } catch {
       showErrorToast("Failed to update integration");
     }
   };
@@ -197,7 +197,7 @@ export function IntegrationDetails({ organizationId }: IntegrationDetailsProps) 
     try {
       await deleteMutation.mutateAsync();
       navigate(`/${organizationId}/settings/integrations`);
-    } catch (_error) {
+    } catch {
       showErrorToast("Failed to delete integration");
     }
   };

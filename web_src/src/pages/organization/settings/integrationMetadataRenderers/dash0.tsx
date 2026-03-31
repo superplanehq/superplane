@@ -20,7 +20,7 @@ export const dash0MetadataRenderer: IntegrationMetadataRenderer = ({ integration
         await navigator.clipboard.writeText(normalizedWebhookURL);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch (_error) {
+      } catch {
         showErrorToast("Failed to copy webhook URL");
       }
     };

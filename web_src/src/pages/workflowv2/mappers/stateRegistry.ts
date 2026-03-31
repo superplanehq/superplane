@@ -19,11 +19,11 @@ export const defaultStateFunction: StateFunction = (execution: ExecutionInfo): E
     return "cancelled";
   }
 
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";
   }
 
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     return "success";
   }
 

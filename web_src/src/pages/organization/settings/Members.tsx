@@ -169,7 +169,7 @@ export function Members({ organizationId }: MembersProps) {
         userId: memberId,
         roleName: newRoleName,
       });
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to update role.");
     }
   };
@@ -188,7 +188,7 @@ export function Members({ organizationId }: MembersProps) {
           userId: member.id,
         });
       }
-    } catch (err) {
+    } catch {
       setRemovalError("Unable to remove this member.");
     }
   };
@@ -196,7 +196,7 @@ export function Members({ organizationId }: MembersProps) {
   const handleInviteLinkToggle = async (enabled: boolean) => {
     try {
       await updateInviteLinkMutation.mutateAsync(enabled);
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to update invite link.");
     }
   };
@@ -205,7 +205,7 @@ export function Members({ organizationId }: MembersProps) {
     try {
       await resetInviteLinkMutation.mutateAsync();
       showSuccessToast("Invite link reset.");
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to reset invite link.");
     }
   };
@@ -216,7 +216,7 @@ export function Members({ organizationId }: MembersProps) {
     try {
       await navigator.clipboard.writeText(inviteLinkUrl);
       showSuccessToast("Invite link copied.");
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to copy invite link.");
     }
   };

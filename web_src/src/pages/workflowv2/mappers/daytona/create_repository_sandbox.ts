@@ -97,7 +97,7 @@ function createRepositorySandboxSpecs(node: ComponentBaseContext["node"]): Compo
   const config = node.configuration as CreateRepositorySandboxConfiguration | undefined;
   const specs: ComponentBaseSpec[] = [];
 
-  if (config?.bootstrap?.from == "inline" && config?.bootstrap?.script) {
+  if (config?.bootstrap?.from === "inline" && config?.bootstrap?.script) {
     specs.push({ title: "Script", value: config.bootstrap.script });
   }
 

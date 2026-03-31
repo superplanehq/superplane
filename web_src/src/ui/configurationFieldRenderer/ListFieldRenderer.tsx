@@ -3,7 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../button";
 import { Input } from "@/components/ui/input";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
-import { FieldRendererProps, ValidationError } from "./types";
+import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { showErrorToast } from "@/lib/toast";
 
