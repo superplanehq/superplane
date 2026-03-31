@@ -73,3 +73,9 @@
       is compatible with Apache 2.0
     :versions: []
     :when: 2025-12-23 15:02:58.461300000 Z
+- - :approve
+  - github.com/beevik/etree
+  - :who: Igor Sarcevic
+    :why: It is BSD, 2-clause
+    :versions: []
+    :when: 2026-03-31 14:17:37.843194000 Z

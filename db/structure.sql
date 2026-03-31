@@ -96,6 +96,7 @@ CREATE TABLE public.accounts (
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    managed_account boolean DEFAULT false NOT NULL,
     installation_admin boolean DEFAULT false NOT NULL
 );
 
@@ -344,6 +345,38 @@ CREATE TABLE public.organization_invite_links (
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: organization_okta_idp; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_okta_idp (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    scim_bearer_token_hash character varying(64),
+    scim_enabled boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    saml_idp_sso_url text DEFAULT ''::text NOT NULL,
+    saml_idp_issuer text DEFAULT ''::text NOT NULL,
+    saml_idp_certificate_pem text DEFAULT ''::text NOT NULL,
+    saml_enabled boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: organization_scim_user_mappings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organization_scim_user_mappings (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    external_id text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -884,6 +917,38 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
+-- Name: organization_okta_idp organization_okta_idp_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_idp
+    ADD CONSTRAINT organization_okta_idp_organization_id_key UNIQUE (organization_id);
+
+
+--
+-- Name: organization_okta_idp organization_okta_idp_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_idp
+    ADD CONSTRAINT organization_okta_idp_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_organization_id_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_organization_id_user_id_key UNIQUE (organization_id, user_id);
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1244,6 +1309,27 @@ CREATE INDEX idx_organization_agent_settings_organization_id ON public.organizat
 
 
 --
+-- Name: idx_organization_okta_idp_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_okta_idp_organization_id ON public.organization_okta_idp USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_scim_user_mappings_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_scim_user_mappings_organization_id ON public.organization_scim_user_mappings USING btree (organization_id);
+
+
+--
+-- Name: idx_organization_scim_user_mappings_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organization_scim_user_mappings_user_id ON public.organization_scim_user_mappings USING btree (user_id);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1496,6 +1582,13 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 
 --
+-- Name: organization_scim_user_mappings_org_external_id_uidx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX organization_scim_user_mappings_org_external_id_uidx ON public.organization_scim_user_mappings USING btree (organization_id, external_id) WHERE (external_id IS NOT NULL);
+
+
+--
 -- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1675,6 +1768,30 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_okta_idp organization_okta_idp_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_okta_idp
+    ADD CONSTRAINT organization_okta_idp_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organization_scim_user_mappings organization_scim_user_mappings_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_scim_user_mappings
+    ADD CONSTRAINT organization_scim_user_mappings_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
