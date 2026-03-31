@@ -334,6 +334,16 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 	})
 }
 
+func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
+	for _, offset := range []string{"5.75", "+5.75", "12.75", "-3.5"} {
+		t.Run(offset, func(t *testing.T) {
+			loc, err := parseGrafanaQueryTimezone(&offset)
+			require.NoError(t, err)
+			require.NotNil(t, loc)
+		})
+	}
+}
+
 func decodeJSONBody(t *testing.T, body io.ReadCloser) map[string]any {
 	t.Helper()
 

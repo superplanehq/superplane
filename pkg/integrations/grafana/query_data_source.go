@@ -294,7 +294,6 @@ func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, err
 	for _, format := range []string{
 		time.RFC3339Nano,
 		time.RFC3339,
-		"2006-01-02T15:04:05Z07:00",
 		"2006-01-02T15:04Z07:00",
 	} {
 		if parsed, err := time.Parse(format, value); err == nil {
@@ -340,10 +339,6 @@ func parseGrafanaQueryTimezone(timezone *string) (*time.Location, error) {
 
 	if offsetHours < -12 || offsetHours > 14 {
 		return nil, fmt.Errorf("offset must be between -12 and +14 hours")
-	}
-
-	if offsetHours*2 != math.Trunc(offsetHours*2) {
-		return nil, fmt.Errorf("offset must be a whole number or half hour")
 	}
 
 	offsetSeconds := int(math.Round(offsetHours * 3600))
