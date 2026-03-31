@@ -67,7 +67,13 @@ export const canvasKeys = {
     [...canvasKeys.changeRequestDetails(), canvasId, changeRequestId] as const,
   nodeExecutions: () => [...canvasKeys.all, "nodeExecutions"] as const,
   nodeExecution: (canvasId: string, nodeId: string, states?: string[], limit?: number) =>
-    [...canvasKeys.nodeExecutions(), canvasId, nodeId, ...(states || []), limit] as const,
+    [
+      ...canvasKeys.nodeExecutions(),
+      canvasId,
+      nodeId,
+      ...(states || []),
+      ...(limit === undefined ? [] : [limit]),
+    ] as const,
   events: () => [...canvasKeys.all, "events"] as const,
   eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
   infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
