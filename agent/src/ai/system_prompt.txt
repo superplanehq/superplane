@@ -74,3 +74,10 @@ Two different triggers; do not confuse them.
 - root() is the original event that started the run; when that payload nests under data, use root().data....
 - previous() refers to upstream output.
 - Never use $.data. for run-start payload fields; use root().data. or the correct path under root() instead.
+
+### Dates, durations, and arithmetic (expr-lang)
+
+- Expressions use **expr-lang** with Go’s `time` package: `now()`, `duration("1h")` (units: ns, us/µs, ms, s, m, h), subtract two times for a duration (`later - earlier`), add a duration to a time (`t + duration("30m")`), compare times with `<`, `>`, `==`, etc. Durations expose methods such as `.Hours()`, `.Minutes()`, `.Seconds()`; `time.Time` exposes `.Format(layout)`, `.Add`, `.In`, etc., like standard Go.
+- **SuperPlane `date()` is not the stock three-argument form.** Use only `date(value)` or `date(value, timezone)`. The first argument may be an ISO/RFC3339 string, a `2006-01-02` date string, a numeric unix timestamp (seconds/ms/µs/ns heuristics), or an existing `time.Time`. The optional second argument is a timezone name (e.g. `"America/New_York"`). **Do not** use upstream examples with three arguments `date(str, format, timezone)` — that signature is **not** available here and will fail at runtime.
+- Webhook timestamps are usually strings: wrap them with `date(...)` before arithmetic or comparison. Use `let` for multi-step clarity when helpful (expr-lang variables).
+- **GitHub pull-request events:** run-start fields live under `root().data` (e.g. `root().data.pull_request.created_at`, `root().data.pull_request.closed_at`). Example for **time to close** on a closed PR: `date(root().data.pull_request.closed_at) - date(root().data.pull_request.created_at)` (then e.g. `.Hours()` on the result). `closed_at` is often null unless the PR is closed — scope the trigger (e.g. closed action), add a filter, or guard with conditionals / `??` so expressions are not evaluated on missing times.
