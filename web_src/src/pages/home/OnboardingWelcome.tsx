@@ -214,7 +214,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
           );
           emittedEventId = emitResponse.data?.eventId;
         } catch {
-          // Best-effort; the regular schedule will fire within a minute.
+          // Best-effort; the regular schedule will fire within ten minutes.
         }
       }
 
@@ -383,8 +383,8 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
                         </Badge>
                       </div>
                       <p className="text-[13px] text-gray-500 dark:text-gray-400 leading-relaxed">
-                        Pings your endpoint every minute and alerts only on healthy-to-failing transitions, including
-                        approximately how long it stayed healthy.
+                        Pings your endpoint every ten minutes and alerts only on healthy-to-failing transitions,
+                        including approximately how long it stayed healthy.
                       </p>
                     </div>
                     {isLaunchingQuickStart ? (
