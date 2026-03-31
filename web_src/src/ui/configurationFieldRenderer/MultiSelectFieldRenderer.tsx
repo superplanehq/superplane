@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 
 interface SelectOption {
