@@ -235,7 +235,6 @@ export interface CreateAgentConfiguration {
   description?: string;
   instruction?: string;
   modelProvider?: string;
-  providerAPIKey?: string;
   modelUUID?: string;
   workspaceSource?: string;
   workspaceUUID?: string;

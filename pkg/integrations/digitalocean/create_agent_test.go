@@ -143,7 +143,7 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		assert.Equal(t, "tor1", createReq["region"])
 		assert.Equal(t, "test-project-id", createReq["project_id"])
 		assert.Equal(t, "test-workspace-uuid", createReq["workspace_uuid"], "workspace_uuid must be in create request")
-		assert.Nil(t, createReq["anthropic_key_uuid"], "should not send provider key when not configured")
+		assert.Nil(t, createReq["anthropic_key_uuid"], "should not send provider key when not set in integration config")
 
 		// Verify metadata stored
 		metadata, ok := metadataCtx.Metadata.(CreateAgentExecutionMetadata)
@@ -210,10 +210,10 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		assert.Equal(t, "new-ws-uuid", agentReq["workspace_uuid"], "new workspace UUID must be passed in create request")
 	})
 
-	t.Run("success: Anthropic provider key -> registers key first, includes uuid in agent request", func(t *testing.T) {
+	t.Run("success: Anthropic key from integration config -> registers key first, includes uuid in agent request", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				// 1. POST /v2/gen-ai/anthropic/keys (provider from spec.ModelProvider, no extra GET)
+				// 1. POST /v2/gen-ai/anthropic/keys (key read from integration config)
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
 					"api_key_info": {"uuid": "ant-key-uuid", "name": "my-agent"}
 				}`))},
@@ -228,13 +228,20 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
+		// Anthropic key is stored in the integration configuration, not in the component.
+		integrationWithAnthropicKey := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken":     "test-token",
+				"anthropicKey": "sk-ant-test-key",
+			},
+		}
+
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"name":               "my-agent",
 				"instruction":        "You are a helpful assistant",
 				"modelProvider":      "anthropic",
 				"modelUUID":          "anthropic-model-uuid",
-				"providerAPIKey":     "sk-ant-test-key",
 				"workspaceSource":    "existing",
 				"workspaceUUID":      "test-workspace-uuid",
 				"region":             "tor1",
@@ -242,7 +249,7 @@ func Test__CreateAgent__Execute(t *testing.T) {
 				"useDefaultSettings": true,
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx(),
+			Integration:    integrationWithAnthropicKey,
 			ExecutionState: executionState,
 			Metadata:       metadataCtx,
 			Requests:       requestCtx,
@@ -267,10 +274,10 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		assert.Equal(t, "test-workspace-uuid", agentReq["workspace_uuid"])
 	})
 
-	t.Run("success: OpenAI provider key -> registers key first, includes uuid in agent request", func(t *testing.T) {
+	t.Run("success: OpenAI key from integration config -> registers key first, includes uuid in agent request", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				// 1. POST /v2/gen-ai/openai/keys
+				// 1. POST /v2/gen-ai/openai/keys (key read from integration config)
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
 					"api_key_info": {"uuid": "oai-key-uuid", "name": "my-agent"}
 				}`))},
@@ -285,13 +292,20 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		requestCtx := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 
+		// OpenAI key is stored in the integration configuration, not in the component.
+		integrationWithOpenAIKey := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken":  "test-token",
+				"openAIKey": "sk-oai-test-key",
+			},
+		}
+
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"name":               "my-agent",
 				"instruction":        "You are a helpful assistant",
 				"modelProvider":      "openai",
 				"modelUUID":          "openai-model-uuid",
-				"providerAPIKey":     "sk-oai-test-key",
 				"workspaceSource":    "existing",
 				"workspaceUUID":      "test-workspace-uuid",
 				"region":             "tor1",
@@ -299,7 +313,7 @@ func Test__CreateAgent__Execute(t *testing.T) {
 				"useDefaultSettings": true,
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx(),
+			Integration:    integrationWithOpenAIKey,
 			ExecutionState: executionState,
 			Metadata:       metadataCtx,
 			Requests:       requestCtx,
@@ -322,6 +336,92 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		assert.Equal(t, "oai-key-uuid", agentReq["open_ai_key_uuid"])
 		assert.Nil(t, agentReq["model_provider_key_uuid"], "model_provider_key_uuid must not be set with openai key UUID")
 		assert.Equal(t, "test-workspace-uuid", agentReq["workspace_uuid"])
+	})
+
+	t.Run("success: DigitalOcean model with no provider key in integration -> no key registration, agent created", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// Only 1 request: POST /v2/gen-ai/agents (no key registration for DO-native models)
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
+					"agent": {"uuid": "agent-uuid-789", "name": "my-agent"}
+				}`))},
+			},
+		}
+
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":               "my-agent",
+				"instruction":        "You are a helpful assistant",
+				"modelProvider":      "digitalocean",
+				"modelUUID":          "do-model-uuid",
+				"workspaceSource":    "existing",
+				"workspaceUUID":      "test-workspace-uuid",
+				"region":             "tor1",
+				"projectID":          "test-project-id",
+				"useDefaultSettings": true,
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx(), // no openAIKey / anthropicKey set
+			ExecutionState: executionState,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		// Only 1 request: no key registration for DO-native models
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, "https://api.digitalocean.com/v2/gen-ai/agents", httpCtx.Requests[0].URL.String())
+		agentBody, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		var agentReq map[string]any
+		require.NoError(t, json.Unmarshal(agentBody, &agentReq))
+		assert.Nil(t, agentReq["anthropic_key_uuid"])
+		assert.Nil(t, agentReq["open_ai_key_uuid"])
+	})
+
+	t.Run("success: Anthropic model but no anthropicKey in integration -> skips key registration", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// Only 1 request: POST /v2/gen-ai/agents (no key registration since integration has no anthropicKey)
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
+					"agent": {"uuid": "agent-uuid-abc", "name": "my-agent"}
+				}`))},
+			},
+		}
+
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":               "my-agent",
+				"instruction":        "You are a helpful assistant",
+				"modelProvider":      "anthropic",
+				"modelUUID":          "anthropic-model-uuid",
+				"workspaceSource":    "existing",
+				"workspaceUUID":      "test-workspace-uuid",
+				"region":             "tor1",
+				"projectID":          "test-project-id",
+				"useDefaultSettings": true,
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx(), // anthropicKey not set in integration
+			ExecutionState: executionState,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		// Only 1 request: agent creation without key registration
+		require.Len(t, httpCtx.Requests, 1)
+		agentBody, _ := io.ReadAll(httpCtx.Requests[0].Body)
+		var agentReq map[string]any
+		require.NoError(t, json.Unmarshal(agentBody, &agentReq))
+		assert.Nil(t, agentReq["anthropic_key_uuid"])
 	})
 
 	t.Run("DO API 404 -> returns error with body", func(t *testing.T) {

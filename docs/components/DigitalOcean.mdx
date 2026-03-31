@@ -55,6 +55,13 @@ Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spa
 
 - Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
 
+## GradientAI Model Provider Keys (optional)
+
+Only required when creating GradientAI agents using **Anthropic** or **OpenAI** models.
+
+- **OpenAI API Key**: Generate one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- **Anthropic API Key**: Generate one at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+
 > **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.
 
 <a id="assign-reserved-ip"></a>
@@ -192,6 +199,12 @@ The Create Agent component creates and deploys a new GradientAI agent.
 - **Knowledge Bases**: Attach existing knowledge bases (optional)
 - **Guardrails**: Attach guardrails for content safety (optional)
 - **Agent Routes**: Child agents to route requests to (optional)
+
+### Provider API Keys
+
+If the selected model requires a third-party provider API key (e.g. Anthropic or OpenAI),
+set the corresponding key in the **DigitalOcean integration configuration** — not here.
+The component will automatically use the key stored in the integration when creating the agent.
 
 ### Output
 

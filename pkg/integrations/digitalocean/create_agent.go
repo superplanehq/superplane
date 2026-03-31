@@ -27,9 +27,8 @@ type CreateAgentSpec struct {
 	Instruction string `mapstructure:"instruction"`
 
 	// Model
-	ModelProvider  string `mapstructure:"modelProvider"`
-	ProviderAPIKey string `mapstructure:"providerAPIKey"`
-	ModelUUID      string `mapstructure:"modelUUID"`
+	ModelProvider string `mapstructure:"modelProvider"`
+	ModelUUID     string `mapstructure:"modelUUID"`
 
 	// Workspace
 	WorkspaceSource string `mapstructure:"workspaceSource"`
@@ -94,6 +93,12 @@ func (c *CreateAgent) Documentation() string {
 - **Guardrails**: Attach guardrails for content safety (optional)
 - **Agent Routes**: Child agents to route requests to (optional)
 
+## Provider API Keys
+
+If the selected model requires a third-party provider API key (e.g. Anthropic or OpenAI),
+set the corresponding key in the **DigitalOcean integration configuration** — not here.
+The component will automatically use the key stored in the integration when creating the agent.
+
 ## Output
 
 Returns the deployed agent including:
@@ -149,16 +154,6 @@ func (c *CreateAgent) Configuration() []configuration.Field {
 					Type: "gradientai_model_provider",
 				},
 			},
-		},
-		{
-			Name:        "providerAPIKey",
-			Label:       "Provider API Key",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Togglable:   true,
-			Sensitive:   true,
-			Placeholder: "sk-...",
-			Description: "API key for the selected provider (Anthropic, OpenAI, etc.). Optional — only needed if the provider requires authentication via your own API key.",
 		},
 		{
 			Name:        "modelUUID",
@@ -487,27 +482,31 @@ func (c *CreateAgent) Execute(ctx core.ExecutionContext) (err error) {
 		ProjectID:      spec.ProjectID,
 	}
 
-	// Register the provider API key if one is provided.
-	// We use spec.ModelProvider (explicitly selected by the user in the UI) rather
-	// than trying to infer the provider from the model UUID via an extra API call,
-	// which can fail or return an empty string.
+	// Register the provider API key from the integration configuration if present.
+	// We use spec.ModelProvider (explicitly selected by the user in the UI) to
+	// determine which key to use. Keys are stored at the integration level so that
+	// users don't need to re-enter them for every agent component.
 	//
 	// Only the provider-specific field (anthropic_key_uuid / open_ai_key_uuid) is
 	// set here. model_provider_key_uuid is a separate resource created via
 	// /v2/gen-ai/model_provider_keys and must NOT be set to an anthropic/openai
 	// key UUID — doing so causes a 404 because the API looks up a
 	// model_provider_key resource that doesn't exist.
-	if spec.ProviderAPIKey != "" {
-		provider := strings.ToLower(spec.ModelProvider)
-		switch {
-		case strings.Contains(provider, "anthropic"):
-			anthropicKey, err := client.CreateGradientAIAnthropicKey(spec.Name, spec.ProviderAPIKey, spec.ProjectID)
+	provider := strings.ToLower(spec.ModelProvider)
+	switch {
+	case strings.Contains(provider, "anthropic"):
+		anthropicKeyRaw, err := ctx.Integration.GetConfig("anthropicKey")
+		if err == nil && len(anthropicKeyRaw) > 0 {
+			anthropicKey, err := client.CreateGradientAIAnthropicKey(spec.Name, string(anthropicKeyRaw), spec.ProjectID)
 			if err != nil {
 				return fmt.Errorf("failed to register Anthropic API key: %v", err)
 			}
 			req.AnthropicKeyUUID = anthropicKey.UUID
-		case strings.Contains(provider, "openai"):
-			openaiKey, err := client.CreateGradientAIOpenAIKey(spec.Name, spec.ProviderAPIKey, spec.ProjectID)
+		}
+	case strings.Contains(provider, "openai"):
+		openAIKeyRaw, err := ctx.Integration.GetConfig("openAIKey")
+		if err == nil && len(openAIKeyRaw) > 0 {
+			openaiKey, err := client.CreateGradientAIOpenAIKey(spec.Name, string(openAIKeyRaw), spec.ProjectID)
 			if err != nil {
 				return fmt.Errorf("failed to register OpenAI API key: %v", err)
 			}
