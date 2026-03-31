@@ -383,13 +383,13 @@ func upsertOktaSAMLAccountProvider(
 	}
 
 	ap := &models.AccountProvider{
-		AccountID:  account.ID,
-		Provider:   models.ProviderOkta,
-		ProviderID: providerUserID,
-		Username:   email,
-		Email:      email,
-		Name:       name,
-		AvatarURL:  "",
+		AccountID:   account.ID,
+		Provider:    models.ProviderOkta,
+		ProviderID:  providerUserID,
+		Username:    email,
+		Email:       email,
+		Name:        name,
+		AvatarURL:   "",
 		AccessToken: enc,
 	}
 	return database.Conn().Create(ap).Error

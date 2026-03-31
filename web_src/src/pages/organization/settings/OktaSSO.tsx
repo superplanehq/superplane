@@ -44,13 +44,57 @@ function getOktaURLs(baseURL: string, orgId: string) {
   };
 }
 
+function StatusMessage({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <span className={`text-sm ${message.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
+      {message}
+    </span>
+  );
+}
+
+function CertificateField({
+  configured,
+  disabled,
+  value,
+  onChange,
+}: {
+  configured: boolean;
+  disabled: boolean;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Field className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">X.509 Certificate</Label>
+        {configured && (
+          <Badge variant="secondary" className="text-xs">
+            Configured
+          </Badge>
+        )}
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Paste the PEM certificate from Okta&apos;s SAML setup instructions.{" "}
+        {configured && "Leave blank to keep the existing certificate."}
+      </p>
+      <textarea
+        placeholder={configured ? "Leave blank to keep existing" : "MIIDtDCCApygAwIBAgI..."}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        rows={5}
+        className="w-full max-w-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+      />
+    </Field>
+  );
+}
+
 export function OktaSSO() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const publicBaseURL = usePublicBaseURL();
   usePageTitle(["SSO"]);
-
-  const canUpdate = canAct("org", "update");
 
   const [settings, setSettings] = useState<OrganizationsOktaIdpSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -89,7 +133,7 @@ export function OktaSSO() {
   }, [organizationId]);
 
   const handleSamlSave = async () => {
-    if (!canUpdate || !organizationId) return;
+    if (!canAct("org", "update") || !organizationId) return;
     setSamlSaving(true);
     try {
       const body: {
@@ -121,7 +165,7 @@ export function OktaSSO() {
   };
 
   const handleScimSave = async () => {
-    if (!canUpdate || !organizationId) return;
+    if (!canAct("org", "update") || !organizationId) return;
     setScimSaving(true);
     try {
       const res = await organizationsUpdateOktaIdpSettings(
@@ -139,7 +183,7 @@ export function OktaSSO() {
   };
 
   const handleRotateToken = async () => {
-    if (!canUpdate || !organizationId) return;
+    if (!canAct("org", "update") || !organizationId) return;
     setRotatingToken(true);
     try {
       const res = await organizationsRotateOktaScimBearerToken(
@@ -158,14 +202,12 @@ export function OktaSSO() {
     }
   };
 
-  if (loadError) {
-    return <p className="text-sm text-red-500 pt-6">{loadError}</p>;
-  }
+  const { scimBearerTokenConfigured: tokenConfigured = false, samlIdpCertificateConfigured: certConfigured = false } =
+    settings ?? {};
 
-  const tokenConfigured = settings?.scimBearerTokenConfigured ?? false;
-  const certConfigured = settings?.samlIdpCertificateConfigured ?? false;
-
-  return (
+  return loadError ? (
+    <p className="text-sm text-red-500 pt-6">{loadError}</p>
+  ) : (
     <div className="space-y-6 pt-6 text-left">
       {/* SAML Section */}
       <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
@@ -190,7 +232,7 @@ export function OktaSSO() {
             placeholder="https://dev-12345.okta.com/app/superplane/exk.../sso/saml"
             value={samlIdpSSOURL}
             onChange={(e) => setSamlIdpSSOURL(e.target.value)}
-            disabled={!canUpdate}
+            disabled={!canAct("org", "update")}
             className="max-w-sm"
           />
         </Field>
@@ -205,33 +247,17 @@ export function OktaSSO() {
             placeholder="http://www.okta.com/exk..."
             value={samlIdpIssuer}
             onChange={(e) => setSamlIdpIssuer(e.target.value)}
-            disabled={!canUpdate}
+            disabled={!canAct("org", "update")}
             className="max-w-sm"
           />
         </Field>
 
-        <Field className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">X.509 Certificate</Label>
-            {certConfigured && (
-              <Badge variant="secondary" className="text-xs">
-                Configured
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Paste the PEM certificate from Okta&apos;s SAML setup instructions.{" "}
-            {certConfigured && "Leave blank to keep the existing certificate."}
-          </p>
-          <textarea
-            placeholder={certConfigured ? "Leave blank to keep existing" : "MIIDtDCCApygAwIBAgI..."}
-            value={samlIdpCertificatePEM}
-            onChange={(e) => setSamlIdpCertificatePEM(e.target.value)}
-            disabled={!canUpdate}
-            rows={5}
-            className="w-full max-w-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm font-mono text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-          />
-        </Field>
+        <CertificateField
+          configured={certConfigured}
+          disabled={!canAct("org", "update")}
+          value={samlIdpCertificatePEM}
+          onChange={setSamlIdpCertificatePEM}
+        />
 
         <Field className="space-y-1.5">
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">ACS URL (Single Sign-On URL)</Label>
@@ -277,7 +303,7 @@ export function OktaSSO() {
             <Switch
               checked={samlEnabled}
               onCheckedChange={setSamlEnabled}
-              disabled={!canUpdate}
+              disabled={!canAct("org", "update")}
               aria-label="Enable SAML sign-in"
             />
             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SAML sign-in</Label>
@@ -286,24 +312,20 @@ export function OktaSSO() {
 
         <div className="flex items-center gap-4 pt-1">
           <PermissionTooltip
-            allowed={canUpdate || permissionsLoading}
+            allowed={canAct("org", "update") || permissionsLoading}
             message="You don't have permission to update SSO settings."
           >
             <LoadingButton
               type="button"
               onClick={handleSamlSave}
-              disabled={!canUpdate}
+              disabled={!canAct("org", "update")}
               loading={samlSaving}
               loadingText="Saving..."
             >
               Save
             </LoadingButton>
           </PermissionTooltip>
-          {samlMessage && (
-            <span className={`text-sm ${samlMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
-              {samlMessage}
-            </span>
-          )}
+          <StatusMessage message={samlMessage} />
         </div>
       </Fieldset>
 
@@ -344,14 +366,14 @@ export function OktaSSO() {
             )}
           </div>
           <PermissionTooltip
-            allowed={canUpdate || permissionsLoading}
+            allowed={canAct("org", "update") || permissionsLoading}
             message="You don't have permission to update SSO settings."
           >
             <LoadingButton
               type="button"
               variant="outline"
               onClick={handleRotateToken}
-              disabled={!canUpdate}
+              disabled={!canAct("org", "update")}
               loading={rotatingToken}
               loadingText="Generating..."
             >
@@ -365,7 +387,7 @@ export function OktaSSO() {
             <Switch
               checked={scimEnabled}
               onCheckedChange={setScimEnabled}
-              disabled={!canUpdate}
+              disabled={!canAct("org", "update")}
               aria-label="Enable SCIM provisioning"
             />
             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SCIM provisioning</Label>
@@ -374,24 +396,20 @@ export function OktaSSO() {
 
         <div className="flex items-center gap-4 pt-1">
           <PermissionTooltip
-            allowed={canUpdate || permissionsLoading}
+            allowed={canAct("org", "update") || permissionsLoading}
             message="You don't have permission to update SSO settings."
           >
             <LoadingButton
               type="button"
               onClick={handleScimSave}
-              disabled={!canUpdate}
+              disabled={!canAct("org", "update")}
               loading={scimSaving}
               loadingText="Saving..."
             >
               Save
             </LoadingButton>
           </PermissionTooltip>
-          {scimMessage && (
-            <span className={`text-sm ${scimMessage.includes("Failed") ? "text-red-600" : "text-green-600"}`}>
-              {scimMessage}
-            </span>
-          )}
+          <StatusMessage message={scimMessage} />
         </div>
       </Fieldset>
 
