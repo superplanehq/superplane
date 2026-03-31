@@ -515,9 +515,29 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           return current;
         }
 
+        // When the server computed a new layout (autoLayout), accept the
+        // server positions as authoritative.  Otherwise preserve current
+        // local node positions to avoid overwriting positions that changed
+        // while the save was in flight.
+        if (variables.autoLayout) {
+          return { ...current, spec: version.spec };
+        }
+
+        const currentPositionsByNodeId = new Map(
+          (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
+        );
+
+        const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
+          const localPosition = currentPositionsByNodeId.get(serverNode.id);
+          if (localPosition) {
+            return { ...serverNode, position: localPosition };
+          }
+          return serverNode;
+        });
+
         return {
           ...current,
-          spec: version.spec,
+          spec: { ...version.spec, nodes: mergedNodes },
         };
       });
 
