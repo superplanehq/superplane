@@ -448,7 +448,7 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
   }
 
   const parts = name?.split(".");
-  if (parts?.length == 1) {
+  if (parts?.length === 1) {
     return createSafeTriggerRenderer(withCustomName(triggerRenderers[name] || defaultTriggerRenderer), name);
   }
 
@@ -470,7 +470,7 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
  */
 export function getComponentBaseMapper(name: string): ComponentBaseMapper {
   const parts = name?.split(".");
-  if (parts?.length == 1) {
+  if (parts?.length === 1) {
     return createSafeComponentMapper(componentBaseMappers[name] || noopMapper, name || "noop");
   }
 
@@ -498,7 +498,7 @@ export function getComponentAdditionalDataBuilder(componentName: string): Compon
  */
 export function getEventStateRegistry(name: string): EventStateRegistry {
   const parts = name.split(".");
-  if (parts.length == 1) {
+  if (parts.length === 1) {
     return eventStateRegistries[name] || DEFAULT_STATE_REGISTRY;
   }
 

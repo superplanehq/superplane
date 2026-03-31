@@ -1,5 +1,5 @@
 {
-  "maxAllowedTotalIssues": 1325,
+  "maxAllowedTotalIssues": 1313,
   "maxAllowedByRule": {
     "@typescript-eslint/no-explicit-any": 360,
     "complexity": 274,
@@ -11,7 +11,6 @@
     "@typescript-eslint/no-unused-vars": 33,
     "max-lines": 26,
     "react-refresh/only-export-components": 26,
-    "eqeqeq": 15,
     "max-depth": 11,
     "max-params": 8,
     "jsx-a11y/label-has-associated-control": 6,
@@ -20,5 +19,5 @@
     "no-constant-binary-expression": 2,
     "@typescript-eslint/no-empty-object-type": 1
   },
-  "updatedAt": "2026-03-31T20:04:24.192Z"
+  "updatedAt": "2026-03-31T16:03:42.428Z"
 }
