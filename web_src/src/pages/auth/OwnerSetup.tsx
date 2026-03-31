@@ -287,6 +287,27 @@ const OwnerSetup: React.FC = () => {
               )}
             </div>
 
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
+              <div>
+                <h5 className="text-sm font-medium text-gray-800">Private network access</h5>
+                <Text className="mt-1 text-sm text-gray-600">
+                  Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or another
+                  closed network. This reduces SSRF protection for private addresses.
+                </Text>
+              </div>
+
+              <Label htmlFor="allow-private-network-access" className="mt-4 inline-flex items-start gap-3 text-sm">
+                <input
+                  id="allow-private-network-access"
+                  type="checkbox"
+                  checked={allowPrivateNetworkAccess}
+                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
+                  className="mt-1"
+                />
+                <span className="text-gray-800">Allow connections to private network tools</span>
+              </Label>
+            </div>
+
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Saving..." : "Next"}
             </Button>
@@ -306,27 +327,6 @@ const OwnerSetup: React.FC = () => {
               <Text className="text-gray-800 dark:text-gray-300">
                 Configure SMTP now to receive notifications. You can skip and set it up later.
               </Text>
-            </div>
-
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
-              <div className="flex items-start gap-3">
-                <input
-                  id="allow-private-network-access"
-                  type="checkbox"
-                  checked={allowPrivateNetworkAccess}
-                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
-                  className="mt-1"
-                />
-                <div>
-                  <Label htmlFor="allow-private-network-access" className="block text-sm font-medium text-gray-800">
-                    Allow connections to private network tools
-                  </Label>
-                  <Text className="mt-1 text-sm text-gray-600">
-                    Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or
-                    closed network. This reduces SSRF protection for private addresses.
-                  </Text>
-                </div>
-              </div>
             </div>
 
             <div className="flex gap-3">
@@ -451,29 +451,6 @@ const OwnerSetup: React.FC = () => {
               <input type="checkbox" checked={smtpUseTLS} onChange={(e) => setSmtpUseTLS(e.target.checked)} />
               Use TLS (STARTTLS)
             </Label>
-
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
-              <div className="flex items-start gap-3">
-                <input
-                  id="allow-private-network-access-smtp"
-                  type="checkbox"
-                  checked={allowPrivateNetworkAccess}
-                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
-                  className="mt-1"
-                />
-                <div>
-                  <Label
-                    htmlFor="allow-private-network-access-smtp"
-                    className="block text-sm font-medium text-gray-800"
-                  >
-                    Allow connections to private network tools
-                  </Label>
-                  <Text className="mt-1 text-sm text-gray-600">
-                    Use this when this instance must reach services on private IPs or internal cluster DNS names.
-                  </Text>
-                </div>
-              </div>
-            </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Saving..." : "Finish setup"}

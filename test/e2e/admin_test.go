@@ -80,6 +80,20 @@ func TestAdminDashboard(t *testing.T) {
 		steps.saveInstallationSettings()
 		steps.assertPrivateNetworkAccessEnabled()
 	})
+
+	t.Run("admin user can update installation smtp settings", func(t *testing.T) {
+		steps := &adminSteps{t: t}
+		steps.start()
+		steps.promoteToAdmin()
+		steps.session.Login()
+		steps.session.Visit("/admin/settings")
+		steps.assertOnInstallationSettingsPage()
+		steps.assertSMTPSettingsSaveDisabled()
+		steps.enableSMTPSettings()
+		steps.fillInSMTPSettings("smtp.example.com", "587", "smtp-user", "smtp-pass", "SuperPlane", "noreply@example.com", true)
+		steps.saveSMTPSettings()
+		steps.assertSMTPSettingsEnabled()
+	})
 }
 
 func TestAdminOwnerSetupPromotion(t *testing.T) {
@@ -157,21 +171,60 @@ func (s *adminSteps) clickExitImpersonation() {
 func (s *adminSteps) assertOnInstallationSettingsPage() {
 	s.session.AssertText("Installation Settings")
 	s.session.AssertText("Private network access")
+	s.session.AssertText("SMTP configuration")
 }
 
 func (s *adminSteps) enablePrivateNetworkAccess() {
-	s.session.Click(q.Text("Allow private network access"))
+	s.session.Click(q.TestID("installation-network-switch"))
 }
 
 func (s *adminSteps) saveInstallationSettings() {
-	s.session.Click(q.Text("Save settings"))
-	s.session.AssertText("Installation settings updated")
+	s.session.Click(q.TestID("installation-network-save"))
+	s.session.AssertText("Network settings updated")
 }
 
 func (s *adminSteps) assertPrivateNetworkAccessEnabled() {
 	metadata, err := models.GetInstallationMetadata()
 	require.NoError(s.t, err)
 	assert.True(s.t, metadata.AllowPrivateNetworkAccess)
+}
+
+func (s *adminSteps) enableSMTPSettings() {
+	s.session.Click(q.TestID("installation-smtp-switch"))
+}
+
+func (s *adminSteps) fillInSMTPSettings(host, port, username, password, fromName, fromEmail string, useTLS bool) {
+	s.session.FillIn(q.Locator(`input[placeholder="smtp.example.com"]`), host)
+	s.session.FillIn(q.Locator(`input[placeholder="587"]`), port)
+	s.session.FillIn(q.Locator(`input[placeholder="smtp-user"]`), username)
+	s.session.FillIn(q.TestID("installation-smtp-password"), password)
+	s.session.FillIn(q.Locator(`input[placeholder="SuperPlane"]`), fromName)
+	s.session.FillIn(q.Locator(`input[placeholder="noreply@example.com"]`), fromEmail)
+
+	if !useTLS {
+		s.session.Click(q.TestID("installation-smtp-tls-switch"))
+	}
+}
+
+func (s *adminSteps) saveSMTPSettings() {
+	s.session.Click(q.TestID("installation-smtp-save"))
+	s.session.AssertText("SMTP settings updated")
+}
+
+func (s *adminSteps) assertSMTPSettingsSaveDisabled() {
+	s.session.AssertDisabled(q.TestID("installation-smtp-save"))
+}
+
+func (s *adminSteps) assertSMTPSettingsEnabled() {
+	settings, err := models.FindEmailSettings(models.EmailProviderSMTP)
+	require.NoError(s.t, err)
+	assert.Equal(s.t, "smtp.example.com", settings.SMTPHost)
+	assert.Equal(s.t, 587, settings.SMTPPort)
+	assert.Equal(s.t, "smtp-user", settings.SMTPUsername)
+	assert.Equal(s.t, []byte("smtp-pass"), settings.SMTPPassword)
+	assert.Equal(s.t, "SuperPlane", settings.SMTPFromName)
+	assert.Equal(s.t, "noreply@example.com", settings.SMTPFromEmail)
+	assert.True(s.t, settings.SMTPUseTLS)
 }
 
 // -- Owner setup + admin promotion step helpers --

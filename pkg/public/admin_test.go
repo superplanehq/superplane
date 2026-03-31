@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func setupAdminTestServer(t *testing.T) (*Server, *support.ResourceRegistry, string) {
@@ -138,12 +140,13 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		var result installationNetworkSettingsResponse
+		var result installationSettingsResponse
 		err := json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.False(t, result.AllowPrivateNetworkAccess)
 		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
 		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
+		assert.False(t, result.SMTPEnabled)
 	})
 
 	t.Run("admin can update installation network settings", func(t *testing.T) {
@@ -166,12 +169,148 @@ func TestAdminInstallationNetworkSettings(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, metadata.AllowPrivateNetworkAccess)
 
-		var result installationNetworkSettingsResponse
+		var result installationSettingsResponse
 		err = json.Unmarshal(response.Body.Bytes(), &result)
 		require.NoError(t, err)
 		assert.True(t, result.AllowPrivateNetworkAccess)
 		assert.Empty(t, result.EffectiveBlockedHTTPHosts)
 		assert.Empty(t, result.EffectivePrivateIPRanges)
+	})
+
+	t.Run("admin can read existing smtp settings", func(t *testing.T) {
+		require.NoError(t, models.UpsertEmailSettings(&models.EmailSettings{
+			Provider:      models.EmailProviderSMTP,
+			SMTPHost:      "smtp.example.com",
+			SMTPPort:      587,
+			SMTPUsername:  "smtp-user",
+			SMTPPassword:  []byte("smtp-pass"),
+			SMTPFromName:  "SuperPlane",
+			SMTPFromEmail: "noreply@example.com",
+			SMTPUseTLS:    true,
+		}))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/network-settings",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result installationSettingsResponse
+		err := json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.True(t, result.SMTPEnabled)
+		assert.Equal(t, "smtp.example.com", result.SMTPHost)
+		assert.Equal(t, 587, result.SMTPPort)
+		assert.Equal(t, "smtp-user", result.SMTPUsername)
+		assert.Equal(t, "SuperPlane", result.SMTPFromName)
+		assert.Equal(t, "noreply@example.com", result.SMTPFromEmail)
+		assert.True(t, result.SMTPUseTLS)
+		assert.True(t, result.SMTPPasswordConfigured)
+	})
+
+	t.Run("admin can update smtp settings through installation settings", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"smtp_enabled":    true,
+			"smtp_host":       "smtp.internal",
+			"smtp_port":       2525,
+			"smtp_username":   "mailer",
+			"smtp_password":   "smtp-secret",
+			"smtp_from_name":  "SuperPlane Admin",
+			"smtp_from_email": "admin@example.com",
+			"smtp_use_tls":    false,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		settings, err := models.FindEmailSettings(models.EmailProviderSMTP)
+		require.NoError(t, err)
+		assert.Equal(t, "smtp.internal", settings.SMTPHost)
+		assert.Equal(t, 2525, settings.SMTPPort)
+		assert.Equal(t, "mailer", settings.SMTPUsername)
+		assert.Equal(t, []byte("smtp-secret"), settings.SMTPPassword)
+		assert.Equal(t, "SuperPlane Admin", settings.SMTPFromName)
+		assert.Equal(t, "admin@example.com", settings.SMTPFromEmail)
+		assert.False(t, settings.SMTPUseTLS)
+	})
+
+	t.Run("admin can disable smtp settings through installation settings", func(t *testing.T) {
+		require.NoError(t, models.UpsertEmailSettings(&models.EmailSettings{
+			Provider:      models.EmailProviderSMTP,
+			SMTPHost:      "smtp.example.com",
+			SMTPPort:      587,
+			SMTPFromEmail: "noreply@example.com",
+			SMTPUseTLS:    true,
+		}))
+
+		body, err := json.Marshal(map[string]bool{
+			"smtp_enabled": false,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		_, err = models.FindEmailSettings(models.EmailProviderSMTP)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, gorm.ErrRecordNotFound))
+	})
+
+	t.Run("admin installation settings updates are atomic", func(t *testing.T) {
+		require.NoError(t, models.DeleteEmailSettings(models.EmailProviderSMTP))
+
+		metadata, err := models.GetInstallationMetadata()
+		require.NoError(t, err)
+		metadata.AllowPrivateNetworkAccess = false
+		metadata.UpdatedAt = time.Now()
+		require.NoError(t, models.UpdateInstallationMetadata(metadata))
+
+		body, err := json.Marshal(map[string]any{
+			"allow_private_network_access": true,
+			"smtp_enabled":                 true,
+			"smtp_host":                    "smtp.internal",
+			"smtp_port":                    2525,
+			"smtp_username":                "mailer",
+			"smtp_from_name":               "SuperPlane Admin",
+			"smtp_from_email":              "admin@example.com",
+			"smtp_use_tls":                 true,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		metadata, err = models.GetInstallationMetadata()
+		require.NoError(t, err)
+		assert.False(t, metadata.AllowPrivateNetworkAccess)
+
+		_, err = models.FindEmailSettings(models.EmailProviderSMTP)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, gorm.ErrRecordNotFound))
 	})
 }
 
