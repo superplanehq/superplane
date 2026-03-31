@@ -31,5 +31,6 @@ export interface QueryDataSourceConfiguration {
   query: string;
   timeFrom?: string;
   timeTo?: string;
+  timezone?: string;
   format?: string;
 }

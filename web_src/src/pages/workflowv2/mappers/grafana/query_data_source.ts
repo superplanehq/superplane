@@ -99,6 +99,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "funnel", label: `Format: ${configuration.format}` });
   }
 
+  if (configuration?.timezone) {
+    metadata.push({ icon: "schedule", label: `Timezone: ${configuration.timezone}` });
+  }
+
   return metadata;
 }
 
