@@ -68,7 +68,7 @@ export function Groups({ organizationId }: GroupsProps) {
         groupName,
         organizationId,
       });
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to delete group");
     }
   };
@@ -81,7 +81,7 @@ export function Groups({ organizationId }: GroupsProps) {
         organizationId,
         role: newRoleName,
       });
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to update group role");
     }
   };

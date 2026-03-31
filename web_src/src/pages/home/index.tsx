@@ -868,7 +868,7 @@ function CanvasActionsMenu({
       await deleteCanvasMutation.mutateAsync(canvas.id);
       showSuccessToast("Canvas deleted successfully");
       closeDialog();
-    } catch (error) {
+    } catch {
       showErrorToast("Failed to delete canvas");
     }
   };
@@ -1072,7 +1072,7 @@ function BlueprintActionsMenu({
       await deleteBlueprintMutation.mutateAsync(blueprint.id);
       showSuccessToast("Component deleted successfully");
       closeDialog();
-    } catch (error) {
+    } catch {
       showErrorToast("Failed to delete Bundle");
     }
   };

@@ -4716,7 +4716,7 @@ export function WorkflowPageV2() {
         await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
         showSuccessToast("Errors acknowledged");
-      } catch (_error) {
+      } catch {
         showErrorToast("Failed to acknowledge errors");
       } finally {
         setIsResolvingErrors(false);
