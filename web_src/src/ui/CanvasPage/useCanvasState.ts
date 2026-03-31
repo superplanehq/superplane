@@ -187,7 +187,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
       setNodes((nds) => applyNodeChanges(changes, nds));
     },
-    [props],
+    [props.onNodeDelete, props.onNodePositionChange, props.onNodesPositionChange],
   );
 
   const onEdgesChange = useCallback(
@@ -201,7 +201,7 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
 
       setEdges((eds) => applyEdgeChanges(changes, eds));
     },
-    [props],
+    [props.onEdgeDelete],
   );
 
   const toggleCollapse = useCallback(() => {
