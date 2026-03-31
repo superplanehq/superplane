@@ -68,6 +68,18 @@ func TestAdminDashboard(t *testing.T) {
 		// Should be back on admin page
 		steps.assertOnAdminPage()
 	})
+
+	t.Run("admin user can update installation network settings", func(t *testing.T) {
+		steps := &adminSteps{t: t}
+		steps.start()
+		steps.promoteToAdmin()
+		steps.session.Login()
+		steps.session.Visit("/admin/settings")
+		steps.assertOnInstallationSettingsPage()
+		steps.enablePrivateNetworkAccess()
+		steps.saveInstallationSettings()
+		steps.assertPrivateNetworkAccessEnabled()
+	})
 }
 
 func TestAdminOwnerSetupPromotion(t *testing.T) {
@@ -140,6 +152,26 @@ func (s *adminSteps) assertImpersonationBannerVisible() {
 
 func (s *adminSteps) clickExitImpersonation() {
 	s.session.Click(q.Text("Exit Impersonation"))
+}
+
+func (s *adminSteps) assertOnInstallationSettingsPage() {
+	s.session.AssertText("Installation Settings")
+	s.session.AssertText("Private network access")
+}
+
+func (s *adminSteps) enablePrivateNetworkAccess() {
+	s.session.Click(q.Text("Allow private network access"))
+}
+
+func (s *adminSteps) saveInstallationSettings() {
+	s.session.Click(q.Text("Save settings"))
+	s.session.AssertText("Installation settings updated")
+}
+
+func (s *adminSteps) assertPrivateNetworkAccessEnabled() {
+	metadata, err := models.GetInstallationMetadata()
+	require.NoError(s.t, err)
+	assert.True(s.t, metadata.AllowPrivateNetworkAccess)
 }
 
 // -- Owner setup + admin promotion step helpers --
