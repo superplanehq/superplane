@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -119,6 +120,74 @@ func TestAdminListOrganizations(t *testing.T) {
 			path:   "/admin/api/organizations",
 		})
 		assert.NotEqual(t, http.StatusOK, response.Code)
+	})
+}
+
+func TestAdminInstallationNetworkSettings(t *testing.T) {
+	unsetEnvForAdminTest(t, "BLOCKED_HTTP_HOSTS")
+	unsetEnvForAdminTest(t, "BLOCKED_PRIVATE_IP_RANGES")
+
+	server, _, token := setupAdminTestServer(t)
+
+	t.Run("admin can read installation network settings", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/network-settings",
+			authCookie: token,
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var result installationNetworkSettingsResponse
+		err := json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.False(t, result.AllowPrivateNetworkAccess)
+		assert.NotEmpty(t, result.EffectiveBlockedHTTPHosts)
+		assert.NotEmpty(t, result.EffectivePrivateIPRanges)
+	})
+
+	t.Run("admin can update installation network settings", func(t *testing.T) {
+		body, err := json.Marshal(map[string]bool{
+			"allow_private_network_access": true,
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/network-settings",
+			body:        body,
+			authCookie:  token,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		metadata, err := models.GetInstallationMetadata()
+		require.NoError(t, err)
+		assert.True(t, metadata.AllowPrivateNetworkAccess)
+
+		var result installationNetworkSettingsResponse
+		err = json.Unmarshal(response.Body.Bytes(), &result)
+		require.NoError(t, err)
+		assert.True(t, result.AllowPrivateNetworkAccess)
+		assert.Empty(t, result.EffectiveBlockedHTTPHosts)
+		assert.Empty(t, result.EffectivePrivateIPRanges)
+	})
+}
+
+func unsetEnvForAdminTest(t *testing.T, key string) {
+	t.Helper()
+
+	previousValue, hadValue := os.LookupEnv(key)
+	require.NoError(t, os.Unsetenv(key))
+
+	t.Cleanup(func() {
+		if !hadValue {
+			require.NoError(t, os.Unsetenv(key))
+			return
+		}
+
+		require.NoError(t, os.Setenv(key, previousValue))
 	})
 }
 

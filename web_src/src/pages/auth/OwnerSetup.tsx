@@ -18,6 +18,7 @@ const OwnerSetup: React.FC = () => {
   const [smtpFromName, setSmtpFromName] = useState("");
   const [smtpFromEmail, setSmtpFromEmail] = useState("");
   const [smtpUseTLS, setSmtpUseTLS] = useState(true);
+  const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
   const [step, setStep] = useState<"owner" | "smtpPrompt" | "smtpConfig">("owner");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +121,7 @@ const OwnerSetup: React.FC = () => {
           smtp_from_name: enableSMTP ? smtpFromName.trim() : "",
           smtp_from_email: enableSMTP ? smtpFromEmail.trim() : "",
           smtp_use_tls: enableSMTP ? smtpUseTLS : false,
+          allow_private_network_access: allowPrivateNetworkAccess,
         }),
       });
 
@@ -306,6 +308,27 @@ const OwnerSetup: React.FC = () => {
               </Text>
             </div>
 
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
+              <div className="flex items-start gap-3">
+                <input
+                  id="allow-private-network-access"
+                  type="checkbox"
+                  checked={allowPrivateNetworkAccess}
+                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
+                  className="mt-1"
+                />
+                <div>
+                  <Label htmlFor="allow-private-network-access" className="block text-sm font-medium text-gray-800">
+                    Allow connections to private network tools
+                  </Label>
+                  <Text className="mt-1 text-sm text-gray-600">
+                    Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or
+                    closed network. This reduces SSRF protection for private addresses.
+                  </Text>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-3">
               <Button type="button" disabled={loading} onClick={handleEnableSMTP}>
                 Set up SMTP
@@ -428,6 +451,29 @@ const OwnerSetup: React.FC = () => {
               <input type="checkbox" checked={smtpUseTLS} onChange={(e) => setSmtpUseTLS(e.target.checked)} />
               Use TLS (STARTTLS)
             </Label>
+
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
+              <div className="flex items-start gap-3">
+                <input
+                  id="allow-private-network-access-smtp"
+                  type="checkbox"
+                  checked={allowPrivateNetworkAccess}
+                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
+                  className="mt-1"
+                />
+                <div>
+                  <Label
+                    htmlFor="allow-private-network-access-smtp"
+                    className="block text-sm font-medium text-gray-800"
+                  >
+                    Allow connections to private network tools
+                  </Label>
+                  <Text className="mt-1 text-sm text-gray-600">
+                    Use this when this instance must reach services on private IPs or internal cluster DNS names.
+                  </Text>
+                </div>
+              </div>
+            </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Saving..." : "Finish setup"}

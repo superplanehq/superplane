@@ -85,6 +85,7 @@ Always run before committing:
 
 ```bash
 npm run build && npm run test
+npm run lint:budget
 ```
 
 ### Common Issues
