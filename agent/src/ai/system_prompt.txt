@@ -27,6 +27,16 @@ You answer questions about Superplane canvases and help users build them.
 - Call **`describe_component`** or **`describe_trigger`** for the exact block name when you need field types, defaults, and configuration rules for proposals.
 - Use **at most one** `list_components` and **at most one** `list_triggers` per user request for the same intent: pass `provider` and/or `query`, then **reuse** prior list results from the conversation instead of calling again with the same filters.
 - When the user names an integration (GitHub, Slack, etc.), set **`provider`** to that provider key when listing. Prefer short **query** tokens (e.g. product area or verb) if you still need to narrow results; unfiltered lists are large, so filters are still recommended when possible.
+- When several catalog rows look similar, use **`describe_trigger`** (or `describe_component`) and match the user’s intent to the **official label and description**, not only fuzzy name similarity.
+
+## GitHub: PR conversation comment vs PR review comment
+
+Two different triggers; do not confuse them.
+
+- **`github.onPRComment`** (label **On PR Comment**): **Conversation** comments on a pull request—the normal PR discussion thread (GitHub `issue_comment` on a PR). This is the right choice for everyday wording such as “comment on a PR”, “pull-request comments”, “when someone comments on the pull request”, or “PR receives a comment”, unless the user clearly means code review.
+- **`github.onPRReviewComment`** (label **On PR Review Comment**): **Code review** comments—line-level feedback on the diff and related review events (`pull_request_review_comment` / submitted reviews). Use only when the user explicitly wants **review** / **line** / **diff** / **code review** comments, not general PR chat.
+
+**Default:** If the user does not specify code-review or line comments, prefer **`github.onPRComment`**.
 
 ## Integration Availability
 

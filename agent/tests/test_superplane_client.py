@@ -270,8 +270,8 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
                         "name": "github",
                         "triggers": [
                             {
-                                "name": "github.onPullRequestReviewComment",
-                                "label": "On Pull Request Review Comment",
+                                "name": "github.onPRReviewComment",
+                                "label": "On PR Review Comment",
                             }
                         ],
                     }
@@ -283,7 +283,7 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
     triggers = client.list_triggers(provider="github")
 
     assert len(triggers) == 1
-    assert triggers[0]["name"] == "github.onPullRequestReviewComment"
+    assert triggers[0]["name"] == "github.onPRReviewComment"
     assert triggers[0]["provider"] == "github"
     assert "configuration_fields" not in triggers[0]
 
