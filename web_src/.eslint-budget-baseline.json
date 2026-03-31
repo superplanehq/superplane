@@ -1,5 +1,5 @@
 {
-  "maxAllowedTotalIssues": 1313,
+  "maxAllowedTotalIssues": 1312,
   "maxAllowedByRule": {
     "@typescript-eslint/no-explicit-any": 360,
     "complexity": 273,
@@ -16,8 +16,7 @@
     "jsx-a11y/label-has-associated-control": 6,
     "react-hooks/rules-of-hooks": 4,
     "no-case-declarations": 2,
-    "no-constant-binary-expression": 2,
-    "@typescript-eslint/no-empty-object-type": 1
+    "no-constant-binary-expression": 2
   },
-  "updatedAt": "2026-03-31T16:03:42.428Z"
+  "updatedAt": "2026-03-31T20:13:34.605Z"
 }
