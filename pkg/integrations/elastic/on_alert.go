@@ -3,14 +3,21 @@ package elastic
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+)
+
+const (
+	checkAlertConnectorAction        = "checkAlertConnectorAvailability"
+	checkAlertConnectorRetryInterval = 10 * time.Second
 )
 
 type OnAlertFires struct{}
@@ -24,20 +31,15 @@ type OnAlertFiresConfiguration struct {
 }
 
 type OnAlertFiresMetadata struct {
-	RuleID   string   `json:"ruleId" mapstructure:"ruleId"`
-	RuleName string   `json:"ruleName" mapstructure:"ruleName"`
-	Spaces   []string `json:"spaces" mapstructure:"spaces"`
+	RuleID         string   `json:"ruleId" mapstructure:"ruleId"`
+	RuleName       string   `json:"ruleName" mapstructure:"ruleName"`
+	Spaces         []string `json:"spaces" mapstructure:"spaces"`
+	PreviousRuleID string   `json:"previousRuleId,omitempty" mapstructure:"previousRuleId"`
 }
 
-const kibanaAlertWebhookActionBody = `{
-  "eventType": "alert_fired",
-  "ruleId": "{{rule.id}}",
-  "ruleName": "{{rule.name}}",
-  "spaceId": "{{rule.spaceId}}",
-  "tags": {{rule.tags}},
-  "severity": "{{context.severity}}",
-  "status": "{{rule.status}}"
-}`
+// Tags must use unquoted {{rule.tags}} so Kibana injects a JSON array; a string field
+// ("tags":"{{rule.tags}}") often yields an empty or non-JSON value and breaks tag filters.
+const kibanaAlertWebhookActionBody = `{"eventType":"alert_fired","ruleId":"{{rule.id}}","ruleName":"{{rule.name}}","spaceId":"{{rule.spaceId}}","tags":{{rule.tags}},"severity":"{{context.severity}}","status":"{{rule.status}}"}`
 
 func (t *OnAlertFires) Name() string  { return "elastic.onAlertFires" }
 func (t *OnAlertFires) Label() string { return "When Alert Fires" }
@@ -58,6 +60,8 @@ SuperPlane creates **one Kibana Webhook connector per integration**, shared acro
 
 1. Select the Kibana alert rule in SuperPlane and save the trigger.
 2. SuperPlane automatically creates or reuses the shared Kibana Webhook connector and attaches it to the selected rule if it is missing.
+
+If canvas versioning is enabled, this provisioning happens when the live version is published. Autosave on a draft version does not create the connector.
 
 ### Kibana action body
 
@@ -212,26 +216,106 @@ func (t *OnAlertFires) Setup(ctx core.TriggerContext) error {
 		ruleName = config.Rule
 	}
 
+	var prevMeta OnAlertFiresMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &prevMeta)
+	previousRuleID := ""
+	if prevMeta.RuleID != "" && prevMeta.RuleID != config.Rule {
+		previousRuleID = prevMeta.RuleID
+	}
+
 	if err := ctx.Metadata.Set(OnAlertFiresMetadata{
-		RuleID:   config.Rule,
-		RuleName: ruleName,
-		Spaces:   resolvedSpaces,
+		RuleID:         config.Rule,
+		RuleName:       ruleName,
+		Spaces:         resolvedSpaces,
+		PreviousRuleID: previousRuleID,
 	}); err != nil {
 		return fmt.Errorf("failed to store rule metadata: %w", err)
 	}
 
-	return ctx.Integration.RequestWebhook(map[string]any{
+	if err := ctx.Integration.RequestWebhook(map[string]any{
 		"kibanaUrl": string(kibanaURL),
-		"ruleId":    config.Rule,
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to request webhook: %w", err)
+	}
+
+	return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
 }
 
 func (t *OnAlertFires) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           checkAlertConnectorAction,
+			Description:    "Find the Kibana connector and attach it to the alert rule",
+			UserAccessible: false,
+		},
+	}
 }
 
-func (t *OnAlertFires) HandleAction(_ core.TriggerActionContext) (map[string]any, error) {
-	return nil, nil
+func (t *OnAlertFires) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	if ctx.Name == checkAlertConnectorAction {
+		return nil, t.checkConnectorAndAttachRule(ctx)
+	}
+	return nil, fmt.Errorf("unknown action: %s", ctx.Name)
+}
+
+func (t *OnAlertFires) checkConnectorAndAttachRule(ctx core.TriggerActionContext) error {
+	var meta OnAlertFiresMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+	if meta.RuleID == "" {
+		return fmt.Errorf("no rule ID in metadata")
+	}
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to get webhook URL: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to create client: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	connector, err := client.FindKibanaWebhookConnector(webhookURL)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to find connector: %v", err)
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	if connector == nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Infof("elastic onAlertFires: connector not found yet, retrying")
+		}
+		return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+	}
+
+	if err := client.EnsureKibanaRuleHasConnector(meta.RuleID, connector.ID); err != nil {
+		return err
+	}
+
+	if meta.PreviousRuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.PreviousRuleID, connector.ID); err != nil {
+			if ctx.Logger != nil {
+				ctx.Logger.Warnf("elastic onAlertFires: failed to detach connector from old rule %s: %v", meta.PreviousRuleID, err)
+			}
+			return ctx.Requests.ScheduleActionCall(checkAlertConnectorAction, map[string]any{}, checkAlertConnectorRetryInterval)
+		}
+		meta.PreviousRuleID = ""
+		if err := ctx.Metadata.Set(meta); err != nil && ctx.Logger != nil {
+			ctx.Logger.Warnf("elastic onAlertFires: failed to clear previous rule ID from metadata: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
@@ -273,8 +357,42 @@ func (t *OnAlertFires) HandleWebhook(ctx core.WebhookRequestContext) (int, *core
 	return http.StatusOK, nil, nil
 }
 
-func (t *OnAlertFires) Cleanup(_ core.TriggerContext) error {
-	return nil
+func (t *OnAlertFires) Cleanup(ctx core.TriggerContext) error {
+	var meta OnAlertFiresMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
+		return nil
+	}
+	if meta.RuleID == "" && meta.PreviousRuleID == "" {
+		return nil
+	}
+
+	webhookURL, err := ctx.Webhook.Setup()
+	if err != nil {
+		return fmt.Errorf("failed to get webhook URL: %w", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	connector, err := client.FindKibanaWebhookConnector(webhookURL)
+	if err != nil || connector == nil {
+		return nil
+	}
+
+	var detachErrs []error
+	if meta.RuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.RuleID, connector.ID); err != nil {
+			detachErrs = append(detachErrs, err)
+		}
+	}
+	if meta.PreviousRuleID != "" {
+		if err := client.RemoveKibanaRuleConnector(meta.PreviousRuleID, connector.ID); err != nil {
+			detachErrs = append(detachErrs, err)
+		}
+	}
+	return errors.Join(detachErrs...)
 }
 
 // matchesFilters returns true if the alert payload satisfies all configured filters.
@@ -334,22 +452,36 @@ func extractString(payload map[string]any, keys ...string) string {
 }
 
 // extractStringSlice returns a string slice from the payload for the given key.
+// Handles both a JSON array and a comma-separated string (Kibana renders {{rule.tags}} as the latter).
 func extractStringSlice(payload map[string]any, key string) []string {
 	v, ok := payload[key]
 	if !ok {
 		return nil
 	}
-	raw, ok := v.([]any)
-	if !ok {
+	switch val := v.(type) {
+	case []any:
+		result := make([]string, 0, len(val))
+		for _, item := range val {
+			if s, ok := item.(string); ok && s != "" {
+				result = append(result, s)
+			}
+		}
+		return result
+	case string:
+		if val == "" {
+			return nil
+		}
+		parts := strings.Split(val, ",")
+		result := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if t := strings.TrimSpace(p); t != "" {
+				result = append(result, t)
+			}
+		}
+		return result
+	default:
 		return nil
 	}
-	result := make([]string, 0, len(raw))
-	for _, item := range raw {
-		if s, ok := item.(string); ok {
-			result = append(result, s)
-		}
-	}
-	return result
 }
 
 // containsIgnoreCase reports whether value is in list (case-insensitive).
