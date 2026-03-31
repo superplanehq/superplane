@@ -35,18 +35,17 @@ func (g *Grafana) Description() string {
 
 func (g *Grafana) Instructions() string {
 	return `
-To connect Grafana:
-1. In Grafana, go to Administration > Users and access > Service accounts.
-2. Create a Service Account and assign a role (Viewer/Editor/Admin as needed).
-3. Open the Service Account and create a token. Copy it immediately.
-4. (Legacy Grafana) If Service Accounts are unavailable, use an API key.
-5. Set the Base URL to your Grafana instance (e.g. https://grafana.example.com).
-6. Paste the token into SuperPlane and save.
 
-For the alert trigger:
-1. SuperPlane will attempt to automatically create/update a Grafana Webhook contact point.
-2. Route your alert rule to the contact point created by SuperPlane.
-3. If auto-provisioning is not available (permissions/API limitations), create a Webhook contact point manually using the webhook URL from SuperPlane.
+**Setup steps:**
+1. In Grafana, go to **Administration → Users and access → Service Accounts**, select **Add service account**. 
+
+   > **Service Account Role:**  
+   > While naming the service account, go to **Roles → Basic roles** and select **Admin**.
+
+	Navigate to the created service account and select **Add service account token**. Name it and set an expiration period then click **Generate token**. This is your **Service Account Token**.
+
+2. Use your Grafana root URL as **Base URL** (for example ` + "`https://grafana.example.com`" + `).
+3. Fill in **Base URL** and **Service Account Token** below, then save.
 `
 }
 
@@ -56,14 +55,14 @@ func (g *Grafana) Configuration() []configuration.Field {
 			Name:        "baseURL",
 			Label:       "Base URL",
 			Type:        configuration.FieldTypeString,
-			Description: "Your Grafana base URL (e.g. https://grafana.example.com)",
+			Description: "Your Grafana base URL (e.g. https://grafana.example.com or https://example.grafana.net)",
 			Required:    true,
 		},
 		{
 			Name:        "apiToken",
-			Label:       "API Token",
+			Label:       "Service Account Token",
 			Type:        configuration.FieldTypeString,
-			Description: "Grafana API key or service account token",
+			Description: "Grafana service account token with access to query data sources and manage alerting webhooks",
 			Sensitive:   true,
 			Required:    false,
 		},
