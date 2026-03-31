@@ -45,11 +45,17 @@ type Handler struct {
 	jwtSigner            *jwt.Signer
 	authService          authorization.Authorization
 	encryptor            crypto.Encryptor
+	publicAppBaseURL     string
 	isDev                bool
 	templateDir          string
 	blockSignup          bool
 	passwordLoginEnabled bool
-	magicCodeEnabled     bool
+	// forceSecureCookies marks all session cookies with Secure=true regardless
+	// of whether the incoming request arrived over TLS. Set this when running
+	// behind a TLS-terminating reverse proxy so that browsers never transmit the
+	// session cookie over plain HTTP. Controlled by FORCE_SECURE_COOKIES=yes.
+	forceSecureCookies bool
+	magicCodeEnabled   bool
 }
 
 type ProviderConfig struct {
@@ -58,15 +64,28 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService authorization.Authorization, appEnv string, templateDir string, blockSignup bool, passwordLoginEnabled bool, magicCodeEnabled bool) *Handler {
+func NewHandler(
+	jwtSigner *jwt.Signer,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	appEnv string,
+	templateDir string,
+	publicAppBaseURL string,
+	blockSignup bool,
+	passwordLoginEnabled bool,
+	forceSecureCookies bool,
+	magicCodeEnabled bool,
+) *Handler {
 	return &Handler{
 		jwtSigner:            jwtSigner,
 		encryptor:            encryptor,
 		authService:          authService,
+		publicAppBaseURL:     strings.TrimRight(publicAppBaseURL, "/"),
 		isDev:                appEnv == "development",
 		templateDir:          templateDir,
 		blockSignup:          blockSignup,
 		passwordLoginEnabled: passwordLoginEnabled,
+		forceSecureCookies:   forceSecureCookies,
 		magicCodeEnabled:     magicCodeEnabled,
 	}
 }
@@ -111,6 +130,10 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 		router.HandleFunc("/auth/magic-code/verify", a.handleMagicCodeVerify).Methods("POST")
 		router.HandleFunc("/auth/magic-code/verify", a.handleMagicLinkRedirect).Methods("GET")
 	}
+
+	router.HandleFunc("/auth/okta/{org_id}/saml/login", a.handleOktaSAMLLogin).Methods("GET")
+	router.HandleFunc("/auth/okta/{org_id}/saml/acs", a.handleOktaSAMLACS).Methods("POST")
+	router.HandleFunc("/auth/sso/lookup", a.handleSSOLookup).Methods("GET")
 
 	//
 	// If we are running the application locally,
@@ -279,30 +302,55 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	redirectURL := getRedirectURL(r)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+}
+
+func (a *Handler) issueAccountSession(w http.ResponseWriter, r *http.Request, accountID string) error {
+	token, err := a.jwtSigner.Generate(accountID, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	a.setAccountCookie(w, r, token)
+	return nil
+}
+
+// issueAccountSessionForSAMLOrg issues a session token that carries the org ID
+// the account just authenticated against via SAML. The auth middleware uses this
+// claim to ensure SAML-enabled orgs can only be reached through their own SSO.
+func (a *Handler) issueAccountSessionForSAMLOrg(w http.ResponseWriter, r *http.Request, accountID, samlOrgID string) error {
+	token, err := a.jwtSigner.GenerateWithSAMLOrg(accountID, samlOrgID, 24*time.Hour)
+	if err != nil {
+		return err
+	}
+	a.setAccountCookie(w, r, token)
+	return nil
+}
+
+// setAccountCookie writes the account_token cookie. Secure is set when either
+// the connection is already TLS or FORCE_SECURE_COOKIES=yes (for deployments
+// behind a TLS-terminating reverse proxy where r.TLS is always nil).
+func (a *Handler) setAccountCookie(w http.ResponseWriter, r *http.Request, token string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "account_token",
 		Value:    token,
 		Path:     "/",
 		MaxAge:   int(24 * time.Hour.Seconds()),
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   a.forceSecureCookies || r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
-
-	redirectURL := getRedirectURL(r)
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
-	ClearAccountCookie(w, r)
+	ClearAccountCookie(w, r, a.forceSecureCookies)
 
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
@@ -319,11 +367,13 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		Providers            []string `json:"providers"`
 		PasswordLoginEnabled bool     `json:"passwordLoginEnabled"`
 		SignupEnabled        bool     `json:"signupEnabled"`
+		PublicAppBaseURL     string   `json:"publicAppBaseUrl"`
 		MagicCodeEnabled     bool     `json:"magicCodeEnabled"`
 	}{
 		Providers:            providerNames,
 		PasswordLoginEnabled: a.passwordLoginEnabled,
 		SignupEnabled:        !a.blockSignup,
+		PublicAppBaseURL:     a.publicAppBaseURL,
 		MagicCodeEnabled:     a.magicCodeEnabled,
 	}
 
@@ -384,24 +434,11 @@ func (a *Handler) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate JWT token
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
 		log.Errorf("Failed to generate token for password login: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	// Set cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	// Redirect
 	redirectURL := getRedirectURL(r)
@@ -490,21 +527,10 @@ func (a *Handler) handlePasswordSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
-	if err != nil {
+	if err := a.issueAccountSession(w, r, account.ID.String()); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "account_token",
-		Value:    token,
-		Path:     "/",
-		MaxAge:   int(24 * time.Hour.Seconds()),
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		SameSite: http.SameSiteLaxMode,
-	})
 
 	redirectURL := getRedirectURL(r)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
@@ -1023,14 +1049,14 @@ func isValidRedirectURL(redirectURL string) bool {
 	return true
 }
 
-func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
+func ClearAccountCookie(w http.ResponseWriter, r *http.Request, forceSecureCookies bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "account_token",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   r.TLS != nil,
+		Secure:   forceSecureCookies || r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
