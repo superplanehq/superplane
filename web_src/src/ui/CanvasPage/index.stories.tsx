@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CanvasPage, type CanvasNode } from "./index";
 import type { BlockData } from "./Block";
 import { createGetSidebarData } from "./storybooks/getSidebarData";
-import { getStorybookData, isInStorybook, navigateToStory } from "./storybooks/navigation";
+import { getStorybookData, isInStorybook } from "./storybooks/navigation";
 
 const meta = {
   title: "Pages/CanvasPage",

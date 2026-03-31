@@ -19,6 +19,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	DefaultLimit = 25
+	MaxLimit     = 50
+)
+
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {
 	wfID, err := uuid.Parse(workflowID)
 	if err != nil {
@@ -359,9 +364,14 @@ func getLastExecutionTimestamp(executions []models.CanvasNodeExecution) *timesta
 }
 
 func getLimit(limit uint32) uint32 {
-	if limit == 0 || limit > 100 {
-		return 100
+	if limit <= 0 {
+		return DefaultLimit
 	}
+
+	if limit > MaxLimit {
+		return MaxLimit
+	}
+
 	return limit
 }
 

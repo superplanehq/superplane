@@ -58,7 +58,7 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
 
     try {
       details["Response Data"] = JSON.stringify(responseData, null, 2);
-    } catch (error) {
+    } catch {
       details["Response Data"] = String(responseData);
     }
 
