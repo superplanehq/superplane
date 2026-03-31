@@ -253,7 +253,9 @@ const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {}
+    } catch {
+      // Clipboard access can fail in unsupported environments.
+    }
   };
 
   return (

@@ -1,4 +1,4 @@
-import { AuthorizationDomainType, ConfigurationField } from "../../api-client";
+import type { AuthorizationDomainType, ConfigurationField } from "../../api-client";
 
 export interface ValidationError {
   field: string;

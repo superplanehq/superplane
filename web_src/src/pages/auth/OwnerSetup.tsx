@@ -141,7 +141,7 @@ const OwnerSetup: React.FC = () => {
 
       const data: { organization_id: string } = await response.json();
       window.location.href = `/${data.organization_id}`;
-    } catch (err) {
+    } catch {
       setError("Network error occurred");
     } finally {
       setLoading(false);
