@@ -65,9 +65,9 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 }
 
 var whoamiCmd = &cobra.Command{
-	Use:     "whoami",
-	Short:   "Get information about the currently authenticated user",
-	Args:    cobra.NoArgs,
+	Use:   "whoami",
+	Short: "Get information about the currently authenticated user",
+	Args:  cobra.NoArgs,
 }
 
 func init() {
