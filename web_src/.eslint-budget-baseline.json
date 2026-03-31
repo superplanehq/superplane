@@ -1,13 +1,13 @@
 {
-  "maxAllowedTotalIssues": 1328,
+  "maxAllowedTotalIssues": 1325,
   "maxAllowedByRule": {
     "@typescript-eslint/no-explicit-any": 360,
-    "complexity": 273,
+    "complexity": 274,
     "@typescript-eslint/consistent-type-imports": 200,
-    "max-statements": 103,
-    "@typescript-eslint/no-non-null-asserted-optional-chain": 100,
-    "max-lines-per-function": 98,
-    "react-hooks/exhaustive-deps": 60,
+    "max-statements": 104,
+    "max-lines-per-function": 97,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 97,
+    "react-hooks/exhaustive-deps": 59,
     "@typescript-eslint/no-unused-vars": 33,
     "max-lines": 26,
     "react-refresh/only-export-components": 26,
@@ -20,5 +20,5 @@
     "no-constant-binary-expression": 2,
     "@typescript-eslint/no-empty-object-type": 1
   },
-  "updatedAt": "2026-03-31T15:57:34.512Z"
+  "updatedAt": "2026-03-31T20:04:24.192Z"
 }
