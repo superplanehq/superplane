@@ -27,7 +27,7 @@ func TestRequireInstallationAdmin(t *testing.T) {
 		w.Write([]byte("admin-ok"))
 	})
 
-	handler := AccountAuthMiddleware(signer)(
+	handler := AccountAuthMiddleware(signer, false)(
 		RequireInstallationAdmin()(finalHandler),
 	)
 
