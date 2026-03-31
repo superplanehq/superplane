@@ -39,6 +39,8 @@ type grafanaQuery struct {
 	Format     string `json:"format,omitempty"`
 }
 
+const grafanaDateTimeFormat = "2006-01-02T15:04"
+
 func (q *QueryDataSource) Name() string {
 	return "grafana.queryDataSource"
 }
@@ -62,9 +64,10 @@ func (q *QueryDataSource) Documentation() string {
 
 ## Configuration
 
-- **Data Source UID**: The Grafana datasource UID to query
+- **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional time range (relative like "now-5m" or absolute)
+- **Time From / Time To**: Optional datetime picker values for the query range
+- If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
 ## Output
@@ -89,10 +92,10 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "dataSourceUid",
-			Label:       "Data Source UID",
+			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The Grafana datasource UID to query",
+			Description: "The Grafana data source to query",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: resourceTypeDataSource,
@@ -110,18 +113,26 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 		{
 			Name:        "timeFrom",
 			Label:       "Time From",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "Start time (e.g. now-5m or 2024-01-01T00:00:00Z)",
-			Placeholder: "now-5m",
+			Description: "Optional start of the query time range",
+			TypeOptions: &configuration.TypeOptions{
+				DateTime: &configuration.DateTimeTypeOptions{
+					Format: "2006-01-02T15:04",
+				},
+			},
 		},
 		{
 			Name:        "timeTo",
 			Label:       "Time To",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeDateTime,
 			Required:    false,
-			Description: "End time (e.g. now or 2024-01-01T01:00:00Z)",
-			Placeholder: "now",
+			Description: "Optional end of the query time range",
+			TypeOptions: &configuration.TypeOptions{
+				DateTime: &configuration.DateTimeTypeOptions{
+					Format: "2006-01-02T15:04",
+				},
+			},
 		},
 		{
 			Name:        "format",
@@ -168,11 +179,11 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From = strings.TrimSpace(*spec.TimeFrom)
+		request.From = resolveQueryTimeValue(*spec.TimeFrom)
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To = strings.TrimSpace(*spec.TimeTo)
+		request.To = resolveQueryTimeValue(*spec.TimeTo)
 	}
 
 	if request.From == "" || request.To == "" {
@@ -243,6 +254,22 @@ func defaultTimeRange() (string, string) {
 	now := time.Now().UTC()
 	from := now.Add(-5 * time.Minute)
 	return fmt.Sprintf("%d", from.UnixMilli()), fmt.Sprintf("%d", now.UnixMilli())
+}
+
+func resolveQueryTimeValue(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	// Preserve Grafana-supported raw values like "now-1h", while normalizing
+	// datetime picker values to epoch milliseconds for the query API.
+	t, err := time.Parse(grafanaDateTimeFormat, trimmed)
+	if err != nil {
+		return trimmed
+	}
+
+	return fmt.Sprintf("%d", t.UTC().UnixMilli())
 }
 
 func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
