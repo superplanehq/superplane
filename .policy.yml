@@ -16,6 +16,7 @@ policy:
     - workers_package_changes_require_platform_reviewer
     - models_package_changes_require_platform_reviewer
     - web_src_changes_require_platform_reviewer
+    - other_changes_do_not_require_approval
 
 approval_rules:
   - name: db_changes_require_core_reviewer
@@ -151,3 +152,20 @@ approval_rules:
         - lucaspin
         - shiroyasha
         - forestileao
+
+  - name: other_changes_do_not_require_approval
+    if:
+      no_changed_files:
+        paths:
+          - "^db/.*$"
+          - "^agent/.*$"
+          - "^protos/.*$"
+          - "^rbac/.*$"
+          - "^release/.*$"
+          - "^pkg/core/.*$"
+          - "^pkg/grpc/.*$"
+          - "^pkg/workers/.*$"
+          - "^pkg/models/.*$"
+          - "^web_src/.*$"
+    requires:
+      count: 0
