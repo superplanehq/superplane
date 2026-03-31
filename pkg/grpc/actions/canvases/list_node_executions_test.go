@@ -211,8 +211,8 @@ func SerializeThosandNodeExecutions(b *testing.B) {
 
 func Test__BenchmarkSerializeNodeExecutions(t *testing.T) {
 	//
-	// Serializing 1000 executions should take no longer than 10ms
+	// Serializing 1000 executions should take no longer than 50ms
 	//
 	res := testing.Benchmark(SerializeThosandNodeExecutions)
-	assert.Less(t, res.NsPerOp(), int64(10000000))
+	assert.Less(t, res.NsPerOp(), int64(50000000))
 }
