@@ -1931,17 +1931,18 @@ type GradientAIOpenAIKey struct {
 // GradientAI request types
 
 type CreateGradientAIAgentRequest struct {
-	Name             string   `json:"name"`
-	Description      string   `json:"description,omitempty"`
-	Instruction      string   `json:"instruction"`
-	ModelUUID        string   `json:"model_uuid"`
-	WorkspaceUUID    string   `json:"workspace_uuid,omitempty"`
-	AnthropicKeyUUID string   `json:"anthropic_key_uuid,omitempty"`
-	OpenAIKeyUUID    string   `json:"open_ai_key_uuid,omitempty"`
-	KnowledgeBases   []string `json:"knowledge_base_uuid,omitempty"`
-	Region           string   `json:"region,omitempty"`
-	Tags             []string `json:"tags,omitempty"`
-	ProjectID        string   `json:"project_id,omitempty"`
+	Name                string   `json:"name"`
+	Description         string   `json:"description,omitempty"`
+	Instruction         string   `json:"instruction"`
+	ModelUUID           string   `json:"model_uuid"`
+	WorkspaceUUID       string   `json:"workspace_uuid,omitempty"`
+	ModelProviderKeyUUID string  `json:"model_provider_key_uuid,omitempty"`
+	AnthropicKeyUUID    string   `json:"anthropic_key_uuid,omitempty"`
+	OpenAIKeyUUID       string   `json:"open_ai_key_uuid,omitempty"`
+	KnowledgeBases      []string `json:"knowledge_base_uuid,omitempty"`
+	Region              string   `json:"region,omitempty"`
+	Tags                []string `json:"tags,omitempty"`
+	ProjectID           string   `json:"project_id,omitempty"`
 }
 
 type UpdateGradientAIAgentRequest struct {

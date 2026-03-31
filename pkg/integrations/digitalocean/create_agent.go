@@ -491,6 +491,12 @@ func (c *CreateAgent) Execute(ctx core.ExecutionContext) (err error) {
 	// We use spec.ModelProvider (explicitly selected by the user in the UI) rather
 	// than trying to infer the provider from the model UUID via an extra API call,
 	// which can fail or return an empty string.
+	//
+	// Only the provider-specific field (anthropic_key_uuid / open_ai_key_uuid) is
+	// set here. model_provider_key_uuid is a separate resource created via
+	// /v2/gen-ai/model_provider_keys and must NOT be set to an anthropic/openai
+	// key UUID — doing so causes a 404 because the API looks up a
+	// model_provider_key resource that doesn't exist.
 	if spec.ProviderAPIKey != "" {
 		provider := strings.ToLower(spec.ModelProvider)
 		switch {

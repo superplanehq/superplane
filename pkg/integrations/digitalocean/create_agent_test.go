@@ -266,11 +266,73 @@ func Test__CreateAgent__Execute(t *testing.T) {
 		// First request: register Anthropic key
 		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/anthropic/keys")
 
-		// Second request: create agent — must include anthropic_key_uuid and workspace_uuid
+		// Second request: create agent — must include anthropic_key_uuid and workspace_uuid.
+		// model_provider_key_uuid must NOT be set: it is a separate resource type
+		// (from /v2/gen-ai/model_provider_keys) and using an anthropic key UUID
+		// would cause a 404.
 		agentBody, _ := io.ReadAll(httpCtx.Requests[1].Body)
 		var agentReq map[string]any
 		require.NoError(t, json.Unmarshal(agentBody, &agentReq))
 		assert.Equal(t, "ant-key-uuid", agentReq["anthropic_key_uuid"])
+		assert.Nil(t, agentReq["model_provider_key_uuid"], "model_provider_key_uuid must not be set with anthropic key UUID")
+		assert.Equal(t, "test-workspace-uuid", agentReq["workspace_uuid"])
+	})
+
+	t.Run("success: OpenAI provider key -> registers key first, includes uuid in agent request", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// 1. POST /v2/gen-ai/openai/keys
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
+					"api_key_info": {"uuid": "oai-key-uuid", "name": "my-agent"}
+				}`))},
+				// 2. POST /v2/gen-ai/agents
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{
+					"agent": {"uuid": "agent-uuid-456", "name": "my-agent"}
+				}`))},
+				// 3. PUT /v2/gen-ai/agents/{uuid}/deployment
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))},
+			},
+		}
+
+		metadataCtx := &contexts.MetadataContext{}
+		requestCtx := &contexts.RequestContext{}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":               "my-agent",
+				"instruction":        "You are a helpful assistant",
+				"modelProvider":      "openai",
+				"modelUUID":          "openai-model-uuid",
+				"providerAPIKey":     "sk-oai-test-key",
+				"workspaceSource":    "existing",
+				"workspaceUUID":      "test-workspace-uuid",
+				"region":             "tor1",
+				"projectID":          "test-project-id",
+				"useDefaultSettings": true,
+			},
+			HTTP:           httpCtx,
+			Integration:    integrationCtx(),
+			ExecutionState: executionState,
+			Metadata:       metadataCtx,
+			Requests:       requestCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 3)
+
+		// First request: register OpenAI key
+		assert.Contains(t, httpCtx.Requests[0].URL.String(), "/openai/keys")
+
+		// Second request: create agent — must include open_ai_key_uuid and workspace_uuid.
+		// model_provider_key_uuid must NOT be set: it is a separate resource type
+		// (from /v2/gen-ai/model_provider_keys) and using an openai key UUID
+		// would cause a 404.
+		agentBody, _ := io.ReadAll(httpCtx.Requests[1].Body)
+		var agentReq map[string]any
+		require.NoError(t, json.Unmarshal(agentBody, &agentReq))
+		assert.Equal(t, "oai-key-uuid", agentReq["open_ai_key_uuid"])
+		assert.Nil(t, agentReq["model_provider_key_uuid"], "model_provider_key_uuid must not be set with openai key UUID")
 		assert.Equal(t, "test-workspace-uuid", agentReq["workspace_uuid"])
 	})
 
