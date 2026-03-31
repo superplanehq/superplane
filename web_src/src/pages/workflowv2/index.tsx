@@ -731,6 +731,7 @@ export function WorkflowPageV2() {
   const activeCanvasVersionIdRef = useRef<string>(activeCanvasVersionId);
   const queuedCanvasSaveRef = useRef<QueuedCanvasSaveRequest | null>(null);
   const isDrainingCanvasSaveQueueRef = useRef(false);
+  const canvasSaveSessionRef = useRef(0);
   const ignoredCanvasUpdatedEventsRef = useRef(0);
   const ignoredCanvasVersionUpdatedEventsRef = useRef<Map<string, number>>(new Map());
   const clearQueuedAutoSaveFlags = useCallback(() => {
@@ -804,6 +805,8 @@ export function WorkflowPageV2() {
   }, [canvas]);
 
   useEffect(() => {
+    canvasSaveSessionRef.current += 1;
+
     const queuedRequest = queuedCanvasSaveRef.current;
     if (queuedRequest) {
       queuedCanvasSaveRef.current = null;
@@ -1081,10 +1084,11 @@ export function WorkflowPageV2() {
   );
 
   const registerIgnoredCanvasUpdatedEcho = useCallback(() => {
+    const saveSession = canvasSaveSessionRef.current;
     ignoredCanvasUpdatedEventsRef.current += 1;
     let released = false;
     const timeoutId = window.setTimeout(() => {
-      if (released) {
+      if (released || canvasSaveSessionRef.current !== saveSession) {
         return;
       }
       released = true;
@@ -1097,6 +1101,9 @@ export function WorkflowPageV2() {
       }
       released = true;
       window.clearTimeout(timeoutId);
+      if (canvasSaveSessionRef.current !== saveSession) {
+        return;
+      }
       ignoredCanvasUpdatedEventsRef.current = Math.max(0, ignoredCanvasUpdatedEventsRef.current - 1);
     };
   }, []);
@@ -1106,11 +1113,12 @@ export function WorkflowPageV2() {
       return () => undefined;
     }
 
+    const saveSession = canvasSaveSessionRef.current;
     const current = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
     ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, current + 1);
     let released = false;
     const timeoutId = window.setTimeout(() => {
-      if (released) {
+      if (released || canvasSaveSessionRef.current !== saveSession) {
         return;
       }
       released = true;
@@ -1128,6 +1136,9 @@ export function WorkflowPageV2() {
       }
       released = true;
       window.clearTimeout(timeoutId);
+      if (canvasSaveSessionRef.current !== saveSession) {
+        return;
+      }
       const count = ignoredCanvasVersionUpdatedEventsRef.current.get(savingVersionId) || 0;
       if (count <= 1) {
         ignoredCanvasVersionUpdatedEventsRef.current.delete(savingVersionId);
@@ -1136,6 +1147,17 @@ export function WorkflowPageV2() {
       ignoredCanvasVersionUpdatedEventsRef.current.set(savingVersionId, count - 1);
     };
   }, []);
+
+  const registerIgnoredCanvasUpdatedEchoIfNeeded = useCallback(
+    (savingVersionId?: string) => {
+      if (savingVersionId) {
+        return () => undefined;
+      }
+
+      return registerIgnoredCanvasUpdatedEcho();
+    },
+    [registerIgnoredCanvasUpdatedEcho],
+  );
 
   const syncCurrentCanvasWithSavedVersion = useCallback(
     (workflow: CanvasesCanvas, version?: CanvasesCanvasVersion) => {
@@ -1185,7 +1207,18 @@ export function WorkflowPageV2() {
   );
 
   const processQueuedCanvasSave = useCallback(
-    async (request: QueuedCanvasSaveRequest) => {
+    async (saveSession: number, request: QueuedCanvasSaveRequest) => {
+      if (canvasSaveSessionRef.current !== saveSession) {
+        request.resolve({
+          status: "stale",
+          workflow: request.workflow,
+          savingVersionId: request.savingVersionId,
+          matchesCurrentCanvas: false,
+          hasQueuedFollowUp: false,
+        });
+        return;
+      }
+
       if (activeCanvasVersionIdRef.current !== (request.savingVersionId || "")) {
         request.resolve({
           status: "stale",
@@ -1199,7 +1232,7 @@ export function WorkflowPageV2() {
 
       const expectedVersionId = request.savingVersionId || liveCanvasVersionId || undefined;
       const releaseCanvasVersionUpdatedEcho = registerIgnoredCanvasVersionUpdatedEcho(expectedVersionId);
-      const releaseCanvasUpdatedEcho = request.savingVersionId ? () => undefined : registerIgnoredCanvasUpdatedEcho();
+      const releaseCanvasUpdatedEcho = registerIgnoredCanvasUpdatedEchoIfNeeded(request.savingVersionId);
 
       try {
         const response = await updateCanvasVersionMutation.mutateAsync({
@@ -1211,6 +1244,17 @@ export function WorkflowPageV2() {
           preserveLocalCanvasState: true,
           invalidateRelatedQueries: false,
         });
+
+        if (canvasSaveSessionRef.current !== saveSession) {
+          request.resolve({
+            status: "stale",
+            workflow: request.workflow,
+            savingVersionId: request.savingVersionId,
+            matchesCurrentCanvas: false,
+            hasQueuedFollowUp: false,
+          });
+          return;
+        }
 
         syncCurrentCanvasWithSavedVersion(request.workflow, response?.data?.version);
 
@@ -1230,7 +1274,7 @@ export function WorkflowPageV2() {
     },
     [
       liveCanvasVersionId,
-      registerIgnoredCanvasUpdatedEcho,
+      registerIgnoredCanvasUpdatedEchoIfNeeded,
       registerIgnoredCanvasVersionUpdatedEcho,
       saveMatchesCurrentCanvas,
       syncCurrentCanvasWithSavedVersion,
@@ -1243,22 +1287,24 @@ export function WorkflowPageV2() {
       return;
     }
 
+    const saveSession = canvasSaveSessionRef.current;
     isDrainingCanvasSaveQueueRef.current = true;
     setIsCanvasSaveInFlight(true);
 
     try {
-      while (queuedCanvasSaveRef.current) {
+      while (queuedCanvasSaveRef.current && canvasSaveSessionRef.current === saveSession) {
         const request = queuedCanvasSaveRef.current;
         queuedCanvasSaveRef.current = null;
         setIsCanvasSaveQueued(false);
-        await processQueuedCanvasSave(request);
+        await processQueuedCanvasSave(saveSession, request);
       }
     } finally {
-      setIsCanvasSaveInFlight(false);
-      isDrainingCanvasSaveQueueRef.current = false;
-
-      if (queuedCanvasSaveRef.current) {
-        void drainCanvasSaveQueue();
+      if (canvasSaveSessionRef.current === saveSession) {
+        setIsCanvasSaveInFlight(false);
+        isDrainingCanvasSaveQueueRef.current = false;
+        if (queuedCanvasSaveRef.current) {
+          void drainCanvasSaveQueue();
+        }
       }
     }
   }, [organizationId, canvasId, processQueuedCanvasSave]);
