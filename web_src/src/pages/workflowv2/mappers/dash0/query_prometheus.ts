@@ -54,7 +54,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
     try {
       const formatted = JSON.stringify(responseData, null, 2);
       details["Response Data"] = formatted;
-    } catch (error) {
+    } catch {
       details["Response Data"] = String(responseData);
     }
 

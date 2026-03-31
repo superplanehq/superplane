@@ -606,7 +606,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             queryClient.invalidateQueries({
               queryKey: canvasKeys.nodeExecution(canvasId, node.id!),
             });
-          } catch (_error) {
+          } catch {
             showErrorToast("Failed to approve");
           }
         },
@@ -633,7 +633,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
             queryClient.invalidateQueries({
               queryKey: canvasKeys.nodeExecution(canvasId, node.id!),
             });
-          } catch (_error) {
+          } catch {
             showErrorToast("Failed to reject");
           }
         },
