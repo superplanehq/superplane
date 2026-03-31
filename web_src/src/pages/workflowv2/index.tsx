@@ -3789,7 +3789,7 @@ export function WorkflowPageV2() {
         queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
         showSuccessToast(updatedPaused ? "Component paused" : "Component resumed");
       } catch (error) {
-        let parsedError = error as { message: string };
+        const parsedError = error as { message: string };
         if (parsedError?.message) {
           showErrorToast(parsedError.message);
         } else {
@@ -5843,11 +5843,11 @@ function prepareCompositeNode(
 }
 
 function getRunItemState(execution: CanvasesCanvasNodeExecution): LastRunState {
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";
   }
 
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     return "success";
   }
 
