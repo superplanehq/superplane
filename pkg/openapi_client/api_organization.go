@@ -1331,6 +1331,118 @@ func (a *OrganizationAPIService) OrganizationsGetInviteLinkExecute(r ApiOrganiza
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiOrganizationsGetOktaIdpSettingsRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+}
+
+func (r ApiOrganizationsGetOktaIdpSettingsRequest) Execute() (*OrganizationsGetOktaIdpSettingsResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsGetOktaIdpSettingsExecute(r)
+}
+
+/*
+OrganizationsGetOktaIdpSettings Get organization Okta IdP settings
+
+Returns Okta OIDC/SCIM configuration metadata for an organization (no secrets)
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsGetOktaIdpSettingsRequest
+*/
+func (a *OrganizationAPIService) OrganizationsGetOktaIdpSettings(ctx context.Context, id string) ApiOrganizationsGetOktaIdpSettingsRequest {
+	return ApiOrganizationsGetOktaIdpSettingsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsGetOktaIdpSettingsResponse
+func (a *OrganizationAPIService) OrganizationsGetOktaIdpSettingsExecute(r ApiOrganizationsGetOktaIdpSettingsRequest) (*OrganizationsGetOktaIdpSettingsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodGet
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsGetOktaIdpSettingsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsGetOktaIdpSettings")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/okta-idp"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiOrganizationsListIntegrationResourcesRequest struct {
 	ctx           context.Context
 	ApiService    *OrganizationAPIService
@@ -2024,6 +2136,118 @@ func (a *OrganizationAPIService) OrganizationsResetInviteLinkExecute(r ApiOrgani
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiOrganizationsRotateOktaScimBearerTokenRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+}
+
+func (r ApiOrganizationsRotateOktaScimBearerTokenRequest) Execute() (*OrganizationsRotateOktaScimBearerTokenResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsRotateOktaScimBearerTokenExecute(r)
+}
+
+/*
+OrganizationsRotateOktaScimBearerToken Rotate organization SCIM bearer token
+
+Generates a new SCIM bearer token; the plaintext is returned once
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsRotateOktaScimBearerTokenRequest
+*/
+func (a *OrganizationAPIService) OrganizationsRotateOktaScimBearerToken(ctx context.Context, id string) ApiOrganizationsRotateOktaScimBearerTokenRequest {
+	return ApiOrganizationsRotateOktaScimBearerTokenRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsRotateOktaScimBearerTokenResponse
+func (a *OrganizationAPIService) OrganizationsRotateOktaScimBearerTokenExecute(r ApiOrganizationsRotateOktaScimBearerTokenRequest) (*OrganizationsRotateOktaScimBearerTokenResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPost
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsRotateOktaScimBearerTokenResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsRotateOktaScimBearerToken")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/okta-idp/rotate-scim-token"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiOrganizationsSetAgentOpenAIKeyRequest struct {
 	ctx        context.Context
 	ApiService *OrganizationAPIService
@@ -2447,6 +2671,129 @@ func (a *OrganizationAPIService) OrganizationsUpdateInviteLinkExecute(r ApiOrgan
 	}
 
 	localVarPath := localBasePath + "/api/v1/organizations/{id}/invite-link"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+		var v GooglerpcStatus
+		err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+		if err != nil {
+			newErr.error = err.Error()
+			return localVarReturnValue, localVarHTTPResponse, newErr
+		}
+		newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+		newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiOrganizationsUpdateOktaIdpSettingsRequest struct {
+	ctx        context.Context
+	ApiService *OrganizationAPIService
+	id         string
+	body       *OrganizationsUpdateOktaIdpSettingsBody
+}
+
+func (r ApiOrganizationsUpdateOktaIdpSettingsRequest) Body(body OrganizationsUpdateOktaIdpSettingsBody) ApiOrganizationsUpdateOktaIdpSettingsRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiOrganizationsUpdateOktaIdpSettingsRequest) Execute() (*OrganizationsUpdateOktaIdpSettingsResponse, *http.Response, error) {
+	return r.ApiService.OrganizationsUpdateOktaIdpSettingsExecute(r)
+}
+
+/*
+OrganizationsUpdateOktaIdpSettings Create or update organization Okta IdP settings
+
+Creates or updates Okta issuer URL, OAuth client id/secret, and OIDC/SCIM toggles
+
+	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+	@param id
+	@return ApiOrganizationsUpdateOktaIdpSettingsRequest
+*/
+func (a *OrganizationAPIService) OrganizationsUpdateOktaIdpSettings(ctx context.Context, id string) ApiOrganizationsUpdateOktaIdpSettingsRequest {
+	return ApiOrganizationsUpdateOktaIdpSettingsRequest{
+		ApiService: a,
+		ctx:        ctx,
+		id:         id,
+	}
+}
+
+// Execute executes the request
+//
+//	@return OrganizationsUpdateOktaIdpSettingsResponse
+func (a *OrganizationAPIService) OrganizationsUpdateOktaIdpSettingsExecute(r ApiOrganizationsUpdateOktaIdpSettingsRequest) (*OrganizationsUpdateOktaIdpSettingsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod  = http.MethodPatch
+		localVarPostBody    interface{}
+		formFiles           []formFile
+		localVarReturnValue *OrganizationsUpdateOktaIdpSettingsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "OrganizationAPIService.OrganizationsUpdateOktaIdpSettings")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/okta-idp"
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)

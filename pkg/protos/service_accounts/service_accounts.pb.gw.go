@@ -43,6 +43,9 @@ func request_ServiceAccounts_CreateServiceAccount_0(ctx context.Context, marshal
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.CreateServiceAccount(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
@@ -64,7 +67,9 @@ func request_ServiceAccounts_ListServiceAccounts_0(ctx context.Context, marshale
 		protoReq ListServiceAccountsRequest
 		metadata runtime.ServerMetadata
 	)
-	io.Copy(io.Discard, req.Body)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	msg, err := client.ListServiceAccounts(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
@@ -84,7 +89,9 @@ func request_ServiceAccounts_DescribeServiceAccount_0(ctx context.Context, marsh
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	io.Copy(io.Discard, req.Body)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	val, ok := pathParams["id"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
@@ -123,6 +130,9 @@ func request_ServiceAccounts_UpdateServiceAccount_0(ctx context.Context, marshal
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
 	}
 	val, ok := pathParams["id"]
 	if !ok {
@@ -163,7 +173,9 @@ func request_ServiceAccounts_DeleteServiceAccount_0(ctx context.Context, marshal
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	io.Copy(io.Discard, req.Body)
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
+	}
 	val, ok := pathParams["id"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id")
@@ -202,6 +214,9 @@ func request_ServiceAccounts_RegenerateServiceAccountToken_0(ctx context.Context
 	)
 	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if req.Body != nil {
+		_, _ = io.Copy(io.Discard, req.Body)
 	}
 	val, ok := pathParams["id"]
 	if !ok {
