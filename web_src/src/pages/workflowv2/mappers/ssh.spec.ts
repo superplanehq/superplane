@@ -33,9 +33,9 @@ function buildExecution({
 }: {
   metadata?: Record<string, unknown>;
   outputs?: { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] };
-  state?: string;
-  result?: string;
-  resultReason?: string;
+  state?: ExecutionInfo["state"];
+  result?: ExecutionInfo["result"];
+  resultReason?: ExecutionInfo["resultReason"];
   resultMessage?: string;
   updatedAt?: string;
 }): ExecutionInfo {
