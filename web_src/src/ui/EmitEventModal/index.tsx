@@ -83,7 +83,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
       let parsedData;
       try {
         parsedData = JSON.parse(eventData);
-      } catch (e) {
+      } catch {
         showErrorToast("Invalid JSON format");
         setIsSubmitting(false);
         return;

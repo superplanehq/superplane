@@ -80,7 +80,7 @@ export const baseMapper: ComponentBaseMapper = {
     try {
       const formatted = JSON.stringify(responseData, null, 2);
       details["Response"] = formatted;
-    } catch (error) {
+    } catch {
       details["Response"] = String(responseData);
     }
 
