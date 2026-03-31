@@ -252,7 +252,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (_error) {
+    } catch {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);
@@ -316,7 +316,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (_error) {
+    } catch {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);

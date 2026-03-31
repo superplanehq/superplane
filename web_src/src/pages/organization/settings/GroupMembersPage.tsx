@@ -83,7 +83,7 @@ export function GroupMembersPage() {
       // Refetch group data from server to ensure consistency
       await refetchGroup();
       setIsEditingGroupName(false);
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to update group name");
     }
   };
@@ -106,7 +106,7 @@ export function GroupMembersPage() {
 
       // Trigger refresh of the AddMembersSection to update the "From organization" tab
       addMembersSectionRef.current?.refreshExistingMembers();
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to remove member");
     }
   };
