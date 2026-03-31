@@ -1,5 +1,21 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import {
+  canvasesCreateCanvas,
+  canvasesDescribeCanvas,
+  canvasesEmitNodeEvent,
+  canvasesListCanvasEvents,
+  canvasesListEventExecutions,
+  canvasesUpdateCanvasVersion2,
+} from "@/api-client/sdk.gen";
+import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
+import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
+import { Heading } from "@/components/Heading/heading";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { Badge } from "@/components/ui/badge";
+import { useAccount } from "@/contexts/AccountContext";
+import { canvasKeys, useCanvasTemplates } from "@/hooks/useCanvasData";
+import { useMe } from "@/hooks/useMe";
+import { showErrorToast } from "@/lib/toast";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -17,24 +33,8 @@ import {
   Terminal,
   Timer,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Heading } from "@/components/Heading/heading";
-import { PermissionTooltip } from "@/components/PermissionGate";
-import { canvasKeys, useCanvasTemplates } from "@/hooks/useCanvasData";
-import {
-  canvasesCreateCanvas,
-  canvasesDescribeCanvas,
-  canvasesEmitNodeEvent,
-  canvasesListCanvasEvents,
-  canvasesListEventExecutions,
-  canvasesUpdateCanvasVersion2,
-} from "@/api-client/sdk.gen";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { showErrorToast } from "@/lib/toast";
-import { useAccount } from "@/contexts/AccountContext";
-import { useMe } from "@/hooks/useMe";
-import { CLIPanel } from "@/components/CanvasCreation/CLIPanel";
-import { AgentPanel } from "@/components/CanvasCreation/AgentPanel";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const QUICK_START_TEMPLATE_NAME = "Health Check Monitor";
 
@@ -131,28 +131,8 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
             },
           };
         }
-        if (node.component?.name === "http") {
-          return {
-            ...node,
-            configuration: {
-              ...node.configuration,
-              url: QUICK_START_HTTP_URL_SERVER1,
-            },
-          };
-        }
         return node;
       });
-      const nodesWithServer2Url = nodes.map((node: any) =>
-        node.component?.name === "http"
-          ? {
-              ...node,
-              configuration: {
-                ...node.configuration,
-                url: QUICK_START_HTTP_URL_SERVER2,
-              },
-            }
-          : node,
-      );
       const edges = template.spec?.edges || [];
       const description = template.metadata?.description || "";
 
@@ -245,7 +225,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
           body: {
             canvas: {
               metadata: { name: QUICK_START_TEMPLATE_NAME, description },
-              spec: { nodes: nodesWithServer2Url, edges },
+              spec: { nodes, edges },
             },
           },
         }),

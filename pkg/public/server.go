@@ -433,19 +433,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
 
-	// Test endpoints
-	publicRoute.HandleFunc("/server1", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}).Methods("GET")
-
-	publicRoute.HandleFunc("/server2", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	}).Methods("GET")
-
-	publicRoute.HandleFunc("/server3", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}).Methods("GET")
-
 	//
 	// Webhook endpoints for triggers
 	//
