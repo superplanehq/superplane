@@ -66,8 +66,14 @@ export const canvasKeys = {
   changeRequestDetail: (canvasId: string, changeRequestId: string) =>
     [...canvasKeys.changeRequestDetails(), canvasId, changeRequestId] as const,
   nodeExecutions: () => [...canvasKeys.all, "nodeExecutions"] as const,
-  nodeExecution: (canvasId: string, nodeId: string, states?: string[]) =>
-    [...canvasKeys.nodeExecutions(), canvasId, nodeId, ...(states || [])] as const,
+  nodeExecution: (canvasId: string, nodeId: string, states?: string[], limit?: number) =>
+    [
+      ...canvasKeys.nodeExecutions(),
+      canvasId,
+      nodeId,
+      ...(states || []),
+      ...(limit === undefined ? [] : [limit]),
+    ] as const,
   events: () => [...canvasKeys.all, "events"] as const,
   eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
   infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
@@ -105,6 +111,8 @@ export const widgetKeys = {
   details: () => [...widgetKeys.all, "detail"] as const,
   detail: (name: string) => [...widgetKeys.details(), name] as const,
 };
+
+export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
 
 // Hooks for fetching canvases
 export const useCanvases = (organizationId: string) => {
@@ -682,56 +690,6 @@ export const useDeleteCanvas = (organizationId: string) => {
   });
 };
 
-export const useNodeExecutions = (
-  canvasId: string,
-  nodeId: string,
-  options?: {
-    states?: string[];
-  },
-) => {
-  return useQuery({
-    queryKey: canvasKeys.nodeExecution(canvasId, nodeId, options?.states),
-    queryFn: async () => {
-      const response = await canvasesListNodeExecutions(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            nodeId,
-          },
-          query: options?.states
-            ? {
-                states: options.states,
-              }
-            : undefined,
-        }),
-      );
-      return response.data;
-    },
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && !!nodeId,
-  });
-};
-
-export const useCanvasEvents = (canvasId: string, enabled = true) => {
-  const limit = 50;
-
-  return useQuery({
-    queryKey: canvasKeys.eventList(canvasId, limit),
-    queryFn: async () => {
-      const response = await canvasesListCanvasEvents(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: { limit },
-        }),
-      );
-      return response.data;
-    },
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && enabled,
-  });
-};
-
 export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
   const limit = 50;
 
@@ -910,7 +868,7 @@ export const nodeExecutionsQueryOptions = (
     limit?: number;
   },
 ) => ({
-  queryKey: canvasKeys.nodeExecution(canvasId, nodeId, options?.states),
+  queryKey: canvasKeys.nodeExecution(canvasId, nodeId, options?.states, options?.limit),
   queryFn: async () => {
     const response = await canvasesListNodeExecutions(
       withOrganizationHeader({
@@ -918,11 +876,7 @@ export const nodeExecutionsQueryOptions = (
           canvasId,
           nodeId,
         },
-        query: options?.states
-          ? {
-              states: options.states,
-            }
-          : undefined,
+        query: options,
       }),
     );
     return response.data;
@@ -1069,7 +1023,7 @@ export const useInfiniteNodeExecutions = (canvasId: string, nodeId: string, enab
             nodeId,
           },
           query: {
-            limit: 10,
+            limit: NODE_EXECUTION_HISTORY_PAGE_SIZE,
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),
