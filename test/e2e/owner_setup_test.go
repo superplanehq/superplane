@@ -47,6 +47,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertRedirectedToSetup()
 		steps.visitSetupPage()
 		steps.fillInOwnerDetails("private-network-owner@example.com", "Private", "Network", "Password1")
+		steps.goToPrivateNetworkSettings()
 		steps.enablePrivateNetworkAccess()
 		steps.goToSetupOptions()
 		steps.finishOwnerSetupWithoutSMTP()
@@ -113,8 +114,13 @@ func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName
 }
 
 func (s *ownerSetupSteps) submitOwnerSetupWithoutSMTP() {
+	s.goToPrivateNetworkSettings()
 	s.goToSetupOptions()
 	s.finishOwnerSetupWithoutSMTP()
+}
+
+func (s *ownerSetupSteps) goToPrivateNetworkSettings() {
+	s.session.Click(q.Text("Next"))
 }
 
 func (s *ownerSetupSteps) goToSetupOptions() {
@@ -136,12 +142,13 @@ func (s *ownerSetupSteps) fillInOwnerDetails(email, firstName, lastName, passwor
 }
 
 func (s *ownerSetupSteps) chooseSMTPSetup() {
-	s.session.Click(q.Text("Next"))
+	s.goToPrivateNetworkSettings()
+	s.goToSetupOptions()
 	s.session.Click(q.Text("Set up SMTP"))
 }
 
 func (s *ownerSetupSteps) enablePrivateNetworkAccess() {
-	s.session.Click(q.Text("Allow connections to private network tools"))
+	s.session.Click(q.TestID("owner-setup-private-network-switch"))
 }
 
 func (s *ownerSetupSteps) fillInSMTPDetails(host, port, username, password, fromName, fromEmail string, useTLS bool) {
