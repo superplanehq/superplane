@@ -36,13 +36,17 @@ func (u *User) GetEmail() string {
 }
 
 func (u *User) Delete() error {
+	return u.SoftDeleteInTransaction(database.Conn())
+}
+
+// SoftDeleteInTransaction soft-deletes the user (sets deleted_at, clears token_hash).
+func (u *User) SoftDeleteInTransaction(tx *gorm.DB) error {
 	now := time.Now()
-	return database.Conn().Unscoped().
-		Model(u).
-		Update("deleted_at", now).
-		Update("updated_at", now).
-		Update("token_hash", nil).
-		Error
+	return tx.Model(u).Updates(map[string]interface{}{
+		"deleted_at": now,
+		"updated_at": now,
+		"token_hash": nil,
+	}).Error
 }
 
 func (u *User) Restore() error {
@@ -233,9 +237,13 @@ func FindActiveUserByIDInTransaction(tx *gorm.DB, orgID, id string) (*User, erro
 }
 
 func FindActiveUserByEmail(orgID, email string) (*User, error) {
+	return FindActiveUserByEmailInTransaction(database.Conn(), orgID, email)
+}
+
+func FindActiveUserByEmailInTransaction(tx *gorm.DB, orgID, email string) (*User, error) {
 	var user User
 
-	err := database.Conn().
+	err := tx.
 		Where("organization_id = ?", orgID).
 		Where("email = ?", utils.NormalizeEmail(email)).
 		First(&user).
