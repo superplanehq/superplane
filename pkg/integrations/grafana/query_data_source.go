@@ -39,6 +39,8 @@ type grafanaQuery struct {
 	Format     string `json:"format,omitempty"`
 }
 
+const grafanaDateTimeFormat = "2006-01-02T15:04"
+
 func (q *QueryDataSource) Name() string {
 	return "grafana.queryDataSource"
 }
@@ -177,15 +179,11 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		if t, err := time.Parse("2006-01-02T15:04", strings.TrimSpace(*spec.TimeFrom)); err == nil {
-			request.From = fmt.Sprintf("%d", t.UTC().UnixMilli())
-		}
+		request.From = resolveQueryTimeValue(*spec.TimeFrom)
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		if t, err := time.Parse("2006-01-02T15:04", strings.TrimSpace(*spec.TimeTo)); err == nil {
-			request.To = fmt.Sprintf("%d", t.UTC().UnixMilli())
-		}
+		request.To = resolveQueryTimeValue(*spec.TimeTo)
 	}
 
 	if request.From == "" || request.To == "" {
@@ -256,6 +254,22 @@ func defaultTimeRange() (string, string) {
 	now := time.Now().UTC()
 	from := now.Add(-5 * time.Minute)
 	return fmt.Sprintf("%d", from.UnixMilli()), fmt.Sprintf("%d", now.UnixMilli())
+}
+
+func resolveQueryTimeValue(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	// Preserve Grafana-supported raw values like "now-1h", while normalizing
+	// datetime picker values to epoch milliseconds for the query API.
+	t, err := time.Parse(grafanaDateTimeFormat, trimmed)
+	if err != nil {
+		return trimmed
+	}
+
+	return fmt.Sprintf("%d", t.UTC().UnixMilli())
 }
 
 func decodeQueryDataSourceSpec(configuration any) (QueryDataSourceSpec, error) {
