@@ -359,8 +359,8 @@ func getLastExecutionTimestamp(executions []models.CanvasNodeExecution) *timesta
 }
 
 func getLimit(limit uint32) uint32 {
-	if limit == 0 || limit > 25 {
-		return 25
+	if limit == 0 || limit > 100 {
+		return 100
 	}
 	return limit
 }
