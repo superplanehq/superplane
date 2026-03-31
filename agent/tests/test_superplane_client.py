@@ -256,6 +256,8 @@ def test_list_components_includes_integration_scoped_components() -> None:
     assert len(components) == 1
     assert components[0]["name"] == "slack.sendTextMessage"
     assert components[0]["provider"] == "slack"
+    assert "configuration_fields" not in components[0]
+    assert components[0].get("output_channel_names") == []
 
 
 def test_list_triggers_includes_integration_scoped_triggers() -> None:
@@ -268,8 +270,8 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
                         "name": "github",
                         "triggers": [
                             {
-                                "name": "github.onPullRequestReviewComment",
-                                "label": "On Pull Request Review Comment",
+                                "name": "github.onPRReviewComment",
+                                "label": "On PR Review Comment",
                             }
                         ],
                     }
@@ -281,5 +283,47 @@ def test_list_triggers_includes_integration_scoped_triggers() -> None:
     triggers = client.list_triggers(provider="github")
 
     assert len(triggers) == 1
-    assert triggers[0]["name"] == "github.onPullRequestReviewComment"
+    assert triggers[0]["name"] == "github.onPRReviewComment"
     assert triggers[0]["provider"] == "github"
+    assert "configuration_fields" not in triggers[0]
+
+
+def test_matches_filters_natural_language_query_matches_block_name() -> None:
+    assert SuperplaneClient._matches_filters(
+        name="slack.sendTextMessage",
+        label="Send Text Message",
+        description="",
+        provider=None,
+        query="slack send text message",
+    )
+
+
+def test_matches_filters_partial_query_tokens() -> None:
+    assert SuperplaneClient._matches_filters(
+        name="slack.sendTextMessage",
+        label="Send Text Message",
+        description="",
+        provider=None,
+        query="slack text",
+    )
+
+
+def test_matches_filters_contiguous_phrase_still_matches() -> None:
+    assert SuperplaneClient._matches_filters(
+        name="filter",
+        label="Filter",
+        description="Filter events based on content",
+        provider=None,
+        query="filter events",
+    )
+
+
+def test_matches_filters_excludes_unrelated_block() -> None:
+    assert not SuperplaneClient._matches_filters(
+        name="noop",
+        label="Noop",
+        description="",
+        provider=None,
+        query="slack",
+    )
+
