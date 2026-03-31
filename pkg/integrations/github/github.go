@@ -21,6 +21,9 @@ const (
 	GitHubAppClientSecret  = "clientSecret"
 	GitHubAppWebhookSecret = "webhookSecret"
 
+	InstallTargetPersonal    = "personal"
+	InstallTargetOrganiation = "organization"
+
 	appBootstrapDescription = `
 To complete the GitHub app setup:
 
@@ -43,7 +46,8 @@ type GitHub struct {
 }
 
 type Configuration struct {
-	Organization string `mapstructure:"organization" json:"organization"`
+	InstallTarget string `mapstructure:"installTarget" json:"installTarget"`
+	Organization  string `mapstructure:"organization" json:"organization"`
 }
 
 type Metadata struct {
@@ -83,10 +87,29 @@ func (g *GitHub) Instructions() string {
 func (g *GitHub) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "installTarget",
+			Label:    "Install target",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  InstallTargetPersonal,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "My personal account", Value: InstallTargetPersonal},
+						{Label: "An organization", Value: InstallTargetOrganiation},
+					},
+				},
+			},
+		},
+		{
 			Name:        "organization",
 			Label:       "Organization",
 			Type:        configuration.FieldTypeString,
-			Description: "Organization to install the app into. If not specified, the app will be installed into the user's account.",
+			Required:    true,
+			Description: "Name of the GitHub organization to install the app into.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "installTarget", Values: []string{InstallTargetOrganiation}},
+			},
 		},
 	}
 }
