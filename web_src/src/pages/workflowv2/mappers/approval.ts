@@ -191,7 +191,7 @@ function getApprovalCustomField(
 ): React.ReactNode | undefined {
   const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
   if (!lastExecution) return;
-  if (!isAwaitingApproval || approvals.length == 0) return;
+  if (!isAwaitingApproval || approvals.length === 0) return;
   return React.createElement(ApprovalGroup, { approvals, awaitingApproval: isAwaitingApproval });
 }
 
