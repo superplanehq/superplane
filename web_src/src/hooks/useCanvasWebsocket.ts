@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
-import { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { canvasKeys } from "./useCanvasData";
 
@@ -34,7 +34,7 @@ export function useCanvasWebsocket(
   onNodeEvent?: (nodeId: string, event: string) => void,
   onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void,
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
-  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => void,
+  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void,
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
@@ -134,11 +134,18 @@ export function useCanvasWebsocket(
             break;
           }
 
-          onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, data.event);
+          const shouldInvalidateLifecycleQueries =
+            onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, data.event) !== false;
 
           if (data.event === "canvas_deleted") {
-            queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-            queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+            if (shouldInvalidateLifecycleQueries) {
+              queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+              queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+            }
+            break;
+          }
+
+          if (!shouldInvalidateLifecycleQueries) {
             break;
           }
 

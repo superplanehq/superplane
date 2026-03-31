@@ -172,7 +172,7 @@ const CopyCodeButton: React.FC<{ code: string }> = ({ code }) => {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to copy text");
     }
   };
@@ -269,7 +269,7 @@ const ResetAuthButton: React.FC<{
           });
         }
       }
-    } catch (_error) {
+    } catch {
       showErrorToast("Failed to reset authentication");
     } finally {
       setIsResetting(false);

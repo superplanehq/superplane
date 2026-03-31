@@ -1,6 +1,6 @@
 import React from "react";
 import Editor from "@monaco-editor/react";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
@@ -40,7 +40,7 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
 
       setValidationError(null);
       return true;
-    } catch (error) {
+    } catch {
       setValidationError("Invalid XML format");
       return false;
     }

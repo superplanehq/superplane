@@ -103,7 +103,7 @@ const CopyWebhookUrlButton: FC<{ webhookUrl: string }> = ({ webhookUrl }) => {
       await navigator.clipboard.writeText(webhookUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to copy webhook URL");
     }
   };

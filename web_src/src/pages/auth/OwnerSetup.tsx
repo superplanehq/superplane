@@ -3,6 +3,7 @@ import { Input, InputGroup } from "../../components/Input/input";
 import { Label } from "@/components/ui/label";
 import { Text } from "../../components/Text/text";
 import { Button } from "../../components/ui/button";
+import { Switch } from "@/ui/switch";
 import superplaneLogo from "../../assets/superplane.svg";
 
 const OwnerSetup: React.FC = () => {
@@ -19,7 +20,7 @@ const OwnerSetup: React.FC = () => {
   const [smtpFromEmail, setSmtpFromEmail] = useState("");
   const [smtpUseTLS, setSmtpUseTLS] = useState(true);
   const [allowPrivateNetworkAccess, setAllowPrivateNetworkAccess] = useState(false);
-  const [step, setStep] = useState<"owner" | "smtpPrompt" | "smtpConfig">("owner");
+  const [step, setStep] = useState<"owner" | "privateNetwork" | "smtpPrompt" | "smtpConfig">("owner");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -141,7 +142,7 @@ const OwnerSetup: React.FC = () => {
 
       const data: { organization_id: string } = await response.json();
       window.location.href = `/${data.organization_id}`;
-    } catch (err) {
+    } catch {
       setError("Network error occurred");
     } finally {
       setLoading(false);
@@ -154,6 +155,10 @@ const OwnerSetup: React.FC = () => {
     if (Object.keys(errors).length > 0) {
       return;
     }
+    setStep("privateNetwork");
+  };
+
+  const handlePrivateNetworkNext = () => {
     setStep("smtpPrompt");
   };
 
@@ -287,31 +292,54 @@ const OwnerSetup: React.FC = () => {
               )}
             </div>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-left">
-              <div>
-                <h5 className="text-sm font-medium text-gray-800">Private network access</h5>
-                <Text className="mt-1 text-sm text-gray-600">
-                  Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or another
-                  closed network. This reduces SSRF protection for private addresses.
-                </Text>
-              </div>
-
-              <Label htmlFor="allow-private-network-access" className="mt-4 inline-flex items-start gap-3 text-sm">
-                <input
-                  id="allow-private-network-access"
-                  type="checkbox"
-                  checked={allowPrivateNetworkAccess}
-                  onChange={(e) => setAllowPrivateNetworkAccess(e.target.checked)}
-                  className="mt-1"
-                />
-                <span className="text-gray-800">Allow connections to private network tools</span>
-              </Label>
-            </div>
-
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Saving..." : "Next"}
             </Button>
           </form>
+        )}
+
+        {step === "privateNetwork" && (
+          <div className="space-y-6">
+            {error && (
+              <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <Text className="text-red-700 dark:text-red-400 text-sm">{error}</Text>
+              </div>
+            )}
+
+            <div className="text-left">
+              <h4 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Private network access</h4>
+              <Text className="text-gray-800 dark:text-gray-300">
+                Decide whether this SuperPlane instance should be allowed to reach internal services before continuing
+                to email setup.
+              </Text>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-left">
+              <div className="flex items-start justify-between gap-6">
+                <div className="max-w-xs">
+                  <Label className="mb-1 block text-sm font-medium text-gray-800">Allow private network targets</Label>
+                  <Text className="text-sm text-gray-600">
+                    Enable this if SuperPlane needs to reach tools inside your VPC, private Kubernetes cluster, or
+                    another closed network. This reduces SSRF protection for private addresses.
+                  </Text>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500">{allowPrivateNetworkAccess ? "Enabled" : "Disabled"}</span>
+                  <Switch
+                    data-testid="owner-setup-private-network-switch"
+                    checked={allowPrivateNetworkAccess}
+                    onCheckedChange={setAllowPrivateNetworkAccess}
+                    aria-label="Allow connections to private network tools"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button type="button" className="w-full" disabled={loading} onClick={handlePrivateNetworkNext}>
+              Next
+            </Button>
+          </div>
         )}
 
         {step === "smtpPrompt" && (

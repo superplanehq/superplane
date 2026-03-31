@@ -161,3 +161,58 @@ func Test__ListNodeExecutions(t *testing.T) {
 		assert.Equal(t, customName, response.Executions[0].RootEvent.CustomName)
 	})
 }
+
+func SerializeThosandNodeExecutions(b *testing.B) {
+	r := support.Setup(b)
+
+	//
+	// Create a simple canvas with single trigger and component
+	//
+	canvas, _ := support.CreateCanvas(b, r.Organization.ID, r.User, []models.CanvasNode{
+		{
+			NodeID: "manual",
+			Name:   "Manual start",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+		},
+		{
+			NodeID: "node-1",
+			Name:   "Test Node",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "noop"},
+			}),
+		},
+	}, []models.Edge{})
+
+	//
+	// Generate 1000 executions for the component node
+	//
+	for i := 0; i < 1000; i++ {
+		event := support.EmitCanvasEventForNode(b, canvas.ID, "manual", "default", nil)
+		execution := support.CreateCanvasNodeExecution(b, canvas.ID, "node-1", event.ID, event.ID, nil)
+		_, err := execution.Pass(map[string][]any{"default": {map[string]any{"data": "test"}}})
+		require.NoError(b, err)
+	}
+
+	executions, err := models.ListNodeExecutions(canvas.ID, "node-1", []string{}, []string{}, 1000, nil)
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for b.Loop() {
+		pb, err := SerializeNodeExecutions(executions, []models.CanvasNodeExecution{})
+		require.NoError(b, err)
+		require.NotNil(b, pb)
+		assert.Len(b, pb, 1000)
+	}
+}
+
+func Test__BenchmarkSerializeNodeExecutions(t *testing.T) {
+	//
+	// Serializing 1000 executions should take no longer than 50ms
+	//
+	res := testing.Benchmark(SerializeThosandNodeExecutions)
+	assert.Less(t, res.NsPerOp(), int64(50000000))
+}
