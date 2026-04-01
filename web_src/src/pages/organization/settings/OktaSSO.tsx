@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Field, Fieldset, Label } from "../../../components/Fieldset/fieldset";
@@ -18,21 +17,10 @@ import {
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePublicBaseURL } from "@/hooks/useAuthConfig";
-import {
-  organizationsGetOktaIdpSettings,
-  organizationsUpdateOktaIdpSettings,
-  organizationsRotateOktaScimBearerToken,
-} from "../../../api-client/sdk.gen";
-import { withOrganizationHeader } from "../../../lib/withOrganizationHeader";
-import type { OrganizationsOktaIdpSettings } from "../../../api-client/types.gen";
+import { useOktaSSO } from "./useOktaSSO";
 
 function copyToClipboard(text: string) {
   navigator.clipboard.writeText(text).catch(() => {});
-}
-
-function flashMessage(setter: (msg: string | null) => void, message: string, duration = 3000) {
-  setter(message);
-  setTimeout(() => setter(null), duration);
 }
 
 function getOktaURLs(baseURL: string, orgId: string) {
@@ -47,6 +35,21 @@ function getOktaURLs(baseURL: string, orgId: string) {
 function StatusMessage({ message }: { message: string | null }) {
   if (!message) return null;
   return <span className={`text-sm ${message.includes("Failed") ? "text-red-600" : "text-green-600"}`}>{message}</span>;
+}
+
+function CopyableField({ label, hint, value }: { label: string; hint: string; value: string }) {
+  return (
+    <Field className="space-y-1.5">
+      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label}</Label>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{hint}</p>
+      <div className="flex items-center gap-2 max-w-sm">
+        <Input type="text" value={value} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+        <Button type="button" variant="outline" onClick={() => copyToClipboard(value)}>
+          Copy
+        </Button>
+      </div>
+    </Field>
+  );
 }
 
 function CertificateField({
@@ -84,133 +87,6 @@ function CertificateField({
       />
     </Field>
   );
-}
-
-function useOktaSSO(organizationId: string | undefined, canUpdate: boolean) {
-  const [settings, setSettings] = useState<OrganizationsOktaIdpSettings | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [samlIdpSSOURL, setSamlIdpSSOURL] = useState("");
-  const [samlIdpIssuer, setSamlIdpIssuer] = useState("");
-  const [samlIdpCertificatePEM, setSamlIdpCertificatePEM] = useState("");
-  const [samlEnabled, setSamlEnabled] = useState(true);
-  const [samlSaving, setSamlSaving] = useState(false);
-  const [samlMessage, setSamlMessage] = useState<string | null>(null);
-  const [scimEnabled, setScimEnabled] = useState(true);
-  const [scimSaving, setScimSaving] = useState(false);
-  const [scimMessage, setScimMessage] = useState<string | null>(null);
-  const [rotatingToken, setRotatingToken] = useState(false);
-  const [newToken, setNewToken] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!organizationId) return;
-    organizationsGetOktaIdpSettings(withOrganizationHeader({ path: { id: organizationId } }))
-      .then((res) => {
-        const s = res.data?.settings;
-        if (s) {
-          setSettings(s);
-          setSamlIdpSSOURL(s.samlIdpSsoUrl || "");
-          setSamlIdpIssuer(s.samlIdpIssuer || "");
-          setSamlEnabled(s.configured ? (s.samlEnabled ?? true) : true);
-          setScimEnabled(s.configured ? (s.scimEnabled ?? true) : true);
-        }
-      })
-      .catch(() => setLoadError("Failed to load SSO settings."));
-  }, [organizationId]);
-
-  const handleSamlSave = async () => {
-    if (!canUpdate || !organizationId) return;
-    setSamlSaving(true);
-    try {
-      const body: {
-        samlIdpSsoUrl?: string;
-        samlIdpIssuer?: string;
-        samlIdpCertificatePem?: string;
-        samlEnabled?: boolean;
-      } = {
-        samlIdpSsoUrl: samlIdpSSOURL.trim(),
-        samlIdpIssuer: samlIdpIssuer.trim(),
-        samlEnabled,
-      };
-      if (samlIdpCertificatePEM.trim()) {
-        body.samlIdpCertificatePem = samlIdpCertificatePEM.trim();
-      }
-      const res = await organizationsUpdateOktaIdpSettings(
-        withOrganizationHeader({ path: { id: organizationId }, body }),
-      );
-      if (res.data?.settings) {
-        setSettings(res.data.settings);
-        setSamlIdpCertificatePEM("");
-      }
-      flashMessage(setSamlMessage, "SAML settings saved.");
-    } catch {
-      flashMessage(setSamlMessage, "Failed to save SAML settings.");
-    } finally {
-      setSamlSaving(false);
-    }
-  };
-
-  const handleScimSave = async () => {
-    if (!canUpdate || !organizationId) return;
-    setScimSaving(true);
-    try {
-      const res = await organizationsUpdateOktaIdpSettings(
-        withOrganizationHeader({ path: { id: organizationId }, body: { scimEnabled } }),
-      );
-      if (res.data?.settings) {
-        setSettings(res.data.settings);
-      }
-      flashMessage(setScimMessage, "SCIM settings saved.");
-    } catch {
-      flashMessage(setScimMessage, "Failed to save SCIM settings.");
-    } finally {
-      setScimSaving(false);
-    }
-  };
-
-  const handleRotateToken = async () => {
-    if (!canUpdate || !organizationId) return;
-    setRotatingToken(true);
-    try {
-      const res = await organizationsRotateOktaScimBearerToken(
-        withOrganizationHeader({ path: { id: organizationId } }),
-      );
-      if (res.data?.settings) {
-        setSettings(res.data.settings);
-      }
-      if (res.data?.scimBearerToken) {
-        setNewToken(res.data.scimBearerToken);
-      }
-    } catch {
-      flashMessage(setScimMessage, "Failed to rotate SCIM token.");
-    } finally {
-      setRotatingToken(false);
-    }
-  };
-
-  return {
-    settings,
-    loadError,
-    samlIdpSSOURL,
-    setSamlIdpSSOURL,
-    samlIdpIssuer,
-    setSamlIdpIssuer,
-    samlIdpCertificatePEM,
-    setSamlIdpCertificatePEM,
-    samlEnabled,
-    setSamlEnabled,
-    samlSaving,
-    samlMessage,
-    scimEnabled,
-    setScimEnabled,
-    scimSaving,
-    scimMessage,
-    rotatingToken,
-    newToken,
-    setNewToken,
-    handleSamlSave,
-    handleScimSave,
-    handleRotateToken,
-  };
 }
 
 type SAMLSectionProps = {
@@ -298,42 +174,21 @@ function SAMLSection({
         value={samlIdpCertificatePEM}
         onChange={setSamlIdpCertificatePEM}
       />
-      <Field className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">ACS URL (Single Sign-On URL)</Label>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Paste this into your Okta app&apos;s <strong>Single sign on URL</strong> field.
-        </p>
-        <div className="flex items-center gap-2 max-w-sm">
-          <Input type="text" value={acsURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(acsURL)}>
-            Copy
-          </Button>
-        </div>
-      </Field>
-      <Field className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SP Entity ID (Audience URI)</Label>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Paste this into your Okta app&apos;s <strong>Audience URI (SP Entity ID)</strong> field.
-        </p>
-        <div className="flex items-center gap-2 max-w-sm">
-          <Input type="text" value={entityID} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(entityID)}>
-            Copy
-          </Button>
-        </div>
-      </Field>
-      <Field className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee login URL</Label>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Share this URL with employees to let them sign in via Okta.
-        </p>
-        <div className="flex items-center gap-2 max-w-sm">
-          <Input type="text" value={loginURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(loginURL)}>
-            Copy
-          </Button>
-        </div>
-      </Field>
+      <CopyableField
+        label="ACS URL (Single Sign-On URL)"
+        hint="Paste this into your Okta app's Single sign on URL field."
+        value={acsURL}
+      />
+      <CopyableField
+        label="SP Entity ID (Audience URI)"
+        hint="Paste this into your Okta app's Audience URI (SP Entity ID) field."
+        value={entityID}
+      />
+      <CopyableField
+        label="Employee login URL"
+        hint="Share this URL with employees to let them sign in via Okta."
+        value={loginURL}
+      />
       <Field>
         <div className="flex items-center gap-3">
           <Switch
@@ -400,18 +255,11 @@ function SCIMSection({
           <em>Provisioning</em> tab.
         </p>
       </div>
-      <Field className="space-y-1.5">
-        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM base URL</Label>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Paste this into your Okta SCIM connector base URL field.
-        </p>
-        <div className="flex items-center gap-2 max-w-sm">
-          <Input type="text" value={scimBaseURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(scimBaseURL)}>
-            Copy
-          </Button>
-        </div>
-      </Field>
+      <CopyableField
+        label="SCIM base URL"
+        hint="Paste this into your Okta SCIM connector base URL field."
+        value={scimBaseURL}
+      />
       <Field className="space-y-1.5">
         <div className="flex items-center gap-2">
           <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM bearer token</Label>

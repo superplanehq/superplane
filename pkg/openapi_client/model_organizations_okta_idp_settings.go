@@ -21,16 +21,16 @@ var _ MappedNullable = &OrganizationsOktaIdpSettings{}
 
 // OrganizationsOktaIdpSettings struct for OrganizationsOktaIdpSettings
 type OrganizationsOktaIdpSettings struct {
-	OrganizationId                  *string    `json:"organizationId,omitempty"`
-	Configured                      *bool      `json:"configured,omitempty"`
-	SamlIdpSsoUrl                   *string    `json:"samlIdpSsoUrl,omitempty"`
-	SamlIdpIssuer                   *string    `json:"samlIdpIssuer,omitempty"`
-	SamlIdpCertificateConfigured    *bool      `json:"samlIdpCertificateConfigured,omitempty"`
-	SamlEnabled                     *bool      `json:"samlEnabled,omitempty"`
-	ScimEnabled                     *bool      `json:"scimEnabled,omitempty"`
-	ScimBearerTokenConfigured       *bool      `json:"scimBearerTokenConfigured,omitempty"`
-	CreatedAt                       *time.Time `json:"createdAt,omitempty"`
-	UpdatedAt                       *time.Time `json:"updatedAt,omitempty"`
+	OrganizationId               *string    `json:"organizationId,omitempty"`
+	Configured                   *bool      `json:"configured,omitempty"`
+	SamlIdpSsoUrl                *string    `json:"samlIdpSsoUrl,omitempty"`
+	SamlIdpIssuer                *string    `json:"samlIdpIssuer,omitempty"`
+	SamlIdpCertificateConfigured *bool      `json:"samlIdpCertificateConfigured,omitempty"`
+	SamlEnabled                  *bool      `json:"samlEnabled,omitempty"`
+	ScimEnabled                  *bool      `json:"scimEnabled,omitempty"`
+	ScimBearerTokenConfigured    *bool      `json:"scimBearerTokenConfigured,omitempty"`
+	CreatedAt                    *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt                    *time.Time `json:"updatedAt,omitempty"`
 }
 
 // NewOrganizationsOktaIdpSettings instantiates a new OrganizationsOktaIdpSettings object

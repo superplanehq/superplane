@@ -20,11 +20,11 @@ var _ MappedNullable = &OrganizationsUpdateOktaIdpSettingsBody{}
 
 // OrganizationsUpdateOktaIdpSettingsBody struct for OrganizationsUpdateOktaIdpSettingsBody
 type OrganizationsUpdateOktaIdpSettingsBody struct {
-	SamlIdpSsoUrl        *string `json:"samlIdpSsoUrl,omitempty"`
-	SamlIdpIssuer        *string `json:"samlIdpIssuer,omitempty"`
+	SamlIdpSsoUrl         *string `json:"samlIdpSsoUrl,omitempty"`
+	SamlIdpIssuer         *string `json:"samlIdpIssuer,omitempty"`
 	SamlIdpCertificatePem *string `json:"samlIdpCertificatePem,omitempty"`
-	SamlEnabled          *bool   `json:"samlEnabled,omitempty"`
-	ScimEnabled          *bool   `json:"scimEnabled,omitempty"`
+	SamlEnabled           *bool   `json:"samlEnabled,omitempty"`
+	ScimEnabled           *bool   `json:"scimEnabled,omitempty"`
 }
 
 // NewOrganizationsUpdateOktaIdpSettingsBody instantiates a new OrganizationsUpdateOktaIdpSettingsBody object
