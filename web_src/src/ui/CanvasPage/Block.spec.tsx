@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@xyflow/react", () => ({
-  Handle: ({ type, id }: { type: string; id?: string }) => <div data-testid={`handle-${type}-${id || "default"}`} />,
+  Handle: ({ type, id, className }: { type: string; id?: string; className?: string }) => (
+    <div
+      data-testid={`handle-${type}-${id || "default"}`}
+      data-highlighted={className === "highlighted" ? "true" : "false"}
+    />
+  ),
   Position: {
     Left: "left",
     Right: "right",
@@ -57,5 +62,37 @@ describe("Block fallback rendering", () => {
 
     expect(screen.getByText("Broken Trigger")).toBeInTheDocument();
     expect(screen.getByText("Can't display")).toBeInTheDocument();
+  });
+
+  it("does not highlight a right handle when the target node is already connected", () => {
+    render(
+      <Block
+        nodeId="source-node"
+        data={{
+          label: "Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          component: {
+            title: "Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _connectingFrom: {
+            nodeId: "target-node",
+            handleType: "target",
+          },
+          _allEdges: [
+            {
+              source: "source-node",
+              sourceHandle: "default",
+              target: "target-node",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-highlighted", "false");
   });
 });
