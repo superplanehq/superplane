@@ -19,7 +19,6 @@ fi
 
 tar -C /usr/local -xzf go.tar.gz
 rm go.tar.gz
-rm -rf /usr/local/go/src
 
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/*
