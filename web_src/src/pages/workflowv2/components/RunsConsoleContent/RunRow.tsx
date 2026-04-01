@@ -4,7 +4,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
 } from "@/api-client";
-import { findNode } from "../../canvasRunsUtils";
+import { findNode } from "@/pages/workflowv2/lib/canvas-runs";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { useCallback, useMemo } from "react";
 import { buildTriggerSidebarEvent } from "../../utils";

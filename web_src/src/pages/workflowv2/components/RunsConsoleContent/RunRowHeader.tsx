@@ -5,16 +5,16 @@ import type {
   CanvasesCanvasNodeExecutionRef,
   ComponentsNode,
 } from "@/api-client";
+import { TimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
-import { computeDuration, getAggregateStatus, resolveNodeIconSlug } from "@/pages/workflowv2/canvasRunsUtils";
+import { computeDuration, getAggregateStatus, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { RUNS_CONSOLE_BADGE_COL } from "./constants";
 import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";
-import { formatRunTimestamp } from "../../canvasRunsUtils";
 
 export function RunRowHeader({
   event,
@@ -36,7 +36,7 @@ export function RunRowHeader({
   const triggerRenderer = getTriggerRenderer(triggerNode?.trigger?.name || "");
   const eventInfo = buildEventInfo(event);
   const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "Run" };
-  const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions, []) : "queued";
+  const aggregateStatus = executions.length > 0 ? getAggregateStatus(executions) : "queued";
   const totalSteps = executions.length + queueItemCount;
 
   const errorAckLabel = useMemo(() => {
@@ -107,7 +107,7 @@ export function RunRowHeader({
         )}
       </div>
       <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
-        {event.createdAt ? formatRunTimestamp(event.createdAt) : ""}
+        {event.createdAt ? <TimeAgo date={event.createdAt} /> : ""}
       </span>
     </button>
   );
