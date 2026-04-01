@@ -13,7 +13,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "../../../lib/withOrganizationHeader";
 import { useOrganizationId } from "../../../hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
-import {showErrorToast, showSuccessToast} from "@/lib/toast.ts";
+import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
 
 export function Profile() {
   usePageTitle(["Profile"]);
@@ -57,7 +57,7 @@ export function Profile() {
     try {
       await navigator.clipboard.writeText(token);
       showSuccessToast("API token copied.");
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to copy API token.");
     }
   };
