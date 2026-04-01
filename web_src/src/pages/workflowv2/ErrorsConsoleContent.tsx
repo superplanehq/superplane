@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { CircleX } from "lucide-react";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -52,7 +52,7 @@ function ErrorItemRow({
   onAcknowledgeErrors,
 }: {
   item: {
-    execution: CanvasesCanvasNodeExecution;
+    execution: CanvasesCanvasNodeExecutionRef;
     event: CanvasesCanvasEventWithExecutions;
     node: ComponentsNode | undefined;
     triggerNode: ComponentsNode | undefined;
@@ -151,7 +151,7 @@ export function ErrorsConsoleContent({
   const errorItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const items: {
-      execution: CanvasesCanvasNodeExecution;
+      execution: CanvasesCanvasNodeExecutionRef;
       event: CanvasesCanvasEventWithExecutions;
       node: ComponentsNode | undefined;
       triggerNode: ComponentsNode | undefined;
