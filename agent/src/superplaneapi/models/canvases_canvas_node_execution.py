@@ -31,7 +31,7 @@ from typing_extensions import Self
 
 class CanvasesCanvasNodeExecution(BaseModel):
     """
-    CanvasesCanvasNodeExecution
+    Full description of a canvas node execution. Should only be used for endpoints specific to executions.
     """ # noqa: E501
     id: Optional[StrictStr] = None
     canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
