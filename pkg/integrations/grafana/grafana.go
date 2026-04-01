@@ -10,6 +10,8 @@ import (
 )
 
 const resourceTypeDataSource = "data-source"
+const resourceTypeFolder = "folder"
+const resourceTypeDashboard = "dashboard"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -30,7 +32,7 @@ func (g *Grafana) Icon() string {
 }
 
 func (g *Grafana) Description() string {
-	return "Connect Grafana alerts and data queries to SuperPlane workflows"
+	return "Connect Grafana alerts, dashboards, and data queries to SuperPlane workflows"
 }
 
 func (g *Grafana) Instructions() string {
@@ -79,7 +81,11 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
+		&CreateDashboardShareLink{},
+		&GetDashboard{},
 		&QueryDataSource{},
+		&RenderPanel{},
+		&SearchDashboards{},
 	}
 }
 
@@ -107,7 +113,10 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeDataSource {
+	switch resourceType {
+	case resourceTypeFolder, resourceTypeDataSource, resourceTypeDashboard:
+		// Known types require a Grafana API client.
+	default:
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -116,29 +125,51 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	dataSources, err := client.ListDataSources()
-	if err != nil {
-		return nil, err
+	switch resourceType {
+	case resourceTypeFolder:
+		folders, err := client.ListFolders()
+		if err != nil {
+			return nil, err
+		}
+		return grafanaResourcesFromList(resourceTypeFolder, folders, func(f Folder) string { return f.UID }, func(f Folder) string { return f.Title }), nil
+	case resourceTypeDataSource:
+		dataSources, err := client.ListDataSources()
+		if err != nil {
+			return nil, err
+		}
+		return grafanaResourcesFromList(resourceTypeDataSource, dataSources, func(ds DataSource) string { return ds.UID }, func(ds DataSource) string { return ds.Name }), nil
+	case resourceTypeDashboard:
+		dashboards, err := client.SearchDashboards("", "", "", 0)
+		if err != nil {
+			return nil, err
+		}
+		return grafanaResourcesFromList(resourceTypeDashboard, dashboards, func(d DashboardSummary) string { return d.UID }, func(d DashboardSummary) string { return d.Title }), nil
 	}
 
-	resources := make([]core.IntegrationResource, 0, len(dataSources))
-	for _, source := range dataSources {
-		id := strings.TrimSpace(source.UID)
+	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
+}
+
+// grafanaResourcesFromList maps Grafana API list rows to workflow integration resources.
+// Empty UIDs are skipped; empty display names fall back to the UID.
+func grafanaResourcesFromList[T any](resourceType string, items []T, idOf func(T) string, nameOf func(T) string) []core.IntegrationResource {
+	resources := make([]core.IntegrationResource, 0, len(items))
+	for _, item := range items {
+		id := strings.TrimSpace(idOf(item))
 		if id == "" {
 			continue
 		}
 
-		name := strings.TrimSpace(source.Name)
+		name := strings.TrimSpace(nameOf(item))
 		if name == "" {
 			name = id
 		}
 
 		resources = append(resources, core.IntegrationResource{
-			Type: resourceTypeDataSource,
+			Type: resourceType,
 			Name: name,
 			ID:   id,
 		})
 	}
 
-	return resources, nil
+	return resources
 }
