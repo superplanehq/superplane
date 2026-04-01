@@ -177,6 +177,8 @@ You can deploy SuperPlane on a single host or on Kubernetes:
 - **[Single Host Installation](https://docs.superplane.com/installation/overview/#single-host-installation)** - Deploy on AWS EC2, GCP Compute Engine, or other cloud providers
 - **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
+Installation admins can enable private network access during owner setup or later in `/admin/settings` when SuperPlane needs to reach tools inside a VPC, private Kubernetes cluster, or another closed network. Environment variables still take precedence: set `BLOCKED_HTTP_HOSTS` or `BLOCKED_PRIVATE_IP_RANGES` to override the UI-controlled policy, and set either variable to an empty value to disable that specific block list entirely.
+
 
 ## Contributing
 

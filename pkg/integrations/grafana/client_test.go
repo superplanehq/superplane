@@ -283,3 +283,31 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, resourceTypeDataSource, resources[0].Type)
 	})
 }
+
+func Test__notificationPolicyRoot__PreservesUnknownRootAndRouteFields(t *testing.T) {
+	raw := []byte(`{"receiver":"default","mute_time_intervals":["offhours"],"routes":[{"receiver":"keep-me","matchers":[{"type":"a"}]}]}`)
+	root, err := parseNotificationPolicyRoot(raw)
+	require.NoError(t, err)
+	require.Contains(t, root, "mute_time_intervals")
+
+	routes, err := getChildRoutes(root)
+	require.NoError(t, err)
+	require.Len(t, routes, 1)
+
+	filtered, err := removeRoutesForReceiverRaw(routes, "other")
+	require.NoError(t, err)
+	require.Len(t, filtered, 1)
+	require.NoError(t, setChildRoutes(root, filtered))
+
+	out, err := marshalNotificationPolicyRoot(root)
+	require.NoError(t, err)
+
+	var check map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(out, &check))
+	require.Contains(t, check, "mute_time_intervals")
+
+	var rt []json.RawMessage
+	require.NoError(t, json.Unmarshal(check["routes"], &rt))
+	require.Len(t, rt, 1)
+	require.Contains(t, string(rt[0]), "matchers")
+}

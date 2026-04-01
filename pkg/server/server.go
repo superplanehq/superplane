@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -14,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
@@ -437,9 +437,19 @@ func Start() {
 	}
 
 	registry, err := registry.NewRegistry(encryptorInstance, registry.HTTPOptions{
-		BlockedHosts:     getBlockedHTTPHosts(),
-		PrivateIPRanges:  getPrivateIPRanges(),
 		MaxResponseBytes: DefaultMaxHTTPResponseBytes,
+		PolicyResolver: func() (registry.HTTPPolicy, error) {
+			policy, err := networkpolicy.ResolveHTTPPolicy()
+			if err != nil {
+				return registry.HTTPPolicy{}, err
+			}
+
+			return registry.HTTPPolicy{
+				BlockedHosts:    policy.BlockedHosts,
+				PrivateIPRanges: policy.PrivateIPRanges,
+			}, nil
+		},
+		PolicyCacheTTL: 5 * time.Second,
 	})
 
 	if err != nil {
@@ -481,55 +491,3 @@ func getWebhookBaseURL(baseURL string) string {
  * and also from emitting large events.
  */
 var DefaultMaxHTTPResponseBytes int64 = 8 * 1024 * 1024
-
-/*
- * Default blocked HTTP hosts include:
- * - Cloud metadata endpoints
- * - Kubernetes API
- * - Localhost variations
- */
-var defaultBlockedHTTPHosts = []string{
-	"metadata.google.internal",
-	"metadata.goog",
-	"metadata.azure.com",
-	"169.254.169.254",
-	"fd00:ec2::254",
-	"kubernetes.default",
-	"kubernetes.default.svc",
-	"kubernetes.default.svc.cluster.local",
-	"localhost",
-	"127.0.0.1",
-	"::1",
-	"0.0.0.0",
-	"::",
-}
-
-func getBlockedHTTPHosts() []string {
-	blockedHosts := os.Getenv("BLOCKED_HTTP_HOSTS")
-	if blockedHosts == "" {
-		return defaultBlockedHTTPHosts
-	}
-
-	return strings.Split(blockedHosts, ",")
-}
-
-var defaultBlockedPrivateIPRanges = []string{
-	"0.0.0.0/8",
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
-	"127.0.0.0/8",
-	"169.254.0.0/16",
-	"::1/128",
-	"fc00::/7",
-	"fe80::/10",
-}
-
-func getPrivateIPRanges() []string {
-	blockedPrivateIPRanges := os.Getenv("BLOCKED_PRIVATE_IP_RANGES")
-	if blockedPrivateIPRanges == "" {
-		return defaultBlockedPrivateIPRanges
-	}
-
-	return strings.Split(blockedPrivateIPRanges, ",")
-}

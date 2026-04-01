@@ -1,0 +1,171 @@
+approval_defaults:
+  options:
+    request_review:
+      enabled: true
+      mode: all-users
+
+policy:
+  approval:
+    - db_changes_require_core_reviewer
+    - agent_changes_require_shiroyasha
+    - protos_changes_require_platform_reviewer
+    - rbac_changes_require_security_reviewer
+    - release_changes_require_release_reviewer
+    - core_package_changes_require_lucaspin
+    - grpc_package_changes_require_platform_reviewer
+    - workers_package_changes_require_platform_reviewer
+    - models_package_changes_require_platform_reviewer
+    - web_src_changes_require_platform_reviewer
+    - other_changes_do_not_require_approval
+
+approval_rules:
+  - name: db_changes_require_core_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^db/.*$"
+    options:
+      allow_author: false
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+        - forestileao
+
+  - name: agent_changes_require_shiroyasha
+    if:
+      changed_files:
+        paths:
+          - "^agent/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - shiroyasha
+
+  - name: protos_changes_require_platform_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^protos/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+        - forestileao
+
+  - name: rbac_changes_require_security_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^rbac/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - forestileao
+
+  - name: release_changes_require_release_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^release/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+
+  - name: core_package_changes_require_lucaspin
+    if:
+      changed_files:
+        paths:
+          - "^pkg/core/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+
+  - name: grpc_package_changes_require_platform_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^pkg/grpc/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+        - forestileao
+
+  - name: workers_package_changes_require_platform_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^pkg/workers/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+        - forestileao
+
+  - name: models_package_changes_require_platform_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^pkg/models/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+        - forestileao
+
+  - name: web_src_changes_require_platform_reviewer
+    if:
+      changed_files:
+        paths:
+          - "^web_src/.*$"
+    options:
+      allow_author: true
+    requires:
+      count: 1
+      users:
+        - lucaspin
+        - shiroyasha
+        - forestileao
+
+  - name: other_changes_do_not_require_approval
+    if:
+      no_changed_files:
+        paths:
+          - "^db/.*$"
+          - "^agent/.*$"
+          - "^protos/.*$"
+          - "^rbac/.*$"
+          - "^release/.*$"
+          - "^pkg/core/.*$"
+          - "^pkg/grpc/.*$"
+          - "^pkg/workers/.*$"
+          - "^pkg/models/.*$"
+          - "^web_src/.*$"
+    requires:
+      count: 0

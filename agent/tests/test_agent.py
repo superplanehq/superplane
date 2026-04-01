@@ -1,6 +1,24 @@
-from ai.agent import build_agent, build_prompt
+from ai.agent import (
+    AgentDeps,
+    _catalog_list_cache_key,
+    _get_cached_catalog_list,
+    _put_cached_catalog_list,
+    build_agent,
+    build_prompt,
+    load_system_prompt,
+)
 from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasProposal, CanvasQuestionRequest
+
+
+def test_load_system_prompt_covers_expr_datetime_semantics() -> None:
+    text = load_system_prompt()
+    assert "expr-lang" in text
+    assert "now()" in text
+    assert "duration(" in text
+    assert "three-argument" in text
+    assert "date(str, format, timezone)" in text
+    assert "root().data" in text
 
 
 def test_build_prompt_contains_question() -> None:
@@ -45,3 +63,38 @@ def test_canvas_answer_serializes_proposal_with_aliases() -> None:
     assert isinstance(operations, list)
     assert operations[0]["blockName"] == "webhook.inbound"
     assert operations[0]["nodeKey"] == "trigger_1"
+
+
+def test_catalog_list_cache_key_normalizes_provider_and_query() -> None:
+    assert _catalog_list_cache_key("components", "Slack", "  Text ") == (
+        "components",
+        "slack",
+        "text",
+    )
+    assert _catalog_list_cache_key("triggers", None, None) == ("triggers", "", "")
+
+
+def test_catalog_list_cache_returns_detached_rows() -> None:
+    deps = AgentDeps(client=None, canvas_id="c")  # type: ignore[arg-type]
+    _put_cached_catalog_list(
+        deps,
+        "components",
+        "slack",
+        None,
+        [{"name": "slack.sendTextMessage", "output_channel_names": ["default"]}],
+    )
+    first = _get_cached_catalog_list(deps, "components", "slack", None)
+    assert first is not None
+    first[0]["name"] = "mutated"
+    second = _get_cached_catalog_list(deps, "components", "slack", None)
+    assert second is not None
+    assert second[0]["name"] == "slack.sendTextMessage"
+    assert second[0]["output_channel_names"] == ["default"]
+
+
+def test_catalog_list_cache_same_key_after_case_normalization() -> None:
+    deps = AgentDeps(client=None, canvas_id="c")  # type: ignore[arg-type]
+    _put_cached_catalog_list(deps, "triggers", "GitHub", "PR", [{"name": "github.onPR"}])
+    hit = _get_cached_catalog_list(deps, "triggers", "github", "pr")
+    assert hit is not None
+    assert hit[0]["name"] == "github.onPR"

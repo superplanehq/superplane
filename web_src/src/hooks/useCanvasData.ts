@@ -66,8 +66,14 @@ export const canvasKeys = {
   changeRequestDetail: (canvasId: string, changeRequestId: string) =>
     [...canvasKeys.changeRequestDetails(), canvasId, changeRequestId] as const,
   nodeExecutions: () => [...canvasKeys.all, "nodeExecutions"] as const,
-  nodeExecution: (canvasId: string, nodeId: string, states?: string[]) =>
-    [...canvasKeys.nodeExecutions(), canvasId, nodeId, ...(states || [])] as const,
+  nodeExecution: (canvasId: string, nodeId: string, states?: string[], limit?: number) =>
+    [
+      ...canvasKeys.nodeExecutions(),
+      canvasId,
+      nodeId,
+      ...(states || []),
+      ...(limit === undefined ? [] : [limit]),
+    ] as const,
   events: () => [...canvasKeys.all, "events"] as const,
   eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
   infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
@@ -105,6 +111,8 @@ export const widgetKeys = {
   details: () => [...widgetKeys.all, "detail"] as const,
   detail: (name: string) => [...widgetKeys.details(), name] as const,
 };
+
+export const NODE_EXECUTION_HISTORY_PAGE_SIZE = 10;
 
 // Hooks for fetching canvases
 export const useCanvases = (organizationId: string) => {
@@ -445,6 +453,8 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       nodes?: any[];
       edges?: any[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+      preserveLocalCanvasState?: boolean;
+      invalidateRelatedQueries?: boolean;
     }) => {
       const body = {
         canvas: {
@@ -510,40 +520,44 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         return next;
       });
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
-        if (!current) {
-          return current;
-        }
-
-        // When the server computed a new layout (autoLayout), accept the
-        // server positions as authoritative.  Otherwise preserve current
-        // local node positions to avoid overwriting positions that changed
-        // while the save was in flight.
-        if (variables.autoLayout) {
-          return { ...current, spec: version.spec };
-        }
-
-        const currentPositionsByNodeId = new Map(
-          (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
-        );
-
-        const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
-          const localPosition = currentPositionsByNodeId.get(serverNode.id);
-          if (localPosition) {
-            return { ...serverNode, position: localPosition };
+      if (!variables.preserveLocalCanvasState) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
+          if (!current) {
+            return current;
           }
-          return serverNode;
+
+          // When the server computed a new layout (autoLayout), accept the
+          // server positions as authoritative. Otherwise preserve current
+          // local node positions to avoid overwriting positions that changed
+          // while the save was in flight.
+          if (variables.autoLayout) {
+            return { ...current, spec: version.spec };
+          }
+
+          const currentPositionsByNodeId = new Map(
+            (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
+          );
+
+          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
+            const localPosition = currentPositionsByNodeId.get(serverNode.id);
+            if (localPosition) {
+              return { ...serverNode, position: localPosition };
+            }
+            return serverNode;
+          });
+
+          return {
+            ...current,
+            spec: { ...version.spec, nodes: mergedNodes },
+          };
         });
+      }
 
-        return {
-          ...current,
-          spec: { ...version.spec, nodes: mergedNodes },
-        };
-      });
-
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      if (variables.invalidateRelatedQueries !== false) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      }
     },
   });
 };
@@ -679,56 +693,6 @@ export const useDeleteCanvas = (organizationId: string) => {
       // Invalidate the list to refresh the canvas list
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
     },
-  });
-};
-
-export const useNodeExecutions = (
-  canvasId: string,
-  nodeId: string,
-  options?: {
-    states?: string[];
-  },
-) => {
-  return useQuery({
-    queryKey: canvasKeys.nodeExecution(canvasId, nodeId, options?.states),
-    queryFn: async () => {
-      const response = await canvasesListNodeExecutions(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            nodeId,
-          },
-          query: options?.states
-            ? {
-                states: options.states,
-              }
-            : undefined,
-        }),
-      );
-      return response.data;
-    },
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && !!nodeId,
-  });
-};
-
-export const useCanvasEvents = (canvasId: string, enabled = true) => {
-  const limit = 50;
-
-  return useQuery({
-    queryKey: canvasKeys.eventList(canvasId, limit),
-    queryFn: async () => {
-      const response = await canvasesListCanvasEvents(
-        withOrganizationHeader({
-          path: { canvasId },
-          query: { limit },
-        }),
-      );
-      return response.data;
-    },
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-    enabled: !!canvasId && enabled,
   });
 };
 
@@ -910,7 +874,7 @@ export const nodeExecutionsQueryOptions = (
     limit?: number;
   },
 ) => ({
-  queryKey: canvasKeys.nodeExecution(canvasId, nodeId, options?.states),
+  queryKey: canvasKeys.nodeExecution(canvasId, nodeId, options?.states, options?.limit),
   queryFn: async () => {
     const response = await canvasesListNodeExecutions(
       withOrganizationHeader({
@@ -918,11 +882,7 @@ export const nodeExecutionsQueryOptions = (
           canvasId,
           nodeId,
         },
-        query: options?.states
-          ? {
-              states: options.states,
-            }
-          : undefined,
+        query: options,
       }),
     );
     return response.data;
@@ -1069,7 +1029,7 @@ export const useInfiniteNodeExecutions = (canvasId: string, nodeId: string, enab
             nodeId,
           },
           query: {
-            limit: 10,
+            limit: NODE_EXECUTION_HISTORY_PAGE_SIZE,
             ...(pageParam ? { before: pageParam } : {}),
           },
         }),

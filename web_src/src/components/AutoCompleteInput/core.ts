@@ -1114,7 +1114,7 @@ function findTailDotContext(input: string): DotContext | null {
       continue;
     }
     if (ch === "(") {
-      if (parenDepth == 0) {
+      if (parenDepth === 0) {
         return null;
       }
       parenDepth = Math.max(0, parenDepth - 1);
