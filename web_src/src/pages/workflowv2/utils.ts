@@ -393,7 +393,7 @@ export function buildRunItemFromExecutionRef(options: {
   timestampOverride?: string;
 }): LogRunItem {
   const state = getRunItemStateFromRef(options.execution);
-  return buildRunItemFromExecutionBase({...options, resolvedState: state});
+  return buildRunItemFromExecutionBase({ ...options, resolvedState: state });
 }
 
 export function buildRunEntryFromEvent(options: {

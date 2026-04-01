@@ -322,7 +322,7 @@ export function RunRow({
   const executionRefs = useMemo(() => event.executions || [], [event.executions]);
   const executionDetailsQuery = useQuery({
     ...eventExecutionsQueryOptions(canvasId, eventId),
-    enabled
+    enabled,
   });
 
   const detailedExecutions = useMemo(
