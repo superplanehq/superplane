@@ -11,6 +11,7 @@ type Account struct {
 	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Email             string
 	Name              string
+	ManagedAccount    bool `gorm:"column:managed_account;not null;default:false"`
 	InstallationAdmin bool `gorm:"default:false"`
 }
 
@@ -39,7 +40,16 @@ func CreateAccount(name, email string) (*Account, error) {
 }
 
 func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, error) {
-	account := &Account{Name: name, Email: utils.NormalizeEmail(email)}
+	return CreateManagedAccountInTransaction(tx, name, email, false)
+}
+
+// CreateManagedAccountInTransaction creates an account; managed is true for directory (SCIM) users.
+func CreateManagedAccountInTransaction(tx *gorm.DB, name, email string, managed bool) (*Account, error) {
+	account := &Account{
+		Name:           name,
+		Email:          utils.NormalizeEmail(email),
+		ManagedAccount: managed,
+	}
 	err := tx.Create(account).Error
 	if err != nil {
 		return nil, err
