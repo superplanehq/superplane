@@ -336,7 +336,7 @@ function buildRunItemFromExecutionBase(options: {
 
   return {
     id: execution.id || `${execution.nodeId}-execution`,
-    type: mapExecutionStateToLogType(execution, resolvedState),
+    type: mapExecutionStateToLogType(execution, executionState),
     title,
     timestamp: timestampOverride || execution.updatedAt || execution.createdAt || timestampFallback || "",
     isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",
