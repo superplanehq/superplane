@@ -233,9 +233,18 @@ func (spec UpdateAlertRuleSpec) HasUpdates() bool {
 		spec.IsPaused != nil
 }
 
-func alertRuleStateOptions() []configuration.FieldOption {
+func alertRuleNoDataStateOptions() []configuration.FieldOption {
 	return []configuration.FieldOption{
 		{Label: "No Data", Value: "NoData"},
+		{Label: "Alerting", Value: "Alerting"},
+		{Label: "OK", Value: "OK"},
+		{Label: "Keep Last State", Value: "KeepLast"},
+	}
+}
+
+func alertRuleExecErrStateOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "Error", Value: "Error"},
 		{Label: "Alerting", Value: "Alerting"},
 		{Label: "OK", Value: "OK"},
 		{Label: "Keep Last State", Value: "KeepLast"},
@@ -345,7 +354,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 			Required: fieldRequired,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
-					Options: alertRuleStateOptions(),
+					Options: alertRuleNoDataStateOptions(),
 				},
 			},
 			Description: "How Grafana should behave when the query returns no data",
@@ -357,7 +366,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 			Required: fieldRequired,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
-					Options: alertRuleStateOptions(),
+					Options: alertRuleExecErrStateOptions(),
 				},
 			},
 			Description: "How Grafana should behave when the query evaluation errors",
