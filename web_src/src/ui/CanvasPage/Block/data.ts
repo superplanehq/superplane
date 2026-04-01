@@ -4,7 +4,7 @@ import type { CompositeProps } from "../../composite";
 import type { TriggerProps } from "../../trigger";
 import type { BlockData, UnknownRecord } from "./types";
 
-export const FALLBACK_NODE_MESSAGE = "Unavailable";
+export const FALLBACK_NODE_MESSAGE = "Can't display";
 
 export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null;

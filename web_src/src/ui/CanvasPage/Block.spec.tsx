@@ -24,7 +24,7 @@ describe("Block fallback rendering", () => {
     );
 
     expect(screen.getByText("Broken Node")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Can't display")).toBeInTheDocument();
   });
 
   it("renders a fallback node when component props are missing", () => {
@@ -40,7 +40,7 @@ describe("Block fallback rendering", () => {
     );
 
     expect(screen.getByText("Broken Component")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Can't display")).toBeInTheDocument();
   });
 
   it("renders a fallback node when trigger props are missing", () => {
@@ -56,6 +56,6 @@ describe("Block fallback rendering", () => {
     );
 
     expect(screen.getByText("Broken Trigger")).toBeInTheDocument();
-    expect(screen.getByText("Unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Can't display")).toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import type { ComponentsNode, ComponentsComponent, TriggersTrigger } from "@/api
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 
-const MINIMAL_FALLBACK_MESSAGE = "Unavailable";
+const MINIMAL_FALLBACK_MESSAGE = "Can't display";
 
 function buildMinimalRenderFallback() {
   return {

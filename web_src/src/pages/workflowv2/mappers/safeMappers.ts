@@ -10,7 +10,7 @@ import type {
   TriggerRendererContext,
 } from "./types";
 
-const FALLBACK_NODE_MESSAGE = "Unavailable";
+const FALLBACK_NODE_MESSAGE = "Can't display";
 
 type UnknownRecord = Record<string, unknown>;
 

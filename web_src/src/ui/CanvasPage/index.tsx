@@ -457,7 +457,7 @@ function createNodeRenderFallbackData(data: BlockData): BlockData {
     group: undefined,
     renderFallback: {
       source: "node-render",
-      message: "Unavailable",
+      message: "Can't display",
     },
   };
 }

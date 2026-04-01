@@ -212,7 +212,7 @@ describe("createSafeComponentMapper", () => {
     expect(result.error).toBe("");
     expect(result.warning).toBe("");
     expect(result.includeEmptyState).toBe(true);
-    expect(result.emptyStateProps?.title).toBe("Unavailable");
+    expect(result.emptyStateProps?.title).toBe("Can't display");
   });
 });
 

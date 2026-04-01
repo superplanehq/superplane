@@ -78,10 +78,10 @@ describe("workflow node preparation resilience", () => {
 
     expect(fallbackData.renderFallback).toEqual({
       source: "mapper",
-      message: "Unavailable",
+      message: "Can't display",
     });
     expect(fallbackData.component.error).toBeUndefined();
-    expect(fallbackData.component.emptyStateProps?.title).toBe("Unavailable");
+    expect(fallbackData.component.emptyStateProps?.title).toBe("Can't display");
   });
 
   it("returns null when a custom field renderer throws so sidebar rendering stays alive", () => {
