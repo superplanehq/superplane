@@ -7,7 +7,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { cn } from "@/lib/utils";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
 import { ErrorsConsoleContent } from "@/pages/workflowv2/ErrorsConsoleContent";
-import { RunsConsoleContent } from "@/pages/workflowv2/CanvasRunsView";
+import { RunsConsoleContent } from "@/pages/workflowv2/components/RunsConsoleContent";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 export type ConsoleTab = "runs" | "errors" | "warnings";
