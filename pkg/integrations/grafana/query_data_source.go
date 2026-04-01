@@ -286,7 +286,7 @@ func resolveQueryTimeValue(value string, timezone *string) (string, error) {
 		return fmt.Sprintf("%d", parsed.UTC().UnixMilli()), nil
 	}
 
-	// Preserve Grafana-supported raw values like "now-1h".
+	// Preserve Grafana-supported raw values like "now-2h".
 	return trimmed, nil
 }
 
