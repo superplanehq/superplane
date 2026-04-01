@@ -76,7 +76,12 @@ func (c *GetAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return validateGetAlertRuleSpec(spec)
+	if err := validateGetAlertRuleSpec(spec); err != nil {
+		return err
+	}
+
+	storeAlertRuleNodeMetadata(ctx, spec.AlertRuleUID, "")
+	return nil
 }
 
 func (c *GetAlertRule) Execute(ctx core.ExecutionContext) error {
