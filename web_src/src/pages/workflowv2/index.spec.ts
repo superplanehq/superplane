@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentsComponent, ComponentsNode } from "@/api-client";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
-import { prepareComponentBaseNode } from "./lib/canvasNodePreparation";
-import { renderWorkflowNodeCustomField } from "./lib/renderWorkflowNodeCustomField";
+import { prepareComponentBaseNode } from "./lib/canvas-node-preparation";
+import { renderWorkflowNodeCustomField } from "./lib/render-workflow-node-custom-field";
 
 type FallbackComponentData = {
   renderFallback?: {

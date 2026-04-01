@@ -130,19 +130,19 @@ import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConfli
 import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
-import { prepareAnnotationNode } from "./lib/canvasAnnotationNode";
-import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvasBundle";
+import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
+import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-bundle";
 import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvasNodePreparation";
-import { renderWorkflowNodeCustomField } from "./lib/renderWorkflowNodeCustomField";
+import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
+import { renderWorkflowNodeCustomField } from "./lib/render-workflow-node-custom-field";
 import {
   deleteNodesFromWorkflow,
   groupWorkflowNodes,
   prepareGroupNode,
   ungroupWorkflowNode,
   wireGroupParentChildRelationships,
-} from "./lib/canvasGroups";
+} from "./lib/canvas-groups";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
