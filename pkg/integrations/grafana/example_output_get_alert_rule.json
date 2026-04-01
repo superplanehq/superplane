@@ -1,0 +1,43 @@
+{
+  "data": {
+    "id": 42,
+    "uid": "cergr5pm79hj4d",
+    "orgID": 1,
+    "folderUID": "infra",
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "condition": "A",
+    "data": [
+      {
+        "refId": "A",
+        "queryType": "",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        },
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "refId": "A"
+        }
+      }
+    ],
+    "updated": "2026-03-31T10:20:30Z",
+    "noDataState": "NoData",
+    "execErrState": "Alerting",
+    "for": "5m",
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "isPaused": false
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
