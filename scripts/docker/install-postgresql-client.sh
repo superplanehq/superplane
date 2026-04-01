@@ -13,6 +13,5 @@ curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -fsSL htt
 
 apt-get update -y
 apt-get install --no-install-recommends -y postgresql-client-17
-apt-get purge -y --auto-remove curl gnupg
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/*
