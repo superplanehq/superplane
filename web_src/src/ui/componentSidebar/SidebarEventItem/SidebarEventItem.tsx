@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isCancelledError } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
@@ -88,6 +89,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [executionChainLoading, setExecutionChainLoading] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const executionChainLoadInFlightRef = useRef(false);
 
   const eventStateStyle: EventStateStyle = useMemo(() => {
     if (!getExecutionState) return DEFAULT_EVENT_STATE_MAP["neutral"];
@@ -108,7 +110,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   // Function to load execution chain data lazily
   const loadExecutionChainData = useCallback(
     async (forceReload = false) => {
-      if (!loadExecutionChain || executionChainLoading) return;
+      if (!loadExecutionChain || executionChainLoadInFlightRef.current) return;
 
       if (executionChainData && !forceReload) return;
 
@@ -116,6 +118,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       if (!rootEventId || typeof rootEventId !== "string") return;
 
       try {
+        executionChainLoadInFlightRef.current = true;
         if (!forceReload) {
           setExecutionChainLoading(true);
         }
@@ -179,11 +182,15 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         }) as ExecutionChainItem[];
 
         setExecutionChainData(processedChainData);
-      } catch {
+      } catch (error) {
+        if (isCancelledError(error)) {
+          return;
+        }
         if (!forceReload) {
           setExecutionChainData([]);
         }
       } finally {
+        executionChainLoadInFlightRef.current = false;
         if (!forceReload) {
           setExecutionChainLoading(false);
         }

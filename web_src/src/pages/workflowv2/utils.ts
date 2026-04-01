@@ -3,6 +3,7 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
   ComponentsComponent,
   ComponentsEdge,
@@ -253,7 +254,7 @@ export function mapQueueItemsToSidebarEvents(
 }
 
 export function mapExecutionStateToLogType(
-  execution: CanvasesCanvasNodeExecution,
+  execution: CanvasesCanvasNodeExecutionRef,
   state?: string,
 ): "success" | "error" | "resolved-error" {
   if (execution.resultReason === "RESULT_REASON_ERROR_RESOLVED") {
@@ -262,8 +263,16 @@ export function mapExecutionStateToLogType(
   return state === "error" ? "error" : "success";
 }
 
-export function buildRunItemFromExecution(options: {
-  execution: CanvasesCanvasNodeExecution;
+function getRunItemStateFromRef(executionRef: CanvasesCanvasNodeExecutionRef): string {
+  if (executionRef.state === "STATE_PENDING" || executionRef.state === "STATE_STARTED") return "running";
+  if (executionRef.result === "RESULT_FAILED") return "error";
+  if (executionRef.result === "RESULT_CANCELLED") return "cancelled";
+  if (executionRef.result === "RESULT_PASSED") return "success";
+  return "unknown";
+}
+
+function buildRunItemFromExecutionBase(options: {
+  execution: CanvasesCanvasNodeExecutionRef;
   nodes: ComponentsNode[];
   onNodeSelect: (nodeId: string) => void;
   onExecutionSelect?: (options: {
@@ -274,14 +283,13 @@ export function buildRunItemFromExecution(options: {
   }) => void;
   event?: CanvasesCanvasEvent;
   timestampOverride?: string;
+  resolvedState?: string;
+  timestampFallback?: string;
 }): LogRunItem {
-  const { execution, nodes, onNodeSelect, timestampOverride } = options;
+  const { execution, nodes, onNodeSelect, timestampOverride, resolvedState, timestampFallback } = options;
   const { onExecutionSelect, event } = options;
   const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const componentName = componentNode?.component?.name || "";
-  const stateResolver = getState(componentName);
-  const state = stateResolver(buildExecutionInfo(execution));
-  const executionState = execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : state || "unknown";
+  const executionState = execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : resolvedState;
   const nodeId = componentNode?.id || execution.nodeId || "";
   const detail = execution.resultMessage;
   const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
@@ -325,9 +333,9 @@ export function buildRunItemFromExecution(options: {
 
   return {
     id: execution.id || `${execution.nodeId}-execution`,
-    type: mapExecutionStateToLogType(execution, state),
+    type: mapExecutionStateToLogType(execution, executionState),
     title,
-    timestamp: timestampOverride || execution.updatedAt || execution.createdAt || execution.rootEvent?.createdAt || "",
+    timestamp: timestampOverride || execution.updatedAt || execution.createdAt || timestampFallback || "",
     isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",
     detail,
     searchText: [
@@ -342,6 +350,50 @@ export function buildRunItemFromExecution(options: {
       .filter(Boolean)
       .join(" "),
   };
+}
+
+export function buildRunItemFromExecution(options: {
+  execution: CanvasesCanvasNodeExecution;
+  nodes: ComponentsNode[];
+  onNodeSelect: (nodeId: string) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  event?: CanvasesCanvasEvent;
+  timestampOverride?: string;
+}): LogRunItem {
+  const { execution, nodes } = options;
+  const componentNode = nodes.find((node) => node.id === execution.nodeId);
+  const componentName = componentNode?.component?.name || "";
+  const stateResolver = getState(componentName);
+  const resolvedState = stateResolver(buildExecutionInfo(execution));
+
+  return buildRunItemFromExecutionBase({
+    ...options,
+    execution,
+    resolvedState,
+    timestampFallback: execution.rootEvent?.createdAt || "",
+  });
+}
+
+export function buildRunItemFromExecutionRef(options: {
+  execution: CanvasesCanvasNodeExecutionRef;
+  nodes: ComponentsNode[];
+  onNodeSelect: (nodeId: string) => void;
+  onExecutionSelect?: (options: {
+    nodeId: string;
+    eventId: string;
+    executionId: string;
+    triggerEvent?: SidebarEvent;
+  }) => void;
+  event?: CanvasesCanvasEvent;
+  timestampOverride?: string;
+}): LogRunItem {
+  const state = getRunItemStateFromRef(options.execution);
+  return buildRunItemFromExecutionBase({...options, resolvedState: state});
 }
 
 export function buildRunEntryFromEvent(options: {
@@ -383,8 +435,8 @@ export function mapWorkflowEventsToRunLogEntries(options: {
 
   return events.map((event) => {
     const runItems = (event.executions || []).map((execution) =>
-      buildRunItemFromExecution({
-        execution: execution as CanvasesCanvasNodeExecution,
+      buildRunItemFromExecutionRef({
+        execution,
         nodes,
         onNodeSelect,
         onExecutionSelect,
