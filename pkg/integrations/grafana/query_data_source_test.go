@@ -173,6 +173,98 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		assert.Equal(t, "bfcwd2pm79hj4c", datasource["uid"])
 		assert.Equal(t, "up", query["query"])
 		assert.Equal(t, "up", query["expr"])
+		assert.Equal(t, "now-5m", body["from"])
+		assert.Equal(t, "now", body["to"])
+	})
+
+	t.Run("datetime picker values are converted to unix millis", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataSourceUid": "logs",
+				"query":         "{}",
+				"timeFrom":      "2026-04-01T10:15",
+				"timeTo":        "2026-04-01T11:45",
+				"timezone":      "5",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://grafana.example.com",
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		body := decodeJSONBody(t, httpContext.Requests[0].Body)
+		assert.Equal(t, "1775020500000", body["from"])
+		assert.Equal(t, "1775025900000", body["to"])
+	})
+
+	t.Run("timezone aware timestamps are converted without timezone field", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataSourceUid": "logs",
+				"query":         "{}",
+				"timeFrom":      "2026-04-01T10:15:00+05:00",
+				"timeTo":        "2026-04-01T11:45:00+05:00",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://grafana.example.com",
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		body := decodeJSONBody(t, httpContext.Requests[0].Body)
+		assert.Equal(t, "1775020500000", body["from"])
+		assert.Equal(t, "1775025900000", body["to"])
+	})
+
+	t.Run("datetime picker values require timezone", func(t *testing.T) {
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataSourceUid": "logs",
+				"query":         "{}",
+				"timeFrom":      "2026-04-01T10:15",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://grafana.example.com",
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.ErrorContains(t, err, "timeFrom: timezone is required for datetime-local values")
 	})
 
 	t.Run("defaults time range when missing", func(t *testing.T) {
@@ -240,6 +332,16 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 
 		require.ErrorContains(t, err, "grafana query failed with status 400")
 	})
+}
+
+func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
+	for _, offset := range []string{"5.75", "+5.75", "12.75", "-3.5"} {
+		t.Run(offset, func(t *testing.T) {
+			loc, err := parseGrafanaQueryTimezone(&offset)
+			require.NoError(t, err)
+			require.NotNil(t, loc)
+		})
+	}
 }
 
 func decodeJSONBody(t *testing.T, body io.ReadCloser) map[string]any {
