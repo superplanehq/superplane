@@ -21,7 +21,7 @@ func TestOrganizationAuthMiddleware_CookieAuthErrors(t *testing.T) {
 	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
 	require.NoError(t, err)
 
-	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := OrganizationAuthMiddleware(signer, "")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -72,7 +72,7 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 	r := support.Setup(t)
 	signer := jwt.NewSigner("test-secret")
 
-	handler := OrganizationAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	handler := OrganizationAuthMiddleware(signer, "")(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		user, ok := GetUserFromContext(req.Context())
 		require.True(t, ok)
 		assert.Equal(t, r.User, user.ID)
