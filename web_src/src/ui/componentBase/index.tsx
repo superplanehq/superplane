@@ -127,8 +127,7 @@ export interface ComponentBaseSpec {
   // - value for JSON/text/XML specs (like payload)
   //
   values?: ComponentBaseSpecValue[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value?: any;
+  value?: unknown;
   // Content type for value tooltips (json, xml, or text)
   contentType?: "json" | "xml" | "text";
 }
@@ -274,8 +273,28 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   warning,
   paused,
 }) => {
-  const hasError = error && error.trim() !== "";
-  const hasWarning = warning && warning.trim() !== "";
+  const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
+  const safeSpecs = Array.isArray(specs) ? specs : undefined;
+  const safeEventSections = Array.isArray(eventSections) ? eventSections : undefined;
+  const safeError = typeof error === "string" ? error : "";
+  const safeWarning = typeof warning === "string" ? warning : "";
+  const safeCustomFieldPosition = customFieldPosition === "before" ? "before" : "after";
+  const safeCustomField = React.useMemo(() => {
+    if (typeof customField === "function") {
+      return (onRunHandler?: () => void, nodeId?: string) => {
+        try {
+          return customField(onRunHandler, nodeId) ?? null;
+        } catch (renderError) {
+          console.error("[ComponentBase] customField threw during render:", renderError);
+          return null;
+        }
+      };
+    }
+
+    return customField ?? null;
+  }, [customField]);
+  const hasError = safeError.trim() !== "";
+  const hasWarning = safeWarning.trim() !== "";
   const hasBadge = hasError || hasWarning;
   const PauseIcon = React.useMemo(() => resolveIcon("pause"), []);
   const ResumeIcon = React.useMemo(() => resolveIcon("step-forward"), []);
@@ -286,9 +305,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     [isCompactView],
   );
   const resolvedEventStateMap = eventStateMap ?? DEFAULT_EVENT_STATE_MAP;
-  const compactEventState = eventSections?.[0]?.eventState || "neutral";
+  const compactEventState = safeEventSections?.[0]?.eventState || "neutral";
   const compactStatusBadgeColor =
-    eventSections && eventSections.length > 0
+    safeEventSections && safeEventSections.length > 0
       ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
       : undefined;
 
@@ -382,7 +401,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
                 </div>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="max-w-xs text-sm">{hasError ? error : warning}</p>
+                <p className="max-w-xs text-sm">{hasError ? safeError : safeWarning}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -408,11 +427,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
         {isCompactView ? null : (
           <>
-            {!hideMetadataList && metadata && metadata.length > 0 && <MetadataList items={metadata} />}
+            {!hideMetadataList && safeMetadata && safeMetadata.length > 0 && <MetadataList items={safeMetadata} />}
 
-            {specs && specs.length > 0 && (
+            {safeSpecs && safeSpecs.length > 0 && (
               <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1.5">
-                {specs.map((spec, index) => (
+                {safeSpecs.map((spec, index) => (
                   <div key={index} className="flex items-center text-md text-gray-500">
                     <div className="w-4 h-4 mr-2">
                       {React.createElement(resolveIcon(spec.iconSlug || "list-filter"), { size: 16 })}
@@ -444,34 +463,38 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
               </div>
             )}
 
-            {customFieldPosition === "before" &&
-              (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}
+            {safeCustomFieldPosition === "before" &&
+              (typeof safeCustomField === "function"
+                ? safeCustomField(runDisabled ? undefined : onRun)
+                : safeCustomField || null)}
 
-            {eventSections?.map((section, index) => (
+            {safeEventSections?.map((section, index) => (
               <EventSectionDisplay
                 className={
                   "pb-3" +
-                  (!!includeEmptyState || (!!customField && customFieldPosition === "after")
+                  (!!includeEmptyState || (!!safeCustomField && safeCustomFieldPosition === "after")
                     ? " border-b border-slate-950/20"
                     : "")
                 }
                 key={index}
                 section={section}
                 index={index}
-                totalSections={eventSections.length}
+                totalSections={safeEventSections.length}
                 stateMap={eventStateMap}
                 lastSection={
-                  index === eventSections.length - 1 &&
+                  index === safeEventSections.length - 1 &&
                   !includeEmptyState &&
-                  !(customField && customFieldPosition === "after")
+                  !(safeCustomField && safeCustomFieldPosition === "after")
                 }
               />
             ))}
 
             {includeEmptyState && <EmptyState compact {...emptyStateProps} />}
 
-            {customFieldPosition === "after" &&
-              (typeof customField === "function" ? customField(runDisabled ? undefined : onRun) : customField || null)}
+            {safeCustomFieldPosition === "after" &&
+              (typeof safeCustomField === "function"
+                ? safeCustomField(runDisabled ? undefined : onRun)
+                : safeCustomField || null)}
           </>
         )}
       </div>
