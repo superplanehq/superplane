@@ -67,7 +67,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       suffix=" }}"
       inputSize="md"
       showValuePreview
-      quickTip="Tip: type `{{` to start an expression."
+      quickTip={field.description ? undefined : "Tip: type `{{` to start an expression."}
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}
     />
