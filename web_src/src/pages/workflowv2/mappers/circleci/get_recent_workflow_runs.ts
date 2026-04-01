@@ -10,6 +10,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatDuration } from "@/lib/duration";
 import { stringOrDash } from "../utils";
 import { baseProps } from "./base";
 
@@ -49,18 +50,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function formatDuration(seconds?: number): string {
-  if (seconds === undefined || seconds === null) {
-    return "-";
-  }
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-}
-
 export const getRecentWorkflowRunsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const base = baseProps(context.nodes, context.node, context.componentDefinition, context.lastExecutions);
@@ -87,7 +76,7 @@ export const getRecentWorkflowRunsMapper: ComponentBaseMapper = {
       details["Latest Run ID"] = stringOrDash(latest.id);
       details["Latest Status"] = stringOrDash(latest.status);
       details["Latest Branch"] = stringOrDash(latest.branch);
-      details["Latest Duration"] = formatDuration(latest.duration);
+      details["Latest Duration"] = latest.duration == null ? "-" : formatDuration(latest.duration * 1000);
       details["Latest Credits"] = stringOrDash(latest.creditsUsed);
 
       const succeeded = runs.filter((r) => r.status === "success").length;

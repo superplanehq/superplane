@@ -1,4 +1,4 @@
-import { type RunsStatusFilter } from "@/pages/workflowv2/canvasRunsUtils";
+import { type RunsStatusFilter } from "@/pages/workflowv2/lib/canvas-runs";
 import { cn } from "@/lib/utils";
 
 export function FilterBar({
