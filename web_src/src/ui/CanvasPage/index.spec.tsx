@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { BlockData } from "./Block";
 
 const { captureException } = vi.hoisted(() => ({
   captureException: vi.fn(),
@@ -125,6 +126,21 @@ describe("CanvasNodeErrorBoundary", () => {
     );
 
     expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("keeps the boundary alive when node data has an unknown runtime type", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const invalidNodeData = { label: "Broken", state: "pending", type: "unexpected" } as unknown as BlockData;
+
+    render(
+      <CanvasNodeErrorBoundary nodeId="node-unknown" nodeData={invalidNodeData} fallback={<div>unknown fallback</div>}>
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("unknown fallback")).toBeInTheDocument();
     expect(captureException).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });

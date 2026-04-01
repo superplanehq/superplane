@@ -474,7 +474,9 @@ const NODE_ERROR_LABEL_GETTERS: Record<BlockData["type"], (data: BlockData) => s
 };
 
 function getNodeErrorDisplayName(data: BlockData): string {
-  return NODE_ERROR_LABEL_GETTERS[data.type](data) || getNonEmptyString(data.label) || "unknown";
+  const labelGetter = NODE_ERROR_LABEL_GETTERS[data.type as BlockData["type"]];
+
+  return labelGetter?.(data) || getNonEmptyString(data.label) || "unknown";
 }
 
 function areOutputChannelsEqual(previous: string[] | undefined, next: string[] | undefined) {
