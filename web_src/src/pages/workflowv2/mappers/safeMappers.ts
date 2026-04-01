@@ -30,6 +30,10 @@ function sanitizeString(value: unknown, fallback: string = ""): string {
   return typeof value === "string" ? value : fallback;
 }
 
+function sanitizeNonEmptyString(value: unknown, fallback: string = ""): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
 function sanitizeBoolean(value: unknown, fallback: boolean = false): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
@@ -183,7 +187,7 @@ function buildLastEventData(lastEventData: unknown, fallbackTitle: string): Trig
   const subtitle = lastEventData.subtitle;
 
   return {
-    title: sanitizeString(lastEventData.title, fallbackTitle),
+    title: sanitizeNonEmptyString(lastEventData.title, fallbackTitle),
     subtitle:
       typeof subtitle === "string" || React.isValidElement(subtitle)
         ? (subtitle as NonNullable<TriggerProps["lastEventData"]>["subtitle"])
@@ -227,10 +231,10 @@ export function normalizeTriggerProps(props: TriggerProps | unknown, context: Tr
 
   return {
     ...normalizedComponentProps,
-    title: sanitizeString(record.title, fallbackProps.title),
-    iconSlug: sanitizeString(record.iconSlug, fallbackProps.iconSlug),
+    title: normalizedComponentProps.title,
+    iconSlug: normalizedComponentProps.iconSlug,
     metadata: sanitizeArray(record.metadata) || [],
-    lastEventData: buildLastEventData(record.lastEventData, fallbackProps.title),
+    lastEventData: buildLastEventData(record.lastEventData, normalizedComponentProps.title),
   };
 }
 

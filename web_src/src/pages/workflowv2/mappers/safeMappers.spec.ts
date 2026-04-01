@@ -323,6 +323,24 @@ describe("createSafeTriggerRenderer", () => {
     expect(result.metadata).toEqual([]);
     expect(result.error).toBe("");
   });
+
+  it("preserves fallback trigger title and icon when renderer returns empty strings", () => {
+    const result = normalizeTriggerProps(
+      {
+        title: "",
+        iconSlug: "",
+        metadata: [],
+        lastEventData: {
+          title: "",
+        },
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(result.title).toBe("Test Trigger");
+    expect(result.iconSlug).toBe("bolt");
+    expect(result.lastEventData?.title).toBe("Test Trigger");
+  });
 });
 
 describe("safe mapper canvas resilience", () => {
