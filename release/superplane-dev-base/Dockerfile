@@ -16,7 +16,7 @@ ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
 ENV GOPROXY="https://proxy.golang.org,direct"
-ENV PLAYWRIGHT_BROWSERS_PATH="/app/tmp/ms-playwright"
+ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
 RUN bash scripts/install-go.sh ${GO_VERSION}
 RUN bash scripts/install-nodejs.sh
@@ -43,5 +43,5 @@ COPY go.sum go.sum
 RUN bash /tmp/scripts/retry.sh 6 2s go mod download
 
 # Pre cache Playwright browsers
-RUN mkdir -p /app/tmp/ms-playwright
+RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 RUN bash /tmp/scripts/retry.sh 6 2s playwright install chromium-headless-shell --with-deps

@@ -31,9 +31,6 @@ blocks:
       prologue:
         commands:
           - checkout
-          - mkdir -p tmp/go tmp/go-build
-          - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
-          - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
           - make test.setup
           - make test.start
       jobs:
@@ -71,7 +68,6 @@ blocks:
             - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
-            - "cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright"
 
   - name: "Frontend Build"
     dependencies: []
