@@ -13,11 +13,9 @@ type DurationFormatConstructor = new (
   format(duration: DurationParts): string;
 };
 
-const DurationFormat = (Intl as typeof Intl & { DurationFormat: DurationFormatConstructor }).DurationFormat;
-
-const durationFormatter = new DurationFormat(undefined, {
-  style: "narrow",
-});
+type IntlWithDurationFormat = typeof Intl & {
+  DurationFormat?: DurationFormatConstructor;
+};
 
 function toDurationParts(durationMs: number): DurationParts {
   let remainingMs = Math.max(0, Math.round(durationMs));
@@ -45,6 +43,25 @@ function toDurationParts(durationMs: number): DurationParts {
   return duration;
 }
 
+function formatDurationFallback(duration: DurationParts): string {
+  const parts = [
+    duration.days ? `${duration.days}d` : "",
+    duration.hours ? `${duration.hours}h` : "",
+    duration.minutes ? `${duration.minutes}m` : "",
+    duration.seconds ? `${duration.seconds}s` : "",
+    duration.milliseconds ? `${duration.milliseconds}ms` : "",
+  ].filter(Boolean);
+
+  return parts.join(" ");
+}
+
 export function formatDuration(durationMs: number): string {
-  return durationFormatter.format(toDurationParts(durationMs));
+  const duration = toDurationParts(durationMs);
+  const DurationFormat = (Intl as IntlWithDurationFormat).DurationFormat;
+
+  if (typeof DurationFormat === "function") {
+    return new DurationFormat(undefined, { style: "narrow" }).format(duration);
+  }
+
+  return formatDurationFallback(duration);
 }
