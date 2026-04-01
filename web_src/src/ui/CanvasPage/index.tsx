@@ -33,7 +33,18 @@ import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
+import {
+  Component,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 
 import {
   ConfigurationField,
@@ -72,6 +83,7 @@ import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
+import { Sentry } from "@/sentry";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -378,6 +390,75 @@ const EDGE_STYLE = {
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
 
+function createNodeRenderFallbackData(data: BlockData): BlockData {
+  return {
+    ...data,
+    label: typeof data.label === "string" && data.label.trim() ? data.label : "Component",
+    outputChannels: Array.isArray(data.outputChannels) ? data.outputChannels : undefined,
+    trigger: undefined,
+    component: undefined,
+    composite: undefined,
+    annotation: undefined,
+    group: undefined,
+    renderFallback: {
+      source: "node-render",
+      message: "Unavailable",
+    },
+  };
+}
+
+type CanvasNodeErrorBoundaryProps = {
+  nodeId: string;
+  nodeData: BlockData;
+  fallback: ReactNode;
+  children: ReactNode;
+};
+
+type CanvasNodeErrorBoundaryState = {
+  hasError: boolean;
+};
+
+export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryProps, CanvasNodeErrorBoundaryState> {
+  state: CanvasNodeErrorBoundaryState = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError(): CanvasNodeErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const nodeWithNames = this.props.nodeData as BlockData & { _componentName?: string; _triggerName?: string };
+    const nodeType = this.props.nodeData.type || "unknown";
+    const componentName =
+      nodeWithNames._componentName || nodeWithNames._triggerName || this.props.nodeData.label || "unknown";
+
+    console.error(`[CanvasPage] Node "${this.props.nodeId}" failed to render:`, error);
+
+    Sentry.withScope((scope) => {
+      scope.setTag("canvas.node_id", this.props.nodeId);
+      scope.setTag("canvas.node_type", nodeType);
+      scope.setExtra("componentName", componentName);
+      scope.setExtra("componentStack", errorInfo.componentStack);
+      Sentry.captureException(error);
+    });
+  }
+
+  componentDidUpdate(prevProps: CanvasNodeErrorBoundaryProps) {
+    if (this.state.hasError && (prevProps.nodeId !== this.props.nodeId || prevProps.nodeData !== this.props.nodeData)) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div data-testid="canvas-node-fallback">{this.props.fallback}</div>;
+    }
+
+    return this.props.children;
+  }
+}
+
 /*
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
@@ -389,41 +470,78 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
 }) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
-
-  if (!callbacks) {
-    return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
-  }
-
-  return (
+  const fallback = (
     <Block
-      data={blockData}
+      data={createNodeRenderFallbackData(blockData)}
       nodeId={nodeProps.id}
       selected={nodeProps.selected}
       runDisabled={callbacks?.runDisabled}
       runDisabledTooltip={callbacks?.runDisabledTooltip}
       showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
-      onExpand={callbacks.handleNodeExpand}
-      onClick={(e) => callbacks.handleNodeClick(nodeProps.id, e)}
-      onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
-      onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-      onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
-      onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
-      onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
-      onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
+      onExpand={callbacks?.handleNodeExpand}
+      onClick={callbacks ? (e) => callbacks.handleNodeClick(nodeProps.id, e) : undefined}
+      onEdit={callbacks?.onNodeEdit.current ? () => callbacks.onNodeEdit.current?.(nodeProps.id) : undefined}
+      onDelete={callbacks?.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
+      onRun={callbacks?.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
+      onDuplicate={callbacks?.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
+      onConfigure={callbacks?.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
+      onDeactivate={callbacks?.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
       onTogglePause={
-        callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
+        callbacks?.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
       }
-      onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
+      onToggleView={callbacks?.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
       onToggleCollapse={
-        callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
+        callbacks?.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
       }
       onAnnotationUpdate={
-        callbacks.onAnnotationUpdate.current
+        callbacks?.onAnnotationUpdate.current
           ? (nodeId: string, updates: any) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
           : undefined
       }
-      onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
+      onAnnotationBlur={callbacks?.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
     />
+  );
+
+  if (!callbacks) {
+    return (
+      <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
+        <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />
+      </CanvasNodeErrorBoundary>
+    );
+  }
+
+  return (
+    <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
+      <Block
+        data={blockData}
+        nodeId={nodeProps.id}
+        selected={nodeProps.selected}
+        runDisabled={callbacks?.runDisabled}
+        runDisabledTooltip={callbacks?.runDisabledTooltip}
+        showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
+        onExpand={callbacks.handleNodeExpand}
+        onClick={(e) => callbacks.handleNodeClick(nodeProps.id, e)}
+        onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
+        onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
+        onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
+        onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
+        onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
+        onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
+        onTogglePause={
+          callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
+        }
+        onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
+        onToggleCollapse={
+          callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
+        }
+        onAnnotationUpdate={
+          callbacks.onAnnotationUpdate.current
+            ? (nodeId: string, updates: any) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
+            : undefined
+        }
+        onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
+      />
+    </CanvasNodeErrorBoundary>
   );
 });
 
@@ -449,17 +567,24 @@ const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
   const handleDelete = callbacks?.onNodeDelete?.current
     ? () => callbacks.onNodeDelete.current?.(nodeProps.id)
     : undefined;
+  const fallback = (
+    <div style={{ width: nodeProps.width, height: nodeProps.height }}>
+      <Block data={createNodeRenderFallbackData(blockData)} nodeId={nodeProps.id} selected={nodeProps.selected} />
+    </div>
+  );
 
   return (
-    <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
-      <GroupNode
-        {...groupData}
-        selected={nodeProps.selected}
-        onGroupUpdate={handleGroupUpdate}
-        onUngroup={handleUngroup}
-        onDelete={handleDelete}
-      />
-    </div>
+    <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
+      <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
+        <GroupNode
+          {...groupData}
+          selected={nodeProps.selected}
+          onGroupUpdate={handleGroupUpdate}
+          onUngroup={handleUngroup}
+          onDelete={handleDelete}
+        />
+      </div>
+    </CanvasNodeErrorBoundary>
   );
 });
 
