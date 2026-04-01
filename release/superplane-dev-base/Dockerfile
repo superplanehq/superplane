@@ -1,10 +1,10 @@
 ARG GO_VERSION=1.25.3
-ARG UBUNTU_VERSION=22.04
-ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+ARG PLAYWRIGHT_GO_VERSION=v0.5200.1
 
-FROM ${BUILDER_IMAGE}
+FROM ubuntu:22.04
 
 ARG GO_VERSION
+ARG PLAYWRIGHT_GO_VERSION
 
 WORKDIR /tmp
 
@@ -16,6 +16,7 @@ ENV GOPATH="/go"
 ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
 ENV GOPROXY="https://proxy.golang.org,direct"
+ENV PLAYWRIGHT_BROWSERS_PATH="/app/tmp/ms-playwright"
 
 RUN bash scripts/install-go.sh ${GO_VERSION}
 RUN bash scripts/install-nodejs.sh
@@ -32,5 +33,15 @@ RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/grpc-ecosystem/grpc-ga
 RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/air-verse/air@latest
 RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/mgechev/revive@v1.8.0
 RUN bash /tmp/scripts/retry.sh 6 2s go install gotest.tools/gotestsum@v1.12.3
+RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@${PLAYWRIGHT_GO_VERSION}
 
 WORKDIR /app
+
+# Pre cache Go modules
+COPY go.mod go.mod
+COPY go.sum go.sum
+RUN bash /tmp/scripts/retry.sh 6 2s go mod download
+
+# Pre cache Playwright browsers
+RUN mkdir -p /app/tmp/ms-playwright
+RUN bash /tmp/scripts/retry.sh 6 2s playwright install chromium-headless-shell --with-deps
