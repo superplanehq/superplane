@@ -1,12 +1,7 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev
-
+    image: ghcr.io/superplanehq/superplane-dev-base:v1
     tty: true
-
     command: bash /app/docker-entrypoint.dev.sh
     environment:
       DB_HOST: "db"

@@ -8,25 +8,8 @@ ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 # ----------------------------------------------------------------------------------------------------------------------
 
 FROM ${SUPERPLANE_BASE_IMAGE} AS dev
-
 WORKDIR /app
-
-COPY pkg /app/pkg
-COPY cmd /app/cmd
-COPY go.mod /app/go.mod
-COPY go.sum /app/go.sum
-COPY db/migrations /app/db/migrations
-COPY db/data_migrations /app/db/data_migrations
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
-COPY web_src /app/web_src
-COPY protos /app/protos
-COPY api/swagger /app/api/swagger
-COPY rbac /app/rbac
-COPY templates /app/templates
-COPY test /app/test
-
-CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
+CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Builder stage to create production artifacts.
