@@ -124,6 +124,32 @@ class TestActiveStreamTracker:
 
         asyncio.run(run())
 
+    def test_acquire_is_visible_before_generator_iterates(self) -> None:
+        """Ensure eager acquire() is seen by drain even if the generator hasn't started."""
+
+        async def run() -> None:
+            tracker = repl_web.ActiveStreamTracker(drain_timeout=1.0)
+
+            await tracker.acquire()
+            assert tracker.active_count == 1
+
+            tracker.begin_shutdown()
+            drained = asyncio.Event()
+
+            async def drain() -> None:
+                await tracker.wait_for_drain()
+                drained.set()
+
+            drain_task = asyncio.create_task(drain())
+            await asyncio.sleep(0.05)
+            assert not drained.is_set(), "drain should block while acquire is held"
+
+            await tracker.release()
+            await asyncio.wait_for(drain_task, timeout=1.0)
+            assert drained.is_set()
+
+        asyncio.run(run())
+
 
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
     event = _parse_stream_event(b'data: {"type":"model_delta","content":"hello"}\n')

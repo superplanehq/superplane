@@ -74,18 +74,24 @@ class ActiveStreamTracker:
     def active_count(self) -> int:
         return self._active_count
 
-    @asynccontextmanager
-    async def track_stream(self) -> AsyncIterator[None]:
+    async def acquire(self) -> None:
         async with self._lock:
             self._active_count += 1
             self._drained.clear()
+
+    async def release(self) -> None:
+        async with self._lock:
+            self._active_count -= 1
+            if self._active_count == 0:
+                self._drained.set()
+
+    @asynccontextmanager
+    async def track_stream(self) -> AsyncIterator[None]:
+        await self.acquire()
         try:
             yield
         finally:
-            async with self._lock:
-                self._active_count -= 1
-                if self._active_count == 0:
-                    self._drained.set()
+            await self.release()
 
     def begin_shutdown(self) -> None:
         self._shutting_down = True
@@ -546,23 +552,26 @@ def _create_app() -> FastAPI:
             has_token=bool(_resolve_bearer_token(request)),
         )
 
+        await tracker.acquire()
+
         async def event_generator() -> AsyncIterator[str]:
-            async with tracker.track_stream():
-                try:
-                    async for event in _stream_agent_run(chat_id, payload, request):
-                        if await request.is_disconnected():
-                            _debug_log("client disconnected", chat_id=chat_id)
-                            break
-                        yield _encode_sse_event(event)
-                except Exception as error:
-                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
-                    yield _encode_sse_event(
-                        {
-                            "type": "run_failed",
-                            "error": str(error),
-                        }
-                    )
-                    yield _encode_sse_event({"type": "done"})
+            try:
+                async for event in _stream_agent_run(chat_id, payload, request):
+                    if await request.is_disconnected():
+                        _debug_log("client disconnected", chat_id=chat_id)
+                        break
+                    yield _encode_sse_event(event)
+            except Exception as error:
+                _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                yield _encode_sse_event(
+                    {
+                        "type": "run_failed",
+                        "error": str(error),
+                    }
+                )
+                yield _encode_sse_event({"type": "done"})
+            finally:
+                await tracker.release()
 
         return StreamingResponse(
             event_generator(),
