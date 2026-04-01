@@ -34,3 +34,49 @@ export interface QueryDataSourceConfiguration {
   timezone?: string;
   format?: string;
 }
+
+export interface DashboardSummary {
+  uid?: string;
+  title?: string;
+  url?: string;
+  folderTitle?: string;
+  folderUid?: string;
+  tags?: string[];
+}
+
+export interface PanelSummary {
+  id?: number;
+  title?: string;
+  type?: string;
+}
+
+export interface DashboardDetails {
+  uid?: string;
+  title?: string;
+  slug?: string;
+  url?: string;
+  folderTitle?: string;
+  folderUid?: string;
+  tags?: string[];
+  panels?: PanelSummary[];
+}
+
+export interface DashboardNodeMetadata {
+  dashboardTitle?: string;
+}
+
+export interface SearchDashboardsOutput {
+  dashboards?: DashboardSummary[];
+}
+
+export interface CreateDashboardShareLinkOutput {
+  url?: string;
+  dashboardTitle?: string;
+  dashboardUid?: string;
+}
+
+export interface RenderPanelOutput {
+  imageData?: string;
+  dashboardUid?: string;
+  panelId?: number;
+}

@@ -1,0 +1,24 @@
+{
+  "data": {
+    "dashboards": [
+      {
+        "uid": "cIBgcSjkk",
+        "title": "Production Overview",
+        "url": "/d/cIBgcSjkk/production-overview",
+        "folderTitle": "Platform",
+        "folderUid": "fdg4m1rt63hj8q",
+        "tags": ["production", "platform"]
+      },
+      {
+        "uid": "dJChfTmkk",
+        "title": "Service Latency",
+        "url": "/d/dJChfTmkk/service-latency",
+        "folderTitle": "Platform",
+        "folderUid": "fdg4m1rt63hj8q",
+        "tags": ["latency"]
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.dashboards"
+}
