@@ -121,7 +121,12 @@ function useOktaSSO(organizationId: string | undefined, canUpdate: boolean) {
     if (!canUpdate || !organizationId) return;
     setSamlSaving(true);
     try {
-      const body: { samlIdpSsoUrl?: string; samlIdpIssuer?: string; samlIdpCertificatePem?: string; samlEnabled?: boolean } = {
+      const body: {
+        samlIdpSsoUrl?: string;
+        samlIdpIssuer?: string;
+        samlIdpCertificatePem?: string;
+        samlEnabled?: boolean;
+      } = {
         samlIdpSsoUrl: samlIdpSSOURL.trim(),
         samlIdpIssuer: samlIdpIssuer.trim(),
         samlEnabled,
@@ -183,37 +188,69 @@ function useOktaSSO(organizationId: string | undefined, canUpdate: boolean) {
   };
 
   return {
-    settings, loadError,
-    samlIdpSSOURL, setSamlIdpSSOURL,
-    samlIdpIssuer, setSamlIdpIssuer,
-    samlIdpCertificatePEM, setSamlIdpCertificatePEM,
-    samlEnabled, setSamlEnabled,
-    samlSaving, samlMessage,
-    scimEnabled, setScimEnabled,
-    scimSaving, scimMessage,
-    rotatingToken, newToken, setNewToken,
-    handleSamlSave, handleScimSave, handleRotateToken,
+    settings,
+    loadError,
+    samlIdpSSOURL,
+    setSamlIdpSSOURL,
+    samlIdpIssuer,
+    setSamlIdpIssuer,
+    samlIdpCertificatePEM,
+    setSamlIdpCertificatePEM,
+    samlEnabled,
+    setSamlEnabled,
+    samlSaving,
+    samlMessage,
+    scimEnabled,
+    setScimEnabled,
+    scimSaving,
+    scimMessage,
+    rotatingToken,
+    newToken,
+    setNewToken,
+    handleSamlSave,
+    handleScimSave,
+    handleRotateToken,
   };
 }
 
 type SAMLSectionProps = {
-  samlIdpSSOURL: string; setSamlIdpSSOURL: (v: string) => void;
-  samlIdpIssuer: string; setSamlIdpIssuer: (v: string) => void;
-  samlIdpCertificatePEM: string; setSamlIdpCertificatePEM: (v: string) => void;
-  samlEnabled: boolean; setSamlEnabled: (v: boolean) => void;
-  samlSaving: boolean; samlMessage: string | null;
-  certConfigured: boolean; acsURL: string; entityID: string; loginURL: string;
-  canUpdate: boolean; permissionsLoading: boolean; onSave: () => void;
+  samlIdpSSOURL: string;
+  setSamlIdpSSOURL: (v: string) => void;
+  samlIdpIssuer: string;
+  setSamlIdpIssuer: (v: string) => void;
+  samlIdpCertificatePEM: string;
+  setSamlIdpCertificatePEM: (v: string) => void;
+  samlEnabled: boolean;
+  setSamlEnabled: (v: boolean) => void;
+  samlSaving: boolean;
+  samlMessage: string | null;
+  certConfigured: boolean;
+  acsURL: string;
+  entityID: string;
+  loginURL: string;
+  canUpdate: boolean;
+  permissionsLoading: boolean;
+  onSave: () => void;
 };
 
 function SAMLSection({
-  samlIdpSSOURL, setSamlIdpSSOURL,
-  samlIdpIssuer, setSamlIdpIssuer,
-  samlIdpCertificatePEM, setSamlIdpCertificatePEM,
-  samlEnabled, setSamlEnabled,
-  samlSaving, samlMessage,
-  certConfigured, acsURL, entityID, loginURL,
-  canUpdate, permissionsLoading, onSave,
+  samlIdpSSOURL,
+  setSamlIdpSSOURL,
+  samlIdpIssuer,
+  setSamlIdpIssuer,
+  samlIdpCertificatePEM,
+  setSamlIdpCertificatePEM,
+  samlEnabled,
+  setSamlEnabled,
+  samlSaving,
+  samlMessage,
+  certConfigured,
+  acsURL,
+  entityID,
+  loginURL,
+  canUpdate,
+  permissionsLoading,
+  onSave,
 }: SAMLSectionProps) {
   return (
     <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
@@ -221,8 +258,8 @@ function SAMLSection({
         <p className="text-sm font-semibold text-gray-800 dark:text-white">SAML Sign-In</p>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
           Allow members to log in via Okta SAML 2.0. Paste the values from Okta&apos;s{" "}
-          <em>View SAML setup instructions</em> panel, then copy the ACS URL and SP Entity ID into your Okta
-          app&apos;s SAML settings.
+          <em>View SAML setup instructions</em> panel, then copy the ACS URL and SP Entity ID into your Okta app&apos;s
+          SAML settings.
         </p>
       </div>
       <Field className="space-y-1.5">
@@ -268,7 +305,9 @@ function SAMLSection({
         </p>
         <div className="flex items-center gap-2 max-w-sm">
           <Input type="text" value={acsURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(acsURL)}>Copy</Button>
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(acsURL)}>
+            Copy
+          </Button>
         </div>
       </Field>
       <Field className="space-y-1.5">
@@ -278,7 +317,9 @@ function SAMLSection({
         </p>
         <div className="flex items-center gap-2 max-w-sm">
           <Input type="text" value={entityID} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(entityID)}>Copy</Button>
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(entityID)}>
+            Copy
+          </Button>
         </div>
       </Field>
       <Field className="space-y-1.5">
@@ -288,7 +329,9 @@ function SAMLSection({
         </p>
         <div className="flex items-center gap-2 max-w-sm">
           <Input type="text" value={loginURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-          <Button type="button" variant="outline" onClick={() => copyToClipboard(loginURL)}>Copy</Button>
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(loginURL)}>
+            Copy
+          </Button>
         </div>
       </Field>
       <Field>
@@ -324,16 +367,29 @@ function SAMLSection({
 }
 
 function SCIMSection({
-  scimEnabled, setScimEnabled,
-  scimSaving, scimMessage,
-  rotatingToken, tokenConfigured, scimBaseURL,
-  canUpdate, permissionsLoading, onSave, onRotateToken,
+  scimEnabled,
+  setScimEnabled,
+  scimSaving,
+  scimMessage,
+  rotatingToken,
+  tokenConfigured,
+  scimBaseURL,
+  canUpdate,
+  permissionsLoading,
+  onSave,
+  onRotateToken,
 }: {
-  scimEnabled: boolean; setScimEnabled: (v: boolean) => void;
-  scimSaving: boolean; scimMessage: string | null;
-  rotatingToken: boolean; tokenConfigured: boolean; scimBaseURL: string;
-  canUpdate: boolean; permissionsLoading: boolean;
-  onSave: () => void; onRotateToken: () => void;
+  scimEnabled: boolean;
+  setScimEnabled: (v: boolean) => void;
+  scimSaving: boolean;
+  scimMessage: string | null;
+  rotatingToken: boolean;
+  tokenConfigured: boolean;
+  scimBaseURL: string;
+  canUpdate: boolean;
+  permissionsLoading: boolean;
+  onSave: () => void;
+  onRotateToken: () => void;
 }) {
   return (
     <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">

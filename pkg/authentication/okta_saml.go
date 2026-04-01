@@ -133,6 +133,20 @@ func (a *Handler) handleOktaSAMLACS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	org, err := models.FindOrganizationByID(orgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "organization not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !org.IsProviderAllowed(models.ProviderOkta) {
+		http.Error(w, "Okta sign-in is not enabled for this organization", http.StatusForbidden)
+		return
+	}
+
 	idp, err := models.FindOrganizationOktaIDPByOrganizationID(orgID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
