@@ -83,7 +83,7 @@ import { CanvasPageState, useCanvasState } from "./useCanvasState";
 import { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
-import { countUnacknowledgedErrors } from "@/pages/workflowv2/canvasRunsUtils";
+import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { Sentry } from "@/sentry";
 
 export interface SidebarData {

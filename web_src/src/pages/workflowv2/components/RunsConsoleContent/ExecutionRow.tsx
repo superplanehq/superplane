@@ -1,4 +1,5 @@
 import type { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
 import { handleKeyboardActivation } from "@/lib/utils";
 import { RUNS_CONSOLE_BADGE_COL } from "./constants";
@@ -6,10 +7,9 @@ import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";
 import {
   computeDuration,
-  formatRunTimestamp,
   resolveExecutionDisplayStatus,
   resolveNodeIconSlug,
-} from "../../canvasRunsUtils";
+} from "@/pages/workflowv2/lib/canvas-runs";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 
 export function ExecutionRow({
@@ -25,7 +25,7 @@ export function ExecutionRow({
   nodes: ComponentsNode[];
   onSelect?: () => void;
 }) {
-  const { nodeName, iconSrc, iconSlug, status, duration, errorMessage, timestamp } = resolveExecutionRowData(
+  const { nodeName, iconSrc, iconSlug, status, duration, errorMessage } = resolveExecutionRowData(
     execution,
     node,
     componentIconMap,
@@ -54,7 +54,11 @@ export function ExecutionRow({
         {duration && <span className="text-xs text-gray-500 tabular-nums">{duration}</span>}
       </div>
       {errorMessage && <span className="text-xs text-red-600 truncate max-w-[300px]">{errorMessage}</span>}
-      {timestamp && <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">{timestamp}</span>}
+      {execution.createdAt && (
+        <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
+          <TimeAgo date={execution.createdAt} />
+        </span>
+      )}
     </div>
   );
 }
@@ -72,6 +76,5 @@ function resolveExecutionRowData(
     status: resolveExecutionDisplayStatus(execution, nodes),
     duration: computeDuration(execution),
     errorMessage: execution.result === "RESULT_FAILED" ? execution.resultMessage : undefined,
-    timestamp: execution.createdAt ? formatRunTimestamp(execution.createdAt) : undefined,
   };
 }
