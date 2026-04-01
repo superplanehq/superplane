@@ -95,17 +95,17 @@ func (c *CreateSilence) Configuration() []configuration.Field {
 						Type: configuration.FieldTypeObject,
 						Schema: []configuration.Field{
 							{
-								Name:     "name",
-								Label:    "Label Name",
-								Type:     configuration.FieldTypeString,
-								Required: true,
+								Name:        "name",
+								Label:       "Label Name",
+								Type:        configuration.FieldTypeString,
+								Required:    true,
 								Description: "Label name",
 							},
 							{
-								Name:     "value",
-								Label:    "Label Value",
-								Type:     configuration.FieldTypeString,
-								Required: true,
+								Name:        "value",
+								Label:       "Label Value",
+								Type:        configuration.FieldTypeString,
+								Required:    true,
 								Description: "Label value",
 							},
 							{
@@ -178,22 +178,25 @@ func (c *CreateSilence) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	const dtFormat = "2006-01-02T15:04"
-	startsAt, err := time.Parse(dtFormat, strings.TrimSpace(spec.StartsAt))
+	startsAt, err := parseSilenceInstant(spec.StartsAt)
 	if err != nil {
 		return fmt.Errorf("invalid startsAt %q: %w", spec.StartsAt, err)
 	}
 
-	endsAt, err := time.Parse(dtFormat, strings.TrimSpace(spec.EndsAt))
+	endsAt, err := parseSilenceInstant(spec.EndsAt)
 	if err != nil {
 		return fmt.Errorf("invalid endsAt %q: %w", spec.EndsAt, err)
+	}
+
+	if !endsAt.After(startsAt) {
+		return fmt.Errorf("endsAt must be after startsAt")
 	}
 
 	matchers := make([]SilenceMatcher, 0, len(spec.Matchers))
 	for _, m := range spec.Matchers {
 		matchers = append(matchers, SilenceMatcher{
-			Name:    m.Name,
-			Value:   m.Value,
+			Name:    strings.TrimSpace(m.Name),
+			Value:   strings.TrimSpace(m.Value),
 			IsRegex: m.IsRegex,
 			IsEqual: true,
 		})
@@ -255,6 +258,7 @@ func decodeCreateSilenceSpec(config any) (CreateSilenceSpec, error) {
 	spec := CreateSilenceSpec{}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           &spec,
+		TagName:          "mapstructure",
 		WeaklyTypedInput: true,
 	})
 	if err != nil {
@@ -270,6 +274,14 @@ func validateCreateSilenceSpec(spec CreateSilenceSpec) error {
 	if len(spec.Matchers) == 0 {
 		return errors.New("at least one matcher is required")
 	}
+	for i, m := range spec.Matchers {
+		if strings.TrimSpace(m.Name) == "" {
+			return fmt.Errorf("matcher %d: name is required", i+1)
+		}
+		if strings.TrimSpace(m.Value) == "" {
+			return fmt.Errorf("matcher %d: value is required", i+1)
+		}
+	}
 	if strings.TrimSpace(spec.StartsAt) == "" {
 		return errors.New("startsAt is required")
 	}
@@ -280,4 +292,21 @@ func validateCreateSilenceSpec(spec CreateSilenceSpec) error {
 		return errors.New("comment is required")
 	}
 	return nil
+}
+
+// parseSilenceInstant accepts RFC3339/RFC3339Nano or local wall time "2006-01-02T15:04" (server local TZ).
+func parseSilenceInstant(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, errors.New("empty time")
+	}
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+		return t, nil
+	}
+
+	const localLayout = "2006-01-02T15:04"
+	return time.ParseInLocation(localLayout, s, time.Local)
 }

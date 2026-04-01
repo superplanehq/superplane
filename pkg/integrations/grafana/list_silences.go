@@ -132,6 +132,7 @@ func decodeListSilencesSpec(config any) (ListSilencesSpec, error) {
 	spec := ListSilencesSpec{}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           &spec,
+		TagName:          "mapstructure",
 		WeaklyTypedInput: true,
 	})
 	if err != nil {
@@ -142,4 +143,3 @@ func decodeListSilencesSpec(config any) (ListSilencesSpec, error) {
 	}
 	return spec, nil
 }
-

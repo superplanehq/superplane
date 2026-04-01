@@ -99,14 +99,15 @@ func (d *DeleteSilence) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	if err := client.DeleteSilence(strings.TrimSpace(spec.SilenceID)); err != nil {
+	silenceID := strings.TrimSpace(spec.SilenceID)
+	if err := client.DeleteSilence(silenceID); err != nil {
 		return fmt.Errorf("error deleting silence: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.silence.deleted",
-		[]any{DeleteSilenceOutput{SilenceID: spec.SilenceID, Deleted: true}},
+		[]any{DeleteSilenceOutput{SilenceID: silenceID, Deleted: true}},
 	)
 }
 
@@ -138,6 +139,7 @@ func decodeDeleteSilenceSpec(config any) (DeleteSilenceSpec, error) {
 	spec := DeleteSilenceSpec{}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           &spec,
+		TagName:          "mapstructure",
 		WeaklyTypedInput: true,
 	})
 	if err != nil {

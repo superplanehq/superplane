@@ -134,6 +134,7 @@ func decodeGetSilenceSpec(config any) (GetSilenceSpec, error) {
 	spec := GetSilenceSpec{}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           &spec,
+		TagName:          "mapstructure",
 		WeaklyTypedInput: true,
 	})
 	if err != nil {

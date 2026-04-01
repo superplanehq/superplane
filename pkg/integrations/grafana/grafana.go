@@ -62,7 +62,7 @@ func (g *Grafana) Configuration() []configuration.Field {
 			Name:        "apiToken",
 			Label:       "Service Account Token",
 			Type:        configuration.FieldTypeString,
-			Description: "Grafana service account token with access to query data sources and manage alerting webhooks",
+			Description: "Grafana service account token with access to query data sources, unified alerting webhooks, and Alertmanager silences",
 			Sensitive:   true,
 			Required:    false,
 		},

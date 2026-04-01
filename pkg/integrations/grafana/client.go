@@ -35,13 +35,13 @@ type DataSource struct {
 }
 
 type Silence struct {
-	ID        string        `json:"id"`
-	Status    SilenceStatus `json:"status"`
-	Comment   string        `json:"comment"`
-	CreatedBy string        `json:"createdBy"`
-	StartsAt  string        `json:"startsAt"`
-	EndsAt    string        `json:"endsAt"`
-	UpdatedAt string        `json:"updatedAt"`
+	ID        string           `json:"id"`
+	Status    SilenceStatus    `json:"status"`
+	Comment   string           `json:"comment"`
+	CreatedBy string           `json:"createdBy"`
+	StartsAt  string           `json:"startsAt"`
+	EndsAt    string           `json:"endsAt"`
+	UpdatedAt string           `json:"updatedAt"`
 	Matchers  []SilenceMatcher `json:"matchers"`
 }
 
@@ -570,8 +570,10 @@ func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
 
 func (c *Client) ListSilences(filter string) ([]Silence, error) {
 	path := "/api/alertmanager/grafana/api/v2/silences"
-	if strings.TrimSpace(filter) != "" {
-		path = fmt.Sprintf("%s?filter=%s", path, url.QueryEscape(strings.TrimSpace(filter)))
+	if f := strings.TrimSpace(filter); f != "" {
+		q := url.Values{}
+		q.Set("filter", f)
+		path = path + "?" + q.Encode()
 	}
 
 	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
@@ -594,7 +596,7 @@ func (c *Client) ListSilences(filter string) ([]Silence, error) {
 func (c *Client) GetSilence(id string) (*Silence, error) {
 	responseBody, status, err := c.execRequest(
 		http.MethodGet,
-		fmt.Sprintf("/api/alertmanager/grafana/api/v2/silences/%s", url.PathEscape(id)),
+		fmt.Sprintf("/api/alertmanager/grafana/api/v2/silence/%s", url.PathEscape(id)),
 		nil, "",
 	)
 	if err != nil {
@@ -645,20 +647,36 @@ func (c *Client) CreateSilence(matchers []SilenceMatcher, startsAt, endsAt, comm
 		return "", newAPIStatusError("grafana silence create", status, responseBody)
 	}
 
+	id, err := parseCreateSilenceResponseBody(responseBody)
+	if err != nil {
+		return "", err
+	}
+
+	return id, nil
+}
+
+func parseCreateSilenceResponseBody(responseBody []byte) (string, error) {
 	var result struct {
 		SilenceID string `json:"silenceID"`
+		SilenceId string `json:"silenceId"`
 	}
 	if err := json.Unmarshal(responseBody, &result); err != nil {
 		return "", fmt.Errorf("error parsing create silence response: %v", err)
 	}
+	if id := strings.TrimSpace(result.SilenceID); id != "" {
+		return id, nil
+	}
+	if id := strings.TrimSpace(result.SilenceId); id != "" {
+		return id, nil
+	}
 
-	return result.SilenceID, nil
+	return "", fmt.Errorf("create silence response missing silence id")
 }
 
 func (c *Client) DeleteSilence(id string) error {
 	responseBody, status, err := c.execRequest(
 		http.MethodDelete,
-		fmt.Sprintf("/api/alertmanager/grafana/api/v2/silences/%s", url.PathEscape(id)),
+		fmt.Sprintf("/api/alertmanager/grafana/api/v2/silence/%s", url.PathEscape(id)),
 		nil, "",
 	)
 	if err != nil {

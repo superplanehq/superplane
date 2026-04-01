@@ -69,9 +69,7 @@ export const listSilencesMapper: ComponentBaseMapper = {
     const output = payload?.data as ListSilencesOutput | undefined;
     const count = output?.silences?.length ?? 0;
 
-    const timeAgo = context.execution.createdAt
-      ? renderTimeAgo(new Date(context.execution.createdAt))
-      : "-";
+    const timeAgo = context.execution.createdAt ? renderTimeAgo(new Date(context.execution.createdAt)) : "-";
 
     return (
       <span>
