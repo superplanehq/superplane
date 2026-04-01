@@ -50,7 +50,13 @@ function getSingleChannelHighlight(args: {
   allEdges: BlockEdgeState[];
 }) {
   const { hoveredEdge, connectingFrom, nodeId, channel, allEdges } = args;
-  const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, nodeId, connectingFrom?.nodeId, channel);
+  const isAlreadyConnected = isAlreadyConnectedToNode(
+    allEdges,
+    connectingFrom,
+    nodeId,
+    connectingFrom?.nodeId,
+    channel,
+  );
 
   return (
     (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||

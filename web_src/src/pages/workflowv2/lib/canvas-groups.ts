@@ -165,7 +165,7 @@ export function wireGroupParentChildRelationships(workflow: CanvasesCanvas, node
   ];
 }
 
-export function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
+function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
   const label = node.name || "Group";
 
   return {
@@ -181,10 +181,7 @@ export function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
   };
 }
 
-export function computeGroupSize(
-  groupNode: ComponentsNode,
-  allNodes: ComponentsNode[],
-): { width: number; height: number } {
+function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[]): { width: number; height: number } {
   const childIds = collectGroupChildIds(groupNode);
   if (childIds.length === 0) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
 
