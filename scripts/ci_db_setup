@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DB_PASSWORD="${DB_PASSWORD:-the-cake-is-a-lie}"
+
+psql -h db -p 5432 -U postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION" || true
+psql -h db -p 5432 -U postgres -c "ALTER DATABASE postgres REFRESH COLLATION VERSION" || true
+
+createdb -h db -p 5432 -U postgres superplane_test || true
+createdb -h db -p 5432 -U postgres agents_test || true
+
+psql -h db -p 5432 -U postgres superplane_test -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+
+migrate -source file://db/migrations -database "postgres://postgres:${DB_PASSWORD}@db:5432/superplane_test?sslmode=disable" up
+migrate -source file://db/data_migrations -database "postgres://postgres:${DB_PASSWORD}@db:5432/superplane_test?sslmode=disable&x-migrations-table=data_migrations" up
+migrate -source file://agent/db/migrations -database "postgres://postgres:${DB_PASSWORD}@db:5432/agents_test?sslmode=disable" up
