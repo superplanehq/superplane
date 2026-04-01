@@ -21,14 +21,14 @@ var _ MappedNullable = &CanvasesCanvasEventWithExecutions{}
 
 // CanvasesCanvasEventWithExecutions struct for CanvasesCanvasEventWithExecutions
 type CanvasesCanvasEventWithExecutions struct {
-	Id         *string                       `json:"id,omitempty"`
-	CanvasId   *string                       `json:"canvasId,omitempty"`
-	NodeId     *string                       `json:"nodeId,omitempty"`
-	Channel    *string                       `json:"channel,omitempty"`
-	Data       map[string]interface{}        `json:"data,omitempty"`
-	CreatedAt  *time.Time                    `json:"createdAt,omitempty"`
-	Executions []CanvasesCanvasNodeExecution `json:"executions,omitempty"`
-	CustomName *string                       `json:"customName,omitempty"`
+	Id         *string                          `json:"id,omitempty"`
+	CanvasId   *string                          `json:"canvasId,omitempty"`
+	NodeId     *string                          `json:"nodeId,omitempty"`
+	Channel    *string                          `json:"channel,omitempty"`
+	Data       map[string]interface{}           `json:"data,omitempty"`
+	CreatedAt  *time.Time                       `json:"createdAt,omitempty"`
+	Executions []CanvasesCanvasNodeExecutionRef `json:"executions,omitempty"`
+	CustomName *string                          `json:"customName,omitempty"`
 }
 
 // NewCanvasesCanvasEventWithExecutions instantiates a new CanvasesCanvasEventWithExecutions object
@@ -241,9 +241,9 @@ func (o *CanvasesCanvasEventWithExecutions) SetCreatedAt(v time.Time) {
 }
 
 // GetExecutions returns the Executions field value if set, zero value otherwise.
-func (o *CanvasesCanvasEventWithExecutions) GetExecutions() []CanvasesCanvasNodeExecution {
+func (o *CanvasesCanvasEventWithExecutions) GetExecutions() []CanvasesCanvasNodeExecutionRef {
 	if o == nil || IsNil(o.Executions) {
-		var ret []CanvasesCanvasNodeExecution
+		var ret []CanvasesCanvasNodeExecutionRef
 		return ret
 	}
 	return o.Executions
@@ -251,7 +251,7 @@ func (o *CanvasesCanvasEventWithExecutions) GetExecutions() []CanvasesCanvasNode
 
 // GetExecutionsOk returns a tuple with the Executions field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasEventWithExecutions) GetExecutionsOk() ([]CanvasesCanvasNodeExecution, bool) {
+func (o *CanvasesCanvasEventWithExecutions) GetExecutionsOk() ([]CanvasesCanvasNodeExecutionRef, bool) {
 	if o == nil || IsNil(o.Executions) {
 		return nil, false
 	}
@@ -267,8 +267,8 @@ func (o *CanvasesCanvasEventWithExecutions) HasExecutions() bool {
 	return false
 }
 
-// SetExecutions gets a reference to the given []CanvasesCanvasNodeExecution and assigns it to the Executions field.
-func (o *CanvasesCanvasEventWithExecutions) SetExecutions(v []CanvasesCanvasNodeExecution) {
+// SetExecutions gets a reference to the given []CanvasesCanvasNodeExecutionRef and assigns it to the Executions field.
+func (o *CanvasesCanvasEventWithExecutions) SetExecutions(v []CanvasesCanvasNodeExecutionRef) {
 	o.Executions = v
 }
 
