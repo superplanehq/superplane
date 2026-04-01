@@ -10,6 +10,7 @@ import (
 )
 
 const resourceTypeDataSource = "data-source"
+const resourceTypeAlertRule = "alert-rule"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -30,7 +31,7 @@ func (g *Grafana) Icon() string {
 }
 
 func (g *Grafana) Description() string {
-	return "Connect Grafana alerts and data queries to SuperPlane workflows"
+	return "Connect Grafana alerts, alert rules, and data queries to SuperPlane workflows"
 }
 
 func (g *Grafana) Instructions() string {
@@ -79,7 +80,12 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
+		&CreateAlertRule{},
+		&DeleteAlertRule{},
+		&GetAlertRule{},
+		&ListAlertRules{},
 		&QueryDataSource{},
+		&UpdateAlertRule{},
 	}
 }
 
@@ -107,7 +113,10 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeDataSource {
+	switch resourceType {
+	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule:
+		// Known types require a Grafana API client.
+	default:
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -116,29 +125,86 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		return nil, fmt.Errorf("error creating client: %w", err)
 	}
 
-	dataSources, err := client.ListDataSources()
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(dataSources))
-	for _, source := range dataSources {
-		id := strings.TrimSpace(source.UID)
-		if id == "" {
-			continue
+	switch resourceType {
+	case resourceTypeFolder:
+		folders, err := client.ListFolders()
+		if err != nil {
+			return nil, err
 		}
 
-		name := strings.TrimSpace(source.Name)
-		if name == "" {
-			name = id
+		resources := make([]core.IntegrationResource, 0, len(folders))
+		for _, folder := range folders {
+			id := strings.TrimSpace(folder.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(folder.Title)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeFolder,
+				Name: name,
+				ID:   id,
+			})
 		}
 
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceTypeDataSource,
-			Name: name,
-			ID:   id,
-		})
+		return resources, nil
+	case resourceTypeDataSource:
+		dataSources, err := client.ListDataSources()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(dataSources))
+		for _, source := range dataSources {
+			id := strings.TrimSpace(source.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(source.Name)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeDataSource,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+	case resourceTypeAlertRule:
+		alertRules, err := client.ListAlertRules()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(alertRules))
+		for _, rule := range alertRules {
+			id := strings.TrimSpace(rule.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(rule.Title)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeAlertRule,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
 	}
 
-	return resources, nil
+	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
 }
