@@ -33,10 +33,16 @@ func (c *ListQueueItemsCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		items := response.GetItems()
+		if len(items) == 0 {
+			_, err := fmt.Fprintln(stdout, "No queue items found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tCREATED_AT\tROOT_EVENT_ID\tSOURCE")
 
-		for _, item := range response.GetItems() {
+		for _, item := range items {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\n",

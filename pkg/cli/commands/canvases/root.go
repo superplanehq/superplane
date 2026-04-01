@@ -209,11 +209,19 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	changeRequestsCmd.AddCommand(changeRequestsPublishCmd)
 	changeRequestsCmd.AddCommand(changeRequestsResolveCmd)
 
+	deleteCmd := &cobra.Command{
+		Use:   "delete <name-or-id>",
+		Short: "Delete a canvas",
+		Args:  cobra.ExactArgs(1),
+	}
+	core.Bind(deleteCmd, &deleteCommand{}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root
