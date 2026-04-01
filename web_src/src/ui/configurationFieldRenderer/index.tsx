@@ -97,6 +97,14 @@ function getInitialPrimitiveToggleValue(field: ConfigurationField, parsedDefault
   return undefined;
 }
 
+function getSecretKeyPlaceholder(field: ConfigurationField, isRequired: boolean): string {
+  if (!isRequired) {
+    return "None";
+  }
+
+  return field.placeholder ?? "Select credential";
+}
+
 function getInitialTogglableValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
   if (field.type === "select") {
     return getInitialSelectValue(field, parsedDefaultValue);
@@ -418,7 +426,7 @@ export const ConfigurationFieldRenderer = ({
             value={value as SecretKeyRefValue}
             onChange={(v) => onChange(v)}
             organizationId={organizationId ?? domainId}
-            placeholder={field.placeholder ?? "Select credential"}
+            placeholder={getSecretKeyPlaceholder(field, isRequired)}
             allowClear={!isRequired}
           />
         );
