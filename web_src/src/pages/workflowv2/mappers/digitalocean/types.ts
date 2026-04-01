@@ -229,3 +229,40 @@ export interface UpdateAppConfiguration {
   envVars?: string[];
   gitHubBranch?: string;
 }
+
+export interface CreateKnowledgeBaseConfiguration {
+  name: string;
+  embeddingModelUUID: string;
+  region: string;
+  projectId: string;
+  tags?: string[];
+  databaseOption?: string;
+  databaseId?: string;
+  dataSources?: KnowledgeBaseDataSource[];
+}
+
+export interface KnowledgeBaseDataSource {
+  type: "spaces" | "web";
+  spacesBucket?: string;
+  spacesRegion?: string;
+  webURL?: string;
+  crawlType?: string;
+  crawlingOption?: string;
+  webEmbedMedia?: boolean;
+  chunkingAlgorithm?: string;
+  maxChunkSize?: number;
+  semanticThreshold?: number;
+  parentChunkSize?: number;
+  childChunkSize?: number;
+}
+
+export interface CreateKnowledgeBaseOutput {
+  uuid?: string;
+  name?: string;
+  region?: string;
+  embeddingModelUUID?: string;
+  projectId?: string;
+  databaseId?: string;
+  tags?: string[];
+  createdAt?: string;
+}
