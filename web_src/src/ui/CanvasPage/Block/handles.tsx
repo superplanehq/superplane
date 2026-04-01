@@ -14,16 +14,17 @@ const HANDLE_STYLE = {
 function isAlreadyConnectedToNode(
   edges: BlockEdgeState[],
   connection: BlockConnectionState | undefined,
+  sourceNodeId: string | undefined,
   targetNodeId: string | undefined,
   sourceHandle?: string | null,
 ) {
-  if (!connection) {
+  if (!connection || !sourceNodeId || !targetNodeId) {
     return false;
   }
 
   return edges.some(
     (edge) =>
-      edge.source === connection.nodeId &&
+      edge.source === sourceNodeId &&
       edge.sourceHandle === (sourceHandle ?? connection.handleId) &&
       edge.target === targetNodeId,
   );
@@ -49,7 +50,7 @@ function getSingleChannelHighlight(args: {
   allEdges: BlockEdgeState[];
 }) {
   const { hoveredEdge, connectingFrom, nodeId, channel, allEdges } = args;
-  const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, connectingFrom?.nodeId, channel);
+  const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, nodeId, connectingFrom?.nodeId, channel);
 
   return (
     (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
@@ -106,7 +107,13 @@ function getChannelHighlightResolver(args: {
   const { hoveredEdge, connectingFrom, nodeId, allEdges } = args;
 
   return (channel: string) => {
-    const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, connectingFrom?.nodeId, channel);
+    const isAlreadyConnected = isAlreadyConnectedToNode(
+      allEdges,
+      connectingFrom,
+      nodeId,
+      connectingFrom?.nodeId,
+      channel,
+    );
 
     return (
       (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
@@ -231,7 +238,12 @@ export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">
 
   const hoveredEdge = data._hoveredEdge;
   const connectingFrom = data._connectingFrom;
-  const isAlreadyConnected = isAlreadyConnectedToNode(getBlockEdges(data), connectingFrom, nodeId);
+  const isAlreadyConnected = isAlreadyConnectedToNode(
+    getBlockEdges(data),
+    connectingFrom,
+    connectingFrom?.nodeId,
+    nodeId,
+  );
   const isHighlighted =
     (hoveredEdge && hoveredEdge.target === nodeId) ||
     (connectingFrom &&
