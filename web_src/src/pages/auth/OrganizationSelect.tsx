@@ -184,9 +184,11 @@ const OrganizationSelect: React.FC = () => {
             <div className="text-left py-2 mb-4 space-y-1">
               <Text className="font-medium text-gray-800 block">You're not a member of any organizations yet.</Text>
               <Text className="font-medium text-gray-800 block">
-                {createOrganizationDisabled
-                  ? "This account has reached its organization limit."
-                  : "Create a new organization to get started!"}
+                {account?.managed_account
+                  ? "Ask your administrator to assign you to an organization in SuperPlane."
+                  : createOrganizationDisabled
+                    ? "This account has reached its organization limit."
+                    : "Create a new organization to get started!"}
               </Text>
             </div>
           )}
@@ -225,24 +227,26 @@ const OrganizationSelect: React.FC = () => {
               </li>
             ))}
 
-            <li>
-              {createOrganizationDisabled ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className={createOrganizationDisabledClasses} aria-disabled tabIndex={0}>
-                      {createOrganizationInner}
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    {createOrganizationTooltip}
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Link to="/create" className={createOrganizationEnabledClasses} aria-label="Create new organization">
-                  {createOrganizationInner}
-                </Link>
-              )}
-            </li>
+            {!account?.managed_account && (
+              <li>
+                {createOrganizationDisabled ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={createOrganizationDisabledClasses} aria-disabled tabIndex={0}>
+                        {createOrganizationInner}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      {createOrganizationTooltip}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Link to="/create" className={createOrganizationEnabledClasses} aria-label="Create new organization">
+                    {createOrganizationInner}
+                  </Link>
+                )}
+              </li>
+            )}
           </ul>
         </div>
       </div>
