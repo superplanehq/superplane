@@ -18,10 +18,8 @@ global_job_config:
 
   prologue:
     commands:
-      - git clone https://github.com/superplanehq/superplane.git
-      - cd superplane
+      - checkout
       - touch agent/.env
-      - git checkout "$REL_VERSION"
       - echo "$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
 
 blocks:
