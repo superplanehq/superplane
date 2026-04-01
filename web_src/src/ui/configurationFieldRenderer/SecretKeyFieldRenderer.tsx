@@ -5,7 +5,7 @@ import { useSecrets } from "@/hooks/useSecrets";
 import { secretKeys } from "@/hooks/useSecrets";
 import { secretsDescribeSecret } from "@/api-client/sdk.gen";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import type { AuthorizationDomainType } from "@/api-client";
+import type { AuthorizationDomainType, ConfigurationField } from "@/api-client";
 
 const SECRET_KEY_DELIMITER = "::";
 const LABEL_SEPARATOR = " / ";
@@ -15,11 +15,11 @@ const DOMAIN_TYPE_ORG: AuthorizationDomainType = "DOMAIN_TYPE_ORGANIZATION";
 export type SecretKeyRefValue = { secret: string; key: string } | undefined;
 
 interface SecretKeyFieldRendererProps {
+  field: ConfigurationField;
+  isRequired: boolean;
   value: SecretKeyRefValue;
   onChange: (value: { secret: string; key: string } | undefined) => void;
   organizationId: string | undefined;
-  placeholder?: string;
-  allowClear?: boolean;
 }
 
 /** Value to option value "secret::key" for the dropdown. */
@@ -49,6 +49,14 @@ function getDisplayValue(optionValue: string, allowClear: boolean): string {
   return allowClear ? CLEAR_OPTION_VALUE : "";
 }
 
+function getSecretKeyPlaceholder(field: ConfigurationField, isRequired: boolean): string {
+  if (!isRequired) {
+    return "None";
+  }
+
+  return field.placeholder ?? "Select credential";
+}
+
 function SecretKeyOptions({
   allowClear,
   options,
@@ -73,13 +81,15 @@ function SecretKeyOptions({
  * Value is stored as { secret: string, key: string } (YAML-friendly).
  */
 export const SecretKeyFieldRenderer = ({
+  field,
+  isRequired,
   value,
   onChange,
   organizationId,
-  placeholder = "Select credential",
-  allowClear = false,
 }: SecretKeyFieldRendererProps) => {
   const domainId = organizationId ?? "";
+  const allowClear = !isRequired;
+  const placeholder = getSecretKeyPlaceholder(field, isRequired);
   const optionValue = toOptionValue(value);
   const displayValue = getDisplayValue(optionValue, allowClear);
   const { data: secrets = [], isLoading: secretsLoading, error: secretsError } = useSecrets(domainId, DOMAIN_TYPE_ORG);

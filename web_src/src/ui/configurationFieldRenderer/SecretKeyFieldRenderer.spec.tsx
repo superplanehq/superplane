@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { useQueries } from "@tanstack/react-query";
-import type { SecretsSecret } from "@/api-client";
+import type { ConfigurationField, SecretsSecret } from "@/api-client";
 import { useSecrets } from "@/hooks/useSecrets";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 
@@ -60,16 +60,25 @@ function mockSecretQueries() {
   );
 }
 
+function createField(): ConfigurationField {
+  return {
+    name: "passphrase",
+    type: "secret-key",
+    label: "Passphrase",
+    placeholder: "Select credential",
+  };
+}
+
 function ControlledSecretKeyFieldRenderer({ initialValue }: { initialValue: SecretKeyRefValue }) {
   const [value, setValue] = React.useState<SecretKeyRefValue>(initialValue);
 
   return (
     <SecretKeyFieldRenderer
+      field={createField()}
+      isRequired={false}
       value={value}
       onChange={setValue}
       organizationId="org-123"
-      allowClear
-      placeholder="Select credential"
     />
   );
 }
@@ -90,11 +99,11 @@ describe("SecretKeyFieldRenderer", () => {
   it("renders None as a selected value for optional empty fields", () => {
     render(
       <SecretKeyFieldRenderer
+        field={createField()}
+        isRequired={false}
         value={undefined}
         onChange={() => {}}
         organizationId="org-123"
-        allowClear
-        placeholder="Select credential"
       />,
     );
 
