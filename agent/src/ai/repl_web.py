@@ -553,34 +553,37 @@ def _create_app() -> FastAPI:
         )
 
         await tracker.acquire()
+        try:
+            async def event_generator() -> AsyncIterator[str]:
+                try:
+                    async for event in _stream_agent_run(chat_id, payload, request):
+                        if await request.is_disconnected():
+                            _debug_log("client disconnected", chat_id=chat_id)
+                            break
+                        yield _encode_sse_event(event)
+                except Exception as error:
+                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                    yield _encode_sse_event(
+                        {
+                            "type": "run_failed",
+                            "error": str(error),
+                        }
+                    )
+                    yield _encode_sse_event({"type": "done"})
+                finally:
+                    await tracker.release()
 
-        async def event_generator() -> AsyncIterator[str]:
-            try:
-                async for event in _stream_agent_run(chat_id, payload, request):
-                    if await request.is_disconnected():
-                        _debug_log("client disconnected", chat_id=chat_id)
-                        break
-                    yield _encode_sse_event(event)
-            except Exception as error:
-                _debug_log("stream failed", chat_id=chat_id, error=str(error))
-                yield _encode_sse_event(
-                    {
-                        "type": "run_failed",
-                        "error": str(error),
-                    }
-                )
-                yield _encode_sse_event({"type": "done"})
-            finally:
-                await tracker.release()
-
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "cache-control": "no-cache",
-                "connection": "keep-alive",
-            },
-        )
+            return StreamingResponse(
+                event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "cache-control": "no-cache",
+                    "connection": "keep-alive",
+                },
+            )
+        except BaseException:
+            await tracker.release()
+            raise
 
     return app
 
