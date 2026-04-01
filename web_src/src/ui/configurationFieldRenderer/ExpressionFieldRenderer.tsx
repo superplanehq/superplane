@@ -48,7 +48,7 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
       expressionMode="raw"
       inputSize="md"
       showValuePreview
-      quickTip="Tip: type `$` to browse node payloads."
+      quickTip={field.description ? undefined : "Tip: type `$` to browse node payloads."}
       className=""
       data-testid={toTestId(`expression-field-${field.name}`)}
     />
