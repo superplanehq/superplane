@@ -85,6 +85,8 @@ regex="^($(printf '%s\n' "${selected_tests[@]}" | paste -sd '|' -))$"
 # Use a per-shard JUnit file so CI can aggregate results.
 junit_file="junit-report.xml"
 
+echo "Running tests: gotestsum --format short --junitfile ${junit_file} --rerun-fails=3 --rerun-fails-max-failures=1 --packages=\"./test/e2e/...\" -- -- -p 1 -run ${regex}"
+
 gotestsum \
   --format short \
   --junitfile "${junit_file}" \
