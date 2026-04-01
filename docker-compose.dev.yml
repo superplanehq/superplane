@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/superplanehq/superplane-dev-base:v3
+    image: ghcr.io/superplanehq/superplane-dev-base:v4
     tty: true
     command: bash /app/docker-entrypoint.dev.sh
     environment:
@@ -108,7 +108,7 @@ services:
       - /tmp:/tmp
 
   agent:
-    image: ghcr.io/superplanehq/superplane-dev-base:v3
+    image: ghcr.io/superplanehq/superplane-dev-base:v4
     working_dir: /app/agent
     env_file:
       - agent/.env
