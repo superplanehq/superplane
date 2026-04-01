@@ -17,6 +17,17 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
+func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
+	body := openapi_client.CanvasesUpdateCanvasBody{}
+	body.SetVersioningEnabled(enabled)
+
+	_, _, err := ctx.API.CanvasAPI.
+		CanvasesUpdateCanvas(ctx.Context, canvasID).
+		Body(body).
+		Execute()
+	return err
+}
+
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
 	if c.file != nil {
@@ -40,13 +51,23 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	var (
 		canvasID string
 		canvas   openapi_client.CanvasesCanvas
-		err      error
+		// requestedVersioningEnabled is only set when updating from a file where the field
+		// is explicitly present in YAML. When updating from an existing canvas, we should
+		// not treat the server-provided metadata as a "requested" change.
+		requestedVersioningEnabled *bool
+		err                        error
 	)
 
 	if filePath != "" {
 		canvasID, canvas, err = loadCanvasFromFile(filePath)
 		if err != nil {
 			return err
+		}
+
+		if canvas.Metadata != nil {
+			if value, ok := canvas.Metadata.GetVersioningEnabledOk(); ok && value != nil {
+				requestedVersioningEnabled = value
+			}
 		}
 	} else {
 		canvasID, canvas, err = loadCanvasFromExisting(ctx)
@@ -60,8 +81,37 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
+	effectiveVersioningEnabled := versioningContext.versioningEnabled
+
+	// If the user is explicitly toggling versioning via YAML, apply metadata changes
+	// via the canvas update endpoint (canvas version updates ignore metadata).
+	if requestedVersioningEnabled != nil && *requestedVersioningEnabled != effectiveVersioningEnabled {
+		switch {
+		case !*requestedVersioningEnabled:
+			// Disabling versioning should happen before we update the canvas spec, so the
+			// spec update can target the live canvas without requiring a version ID.
+			if draftMode {
+				return fmt.Errorf("--draft cannot be used when disabling canvas versioning; remove --draft to update the live canvas directly")
+			}
+			if err := updateCanvasVersioningEnabled(ctx, canvasID, false); err != nil {
+				return err
+			}
+			effectiveVersioningEnabled = false
+
+		case *requestedVersioningEnabled:
+			// Enabling versioning must happen before updating a draft, since drafts only
+			// exist once versioning is enabled.
+			if draftMode {
+				if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+					return err
+				}
+				effectiveVersioningEnabled = true
+			}
+		}
+	}
+
 	targetVersionID := ""
-	if !versioningContext.versioningEnabled {
+	if !effectiveVersioningEnabled {
 		if draftMode {
 			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to update the live canvas directly")
 		}
@@ -103,6 +153,15 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	version := response.GetVersion()
+
+	// If we're enabling versioning and we didn't already enable it before updating the spec,
+	// apply the toggle after the live update so this command still works without --draft.
+	if requestedVersioningEnabled != nil && *requestedVersioningEnabled && !versioningContext.versioningEnabled && !draftMode {
+		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+			return err
+		}
+	}
+
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(version)
 	}
@@ -111,7 +170,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
 
-		if versioningContext.versioningEnabled {
+		if targetVersionID != "" {
 			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		}
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
