@@ -185,6 +185,40 @@ service Organizations {
     };
   }
 
+  rpc GetOktaIdpSettings(GetOktaIdpSettingsRequest) returns (GetOktaIdpSettingsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/okta-idp"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization Okta IdP settings";
+      description: "Returns Okta SAML/SCIM configuration metadata for an organization (no secrets)";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateOktaIdpSettings(UpdateOktaIdpSettingsRequest) returns (UpdateOktaIdpSettingsResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id}/okta-idp"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create or update organization Okta IdP settings";
+      description: "Creates or updates Okta SAML IdP settings (SSO URL, issuer, certificate) and SAML/SCIM toggles";
+      tags: "Organization";
+    };
+  }
+
+  rpc RotateOktaScimBearerToken(RotateOktaScimBearerTokenRequest) returns (RotateOktaScimBearerTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/okta-idp/rotate-scim-token"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Rotate organization SCIM bearer token";
+      description: "Generates a new SCIM bearer token; the plaintext is returned once";
+      tags: "Organization";
+    };
+  }
+
   rpc DescribeUsage(DescribeUsageRequest) returns (DescribeUsageResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id}/usage"
@@ -428,6 +462,49 @@ message DeleteAgentOpenAIKeyRequest {
 
 message DeleteAgentOpenAIKeyResponse {
   AgentSettings agent_settings = 1;
+}
+
+message OktaIdpSettings {
+  string organization_id = 1;
+  bool configured = 2;
+  string saml_idp_sso_url = 3;
+  string saml_idp_issuer = 4;
+  bool saml_idp_certificate_configured = 5;
+  bool saml_enabled = 6;
+  bool scim_enabled = 7;
+  bool scim_bearer_token_configured = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GetOktaIdpSettingsRequest {
+  string id = 1;
+}
+
+message GetOktaIdpSettingsResponse {
+  OktaIdpSettings settings = 1;
+}
+
+message UpdateOktaIdpSettingsRequest {
+  string id = 1;
+  optional string saml_idp_sso_url = 2;
+  optional string saml_idp_issuer = 3;
+  optional string saml_idp_certificate_pem = 4;
+  optional bool saml_enabled = 5;
+  optional bool scim_enabled = 6;
+}
+
+message UpdateOktaIdpSettingsResponse {
+  OktaIdpSettings settings = 1;
+}
+
+message RotateOktaScimBearerTokenRequest {
+  string id = 1;
+}
+
+message RotateOktaScimBearerTokenResponse {
+  string scim_bearer_token = 1;
+  OktaIdpSettings settings = 2;
 }
 
 message OrganizationLimits {

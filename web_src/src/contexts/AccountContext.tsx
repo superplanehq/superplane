@@ -10,6 +10,7 @@ interface Account {
   name: string;
   email: string;
   avatar_url: string;
+  managed_account?: boolean;
   installation_admin: boolean;
   impersonation?: AccountImpersonation;
 }
