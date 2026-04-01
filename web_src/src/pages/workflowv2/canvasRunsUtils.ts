@@ -1,6 +1,7 @@
 import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
 } from "@/api-client";
@@ -27,7 +28,7 @@ export function getExecutionStatus(execution: CanvasesCanvasNodeExecution, nodes
   return stateResolver(buildExecutionInfo(execution));
 }
 
-export function getAggregateStatus(executions: CanvasesCanvasNodeExecution[], _nodes: ComponentsNode[]) {
+export function getAggregateStatus(executions: CanvasesCanvasNodeExecutionRef[], _nodes: ComponentsNode[]) {
   if (executions.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
     return "running";
   }
@@ -58,7 +59,7 @@ function formatDurationMs(ms: number): string {
   return `${Math.round(m)}m`;
 }
 
-export function computeDuration(execution: CanvasesCanvasNodeExecution): string | null {
+export function computeDuration(execution: CanvasesCanvasNodeExecutionRef): string | null {
   if (execution.state !== "STATE_FINISHED" || !execution.createdAt || !execution.updatedAt) {
     return null;
   }
@@ -147,7 +148,7 @@ export function getStatusBadgeProps(status: string) {
 }
 
 function matchesStatusFilter(
-  executions: CanvasesCanvasNodeExecution[],
+  executions: CanvasesCanvasNodeExecutionRef[],
   nodes: ComponentsNode[],
   statusFilter: RunsStatusFilter,
 ): boolean {
@@ -161,7 +162,7 @@ function matchesStatusFilter(
 
 function matchesSearchQuery(
   event: CanvasesCanvasEventWithExecutions,
-  executions: CanvasesCanvasNodeExecution[],
+  executions: CanvasesCanvasNodeExecutionRef[],
   nodes: ComponentsNode[],
   query: string,
 ): boolean {
