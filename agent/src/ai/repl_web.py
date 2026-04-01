@@ -39,6 +39,101 @@ from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
 
+_DEFAULT_DRAIN_TIMEOUT = 300.0
+_DRAIN_LOG_INTERVAL = 5.0
+
+
+def _resolve_drain_timeout() -> float:
+    raw = os.getenv("DRAIN_TIMEOUT", "").strip()
+    if not raw:
+        return _DEFAULT_DRAIN_TIMEOUT
+    try:
+        return max(float(raw), 0.0)
+    except ValueError:
+        return _DEFAULT_DRAIN_TIMEOUT
+
+
+class ActiveStreamTracker:
+    """Tracks in-flight SSE streams so the service can drain them before shutting down."""
+
+    def __init__(self, drain_timeout: float | None = None) -> None:
+        self._active_count = 0
+        self._lock = asyncio.Lock()
+        self._drained = asyncio.Event()
+        self._drained.set()
+        self._shutting_down = False
+        self._drain_timeout = (
+            drain_timeout if drain_timeout is not None else _resolve_drain_timeout()
+        )
+
+    @property
+    def is_shutting_down(self) -> bool:
+        return self._shutting_down
+
+    @property
+    def active_count(self) -> int:
+        return self._active_count
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            self._active_count += 1
+            self._drained.clear()
+
+    async def release(self) -> None:
+        async with self._lock:
+            self._active_count -= 1
+            if self._active_count == 0:
+                self._drained.set()
+
+    @asynccontextmanager
+    async def track_stream(self) -> AsyncIterator[None]:
+        await self.acquire()
+        try:
+            yield
+        finally:
+            await self.release()
+
+    def begin_shutdown(self) -> None:
+        self._shutting_down = True
+
+    async def wait_for_drain(self) -> None:
+        if self._active_count == 0:
+            print("[web] graceful shutdown: no active streams, proceeding with cleanup", flush=True)
+            return
+
+        print(
+            f"[web] graceful shutdown: waiting for {self._active_count} active stream(s) to finish"
+            f" (timeout={self._drain_timeout}s)...",
+            flush=True,
+        )
+        try:
+            await asyncio.wait_for(self._drain_with_logging(), timeout=self._drain_timeout)
+            print(
+                "[web] graceful shutdown: all streams finished, proceeding with cleanup",
+                flush=True,
+            )
+        except TimeoutError:
+            remaining = self._active_count
+            print(
+                f"[web] graceful shutdown: drain timeout reached"
+                f" with {remaining} stream(s) still active,"
+                " forcing shutdown",
+                flush=True,
+            )
+
+    async def _drain_with_logging(self) -> None:
+        while not self._drained.is_set():
+            try:
+                await asyncio.wait_for(self._drained.wait(), timeout=_DRAIN_LOG_INTERVAL)
+            except TimeoutError:
+                remaining = self._active_count
+                print(
+                    f"[web] graceful shutdown: waiting for"
+                    f" {remaining} active stream(s) to finish...",
+                    flush=True,
+                )
+
+
 @dataclass(frozen=True)
 class WebServerConfig:
     host: str = "127.0.0.1"
@@ -413,13 +508,17 @@ def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         store = SessionStore()
+        tracker = ActiveStreamTracker()
         app.state.session_store = store
+        app.state.stream_tracker = tracker
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
         try:
             yield
         finally:
+            tracker.begin_shutdown()
+            await tracker.wait_for_drain()
             grpc_server.stop()
             store.close()
 
@@ -438,6 +537,10 @@ def _create_app() -> FastAPI:
 
     @app.post("/agents/chats/{chat_id}/stream")
     async def stream_repl(chat_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+        tracker: ActiveStreamTracker = request.app.state.stream_tracker
+        if tracker.is_shutting_down:
+            raise HTTPException(status_code=503, detail="Service is shutting down")
+
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
@@ -449,31 +552,38 @@ def _create_app() -> FastAPI:
             has_token=bool(_resolve_bearer_token(request)),
         )
 
-        async def event_generator() -> AsyncIterator[str]:
-            try:
-                async for event in _stream_agent_run(chat_id, payload, request):
-                    if await request.is_disconnected():
-                        _debug_log("client disconnected", chat_id=chat_id)
-                        break
-                    yield _encode_sse_event(event)
-            except Exception as error:
-                _debug_log("stream failed", chat_id=chat_id, error=str(error))
-                yield _encode_sse_event(
-                    {
-                        "type": "run_failed",
-                        "error": str(error),
-                    }
-                )
-                yield _encode_sse_event({"type": "done"})
+        await tracker.acquire()
+        try:
+            async def event_generator() -> AsyncIterator[str]:
+                try:
+                    async for event in _stream_agent_run(chat_id, payload, request):
+                        if await request.is_disconnected():
+                            _debug_log("client disconnected", chat_id=chat_id)
+                            break
+                        yield _encode_sse_event(event)
+                except Exception as error:
+                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                    yield _encode_sse_event(
+                        {
+                            "type": "run_failed",
+                            "error": str(error),
+                        }
+                    )
+                    yield _encode_sse_event({"type": "done"})
+                finally:
+                    await tracker.release()
 
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "cache-control": "no-cache",
-                "connection": "keep-alive",
-            },
-        )
+            return StreamingResponse(
+                event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "cache-control": "no-cache",
+                    "connection": "keep-alive",
+                },
+            )
+        except BaseException:
+            await tracker.release()
+            raise
 
     return app
 
