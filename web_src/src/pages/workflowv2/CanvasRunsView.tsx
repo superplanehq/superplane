@@ -313,13 +313,18 @@ export function RunRow({
     triggerEvent?: SidebarEvent;
   }) => void;
 }) {
+  const canvasId = event.canvasId || "";
+  const eventId = event.id || "";
+  const enabled = isExpanded && !!event.canvasId && !!event.id;
+
   const triggerNode = useMemo(() => nodes.find((n) => n.id === event.nodeId), [nodes, event.nodeId]);
   const triggerSidebarEvent = useMemo(() => buildTriggerSidebarEvent(event, triggerNode), [event, triggerNode]);
   const executionRefs = useMemo(() => event.executions || [], [event.executions]);
   const executionDetailsQuery = useQuery({
-    ...eventExecutionsQueryOptions(event.canvasId || "", event.id || ""),
-    enabled: isExpanded && !!event.canvasId && !!event.id,
+    ...eventExecutionsQueryOptions(canvasId, eventId),
+    enabled
   });
+
   const detailedExecutions = useMemo(
     () => executionDetailsQuery.data?.executions || [],
     [executionDetailsQuery.data?.executions],

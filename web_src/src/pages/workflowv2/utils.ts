@@ -263,12 +263,11 @@ export function mapExecutionStateToLogType(
   return state === "error" ? "error" : "success";
 }
 
-function getRunItemFallbackState(execution: CanvasesCanvasNodeExecutionRef): string {
-  if (execution.state === "STATE_PENDING") return "queued";
-  if (execution.state === "STATE_STARTED") return "running";
-  if (execution.result === "RESULT_FAILED") return "error";
-  if (execution.result === "RESULT_CANCELLED") return "cancelled";
-  if (execution.result === "RESULT_PASSED") return "success";
+function getRunItemStateFromRef(executionRef: CanvasesCanvasNodeExecutionRef): string {
+  if (executionRef.state === "STATE_PENDING" || executionRef.state === "STATE_STARTED") return "running";
+  if (executionRef.result === "RESULT_FAILED") return "error";
+  if (executionRef.result === "RESULT_CANCELLED") return "cancelled";
+  if (executionRef.result === "RESULT_PASSED") return "success";
   return "unknown";
 }
 
@@ -290,9 +289,7 @@ function buildRunItemFromExecutionBase(options: {
   const { execution, nodes, onNodeSelect, timestampOverride, resolvedState, timestampFallback } = options;
   const { onExecutionSelect, event } = options;
   const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const fallbackState = getRunItemFallbackState(execution);
-  const executionState =
-    execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : resolvedState || fallbackState;
+  const executionState = execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : resolvedState;
   const nodeId = componentNode?.id || execution.nodeId || "";
   const detail = execution.resultMessage;
   const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
@@ -395,7 +392,8 @@ export function buildRunItemFromExecutionRef(options: {
   event?: CanvasesCanvasEvent;
   timestampOverride?: string;
 }): LogRunItem {
-  return buildRunItemFromExecutionBase(options);
+  const state = getRunItemStateFromRef(options.execution);
+  return buildRunItemFromExecutionBase({...options, resolvedState: state});
 }
 
 export function buildRunEntryFromEvent(options: {

@@ -5926,14 +5926,8 @@ function useExecutionChainData(workflowId: string, queryClient: QueryClient, wor
       }
 
       if (allExecutions.length === 0) {
-        const data = await queryClient.fetchQuery(
-          forceReload
-            ? {
-                ...queryOptions,
-                staleTime: 0,
-              }
-            : queryOptions,
-        );
+        const options = forceReload ? { ...queryOptions, staleTime: 0 } : queryOptions;
+        const data = await queryClient.fetchQuery(options);
         allExecutions = (data as CanvasesListEventExecutionsResponse)?.executions || [];
       }
 
