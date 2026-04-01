@@ -139,3 +139,15 @@ export function isUrl(value: string): boolean {
     return false;
   }
 }
+
+/**
+ * Handles keyboard activation of a handler.
+ * @param e - The keyboard event
+ * @param handler - The handler to activate
+ */
+export function handleKeyboardActivation(e: React.KeyboardEvent, handler: () => void) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    handler();
+  }
+}

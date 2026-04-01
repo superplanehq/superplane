@@ -19,7 +19,7 @@ import (
 // checks if the CanvasesCanvasNodeExecution type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &CanvasesCanvasNodeExecution{}
 
-// CanvasesCanvasNodeExecution struct for CanvasesCanvasNodeExecution
+// CanvasesCanvasNodeExecution Full description of a canvas node execution. Should only be used for endpoints specific to executions.
 type CanvasesCanvasNodeExecution struct {
 	Id                  *string                           `json:"id,omitempty"`
 	CanvasId            *string                           `json:"canvasId,omitempty"`
