@@ -86,31 +86,20 @@ function CertificateField({
   );
 }
 
-export function OktaSSO() {
-  const { organizationId } = useParams<{ organizationId: string }>();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const publicBaseURL = usePublicBaseURL();
-  usePageTitle(["SSO"]);
-
+function useOktaSSO(organizationId: string | undefined, canUpdate: boolean) {
   const [settings, setSettings] = useState<OrganizationsOktaIdpSettings | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  // SAML form state
   const [samlIdpSSOURL, setSamlIdpSSOURL] = useState("");
   const [samlIdpIssuer, setSamlIdpIssuer] = useState("");
   const [samlIdpCertificatePEM, setSamlIdpCertificatePEM] = useState("");
   const [samlEnabled, setSamlEnabled] = useState(true);
   const [samlSaving, setSamlSaving] = useState(false);
   const [samlMessage, setSamlMessage] = useState<string | null>(null);
-
-  // SCIM form state
   const [scimEnabled, setScimEnabled] = useState(true);
   const [scimSaving, setScimSaving] = useState(false);
   const [scimMessage, setScimMessage] = useState<string | null>(null);
   const [rotatingToken, setRotatingToken] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
-
-  const { acsURL, entityID, loginURL, scimBaseURL } = getOktaURLs(publicBaseURL, organizationId ?? "");
 
   useEffect(() => {
     if (!organizationId) return;
@@ -129,15 +118,10 @@ export function OktaSSO() {
   }, [organizationId]);
 
   const handleSamlSave = async () => {
-    if (!canAct("org", "update") || !organizationId) return;
+    if (!canUpdate || !organizationId) return;
     setSamlSaving(true);
     try {
-      const body: {
-        samlIdpSsoUrl?: string;
-        samlIdpIssuer?: string;
-        samlIdpCertificatePem?: string;
-        samlEnabled?: boolean;
-      } = {
+      const body: { samlIdpSsoUrl?: string; samlIdpIssuer?: string; samlIdpCertificatePem?: string; samlEnabled?: boolean } = {
         samlIdpSsoUrl: samlIdpSSOURL.trim(),
         samlIdpIssuer: samlIdpIssuer.trim(),
         samlEnabled,
@@ -161,7 +145,7 @@ export function OktaSSO() {
   };
 
   const handleScimSave = async () => {
-    if (!canAct("org", "update") || !organizationId) return;
+    if (!canUpdate || !organizationId) return;
     setScimSaving(true);
     try {
       const res = await organizationsUpdateOktaIdpSettings(
@@ -179,7 +163,7 @@ export function OktaSSO() {
   };
 
   const handleRotateToken = async () => {
-    if (!canAct("org", "update") || !organizationId) return;
+    if (!canUpdate || !organizationId) return;
     setRotatingToken(true);
     try {
       const res = await organizationsRotateOktaScimBearerToken(
@@ -198,222 +182,296 @@ export function OktaSSO() {
     }
   };
 
-  const { scimBearerTokenConfigured: tokenConfigured = false, samlIdpCertificateConfigured: certConfigured = false } =
-    settings ?? {};
+  return {
+    settings, loadError,
+    samlIdpSSOURL, setSamlIdpSSOURL,
+    samlIdpIssuer, setSamlIdpIssuer,
+    samlIdpCertificatePEM, setSamlIdpCertificatePEM,
+    samlEnabled, setSamlEnabled,
+    samlSaving, samlMessage,
+    scimEnabled, setScimEnabled,
+    scimSaving, scimMessage,
+    rotatingToken, newToken, setNewToken,
+    handleSamlSave, handleScimSave, handleRotateToken,
+  };
+}
 
-  return loadError ? (
-    <p className="text-sm text-red-500 pt-6">{loadError}</p>
-  ) : (
-    <div className="space-y-6 pt-6 text-left">
-      {/* SAML Section */}
-      <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
-        <div>
-          <p className="text-sm font-semibold text-gray-800 dark:text-white">SAML Sign-In</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Allow members to log in via Okta SAML 2.0. Paste the values from Okta&apos;s{" "}
-            <em>View SAML setup instructions</em> panel, then copy the ACS URL and SP Entity ID into your Okta
-            app&apos;s SAML settings.
-          </p>
-        </div>
+type SAMLSectionProps = {
+  samlIdpSSOURL: string; setSamlIdpSSOURL: (v: string) => void;
+  samlIdpIssuer: string; setSamlIdpIssuer: (v: string) => void;
+  samlIdpCertificatePEM: string; setSamlIdpCertificatePEM: (v: string) => void;
+  samlEnabled: boolean; setSamlEnabled: (v: boolean) => void;
+  samlSaving: boolean; samlMessage: string | null;
+  certConfigured: boolean; acsURL: string; entityID: string; loginURL: string;
+  canUpdate: boolean; permissionsLoading: boolean; onSave: () => void;
+};
 
-        <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Identity Provider Single Sign-On URL
-          </Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Paste the SSO URL from Okta&apos;s SAML setup instructions.
-          </p>
-          <Input
-            type="text"
-            placeholder="https://dev-12345.okta.com/app/superplane/exk.../sso/saml"
-            value={samlIdpSSOURL}
-            onChange={(e) => setSamlIdpSSOURL(e.target.value)}
-            disabled={!canAct("org", "update")}
-            className="max-w-sm"
-          />
-        </Field>
-
-        <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Identity Provider Issuer</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Paste the issuer (Entity ID) from Okta&apos;s SAML setup instructions.
-          </p>
-          <Input
-            type="text"
-            placeholder="http://www.okta.com/exk..."
-            value={samlIdpIssuer}
-            onChange={(e) => setSamlIdpIssuer(e.target.value)}
-            disabled={!canAct("org", "update")}
-            className="max-w-sm"
-          />
-        </Field>
-
-        <CertificateField
-          configured={certConfigured}
-          disabled={!canAct("org", "update")}
-          value={samlIdpCertificatePEM}
-          onChange={setSamlIdpCertificatePEM}
+function SAMLSection({
+  samlIdpSSOURL, setSamlIdpSSOURL,
+  samlIdpIssuer, setSamlIdpIssuer,
+  samlIdpCertificatePEM, setSamlIdpCertificatePEM,
+  samlEnabled, setSamlEnabled,
+  samlSaving, samlMessage,
+  certConfigured, acsURL, entityID, loginURL,
+  canUpdate, permissionsLoading, onSave,
+}: SAMLSectionProps) {
+  return (
+    <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
+      <div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-white">SAML Sign-In</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Allow members to log in via Okta SAML 2.0. Paste the values from Okta&apos;s{" "}
+          <em>View SAML setup instructions</em> panel, then copy the ACS URL and SP Entity ID into your Okta
+          app&apos;s SAML settings.
+        </p>
+      </div>
+      <Field className="space-y-1.5">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          Identity Provider Single Sign-On URL
+        </Label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Paste the SSO URL from Okta&apos;s SAML setup instructions.
+        </p>
+        <Input
+          type="text"
+          placeholder="https://dev-12345.okta.com/app/superplane/exk.../sso/saml"
+          value={samlIdpSSOURL}
+          onChange={(e) => setSamlIdpSSOURL(e.target.value)}
+          disabled={!canUpdate}
+          className="max-w-sm"
         />
-
-        <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">ACS URL (Single Sign-On URL)</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Paste this into your Okta app&apos;s <strong>Single sign on URL</strong> field.
-          </p>
-          <div className="flex items-center gap-2 max-w-sm">
-            <Input type="text" value={acsURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-            <Button type="button" variant="outline" onClick={() => copyToClipboard(acsURL)}>
-              Copy
-            </Button>
-          </div>
-        </Field>
-
-        <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SP Entity ID (Audience URI)</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Paste this into your Okta app&apos;s <strong>Audience URI (SP Entity ID)</strong> field.
-          </p>
-          <div className="flex items-center gap-2 max-w-sm">
-            <Input type="text" value={entityID} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-            <Button type="button" variant="outline" onClick={() => copyToClipboard(entityID)}>
-              Copy
-            </Button>
-          </div>
-        </Field>
-
-        <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee login URL</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Share this URL with employees to let them sign in via Okta.
-          </p>
-          <div className="flex items-center gap-2 max-w-sm">
-            <Input type="text" value={loginURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-            <Button type="button" variant="outline" onClick={() => copyToClipboard(loginURL)}>
-              Copy
-            </Button>
-          </div>
-        </Field>
-
-        <Field>
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={samlEnabled}
-              onCheckedChange={setSamlEnabled}
-              disabled={!canAct("org", "update")}
-              aria-label="Enable SAML sign-in"
-            />
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SAML sign-in</Label>
-          </div>
-        </Field>
-
-        <div className="flex items-center gap-4 pt-1">
-          <PermissionTooltip
-            allowed={canAct("org", "update") || permissionsLoading}
-            message="You don't have permission to update SSO settings."
-          >
-            <LoadingButton
-              type="button"
-              onClick={handleSamlSave}
-              disabled={!canAct("org", "update")}
-              loading={samlSaving}
-              loadingText="Saving..."
-            >
-              Save
-            </LoadingButton>
-          </PermissionTooltip>
-          <StatusMessage message={samlMessage} />
+      </Field>
+      <Field className="space-y-1.5">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Identity Provider Issuer</Label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Paste the issuer (Entity ID) from Okta&apos;s SAML setup instructions.
+        </p>
+        <Input
+          type="text"
+          placeholder="http://www.okta.com/exk..."
+          value={samlIdpIssuer}
+          onChange={(e) => setSamlIdpIssuer(e.target.value)}
+          disabled={!canUpdate}
+          className="max-w-sm"
+        />
+      </Field>
+      <CertificateField
+        configured={certConfigured}
+        disabled={!canUpdate}
+        value={samlIdpCertificatePEM}
+        onChange={setSamlIdpCertificatePEM}
+      />
+      <Field className="space-y-1.5">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">ACS URL (Single Sign-On URL)</Label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Paste this into your Okta app&apos;s <strong>Single sign on URL</strong> field.
+        </p>
+        <div className="flex items-center gap-2 max-w-sm">
+          <Input type="text" value={acsURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(acsURL)}>Copy</Button>
         </div>
-      </Fieldset>
-
-      {/* SCIM Section */}
-      <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
-        <div>
-          <p className="text-sm font-semibold text-gray-800 dark:text-white">SCIM Provisioning</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Automatically provision and deprovision members via Okta. Configure SCIM in your Okta app&apos;s{" "}
-            <em>Provisioning</em> tab.
-          </p>
+      </Field>
+      <Field className="space-y-1.5">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SP Entity ID (Audience URI)</Label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Paste this into your Okta app&apos;s <strong>Audience URI (SP Entity ID)</strong> field.
+        </p>
+        <div className="flex items-center gap-2 max-w-sm">
+          <Input type="text" value={entityID} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(entityID)}>Copy</Button>
         </div>
-
-        <Field className="space-y-1.5">
-          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM base URL</Label>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            Paste this into your Okta SCIM connector base URL field.
-          </p>
-          <div className="flex items-center gap-2 max-w-sm">
-            <Input type="text" value={scimBaseURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
-            <Button type="button" variant="outline" onClick={() => copyToClipboard(scimBaseURL)}>
-              Copy
-            </Button>
-          </div>
-        </Field>
-
-        <Field className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM bearer token</Label>
-            {tokenConfigured ? (
-              <Badge variant="secondary" className="text-xs">
-                Configured
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs">
-                Not configured
-              </Badge>
-            )}
-          </div>
-          <PermissionTooltip
-            allowed={canAct("org", "update") || permissionsLoading}
-            message="You don't have permission to update SSO settings."
-          >
-            <LoadingButton
-              type="button"
-              variant="outline"
-              onClick={handleRotateToken}
-              disabled={!canAct("org", "update")}
-              loading={rotatingToken}
-              loadingText="Generating..."
-            >
-              {tokenConfigured ? "Rotate token" : "Generate token"}
-            </LoadingButton>
-          </PermissionTooltip>
-        </Field>
-
-        <Field>
-          <div className="flex items-center gap-3">
-            <Switch
-              checked={scimEnabled}
-              onCheckedChange={setScimEnabled}
-              disabled={!canAct("org", "update")}
-              aria-label="Enable SCIM provisioning"
-            />
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SCIM provisioning</Label>
-          </div>
-        </Field>
-
-        <div className="flex items-center gap-4 pt-1">
-          <PermissionTooltip
-            allowed={canAct("org", "update") || permissionsLoading}
-            message="You don't have permission to update SSO settings."
-          >
-            <LoadingButton
-              type="button"
-              onClick={handleScimSave}
-              disabled={!canAct("org", "update")}
-              loading={scimSaving}
-              loadingText="Saving..."
-            >
-              Save
-            </LoadingButton>
-          </PermissionTooltip>
-          <StatusMessage message={scimMessage} />
+      </Field>
+      <Field className="space-y-1.5">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Employee login URL</Label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Share this URL with employees to let them sign in via Okta.
+        </p>
+        <div className="flex items-center gap-2 max-w-sm">
+          <Input type="text" value={loginURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(loginURL)}>Copy</Button>
         </div>
-      </Fieldset>
+      </Field>
+      <Field>
+        <div className="flex items-center gap-3">
+          <Switch
+            checked={samlEnabled}
+            onCheckedChange={setSamlEnabled}
+            disabled={!canUpdate}
+            aria-label="Enable SAML sign-in"
+          />
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SAML sign-in</Label>
+        </div>
+      </Field>
+      <div className="flex items-center gap-4 pt-1">
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You don't have permission to update SSO settings."
+        >
+          <LoadingButton
+            type="button"
+            onClick={onSave}
+            disabled={!canUpdate}
+            loading={samlSaving}
+            loadingText="Saving..."
+          >
+            Save
+          </LoadingButton>
+        </PermissionTooltip>
+        <StatusMessage message={samlMessage} />
+      </div>
+    </Fieldset>
+  );
+}
 
-      {/* New token modal */}
+function SCIMSection({
+  scimEnabled, setScimEnabled,
+  scimSaving, scimMessage,
+  rotatingToken, tokenConfigured, scimBaseURL,
+  canUpdate, permissionsLoading, onSave, onRotateToken,
+}: {
+  scimEnabled: boolean; setScimEnabled: (v: boolean) => void;
+  scimSaving: boolean; scimMessage: string | null;
+  rotatingToken: boolean; tokenConfigured: boolean; scimBaseURL: string;
+  canUpdate: boolean; permissionsLoading: boolean;
+  onSave: () => void; onRotateToken: () => void;
+}) {
+  return (
+    <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-5">
+      <div>
+        <p className="text-sm font-semibold text-gray-800 dark:text-white">SCIM Provisioning</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Automatically provision and deprovision members via Okta. Configure SCIM in your Okta app&apos;s{" "}
+          <em>Provisioning</em> tab.
+        </p>
+      </div>
+      <Field className="space-y-1.5">
+        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM base URL</Label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Paste this into your Okta SCIM connector base URL field.
+        </p>
+        <div className="flex items-center gap-2 max-w-sm">
+          <Input type="text" value={scimBaseURL} readOnly className="bg-gray-50 dark:bg-gray-700 text-gray-600" />
+          <Button type="button" variant="outline" onClick={() => copyToClipboard(scimBaseURL)}>
+            Copy
+          </Button>
+        </div>
+      </Field>
+      <Field className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">SCIM bearer token</Label>
+          {tokenConfigured ? (
+            <Badge variant="secondary" className="text-xs">
+              Configured
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">
+              Not configured
+            </Badge>
+          )}
+        </div>
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You don't have permission to update SSO settings."
+        >
+          <LoadingButton
+            type="button"
+            variant="outline"
+            onClick={onRotateToken}
+            disabled={!canUpdate}
+            loading={rotatingToken}
+            loadingText="Generating..."
+          >
+            {tokenConfigured ? "Rotate token" : "Generate token"}
+          </LoadingButton>
+        </PermissionTooltip>
+      </Field>
+      <Field>
+        <div className="flex items-center gap-3">
+          <Switch
+            checked={scimEnabled}
+            onCheckedChange={setScimEnabled}
+            disabled={!canUpdate}
+            aria-label="Enable SCIM provisioning"
+          />
+          <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SCIM provisioning</Label>
+        </div>
+      </Field>
+      <div className="flex items-center gap-4 pt-1">
+        <PermissionTooltip
+          allowed={canUpdate || permissionsLoading}
+          message="You don't have permission to update SSO settings."
+        >
+          <LoadingButton
+            type="button"
+            onClick={onSave}
+            disabled={!canUpdate}
+            loading={scimSaving}
+            loadingText="Saving..."
+          >
+            Save
+          </LoadingButton>
+        </PermissionTooltip>
+        <StatusMessage message={scimMessage} />
+      </div>
+    </Fieldset>
+  );
+}
+
+export function OktaSSO() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const publicBaseURL = usePublicBaseURL();
+  usePageTitle(["SSO"]);
+
+  const canUpdate = canAct("org", "update");
+  const { acsURL, entityID, loginURL, scimBaseURL } = getOktaURLs(publicBaseURL, organizationId ?? "");
+  const state = useOktaSSO(organizationId, canUpdate);
+
+  const { scimBearerTokenConfigured: tokenConfigured = false, samlIdpCertificateConfigured: certConfigured = false } =
+    state.settings ?? {};
+
+  if (state.loadError) {
+    return <p className="text-sm text-red-500 pt-6">{state.loadError}</p>;
+  }
+
+  return (
+    <div className="space-y-6 pt-6 text-left">
+      <SAMLSection
+        samlIdpSSOURL={state.samlIdpSSOURL}
+        setSamlIdpSSOURL={state.setSamlIdpSSOURL}
+        samlIdpIssuer={state.samlIdpIssuer}
+        setSamlIdpIssuer={state.setSamlIdpIssuer}
+        samlIdpCertificatePEM={state.samlIdpCertificatePEM}
+        setSamlIdpCertificatePEM={state.setSamlIdpCertificatePEM}
+        samlEnabled={state.samlEnabled}
+        setSamlEnabled={state.setSamlEnabled}
+        samlSaving={state.samlSaving}
+        samlMessage={state.samlMessage}
+        certConfigured={certConfigured}
+        acsURL={acsURL}
+        entityID={entityID}
+        loginURL={loginURL}
+        canUpdate={canUpdate}
+        permissionsLoading={permissionsLoading}
+        onSave={state.handleSamlSave}
+      />
+      <SCIMSection
+        scimEnabled={state.scimEnabled}
+        setScimEnabled={state.setScimEnabled}
+        scimSaving={state.scimSaving}
+        scimMessage={state.scimMessage}
+        rotatingToken={state.rotatingToken}
+        tokenConfigured={tokenConfigured}
+        scimBaseURL={scimBaseURL}
+        canUpdate={canUpdate}
+        permissionsLoading={permissionsLoading}
+        onSave={state.handleScimSave}
+        onRotateToken={state.handleRotateToken}
+      />
       <Dialog
-        open={!!newToken}
+        open={!!state.newToken}
         onOpenChange={(open) => {
-          if (!open) setNewToken(null);
+          if (!open) state.setNewToken(null);
         }}
       >
         <DialogContent showCloseButton={false}>
@@ -424,7 +482,7 @@ export function OktaSSO() {
           <div className="my-2">
             <Input
               type="text"
-              value={newToken || ""}
+              value={state.newToken || ""}
               readOnly
               className="font-mono text-xs bg-gray-50 dark:bg-gray-700"
             />
@@ -433,8 +491,8 @@ export function OktaSSO() {
             <Button
               type="button"
               onClick={() => {
-                if (newToken) copyToClipboard(newToken);
-                setNewToken(null);
+                if (state.newToken) copyToClipboard(state.newToken);
+                state.setNewToken(null);
               }}
             >
               Copy and close

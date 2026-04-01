@@ -114,7 +114,7 @@ func scimBearerAndOrgMiddleware(inner http.Handler) http.Handler {
 		r = r.Clone(WithOrganizationID(r.Context(), orgID))
 		r2 := *r
 		u := *r.URL
-		u.Path = "/" + suffix
+		u.Path = "/" + strings.TrimPrefix(suffix, "v2/")
 		r2.URL = &u
 		inner.ServeHTTP(w, &r2)
 	})

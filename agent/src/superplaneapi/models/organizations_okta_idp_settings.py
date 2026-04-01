@@ -30,15 +30,15 @@ class OrganizationsOktaIdpSettings(BaseModel):
     """ # noqa: E501
     organization_id: Optional[StrictStr] = Field(default=None, alias="organizationId")
     configured: Optional[StrictBool] = None
-    issuer_base_url: Optional[StrictStr] = Field(default=None, alias="issuerBaseUrl")
-    oauth_client_id: Optional[StrictStr] = Field(default=None, alias="oauthClientId")
-    oauth_client_secret_configured: Optional[StrictBool] = Field(default=None, alias="oauthClientSecretConfigured")
-    oidc_enabled: Optional[StrictBool] = Field(default=None, alias="oidcEnabled")
+    saml_idp_sso_url: Optional[StrictStr] = Field(default=None, alias="samlIdpSsoUrl")
+    saml_idp_issuer: Optional[StrictStr] = Field(default=None, alias="samlIdpIssuer")
+    saml_idp_certificate_configured: Optional[StrictBool] = Field(default=None, alias="samlIdpCertificateConfigured")
+    saml_enabled: Optional[StrictBool] = Field(default=None, alias="samlEnabled")
     scim_enabled: Optional[StrictBool] = Field(default=None, alias="scimEnabled")
     scim_bearer_token_configured: Optional[StrictBool] = Field(default=None, alias="scimBearerTokenConfigured")
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
-    __properties: ClassVar[List[str]] = ["organizationId", "configured", "issuerBaseUrl", "oauthClientId", "oauthClientSecretConfigured", "oidcEnabled", "scimEnabled", "scimBearerTokenConfigured", "createdAt", "updatedAt"]
+    __properties: ClassVar[List[str]] = ["organizationId", "configured", "samlIdpSsoUrl", "samlIdpIssuer", "samlIdpCertificateConfigured", "samlEnabled", "scimEnabled", "scimBearerTokenConfigured", "createdAt", "updatedAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -93,10 +93,10 @@ class OrganizationsOktaIdpSettings(BaseModel):
         _obj = cls.model_validate({
             "organizationId": obj.get("organizationId"),
             "configured": obj.get("configured"),
-            "issuerBaseUrl": obj.get("issuerBaseUrl"),
-            "oauthClientId": obj.get("oauthClientId"),
-            "oauthClientSecretConfigured": obj.get("oauthClientSecretConfigured"),
-            "oidcEnabled": obj.get("oidcEnabled"),
+            "samlIdpSsoUrl": obj.get("samlIdpSsoUrl"),
+            "samlIdpIssuer": obj.get("samlIdpIssuer"),
+            "samlIdpCertificateConfigured": obj.get("samlIdpCertificateConfigured"),
+            "samlEnabled": obj.get("samlEnabled"),
             "scimEnabled": obj.get("scimEnabled"),
             "scimBearerTokenConfigured": obj.get("scimBearerTokenConfigured"),
             "createdAt": obj.get("createdAt"),

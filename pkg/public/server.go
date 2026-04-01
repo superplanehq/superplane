@@ -685,6 +685,11 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if account.ManagedAccount {
+		http.Error(w, "Managed accounts cannot create organizations", http.StatusForbidden)
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)

@@ -20,11 +20,11 @@ var _ MappedNullable = &OrganizationsUpdateOktaIdpSettingsBody{}
 
 // OrganizationsUpdateOktaIdpSettingsBody struct for OrganizationsUpdateOktaIdpSettingsBody
 type OrganizationsUpdateOktaIdpSettingsBody struct {
-	IssuerBaseUrl     *string `json:"issuerBaseUrl,omitempty"`
-	OauthClientId     *string `json:"oauthClientId,omitempty"`
-	OauthClientSecret *string `json:"oauthClientSecret,omitempty"`
-	OidcEnabled       *bool   `json:"oidcEnabled,omitempty"`
-	ScimEnabled       *bool   `json:"scimEnabled,omitempty"`
+	SamlIdpSsoUrl        *string `json:"samlIdpSsoUrl,omitempty"`
+	SamlIdpIssuer        *string `json:"samlIdpIssuer,omitempty"`
+	SamlIdpCertificatePem *string `json:"samlIdpCertificatePem,omitempty"`
+	SamlEnabled          *bool   `json:"samlEnabled,omitempty"`
+	ScimEnabled          *bool   `json:"scimEnabled,omitempty"`
 }
 
 // NewOrganizationsUpdateOktaIdpSettingsBody instantiates a new OrganizationsUpdateOktaIdpSettingsBody object
@@ -44,132 +44,132 @@ func NewOrganizationsUpdateOktaIdpSettingsBodyWithDefaults() *OrganizationsUpdat
 	return &this
 }
 
-// GetIssuerBaseUrl returns the IssuerBaseUrl field value if set, zero value otherwise.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetIssuerBaseUrl() string {
-	if o == nil || IsNil(o.IssuerBaseUrl) {
+// GetSamlIdpSsoUrl returns the SamlIdpSsoUrl field value if set, zero value otherwise.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlIdpSsoUrl() string {
+	if o == nil || IsNil(o.SamlIdpSsoUrl) {
 		var ret string
 		return ret
 	}
-	return *o.IssuerBaseUrl
+	return *o.SamlIdpSsoUrl
 }
 
-// GetIssuerBaseUrlOk returns a tuple with the IssuerBaseUrl field value if set, nil otherwise
+// GetSamlIdpSsoUrlOk returns a tuple with the SamlIdpSsoUrl field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetIssuerBaseUrlOk() (*string, bool) {
-	if o == nil || IsNil(o.IssuerBaseUrl) {
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlIdpSsoUrlOk() (*string, bool) {
+	if o == nil || IsNil(o.SamlIdpSsoUrl) {
 		return nil, false
 	}
-	return o.IssuerBaseUrl, true
+	return o.SamlIdpSsoUrl, true
 }
 
-// HasIssuerBaseUrl returns a boolean if a field has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) HasIssuerBaseUrl() bool {
-	if o != nil && !IsNil(o.IssuerBaseUrl) {
+// HasSamlIdpSsoUrl returns a boolean if a field has been set.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) HasSamlIdpSsoUrl() bool {
+	if o != nil && !IsNil(o.SamlIdpSsoUrl) {
 		return true
 	}
 
 	return false
 }
 
-// SetIssuerBaseUrl gets a reference to the given string and assigns it to the IssuerBaseUrl field.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) SetIssuerBaseUrl(v string) {
-	o.IssuerBaseUrl = &v
+// SetSamlIdpSsoUrl gets a reference to the given string and assigns it to the SamlIdpSsoUrl field.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) SetSamlIdpSsoUrl(v string) {
+	o.SamlIdpSsoUrl = &v
 }
 
-// GetOauthClientId returns the OauthClientId field value if set, zero value otherwise.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetOauthClientId() string {
-	if o == nil || IsNil(o.OauthClientId) {
+// GetSamlIdpIssuer returns the SamlIdpIssuer field value if set, zero value otherwise.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlIdpIssuer() string {
+	if o == nil || IsNil(o.SamlIdpIssuer) {
 		var ret string
 		return ret
 	}
-	return *o.OauthClientId
+	return *o.SamlIdpIssuer
 }
 
-// GetOauthClientIdOk returns a tuple with the OauthClientId field value if set, nil otherwise
+// GetSamlIdpIssuerOk returns a tuple with the SamlIdpIssuer field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetOauthClientIdOk() (*string, bool) {
-	if o == nil || IsNil(o.OauthClientId) {
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlIdpIssuerOk() (*string, bool) {
+	if o == nil || IsNil(o.SamlIdpIssuer) {
 		return nil, false
 	}
-	return o.OauthClientId, true
+	return o.SamlIdpIssuer, true
 }
 
-// HasOauthClientId returns a boolean if a field has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) HasOauthClientId() bool {
-	if o != nil && !IsNil(o.OauthClientId) {
+// HasSamlIdpIssuer returns a boolean if a field has been set.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) HasSamlIdpIssuer() bool {
+	if o != nil && !IsNil(o.SamlIdpIssuer) {
 		return true
 	}
 
 	return false
 }
 
-// SetOauthClientId gets a reference to the given string and assigns it to the OauthClientId field.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) SetOauthClientId(v string) {
-	o.OauthClientId = &v
+// SetSamlIdpIssuer gets a reference to the given string and assigns it to the SamlIdpIssuer field.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) SetSamlIdpIssuer(v string) {
+	o.SamlIdpIssuer = &v
 }
 
-// GetOauthClientSecret returns the OauthClientSecret field value if set, zero value otherwise.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetOauthClientSecret() string {
-	if o == nil || IsNil(o.OauthClientSecret) {
+// GetSamlIdpCertificatePem returns the SamlIdpCertificatePem field value if set, zero value otherwise.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlIdpCertificatePem() string {
+	if o == nil || IsNil(o.SamlIdpCertificatePem) {
 		var ret string
 		return ret
 	}
-	return *o.OauthClientSecret
+	return *o.SamlIdpCertificatePem
 }
 
-// GetOauthClientSecretOk returns a tuple with the OauthClientSecret field value if set, nil otherwise
+// GetSamlIdpCertificatePemOk returns a tuple with the SamlIdpCertificatePem field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetOauthClientSecretOk() (*string, bool) {
-	if o == nil || IsNil(o.OauthClientSecret) {
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlIdpCertificatePemOk() (*string, bool) {
+	if o == nil || IsNil(o.SamlIdpCertificatePem) {
 		return nil, false
 	}
-	return o.OauthClientSecret, true
+	return o.SamlIdpCertificatePem, true
 }
 
-// HasOauthClientSecret returns a boolean if a field has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) HasOauthClientSecret() bool {
-	if o != nil && !IsNil(o.OauthClientSecret) {
+// HasSamlIdpCertificatePem returns a boolean if a field has been set.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) HasSamlIdpCertificatePem() bool {
+	if o != nil && !IsNil(o.SamlIdpCertificatePem) {
 		return true
 	}
 
 	return false
 }
 
-// SetOauthClientSecret gets a reference to the given string and assigns it to the OauthClientSecret field.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) SetOauthClientSecret(v string) {
-	o.OauthClientSecret = &v
+// SetSamlIdpCertificatePem gets a reference to the given string and assigns it to the SamlIdpCertificatePem field.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) SetSamlIdpCertificatePem(v string) {
+	o.SamlIdpCertificatePem = &v
 }
 
-// GetOidcEnabled returns the OidcEnabled field value if set, zero value otherwise.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetOidcEnabled() bool {
-	if o == nil || IsNil(o.OidcEnabled) {
+// GetSamlEnabled returns the SamlEnabled field value if set, zero value otherwise.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlEnabled() bool {
+	if o == nil || IsNil(o.SamlEnabled) {
 		var ret bool
 		return ret
 	}
-	return *o.OidcEnabled
+	return *o.SamlEnabled
 }
 
-// GetOidcEnabledOk returns a tuple with the OidcEnabled field value if set, nil otherwise
+// GetSamlEnabledOk returns a tuple with the SamlEnabled field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) GetOidcEnabledOk() (*bool, bool) {
-	if o == nil || IsNil(o.OidcEnabled) {
+func (o *OrganizationsUpdateOktaIdpSettingsBody) GetSamlEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.SamlEnabled) {
 		return nil, false
 	}
-	return o.OidcEnabled, true
+	return o.SamlEnabled, true
 }
 
-// HasOidcEnabled returns a boolean if a field has been set.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) HasOidcEnabled() bool {
-	if o != nil && !IsNil(o.OidcEnabled) {
+// HasSamlEnabled returns a boolean if a field has been set.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) HasSamlEnabled() bool {
+	if o != nil && !IsNil(o.SamlEnabled) {
 		return true
 	}
 
 	return false
 }
 
-// SetOidcEnabled gets a reference to the given bool and assigns it to the OidcEnabled field.
-func (o *OrganizationsUpdateOktaIdpSettingsBody) SetOidcEnabled(v bool) {
-	o.OidcEnabled = &v
+// SetSamlEnabled gets a reference to the given bool and assigns it to the SamlEnabled field.
+func (o *OrganizationsUpdateOktaIdpSettingsBody) SetSamlEnabled(v bool) {
+	o.SamlEnabled = &v
 }
 
 // GetScimEnabled returns the ScimEnabled field value if set, zero value otherwise.
@@ -214,17 +214,17 @@ func (o OrganizationsUpdateOktaIdpSettingsBody) MarshalJSON() ([]byte, error) {
 
 func (o OrganizationsUpdateOktaIdpSettingsBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.IssuerBaseUrl) {
-		toSerialize["issuerBaseUrl"] = o.IssuerBaseUrl
+	if !IsNil(o.SamlIdpSsoUrl) {
+		toSerialize["samlIdpSsoUrl"] = o.SamlIdpSsoUrl
 	}
-	if !IsNil(o.OauthClientId) {
-		toSerialize["oauthClientId"] = o.OauthClientId
+	if !IsNil(o.SamlIdpIssuer) {
+		toSerialize["samlIdpIssuer"] = o.SamlIdpIssuer
 	}
-	if !IsNil(o.OauthClientSecret) {
-		toSerialize["oauthClientSecret"] = o.OauthClientSecret
+	if !IsNil(o.SamlIdpCertificatePem) {
+		toSerialize["samlIdpCertificatePem"] = o.SamlIdpCertificatePem
 	}
-	if !IsNil(o.OidcEnabled) {
-		toSerialize["oidcEnabled"] = o.OidcEnabled
+	if !IsNil(o.SamlEnabled) {
+		toSerialize["samlEnabled"] = o.SamlEnabled
 	}
 	if !IsNil(o.ScimEnabled) {
 		toSerialize["scimEnabled"] = o.ScimEnabled

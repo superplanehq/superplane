@@ -27,12 +27,12 @@ class OrganizationsUpdateOktaIdpSettingsBody(BaseModel):
     """
     OrganizationsUpdateOktaIdpSettingsBody
     """ # noqa: E501
-    issuer_base_url: Optional[StrictStr] = Field(default=None, alias="issuerBaseUrl")
-    oauth_client_id: Optional[StrictStr] = Field(default=None, alias="oauthClientId")
-    oauth_client_secret: Optional[StrictStr] = Field(default=None, alias="oauthClientSecret")
-    oidc_enabled: Optional[StrictBool] = Field(default=None, alias="oidcEnabled")
+    saml_idp_sso_url: Optional[StrictStr] = Field(default=None, alias="samlIdpSsoUrl")
+    saml_idp_issuer: Optional[StrictStr] = Field(default=None, alias="samlIdpIssuer")
+    saml_idp_certificate_pem: Optional[StrictStr] = Field(default=None, alias="samlIdpCertificatePem")
+    saml_enabled: Optional[StrictBool] = Field(default=None, alias="samlEnabled")
     scim_enabled: Optional[StrictBool] = Field(default=None, alias="scimEnabled")
-    __properties: ClassVar[List[str]] = ["issuerBaseUrl", "oauthClientId", "oauthClientSecret", "oidcEnabled", "scimEnabled"]
+    __properties: ClassVar[List[str]] = ["samlIdpSsoUrl", "samlIdpIssuer", "samlIdpCertificatePem", "samlEnabled", "scimEnabled"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -85,10 +85,10 @@ class OrganizationsUpdateOktaIdpSettingsBody(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "issuerBaseUrl": obj.get("issuerBaseUrl"),
-            "oauthClientId": obj.get("oauthClientId"),
-            "oauthClientSecret": obj.get("oauthClientSecret"),
-            "oidcEnabled": obj.get("oidcEnabled"),
+            "samlIdpSsoUrl": obj.get("samlIdpSsoUrl"),
+            "samlIdpIssuer": obj.get("samlIdpIssuer"),
+            "samlIdpCertificatePem": obj.get("samlIdpCertificatePem"),
+            "samlEnabled": obj.get("samlEnabled"),
             "scimEnabled": obj.get("scimEnabled")
         })
         return _obj
