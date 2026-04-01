@@ -19,7 +19,7 @@ COPY evals evals
 
 RUN uv sync --frozen --no-dev
 
-FROM python:3.13-slim AS runner
+FROM python:3.12-slim AS runner
 
 LABEL org.opencontainers.image.title="superplane-agent" \
   org.opencontainers.image.description="SuperPlane agent service" \
