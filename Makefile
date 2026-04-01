@@ -37,7 +37,7 @@ test.setup:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build
-	$(COMPOSE) run --rm app go mod download
+	$(COMPOSE) run --rm --no-deps app go mod download
 	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e DB_PASSWORD=$(DB_PASSWORD) -e PGPASSWORD=$(DB_PASSWORD) app bash /app/scripts/ci_db_setup
 
 test.start:
