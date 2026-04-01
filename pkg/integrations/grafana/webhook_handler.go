@@ -55,9 +55,7 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 	}
 
 	if err := client.UpsertNotificationPolicyRoute(name, config.AlertNames); err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.Warnf("grafana webhook setup: failed to upsert notification policy route: %v", err)
-		}
+		return nil, fmt.Errorf("grafana webhook setup: notification policy route: %w", err)
 	}
 
 	return GrafanaWebhookMetadata{
@@ -67,16 +65,23 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 }
 
 func resolveOrCreateWebhookSecret(webhook core.WebhookContext, config OnAlertFiringConfig) (string, error) {
+	legacy := strings.TrimSpace(config.SharedSecret)
+
 	secret, err := webhook.GetSecret()
 	if err != nil {
 		return "", err
 	}
+	stored := strings.TrimSpace(string(secret))
 
-	sharedSecret := strings.TrimSpace(string(secret))
-	if sharedSecret == "" {
-		sharedSecret = strings.TrimSpace(config.SharedSecret)
-	}
-	if sharedSecret == "" {
+	var sharedSecret string
+	switch {
+	case legacy != "":
+		// Legacy trigger config wins over an existing stored secret so contact points and
+		// any manually configured Grafana bearer tokens stay aligned with user intent.
+		sharedSecret = legacy
+	case stored != "":
+		sharedSecret = stored
+	default:
 		sharedSecret, err = crypto.Base64String(32)
 		if err != nil {
 			return "", err
@@ -116,8 +121,8 @@ func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		contactPointName = buildContactPointName(ctx.Webhook.GetID())
 	}
 
-	if err := client.RemoveNotificationPolicyRoute(contactPointName); err != nil && ctx.Logger != nil {
-		ctx.Logger.Warnf("grafana webhook cleanup: failed to remove notification policy route: %v", err)
+	if err := client.RemoveNotificationPolicyRoute(contactPointName); err != nil {
+		return fmt.Errorf("grafana webhook cleanup: notification policy route: %w", err)
 	}
 
 	return client.DeleteContactPoint(contactPointUID)
@@ -142,7 +147,15 @@ func (h *GrafanaWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		}
 	}
 
-	secretsMatch := strings.TrimSpace(configA.SharedSecret) == strings.TrimSpace(configB.SharedSecret)
+	trimA := strings.TrimSpace(configA.SharedSecret)
+	trimB := strings.TrimSpace(configB.SharedSecret)
+	secretsMatch := trimA == trimB
+	if !secretsMatch && bindingKeyA != "" && bindingKeyA == bindingKeyB && trimB == "" {
+		// New canvases omit sharedSecret; treat as compatible with an existing webhook record
+		// that still carries a legacy or stored secret so we do not force reprovisioning.
+		secretsMatch = true
+	}
+
 	return secretsMatch && predicatesSliceEqual(configA.AlertNames, configB.AlertNames), nil
 }
 

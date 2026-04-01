@@ -139,6 +139,79 @@ func Test__GrafanaWebhookHandler__Setup__PolicyRouteHasAlertNameMatchers(t *test
 	assert.Equal(t, `^(?:High CPU|Low.*)$`, matcher[2])
 }
 
+func Test__GrafanaWebhookHandler__Setup__FailsWhenNotificationPolicyUpsertFails(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"uid":"cp_x"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default"}`))},
+			{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`policy error`))},
+		},
+	}
+	webhookCtx := &testWebhookContext{
+		id:            "wh_policy_fail",
+		url:           "https://example.com/webhook",
+		configuration: map[string]any{},
+	}
+
+	metadata, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+
+	require.ErrorContains(t, err, "notification policy route")
+	assert.Nil(t, metadata)
+	require.Len(t, httpCtx.Requests, 4)
+}
+
+func Test__GrafanaWebhookHandler__Setup__LegacySharedSecretOverridesStoredWebhookSecret(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"uid":"cp_override"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default"}`))},
+			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(`{}`))},
+		},
+	}
+
+	webhookCtx := &testWebhookContext{
+		id:            "wh_override",
+		url:           "https://example.com/webhook",
+		configuration: map[string]any{"sharedSecret": "legacy-bearer"},
+		secret:        []byte("auto-generated-stored"),
+	}
+
+	_, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []byte("legacy-bearer"), webhookCtx.secret)
+
+	body, err := io.ReadAll(httpCtx.Requests[1].Body)
+	require.NoError(t, err)
+	payload := map[string]any{}
+	require.NoError(t, json.Unmarshal(body, &payload))
+	settings, ok := payload["settings"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "legacy-bearer", settings["authorization_credentials"])
+}
+
 func Test__GrafanaWebhookHandler__Setup__ManualFallbackWhenClientUnavailable(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	webhookCtx := &testWebhookContext{
@@ -306,6 +379,36 @@ func Test__GrafanaWebhookHandler__Cleanup(t *testing.T) {
 	assert.Empty(t, routes)
 }
 
+func Test__GrafanaWebhookHandler__Cleanup__FailsWhenPolicyRouteRemovalFails(t *testing.T) {
+	handler := &GrafanaWebhookHandler{}
+	contactPointName := buildContactPointName("wh_fail_policy")
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"receiver":"default","routes":[{"receiver":"` + contactPointName + `","continue":true}]}`))},
+			{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`cannot update policies`))},
+		},
+	}
+	webhookCtx := &testWebhookContext{
+		id:       "wh_fail_policy",
+		metadata: map[string]any{"contactPointUid": "cp_123", "contactPointName": contactPointName},
+	}
+
+	err := handler.Cleanup(core.WebhookHandlerContext{
+		HTTP:    httpCtx,
+		Webhook: webhookCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+
+	require.ErrorContains(t, err, "notification policy route")
+	require.Len(t, httpCtx.Requests, 2)
+	assert.Equal(t, http.MethodPut, httpCtx.Requests[1].Method)
+}
+
 func Test__GrafanaWebhookHandler__Cleanup__NoContactPointUIDWithoutTokenIsNoOp(t *testing.T) {
 	handler := &GrafanaWebhookHandler{}
 	httpCtx := &contexts.HTTPContext{}
@@ -386,6 +489,13 @@ func Test__GrafanaWebhookHandler__CompareConfig(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.True(t, equal)
+
+	equal, err = handler.CompareConfig(
+		map[string]any{"webhookBindingKey": "node-1", "sharedSecret": "legacy"},
+		map[string]any{"webhookBindingKey": "node-1"},
+	)
+	require.NoError(t, err)
+	assert.True(t, equal, "omitted sharedSecret on new config should match legacy stored secret when binding key matches")
 
 	equal, err = handler.CompareConfig(
 		map[string]any{

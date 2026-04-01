@@ -266,6 +266,24 @@ func Test__OnAlertFiring__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "missing webhook context")
 		require.Len(t, integrationContext.WebhookRequests, 0)
 	})
+
+	t.Run("invalid matches regex is rejected at setup", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{}
+		metadataContext := &contexts.MetadataContext{}
+		webhookContext := &contexts.NodeWebhookContext{}
+
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: map[string]any{
+				"alertNames": []map[string]any{{"type": "matches", "value": "("}},
+			},
+			Integration: integrationContext,
+			Metadata:    metadataContext,
+			Webhook:     webhookContext,
+		})
+
+		require.ErrorContains(t, err, "invalid regex")
+		require.Len(t, integrationContext.WebhookRequests, 0)
+	})
 }
 
 func Test__OnAlertFiring__HandleWebhook__Filters(t *testing.T) {

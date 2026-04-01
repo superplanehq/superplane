@@ -275,7 +275,19 @@ func sanitizeOnAlertFiringConfig(config OnAlertFiringConfig) OnAlertFiringConfig
 	return config
 }
 
-func validateOnAlertFiringConfig(_ OnAlertFiringConfig) error {
+func validateOnAlertFiringConfig(config OnAlertFiringConfig) error {
+	for _, p := range config.AlertNames {
+		if p.Type == configuration.PredicateTypeMatches {
+			if _, err := regexp.Compile(p.Value); err != nil {
+				return fmt.Errorf("alertNames matches predicate: invalid regex: %w", err)
+			}
+		}
+	}
+	if combined, ok := combinedPositiveAlertNameRegex(config.AlertNames); ok {
+		if _, err := regexp.Compile(combined); err != nil {
+			return fmt.Errorf("alertNames: combined positive regex is invalid: %w", err)
+		}
+	}
 	return nil
 }
 
