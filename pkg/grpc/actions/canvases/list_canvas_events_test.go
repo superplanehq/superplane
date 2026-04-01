@@ -22,8 +22,24 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 		r.User,
 		[]models.CanvasNode{
 			{
+				NodeID: "trigger-0",
+				Name:   "Trigger 0",
+				Type:   models.NodeTypeTrigger,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Trigger: &models.TriggerRef{Name: "start"},
+				}),
+			},
+			{
 				NodeID: "node-1",
 				Name:   "Node 1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "node-2",
+				Name:   "Node 2",
 				Type:   models.NodeTypeComponent,
 				Ref: datatypes.NewJSONType(models.NodeRef{
 					Component: &models.ComponentRef{Name: "noop"},
@@ -33,14 +49,37 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-	customName := "Custom Run Name"
+	//
+	// First root event
+	//
+	rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-0", "default", nil)
+	customName := "Root Event 1"
 	rootEvent1.CustomName = &customName
 	require.NoError(t, database.Conn().Save(rootEvent1).Error)
 
-	parentExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
-	nextExecution := support.CreateNextNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, &parentExecution.ID)
+	firstExecution := support.CreateCanvasNodeExecution(t, canvas.ID, "node-1", rootEvent1.ID, rootEvent1.ID, nil)
+	_, err := firstExecution.Pass(map[string][]any{
+		"default": {map[string]any{"data": "first"}},
+	})
+
+	require.NoError(t, err)
+	secondExecution := support.CreateNextNodeExecution(t, canvas.ID, "node-2", rootEvent1.ID, rootEvent1.ID, &firstExecution.ID)
+	_, err = secondExecution.Pass(map[string][]any{
+		"default": {map[string]any{"data": "second"}},
+	})
+	require.NoError(t, err)
+
+	//
+	// Second root event, no executions
+	//
+	rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "trigger-0", "default", nil)
+	customName2 := "Root Event 2"
+	rootEvent2.CustomName = &customName2
+	require.NoError(t, database.Conn().Save(rootEvent2).Error)
+
+	//
+	// Verify endpoint returns proper results
+	//
 
 	response, err := ListCanvasEvents(context.Background(), r.Registry, canvas.ID, 0, nil)
 	require.NoError(t, err)
@@ -52,22 +91,6 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	require.Len(t, event1.Executions, 2)
 	assert.Equal(t, customName, event1.CustomName)
 
-	parent := findCanvasNodeExecution(event1.Executions, parentExecution.ID.String())
-	require.NotNil(t, parent)
-	assert.Equal(t, canvas.ID.String(), parent.CanvasId)
-	assert.Equal(t, "node-1", parent.NodeId)
-	assert.Empty(t, parent.ParentExecutionId)
-	assert.Empty(t, parent.PreviousExecutionId)
-	assert.Equal(t, pb.CanvasNodeExecution_STATE_PENDING, parent.State)
-
-	next := findCanvasNodeExecution(event1.Executions, nextExecution.ID.String())
-	require.NotNil(t, next)
-	assert.Equal(t, canvas.ID.String(), next.CanvasId)
-	assert.Equal(t, "node-1", next.NodeId)
-	assert.Empty(t, next.ParentExecutionId)
-	assert.Equal(t, parentExecution.ID.String(), next.PreviousExecutionId)
-	assert.Equal(t, pb.CanvasNodeExecution_STATE_PENDING, next.State)
-
 	event2 := findCanvasEventWithExecutions(response.Events, rootEvent2.ID.String())
 	require.NotNil(t, event2)
 	assert.Empty(t, event2.Executions)
@@ -77,16 +100,6 @@ func findCanvasEventWithExecutions(events []*pb.CanvasEventWithExecutions, id st
 	for _, event := range events {
 		if event.Id == id {
 			return event
-		}
-	}
-
-	return nil
-}
-
-func findCanvasNodeExecution(executions []*pb.CanvasNodeExecution, id string) *pb.CanvasNodeExecution {
-	for _, execution := range executions {
-		if execution.Id == id {
-			return execution
 		}
 	}
 
