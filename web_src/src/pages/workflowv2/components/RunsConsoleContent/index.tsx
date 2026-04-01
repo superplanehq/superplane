@@ -12,13 +12,6 @@ import {
 } from "@/pages/workflowv2/canvasRunsUtils";
 import { Play } from "lucide-react";
 
-export function handleKeyboardActivation(e: React.KeyboardEvent, handler: () => void) {
-  if (e.key === "Enter" || e.key === " ") {
-    e.preventDefault();
-    handler();
-  }
-}
-
 export function RunsConsoleContent({
   events,
   totalCount,

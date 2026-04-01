@@ -2,7 +2,7 @@ import type { CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { formatRunTimestamp, resolveNodeIconSlug } from "../../canvasRunsUtils";
 import { cn } from "@/lib/utils";
-import { handleKeyboardActivation } from ".";
+import { handleKeyboardActivation } from "@/lib/utils";
 import { NodeIcon } from "./NodeIcon";
 import { StatusBadge } from "./StatusBadge";
 import { RUNS_CONSOLE_BADGE_COL } from "./constants";
