@@ -15,4 +15,4 @@ fi
 
 unzip protoc.zip
 mv bin/protoc /usr/local/bin/protoc
-rm -rf protoc.zip
+rm -rf protoc.zip bin include readme.txt
