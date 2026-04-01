@@ -60,7 +60,7 @@ func TestClient_ExecuteQueryWithToken_SetsAuthAndQueryParams(t *testing.T) {
 	assert.Equal(t, "2025-01-01T00:00:00Z", req.URL.Query().Get("min_timestamp"))
 	assert.Equal(t, "2025-01-01T23:59:59Z", req.URL.Query().Get("max_timestamp"))
 	assert.Equal(t, "10", req.URL.Query().Get("limit"))
-	assert.Equal(t, "true", req.URL.Query().Get("row_oriented"))
+	assert.Equal(t, "true", req.URL.Query().Get("json_rows"))
 }
 
 func TestClient_createReadToken_EmptyTokenReturned(t *testing.T) {
