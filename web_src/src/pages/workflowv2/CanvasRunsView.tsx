@@ -1,11 +1,14 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Play } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, Loader2, Play } from "lucide-react";
 import type {
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
 } from "@/api-client";
+import { eventExecutionsQueryOptions } from "@/hooks/useCanvasData";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -81,6 +84,19 @@ function resolveExecutionRowData(
     errorMessage: execution.result === "RESULT_FAILED" ? execution.resultMessage : undefined,
     timestamp: execution.createdAt ? formatRunTimestamp(execution.createdAt) : undefined,
   };
+}
+
+function RunRowLoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 pl-11 text-xs text-gray-500 border-t border-gray-200">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function RunRowErrorState({ label }: { label: string }) {
+  return <div className="px-4 py-2 pl-11 text-xs text-red-600 border-t border-gray-200">{label}</div>;
 }
 
 function ExecutionRow({
@@ -188,7 +204,7 @@ function RunRowHeader({
   event: CanvasesCanvasEventWithExecutions;
   triggerNode: ComponentsNode | undefined;
   componentIconMap: Record<string, string>;
-  executions: CanvasesCanvasNodeExecution[];
+  executions: CanvasesCanvasNodeExecutionRef[];
   queueItemCount: number;
   isExpanded: boolean;
   onToggle: () => void;
@@ -297,9 +313,22 @@ export function RunRow({
     triggerEvent?: SidebarEvent;
   }) => void;
 }) {
-  const executions = useMemo(() => event.executions || [], [event.executions]);
+  const canvasId = event.canvasId || "";
+  const eventId = event.id || "";
+  const enabled = isExpanded && !!event.canvasId && !!event.id;
+
   const triggerNode = useMemo(() => nodes.find((n) => n.id === event.nodeId), [nodes, event.nodeId]);
   const triggerSidebarEvent = useMemo(() => buildTriggerSidebarEvent(event, triggerNode), [event, triggerNode]);
+  const executionRefs = useMemo(() => event.executions || [], [event.executions]);
+  const executionDetailsQuery = useQuery({
+    ...eventExecutionsQueryOptions(canvasId, eventId),
+    enabled
+  });
+
+  const detailedExecutions = useMemo(
+    () => executionDetailsQuery.data?.executions || [],
+    [executionDetailsQuery.data?.executions],
+  );
 
   const makeExecutionSelectHandler = useCallback(
     (execution: CanvasesCanvasNodeExecution) => {
@@ -326,14 +355,20 @@ export function RunRow({
         event={event}
         triggerNode={triggerNode}
         componentIconMap={componentIconMap}
-        executions={executions}
+        executions={executionRefs}
         queueItemCount={queueItems.length}
         isExpanded={isExpanded}
         onToggle={onToggle}
       />
-      {isExpanded && (executions.length > 0 || queueItems.length > 0) && (
+      {isExpanded && (executionRefs.length > 0 || queueItems.length > 0) && (
         <div className="bg-gray-50">
-          {executions.map((execution) => (
+          {executionDetailsQuery.isPending && executionRefs.length > 0 && (
+            <RunRowLoadingState label="Loading run details..." />
+          )}
+          {executionDetailsQuery.isError && executionRefs.length > 0 && (
+            <RunRowErrorState label="Could not load run details." />
+          )}
+          {detailedExecutions.map((execution) => (
             <ExecutionRow
               key={execution.id}
               execution={execution}

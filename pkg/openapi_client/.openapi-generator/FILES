@@ -73,6 +73,7 @@ docs/CanvasesCanvasEventWithExecutions.md
 docs/CanvasesCanvasMemory.md
 docs/CanvasesCanvasMetadata.md
 docs/CanvasesCanvasNodeExecution.md
+docs/CanvasesCanvasNodeExecutionRef.md
 docs/CanvasesCanvasNodeExecutionState.md
 docs/CanvasesCanvasNodeQueueItem.md
 docs/CanvasesCanvasSpec.md
@@ -311,6 +312,7 @@ model_canvases_canvas_event_with_executions.go
 model_canvases_canvas_memory.go
 model_canvases_canvas_metadata.go
 model_canvases_canvas_node_execution.go
+model_canvases_canvas_node_execution_ref.go
 model_canvases_canvas_node_execution_state.go
 model_canvases_canvas_node_queue_item.go
 model_canvases_canvas_spec.go
