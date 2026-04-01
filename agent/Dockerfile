@@ -1,21 +1,8 @@
-FROM python:3.13-slim AS base
+ARG SUPERPLANE_DEV_BASE_IMAGE="ghcr.io/superplanehq/superplane-dev-base:v1"
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
-
-WORKDIR /app/agent
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+FROM ${SUPERPLANE_DEV_BASE_IMAGE} AS base
 
 FROM base AS dev
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends make \
-    && rm -rf /var/lib/apt/lists/*
 
 CMD ["bash", "-lc", "sleep infinity"]
 

@@ -1,13 +1,14 @@
 ARG GO_VERSION=1.25.3
 ARG PLAYWRIGHT_GO_VERSION=v0.5200.1
 
-FROM ubuntu:22.04
+FROM python:3.13-slim
 
 ARG GO_VERSION
 ARG PLAYWRIGHT_GO_VERSION
 
 WORKDIR /opt/install
 COPY scripts/docker /opt/install-scripts
+COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
 
 ENV GO_VERSION=${GO_VERSION}
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -16,8 +17,14 @@ ENV GOBIN="/go/bin"
 ENV PATH="${GOBIN}:${PATH}"
 ENV GOPROXY="https://proxy.golang.org,direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-RUN bash /opt/install-scripts/install-go.sh "${GO_VERSION}" && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends bash ca-certificates make && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* && \
+    bash /opt/install-scripts/install-go.sh "${GO_VERSION}" && \
     bash /opt/install-scripts/install-nodejs.sh && \
     bash /opt/install-scripts/install-postgresql-client.sh && \
     bash /opt/install-scripts/install-gomigrate.sh && \
