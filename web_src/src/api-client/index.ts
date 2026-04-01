@@ -209,6 +209,7 @@ export type {
   CanvasesCanvasMemory,
   CanvasesCanvasMetadata,
   CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeExecutionState,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasSpec,
