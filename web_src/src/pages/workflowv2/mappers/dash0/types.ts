@@ -14,10 +14,6 @@ export interface SendLogEventConfiguration {
   attributes?: Record<string, string>;
 }
 
-export interface QueryPrometheusMetadata {
-  // No metadata needed initially
-}
-
 export interface ListIssuesConfiguration {
   checkRules?: string[];
 }

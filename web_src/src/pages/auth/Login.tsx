@@ -159,7 +159,7 @@ export const Login: React.FC = () => {
             magicCodeEnabled: Boolean(data.magicCodeEnabled),
           });
         }
-      } catch (err) {
+      } catch {
         if (!canceled) {
           setConfigError("Failed to load login options.");
         }

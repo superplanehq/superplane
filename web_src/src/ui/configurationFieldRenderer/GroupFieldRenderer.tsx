@@ -1,6 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useOrganizationGroups } from "../../hooks/useOrganizationData";
-import { ConfigurationField } from "../../api-client";
+import type { ConfigurationField } from "../../api-client";
 
 interface GroupFieldRendererProps {
   field: ConfigurationField;

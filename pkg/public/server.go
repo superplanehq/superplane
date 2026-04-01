@@ -30,6 +30,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+	"go.opentelemetry.io/otel/attribute"
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -59,6 +60,7 @@ import (
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -93,6 +95,48 @@ type Server struct {
 // WebsocketHub returns the websocket hub for this server
 func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
+}
+
+type otelMetricRouteContextKey struct{}
+
+type otelMetricRoute struct {
+	pattern string
+}
+
+/*
+ * withOtelMetricRoute creates a request-scoped holder for the final metric route.
+ * This is needed for grpc-gateway endpoints, where the outer Gorilla route only sees
+ * a broad PathPrefix such as /api/v1/canvases, while grpc-gateway knows the exact
+ * proto-backed template such as /api/v1/canvases/{canvas_id}/versions/{version_id}.
+ */
+func withOtelMetricRoute(r *http.Request) *http.Request {
+	return r.WithContext(context.WithValue(
+		r.Context(),
+		otelMetricRouteContextKey{},
+		&otelMetricRoute{},
+	))
+}
+
+func setOtelMetricRoute(ctx context.Context, pattern string) {
+	if pattern == "" {
+		return
+	}
+
+	route, ok := ctx.Value(otelMetricRouteContextKey{}).(*otelMetricRoute)
+	if !ok || route == nil {
+		return
+	}
+
+	route.pattern = pattern
+}
+
+func getOtelMetricRoute(ctx context.Context) string {
+	route, ok := ctx.Value(otelMetricRouteContextKey{}).(*otelMetricRoute)
+	if !ok || route == nil {
+		return ""
+	}
+
+	return route.pattern
 }
 
 func NewServer(
@@ -187,6 +231,19 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
+			/*
+			 * grpc-gateway annotates the matched HTTP path template in the request context.
+			 * We copy it into the request-scoped holder so otelmux can use it later when
+			 * recording metrics for the outer HTTP request.
+			 */
+			pattern, ok := runtime.HTTPPathPattern(ctx)
+			if ok {
+				setOtelMetricRoute(ctx, pattern)
+			}
+
+			return nil
+		}),
 		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
 	)
 
@@ -419,8 +476,46 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			/*
+			 * Seed a per-request holder before otelmux runs so deeper handlers can
+			 * populate the final route template without sharing state across requests.
+			 */
+			next.ServeHTTP(w, withOtelMetricRoute(r))
+		})
+	})
 	r.Use(otelmux.Middleware(
 		"superplane-public-api",
+		otelmux.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
+			/*
+			 * Prefer the route resolved by grpc-gateway. Fall back to Gorilla mux for
+			 * non-gateway routes that are matched directly by the outer router.
+			 */
+			route := getOtelMetricRoute(r.Context())
+
+			if route == "" {
+				route = r.Pattern
+			}
+
+			if route == "" {
+				currentRoute := mux.CurrentRoute(r)
+				if currentRoute != nil {
+					routeTemplate, err := currentRoute.GetPathTemplate()
+					if err == nil {
+						route = routeTemplate
+					}
+				}
+			}
+
+			if route == "" {
+				return nil
+			}
+
+			return []attribute.KeyValue{
+				attribute.String("http.route", route),
+			}
+		}),
 		otelmux.WithTracerProvider(nooptrace.NewTracerProvider()),
 	))
 	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))

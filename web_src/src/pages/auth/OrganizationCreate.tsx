@@ -62,7 +62,7 @@ const OrganizationCreate: React.FC = () => {
           setError(errorMessage);
         }
       }
-    } catch (err) {
+    } catch {
       setError("Network error occurred");
     } finally {
       setLoading(false);

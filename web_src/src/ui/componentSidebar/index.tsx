@@ -355,7 +355,7 @@ export const ComponentSidebar = ({
     try {
       await updateIntegrationMutation.mutateAsync({ name: nextName, configuration: configureIntegrationConfig });
       handleCloseConfigureIntegrationDialog();
-    } catch (_error) {
+    } catch {
       showErrorToast("Failed to update integration");
     }
   }, [

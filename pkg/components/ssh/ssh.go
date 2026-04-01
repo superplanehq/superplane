@@ -1,6 +1,7 @@
 package ssh
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -559,12 +560,26 @@ func (c *SSHCommand) getRetryAttempt(metadata core.MetadataContext) int {
 }
 
 func (c *SSHCommand) getMetadataMap(metadata core.MetadataContext) map[string]any {
-	current, ok := metadata.Get().(map[string]any)
-	if !ok || current == nil {
+	current := metadata.Get()
+	if current == nil {
 		return map[string]any{}
 	}
 
-	return current
+	if metadataMap, ok := current.(map[string]any); ok {
+		return metadataMap
+	}
+
+	data, err := json.Marshal(current)
+	if err != nil {
+		return map[string]any{}
+	}
+
+	metadataMap := map[string]any{}
+	if err := json.Unmarshal(data, &metadataMap); err != nil {
+		return map[string]any{}
+	}
+
+	return metadataMap
 }
 
 func (c *SSHCommand) setResultMetadata(metadata core.MetadataContext, result *CommandResult) error {
