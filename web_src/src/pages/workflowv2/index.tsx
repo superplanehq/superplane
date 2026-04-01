@@ -131,6 +131,7 @@ import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { prepareAnnotationNode } from "./lib/canvasAnnotationNode";
+import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvasBundle";
 import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvasNodePreparation";
@@ -142,9 +143,6 @@ import {
   ungroupWorkflowNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvasGroups";
-
-const BUNDLE_ICON_SLUG = "component";
-const BUNDLE_COLOR = "gray";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -6152,8 +6150,8 @@ function prepareSidebarData(
   let color = "indigo";
 
   if (blueprintMetadata) {
-    iconSlug = BUNDLE_ICON_SLUG;
-    color = BUNDLE_COLOR;
+    iconSlug = CANVAS_BUNDLE_ICON_SLUG;
+    color = CANVAS_BUNDLE_COLOR;
   } else if (componentMetadata) {
     iconSlug = componentMetadata.icon || iconSlug;
     color = componentMetadata.color || color;

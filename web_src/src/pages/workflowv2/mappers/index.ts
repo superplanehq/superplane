@@ -474,19 +474,7 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
  * to prevent a single component mapper failure from breaking the entire canvas.
  */
 export function getComponentBaseMapper(name: string): ComponentBaseMapper {
-  const parts = name?.split(".");
-  if (parts?.length === 1) {
-    return createSafeComponentMapper(componentBaseMappers[name] || noopMapper, name || "noop");
-  }
-
-  const appName = parts[0];
-  const appMapper = appMappers[appName];
-  if (!appMapper) {
-    return createSafeComponentMapper(noopMapper, name);
-  }
-
-  const componentName = parts.slice(1).join(".");
-  return createSafeComponentMapper(appMapper[componentName] || noopMapper, name);
+  return createSafeComponentMapper(findRegisteredComponentMapper(name) || noopMapper, name || "noop");
 }
 
 /**
@@ -567,11 +555,34 @@ export function getExecutionDetails(
   node: ComponentsNode,
   nodes?: ComponentsNode[],
 ): Record<string, unknown> | undefined {
-  return getComponentBaseMapper(componentName).getExecutionDetails({
+  const mapper = findRegisteredComponentMapper(componentName);
+  if (!mapper) {
+    return undefined;
+  }
+
+  return createSafeComponentMapper(mapper, componentName).getExecutionDetails({
     execution: buildExecutionInfo(execution),
     node: buildNodeInfo(node),
     nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
   });
+}
+
+function findRegisteredComponentMapper(name: string): ComponentBaseMapper | undefined {
+  const parts = name?.split(".");
+  if (!parts?.length) {
+    return undefined;
+  }
+
+  if (parts.length === 1) {
+    return componentBaseMappers[name];
+  }
+
+  const appMapper = appMappers[parts[0]];
+  if (!appMapper) {
+    return undefined;
+  }
+
+  return appMapper[parts.slice(1).join(".")];
 }
 
 function withCustomName(renderer: TriggerRenderer): TriggerRenderer {

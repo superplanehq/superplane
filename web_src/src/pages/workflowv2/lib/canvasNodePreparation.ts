@@ -16,6 +16,7 @@ import type { CanvasNode } from "@/ui/CanvasPage";
 import type { CompositeProps, LastRunState } from "@/ui/composite";
 import type { ComponentBaseMapper } from "../mappers/types";
 import { getComponentAdditionalDataBuilder, getComponentBaseMapper, getTriggerRenderer } from "../mappers";
+import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./canvasBundle";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvasNodeFallback";
 import {
   buildComponentDefinition,
@@ -25,9 +26,6 @@ import {
   buildQueueItemInfo,
   getNextInQueueInfo,
 } from "../utils";
-
-const BUNDLE_ICON_SLUG = "component";
-const BUNDLE_COLOR = "gray";
 
 type PrepareComponentNodeArgs = {
   nodes: ComponentsNode[];
@@ -174,9 +172,9 @@ function buildCompositeCanvasNode(args: {
       state: "pending" as const,
       outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
       composite: {
-        iconSlug: BUNDLE_ICON_SLUG,
-        iconColor: getColorClass(BUNDLE_COLOR),
-        collapsedBackground: getBackgroundColorClass(BUNDLE_COLOR),
+        iconSlug: CANVAS_BUNDLE_ICON_SLUG,
+        iconColor: getColorClass(CANVAS_BUNDLE_COLOR),
+        collapsedBackground: getBackgroundColorClass(CANVAS_BUNDLE_COLOR),
         collapsed: node.isCollapsed,
         title: displayLabel,
         description: blueprintMetadata?.description,
