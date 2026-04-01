@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentsComponent, ComponentsNode } from "@/api-client";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
-import { prepareComponentBaseNode, renderWorkflowNodeCustomField } from "./index";
+import { prepareComponentBaseNode } from "./lib/canvasNodePreparation";
+import { renderWorkflowNodeCustomField } from "./lib/renderWorkflowNodeCustomField";
 
 type FallbackComponentData = {
   renderFallback?: {
@@ -62,16 +63,16 @@ describe("workflow node preparation resilience", () => {
       getExecutionDetails: () => ({}),
     });
 
-    const result = prepareComponentBaseNode(
-      [makeNode()],
-      makeNode(),
-      [makeComponent()],
-      {},
-      {},
-      "canvas-1",
-      new QueryClient(),
-      "org-1",
-    );
+    const result = prepareComponentBaseNode({
+      nodes: [makeNode()],
+      node: makeNode(),
+      components: [makeComponent()],
+      nodeExecutionsMap: {},
+      nodeQueueItemsMap: {},
+      workflowId: "canvas-1",
+      queryClient: new QueryClient(),
+      organizationId: "org-1",
+    });
 
     const fallbackData = result.data as unknown as FallbackComponentData;
 

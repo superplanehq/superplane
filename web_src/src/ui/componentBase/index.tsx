@@ -127,8 +127,7 @@ export interface ComponentBaseSpec {
   // - value for JSON/text/XML specs (like payload)
   //
   values?: ComponentBaseSpecValue[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  value?: any;
+  value?: unknown;
   // Content type for value tooltips (json, xml, or text)
   contentType?: "json" | "xml" | "text";
 }

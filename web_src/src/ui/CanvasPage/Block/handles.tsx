@@ -33,27 +33,63 @@ function getBlockEdges(data: CanvasBlockData): BlockEdgeState[] {
   return data._allEdges || [];
 }
 
-export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">) {
-  if (data.type === "trigger" || data.type === "annotation" || data.type === "group") return null;
+function shouldHideLeftHandle(data: CanvasBlockData) {
+  return data.type === "trigger" || data.type === "annotation" || data.type === "group";
+}
 
-  const hoveredEdge = data._hoveredEdge;
-  const connectingFrom = data._connectingFrom;
-  const isAlreadyConnected = isAlreadyConnectedToNode(getBlockEdges(data), connectingFrom, nodeId);
+function shouldHideRightHandle(data: CanvasBlockData) {
+  return data.isTemplate || data.isPendingConnection || data.type === "annotation" || data.type === "group";
+}
 
-  const isHighlighted =
-    (hoveredEdge && hoveredEdge.target === nodeId) ||
+function getSingleChannelHighlight(args: {
+  hoveredEdge?: BlockEdgeState;
+  connectingFrom?: BlockConnectionState;
+  nodeId?: string;
+  channel: string;
+  allEdges: BlockEdgeState[];
+}) {
+  const { hoveredEdge, connectingFrom, nodeId, channel, allEdges } = args;
+  const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, connectingFrom?.nodeId, channel);
+
+  return (
+    (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channel) ||
+    (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channel) ||
     (connectingFrom &&
       connectingFrom.nodeId !== nodeId &&
-      connectingFrom.handleType === "source" &&
-      !isAlreadyConnected);
+      connectingFrom.handleType === "target" &&
+      !isAlreadyConnected)
+  );
+}
+
+function SingleRightHandle({
+  channel,
+  hoveredEdge,
+  connectingFrom,
+  nodeId,
+  allEdges,
+}: {
+  channel: string;
+  hoveredEdge?: BlockEdgeState;
+  connectingFrom?: BlockConnectionState;
+  nodeId?: string;
+  allEdges: BlockEdgeState[];
+}) {
+  const isHighlighted = getSingleChannelHighlight({
+    hoveredEdge,
+    connectingFrom,
+    nodeId,
+    channel,
+    allEdges,
+  });
 
   return (
     <Handle
-      type="target"
-      position={Position.Left}
+      type="source"
+      position={Position.Right}
+      id={channel}
       style={{
         ...HANDLE_STYLE,
-        left: -15,
+        right: -15,
         top: 18,
       }}
       className={isHighlighted ? "highlighted" : undefined}
@@ -61,44 +97,15 @@ export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">
   );
 }
 
-// eslint-disable-next-line max-lines-per-function, max-statements, complexity
-export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">) {
-  const isTemplate = data.isTemplate;
-  const isPendingConnection = data.isPendingConnection;
-  if (isTemplate || isPendingConnection || data.type === "annotation" || data.type === "group") return null;
+function getChannelHighlightResolver(args: {
+  hoveredEdge?: BlockEdgeState;
+  connectingFrom?: BlockConnectionState;
+  nodeId?: string;
+  allEdges: BlockEdgeState[];
+}) {
+  const { hoveredEdge, connectingFrom, nodeId, allEdges } = args;
 
-  const channels = getOutputChannels(data);
-  const hoveredEdge = data._hoveredEdge;
-  const connectingFrom = data._connectingFrom;
-  const allEdges = getBlockEdges(data);
-
-  if (channels.length === 1) {
-    const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, connectingFrom?.nodeId, channels[0]);
-
-    const isHighlighted =
-      (hoveredEdge && hoveredEdge.source === nodeId && hoveredEdge.sourceHandle === channels[0]) ||
-      (connectingFrom && connectingFrom.nodeId === nodeId && connectingFrom.handleId === channels[0]) ||
-      (connectingFrom &&
-        connectingFrom.nodeId !== nodeId &&
-        connectingFrom.handleType === "target" &&
-        !isAlreadyConnected);
-
-    return (
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={channels[0]}
-        style={{
-          ...HANDLE_STYLE,
-          right: -15,
-          top: 18,
-        }}
-        className={isHighlighted ? "highlighted" : undefined}
-      />
-    );
-  }
-
-  const getChannelHighlight = (channel: string) => {
+  return (channel: string) => {
     const isAlreadyConnected = isAlreadyConnectedToNode(allEdges, connectingFrom, connectingFrom?.nodeId, channel);
 
     return (
@@ -110,6 +117,27 @@ export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId"
         !isAlreadyConnected)
     );
   };
+}
+
+function MultiRightHandle({
+  channels,
+  hoveredEdge,
+  connectingFrom,
+  nodeId,
+  allEdges,
+}: {
+  channels: string[];
+  hoveredEdge?: BlockEdgeState;
+  connectingFrom?: BlockConnectionState;
+  nodeId?: string;
+  allEdges: BlockEdgeState[];
+}) {
+  const getChannelHighlight = getChannelHighlightResolver({
+    hoveredEdge,
+    connectingFrom,
+    nodeId,
+    allEdges,
+  });
 
   const channelSpacing = 24;
   const handleSize = 12;
@@ -123,7 +151,6 @@ export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId"
   const totalHeight = (channels.length - 1) * channelSpacing;
   const svgHeight = totalHeight + 40;
   const svgCenterY = svgHeight / 2;
-
   const channelPositions = channels.map((channel, index) => ({
     channel,
     offsetY: (index - (channels.length - 1) / 2) * channelSpacing,
@@ -196,5 +223,63 @@ export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId"
         </React.Fragment>
       ))}
     </div>
+  );
+}
+
+export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">) {
+  if (shouldHideLeftHandle(data)) return null;
+
+  const hoveredEdge = data._hoveredEdge;
+  const connectingFrom = data._connectingFrom;
+  const isAlreadyConnected = isAlreadyConnectedToNode(getBlockEdges(data), connectingFrom, nodeId);
+  const isHighlighted =
+    (hoveredEdge && hoveredEdge.target === nodeId) ||
+    (connectingFrom &&
+      connectingFrom.nodeId !== nodeId &&
+      connectingFrom.handleType === "source" &&
+      !isAlreadyConnected);
+
+  return (
+    <Handle
+      type="target"
+      position={Position.Left}
+      style={{
+        ...HANDLE_STYLE,
+        left: -15,
+        top: 18,
+      }}
+      className={isHighlighted ? "highlighted" : undefined}
+    />
+  );
+}
+
+export function RightHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">) {
+  if (shouldHideRightHandle(data)) return null;
+
+  const channels = getOutputChannels(data);
+  const hoveredEdge = data._hoveredEdge;
+  const connectingFrom = data._connectingFrom;
+  const allEdges = getBlockEdges(data);
+
+  if (channels.length === 1) {
+    return (
+      <SingleRightHandle
+        channel={channels[0]}
+        hoveredEdge={hoveredEdge}
+        connectingFrom={connectingFrom}
+        nodeId={nodeId}
+        allEdges={allEdges}
+      />
+    );
+  }
+
+  return (
+    <MultiRightHandle
+      channels={channels}
+      hoveredEdge={hoveredEdge}
+      connectingFrom={connectingFrom}
+      nodeId={nodeId}
+      allEdges={allEdges}
+    />
   );
 }

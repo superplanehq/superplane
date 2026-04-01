@@ -1,4 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -88,7 +87,6 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { Button } from "@/components/ui/button";
 import { getComponentAdditionalDataBuilder, getCustomFieldRenderer, getState, getStateMap } from "./mappers";
-import type { CustomFieldRenderer } from "./mappers/types";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
@@ -136,22 +134,14 @@ import { prepareAnnotationNode } from "./lib/canvasAnnotationNode";
 import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvasNodePreparation";
+import { renderWorkflowNodeCustomField } from "./lib/renderWorkflowNodeCustomField";
 import {
   deleteNodesFromWorkflow,
   groupWorkflowNodes,
   prepareGroupNode,
   ungroupWorkflowNode,
   wireGroupParentChildRelationships,
-} from "./lib/workflow-groups";
-
-export {
-  prepareComponentBaseNode,
-  prepareComponentNode,
-  prepareCompositeNode,
-  prepareTriggerNode,
-} from "./lib/canvasNodePreparation";
-export { prepareGroupNode, wireGroupParentChildRelationships } from "./lib/workflow-groups";
-export { prepareAnnotationNode } from "./lib/canvasAnnotationNode";
+} from "./lib/canvasGroups";
 
 const BUNDLE_ICON_SLUG = "component";
 const BUNDLE_COLOR = "gray";
@@ -6102,7 +6092,7 @@ function prepareNode(
       return prepareAnnotationNode(node);
 
     default:
-      return prepareComponentNode(
+      return prepareComponentNode({
         nodes,
         node,
         components,
@@ -6113,7 +6103,7 @@ function prepareNode(
         organizationId,
         currentUser,
         edges,
-      );
+      });
   }
 }
 
@@ -6203,36 +6193,4 @@ function prepareSidebarData(
     hideQueueEvents,
     isComposite: node.type === "TYPE_BLUEPRINT",
   };
-}
-
-export function renderWorkflowNodeCustomField({
-  renderer,
-  node,
-  configuration,
-  nodeId,
-  context,
-}: {
-  renderer: CustomFieldRenderer;
-  node: ComponentsNode;
-  configuration?: Record<string, unknown>;
-  nodeId: string;
-  context?: {
-    onRun?: (initialData?: string) => void;
-    integration?: OrganizationsIntegration;
-  };
-}) {
-  const nodeWithConfiguration = {
-    ...node,
-    configuration: configuration ?? node.configuration,
-  };
-
-  try {
-    return renderer.render(
-      buildNodeInfo(nodeWithConfiguration),
-      context && Object.keys(context).length > 0 ? context : undefined,
-    );
-  } catch (error) {
-    console.error(`[CanvasPage] Failed to render custom field for node "${nodeId}":`, error);
-    return null;
-  }
 }

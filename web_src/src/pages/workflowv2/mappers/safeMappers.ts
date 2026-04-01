@@ -76,20 +76,30 @@ function sanitizeCustomField(
   return sanitizeReactNodeValue(customField);
 }
 
-// eslint-disable-next-line complexity
-export function normalizeComponentBaseProps(
-  props: ComponentBaseProps | unknown,
-  context: ComponentBaseContext,
-): ComponentBaseProps {
-  const fallbackTitle = getFallbackComponentTitle(context);
-  const fallbackIconSlug = context.componentDefinition?.icon || "circle-off";
-  const fallbackEmptyStateProps: NonNullable<ComponentBaseProps["emptyStateProps"]> = {
-    icon: undefined,
-    title: FALLBACK_NODE_MESSAGE,
-    description: undefined,
+function normalizeEmptyStateProps(
+  emptyStateProps: unknown,
+): NonNullable<ComponentBaseProps["emptyStateProps"]> | undefined {
+  if (!isRecord(emptyStateProps)) {
+    return undefined;
+  }
+
+  return {
+    icon:
+      typeof emptyStateProps.icon === "function"
+        ? (emptyStateProps.icon as NonNullable<ComponentBaseProps["emptyStateProps"]>["icon"])
+        : undefined,
+    title: sanitizeString(emptyStateProps.title),
+    description: sanitizeString(emptyStateProps.description),
   };
-  const record = isRecord(props) ? props : {};
-  const normalized = {
+}
+
+function buildNormalizedComponentBaseProps(
+  record: UnknownRecord,
+  context: ComponentBaseContext,
+  fallbackTitle: string,
+  fallbackIconSlug: string,
+): ComponentBaseProps {
+  return {
     ...record,
     iconSrc: typeof record.iconSrc === "string" ? record.iconSrc : undefined,
     iconSlug: sanitizeString(record.iconSlug, fallbackIconSlug),
@@ -111,21 +121,26 @@ export function normalizeComponentBaseProps(
       ? (record.eventStateMap as ComponentBaseProps["eventStateMap"])
       : undefined,
     includeEmptyState: sanitizeBoolean(record.includeEmptyState, false),
-    emptyStateProps: isRecord(record.emptyStateProps)
-      ? ({
-          icon:
-            typeof record.emptyStateProps.icon === "function"
-              ? (record.emptyStateProps.icon as NonNullable<ComponentBaseProps["emptyStateProps"]>["icon"])
-              : undefined,
-          title: sanitizeString(record.emptyStateProps.title),
-          description: sanitizeString(record.emptyStateProps.description),
-        } as NonNullable<ComponentBaseProps["emptyStateProps"]>)
-      : undefined,
+    emptyStateProps: normalizeEmptyStateProps(record.emptyStateProps),
     error: sanitizeString(record.error),
     warning: sanitizeString(record.warning),
-  } satisfies ComponentBaseProps;
+  };
+}
 
+function applyComponentBaseFallbacks(
+  normalized: ComponentBaseProps,
+  props: ComponentBaseProps | unknown,
+  record: UnknownRecord,
+  fallbackTitle: string,
+  fallbackIconSlug: string,
+): ComponentBaseProps {
+  const fallbackEmptyStateProps: NonNullable<ComponentBaseProps["emptyStateProps"]> = {
+    icon: undefined,
+    title: FALLBACK_NODE_MESSAGE,
+    description: undefined,
+  };
   const isFallback = !isRecord(props) || typeof record.title !== "string";
+
   if (!normalized.title) {
     normalized.title = fallbackTitle;
   }
@@ -140,13 +155,65 @@ export function normalizeComponentBaseProps(
   return normalized;
 }
 
-// eslint-disable-next-line complexity
-export function normalizeTriggerProps(props: TriggerProps | unknown, context: TriggerRendererContext): TriggerProps {
-  const fallbackProps = {
+export function normalizeComponentBaseProps(
+  props: ComponentBaseProps | unknown,
+  context: ComponentBaseContext,
+): ComponentBaseProps {
+  const fallbackTitle = getFallbackComponentTitle(context);
+  const fallbackIconSlug = context.componentDefinition?.icon || "circle-off";
+  const record = isRecord(props) ? props : {};
+  const normalized = buildNormalizedComponentBaseProps(record, context, fallbackTitle, fallbackIconSlug);
+
+  return applyComponentBaseFallbacks(normalized, props, record, fallbackTitle, fallbackIconSlug);
+}
+
+function buildFallbackTriggerProps(context: TriggerRendererContext): TriggerProps {
+  return {
     title: getFallbackTriggerTitle(context),
     iconSlug: context.definition?.icon || "bolt",
     metadata: [],
-  } satisfies TriggerProps;
+  };
+}
+
+function buildLastEventData(lastEventData: unknown, fallbackTitle: string): TriggerProps["lastEventData"] {
+  if (!isRecord(lastEventData)) {
+    return undefined;
+  }
+
+  const subtitle = lastEventData.subtitle;
+
+  return {
+    title: sanitizeString(lastEventData.title, fallbackTitle),
+    subtitle:
+      typeof subtitle === "string" || React.isValidElement(subtitle)
+        ? (subtitle as NonNullable<TriggerProps["lastEventData"]>["subtitle"])
+        : undefined,
+    receivedAt: lastEventData.receivedAt instanceof Date ? lastEventData.receivedAt : new Date(),
+    state: sanitizeString(lastEventData.state, "triggered"),
+    eventId: sanitizeString(lastEventData.eventId),
+  };
+}
+
+function buildTriggerNormalizationContext(
+  context: TriggerRendererContext,
+  fallbackProps: TriggerProps,
+): ComponentBaseContext {
+  return {
+    nodes: [],
+    node: context.node,
+    componentDefinition: {
+      name: context.definition?.name || "",
+      label: context.definition?.label || fallbackProps.title,
+      description: context.definition?.description || "",
+      icon: context.definition?.icon || fallbackProps.iconSlug || "bolt",
+      color: context.definition?.color || "",
+    },
+    lastExecutions: [],
+  };
+}
+
+export function normalizeTriggerProps(props: TriggerProps | unknown, context: TriggerRendererContext): TriggerProps {
+  const fallbackProps = buildFallbackTriggerProps(context);
   const record = isRecord(props) ? props : {};
   const normalizedComponentProps = normalizeComponentBaseProps(
     {
@@ -155,39 +222,15 @@ export function normalizeTriggerProps(props: TriggerProps | unknown, context: Tr
       iconSlug: sanitizeString(record.iconSlug, fallbackProps.iconSlug),
       metadata: sanitizeArray(record.metadata),
     },
-    {
-      nodes: [],
-      node: context.node,
-      componentDefinition: {
-        name: context.definition?.name || "",
-        label: context.definition?.label || fallbackProps.title,
-        description: context.definition?.description || "",
-        icon: context.definition?.icon || fallbackProps.iconSlug,
-        color: context.definition?.color || "",
-      },
-      lastExecutions: [],
-    },
+    buildTriggerNormalizationContext(context, fallbackProps),
   );
-
-  const lastEventData = isRecord(record.lastEventData)
-    ? {
-        title: sanitizeString(record.lastEventData.title, fallbackProps.title),
-        subtitle:
-          typeof record.lastEventData.subtitle === "string" || React.isValidElement(record.lastEventData.subtitle)
-            ? (record.lastEventData.subtitle as NonNullable<TriggerProps["lastEventData"]>["subtitle"])
-            : undefined,
-        receivedAt: record.lastEventData.receivedAt instanceof Date ? record.lastEventData.receivedAt : new Date(),
-        state: sanitizeString(record.lastEventData.state, "triggered"),
-        eventId: sanitizeString(record.lastEventData.eventId),
-      }
-    : undefined;
 
   return {
     ...normalizedComponentProps,
     title: sanitizeString(record.title, fallbackProps.title),
     iconSlug: sanitizeString(record.iconSlug, fallbackProps.iconSlug),
     metadata: sanitizeArray(record.metadata) || [],
-    lastEventData,
+    lastEventData: buildLastEventData(record.lastEventData, fallbackProps.title),
   };
 }
 

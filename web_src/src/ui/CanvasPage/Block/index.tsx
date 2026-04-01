@@ -4,6 +4,7 @@ import { LeftHandle, RightHandle } from "./handles";
 import type { BlockProps } from "./types";
 
 export type { BlockData, BlockProps } from "./types";
+export type { CanvasBlockData } from "./types";
 
 export const Block = React.memo(function Block(props: BlockProps) {
   const data = props.data;
