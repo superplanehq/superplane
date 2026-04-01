@@ -5137,7 +5137,6 @@ export function WorkflowPageV2() {
           renderer,
           node,
           configuration,
-          nodeId,
           context: Object.keys(context).length > 0 ? context : undefined,
         });
       };

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentsComponent, ComponentsNode } from "@/api-client";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
+import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
 import { prepareComponentBaseNode } from "./lib/canvas-node-preparation";
 import { renderWorkflowNodeCustomField } from "./lib/render-workflow-node-custom-field";
 
@@ -86,21 +87,23 @@ describe("workflow node preparation resilience", () => {
 
   it("returns null when a custom field renderer throws so sidebar rendering stays alive", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const renderer: CustomFieldRenderer = {
-      render: () => {
-        throw new Error("custom field failed");
-      },
-    };
+    const renderer = createSafeCustomFieldRenderer(
+      {
+        render: () => {
+          throw new Error("custom field failed");
+        },
+      } satisfies CustomFieldRenderer,
+      "approval",
+    );
 
     const result = renderWorkflowNodeCustomField({
       renderer,
       node: makeNode(),
-      nodeId: "node-1",
     });
 
     expect(result).toBeNull();
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to render custom field for node "node-1"'),
+      expect.stringContaining('Custom field renderer "approval" threw in render()'),
       expect.any(Error),
     );
     consoleSpy.mockRestore();

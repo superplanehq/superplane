@@ -412,7 +412,7 @@ type PendingRunData = {
 };
 
 type CanvasNodeRendererCallbacks = {
-  handleNodeExpand: (nodeId: string) => void;
+  handleNodeExpand: NonNullable<BlockProps["onExpand"]>;
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
@@ -422,6 +422,7 @@ type CanvasNodeRendererCallbacks = {
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
+  onToggleCollapse: React.MutableRefObject<CanvasPageProps["onToggleCollapse"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   onGroupUpdate: React.MutableRefObject<CanvasPageProps["onGroupUpdate"] | undefined>;
@@ -531,7 +532,7 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
-    onExpand: callbacks.handleNodeExpand,
+    onExpand: (expandedNodeId, nodeData) => callbacks.handleNodeExpand(expandedNodeId, nodeData),
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -541,7 +542,7 @@ function buildInteractiveNodeBlockProps(
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
-    onToggleCollapse: getNodeAction(callbacks.onToggleView, nodeId),
+    onToggleCollapse: getVoidAction(callbacks.onToggleCollapse),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
   };
@@ -2317,10 +2318,11 @@ function CanvasContent({
     restoreActiveNoteFocus();
   }, [state.nodes]);
 
-  const handleNodeExpand = useCallback((nodeId: string) => {
+  const handleNodeExpand = useCallback<NonNullable<BlockProps["onExpand"]>>((nodeId: string, nodeData: BlockData) => {
     const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
-    if (node && stateRef.current.onNodeExpand) {
-      stateRef.current.onNodeExpand(nodeId, node.data);
+    const expandedNodeData = (node?.data as BlockData | undefined) ?? nodeData;
+    if (stateRef.current.onNodeExpand) {
+      stateRef.current.onNodeExpand(nodeId, expandedNodeData);
     }
   }, []);
 
@@ -2426,6 +2428,8 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+  const onToggleCollapseRef = useRef(onToggleCollapse);
+  onToggleCollapseRef.current = onToggleCollapse;
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
@@ -2638,6 +2642,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onToggleCollapse: onToggleCollapseRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
@@ -2658,6 +2663,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onToggleCollapse: onToggleCollapseRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
