@@ -38,7 +38,6 @@ export function buildTriggerFallbackCanvasNode({
       label: displayLabel,
       state: "pending" as const,
       outputChannels: ["default"],
-      _triggerName: node.trigger?.name,
       renderFallback: buildMinimalRenderFallback(),
       trigger: {
         title: displayLabel,
@@ -69,7 +68,6 @@ export function buildComponentFallbackCanvasNode({
       label: displayLabel,
       state: "pending" as const,
       outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
-      _componentName: node.component?.name,
       renderFallback: buildMinimalRenderFallback(),
       component: {
         iconSlug: metadata?.icon || "triangle-alert",

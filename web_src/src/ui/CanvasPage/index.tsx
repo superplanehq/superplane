@@ -434,8 +434,6 @@ type CanvasNodeRendererCallbacks = {
 
 type CanvasBlockNodeData = CanvasBlockData & {
   _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
-  _componentName?: string;
-  _triggerName?: string;
   nodeName?: string;
 };
 
@@ -462,6 +460,22 @@ function createNodeRenderFallbackData(data: BlockData): BlockData {
   };
 }
 
+function getNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+const NODE_ERROR_LABEL_GETTERS: Record<BlockData["type"], (data: BlockData) => string | undefined> = {
+  trigger: (data) => getNonEmptyString(data.trigger?.title),
+  component: (data) => getNonEmptyString(data.component?.title),
+  composite: (data) => getNonEmptyString(data.composite?.title),
+  annotation: (data) => getNonEmptyString(data.annotation?.title),
+  group: (data) => getNonEmptyString(data.group?.groupLabel),
+};
+
+function getNodeErrorDisplayName(data: BlockData): string {
+  return NODE_ERROR_LABEL_GETTERS[data.type](data) || getNonEmptyString(data.label) || "unknown";
+}
+
 type CanvasNodeErrorBoundaryProps = {
   nodeId: string;
   nodeData: BlockData;
@@ -483,17 +497,15 @@ export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryPr
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const nodeWithNames = this.props.nodeData as BlockData & { _componentName?: string; _triggerName?: string };
     const nodeType = this.props.nodeData.type || "unknown";
-    const componentName =
-      nodeWithNames._componentName || nodeWithNames._triggerName || this.props.nodeData.label || "unknown";
+    const nodeLabel = getNodeErrorDisplayName(this.props.nodeData);
 
     console.error(`[CanvasPage] Node "${this.props.nodeId}" failed to render:`, error);
 
     Sentry.withScope((scope) => {
       scope.setTag("canvas.node_id", this.props.nodeId);
       scope.setTag("canvas.node_type", nodeType);
-      scope.setExtra("componentName", componentName);
+      scope.setExtra("nodeLabel", nodeLabel);
       scope.setExtra("componentStack", errorInfo.componentStack);
       Sentry.captureException(error);
     });

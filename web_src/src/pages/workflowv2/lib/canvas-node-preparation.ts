@@ -105,7 +105,6 @@ function buildPreparedTriggerCanvasNode(args: {
       label: displayLabel,
       state: "pending" as const,
       outputChannels: ["default"],
-      _triggerName: node.trigger?.name,
       trigger: {
         ...triggerProps,
         collapsed: node.isCollapsed,
@@ -450,7 +449,6 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
         label: displayLabel,
         state: "pending" as const,
         outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
-        _componentName: node.component?.name,
         component: {
           ...componentBaseProps,
           emptyStateProps,
