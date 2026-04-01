@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { captureException } = vi.hoisted(() => ({
   captureException: vi.fn(),
@@ -39,6 +39,10 @@ function ThrowingNode(): ReactElement {
 }
 
 describe("CanvasNodeErrorBoundary", () => {
+  beforeEach(() => {
+    captureException.mockClear();
+  });
+
   it("isolates one node render failure and keeps sibling nodes visible", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -91,6 +95,37 @@ describe("CanvasNodeErrorBoundary", () => {
 
     expect(screen.getByText("group fallback")).toBeInTheDocument();
     expect(screen.getByText("another healthy node")).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
+  it("does not retry a broken node when rerendered with equivalent data", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { rerender } = render(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{ label: "Broken", state: "pending", type: "component" }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CanvasNodeErrorBoundary
+        nodeId="node-1"
+        nodeData={{ label: "Broken", state: "pending", type: "component" }}
+        fallback={<div>node fallback</div>}
+      >
+        <ThrowingNode />
+      </CanvasNodeErrorBoundary>,
+    );
+
+    expect(screen.getByText("node fallback")).toBeInTheDocument();
+    expect(captureException).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
 });

@@ -476,6 +476,33 @@ function getNodeErrorDisplayName(data: BlockData): string {
   return NODE_ERROR_LABEL_GETTERS[data.type](data) || getNonEmptyString(data.label) || "unknown";
 }
 
+function areOutputChannelsEqual(previous: string[] | undefined, next: string[] | undefined) {
+  if (previous === next) {
+    return true;
+  }
+
+  if (!previous || !next || previous.length !== next.length) {
+    return false;
+  }
+
+  return previous.every((channel, index) => channel === next[index]);
+}
+
+function didNodeErrorBoundaryDataChange(previous: BlockData, next: BlockData) {
+  return (
+    previous.type !== next.type ||
+    previous.label !== next.label ||
+    previous.trigger !== next.trigger ||
+    previous.component !== next.component ||
+    previous.composite !== next.composite ||
+    previous.annotation !== next.annotation ||
+    previous.group !== next.group ||
+    previous.renderFallback?.source !== next.renderFallback?.source ||
+    previous.renderFallback?.message !== next.renderFallback?.message ||
+    !areOutputChannelsEqual(previous.outputChannels, next.outputChannels)
+  );
+}
+
 function getNodeAction<TArgs extends unknown[]>(
   actionRef: React.MutableRefObject<((...args: TArgs) => void) | undefined> | undefined,
   ...args: TArgs
@@ -572,7 +599,11 @@ export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryPr
   }
 
   componentDidUpdate(prevProps: CanvasNodeErrorBoundaryProps) {
-    if (this.state.hasError && (prevProps.nodeId !== this.props.nodeId || prevProps.nodeData !== this.props.nodeData)) {
+    if (
+      this.state.hasError &&
+      (prevProps.nodeId !== this.props.nodeId ||
+        didNodeErrorBoundaryDataChange(prevProps.nodeData, this.props.nodeData))
+    ) {
       this.setState({ hasError: false });
     }
   }
