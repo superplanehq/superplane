@@ -31,6 +31,7 @@ blocks:
       prologue:
         commands:
           - checkout
+          - docker compose pull
           - make test.setup
           - make test.start
       jobs:
