@@ -122,7 +122,7 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Description: "Optional start of the query time range",
 			TypeOptions: &configuration.TypeOptions{
 				DateTime: &configuration.DateTimeTypeOptions{
-					Format: "2006-01-02T15:04",
+					Format: grafanaDateTimeFormat,
 				},
 			},
 		},
@@ -134,7 +134,7 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Description: "Optional end of the query time range",
 			TypeOptions: &configuration.TypeOptions{
 				DateTime: &configuration.DateTimeTypeOptions{
-					Format: "2006-01-02T15:04",
+					Format: grafanaDateTimeFormat,
 				},
 			},
 		},
@@ -191,14 +191,14 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		request.From, err = resolveQueryTimeValue(strings.TrimSpace(*spec.TimeFrom), spec.Timezone)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		request.To, err = resolveQueryTimeValue(strings.TrimSpace(*spec.TimeTo), spec.Timezone)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}
@@ -223,7 +223,7 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error marshaling request: %v", err)
 	}
 
-	responseBody, status, err := client.execRequest(http.MethodPost, "/api/ds/query", bytes.NewReader(body), "application/json")
+	responseBody, status, err := client.execRequest(http.MethodPost, "/api/ds/query", bytes.NewReader(body), "")
 	if err != nil {
 		return fmt.Errorf("error querying data source: %v", err)
 	}
@@ -286,7 +286,7 @@ func resolveQueryTimeValue(value string, timezone *string) (string, error) {
 		return fmt.Sprintf("%d", parsed.UTC().UnixMilli()), nil
 	}
 
-	// Preserve Grafana-supported raw values like "now-2h".
+	// Preserve Grafana-supported raw values like "now-1h".
 	return trimmed, nil
 }
 
