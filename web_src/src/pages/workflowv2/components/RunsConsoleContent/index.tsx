@@ -18,7 +18,7 @@ type RunCounts = {
   running: number;
   queued: number;
   total: number;
-}
+};
 
 export function countRuns(events: CanvasesCanvasEventWithExecutions[]): RunCounts {
   const counts: RunCounts = {
