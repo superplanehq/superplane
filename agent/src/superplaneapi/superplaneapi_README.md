@@ -212,6 +212,7 @@ Class | Method | HTTP request | Description
  - [CanvasesCanvasMemory](superplaneapi/docs/CanvasesCanvasMemory.md)
  - [CanvasesCanvasMetadata](superplaneapi/docs/CanvasesCanvasMetadata.md)
  - [CanvasesCanvasNodeExecution](superplaneapi/docs/CanvasesCanvasNodeExecution.md)
+ - [CanvasesCanvasNodeExecutionRef](superplaneapi/docs/CanvasesCanvasNodeExecutionRef.md)
  - [CanvasesCanvasNodeExecutionState](superplaneapi/docs/CanvasesCanvasNodeExecutionState.md)
  - [CanvasesCanvasNodeQueueItem](superplaneapi/docs/CanvasesCanvasNodeQueueItem.md)
  - [CanvasesCanvasSpec](superplaneapi/docs/CanvasesCanvasSpec.md)
