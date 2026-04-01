@@ -20,7 +20,7 @@ type RunCounts = {
   total: number;
 };
 
-export function countRuns(events: CanvasesCanvasEventWithExecutions[]): RunCounts {
+function countRuns(events: CanvasesCanvasEventWithExecutions[]): RunCounts {
   const counts: RunCounts = {
     completed: 0,
     errors: 0,
