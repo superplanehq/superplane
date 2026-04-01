@@ -69,8 +69,8 @@ func (q *QueryDataSource) Documentation() string {
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional range as Grafana relative times (e.g. now-5m, now), RFC3339 timestamps, or local datetimes (2006-01-02T15:04) with **Timezone** below
+- **Timezone**: Required for local datetime strings without an offset; ignored for relative times and RFC3339 values
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -117,26 +117,18 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 		{
 			Name:        "timeFrom",
 			Label:       "Time From",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional start of the query time range",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Description: "Optional start: Grafana relative time (e.g. now-5m), RFC3339, or local datetime (2006-01-02T15:04) with Timezone set",
+			Placeholder: "now-5m",
 		},
 		{
 			Name:        "timeTo",
 			Label:       "Time To",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional end of the query time range",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Description: "Optional end: Grafana relative time (e.g. now), RFC3339, or local datetime with Timezone set",
+			Placeholder: "now",
 		},
 		{
 			Name:        "timezone",
@@ -223,7 +215,7 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error marshaling request: %v", err)
 	}
 
-	responseBody, status, err := client.execRequest(http.MethodPost, "/api/ds/query", bytes.NewReader(body), "")
+	responseBody, status, err := client.execRequest(http.MethodPost, "/api/ds/query", bytes.NewReader(body), "application/json")
 	if err != nil {
 		return fmt.Errorf("error querying data source: %v", err)
 	}

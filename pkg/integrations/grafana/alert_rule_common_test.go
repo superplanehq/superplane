@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test__mergeAlertRulePayload__preservesLabelsWhenUpdateSendsEmptyList(t *testing.T) {
+func Test__mergeAlertRulePayload__clearsLabelsWhenUpdateSendsEmptyList(t *testing.T) {
 	existing := map[string]any{
 		"uid":       "rule-1",
 		"title":     "Old",
@@ -36,10 +36,9 @@ func Test__mergeAlertRulePayload__preservesLabelsWhenUpdateSendsEmptyList(t *tes
 	merged, err := mergeAlertRulePayload(existing, spec)
 	require.NoError(t, err)
 
-	labels, ok := merged["labels"].(map[string]any)
+	labels, ok := merged["labels"].(map[string]string)
 	require.True(t, ok)
-	assert.Equal(t, "ops", labels["team"])
-	assert.Equal(t, "prod", labels["env"])
+	assert.Empty(t, labels)
 }
 
 func strPtr(s string) *string {

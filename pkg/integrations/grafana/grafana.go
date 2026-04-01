@@ -113,6 +113,13 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	switch resourceType {
+	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule:
+		// Known types require a Grafana API client.
+	default:
+		return []core.IntegrationResource{}, nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %w", err)
@@ -197,7 +204,7 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 
 		return resources, nil
-	default:
-		return []core.IntegrationResource{}, nil
 	}
+
+	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
 }

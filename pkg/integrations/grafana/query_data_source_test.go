@@ -164,6 +164,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		request := httpContext.Requests[0]
 		assert.Equal(t, http.MethodPost, request.Method)
 		assert.True(t, strings.HasSuffix(request.URL.String(), "/api/ds/query"))
+		assert.Equal(t, "application/json", request.Header.Get("Content-Type"))
 
 		body := decodeJSONBody(t, request.Body)
 		queries := body["queries"].([]any)
@@ -175,96 +176,6 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		assert.Equal(t, "up", query["expr"])
 		assert.Equal(t, "now-5m", body["from"])
 		assert.Equal(t, "now", body["to"])
-	})
-
-	t.Run("datetime picker values are converted to unix millis", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
-				},
-			},
-		}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "2026-04-01T10:15",
-				"timeTo":        "2026-04-01T11:45",
-				"timezone":      "5",
-			},
-			HTTP: httpContext,
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"apiToken": "token123",
-					"baseURL":  "https://grafana.example.com",
-				},
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-
-		body := decodeJSONBody(t, httpContext.Requests[0].Body)
-		assert.Equal(t, "1775020500000", body["from"])
-		assert.Equal(t, "1775025900000", body["to"])
-	})
-
-	t.Run("timezone aware timestamps are converted without timezone field", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
-				},
-			},
-		}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "2026-04-01T10:15:00+05:00",
-				"timeTo":        "2026-04-01T11:45:00+05:00",
-			},
-			HTTP: httpContext,
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"apiToken": "token123",
-					"baseURL":  "https://grafana.example.com",
-				},
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-		})
-
-		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
-
-		body := decodeJSONBody(t, httpContext.Requests[0].Body)
-		assert.Equal(t, "1775020500000", body["from"])
-		assert.Equal(t, "1775025900000", body["to"])
-	})
-
-	t.Run("datetime picker values require timezone", func(t *testing.T) {
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"dataSourceUid": "logs",
-				"query":         "{}",
-				"timeFrom":      "2026-04-01T10:15",
-			},
-			Integration: &contexts.IntegrationContext{
-				Configuration: map[string]any{
-					"apiToken": "token123",
-					"baseURL":  "https://grafana.example.com",
-				},
-			},
-			ExecutionState: &contexts.ExecutionStateContext{},
-		})
-
-		require.ErrorContains(t, err, "timeFrom: timezone is required for datetime-local values")
 	})
 
 	t.Run("datetime picker values are converted to unix millis", func(t *testing.T) {

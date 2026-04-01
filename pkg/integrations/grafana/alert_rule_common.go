@@ -446,10 +446,10 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 	if spec.ExecErrState != nil {
 		updated["execErrState"] = *spec.ExecErrState
 	}
-	if spec.Labels != nil && len(*spec.Labels) > 0 {
+	if spec.Labels != nil {
 		updated["labels"] = keyValuePairsToMap(spec.Labels)
 	}
-	if spec.Annotations != nil && len(*spec.Annotations) > 0 {
+	if spec.Annotations != nil {
 		updated["annotations"] = keyValuePairsToMap(spec.Annotations)
 	}
 	if spec.IsPaused != nil {

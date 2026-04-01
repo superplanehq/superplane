@@ -326,8 +326,8 @@ The Query Data Source component executes a query against a Grafana data source u
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional range as Grafana relative times (e.g. now-5m, now), RFC3339 timestamps, or local datetimes (2006-01-02T15:04) with **Timezone** below
+- **Timezone**: Required for local datetime strings without an offset; ignored for relative times and RFC3339 values
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 

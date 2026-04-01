@@ -435,6 +435,21 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Empty(t, resources)
 	})
 
+	t.Run("unknown resource type returns empty without calling grafana when integration token missing", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		resources, err := g.ListResources("unknown-type", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL": "https://grafana.example.com",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Empty(t, resources)
+		require.Empty(t, httpContext.Requests)
+	})
+
 	t.Run("data-source returns grafana datasources", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
