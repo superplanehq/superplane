@@ -192,6 +192,43 @@ func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 	assert.Equal(t, 0, saved.IntervalSeconds)
 }
 
+func TestSSHCommand_MetadataHelpersSupportStructMetadata(t *testing.T) {
+	c := &SSHCommand{}
+	metadata := &testMetadataContext{
+		value: ExecutionMetadata{
+			Host:     "example.com",
+			User:     "root",
+			Commands: "exit 1",
+			Attempt:  0,
+		},
+	}
+
+	err := c.incrementRetryCount(metadata)
+	require.NoError(t, err)
+
+	current, ok := metadata.Get().(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "example.com", current["host"])
+	assert.Equal(t, "root", current["user"])
+	assert.Equal(t, "exit 1", current["commands"])
+	assert.Equal(t, 1, c.getRetryAttempt(metadata))
+
+	err = c.setResultMetadata(metadata, &CommandResult{
+		Stdout:   "",
+		Stderr:   "command failed",
+		ExitCode: 1,
+	})
+	require.NoError(t, err)
+
+	current, ok = metadata.Get().(map[string]any)
+	require.True(t, ok)
+
+	result, ok := current["result"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, 1, result["exitCode"])
+	assert.Equal(t, "command failed", result["stderr"])
+}
+
 func TestSSHCommand_BuildRemoteCommand(t *testing.T) {
 	c := &SSHCommand{}
 

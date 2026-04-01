@@ -5,16 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type GrafanaWebhookHandler struct{}
 
 type GrafanaWebhookMetadata struct {
-	ContactPointUID string `json:"contactPointUid" mapstructure:"contactPointUid"`
+	ContactPointUID  string `json:"contactPointUid" mapstructure:"contactPointUid"`
+	ContactPointName string `json:"contactPointName" mapstructure:"contactPointName"`
 }
 
 func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -23,8 +27,8 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 		return nil, fmt.Errorf("error decoding webhook configuration: %v", err)
 	}
 
-	sharedSecret := strings.TrimSpace(config.SharedSecret)
-	if err := ctx.Webhook.SetSecret([]byte(sharedSecret)); err != nil {
+	sharedSecret, err := resolveOrCreateWebhookSecret(ctx.Webhook, config)
+	if err != nil {
 		return nil, fmt.Errorf("failed to persist shared secret in webhook storage: %w", err)
 	}
 
@@ -50,9 +54,45 @@ func (h *GrafanaWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, erro
 		return nil, nil
 	}
 
+	if err := client.UpsertNotificationPolicyRoute(name, config.AlertNames); err != nil {
+		return nil, fmt.Errorf("grafana webhook setup: notification policy route: %w", err)
+	}
+
 	return GrafanaWebhookMetadata{
-		ContactPointUID: uid,
+		ContactPointUID:  uid,
+		ContactPointName: name,
 	}, nil
+}
+
+func resolveOrCreateWebhookSecret(webhook core.WebhookContext, config OnAlertFiringConfig) (string, error) {
+	legacy := strings.TrimSpace(config.SharedSecret)
+
+	secret, err := webhook.GetSecret()
+	if err != nil {
+		return "", err
+	}
+	stored := strings.TrimSpace(string(secret))
+
+	var sharedSecret string
+	switch {
+	case legacy != "":
+		// Legacy trigger config wins over an existing stored secret so contact points and
+		// any manually configured Grafana bearer tokens stay aligned with user intent.
+		sharedSecret = legacy
+	case stored != "":
+		sharedSecret = stored
+	default:
+		sharedSecret, err = crypto.Base64String(32)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if err := webhook.SetSecret([]byte(sharedSecret)); err != nil {
+		return "", err
+	}
+
+	return sharedSecret, nil
 }
 
 func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
@@ -75,6 +115,16 @@ func (h *GrafanaWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 		return err
 	}
 
+	contactPointName := strings.TrimSpace(metadata.ContactPointName)
+	if contactPointName == "" {
+		// Backward compat: recompute name from webhook ID if not stored.
+		contactPointName = buildContactPointName(ctx.Webhook.GetID())
+	}
+
+	if err := client.RemoveNotificationPolicyRoute(contactPointName); err != nil {
+		return fmt.Errorf("grafana webhook cleanup: notification policy route: %w", err)
+	}
+
 	return client.DeleteContactPoint(contactPointUID)
 }
 
@@ -92,10 +142,21 @@ func (h *GrafanaWebhookHandler) CompareConfig(a, b any) (bool, error) {
 	bindingKeyA := strings.TrimSpace(configA.WebhookBindingKey)
 	bindingKeyB := strings.TrimSpace(configB.WebhookBindingKey)
 	if bindingKeyA != "" || bindingKeyB != "" {
-		return bindingKeyA != "" && bindingKeyA == bindingKeyB, nil
+		if bindingKeyA == "" || bindingKeyB == "" || bindingKeyA != bindingKeyB {
+			return false, nil
+		}
 	}
 
-	return strings.TrimSpace(configA.SharedSecret) == strings.TrimSpace(configB.SharedSecret), nil
+	trimA := strings.TrimSpace(configA.SharedSecret)
+	trimB := strings.TrimSpace(configB.SharedSecret)
+	secretsMatch := trimA == trimB
+	if !secretsMatch && bindingKeyA != "" && bindingKeyA == bindingKeyB && trimB == "" {
+		// New canvases omit sharedSecret; treat as compatible with an existing webhook record
+		// that still carries a legacy or stored secret so we do not force reprovisioning.
+		secretsMatch = true
+	}
+
+	return secretsMatch && predicatesSliceEqual(configA.AlertNames, configB.AlertNames), nil
 }
 
 func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error) {
@@ -111,9 +172,11 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 
 	sharedSecretProvided := false
 	webhookBindingKeyProvided := false
+	alertNamesProvided := false
 	if requestedMap, ok := requested.(map[string]any); ok {
 		_, sharedSecretProvided = requestedMap["sharedSecret"]
 		_, webhookBindingKeyProvided = requestedMap["webhookBindingKey"]
+		_, alertNamesProvided = requestedMap["alertNames"]
 	}
 
 	mergedSharedSecret := strings.TrimSpace(currentConfig.SharedSecret)
@@ -126,14 +189,28 @@ func (h *GrafanaWebhookHandler) Merge(current, requested any) (any, bool, error)
 		mergedWebhookBindingKey = strings.TrimSpace(requestedConfig.WebhookBindingKey)
 	}
 
+	mergedAlertNames := currentConfig.AlertNames
+	if alertNamesProvided {
+		mergedAlertNames = requestedConfig.AlertNames
+	}
+
 	merged := OnAlertFiringConfig{
 		SharedSecret:      mergedSharedSecret,
 		WebhookBindingKey: mergedWebhookBindingKey,
+		AlertNames:        mergedAlertNames,
 	}
 
 	changed := strings.TrimSpace(currentConfig.SharedSecret) != merged.SharedSecret ||
-		strings.TrimSpace(currentConfig.WebhookBindingKey) != merged.WebhookBindingKey
+		strings.TrimSpace(currentConfig.WebhookBindingKey) != merged.WebhookBindingKey ||
+		!predicatesSliceEqual(currentConfig.AlertNames, merged.AlertNames)
 	return merged, changed, nil
+}
+
+func predicatesSliceEqual(a, b []configuration.Predicate) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 func buildContactPointName(webhookID string) string {
