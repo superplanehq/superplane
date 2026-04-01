@@ -131,80 +131,45 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		if err != nil {
 			return nil, err
 		}
-
-		resources := make([]core.IntegrationResource, 0, len(folders))
-		for _, folder := range folders {
-			id := strings.TrimSpace(folder.UID)
-			if id == "" {
-				continue
-			}
-
-			name := strings.TrimSpace(folder.Title)
-			if name == "" {
-				name = id
-			}
-
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceTypeFolder,
-				Name: name,
-				ID:   id,
-			})
-		}
-
-		return resources, nil
+		return grafanaResourcesFromList(resourceTypeFolder, folders, func(f Folder) string { return f.UID }, func(f Folder) string { return f.Title }), nil
 	case resourceTypeDataSource:
 		dataSources, err := client.ListDataSources()
 		if err != nil {
 			return nil, err
 		}
-
-		resources := make([]core.IntegrationResource, 0, len(dataSources))
-		for _, source := range dataSources {
-			id := strings.TrimSpace(source.UID)
-			if id == "" {
-				continue
-			}
-
-			name := strings.TrimSpace(source.Name)
-			if name == "" {
-				name = id
-			}
-
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceTypeDataSource,
-				Name: name,
-				ID:   id,
-			})
-		}
-
-		return resources, nil
+		return grafanaResourcesFromList(resourceTypeDataSource, dataSources, func(ds DataSource) string { return ds.UID }, func(ds DataSource) string { return ds.Name }), nil
 	case resourceTypeAlertRule:
 		alertRules, err := client.ListAlertRules()
 		if err != nil {
 			return nil, err
 		}
-
-		resources := make([]core.IntegrationResource, 0, len(alertRules))
-		for _, rule := range alertRules {
-			id := strings.TrimSpace(rule.UID)
-			if id == "" {
-				continue
-			}
-
-			name := strings.TrimSpace(rule.Title)
-			if name == "" {
-				name = id
-			}
-
-			resources = append(resources, core.IntegrationResource{
-				Type: resourceTypeAlertRule,
-				Name: name,
-				ID:   id,
-			})
-		}
-
-		return resources, nil
+		return grafanaResourcesFromList(resourceTypeAlertRule, alertRules, func(r AlertRuleSummary) string { return r.UID }, func(r AlertRuleSummary) string { return r.Title }), nil
 	}
 
 	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
+}
+
+// grafanaResourcesFromList maps Grafana API list rows to workflow integration resources.
+// Empty UIDs are skipped; empty display names fall back to the UID.
+func grafanaResourcesFromList[T any](resourceType string, items []T, idOf func(T) string, nameOf func(T) string) []core.IntegrationResource {
+	resources := make([]core.IntegrationResource, 0, len(items))
+	for _, item := range items {
+		id := strings.TrimSpace(idOf(item))
+		if id == "" {
+			continue
+		}
+
+		name := strings.TrimSpace(nameOf(item))
+		if name == "" {
+			name = id
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: name,
+			ID:   id,
+		})
+	}
+
+	return resources
 }
