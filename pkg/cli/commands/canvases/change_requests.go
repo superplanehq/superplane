@@ -80,6 +80,11 @@ func (c *changeRequestListCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		if len(changeRequests) == 0 {
+			_, err := fmt.Fprintln(stdout, "No change requests found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tSTATUS\tCONFLICTED\tCHANGED_NODES\tCONFLICTING_NODES\tTITLE\tUPDATED_AT")
 
