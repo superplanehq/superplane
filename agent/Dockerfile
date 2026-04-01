@@ -2,6 +2,8 @@ ARG SUPERPLANE_DEV_BASE_IMAGE="ghcr.io/superplanehq/superplane-dev-base:v1"
 
 FROM ${SUPERPLANE_DEV_BASE_IMAGE} AS base
 
+WORKDIR /app/agent
+
 FROM base AS dev
 
 CMD ["bash", "-lc", "sleep infinity"]

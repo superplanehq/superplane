@@ -1,7 +1,7 @@
 ARG GO_VERSION=1.25.3
 ARG PLAYWRIGHT_GO_VERSION=v0.5200.1
 
-FROM python:3.13-slim
+FROM ubuntu:24.04
 
 ARG GO_VERSION
 ARG PLAYWRIGHT_GO_VERSION
@@ -21,7 +21,12 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends bash ca-certificates make && \
+    apt-get install -y --no-install-recommends bash ca-certificates make software-properties-common && \
+    add-apt-repository -y ppa:deadsnakes/ppa && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends python3.13 python3.13-venv python3.13-dev && \
+    ln -sf /usr/bin/python3.13 /usr/local/bin/python3 && \
+    ln -sf /usr/bin/python3.13 /usr/local/bin/python && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* && \
     bash /opt/install-scripts/install-go.sh "${GO_VERSION}" && \
