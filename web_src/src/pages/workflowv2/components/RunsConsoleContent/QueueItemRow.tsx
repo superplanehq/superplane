@@ -1,6 +1,7 @@
 import type { CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
+import { TimeAgo } from "@/components/TimeAgo";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import { formatRunTimestamp, resolveNodeIconSlug } from "../../canvasRunsUtils";
+import { resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { cn } from "@/lib/utils";
 import { handleKeyboardActivation } from "@/lib/utils";
 import { NodeIcon } from "./NodeIcon";
@@ -47,7 +48,7 @@ export function QueueItemRow({
         <span className="text-xs text-gray-700 truncate">{nodeName}</span>
       </div>
       <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
-        {item.createdAt ? formatRunTimestamp(item.createdAt) : ""}
+        {item.createdAt ? <TimeAgo date={item.createdAt} /> : ""}
       </span>
     </div>
   );
