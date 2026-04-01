@@ -173,7 +173,8 @@ func buildQueryParams(sql string, request QueryRequest) url.Values {
 		params.Set("limit", strconv.Itoa(request.Limit))
 	}
 	if request.RowOriented {
-		params.Set("row_oriented", "true")
+		// Logfire's query API expects json_rows=true for row-oriented JSON payloads.
+		params.Set("json_rows", "true")
 	}
 	return params
 }
