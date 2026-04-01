@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 
-import { BuiltInEdge, useReactFlow, type Node, type PanelProps } from "@xyflow/react";
+import { useReactFlow, type BuiltInEdge, type Node, type PanelProps } from "@xyflow/react";
 
 import { CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";

@@ -59,7 +59,7 @@ export function Roles({ organizationId }: RolesProps) {
         domainType: "DOMAIN_TYPE_ORGANIZATION",
         domainId: organizationId,
       });
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to delete role");
     }
   };

@@ -734,7 +734,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           continue;
         }
         if (ch === "(") {
-          if (parenDepth == 0) {
+          if (parenDepth === 0) {
             return s.slice(i + 1).trim();
           }
           parenDepth = Math.max(0, parenDepth - 1);

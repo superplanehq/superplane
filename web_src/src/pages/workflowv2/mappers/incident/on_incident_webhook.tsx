@@ -36,7 +36,7 @@ const CopyWebhookUrlButton: React.FC<{ webhookUrl: string }> = ({ webhookUrl }) 
       await navigator.clipboard.writeText(webhookUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to copy webhook URL");
     }
   };
@@ -143,7 +143,7 @@ const SetSigningSecretSection: React.FC<{ nodeId: string }> = ({ nodeId }) => {
       } else {
         showErrorToast("Could not update version (invalid canvas structure).");
       }
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to set signing secret or save version");
     } finally {
       setIsSubmitting(false);

@@ -17,10 +17,20 @@ export interface OnAlertFiringEventData {
   commonAnnotations?: Record<string, string>;
 }
 
+export interface AlertNamePredicate {
+  type: "equals" | "notEquals" | "matches";
+  value: string;
+}
+
+export interface OnAlertFiringConfiguration {
+  alertNames?: AlertNamePredicate[];
+}
+
 export interface QueryDataSourceConfiguration {
   dataSourceUid: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
+  timezone?: string;
   format?: string;
 }
