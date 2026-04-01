@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { LoadMoreButton } from "./LoadMoreButton";
