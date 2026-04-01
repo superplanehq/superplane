@@ -107,13 +107,14 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 	executionInfos := make([]*pb.CanvasNodeExecutionRef, 0, len(executions))
 	for _, execution := range executions {
 		executionInfos = append(executionInfos, &pb.CanvasNodeExecutionRef{
-			Id:           execution.ID.String(),
-			NodeId:       execution.NodeID,
-			State:        NodeExecutionStateToProto(execution.State),
-			Result:       NodeExecutionResultToProto(execution.Result),
-			ResultReason: NodeExecutionResultReasonToProto(execution.ResultReason),
-			CreatedAt:    timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:    timestamppb.New(*execution.UpdatedAt),
+			Id:            execution.ID.String(),
+			NodeId:        execution.NodeID,
+			State:         NodeExecutionStateToProto(execution.State),
+			Result:        NodeExecutionResultToProto(execution.Result),
+			ResultReason:  NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage: execution.ResultMessage,
+			CreatedAt:     timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
 		})
 	}
 
@@ -154,7 +155,7 @@ func listExecutionsForCanvasEvents(canvasID uuid.UUID, events []models.CanvasEve
 		eventIDs[i] = event.ID
 	}
 
-	executions, err := models.ListNodeExecutionsForRootEvents(canvasID, eventIDs)
+	executions, err := models.ListParentExecutionsForRootEvents(canvasID, eventIDs)
 	if err != nil {
 		return nil, err
 	}

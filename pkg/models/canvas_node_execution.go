@@ -171,20 +171,38 @@ func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, re
 	return executions, nil
 }
 
-func ListNodeExecutionsForRootEvents(canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
-	return ListNodeExecutionsForRootEventsInTransaction(database.Conn(), canvasID, rootEventIDs)
+func ListParentExecutionsForRootEvents(canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+	return ListParentExecutionsForRootEventsInTransaction(database.Conn(), canvasID, rootEventIDs)
 }
 
-func ListNodeExecutionsForRootEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+func ListParentExecutionsForRootEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
 	if len(rootEventIDs) == 0 {
 		return []CanvasNodeExecution{}, nil
 	}
 
 	var executions []CanvasNodeExecution
-	query := database.Conn().
+	query := tx.
 		Where("workflow_id = ?", canvasID).
 		Where("root_event_id IN ?", rootEventIDs).
 		Where("parent_execution_id IS NULL").
+		Order("created_at ASC")
+
+	err := query.Find(&executions).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
+}
+
+func ListAllExecutionsForRootEvent(rootEventID uuid.UUID) ([]CanvasNodeExecution, error) {
+	return ListAllExecutionsForRootEventInTransaction(database.Conn(), rootEventID)
+}
+
+func ListAllExecutionsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) ([]CanvasNodeExecution, error) {
+	var executions []CanvasNodeExecution
+	query := tx.
+		Where("root_event_id = ?", rootEventID).
 		Order("created_at ASC")
 
 	err := query.Find(&executions).Error
