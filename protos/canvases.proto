@@ -732,6 +732,26 @@ message ListChildExecutionsResponse {
   repeated CanvasNodeExecution executions = 1;
 }
 
+//
+// More succint description of a canvas node execution.
+// No input, outputs, root event, children.
+// Used to embed execution information into other messages.
+//
+message CanvasNodeExecutionRef {
+  string id = 1;
+  string node_id = 2;
+  CanvasNodeExecution.State state = 3;
+  CanvasNodeExecution.Result result = 4;
+  CanvasNodeExecution.ResultReason result_reason = 5;
+  string result_message = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+//
+// Full description of a canvas node execution.
+// Should only be used for endpoints specific to executions.
+//
 message CanvasNodeExecution {
   enum State {
     STATE_UNKNOWN = 0;
@@ -853,7 +873,7 @@ message CanvasEventWithExecutions {
   string channel = 4;
   google.protobuf.Struct data = 5;
   google.protobuf.Timestamp created_at = 6;
-  repeated CanvasNodeExecution executions = 7;
+  repeated CanvasNodeExecutionRef executions = 7;
   string custom_name = 8;
 }
 
