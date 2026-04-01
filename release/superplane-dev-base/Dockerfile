@@ -33,21 +33,14 @@ RUN bash /opt/install-scripts/install-postgresql-client.sh
 RUN bash /opt/install-scripts/install-gomigrate.sh
 RUN bash /opt/install-scripts/install-protoc.sh
 
-RUN GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
+RUN export GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build && \
   go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6 && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0 && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.26.3 && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.26.3 && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install github.com/air-verse/air@latest && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install github.com/mgechev/revive@v1.8.0 && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install gotest.tools/gotestsum@v1.12.3 && \
-  GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build \
   go install github.com/playwright-community/playwright-go/cmd/playwright@"${PLAYWRIGHT_GO_VERSION}" && \
   rm -rf /tmp/go-mod /tmp/go-build /go/pkg/* /root/.cache/* /root/.config/go/telemetry
 
