@@ -72,7 +72,7 @@ import { ComponentSidebar } from "../componentSidebar";
 import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
 import { EventState, EventStateMap } from "../componentBase";
-import { Block, type BlockData, type CanvasBlockData } from "./Block";
+import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import { GroupNode } from "../groupNode";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
@@ -476,6 +476,66 @@ function getNodeErrorDisplayName(data: BlockData): string {
   return NODE_ERROR_LABEL_GETTERS[data.type](data) || getNonEmptyString(data.label) || "unknown";
 }
 
+function getNodeAction<TArgs extends unknown[]>(
+  actionRef: React.MutableRefObject<((...args: TArgs) => void) | undefined> | undefined,
+  ...args: TArgs
+) {
+  return actionRef?.current ? () => actionRef.current?.(...args) : undefined;
+}
+
+function getVoidAction(actionRef: React.MutableRefObject<(() => void) | undefined> | undefined) {
+  return actionRef?.current ? () => actionRef.current?.() : undefined;
+}
+
+function getAnnotationUpdateAction(callbacks?: CanvasNodeRendererCallbacks) {
+  return callbacks?.onAnnotationUpdate.current
+    ? (annotationNodeId: string, updates: CanvasAnnotationUpdate) =>
+        callbacks.onAnnotationUpdate.current?.(annotationNodeId, updates)
+    : undefined;
+}
+
+function buildInteractiveNodeBlockProps(
+  callbacks: CanvasNodeRendererCallbacks | undefined,
+  nodeId: string,
+): Omit<BlockProps, "data" | "nodeId" | "selected" | "runDisabled" | "runDisabledTooltip"> {
+  if (!callbacks) {
+    return {};
+  }
+
+  return {
+    showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
+    onExpand: callbacks.handleNodeExpand,
+    onClick: (event) => callbacks.handleNodeClick(nodeId, event),
+    onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
+    onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
+    onRun: getNodeAction(callbacks.onRun, nodeId),
+    onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
+    onConfigure: getNodeAction(callbacks.onConfigure, nodeId),
+    onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
+    onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
+    onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
+    onToggleCollapse: getNodeAction(callbacks.onToggleView, nodeId),
+    onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
+    onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
+  };
+}
+
+function buildDefaultNodeBlockProps(args: {
+  nodeId: string;
+  selected?: boolean;
+  callbacks?: CanvasNodeRendererCallbacks;
+}): Omit<BlockProps, "data"> {
+  const { nodeId, selected, callbacks } = args;
+
+  return {
+    nodeId,
+    selected,
+    runDisabled: callbacks?.runDisabled,
+    runDisabledTooltip: callbacks?.runDisabledTooltip,
+    ...buildInteractiveNodeBlockProps(callbacks, nodeId),
+  };
+}
+
 type CanvasNodeErrorBoundaryProps = {
   nodeId: string;
   nodeData: BlockData;
@@ -537,78 +597,16 @@ const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
 }) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
-  const fallback = (
-    <Block
-      data={createNodeRenderFallbackData(blockData)}
-      nodeId={nodeProps.id}
-      selected={nodeProps.selected}
-      runDisabled={callbacks?.runDisabled}
-      runDisabledTooltip={callbacks?.runDisabledTooltip}
-      showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
-      onExpand={callbacks?.handleNodeExpand}
-      onClick={callbacks ? (e) => callbacks.handleNodeClick(nodeProps.id, e) : undefined}
-      onEdit={callbacks?.onNodeEdit.current ? () => callbacks.onNodeEdit.current?.(nodeProps.id) : undefined}
-      onDelete={callbacks?.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-      onRun={callbacks?.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
-      onDuplicate={callbacks?.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
-      onConfigure={callbacks?.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
-      onDeactivate={callbacks?.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
-      onTogglePause={
-        callbacks?.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
-      }
-      onToggleView={callbacks?.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
-      onToggleCollapse={
-        callbacks?.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
-      }
-      onAnnotationUpdate={
-        callbacks?.onAnnotationUpdate.current
-          ? (nodeId: string, updates: CanvasAnnotationUpdate) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
-          : undefined
-      }
-      onAnnotationBlur={callbacks?.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
-    />
-  );
-
-  if (!callbacks) {
-    return (
-      <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
-        <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />
-      </CanvasNodeErrorBoundary>
-    );
-  }
+  const blockProps = buildDefaultNodeBlockProps({
+    nodeId: nodeProps.id,
+    selected: nodeProps.selected,
+    callbacks,
+  });
+  const fallback = <Block {...blockProps} data={createNodeRenderFallbackData(blockData)} />;
 
   return (
     <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
-      <Block
-        data={blockData}
-        nodeId={nodeProps.id}
-        selected={nodeProps.selected}
-        runDisabled={callbacks?.runDisabled}
-        runDisabledTooltip={callbacks?.runDisabledTooltip}
-        showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
-        onExpand={callbacks.handleNodeExpand}
-        onClick={(e) => callbacks.handleNodeClick(nodeProps.id, e)}
-        onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
-        onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-        onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
-        onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
-        onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
-        onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
-        onTogglePause={
-          callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
-        }
-        onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
-        onToggleCollapse={
-          callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
-        }
-        onAnnotationUpdate={
-          callbacks.onAnnotationUpdate.current
-            ? (nodeId: string, updates: CanvasAnnotationUpdate) =>
-                callbacks.onAnnotationUpdate.current?.(nodeId, updates)
-            : undefined
-        }
-        onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
-      />
+      <Block {...blockProps} data={blockData} />
     </CanvasNodeErrorBoundary>
   );
 });
