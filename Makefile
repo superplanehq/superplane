@@ -38,14 +38,10 @@ test.setup:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build
 	$(COMPOSE) run --rm app go mod download
-	$(MAKE) db.create DB_NAME=superplane_test
-	$(MAKE) db.migrate DB_NAME=superplane_test
-	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
-	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
+	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e DB_PASSWORD=$(DB_PASSWORD) -e PGPASSWORD=$(DB_PASSWORD) app bash /app/scripts/ci_db_setup
 
 test.start:
-	$(COMPOSE) up -d
-	sleep 5
+	$(COMPOSE) up -d --wait --wait-timeout 60
 
 test.down:
 	$(COMPOSE) down --remove-orphans
