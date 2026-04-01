@@ -1,4 +1,4 @@
-import { getStatusBadgeProps } from "../../canvasRunsUtils";
+import { getStatusBadgeProps } from "@/pages/workflowv2/lib/canvas-runs";
 
 export function StatusBadge({ status }: { status: string }) {
   const { badgeColor, label } = getStatusBadgeProps(status);

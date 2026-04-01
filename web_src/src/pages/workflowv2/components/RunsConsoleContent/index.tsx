@@ -6,11 +6,44 @@ import { RunRow } from "./RunRow";
 import { FilterBar } from "./FilterBar";
 import {
   type RunsStatusFilter,
-  computeRunsCounts,
+  getAggregateStatus,
   filterRunEvents,
   mergeQueueItemsWithEvents,
-} from "@/pages/workflowv2/canvasRunsUtils";
+} from "@/pages/workflowv2/lib/canvas-runs";
 import { Play } from "lucide-react";
+
+type RunCounts = {
+  completed: number;
+  errors: number;
+  running: number;
+  queued: number;
+  total: number;
+};
+
+export function countRuns(events: CanvasesCanvasEventWithExecutions[]): RunCounts {
+  const counts: RunCounts = {
+    completed: 0,
+    errors: 0,
+    running: 0,
+    queued: 0,
+    total: events.length,
+  };
+
+  for (const event of events) {
+    const executions = event.executions || [];
+    if (executions.length === 0) {
+      counts.queued++;
+      continue;
+    }
+    const aggregate = getAggregateStatus(executions);
+    if (aggregate === "completed" || aggregate === "cancelled") counts.completed++;
+    else if (aggregate === "error") counts.errors++;
+    else if (aggregate === "running") counts.running++;
+    else if (aggregate === "queued") counts.queued++;
+  }
+
+  return counts;
+}
 
 export function RunsConsoleContent({
   events,
@@ -64,7 +97,7 @@ export function RunsConsoleContent({
     [allEvents, nodes, statusFilter, searchQuery],
   );
 
-  const counts = useMemo(() => computeRunsCounts(allEvents, nodes), [allEvents, nodes]);
+  const counts = useMemo(() => countRuns(allEvents), [allEvents]);
   const allCount = totalCount != null && totalCount > 0 ? totalCount : counts.total;
 
   return (

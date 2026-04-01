@@ -5,12 +5,10 @@ import type {
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
 } from "@/api-client";
-import { formatTimeAgo } from "@/lib/date";
+import { formatDuration } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
-import { getState, getTriggerRenderer } from "./mappers";
-import { buildEventInfo, buildExecutionInfo } from "./utils";
-
-export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
+import { getState, getTriggerRenderer } from "../mappers";
+import { buildEventInfo, buildExecutionInfo } from "../utils";
 
 export function resolveNodeIconSlug(
   node: ComponentsNode | undefined,
@@ -21,14 +19,7 @@ export function resolveNodeIconSlug(
   return componentIconMap[name];
 }
 
-export function getExecutionStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]) {
-  const node = nodes.find((n) => n.id === execution.nodeId);
-  const componentName = node?.component?.name || "";
-  const stateResolver = getState(componentName);
-  return stateResolver(buildExecutionInfo(execution));
-}
-
-export function getAggregateStatus(executions: CanvasesCanvasNodeExecutionRef[], _nodes: ComponentsNode[]) {
+export function getAggregateStatus(executions: CanvasesCanvasNodeExecutionRef[]) {
   if (executions.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
     return "running";
   }
@@ -47,53 +38,27 @@ export function getAggregateStatus(executions: CanvasesCanvasNodeExecutionRef[],
   return "queued";
 }
 
-function formatDurationMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) {
-    const s = ms / 1000;
-    return s % 1 === 0 ? `${s}s` : `${s.toFixed(1)}s`;
-  }
-  const m = ms / 60000;
-  if (m % 1 === 0) return `${m}m`;
-  if (m < 10) return `${m.toFixed(1)}m`;
-  return `${Math.round(m)}m`;
-}
-
 export function computeDuration(execution: CanvasesCanvasNodeExecutionRef): string | null {
   if (execution.state !== "STATE_FINISHED" || !execution.createdAt || !execution.updatedAt) {
     return null;
   }
   const ms = new Date(execution.updatedAt).getTime() - new Date(execution.createdAt).getTime();
-  return formatDurationMs(ms);
+  return formatDuration(ms);
 }
 
 export function resolveExecutionDisplayStatus(execution: CanvasesCanvasNodeExecution, nodes: ComponentsNode[]): string {
-  const componentState = getExecutionStatus(execution, nodes);
-  if (componentState && componentState !== "neutral") return componentState;
+  const node = nodes.find((n) => n.id === execution.nodeId);
+  const componentName = node?.component?.name || "";
+  const stateResolver = getState(componentName);
+  const componentState = stateResolver(buildExecutionInfo(execution));
 
+  if (componentState && componentState !== "neutral") return componentState;
   if (execution.state === "STATE_PENDING") return "pending";
   if (execution.state === "STATE_STARTED") return "running";
   if (execution.result === "RESULT_CANCELLED") return "cancelled";
   if (execution.result === "RESULT_FAILED") return "failed";
   if (execution.result === "RESULT_PASSED") return "success";
   return "unknown";
-}
-
-export function formatRunTimestamp(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-
-  if (diffHours < 24) {
-    return formatTimeAgo(date);
-  }
-
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${weekdays[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()}, ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 const STATUS_TO_EVENT_STATE: Record<string, EventState> = {
@@ -147,12 +112,25 @@ export function getStatusBadgeProps(status: string) {
   return { badgeColor: style.badgeColor, label };
 }
 
-function matchesStatusFilter(
-  executions: CanvasesCanvasNodeExecutionRef[],
+export type RunsStatusFilter = "all" | "completed" | "errors" | "running" | "queued";
+
+export function filterRunEvents(
+  events: CanvasesCanvasEventWithExecutions[],
   nodes: ComponentsNode[],
   statusFilter: RunsStatusFilter,
-): boolean {
-  const aggregate = executions.length > 0 ? getAggregateStatus(executions, nodes) : "queued";
+  searchQuery: string,
+) {
+  const query = searchQuery.trim().toLowerCase();
+  return events.filter((event) => {
+    const executions = event.executions || [];
+    if (statusFilter !== "all" && !matchesStatusFilter(executions, statusFilter)) return false;
+    if (query && !matchesSearchQuery(event, executions, nodes, query)) return false;
+    return true;
+  });
+}
+
+function matchesStatusFilter(executions: CanvasesCanvasNodeExecutionRef[], statusFilter: RunsStatusFilter): boolean {
+  const aggregate = executions.length > 0 ? getAggregateStatus(executions) : "queued";
   if (statusFilter === "completed") return aggregate === "completed" || aggregate === "cancelled";
   if (statusFilter === "errors") return aggregate === "error";
   if (statusFilter === "running") return aggregate === "running";
@@ -185,41 +163,6 @@ function matchesSearchQuery(
     .toLowerCase();
 
   return searchableText.includes(query);
-}
-
-export function filterRunEvents(
-  events: CanvasesCanvasEventWithExecutions[],
-  nodes: ComponentsNode[],
-  statusFilter: RunsStatusFilter,
-  searchQuery: string,
-) {
-  const query = searchQuery.trim().toLowerCase();
-  return events.filter((event) => {
-    const executions = event.executions || [];
-    if (statusFilter !== "all" && !matchesStatusFilter(executions, nodes, statusFilter)) return false;
-    if (query && !matchesSearchQuery(event, executions, nodes, query)) return false;
-    return true;
-  });
-}
-
-export function computeRunsCounts(events: CanvasesCanvasEventWithExecutions[], nodes: ComponentsNode[]) {
-  let completed = 0;
-  let errors = 0;
-  let running = 0;
-  let queued = 0;
-  for (const event of events) {
-    const executions = event.executions || [];
-    if (executions.length === 0) {
-      queued++;
-      continue;
-    }
-    const aggregate = getAggregateStatus(executions, nodes);
-    if (aggregate === "completed" || aggregate === "cancelled") completed++;
-    else if (aggregate === "error") errors++;
-    else if (aggregate === "running") running++;
-    else if (aggregate === "queued") queued++;
-  }
-  return { completed, errors, running, queued, total: events.length };
 }
 
 export function countUnacknowledgedErrors(events: CanvasesCanvasEventWithExecutions[]): number {
