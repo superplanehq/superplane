@@ -41,7 +41,7 @@ test.setup:
 	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e DB_PASSWORD=$(DB_PASSWORD) -e PGPASSWORD=$(DB_PASSWORD) app bash /app/scripts/ci_db_setup
 
 test.start:
-	$(COMPOSE) up -d --wait --wait-timeout 60
+	$(COMPOSE) up -d --wait --wait-timeout 60 db rabbitmq otel agent app
 
 test.down:
 	$(COMPOSE) down --remove-orphans
