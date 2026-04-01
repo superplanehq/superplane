@@ -171,21 +171,23 @@ func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, re
 	return executions, nil
 }
 
-func ListNodeExecutionsForRootEvents(rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
-	return ListNodeExecutionsForRootEventsInTransaction(database.Conn(), rootEventIDs)
+func ListNodeExecutionsForRootEvents(canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+	return ListNodeExecutionsForRootEventsInTransaction(database.Conn(), canvasID, rootEventIDs)
 }
 
-func ListNodeExecutionsForRootEventsInTransaction(tx *gorm.DB, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+func ListNodeExecutionsForRootEventsInTransaction(tx *gorm.DB, canvasID uuid.UUID, rootEventIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
 	if len(rootEventIDs) == 0 {
 		return []CanvasNodeExecution{}, nil
 	}
 
 	var executions []CanvasNodeExecution
-	err := tx.
+	query := database.Conn().
+		Where("workflow_id = ?", canvasID).
 		Where("root_event_id IN ?", rootEventIDs).
-		Order("created_at ASC").
-		Find(&executions).
-		Error
+		Where("parent_execution_id IS NULL").
+		Order("created_at ASC")
+
+	err := query.Find(&executions).Error
 	if err != nil {
 		return nil, err
 	}

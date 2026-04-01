@@ -119,7 +119,7 @@ func (w *EventRetentionWorker) processRootEvent(tx *gorm.DB, rootEvent models.Ca
 		return nil
 	}
 
-	executions, err := models.ListNodeExecutionsForRootEventsInTransaction(tx, []uuid.UUID{rootEvent.ID})
+	executions, err := models.ListNodeExecutionsForRootEventsInTransaction(tx, rootEvent.WorkflowID, []uuid.UUID{rootEvent.ID})
 	if err != nil {
 		return fmt.Errorf("list executions for root event %s: %w", rootEvent.ID, err)
 	}

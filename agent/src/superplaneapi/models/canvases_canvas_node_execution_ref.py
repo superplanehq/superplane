@@ -21,23 +21,25 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_node_execution_ref import CanvasesCanvasNodeExecutionRef
+from superplaneapi.models.canvas_node_execution_result import CanvasNodeExecutionResult
+from superplaneapi.models.canvas_node_execution_result_reason import CanvasNodeExecutionResultReason
+from superplaneapi.models.canvases_canvas_node_execution_state import CanvasesCanvasNodeExecutionState
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesCanvasEventWithExecutions(BaseModel):
+class CanvasesCanvasNodeExecutionRef(BaseModel):
     """
-    CanvasesCanvasEventWithExecutions
+    More succint description of a canvas node execution. No input, outputs, root event, children. Used to embed execution information into other messages.
     """ # noqa: E501
     id: Optional[StrictStr] = None
-    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
     node_id: Optional[StrictStr] = Field(default=None, alias="nodeId")
-    channel: Optional[StrictStr] = None
-    data: Optional[Dict[str, Any]] = None
+    state: Optional[CanvasesCanvasNodeExecutionState] = CanvasesCanvasNodeExecutionState.STATE_UNKNOWN
+    result: Optional[CanvasNodeExecutionResult] = CanvasNodeExecutionResult.RESULT_UNKNOWN
+    result_reason: Optional[CanvasNodeExecutionResultReason] = Field(default=CanvasNodeExecutionResultReason.RESULT_REASON_OK, alias="resultReason")
+    result_message: Optional[StrictStr] = Field(default=None, alias="resultMessage")
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
-    executions: Optional[List[CanvasesCanvasNodeExecutionRef]] = None
-    custom_name: Optional[StrictStr] = Field(default=None, alias="customName")
-    __properties: ClassVar[List[str]] = ["id", "canvasId", "nodeId", "channel", "data", "createdAt", "executions", "customName"]
+    updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
+    __properties: ClassVar[List[str]] = ["id", "nodeId", "state", "result", "resultReason", "resultMessage", "createdAt", "updatedAt"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -57,7 +59,7 @@ class CanvasesCanvasEventWithExecutions(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasEventWithExecutions from a JSON string"""
+        """Create an instance of CanvasesCanvasNodeExecutionRef from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -78,18 +80,11 @@ class CanvasesCanvasEventWithExecutions(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in executions (list)
-        _items = []
-        if self.executions:
-            for _item_executions in self.executions:
-                if _item_executions:
-                    _items.append(_item_executions.to_dict())
-            _dict['executions'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasEventWithExecutions from a dict"""
+        """Create an instance of CanvasesCanvasNodeExecutionRef from a dict"""
         if obj is None:
             return None
 
@@ -98,13 +93,13 @@ class CanvasesCanvasEventWithExecutions(BaseModel):
 
         _obj = cls.model_validate({
             "id": obj.get("id"),
-            "canvasId": obj.get("canvasId"),
             "nodeId": obj.get("nodeId"),
-            "channel": obj.get("channel"),
-            "data": obj.get("data"),
+            "state": obj.get("state") if obj.get("state") is not None else CanvasesCanvasNodeExecutionState.STATE_UNKNOWN,
+            "result": obj.get("result") if obj.get("result") is not None else CanvasNodeExecutionResult.RESULT_UNKNOWN,
+            "resultReason": obj.get("resultReason") if obj.get("resultReason") is not None else CanvasNodeExecutionResultReason.RESULT_REASON_OK,
+            "resultMessage": obj.get("resultMessage"),
             "createdAt": obj.get("createdAt"),
-            "executions": [CanvasesCanvasNodeExecutionRef.from_dict(_item) for _item in obj["executions"]] if obj.get("executions") is not None else None,
-            "customName": obj.get("customName")
+            "updatedAt": obj.get("updatedAt")
         })
         return _obj
 
