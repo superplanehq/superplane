@@ -2,6 +2,7 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getStateMap } from "..";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -9,8 +10,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatOptionalIsoTimestamp } from "@/lib/timezone";
+import { formatTimestamp } from "../utils";
 import { buildAlertRuleMetadata, buildGrafanaEventSections } from "./alert_rule_shared";
 import type { DeleteAlertRuleOutput } from "./types";
 
@@ -34,7 +34,7 @@ export const deleteAlertRuleMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const details: Record<string, string> = {
-      "Deleted At": formatOptionalIsoTimestamp(context.execution.createdAt),
+      "Deleted At": formatTimestamp(context.execution.createdAt),
     };
 
     const response = outputs?.default?.[0]?.data as DeleteAlertRuleOutput | undefined;

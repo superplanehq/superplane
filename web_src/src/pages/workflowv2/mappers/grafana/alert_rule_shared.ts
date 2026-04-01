@@ -1,9 +1,9 @@
 import type { EventSection } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatOptionalIsoTimestamp } from "@/lib/timezone";
 import { getState, getTriggerRenderer } from "..";
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
+import { formatTimestamp } from "../utils";
 import type {
   AlertRuleNodeMetadata,
   CreateAlertRuleConfiguration,
@@ -61,7 +61,7 @@ export function buildAlertRuleExecutionDetails(
   const nodeMetadata = context.node.metadata as AlertRuleNodeMetadata | undefined;
 
   const details: Record<string, string> = {
-    [actionLabel]: formatOptionalIsoTimestamp(payload?.timestamp ?? context.execution.createdAt),
+    [actionLabel]: formatTimestamp(payload?.timestamp ?? context.execution.createdAt),
   };
 
   addOptionalDetail(details, "Title", alertRule.title);
