@@ -4,7 +4,12 @@ import { handleKeyboardActivation } from ".";
 import { RUNS_CONSOLE_BADGE_COL } from ".";
 import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";
-import { computeDuration, formatRunTimestamp, resolveExecutionDisplayStatus, resolveNodeIconSlug } from "../../canvasRunsUtils";
+import {
+  computeDuration,
+  formatRunTimestamp,
+  resolveExecutionDisplayStatus,
+  resolveNodeIconSlug,
+} from "../../canvasRunsUtils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 
 export function ExecutionRow({

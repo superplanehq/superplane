@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecution, CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
+import {
+  CanvasesCanvasEventWithExecutions,
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasNodeExecutionRef,
+  ComponentsNode,
+} from "@/api-client";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { computeDuration, getAggregateStatus, resolveNodeIconSlug } from "@/pages/workflowv2/canvasRunsUtils";
