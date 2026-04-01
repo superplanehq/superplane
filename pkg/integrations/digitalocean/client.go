@@ -2289,6 +2289,189 @@ func (c *Client) ListApps() ([]App, error) {
 	return response.Apps, nil
 }
 
+// EmbeddingModel represents a DigitalOcean Gradient AI embedding model
+type EmbeddingModel struct {
+	UUID               string `json:"uuid"`
+	Name               string `json:"name"`
+	Description        string `json:"description"`
+	KBMinChunkSize     int    `json:"kb_min_chunk_size"`
+	KBMaxChunkSize     int    `json:"kb_max_chunk_size"`
+	KBDefaultChunkSize int    `json:"kb_default_chunk_size"`
+}
+
+// ListEmbeddingModels retrieves all embedding models available for knowledge base vectorization
+func (c *Client) ListEmbeddingModels() ([]EmbeddingModel, error) {
+	url := fmt.Sprintf("%s/gen-ai/models?usecases=MODEL_USECASE_KNOWLEDGEBASE&per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Models []EmbeddingModel `json:"models"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Models, nil
+}
+
+// Project represents a DigitalOcean project
+type Project struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Purpose     string `json:"purpose"`
+	Environment string `json:"environment"`
+	IsDefault   bool   `json:"is_default"`
+}
+
+// ListProjects retrieves all projects in the account
+func (c *Client) ListProjects() ([]Project, error) {
+	url := fmt.Sprintf("%s/projects?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Projects []Project `json:"projects"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Projects, nil
+}
+
+// Database represents a DigitalOcean managed database cluster
+type Database struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Engine string `json:"engine"`
+	Status string `json:"status"`
+}
+
+// ListDatabasesByEngine retrieves all managed database clusters filtered by engine
+func (c *Client) ListDatabasesByEngine(engine string) ([]Database, error) {
+	url := fmt.Sprintf("%s/databases?engine=%s&per_page=200", c.BaseURL, engine)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []Database `json:"databases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
+}
+
+// KnowledgeBase represents a DigitalOcean Gradient AI knowledge base
+type KnowledgeBase struct {
+	UUID               string   `json:"uuid"`
+	Name               string   `json:"name"`
+	EmbeddingModelUUID string   `json:"embedding_model_uuid"`
+	Region             string   `json:"region"`
+	ProjectID          string   `json:"project_id"`
+	Tags               []string `json:"tags"`
+	DatabaseID         string   `json:"database_id"`
+	CreatedAt          string   `json:"created_at"`
+	UpdatedAt          string   `json:"updated_at"`
+}
+
+// KBSpacesDataSource defines a Spaces bucket data source for a knowledge base
+type KBSpacesDataSource struct {
+	BucketName string `json:"bucket_name"`
+	Region     string `json:"region"`
+}
+
+// KBWebCrawlerDataSource defines a web crawler data source for a knowledge base
+type KBWebCrawlerDataSource struct {
+	BaseURL        string   `json:"base_url"`
+	CrawlingOption string   `json:"crawling_option,omitempty"`
+	EmbedMedia     bool     `json:"embed_media"`
+	ExcludeTags    []string `json:"exclude_tags,omitempty"`
+}
+
+// KBChunkingOptions defines chunking configuration for a knowledge base data source
+type KBChunkingOptions struct {
+	MaxChunkSize      int     `json:"max_chunk_size,omitempty"`
+	SemanticThreshold float64 `json:"semantic_threshold,omitempty"`
+	ParentChunkSize   int     `json:"parent_chunk_size,omitempty"`
+	ChildChunkSize    int     `json:"child_chunk_size,omitempty"`
+}
+
+// KBDataSource represents a single data source in a knowledge base
+type KBDataSource struct {
+	SpacesDataSource     *KBSpacesDataSource     `json:"spaces_data_source,omitempty"`
+	WebCrawlerDataSource *KBWebCrawlerDataSource `json:"web_crawler_data_source,omitempty"`
+	ChunkingAlgorithm    string                  `json:"chunking_algorithm,omitempty"`
+	ChunkingOptions      *KBChunkingOptions      `json:"chunking_options,omitempty"`
+}
+
+// CreateKnowledgeBaseRequest is the payload for POST /v2/gen-ai/knowledge_bases
+type CreateKnowledgeBaseRequest struct {
+	Name               string         `json:"name"`
+	EmbeddingModelUUID string         `json:"embedding_model_uuid"`
+	Region             string         `json:"region"`
+	ProjectID          string         `json:"project_id"`
+	Tags               []string       `json:"tags,omitempty"`
+	DatabaseID         string         `json:"database_id,omitempty"`
+	DataSources        []KBDataSource `json:"datasources,omitempty"`
+}
+
+// CreateKnowledgeBase creates a new Gradient AI knowledge base
+func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBase KnowledgeBase `json:"knowledge_base"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.KnowledgeBase, nil
+}
+
+// ListKnowledgeBases retrieves all knowledge bases in the account
+func (c *Client) ListKnowledgeBases() ([]KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBases []KnowledgeBase `json:"knowledge_bases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.KnowledgeBases, nil
+}
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`

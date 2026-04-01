@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Create Knowledge Base" href="#create-knowledge-base" description="Create a DigitalOcean Gradient AI knowledge base with one or more data sources" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
   <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
@@ -469,6 +470,71 @@ Returns the created droplet object including:
   },
   "timestamp": "2026-03-12T21:10:00.000000000Z",
   "type": "digitalocean.droplet.created"
+}
+```
+
+<a id="create-knowledge-base"></a>
+
+## Create Knowledge Base
+
+The Create Knowledge Base component creates a new knowledge base on the DigitalOcean Gradient AI Platform, ready for use with AI agents via retrieval-augmented generation (RAG).
+
+### How it works
+
+A knowledge base converts your data sources into vector embeddings using the selected embedding model. Those embeddings are stored in an OpenSearch database — either a newly provisioned one or one you already have. Once created, the knowledge base can be attached to any Gradient AI agent.
+
+### Data Sources
+
+You can add multiple data sources of different types:
+
+- **Spaces Bucket or Folder** — indexes all supported files in a DigitalOcean Spaces bucket or folder
+- **Web or Sitemap URL** — crawls a public website (seed URL) or a list of URLs from a sitemap
+
+Each data source has its own independent chunking strategy.
+
+### Chunking Strategies
+
+- **Section-based** (default) — splits on structural elements like headings and paragraphs; fast and low-cost
+- **Semantic** — groups sentences by meaning; slower but context-aware
+- **Hierarchical** — creates parent (context) and child (retrieval) chunk pairs
+- **Fixed-length** — splits strictly by token count; best for logs and unstructured text
+
+### OpenSearch Database
+
+The knowledge base requires an OpenSearch database to store the vector embeddings:
+- **Create new** — provisions a new database automatically sized to your data
+- **Use existing** — connects to a database you already have by providing its ID
+
+### Output
+
+Returns the created knowledge base including:
+- **uuid**: Knowledge base UUID for use in downstream components
+- **name**: Name of the knowledge base
+- **region**: Datacenter region
+- **embeddingModelUUID**: UUID of the embedding model used
+- **projectId**: Associated project ID
+- **databaseId**: UUID of the OpenSearch database (empty when creating new)
+- **createdAt**: Creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2025-01-01T00:00:00Z",
+    "databaseId": "abf1055a-745d-4c24-a1db-1959ea819264",
+    "embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+    "name": "my-knowledge-base",
+    "projectId": "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+    "region": "tor1",
+    "tags": [
+      "docs",
+      "production"
+    ],
+    "uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.created"
 }
 ```
 

@@ -36,6 +36,12 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listSpacesBuckets(ctx)
 	case "app":
 		return listApps(ctx)
+	case "embedding_model":
+		return listEmbeddingModels(ctx)
+	case "project":
+		return listProjects(ctx)
+	case "opensearch_database":
+		return listOpenSearchDatabases(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -377,6 +383,83 @@ func listVPCs(ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 			Type: "vpc",
 			Name: vpc.Name,
 			ID:   vpc.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listEmbeddingModels(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	models, err := client.ListEmbeddingModels()
+	if err != nil {
+		return nil, fmt.Errorf("error listing embedding models: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(models))
+	for _, model := range models {
+		name := model.Name
+		if model.KBMinChunkSize > 0 && model.KBMaxChunkSize > 0 {
+			name = fmt.Sprintf("%s (%d–%d tokens)", model.Name, model.KBMinChunkSize, model.KBMaxChunkSize)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "embedding_model",
+			Name: name,
+			ID:   model.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	projects, err := client.ListProjects()
+	if err != nil {
+		return nil, fmt.Errorf("error listing projects: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, project := range projects {
+		name := project.Name
+		if project.IsDefault {
+			name += " (default)"
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "project",
+			Name: name,
+			ID:   project.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listOpenSearchDatabases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	databases, err := client.ListDatabasesByEngine("opensearch")
+	if err != nil {
+		return nil, fmt.Errorf("error listing OpenSearch databases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(databases))
+	for _, db := range databases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "opensearch_database",
+			Name: db.Name,
+			ID:   db.ID,
 		})
 	}
 

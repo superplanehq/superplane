@@ -24,6 +24,7 @@ import { createAppMapper } from "./create_app";
 import { getAppMapper } from "./get_app";
 import { deleteAppMapper } from "./delete_app";
 import { updateAppMapper } from "./update_app";
+import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -52,6 +53,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getApp: getAppMapper,
   deleteApp: deleteAppMapper,
   updateApp: updateAppMapper,
+  createKnowledgeBase: createKnowledgeBaseMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -82,4 +84,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getApp: buildActionStateRegistry("fetched"),
   deleteApp: buildActionStateRegistry("deleted"),
   updateApp: buildActionStateRegistry("updated"),
+  createKnowledgeBase: buildActionStateRegistry("created"),
 };
