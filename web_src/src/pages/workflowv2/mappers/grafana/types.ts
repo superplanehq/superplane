@@ -34,3 +34,38 @@ export interface QueryDataSourceConfiguration {
   timezone?: string;
   format?: string;
 }
+
+export interface SilenceMatcher {
+  name?: string;
+  value?: string;
+  isRegex?: boolean;
+  isEqual?: boolean;
+}
+
+export interface SilenceStatus {
+  state?: string;
+}
+
+export interface Silence {
+  id?: string;
+  status?: SilenceStatus;
+  comment?: string;
+  createdBy?: string;
+  startsAt?: string;
+  endsAt?: string;
+  updatedAt?: string;
+  matchers?: SilenceMatcher[];
+}
+
+export interface ListSilencesOutput {
+  silences?: Silence[];
+}
+
+export interface CreateSilenceOutput {
+  silenceId?: string;
+}
+
+export interface DeleteSilenceOutput {
+  silenceId?: string;
+  deleted?: boolean;
+}
