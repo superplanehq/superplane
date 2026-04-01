@@ -8,12 +8,12 @@ import type {
   ComponentsEdge,
   ComponentsNode,
 } from "@/api-client";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatTimeAgo } from "@/lib/date";
 import { flattenObject } from "@/lib/utils";
 import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { renderTimeAgo } from "@/components/TimeAgo";
-import { formatTimeAgo } from "@/lib/date";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
 import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
@@ -344,6 +344,11 @@ export function buildRunItemFromExecution(options: {
   };
 }
 
+function formatRunTitle(eventId: string | undefined, title: string): string {
+  const runIdPrefix = eventId?.slice(0, 4);
+  return runIdPrefix ? `#${runIdPrefix} ·  ${title}` : `${title}`;
+}
+
 export function buildRunEntryFromEvent(options: {
   event: CanvasesCanvasEvent;
   nodes: ComponentsNode[];
@@ -359,7 +364,7 @@ export function buildRunEntryFromEvent(options: {
     id: event.id || `run-${Date.now()}`,
     source: "runs",
     timestamp: event.createdAt || "",
-    title: `#${event.id?.slice(0, 4)} ·  ${title}` || "· Run",
+    title: formatRunTitle(event.id, title),
     type: "run",
     runItems,
     searchText: [title, subtitle, event.id, event.nodeId, Object.values(rootValues).join(" ")]
