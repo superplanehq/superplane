@@ -1,7 +1,7 @@
 import { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { handleKeyboardActivation } from ".";
-import { RUNS_CONSOLE_BADGE_COL } from ".";
+import { RUNS_CONSOLE_BADGE_COL } from "./constants";
 import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";
 import {

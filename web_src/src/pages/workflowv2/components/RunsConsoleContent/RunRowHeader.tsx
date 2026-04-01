@@ -11,7 +11,7 @@ import { computeDuration, getAggregateStatus, resolveNodeIconSlug } from "@/page
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import { RUNS_CONSOLE_BADGE_COL } from ".";
+import { RUNS_CONSOLE_BADGE_COL } from "./constants";
 import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";
 import { formatRunTimestamp } from "../../canvasRunsUtils";
