@@ -1,4 +1,4 @@
-import { CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { formatRunTimestamp, resolveNodeIconSlug } from "../../canvasRunsUtils";
 import { cn } from "@/lib/utils";

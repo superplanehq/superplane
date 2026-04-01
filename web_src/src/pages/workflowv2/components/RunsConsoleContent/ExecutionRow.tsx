@@ -1,4 +1,4 @@
-import { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
 import { cn } from "@/lib/utils";
 import { handleKeyboardActivation } from ".";
 import { RUNS_CONSOLE_BADGE_COL } from "./constants";
