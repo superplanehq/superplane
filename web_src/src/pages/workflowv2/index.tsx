@@ -6450,6 +6450,8 @@ function prepareComponentBaseNode(
     lastExecutions: executions.map((e) => buildExecutionInfo(e)),
     nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
     additionalData: additionalData,
+    organizationId: organizationId,
+    integrationId: node.integration?.id,
   });
 
   // If the mapper didn't provide a custom icon, resolve from the app logo map

@@ -282,6 +282,93 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, "prom", resources[0].ID)
 		require.Equal(t, resourceTypeDataSource, resources[0].Type)
 	})
+
+	t.Run("dashboard returns search hits", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"uid":"dash1","title":"Overview","type":"dash-db"},
+						{"uid":"","title":"No UID","type":"dash-db"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypeDashboard, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		require.Equal(t, "Overview", resources[0].Name)
+		require.Equal(t, "dash1", resources[0].ID)
+		require.Equal(t, resourceTypeDashboard, resources[0].Type)
+	})
+}
+
+func Test__Client__SearchDashboards__ParsesResponse(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"uid":"a","title":"A"},{"uid":"b","title":""}]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	hits, err := client.SearchDashboards()
+	require.NoError(t, err)
+	require.Len(t, hits, 2)
+	require.Equal(t, "a", hits[0].UID)
+	require.Equal(t, "A", hits[0].Title)
+	require.Equal(t, "b", hits[1].UID)
+	require.Equal(t, "", hits[1].Title)
+	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/search")
+}
+
+func Test__Grafana__ListResources__Annotations(t *testing.T) {
+	g := &Grafana{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"id":1,"text":"a","time":0},
+					{"id":2,"text":"","time":0}
+				]`)),
+			},
+		},
+	}
+
+	resources, err := g.ListResources(resourceTypeAnnotation, core.ListResourcesContext{
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, resources, 2)
+	require.Equal(t, "1", resources[0].ID)
+	require.Equal(t, resourceTypeAnnotation, resources[0].Type)
+	require.Contains(t, resources[0].Name, "#1")
+	require.Equal(t, "2", resources[1].ID)
+	require.Equal(t, "#2", resources[1].Name)
 }
 
 func Test__notificationPolicyRoot__PreservesUnknownRootAndRouteFields(t *testing.T) {
