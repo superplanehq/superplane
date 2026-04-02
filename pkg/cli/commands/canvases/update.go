@@ -55,30 +55,31 @@ func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error)
 	return metadata.GetVersioningEnabled(), nil
 }
 
-func requestedCanvasVersioningEnabled(canvas openapi_client.CanvasesCanvas) *bool {
+func requestedCanvasVersioningEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
 	if canvas.Metadata == nil {
-		return nil
+		return false, false
 	}
 	value, ok := canvas.Metadata.GetVersioningEnabledOk()
 	if !ok || value == nil {
-		return nil
+		return false, false
 	}
-	return value
+	return *value, true
 }
 
 func planCanvasVersioningUpdate(
 	ctx core.CommandContext,
 	canvasID string,
-	requested *bool,
+	requestedEnabled bool,
+	requestedSet bool,
 	currentEffective bool,
 	draftMode bool,
 ) (*versioningPlan, error) {
 	plan := &versioningPlan{effectiveEnabled: currentEffective}
-	if requested == nil || *requested == currentEffective {
+	if !requestedSet || requestedEnabled == currentEffective {
 		return plan, nil
 	}
 
-	if !*requested {
+	if !requestedEnabled {
 		orgEnabled, err := resolveOrganizationVersioningEnabled(ctx)
 		if err != nil {
 			return nil, err
@@ -152,8 +153,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	requestedVersioningEnabled := requestedCanvasVersioningEnabled(canvas)
-	plan, err := planCanvasVersioningUpdate(ctx, canvasID, requestedVersioningEnabled, versioningContext.versioningEnabled, draftMode)
+	requestedEnabled, requestedSet := requestedCanvasVersioningEnabled(canvas)
+	plan, err := planCanvasVersioningUpdate(ctx, canvasID, requestedEnabled, requestedSet, versioningContext.versioningEnabled, draftMode)
 	if err != nil {
 		return err
 	}
