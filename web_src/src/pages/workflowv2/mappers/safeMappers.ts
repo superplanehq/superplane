@@ -22,6 +22,10 @@ function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function asBoolean(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
+}
+
 function getFallbackComponentTitle(context: ComponentBaseContext): string {
   return context.node?.name || context.componentDefinition?.label || context.componentDefinition?.name || "Component";
 }
@@ -113,15 +117,15 @@ function buildNormalizedComponentBaseProps(
     iconSlug: sanitizeString(record.iconSlug, fallbackIconSlug),
     iconColor: asString(record.iconColor),
     title: sanitizeString(record.title, fallbackTitle),
-    showHeader: typeof record.showHeader === "boolean" ? record.showHeader : undefined,
-    paused: typeof record.paused === "boolean" ? record.paused : undefined,
+    showHeader: asBoolean(record.showHeader),
+    paused: asBoolean(record.paused),
     specs: sanitizeArray(record.specs),
-    hideCount: typeof record.hideCount === "boolean" ? record.hideCount : undefined,
-    hideMetadataList: typeof record.hideMetadataList === "boolean" ? record.hideMetadataList : undefined,
+    hideCount: asBoolean(record.hideCount),
+    hideMetadataList: asBoolean(record.hideMetadataList),
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
     collapsedBackground: asString(record.collapsedBackground),
     eventSections: sanitizeArray(record.eventSections),
-    selected: typeof record.selected === "boolean" ? record.selected : undefined,
+    selected: asBoolean(record.selected),
     metadata: sanitizeArray(record.metadata),
     customField: sanitizeCustomField(record.customField as ComponentBaseProps["customField"], fallbackTitle),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
@@ -225,14 +229,14 @@ function buildNormalizedTriggerProps(
     iconSlug: normalizedIconSlug,
     iconColor: asString(record.iconColor),
     title: normalizedTitle,
-    showHeader: typeof record.showHeader === "boolean" ? record.showHeader : undefined,
-    paused: typeof record.paused === "boolean" ? record.paused : undefined,
+    showHeader: asBoolean(record.showHeader),
+    paused: asBoolean(record.paused),
     specs: sanitizeArray(record.specs),
-    hideCount: typeof record.hideCount === "boolean" ? record.hideCount : undefined,
-    hideMetadataList: typeof record.hideMetadataList === "boolean" ? record.hideMetadataList : undefined,
+    hideCount: asBoolean(record.hideCount),
+    hideMetadataList: asBoolean(record.hideMetadataList),
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
     collapsedBackground: asString(record.collapsedBackground),
-    selected: typeof record.selected === "boolean" ? record.selected : undefined,
+    selected: asBoolean(record.selected),
     metadata,
     customField: normalizeTriggerCustomField(record.customField),
     customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
