@@ -63,6 +63,67 @@ func Test__decodeUpdateAlertRuleSpec__whitespaceOnlyReducerConditionBecomeNil__n
 	assert.NotNil(t, spec.Title)
 }
 
+func Test__mergeAlertRulePayload__preservesConditionWhenOnlyQueryFieldsUpdate(t *testing.T) {
+	existing := map[string]any{
+		"uid":       "rule-1",
+		"condition": "A",
+		"data": []any{
+			map[string]any{
+				"refId":         "A",
+				"datasourceUid": "ds1",
+				"model":         map[string]any{"expr": "up"},
+			},
+		},
+	}
+
+	spec := UpdateAlertRuleSpec{
+		AlertRuleUID: "rule-1",
+		Query:        strPtr("sum(rate(http_requests_total[5m]))"),
+	}
+
+	merged, err := mergeAlertRulePayload(existing, spec)
+	require.NoError(t, err)
+	assert.Equal(t, "A", merged["condition"])
+}
+
+func Test__mergeAlertRulePayload__setsConditionCWhenConditionFieldsUpdate(t *testing.T) {
+	existing := map[string]any{
+		"uid":       "rule-1",
+		"condition": "A",
+		"data": []any{
+			map[string]any{
+				"refId":         "A",
+				"datasourceUid": "ds1",
+				"model":         map[string]any{"expr": "up"},
+			},
+			map[string]any{
+				"refId": "B",
+				"model": map[string]any{"type": "reduce", "reducer": "last", "expression": "A"},
+			},
+			map[string]any{
+				"refId": "C",
+				"model": map[string]any{
+					"type": "threshold",
+					"conditions": []any{
+						map[string]any{
+							"evaluator": map[string]any{"type": "gt", "params": []any{float64(0.5)}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := UpdateAlertRuleSpec{
+		AlertRuleUID: "rule-1",
+		Threshold:    float64Ptr(99),
+	}
+
+	merged, err := mergeAlertRulePayload(existing, spec)
+	require.NoError(t, err)
+	assert.Equal(t, alertRuleConditionRefID, merged["condition"])
+}
+
 func Test__mergeAlertRulePayload__clearsNotificationSettingsWhenReceiverEmpty(t *testing.T) {
 	existing := map[string]any{
 		"uid":   "rule-1",
@@ -107,6 +168,44 @@ func Test__validateUpdateAlertRuleSpec__rejectsInvalidReducerAndConditionType(t 
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid conditionType")
+}
+
+func Test__mergeAlertRulePayload__rejectsRangeConditionWithoutThreshold2(t *testing.T) {
+	existing := map[string]any{
+		"uid":       "rule-1",
+		"condition": "C",
+		"data": []any{
+			map[string]any{
+				"refId":         "A",
+				"datasourceUid": "ds1",
+				"model":         map[string]any{"expr": "up"},
+			},
+			map[string]any{
+				"refId": "B",
+				"model": map[string]any{"type": "reduce", "reducer": "last", "expression": "A"},
+			},
+			map[string]any{
+				"refId": "C",
+				"model": map[string]any{
+					"type": "threshold",
+					"conditions": []any{
+						map[string]any{
+							"evaluator": map[string]any{"type": "gt", "params": []any{float64(1)}},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	spec := UpdateAlertRuleSpec{
+		AlertRuleUID:  "rule-1",
+		ConditionType: strPtr("within_range"),
+	}
+
+	_, err := mergeAlertRulePayload(existing, spec)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "threshold2 is required for range conditions")
 }
 
 func float64Ptr(f float64) *float64 {

@@ -636,7 +636,9 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 			return nil, err
 		}
 		updated["data"] = queryData
-		updated["condition"] = alertRuleConditionRefID
+		if updateAlertRuleSpecHasConditionUpdate(spec) {
+			updated["condition"] = alertRuleConditionRefID
+		}
 	}
 
 	if spec.NotificationReceiver != nil {
@@ -813,6 +815,10 @@ func extractExistingConditionFromData(data []any) (reducer, conditionType string
 	return
 }
 
+func updateAlertRuleSpecHasConditionUpdate(spec UpdateAlertRuleSpec) bool {
+	return spec.Reducer != nil || spec.ConditionType != nil || spec.Threshold != nil || spec.Threshold2 != nil
+}
+
 func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any, error) {
 	data, ok := existingData.([]any)
 	if !ok || len(data) == 0 {
@@ -874,8 +880,7 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 		updatedQuery["model"] = model
 	}
 
-	hasConditionUpdate := spec.Reducer != nil || spec.ConditionType != nil || spec.Threshold != nil || spec.Threshold2 != nil
-	if !hasConditionUpdate {
+	if !updateAlertRuleSpecHasConditionUpdate(spec) {
 		updatedData := make([]any, len(data))
 		copy(updatedData, data)
 		updatedData[0] = updatedQuery
@@ -905,6 +910,9 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 
 	if reducer == "" || conditionType == "" || threshold == nil {
 		return nil, errors.New("reducer, conditionType, and threshold are required to update alert condition")
+	}
+	if isRangeConditionType(conditionType) && threshold2 == nil {
+		return nil, errors.New("threshold2 is required for range conditions (within_range, outside_range)")
 	}
 
 	params := thresholdParamsForConditionType(conditionType, threshold, threshold2)
