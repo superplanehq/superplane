@@ -207,7 +207,7 @@ CREATE TABLE public.canvas_memories (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -1202,6 +1202,13 @@ CREATE INDEX idx_casbin_rule_ptype ON public.casbin_rule USING btree (ptype);
 
 
 --
+-- Name: idx_casbin_rule_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule_unique ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_v0; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1981,7 +1988,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260331003955	f
+20260402003713	f
 \.
 
 
