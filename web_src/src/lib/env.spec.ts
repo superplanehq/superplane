@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isAgentReplEnabled, isCustomComponentsEnabled, isUsagePageForced } from "@/lib/env";
+import {
+  isAgentReplEnabled,
+  isCustomComponentsEnabled,
+  isInlineConfigAssistantEnabled,
+  isUsagePageForced,
+} from "@/lib/env";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -22,5 +27,11 @@ describe("env", () => {
     vi.stubEnv("VITE_FORCE_USAGE_PAGE", "true");
 
     expect(isUsagePageForced()).toBe(true);
+  });
+
+  it("reads the inline config assistant flag", () => {
+    vi.stubEnv("VITE_ENABLE_INLINE_CONFIG_ASSISTANT", "true");
+
+    expect(isInlineConfigAssistantEnabled()).toBe(true);
   });
 });

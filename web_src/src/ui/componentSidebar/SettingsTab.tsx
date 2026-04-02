@@ -19,6 +19,8 @@ import {
   parseDefaultValues,
   validateFieldForSubmission,
 } from "@/lib/components";
+import { isInlineConfigAssistantEnabled } from "@/lib/env";
+import { useConfigAssistantSuggest } from "@/hooks/useConfigAssistantSuggest";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
@@ -51,6 +53,8 @@ interface SettingsTabProps {
   canUpdateIntegrations?: boolean;
   /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
   configurationSaveMode?: "manual" | "auto";
+  /** When set (workflow canvas), inline assistant calls the config-assistant API. */
+  canvasId?: string;
 }
 
 function buildAutosaveSnapshot(
@@ -72,6 +76,7 @@ function buildAutosaveSnapshot(
 
 export function SettingsTab({
   nodeId: _nodeId,
+  canvasId,
   nodeName,
   nodeLabel: _nodeLabel,
   configuration,
@@ -112,6 +117,16 @@ export function SettingsTab({
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
+
+  const inlineAssistantEnabled = isInlineConfigAssistantEnabled() && !isReadOnly;
+
+  const { isFieldAssistantEnabled, getSuggestFieldValue } = useConfigAssistantSuggest({
+    organizationId: domainId,
+    canvasId,
+    nodeId: _nodeId,
+    autocompleteExampleObj: resolvedAutocompleteExampleObj ?? null,
+    featureEnabled: inlineAssistantEnabled,
+  });
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -695,6 +710,8 @@ export function SettingsTab({
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  suggestFieldValue={getSuggestFieldValue(field, () => nodeConfiguration[fieldName])}
+                  assistantEnabled={isFieldAssistantEnabled(field)}
                 />
               );
             })}

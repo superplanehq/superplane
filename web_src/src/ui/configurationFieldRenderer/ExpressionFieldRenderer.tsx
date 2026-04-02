@@ -1,6 +1,7 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
+import { InlineFieldAssistant } from "@/ui/InlineFieldAssistant";
 import { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
@@ -10,6 +11,10 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   onChange,
   autocompleteExampleObj,
   allowExpressions = false,
+  suggestFieldValue,
+  assistantEnabled = false,
+  labelRightRef,
+  labelRightReady = false,
 }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
 
@@ -39,18 +44,35 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
     );
   }
 
+  const fieldLabel = field.label || field.name || "Field";
+  const showAssistant = Boolean(
+    assistantEnabled && suggestFieldValue && !field.sensitive && field.type === "expression",
+  );
+
   return (
-    <AutoCompleteInput
-      exampleObj={autocompleteExampleObj ?? null}
-      value={currentValue}
-      onChange={(nextValue) => onChange(nextValue || undefined)}
-      placeholder={field.placeholder || ""}
-      expressionMode="raw"
-      inputSize="md"
-      showValuePreview
-      quickTip="Tip: type `$` to browse node payloads."
-      className=""
-      data-testid={toTestId(`expression-field-${field.name}`)}
-    />
+    <div className="space-y-2">
+      {showAssistant ? (
+        <InlineFieldAssistant
+          fieldLabel={fieldLabel}
+          onApplyValue={(next) => onChange(next || undefined)}
+          suggestFieldValue={suggestFieldValue}
+          assistantEnabled={assistantEnabled}
+          labelRightRef={labelRightRef}
+          labelRightReady={labelRightReady}
+        />
+      ) : null}
+      <AutoCompleteInput
+        exampleObj={autocompleteExampleObj ?? null}
+        value={currentValue}
+        onChange={(nextValue) => onChange(nextValue || undefined)}
+        placeholder={field.placeholder || ""}
+        expressionMode="raw"
+        inputSize="md"
+        showValuePreview
+        quickTip="Tip: type `$` to browse node payloads."
+        className=""
+        data-testid={toTestId(`expression-field-${field.name}`)}
+      />
+    </div>
   );
 };

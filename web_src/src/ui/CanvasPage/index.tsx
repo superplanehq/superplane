@@ -1231,6 +1231,7 @@ function CanvasPage(props: CanvasPageProps) {
               currentTab={currentTab}
               onTabChange={setCurrentTab}
               organizationId={props.organizationId}
+              canvasId={props.canvasId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
               workflowNodes={props.workflowNodes}
@@ -1307,6 +1308,7 @@ function Sidebar({
   currentTab,
   onTabChange,
   organizationId,
+  canvasId,
   getCustomField,
   integrations,
   workflowNodes,
@@ -1365,6 +1367,7 @@ function Sidebar({
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   organizationId?: string;
+  canvasId?: string;
   getCustomField?: (
     nodeId: string,
     onRun?: (initialData?: string) => void,
@@ -1539,6 +1542,7 @@ function Sidebar({
       configurationSaveMode={configurationSaveMode}
       onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
+      canvasId={canvasId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
         getCustomField && state.componentSidebar.selectedNodeId

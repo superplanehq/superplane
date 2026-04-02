@@ -134,6 +134,8 @@ export const ConfigurationFieldRenderer = ({
   enableRealtimeValidation = false,
   autocompleteExampleObj,
   allowExpressions = false,
+  suggestFieldValue,
+  assistantEnabled = false,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -272,6 +274,10 @@ export const ConfigurationFieldRenderer = ({
       integrationId,
       organizationId,
       allowExpressions,
+      suggestFieldValue,
+      assistantEnabled,
+      labelRightRef,
+      labelRightReady,
     };
 
     switch (field.type) {
@@ -336,6 +342,8 @@ export const ConfigurationFieldRenderer = ({
             autocompleteExampleObj={autocompleteExampleObj}
             labelRightRef={allowExpressions ? labelRightRef : undefined}
             labelRightReady={allowExpressions ? labelRightReady : false}
+            suggestFieldValue={suggestFieldValue}
+            assistantEnabled={assistantEnabled}
           />
         );
 
@@ -433,10 +441,10 @@ export const ConfigurationFieldRenderer = ({
   if (field.type === "boolean") {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
           {isEnabled && renderField()}
-          <Label className="text-left cursor-pointer">
+          <Label className="text-left cursor-pointer flex-1 min-w-0">
             {field.label || field.name}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
             {hasFieldError &&
@@ -448,6 +456,7 @@ export const ConfigurationFieldRenderer = ({
                 <span className="text-red-500 text-xs ml-2">Required</span>
               )}
           </Label>
+          <div ref={labelRightRef} className="ml-auto shrink-0" />
         </div>
 
         {/* Display validation errors */}

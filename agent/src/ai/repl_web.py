@@ -30,14 +30,15 @@ from pydantic_ai.run import AgentRunResultEvent
 from ai.agent import AgentDeps, build_agent
 from ai.config import config
 from ai.grpc import InternalAgentServer
-from ai.models import CanvasAnswer
 from ai.jwt import JwtClaims, JwtValidator
+from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
-from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
+from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
+from config_assistant.router import build_config_assistant_router
 
 
 @dataclass(frozen=True)
@@ -489,6 +490,8 @@ def _create_app() -> FastAPI:
         except BaseException:
             await tracker.release()
             raise
+
+    app.include_router(build_config_assistant_router())
 
     return app
 

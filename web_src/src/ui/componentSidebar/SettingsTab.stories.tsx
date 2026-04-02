@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { TooltipProvider } from "@/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { SettingsTab } from "./SettingsTab";
 import {
   ConfigurationStorySeed,
