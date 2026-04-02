@@ -152,7 +152,7 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 			return nil, err
 		}
 		// Contact point name is the value used in notification_settings.receiver, so use name as ID.
-		return grafanaResourcesFromList(resourceTypeContactPoint, contactPoints, func(cp contactPoint) string { return cp.Name }, func(cp contactPoint) string { return cp.Name }), nil
+		return grafanaResourcesFromList(resourceTypeContactPoint, contactPoints, func(cp ContactPoint) string { return cp.Name }, func(cp ContactPoint) string { return cp.Name }), nil
 	case resourceTypeRuleGroup:
 		groups, err := client.ListRuleGroups()
 		if err != nil {

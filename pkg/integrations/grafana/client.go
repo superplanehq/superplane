@@ -29,7 +29,7 @@ type Client struct {
 	http     core.HTTPContext
 }
 
-type contactPoint struct {
+type ContactPoint struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
 }
@@ -200,7 +200,7 @@ func (c *Client) execRequestWithHeaders(
 	return responseBody, res.StatusCode, nil
 }
 
-func (c *Client) ListContactPoints() ([]contactPoint, error) {
+func (c *Client) ListContactPoints() ([]ContactPoint, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/contact-points", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing contact points: %v", err)
@@ -210,7 +210,7 @@ func (c *Client) ListContactPoints() ([]contactPoint, error) {
 		return nil, newAPIStatusError("grafana contact point list", status, responseBody)
 	}
 
-	var direct []contactPoint
+	var direct []ContactPoint
 	if err := json.Unmarshal(responseBody, &direct); err == nil {
 		return direct, nil
 	}
@@ -223,7 +223,7 @@ func (c *Client) ListContactPoints() ([]contactPoint, error) {
 			return nil, fmt.Errorf("error parsing contact points response")
 		}
 
-		var items []contactPoint
+		var items []ContactPoint
 		if err := json.Unmarshal(wrapped.Items, &items); err != nil {
 			return nil, fmt.Errorf("error parsing contact points response")
 		}
@@ -304,7 +304,7 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 		return "", newAPIStatusError("grafana contact point create", status, responseBody)
 	}
 
-	created := contactPoint{}
+	created := ContactPoint{}
 	if err := json.Unmarshal(responseBody, &created); err == nil && strings.TrimSpace(created.UID) != "" {
 		return strings.TrimSpace(created.UID), nil
 	}
