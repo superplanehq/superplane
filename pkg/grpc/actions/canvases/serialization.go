@@ -18,7 +18,47 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, error) {
+func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
+	//
+	// Get all users with a single query, to avoid N+1 queries.
+	//
+	userIDs := make([]uuid.UUID, len(canvases))
+	for i, canvas := range canvases {
+		userIDs[i] = *canvas.CreatedBy
+	}
+
+	users, err := models.FindMaybeDeletedUsersByIDs(userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	usersByID := make(map[string]models.User, len(users))
+	for _, user := range users {
+		usersByID[user.ID.String()] = user
+	}
+
+	//
+	// Serialize all canvases now
+	//
+	protoCanvases := make([]*pb.Canvas, len(canvases))
+	for i, canvas := range canvases {
+		user, ok := usersByID[canvas.CreatedBy.String()]
+		if !ok {
+			return nil, fmt.Errorf("user %s not found for canvas %s", canvas.CreatedBy.String(), canvas.ID.String())
+		}
+
+		protoCanvas, err := SerializeCanvas(&canvas, false, &user)
+		if err != nil {
+			return nil, err
+		}
+
+		protoCanvases[i] = protoCanvas
+	}
+
+	return protoCanvases, nil
+}
+
+func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.User) (*pb.Canvas, error) {
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
 	if err != nil {
 		return nil, err
@@ -35,13 +75,8 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool) (*pb.Canvas, err
 	}
 
 	var createdBy *pb.UserRef
-	if canvas.CreatedBy != nil {
-		idStr := canvas.CreatedBy.String()
-		name := ""
-		if user, err := models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), idStr); err == nil && user != nil {
-			name = user.Name
-		}
-		createdBy = &pb.UserRef{Id: idStr, Name: name}
+	if user != nil {
+		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 	}
 
 	if !includeStatus {

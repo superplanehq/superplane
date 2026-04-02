@@ -33,7 +33,12 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		}
 	}
 
-	proto, err := SerializeCanvas(canvas, true)
+	user, err := models.FindActiveUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+	if err != nil {
+		return nil, err
+	}
+
+	proto, err := SerializeCanvas(canvas, true, user)
 	if err != nil {
 		log.Errorf("failed to serialize canvas %s: %v", canvas.ID.String(), err)
 		return nil, status.Error(codes.Internal, "failed to serialize workflow")
