@@ -67,6 +67,20 @@ blocks:
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
             - "cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright"
+  - name: "\U0001F9EA Agent Tests"
+    dependencies: []
+    task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+      prologue:
+        commands:
+          - checkout
+          - make test.agent.setup
+      jobs:
+        - name: Unit Tests
+          commands:
+            - make test.agent.unit
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
