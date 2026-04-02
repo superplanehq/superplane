@@ -121,6 +121,12 @@ func TestUpdateFromFileDisablesVersioningBeforeSpecUpdate(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID:
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/organizations/org-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","versioningEnabled":false}}}`))
 		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID:
 			rawBody, _ := io.ReadAll(r.Body)
 			var payload map[string]any
@@ -146,6 +152,8 @@ func TestUpdateFromFileDisablesVersioningBeforeSpecUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, []string{
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " /api/v1/organizations/org-1",
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
@@ -200,6 +208,45 @@ func TestUpdateFromFileEnablesVersioningBeforeDraftUpdate(t *testing.T) {
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
+	}, calls)
+}
+
+func TestUpdateFromFileDisableVersioningFailsWhenOrganizationEnforcesVersioning(t *testing.T) {
+	t.Helper()
+
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+
+	calls := make([]string, 0, 4)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/organizations/org-1":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","versioningEnabled":true}}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	filePath := writeTestCanvasFileWithVersioningEnabled(t, canvasID, false)
+	file := filePath
+	draft := false
+	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+
+	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot disable canvas versioning")
+
+	require.Equal(t, []string{
+		http.MethodGet + " /api/v1/me",
+		http.MethodGet + " /api/v1/organizations/org-1",
 	}, calls)
 }
 
