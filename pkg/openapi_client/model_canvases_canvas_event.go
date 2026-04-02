@@ -28,6 +28,7 @@ type CanvasesCanvasEvent struct {
 	CustomName *string                `json:"customName,omitempty"`
 	Data       map[string]interface{} `json:"data,omitempty"`
 	CreatedAt  *time.Time             `json:"createdAt,omitempty"`
+	Root       *bool                  `json:"root,omitempty"`
 }
 
 // NewCanvasesCanvasEvent instantiates a new CanvasesCanvasEvent object
@@ -271,6 +272,38 @@ func (o *CanvasesCanvasEvent) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
+// GetRoot returns the Root field value if set, zero value otherwise.
+func (o *CanvasesCanvasEvent) GetRoot() bool {
+	if o == nil || IsNil(o.Root) {
+		var ret bool
+		return ret
+	}
+	return *o.Root
+}
+
+// GetRootOk returns a tuple with the Root field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasEvent) GetRootOk() (*bool, bool) {
+	if o == nil || IsNil(o.Root) {
+		return nil, false
+	}
+	return o.Root, true
+}
+
+// HasRoot returns a boolean if a field has been set.
+func (o *CanvasesCanvasEvent) HasRoot() bool {
+	if o != nil && !IsNil(o.Root) {
+		return true
+	}
+
+	return false
+}
+
+// SetRoot gets a reference to the given bool and assigns it to the Root field.
+func (o *CanvasesCanvasEvent) SetRoot(v bool) {
+	o.Root = &v
+}
+
 func (o CanvasesCanvasEvent) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -301,6 +334,9 @@ func (o CanvasesCanvasEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt
+	}
+	if !IsNil(o.Root) {
+		toSerialize["root"] = o.Root
 	}
 	return toSerialize, nil
 }

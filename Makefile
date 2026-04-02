@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit
+.PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -78,6 +78,14 @@ test.watch:
 
 test.agent.evals:
 	$(COMPOSE) exec agent uv run python -m evals.runner
+
+test.agent.setup:
+	@touch agent/.env
+	$(COMPOSE) build app agent
+	$(COMPOSE) up -d db
+	sleep 5
+	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
+	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.agent.unit:
 	$(COMPOSE) run --rm -e DB_NAME=agents_test agent uv run --group dev python -m pytest $(AGENT_TEST_TARGETS)

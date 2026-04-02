@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -6,6 +5,7 @@ from typing import Any, Literal
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
 
+from ai.config import config
 from ai.models import CanvasAnswer, CanvasQuestionRequest, CanvasSummary
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
@@ -91,7 +91,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     )
 
     def _tool_debug(message: str) -> None:
-        if os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if config.debug:
             print(f"[web][agent] {message}", flush=True)
 
     def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:

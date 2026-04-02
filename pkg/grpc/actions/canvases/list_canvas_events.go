@@ -25,12 +25,12 @@ func ListCanvasEvents(ctx context.Context, registry *registry.Registry, canvasID
 		return nil, err
 	}
 
-	executionsByEventID, childExecutionsByEventID, err := listExecutionsForCanvasEvents(events)
+	executionsByEventID, err := listExecutionsForCanvasEvents(canvasID, events)
 	if err != nil {
 		return nil, err
 	}
 
-	serialized, err := SerializeCanvasEventsWithExecutions(events, executionsByEventID, childExecutionsByEventID)
+	serialized, err := SerializeCanvasEventsWithExecutions(events, executionsByEventID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +57,11 @@ func SerializeCanvasEvents(events []models.CanvasEvent) ([]*pb.CanvasEvent, erro
 	return result, nil
 }
 
-func SerializeCanvasEventsWithExecutions(events []models.CanvasEvent, executionsByEventID map[string][]models.CanvasNodeExecution, childExecutionsByEventID map[string][]models.CanvasNodeExecution) ([]*pb.CanvasEventWithExecutions, error) {
+func SerializeCanvasEventsWithExecutions(events []models.CanvasEvent, executionsByEventID map[string][]models.CanvasNodeExecution) ([]*pb.CanvasEventWithExecutions, error) {
 	result := make([]*pb.CanvasEventWithExecutions, 0, len(events))
 
 	for _, event := range events {
-		serializedEvent, err := SerializeCanvasEventWithExecutions(event, executionsByEventID[event.ID.String()], childExecutionsByEventID[event.ID.String()])
+		serializedEvent, err := SerializeCanvasEventWithExecutions(event, executionsByEventID[event.ID.String()])
 		if err != nil {
 			return nil, err
 		}
@@ -90,10 +90,11 @@ func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 		CustomName: valueOrEmpty(event.CustomName),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
+		Root:       event.ExecutionID == nil,
 	}, nil
 }
 
-func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []models.CanvasNodeExecution, childExecutions []models.CanvasNodeExecution) (*pb.CanvasEventWithExecutions, error) {
+func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []models.CanvasNodeExecution) (*pb.CanvasEventWithExecutions, error) {
 	data, ok := event.Data.Data().(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf("event data is not a map[string]any")
@@ -104,9 +105,18 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 		return nil, err
 	}
 
-	serializedExecutions, err := SerializeNodeExecutions(executions, childExecutions)
-	if err != nil {
-		return nil, err
+	executionInfos := make([]*pb.CanvasNodeExecutionRef, 0, len(executions))
+	for _, execution := range executions {
+		executionInfos = append(executionInfos, &pb.CanvasNodeExecutionRef{
+			Id:            execution.ID.String(),
+			NodeId:        execution.NodeID,
+			State:         NodeExecutionStateToProto(execution.State),
+			Result:        NodeExecutionResultToProto(execution.Result),
+			ResultReason:  NodeExecutionResultReasonToProto(execution.ResultReason),
+			ResultMessage: execution.ResultMessage,
+			CreatedAt:     timestamppb.New(*execution.CreatedAt),
+			UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
+		})
 	}
 
 	return &pb.CanvasEventWithExecutions{
@@ -117,7 +127,7 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 		CustomName: valueOrEmpty(event.CustomName),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
-		Executions: serializedExecutions,
+		Executions: executionInfos,
 	}, nil
 }
 
@@ -136,9 +146,9 @@ func getLastEventTimestamp(events []models.CanvasEvent) *timestamppb.Timestamp {
 	return nil
 }
 
-func listExecutionsForCanvasEvents(events []models.CanvasEvent) (map[string][]models.CanvasNodeExecution, map[string][]models.CanvasNodeExecution, error) {
+func listExecutionsForCanvasEvents(canvasID uuid.UUID, events []models.CanvasEvent) (map[string][]models.CanvasNodeExecution, error) {
 	if len(events) == 0 {
-		return map[string][]models.CanvasNodeExecution{}, map[string][]models.CanvasNodeExecution{}, nil
+		return map[string][]models.CanvasNodeExecution{}, nil
 	}
 
 	eventIDs := make([]uuid.UUID, len(events))
@@ -146,35 +156,16 @@ func listExecutionsForCanvasEvents(events []models.CanvasEvent) (map[string][]mo
 		eventIDs[i] = event.ID
 	}
 
-	executions, err := models.ListNodeExecutionsForRootEvents(eventIDs)
+	executions, err := models.ListParentExecutionsForRootEvents(canvasID, eventIDs)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	parentExecutionsByEventID := make(map[string][]models.CanvasNodeExecution, len(eventIDs))
-	parentExecutions := []models.CanvasNodeExecution{}
+	executionsByEventID := make(map[string][]models.CanvasNodeExecution, len(eventIDs))
 	for _, execution := range executions {
-		if execution.ParentExecutionID == nil {
-			parentExecutions = append(parentExecutions, execution)
-			eventID := execution.RootEventID.String()
-			parentExecutionsByEventID[eventID] = append(parentExecutionsByEventID[eventID], execution)
-		}
-	}
-
-	if len(parentExecutions) == 0 {
-		return parentExecutionsByEventID, map[string][]models.CanvasNodeExecution{}, nil
-	}
-
-	childExecutions, err := models.FindChildExecutionsForMultiple(executionIDs(parentExecutions))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	childExecutionsByEventID := make(map[string][]models.CanvasNodeExecution, len(eventIDs))
-	for _, execution := range childExecutions {
 		eventID := execution.RootEventID.String()
-		childExecutionsByEventID[eventID] = append(childExecutionsByEventID[eventID], execution)
+		executionsByEventID[eventID] = append(executionsByEventID[eventID], execution)
 	}
 
-	return parentExecutionsByEventID, childExecutionsByEventID, nil
+	return executionsByEventID, nil
 }

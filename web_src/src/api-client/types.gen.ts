@@ -223,6 +223,7 @@ export type CanvasesCanvasEvent = {
     [key: string]: unknown;
   };
   createdAt?: string;
+  root?: boolean;
 };
 
 export type CanvasesCanvasEventWithExecutions = {
@@ -234,7 +235,7 @@ export type CanvasesCanvasEventWithExecutions = {
     [key: string]: unknown;
   };
   createdAt?: string;
-  executions?: Array<CanvasesCanvasNodeExecution>;
+  executions?: Array<CanvasesCanvasNodeExecutionRef>;
   customName?: string;
 };
 
@@ -257,6 +258,10 @@ export type CanvasesCanvasMetadata = {
   changeRequestApprovalConfig?: CanvasesCanvasChangeRequestApprovalConfig;
 };
 
+/**
+ * Full description of a canvas node execution.
+ * Should only be used for endpoints specific to executions.
+ */
 export type CanvasesCanvasNodeExecution = {
   id?: string;
   canvasId?: string;
@@ -284,6 +289,22 @@ export type CanvasesCanvasNodeExecution = {
   childExecutions?: Array<CanvasesCanvasNodeExecution>;
   rootEvent?: CanvasesCanvasEvent;
   cancelledBy?: SuperplaneCanvasesUserRef;
+};
+
+/**
+ * More succint description of a canvas node execution.
+ * No input, outputs, root event, children.
+ * Used to embed execution information into other messages.
+ */
+export type CanvasesCanvasNodeExecutionRef = {
+  id?: string;
+  nodeId?: string;
+  state?: CanvasesCanvasNodeExecutionState;
+  result?: CanvasNodeExecutionResult;
+  resultReason?: CanvasNodeExecutionResultReason;
+  resultMessage?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CanvasesCanvasNodeExecutionState = "STATE_UNKNOWN" | "STATE_PENDING" | "STATE_STARTED" | "STATE_FINISHED";

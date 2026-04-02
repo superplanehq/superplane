@@ -47,9 +47,15 @@ func (c *ListExecutionsCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		executions := response.GetExecutions()
+		if len(executions) == 0 {
+			_, err := fmt.Fprintln(stdout, "No executions found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tNODE_ID\tSTATE\tRESULT\tMESSAGE\tCREATED_AT\tUPDATED_AT")
-		for _, execution := range response.GetExecutions() {
+		for _, execution := range executions {
 			_, _ = fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
