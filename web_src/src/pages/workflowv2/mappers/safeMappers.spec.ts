@@ -358,7 +358,9 @@ describe("createSafeTriggerRenderer normalization", () => {
       makeTriggerRendererContext(),
     );
 
-    expect(result.customField).toBe(customField);
+    expect(typeof result.customField).toBe("function");
+    (result.customField as Function)();
+    expect(customField).toHaveBeenCalled();
     expect(result.warning).toBe("be careful");
     expect(result.collapsed).toBe(true);
     expect(result.metadata).toEqual([{ title: "Region", value: "us-east-1" }]);
