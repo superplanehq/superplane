@@ -39,7 +39,13 @@ func (c *CreateAlertRule) Documentation() string {
 - **Rule Group**: Grafana rule group to create the rule in
 - **Data Source**: Existing Grafana data source the query should use
 - **Query**: Expression Grafana evaluates when checking the alert
+- **Lookback Window**: How far back to query when evaluating the rule
+- **Reducer / Condition / Threshold(s)**: How the series is reduced, how it is compared to thresholds, and optional upper bound for range conditions
+- **For**: How long the condition must hold before firing
+- **No Data / Execution Error State**: Grafana behavior when the query returns no data or errors
+- **Contact Point**: Optional Grafana contact point for notifications when the rule fires
 - **Labels / Annotations**: Optional routing and context metadata attached to the rule
+- **Paused**: Whether the rule starts paused
 
 ## Output
 

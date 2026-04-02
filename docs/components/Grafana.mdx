@@ -109,7 +109,13 @@ The Create Alert Rule component creates a Grafana-managed alert rule using the A
 - **Rule Group**: Grafana rule group to create the rule in
 - **Data Source**: Existing Grafana data source the query should use
 - **Query**: Expression Grafana evaluates when checking the alert
+- **Lookback Window**: How far back to query when evaluating the rule
+- **Reducer / Condition / Threshold(s)**: How the series is reduced, how it is compared to thresholds, and optional upper bound for range conditions
+- **For**: How long the condition must hold before firing
+- **No Data / Execution Error State**: Grafana behavior when the query returns no data or errors
+- **Contact Point**: Optional Grafana contact point for notifications when the rule fires
 - **Labels / Annotations**: Optional routing and context metadata attached to the rule
+- **Paused**: Whether the rule starts paused
 
 ### Output
 
@@ -279,7 +285,12 @@ The List Alert Rules component lists Grafana-managed alert rules using the Alert
 
 ### Configuration
 
-This component does not require configuration.
+All fields are optional:
+
+- **Folder**: When set, only alert rules in this Grafana folder are listed
+- **Rule Group**: When set, only rules in this Grafana rule group are listed
+
+When both are omitted, the component lists alert rules across the instance (subject to Grafana permissions).
 
 ### Output
 
@@ -396,6 +407,8 @@ The Update Alert Rule component updates a Grafana-managed alert rule using the A
 - **All other fields are optional**: only the values you provide will be changed
 - **Folder / Rule Group**: Optional location changes for the rule in Grafana
 - **Data Source / Query**: Optional query details Grafana evaluates
+- **Lookback / Reducer / Condition / Threshold(s)**: Optional changes to evaluation and thresholds
+- **Contact Point**: Set to a contact point to attach notifications; clear the value to remove notification settings from the rule
 - **Labels / Annotations**: Optional metadata to update alongside the rule
 
 ### Output

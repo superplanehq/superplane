@@ -13,7 +13,7 @@ import type {
 } from "../types";
 import { formatTimestamp } from "../utils";
 import { buildGrafanaEventSections } from "./alert_rule_shared";
-import type { ListAlertRulesConfiguration, ListAlertRulesOutput } from "./types";
+import type { ListAlertRulesConfiguration, ListAlertRulesNodeMetadata, ListAlertRulesOutput } from "./types";
 
 export const listAlertRulesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -26,7 +26,10 @@ export const listAlertRulesMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: buildListAlertRulesMetadata(context.node.configuration as ListAlertRulesConfiguration | undefined),
+      metadata: buildListAlertRulesMetadata(
+        context.node.configuration as ListAlertRulesConfiguration | undefined,
+        context.node.metadata as ListAlertRulesNodeMetadata | undefined,
+      ),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -69,9 +72,13 @@ export const listAlertRulesMapper: ComponentBaseMapper = {
   },
 };
 
-function buildListAlertRulesMetadata(config: ListAlertRulesConfiguration | undefined): MetadataItem[] {
+function buildListAlertRulesMetadata(
+  config: ListAlertRulesConfiguration | undefined,
+  nodeMetadata: ListAlertRulesNodeMetadata | undefined,
+): MetadataItem[] {
   const items: MetadataItem[] = [];
-  if (config?.folderUID) items.push({ icon: "folder", label: config.folderUID });
+  const folderLabel = nodeMetadata?.folderTitle || config?.folderUID;
+  if (folderLabel) items.push({ icon: "folder", label: folderLabel });
   if (config?.group) items.push({ icon: "layers-3", label: config.group });
   return items;
 }

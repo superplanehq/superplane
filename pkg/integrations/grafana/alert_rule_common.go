@@ -145,7 +145,7 @@ func sanitizeUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) UpdateAlertRuleSpec {
 	spec.Query = sanitizeOptionalAlertRuleString(spec.Query)
 	spec.Reducer = sanitizeOptionalAlertRuleString(spec.Reducer)
 	spec.ConditionType = sanitizeOptionalAlertRuleString(spec.ConditionType)
-	spec.NotificationReceiver = sanitizeOptionalAlertRuleString(spec.NotificationReceiver)
+	spec.NotificationReceiver = sanitizeOptionalAlertRuleNotificationReceiver(spec.NotificationReceiver)
 	spec.For = sanitizeOptionalAlertRuleString(spec.For)
 	spec.NoDataState = sanitizeOptionalAlertRuleString(spec.NoDataState)
 	spec.ExecErrState = sanitizeOptionalAlertRuleString(spec.ExecErrState)
@@ -171,6 +171,23 @@ func sanitizeOptionalAlertRuleString(value *string) *string {
 	trimmed := strings.TrimSpace(*value)
 	if trimmed == "" {
 		return nil
+	}
+
+	return &trimmed
+}
+
+// sanitizeOptionalAlertRuleNotificationReceiver preserves a non-nil pointer to an empty string when the
+// input is empty or whitespace, so mergeAlertRulePayload can delete notification_settings (clear contact).
+// A nil input means "do not change notification settings".
+func sanitizeOptionalAlertRuleNotificationReceiver(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		empty := ""
+		return &empty
 	}
 
 	return &trimmed
@@ -250,6 +267,12 @@ func validateUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) error {
 	}
 	if spec.LookbackSeconds != nil && *spec.LookbackSeconds <= 0 {
 		return errors.New("lookbackSeconds must be greater than 0")
+	}
+	if spec.Reducer != nil && !isValidReducer(*spec.Reducer) {
+		return fmt.Errorf("invalid reducer %q: must be one of last, mean, min, max, sum, count", *spec.Reducer)
+	}
+	if spec.ConditionType != nil && !isValidConditionType(*spec.ConditionType) {
+		return fmt.Errorf("invalid conditionType %q: must be one of gt, lt, gte, lte, within_range, outside_range", *spec.ConditionType)
 	}
 
 	return nil

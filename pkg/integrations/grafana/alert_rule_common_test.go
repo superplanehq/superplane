@@ -46,7 +46,7 @@ func strPtr(s string) *string {
 	return &s
 }
 
-func Test__decodeUpdateAlertRuleSpec__whitespaceOnlyReducerConditionAndNotificationBecomeNil(t *testing.T) {
+func Test__decodeUpdateAlertRuleSpec__whitespaceOnlyReducerConditionBecomeNil__notificationClearsContact(t *testing.T) {
 	ws := "   "
 	spec, err := decodeUpdateAlertRuleSpec(map[string]any{
 		"alertRuleUid":         "rule-1",
@@ -58,8 +58,63 @@ func Test__decodeUpdateAlertRuleSpec__whitespaceOnlyReducerConditionAndNotificat
 	require.NoError(t, err)
 	assert.Nil(t, spec.Reducer)
 	assert.Nil(t, spec.ConditionType)
-	assert.Nil(t, spec.NotificationReceiver)
+	require.NotNil(t, spec.NotificationReceiver)
+	assert.Equal(t, "", *spec.NotificationReceiver)
 	assert.NotNil(t, spec.Title)
+}
+
+func Test__mergeAlertRulePayload__clearsNotificationSettingsWhenReceiverEmpty(t *testing.T) {
+	existing := map[string]any{
+		"uid":   "rule-1",
+		"title": "Old",
+		"notification_settings": map[string]any{
+			"receiver": "slack-alerts",
+		},
+		"data": []any{
+			map[string]any{"refId": "A", "datasourceUid": "ds1", "model": map[string]any{"expr": "up"}},
+		},
+	}
+
+	spec, err := decodeUpdateAlertRuleSpec(map[string]any{
+		"alertRuleUid":         "rule-1",
+		"notificationReceiver": "",
+	})
+	require.NoError(t, err)
+
+	merged, err := mergeAlertRulePayload(existing, spec)
+	require.NoError(t, err)
+	_, has := merged["notification_settings"]
+	assert.False(t, has)
+}
+
+func Test__validateUpdateAlertRuleSpec__rejectsInvalidReducerAndConditionType(t *testing.T) {
+	err := validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
+		AlertRuleUID:    "rule-1",
+		Reducer:         strPtr("foobar"),
+		ConditionType:   strPtr("gt"),
+		Threshold:       float64Ptr(1),
+		LookbackSeconds: intPtr(60),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid reducer")
+
+	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
+		AlertRuleUID:    "rule-1",
+		Reducer:         strPtr("last"),
+		ConditionType:   strPtr("not_a_condition"),
+		Threshold:       float64Ptr(1),
+		LookbackSeconds: intPtr(60),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid conditionType")
+}
+
+func float64Ptr(f float64) *float64 {
+	return &f
+}
+
+func intPtr(i int) *int {
+	return &i
 }
 
 func Test__alertRuleFieldConfiguration__noDataAndExecErrStateSelectOptions(t *testing.T) {

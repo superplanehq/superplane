@@ -109,6 +109,10 @@ export interface ListAlertRulesConfiguration {
   group?: string;
 }
 
+export interface ListAlertRulesNodeMetadata {
+  folderTitle?: string;
+}
+
 export interface ListAlertRulesOutput {
   alertRules?: GrafanaAlertRuleSummary[];
 }

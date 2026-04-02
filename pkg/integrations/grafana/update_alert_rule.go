@@ -38,6 +38,8 @@ func (c *UpdateAlertRule) Documentation() string {
 - **All other fields are optional**: only the values you provide will be changed
 - **Folder / Rule Group**: Optional location changes for the rule in Grafana
 - **Data Source / Query**: Optional query details Grafana evaluates
+- **Lookback / Reducer / Condition / Threshold(s)**: Optional changes to evaluation and thresholds
+- **Contact Point**: Set to a contact point to attach notifications; clear the value to remove notification settings from the rule
 - **Labels / Annotations**: Optional metadata to update alongside the rule
 
 ## Output

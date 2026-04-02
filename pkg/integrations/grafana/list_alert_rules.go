@@ -18,6 +18,10 @@ type ListAlertRulesSpec struct {
 	Group     string `json:"group,omitempty" mapstructure:"group"`
 }
 
+type ListAlertRulesNodeMetadata struct {
+	FolderTitle string `json:"folderTitle,omitempty" mapstructure:"folderTitle"`
+}
+
 type ListAlertRulesOutput struct {
 	AlertRules []AlertRuleSummary `json:"alertRules" mapstructure:"alertRules"`
 }
@@ -63,7 +67,12 @@ func (c *ListAlertRules) Documentation() string {
 
 ## Configuration
 
-This component does not require configuration.
+All fields are optional:
+
+- **Folder**: When set, only alert rules in this Grafana folder are listed
+- **Rule Group**: When set, only rules in this Grafana rule group are listed
+
+When both are omitted, the component lists alert rules across the instance (subject to Grafana permissions).
 
 ## Output
 
@@ -112,6 +121,38 @@ func (c *ListAlertRules) Configuration() []configuration.Field {
 }
 
 func (c *ListAlertRules) Setup(ctx core.SetupContext) error {
+	spec, err := decodeListAlertRulesSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	if spec.FolderUID == "" || ctx.Metadata == nil || ctx.HTTP == nil {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+	if err != nil {
+		return nil
+	}
+
+	folders, err := client.ListFolders()
+	if err != nil {
+		return nil
+	}
+
+	for _, folder := range folders {
+		if strings.TrimSpace(folder.UID) != spec.FolderUID {
+			continue
+		}
+
+		title := strings.TrimSpace(folder.Title)
+		if title != "" {
+			_ = ctx.Metadata.Set(ListAlertRulesNodeMetadata{FolderTitle: title})
+		}
+
+		break
+	}
+
 	return nil
 }
 
