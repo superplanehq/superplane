@@ -52,13 +52,9 @@ services:
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
     restart: always
-    env_file:
-      - superplane.env
     ports:
       - "5672:5672"
       - "15672:15672"
-    volumes:
-      - ./init-rabbitmq.sh:/docker-entrypoint-initdb.d/init-rabbitmq.sh:ro
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 5s
