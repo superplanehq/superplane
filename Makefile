@@ -46,6 +46,8 @@ test.setup:
 test.start:
 	$(COMPOSE) up -d
 	sleep 5
+	$(COMPOSE) exec -T rabbitmq rabbitmqctl add_vhost superplane_test || true
+	$(COMPOSE) exec -T rabbitmq rabbitmqctl set_permissions -p superplane_test guest ".*" ".*" ".*"
 
 test.down:
 	$(COMPOSE) down --remove-orphans
@@ -141,6 +143,9 @@ dev.start.fg:
 
 dev.start:
 	$(COMPOSE) up -d
+	$(COMPOSE) exec -T rabbitmq rabbitmqctl await_startup
+	$(COMPOSE) exec -T rabbitmq rabbitmqctl add_vhost superplane_test || true
+	$(COMPOSE) exec -T rabbitmq rabbitmqctl set_permissions -p superplane_test guest ".*" ".*" ".*"
 	@bash ./scripts/wait-for-app
 
 dev.start.ephemeral:

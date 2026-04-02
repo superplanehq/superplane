@@ -192,9 +192,13 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
+    environment:
+      RABBITMQ_ADDITIONAL_VHOSTS: ${RABBITMQ_ADDITIONAL_VHOSTS:-superplane_test}
     ports:
       - ${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}
       - ${RABBITMQ_MANAGEMENT_PORT:-15672}:${RABBITMQ_MANAGEMENT_PORT:-15672}
+    volumes:
+      - ./scripts/docker/init-rabbitmq.sh:/docker-entrypoint-initdb.d/init-rabbitmq.sh:ro
     restart: "on-failure"
     healthcheck:
       test: rabbitmq-diagnostics -q ping
