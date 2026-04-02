@@ -80,6 +80,9 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
 		&QueryDataSource{},
+		&CreateAnnotation{},
+		&ListAnnotations{},
+		&DeleteAnnotation{},
 	}
 }
 

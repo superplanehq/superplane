@@ -1,0 +1,28 @@
+{
+  "type": "grafana.annotations",
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "data": {
+    "annotations": [
+      {
+        "id": 42,
+        "dashboardUID": "abc123",
+        "panelId": 3,
+        "time": 1739376000000,
+        "timeEnd": 1739376000000,
+        "text": "Deploy v1.2.3 to production",
+        "tags": ["deploy", "production"],
+        "type": "annotation"
+      },
+      {
+        "id": 41,
+        "dashboardUID": "abc123",
+        "panelId": 3,
+        "time": 1739289600000,
+        "timeEnd": 1739289600000,
+        "text": "Rollback to v1.2.2",
+        "tags": ["rollback", "production"],
+        "type": "annotation"
+      }
+    ]
+  }
+}

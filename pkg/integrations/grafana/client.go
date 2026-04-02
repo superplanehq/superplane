@@ -546,6 +546,115 @@ func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
 	return c.putNotificationPolicies(root)
 }
 
+type Annotation struct {
+	ID           int64    `json:"id"`
+	DashboardUID string   `json:"dashboardUID"`
+	PanelID      int64    `json:"panelId"`
+	Time         int64    `json:"time"`
+	TimeEnd      int64    `json:"timeEnd"`
+	Text         string   `json:"text"`
+	Tags         []string `json:"tags"`
+	Type         string   `json:"type"`
+}
+
+func (c *Client) CreateAnnotation(text string, tags []string, dashboardUID string, panelID *int64, timeMS, timeEndMS int64) (int64, error) {
+	payload := map[string]any{
+		"text": text,
+	}
+	if len(tags) > 0 {
+		payload["tags"] = tags
+	}
+	if strings.TrimSpace(dashboardUID) != "" {
+		payload["dashboardUID"] = strings.TrimSpace(dashboardUID)
+	}
+	if panelID != nil {
+		payload["panelId"] = *panelID
+	}
+	if timeMS > 0 {
+		payload["time"] = timeMS
+	}
+	if timeEndMS > 0 {
+		payload["timeEnd"] = timeEndMS
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling annotation payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodPost, "/api/annotations", bytes.NewReader(body), "application/json")
+	if err != nil {
+		return 0, fmt.Errorf("error creating annotation: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return 0, newAPIStatusError("grafana annotation create", status, responseBody)
+	}
+
+	var result struct {
+		ID      int64  `json:"id"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return 0, fmt.Errorf("error parsing create annotation response: %v", err)
+	}
+	return result.ID, nil
+}
+
+func (c *Client) ListAnnotations(tags []string, dashboardUID string, from, to, limit int64) ([]Annotation, error) {
+	q := url.Values{}
+	for _, tag := range tags {
+		if strings.TrimSpace(tag) != "" {
+			q.Add("tags", strings.TrimSpace(tag))
+		}
+	}
+	if strings.TrimSpace(dashboardUID) != "" {
+		q.Set("dashboardUID", strings.TrimSpace(dashboardUID))
+	}
+	if from > 0 {
+		q.Set("from", fmt.Sprintf("%d", from))
+	}
+	if to > 0 {
+		q.Set("to", fmt.Sprintf("%d", to))
+	}
+	if limit > 0 {
+		q.Set("limit", fmt.Sprintf("%d", limit))
+	}
+
+	path := "/api/annotations"
+	if encoded := q.Encode(); encoded != "" {
+		path = path + "?" + encoded
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing annotations: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana annotation list", status, responseBody)
+	}
+
+	var annotations []Annotation
+	if err := json.Unmarshal(responseBody, &annotations); err != nil {
+		return nil, fmt.Errorf("error parsing annotations response: %v", err)
+	}
+	return annotations, nil
+}
+
+func (c *Client) DeleteAnnotation(id int64) error {
+	responseBody, status, err := c.execRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/annotations/%d", id),
+		nil, "",
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting annotation: %v", err)
+	}
+	if status == http.StatusNotFound || (status >= 200 && status < 300) {
+		return nil
+	}
+	return newAPIStatusError("grafana annotation delete", status, responseBody)
+}
+
 func (c *Client) ListDataSources() ([]DataSource, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/datasources", nil, "")
 	if err != nil {
