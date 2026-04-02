@@ -21,6 +21,8 @@ export function buildFallbackComponentProps(data: BlockData, fallbackTitle: stri
     title: getBlockLabel(data, fallbackTitle),
     iconSlug: "circle-off",
     metadata: [],
+    includeEmptyState: true,
+    emptyStateProps: { title: "Can't display" },
   };
 }
 

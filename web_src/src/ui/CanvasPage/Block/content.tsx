@@ -3,7 +3,7 @@ import { AnnotationComponent } from "../../annotationComponent";
 import { ComponentBase } from "../../componentBase";
 import { Composite } from "../../composite";
 import { Trigger } from "../../trigger";
-import type { BlockProps } from "./types";
+import type { BlockProps, ComponentActionKeys } from "./types";
 import {
   buildFallbackComponentProps,
   getSafeAnnotationProps,
@@ -29,24 +29,7 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
   }
 }
 
-function getActionProps(
-  data: BlockProps["data"],
-  compactView: boolean,
-  props: Pick<
-    BlockProps,
-    | "onRun"
-    | "runDisabled"
-    | "runDisabledTooltip"
-    | "onTogglePause"
-    | "onEdit"
-    | "onConfigure"
-    | "onDuplicate"
-    | "onDeactivate"
-    | "onToggleCollapse"
-    | "onToggleView"
-    | "onDelete"
-  >,
-) {
+function getActionProps(data: BlockProps["data"], compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
   return {
     onRun: props.onRun,
     runDisabled: props.runDisabled,
