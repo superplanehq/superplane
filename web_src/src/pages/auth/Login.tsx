@@ -191,6 +191,15 @@ export const Login: React.FC = () => {
     }
   }, [canSignup, isSignupMode]);
 
+  const isPasswordValid = (password: string) => {
+    if (password.length < 8) return false;
+    if (!/[A-Z]/.test(password)) return false;
+    if (!/[a-z]/.test(password)) return false;
+    if (!/[0-9]/.test(password)) return false;
+    if (!/[^A-Za-z0-9]/.test(password)) return false;
+    return true;
+  };
+
   const handleToggleMode = (nextMode: "login" | "signup") => {
     setIsSignupMode(nextMode === "signup");
     setFormError(null);
@@ -375,6 +384,11 @@ export const Login: React.FC = () => {
 
     if (!signupEmail.trim() || !signupPassword || !signupConfirmPassword) {
       setFormError("Email and password are required");
+      return;
+    }
+
+    if (!isPasswordValid(signupPassword)) {
+      setFormError("Password must be at least 8 characters and include uppercase, lowercase, a number, and a symbol.");
       return;
     }
 
@@ -609,6 +623,7 @@ export const Login: React.FC = () => {
                   value={signupPassword}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSignupPassword(e.target.value)}
                 />
+                <p className="text-xs text-gray-500">8+ characters, uppercase, lowercase, a number, and a symbol</p>
               </div>
 
               <div className="space-y-2">
