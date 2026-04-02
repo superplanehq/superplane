@@ -17,6 +17,39 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
+func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
+	body := openapi_client.CanvasesUpdateCanvasBody{}
+	body.SetVersioningEnabled(enabled)
+
+	_, _, err := ctx.API.CanvasAPI.
+		CanvasesUpdateCanvas(ctx.Context, canvasID).
+		Body(body).
+		Execute()
+	return err
+}
+
+func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error) {
+	organizationID, err := core.ResolveOrganizationID(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	response, _, err := ctx.API.OrganizationAPI.
+		OrganizationsDescribeOrganization(ctx.Context, organizationID).
+		Execute()
+	if err != nil {
+		return false, err
+	}
+
+	org := response.GetOrganization()
+	metadata, _ := org.GetMetadataOk()
+	if metadata == nil {
+		return false, fmt.Errorf("organization metadata not found")
+	}
+
+	return metadata.GetVersioningEnabled(), nil
+}
+
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
 	if c.file != nil {
@@ -38,15 +71,22 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	draftMode := c.draft != nil && *c.draft
 
 	var (
-		canvasID string
-		canvas   openapi_client.CanvasesCanvas
-		err      error
+		canvasID                   string
+		canvas                     openapi_client.CanvasesCanvas
+		requestedVersioningEnabled *bool
+		err                        error
 	)
 
 	if filePath != "" {
 		canvasID, canvas, err = loadCanvasFromFile(filePath)
 		if err != nil {
 			return err
+		}
+
+		if canvas.Metadata != nil {
+			if value, ok := canvas.Metadata.GetVersioningEnabledOk(); ok && value != nil {
+				requestedVersioningEnabled = value
+			}
 		}
 	} else {
 		canvasID, canvas, err = loadCanvasFromExisting(ctx)
@@ -55,13 +95,46 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 	}
 
+	if requestedVersioningEnabled != nil && !*requestedVersioningEnabled {
+		organizationVersioningEnabled, err := resolveOrganizationVersioningEnabled(ctx)
+		if err != nil {
+			return err
+		}
+		if organizationVersioningEnabled {
+			return fmt.Errorf("cannot disable canvas versioning while organization versioning is enabled")
+		}
+	}
+
 	versioningContext, err := resolveCanvasVersioningContext(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
+	effectiveVersioningEnabled := versioningContext.versioningEnabled
+
+	enableAfterSpecUpdate := false
+	if requestedVersioningEnabled != nil && *requestedVersioningEnabled && !effectiveVersioningEnabled {
+		if draftMode {
+			if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+				return err
+			}
+			effectiveVersioningEnabled = true
+		} else {
+			enableAfterSpecUpdate = true
+		}
+	}
+	if requestedVersioningEnabled != nil && !*requestedVersioningEnabled && effectiveVersioningEnabled {
+		if draftMode {
+			return fmt.Errorf("--draft cannot be used when disabling canvas versioning; remove --draft to update the live canvas directly")
+		}
+		if err := updateCanvasVersioningEnabled(ctx, canvasID, false); err != nil {
+			return err
+		}
+		effectiveVersioningEnabled = false
+	}
+
 	targetVersionID := ""
-	if !versioningContext.versioningEnabled {
+	if !effectiveVersioningEnabled {
 		if draftMode {
 			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to update the live canvas directly")
 		}
@@ -103,6 +176,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	version := response.GetVersion()
+
+	if enableAfterSpecUpdate {
+		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+			return err
+		}
+	}
+
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(version)
 	}
@@ -111,7 +191,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
 
-		if versioningContext.versioningEnabled {
+		if targetVersionID != "" {
 			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		}
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
