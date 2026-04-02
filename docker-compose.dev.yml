@@ -139,9 +139,11 @@ services:
       --factory
       --host 0.0.0.0
       --port 8090
+      --timeout-graceful-shutdown 310
       --reload
       --reload-dir /app/agent/src
       --reload-dir /app/agent/evals"
+    stop_grace_period: 330s
     tty: true
     stdin_open: true
     ports:
