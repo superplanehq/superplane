@@ -452,8 +452,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
         component: {
           ...componentBaseProps,
           emptyStateProps,
-          error: node.errorMessage || componentBaseProps.error,
-          warning: node.warningMessage || componentBaseProps.warning,
+          error: node.errorMessage,
+          warning: node.warningMessage,
           paused: !!node.paused,
         },
       },
