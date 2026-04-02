@@ -54,10 +54,6 @@ func newAPITestServer(t *testing.T, expectations ...requestExpectation) *apiTest
 	return s
 }
 
-func (s *apiTestServer) URL() string {
-	return s.server.URL
-}
-
 func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 	t.Helper()
 	require.Equal(t, calls, s.calls)
