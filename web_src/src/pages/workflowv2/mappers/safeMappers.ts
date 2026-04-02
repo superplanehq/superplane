@@ -1,5 +1,5 @@
 import React from "react";
-import { isRecord, type UnknownRecord } from "@/lib/records";
+import { asString, isRecord, type UnknownRecord } from "@/lib/records";
 
 const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { ComponentBaseProps } from "@/ui/componentBase";
@@ -100,9 +100,9 @@ function buildNormalizedComponentBaseProps(
 ): ComponentBaseProps {
   return {
     ...record,
-    iconSrc: typeof record.iconSrc === "string" ? record.iconSrc : undefined,
+    iconSrc: asString(record.iconSrc),
     iconSlug: sanitizeString(record.iconSlug, fallbackIconSlug),
-    iconColor: typeof record.iconColor === "string" ? record.iconColor : undefined,
+    iconColor: asString(record.iconColor),
     title: sanitizeString(record.title, fallbackTitle),
     showHeader: typeof record.showHeader === "boolean" ? record.showHeader : undefined,
     paused: typeof record.paused === "boolean" ? record.paused : undefined,
@@ -110,7 +110,7 @@ function buildNormalizedComponentBaseProps(
     hideCount: typeof record.hideCount === "boolean" ? record.hideCount : undefined,
     hideMetadataList: typeof record.hideMetadataList === "boolean" ? record.hideMetadataList : undefined,
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
-    collapsedBackground: typeof record.collapsedBackground === "string" ? record.collapsedBackground : undefined,
+    collapsedBackground: asString(record.collapsedBackground),
     eventSections: sanitizeArray(record.eventSections),
     selected: typeof record.selected === "boolean" ? record.selected : undefined,
     metadata: sanitizeArray(record.metadata),
@@ -212,9 +212,9 @@ function buildNormalizedTriggerProps(
 
   return {
     ...record,
-    iconSrc: typeof record.iconSrc === "string" ? record.iconSrc : undefined,
+    iconSrc: asString(record.iconSrc),
     iconSlug: normalizedIconSlug,
-    iconColor: typeof record.iconColor === "string" ? record.iconColor : undefined,
+    iconColor: asString(record.iconColor),
     title: normalizedTitle,
     showHeader: typeof record.showHeader === "boolean" ? record.showHeader : undefined,
     paused: typeof record.paused === "boolean" ? record.paused : undefined,
@@ -222,7 +222,7 @@ function buildNormalizedTriggerProps(
     hideCount: typeof record.hideCount === "boolean" ? record.hideCount : undefined,
     hideMetadataList: typeof record.hideMetadataList === "boolean" ? record.hideMetadataList : undefined,
     collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
-    collapsedBackground: typeof record.collapsedBackground === "string" ? record.collapsedBackground : undefined,
+    collapsedBackground: asString(record.collapsedBackground),
     selected: typeof record.selected === "boolean" ? record.selected : undefined,
     metadata,
     customField: normalizeTriggerCustomField(record.customField),
