@@ -1,4 +1,5 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { createElement } from "react";
 import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
@@ -15,6 +16,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { ListAnnotationsConfiguration, ListAnnotationsOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
+import { GrafanaDashboardMetadataLabel } from "./DashboardMetadataLabel";
 
 export const listAnnotationsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -27,7 +29,7 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(context.node),
+      metadata: metadataList(context),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -74,16 +76,23 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
   },
 };
 
-function metadataList(node: NodeInfo): MetadataItem[] {
+function metadataList(context: ComponentBaseContext): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as ListAnnotationsConfiguration | undefined;
+  const configuration = context.node.configuration as ListAnnotationsConfiguration | undefined;
 
   if (configuration?.tags && configuration.tags.length > 0) {
     metadata.push({ icon: "tag", label: `Tags: ${configuration.tags.join(", ")}` });
   }
 
   if (configuration?.dashboardUID) {
-    metadata.push({ icon: "layout-dashboard", label: `Dashboard: ${configuration.dashboardUID}` });
+    metadata.push({
+      icon: "layout-dashboard",
+      label: createElement(GrafanaDashboardMetadataLabel, {
+        organizationId: context.organizationId,
+        integrationId: context.integrationId,
+        dashboardUid: configuration.dashboardUID,
+      }),
+    });
   }
 
   return metadata;

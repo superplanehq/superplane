@@ -1,4 +1,5 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { createElement } from "react";
 import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
@@ -12,9 +13,10 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import type { DeleteAnnotationOutput } from "./types";
+import type { DeleteAnnotationConfiguration, DeleteAnnotationOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
+import { AnnotationMetadataLabel } from "./AnnotationMetadataLabel";
 
 export const deleteAnnotationMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -27,7 +29,7 @@ export const deleteAnnotationMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: metadataList(context.node),
+      metadata: metadataList(context),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -63,8 +65,21 @@ export const deleteAnnotationMapper: ComponentBaseMapper = {
   },
 };
 
-function metadataList(_node: NodeInfo): MetadataItem[] {
-  return [];
+function metadataList(context: ComponentBaseContext): MetadataItem[] {
+  const configuration = context.node.configuration as DeleteAnnotationConfiguration | undefined;
+  if (!configuration?.annotationId?.trim()) {
+    return [];
+  }
+  return [
+    {
+      icon: "bookmark",
+      label: createElement(AnnotationMetadataLabel, {
+        organizationId: context.organizationId,
+        integrationId: context.integrationId,
+        annotationId: configuration.annotationId.trim(),
+      }),
+    },
+  ];
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {

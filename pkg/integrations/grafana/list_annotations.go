@@ -50,7 +50,7 @@ func (l *ListAnnotations) Documentation() string {
 ## Configuration
 
 - **Tags**: Filter to annotations matching all of the specified tags (optional)
-- **Dashboard UID**: Filter to annotations on a specific dashboard (optional)
+- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
 - **From / To**: Time range filter as datetime values (optional)
 - **Limit**: Maximum number of annotations to return (optional)
 
@@ -91,10 +91,15 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "dashboardUID",
-			Label:       "Dashboard UID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Dashboard",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Filter annotations to a specific dashboard",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeDashboard,
+				},
+			},
 		},
 		{
 			Name:        "from",

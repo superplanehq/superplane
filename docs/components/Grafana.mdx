@@ -105,7 +105,7 @@ The Create Annotation component writes an annotation into Grafana, marking opera
 
 - **Text**: The annotation message (required)
 - **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
-- **Dashboard UID**: Optional UID of the dashboard to scope the annotation to
+- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
 - **Panel ID**: Optional panel ID within the dashboard to attach the annotation to
 - **Time**: Optional start time (defaults to now if omitted)
 - **Time End**: Optional end time — providing this creates a region annotation spanning the window
@@ -130,7 +130,7 @@ Returns the ID of the newly created annotation.
 
 ## Delete Annotation
 
-The Delete Annotation component removes an annotation from Grafana by its ID.
+The Delete Annotation component removes an annotation from Grafana by ID.
 
 ### Use Cases
 
@@ -140,7 +140,7 @@ The Delete Annotation component removes an annotation from Grafana by its ID.
 
 ### Configuration
 
-- **Annotation ID**: The numeric ID of the annotation to delete (required)
+- **Annotation**: The annotation to delete, chosen from your Grafana instance (required)
 
 ### Output
 
@@ -174,7 +174,7 @@ The List Annotations component retrieves annotations from Grafana, optionally fi
 ### Configuration
 
 - **Tags**: Filter to annotations matching all of the specified tags (optional)
-- **Dashboard UID**: Filter to annotations on a specific dashboard (optional)
+- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
 - **From / To**: Time range filter as datetime values (optional)
 - **Limit**: Maximum number of annotations to return (optional)
 

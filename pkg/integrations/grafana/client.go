@@ -672,3 +672,28 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 
 	return sources, nil
 }
+
+// DashboardSearchHit matches Grafana GET /api/search entries for type=dash-db.
+type DashboardSearchHit struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+// SearchDashboards lists dashboards via the folder/dashboard search API (dashboard UID + title).
+func (c *Client) SearchDashboards() ([]DashboardSearchHit, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/search?type=dash-db&limit=5000", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error searching dashboards: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard search", status, responseBody)
+	}
+
+	var hits []DashboardSearchHit
+	if err := json.Unmarshal(responseBody, &hits); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard search response: %v", err)
+	}
+
+	return hits, nil
+}

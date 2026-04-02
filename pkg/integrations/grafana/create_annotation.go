@@ -54,7 +54,7 @@ func (c *CreateAnnotation) Documentation() string {
 
 - **Text**: The annotation message (required)
 - **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
-- **Dashboard UID**: Optional UID of the dashboard to scope the annotation to
+- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
 - **Panel ID**: Optional panel ID within the dashboard to attach the annotation to
 - **Time**: Optional start time (defaults to now if omitted)
 - **Time End**: Optional end time — providing this creates a region annotation spanning the window
@@ -104,10 +104,15 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "dashboardUID",
-			Label:       "Dashboard UID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Dashboard",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "Scope the annotation to a specific dashboard (optional)",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeDashboard,
+				},
+			},
 		},
 		{
 			Name:        "panelId",

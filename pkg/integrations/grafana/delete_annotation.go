@@ -1,12 +1,14 @@
 package grafana
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -14,7 +16,7 @@ import (
 type DeleteAnnotation struct{}
 
 type DeleteAnnotationSpec struct {
-	AnnotationID int64 `json:"annotationId" mapstructure:"annotationId"`
+	AnnotationID string `json:"annotationId" mapstructure:"annotationId"`
 }
 
 type DeleteAnnotationOutput struct {
@@ -35,7 +37,7 @@ func (d *DeleteAnnotation) Description() string {
 }
 
 func (d *DeleteAnnotation) Documentation() string {
-	return `The Delete Annotation component removes an annotation from Grafana by its ID.
+	return `The Delete Annotation component removes an annotation from Grafana by ID.
 
 ## Use Cases
 
@@ -45,7 +47,7 @@ func (d *DeleteAnnotation) Documentation() string {
 
 ## Configuration
 
-- **Annotation ID**: The numeric ID of the annotation to delete (required)
+- **Annotation**: The annotation to delete, chosen from your Grafana instance (required)
 
 ## Output
 
@@ -69,10 +71,15 @@ func (d *DeleteAnnotation) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "annotationId",
-			Label:       "Annotation ID",
-			Type:        configuration.FieldTypeNumber,
+			Label:       "Annotation",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The numeric ID of the annotation to delete",
+			Description: "The annotation to delete",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeAnnotation,
+				},
+			},
 		},
 	}
 }
@@ -94,19 +101,24 @@ func (d *DeleteAnnotation) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	id, err := parseAnnotationIDForExecute(spec.AnnotationID)
+	if err != nil {
+		return err
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	if err := client.DeleteAnnotation(spec.AnnotationID); err != nil {
+	if err := client.DeleteAnnotation(id); err != nil {
 		return fmt.Errorf("error deleting annotation: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.annotation.deleted",
-		[]any{DeleteAnnotationOutput{ID: spec.AnnotationID, Deleted: true}},
+		[]any{DeleteAnnotationOutput{ID: id, Deleted: true}},
 	)
 }
 
@@ -135,24 +147,72 @@ func (d *DeleteAnnotation) Cleanup(_ core.SetupContext) error {
 }
 
 func decodeDeleteAnnotationSpec(config any) (DeleteAnnotationSpec, error) {
-	spec := DeleteAnnotationSpec{}
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &spec,
-		TagName:          "mapstructure",
-		WeaklyTypedInput: true,
-	})
-	if err != nil {
-		return DeleteAnnotationSpec{}, fmt.Errorf("error creating decoder: %v", err)
+	m, ok := config.(map[string]any)
+	if !ok {
+		return DeleteAnnotationSpec{}, fmt.Errorf("error decoding configuration: expected map")
 	}
-	if err := decoder.Decode(config); err != nil {
-		return DeleteAnnotationSpec{}, fmt.Errorf("error decoding configuration: %v", err)
+	raw, ok := m["annotationId"]
+	if !ok || raw == nil {
+		return DeleteAnnotationSpec{}, nil
 	}
-	return spec, nil
+	return DeleteAnnotationSpec{AnnotationID: normalizeAnnotationIDRaw(raw)}, nil
 }
 
 func validateDeleteAnnotationSpec(spec DeleteAnnotationSpec) error {
-	if spec.AnnotationID <= 0 {
+	s := strings.TrimSpace(spec.AnnotationID)
+	if s == "" {
 		return errors.New("annotationId is required")
 	}
-	return nil
+	if isExpressionValue(s) {
+		return nil
+	}
+	_, err := parseAnnotationIDString(s)
+	return err
+}
+
+// isExpressionValue matches workflow expression syntax (see IntegrationResourceFieldRenderer).
+func isExpressionValue(value string) bool {
+	value = strings.TrimSpace(value)
+	return strings.Contains(value, "{{") || strings.Contains(value, "$[")
+}
+
+// normalizeAnnotationIDRaw converts UI / legacy config values to a decimal string ID.
+func normalizeAnnotationIDRaw(raw any) string {
+	switch v := raw.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case float64:
+		return strconv.FormatInt(int64(v), 10)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case int:
+		return strconv.FormatInt(int64(v), 10)
+	case json.Number:
+		return strings.TrimSpace(v.String())
+	default:
+		return strings.TrimSpace(fmt.Sprint(v))
+	}
+}
+
+func parseAnnotationIDForExecute(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, errors.New("annotationId is required")
+	}
+	if isExpressionValue(s) {
+		return 0, errors.New("annotationId must resolve to a numeric id before execution")
+	}
+	return parseAnnotationIDString(s)
+}
+
+func parseAnnotationIDString(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, errors.New("annotationId is required")
+	}
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, errors.New("annotationId must be a positive integer")
+	}
+	return id, nil
 }

@@ -71,6 +71,10 @@ export interface ListAnnotationsOutput {
   annotations: Annotation[];
 }
 
+export interface DeleteAnnotationConfiguration {
+  annotationId?: string;
+}
+
 export interface DeleteAnnotationOutput {
   id: number;
   deleted: boolean;
