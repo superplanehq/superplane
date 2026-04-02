@@ -178,7 +178,12 @@ func CreateCanvasWithAutoLayoutAndUsage(
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
 
-	proto, err := SerializeCanvas(&canvas, false)
+	user, err := models.FindActiveUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+	if err != nil {
+		return nil, err
+	}
+
+	proto, err := SerializeCanvas(&canvas, false, user)
 	if err != nil {
 		return nil, err
 	}

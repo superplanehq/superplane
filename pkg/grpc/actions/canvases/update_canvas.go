@@ -112,7 +112,12 @@ func UpdateCanvas(
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", publishErr)
 	}
 
-	serializedCanvas, serializeErr := SerializeCanvas(canvas, false)
+	user, err := models.FindActiveUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+	if err != nil {
+		return nil, err
+	}
+
+	serializedCanvas, serializeErr := SerializeCanvas(canvas, false, user)
 	if serializeErr != nil {
 		log.Errorf("failed to serialize canvas %s after update: %v", canvas.ID.String(), serializeErr)
 		return nil, status.Error(codes.Internal, "failed to serialize canvas")
