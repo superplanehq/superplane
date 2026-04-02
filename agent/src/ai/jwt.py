@@ -1,7 +1,6 @@
-import os
 from dataclasses import dataclass
 
-import jwt
+from ai.config import configimport jwt
 
 from ai.text import normalize_optional
 
@@ -22,7 +21,7 @@ class JwtValidator:
 
     @classmethod
     def from_env(cls) -> "JwtValidator":
-        jwt_secret = normalize_optional(os.getenv("JWT_SECRET"))
+        jwt_secret = normalize_optional(config.jwt_secret)
         if jwt_secret is None:
             raise ValueError("Missing required setting: JWT_SECRET")
         return cls(jwt_secret=jwt_secret)
