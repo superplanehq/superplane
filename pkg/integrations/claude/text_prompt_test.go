@@ -22,7 +22,7 @@ func TestTextPrompt_Configuration(t *testing.T) {
 	}{
 		"model":         {true, string(configuration.FieldTypeIntegrationResource)},
 		"prompt":        {true, string(configuration.FieldTypeText)},
-		"systemMessage": {false, string(configuration.FieldTypeText)},
+		"systemMessage": {false, string(configuration.FieldTypeExpression)},
 		"maxTokens":     {false, string(configuration.FieldTypeNumber)},
 		"temperature":   {false, string(configuration.FieldTypeNumber)},
 	}
