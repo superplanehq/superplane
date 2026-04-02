@@ -356,6 +356,12 @@ export interface CanvasPageProps {
 
   /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
   onPreviewPreviousVersionViewDetails?: () => void;
+  /** Opens edit mode with a new draft whose graph/YAML matches the previewed published version. */
+  onRollbackPreviewToEdit?: () => void;
+  rollbackPreviewToEditDisabled?: boolean;
+  rollbackPreviewToEditDisabledTooltip?: string;
+  /** Leave published-version preview and return to the current live canvas. */
+  onExitPreviewToLive?: () => void;
   /** Change request being previewed while awaiting approval (floating bar + versioning sidebar). */
   awaitingApprovalBanner?: {
     title: string;
@@ -1305,6 +1311,41 @@ function CanvasPage(props: CanvasPageProps) {
                   >
                     View details
                   </Button>
+                  {!showAwaitingFloatingBar && props.onRollbackPreviewToEdit ? (
+                    props.rollbackPreviewToEditDisabled && props.rollbackPreviewToEditDisabledTooltip ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex shrink-0">
+                            <Button type="button" variant="outline" size="sm" className="shrink-0" disabled>
+                              Roll back
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">{props.rollbackPreviewToEditDisabledTooltip}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => props.onRollbackPreviewToEdit?.()}
+                      >
+                        Roll back
+                      </Button>
+                    )
+                  ) : null}
+                  {!showAwaitingFloatingBar && props.onExitPreviewToLive ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => props.onExitPreviewToLive?.()}
+                    >
+                      Exit preview
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             ) : null}

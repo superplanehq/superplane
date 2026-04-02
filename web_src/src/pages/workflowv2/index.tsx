@@ -4470,6 +4470,149 @@ export function WorkflowPageV2() {
     });
   }, [selectedCanvasVersionID, selectedCanvasVersion, liveVersions, liveVersionChangeRequestsByVersionId]);
 
+  const handleRollbackPreviewToEdit = useCallback(async () => {
+    if (!organizationId || !canvasId || !liveCanvas) {
+      return;
+    }
+    if (!canUpdateCanvas) {
+      showErrorToast("You don't have permission to edit this canvas");
+      return;
+    }
+    if (isTemplate) {
+      showErrorToast("Template canvases are read-only");
+      return;
+    }
+    if (hasEditableVersion) {
+      return;
+    }
+
+    const previewVersion = selectedCanvasVersion;
+    const previewSpec = previewVersion?.spec;
+    if (!previewVersion?.metadata?.id || !previewSpec) {
+      showErrorToast("Nothing to roll back to");
+      return;
+    }
+    if (!previewVersion.metadata?.isPublished || isViewingCurrentLiveVersion) {
+      return;
+    }
+
+    const userHasDraft = draftVersions.some((v) => v.metadata?.owner?.id === currentUserId);
+    if (userHasDraft) {
+      const confirmed = window.confirm(
+        "Replace your current draft with this version? You can keep editing from there before publishing.",
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    clearPendingAutoSaveWork();
+
+    const recoverFromFailedRollback = async () => {
+      try {
+        await discardCanvasDraftMutation.mutateAsync();
+      } catch {
+        // Draft may not exist if create failed mid-flight
+      }
+      setActiveCanvasVersion(null);
+      activeCanvasVersionIdRef.current = "";
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("version");
+        return next;
+      });
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      await queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+    };
+
+    let createdNewDraftId: string | null = null;
+    try {
+      const response = await createCanvasVersionMutation.mutateAsync();
+      const version = response?.data?.version;
+      const newVersionId = version?.metadata?.id;
+      if (!version || !newVersionId) {
+        showErrorToast("Failed to open edit mode");
+        return;
+      }
+
+      createdNewDraftId = newVersionId;
+
+      const rolledBackWorkflow: CanvasesCanvas = {
+        ...liveCanvas,
+        spec: {
+          nodes: previewSpec.nodes ?? [],
+          edges: previewSpec.edges ?? [],
+        },
+      };
+
+      setActiveCanvasVersion(version);
+      activeCanvasVersionIdRef.current = newVersionId;
+      setSuppressUnpublishedChangesBadge(false);
+
+      queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          spec: rolledBackWorkflow.spec,
+        };
+      });
+
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.set("version", newVersionId);
+        return next;
+      });
+
+      const result = await enqueueCanvasSave(rolledBackWorkflow, newVersionId);
+      if (result.status !== "saved") {
+        showErrorToast("Could not apply rolled-back canvas to the draft");
+        await recoverFromFailedRollback();
+        return;
+      }
+
+      const savedVersion = result.response?.data?.version;
+      if (savedVersion && activeCanvasVersionIdRef.current === newVersionId) {
+        setActiveCanvasVersion(savedVersion);
+      }
+
+      lastSavedWorkflowRef.current = JSON.parse(JSON.stringify(rolledBackWorkflow));
+      setHasUnsavedChanges(false);
+      setHasNonPositionalUnsavedChanges(false);
+      setInitialWorkflowSnapshot(null);
+
+      showSuccessToast(`Editing ${formatVersionLabelWithTimestamp(savedVersion ?? version)}`);
+    } catch (error) {
+      if (createdNewDraftId) {
+        await recoverFromFailedRollback();
+      }
+      showErrorToast(
+        getUsageLimitToastMessage(
+          error,
+          getApiErrorMessage(error, createdNewDraftId ? "Could not save rolled-back draft" : "Failed to roll back"),
+        ),
+      );
+    }
+  }, [
+    organizationId,
+    canvasId,
+    liveCanvas,
+    canUpdateCanvas,
+    isTemplate,
+    hasEditableVersion,
+    selectedCanvasVersion,
+    isViewingCurrentLiveVersion,
+    draftVersions,
+    currentUserId,
+    clearPendingAutoSaveWork,
+    createCanvasVersionMutation,
+    discardCanvasDraftMutation,
+    queryClient,
+    enqueueCanvasSave,
+    setSearchParams,
+  ]);
+
   const handleOpenAwaitingApprovalNodeDiff = useCallback(() => {
     if (!selectedCanvasVersionID) {
       return;
@@ -4706,6 +4849,13 @@ export function WorkflowPageV2() {
       clearPendingAutoSaveWork,
     ],
   );
+
+  const handleExitPreviewToLive = useCallback(() => {
+    if (!liveCanvasVersionId) {
+      return;
+    }
+    handleUseVersion(liveCanvasVersionId);
+  }, [liveCanvasVersionId, handleUseVersion]);
 
   const handleSubmitCreateChangeRequest = useCallback(
     async ({ title, description }: { title: string; description: string }) => {
@@ -5440,6 +5590,13 @@ export function WorkflowPageV2() {
       : !isViewingCurrentLiveVersion
         ? "previewing-previous-version"
         : "default";
+  const rollbackPreviewToEditDisabled =
+    createCanvasVersionMutation.isPending || isCanvasSaveInFlight || isCanvasSaveQueued || !liveCanvasVersionId;
+  const rollbackPreviewToEditDisabledTooltip = !liveCanvasVersionId
+    ? "No live version available."
+    : createCanvasVersionMutation.isPending || isCanvasSaveInFlight || isCanvasSaveQueued
+      ? "Please wait…"
+      : undefined;
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = !canUpdateCanvas
@@ -5532,6 +5689,12 @@ export function WorkflowPageV2() {
           topViewMode={topViewMode}
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
+          onRollbackPreviewToEdit={
+            !isTemplate && canUpdateCanvas && !canvasDeletedRemotely ? handleRollbackPreviewToEdit : undefined
+          }
+          rollbackPreviewToEditDisabled={rollbackPreviewToEditDisabled}
+          rollbackPreviewToEditDisabledTooltip={rollbackPreviewToEditDisabledTooltip}
+          onExitPreviewToLive={liveCanvasVersionId ? handleExitPreviewToLive : undefined}
           awaitingApprovalBanner={awaitingApprovalBanner}
           onTopViewModeChange={(mode) => {
             setIsCreateChangeRequestMode(false);
