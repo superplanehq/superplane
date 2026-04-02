@@ -424,11 +424,17 @@ func validateChunking(index int, ds DataSourceSpec) error {
 		return fmt.Errorf("data source %d: unsupported chunking algorithm %q", index, ds.ChunkingAlgorithm)
 	}
 
-	if ds.ChunkingAlgorithm == chunkingHierarchical &&
-		ds.ParentChunkSize > 0 && ds.ChildChunkSize > 0 &&
-		ds.ChildChunkSize >= ds.ParentChunkSize {
-		return fmt.Errorf("data source %d: childChunkSize (%d) must be smaller than parentChunkSize (%d)",
-			index, ds.ChildChunkSize, ds.ParentChunkSize)
+	if ds.ChunkingAlgorithm == chunkingHierarchical {
+		if ds.ParentChunkSize == 0 {
+			return fmt.Errorf("data source %d: parentChunkSize is required for hierarchical chunking", index)
+		}
+		if ds.ChildChunkSize == 0 {
+			return fmt.Errorf("data source %d: childChunkSize is required for hierarchical chunking", index)
+		}
+		if ds.ChildChunkSize >= ds.ParentChunkSize {
+			return fmt.Errorf("data source %d: childChunkSize (%d) must be smaller than parentChunkSize (%d)",
+				index, ds.ChildChunkSize, ds.ParentChunkSize)
+		}
 	}
 
 	return nil
@@ -832,9 +838,11 @@ func dataSourceItemSchema() []configuration.Field {
 			Label:       "Maximum Parent Chunk Size (tokens)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Togglable:   true,
 			Description: "Maximum tokens in the parent (context) chunk. The valid range is shown in the selected embedding model above. Must be larger than the child chunk size.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "chunkingAlgorithm", Values: []string{chunkingHierarchical}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "chunkingAlgorithm", Values: []string{chunkingHierarchical}},
 			},
 		},
@@ -843,9 +851,11 @@ func dataSourceItemSchema() []configuration.Field {
 			Label:       "Maximum Child Chunk Size (tokens)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
-			Togglable:   true,
 			Description: "Maximum tokens in the child (retrieval) chunk. The valid range is shown in the selected embedding model above. Must be smaller than the parent chunk size.",
 			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "chunkingAlgorithm", Values: []string{chunkingHierarchical}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "chunkingAlgorithm", Values: []string{chunkingHierarchical}},
 			},
 		},

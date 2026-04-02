@@ -347,6 +347,50 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "unsupported chunking algorithm")
 	})
 
+	t.Run("hierarchical chunking without parentChunkSize returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":               "my-kb",
+				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":             "tor1",
+				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption":     "new",
+				"dataSources": []any{
+					map[string]any{
+						"type":              "spaces",
+						"spacesBucket":      "tor1/my-bucket",
+						"chunkingAlgorithm": chunkingHierarchical,
+						"childChunkSize":    200,
+					},
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "parentChunkSize is required for hierarchical chunking")
+	})
+
+	t.Run("hierarchical chunking without childChunkSize returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":               "my-kb",
+				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":             "tor1",
+				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption":     "new",
+				"dataSources": []any{
+					map[string]any{
+						"type":              "spaces",
+						"spacesBucket":      "tor1/my-bucket",
+						"chunkingAlgorithm": chunkingHierarchical,
+						"parentChunkSize":   500,
+					},
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "childChunkSize is required for hierarchical chunking")
+	})
+
 	t.Run("hierarchical chunking with childChunkSize >= parentChunkSize returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -1286,7 +1330,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 		assert.Len(t, chunkingField.TypeOptions.Select.Options, 4)
 	})
 
-	t.Run("hierarchical chunk size fields are conditional on chunkingAlgorithm=hierarchical", func(t *testing.T) {
+	t.Run("hierarchical chunk size fields are required and not togglable when hierarchical is selected", func(t *testing.T) {
 		dataSourcesField := findField("dataSources")
 		require.NotNil(t, dataSourcesField)
 		schema := dataSourcesField.TypeOptions.List.ItemDefinition.Schema
@@ -1303,10 +1347,13 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 		for _, name := range []string{"parentChunkSize", "childChunkSize"} {
 			f := findSchemaField(name)
 			require.NotNil(t, f, "%s must exist in schema", name)
-			assert.True(t, f.Togglable)
+			assert.False(t, f.Togglable, "%s must not be togglable — it is always required for hierarchical", name)
 			require.Len(t, f.VisibilityConditions, 1)
 			assert.Equal(t, "chunkingAlgorithm", f.VisibilityConditions[0].Field)
 			assert.Equal(t, []string{chunkingHierarchical}, f.VisibilityConditions[0].Values)
+			require.Len(t, f.RequiredConditions, 1)
+			assert.Equal(t, "chunkingAlgorithm", f.RequiredConditions[0].Field)
+			assert.Equal(t, []string{chunkingHierarchical}, f.RequiredConditions[0].Values)
 		}
 	})
 
