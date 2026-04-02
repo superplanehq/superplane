@@ -487,6 +487,7 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 		CustomName: valueOrEmpty(rootEvent.CustomName),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*rootEvent.CreatedAt),
+		Root:       rootEvent.ExecutionID == nil,
 	}, nil
 }
 
