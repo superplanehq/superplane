@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
-import { deleteNodesFromWorkflow, groupWorkflowNodes, ungroupWorkflowNode } from "./workflow-groups";
+import { deleteNodesFromWorkflow, groupWorkflowNodes, ungroupWorkflowNode } from "./canvas-groups";
 
 describe("deleteNodesFromWorkflow", () => {
   it("deletes groups recursively and removes stale child references from surviving groups", () => {
