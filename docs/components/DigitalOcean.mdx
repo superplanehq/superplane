@@ -26,6 +26,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
+  <LinkCard title="Get Cluster Configuration" href="#get-cluster-configuration" description="Retrieve the configuration details for a database cluster" />
+  <LinkCard title="Get Database" href="#get-database" description="Retrieve details of a specific managed database instance" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
@@ -1122,6 +1124,119 @@ Returns the app object including:
   },
   "timestamp": "2026-03-26T08:21:30.077395918Z",
   "type": "digitalocean.app.fetched"
+}
+```
+
+<a id="get-cluster-configuration"></a>
+
+## Get Cluster Configuration
+
+The Get Cluster Configuration component retrieves the active configuration for a DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Audit workflows**: Inspect the active cluster configuration for reporting or compliance checks
+- **Validation**: Compare the current cluster configuration before updates or maintenance
+- **Operational visibility**: Retrieve engine-specific settings that affect behavior and performance
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster to inspect (required)
+
+### Output
+
+Returns the cluster configuration including:
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+- **config**: The configuration object returned by the DigitalOcean API
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:read`
+- The keys inside `config` vary by database engine
+
+### Example Output
+
+```json
+{
+  "data": {
+    "config": {
+      "autovacuum_naptime": 60,
+      "backtrack_commit_timeout": 30,
+      "default_toast_compression": "pglz",
+      "idle_in_transaction_session_timeout": 0,
+      "jit": true,
+      "max_parallel_workers": 8
+    },
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test"
+  },
+  "timestamp": "2026-03-27T11:10:00.000000000Z",
+  "type": "digitalocean.database.cluster.config.fetched"
+}
+```
+
+<a id="get-database"></a>
+
+## Get Database
+
+The Get Database component retrieves a managed database from a DigitalOcean cluster and enriches it with cluster context.
+
+### Use Cases
+
+- **Routing decisions**: Inspect the database and cluster state before directing traffic or jobs
+- **Operational checks**: Review engine, region, and connection details before maintenance steps
+- **Audit workflows**: Retrieve the current database and cluster context for reporting or validation
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster containing the database (required)
+- **Database**: The database to retrieve (required)
+
+### Output
+
+Returns the requested database enriched with cluster details, including:
+- **name**: The database name
+- **databaseClusterId**: The cluster UUID
+- **databaseClusterName**: The cluster name
+- **engine**: The cluster engine
+- **version**: The cluster engine version
+- **region**: The cluster region
+- **status**: The cluster status
+- **connection**: Connection information when available
+- **database**: The raw database object returned by the API
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:read`
+- Database management is not supported for Caching or Valkey clusters
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connection": {
+      "database": "defaultdb",
+      "host": "superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com",
+      "port": 25060,
+      "ssl": true,
+      "uri": "postgresql://doadmin@superplane-db-test-do-user-1234567-0.j.db.ondigitalocean.com:25060/defaultdb?sslmode=require",
+      "user": "doadmin"
+    },
+    "database": {
+      "name": "app_db"
+    },
+    "databaseClusterId": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "databaseClusterName": "superplane-db-test",
+    "engine": "pg",
+    "name": "app_db",
+    "region": "nyc1",
+    "status": "online",
+    "version": "17"
+  },
+  "timestamp": "2026-03-27T11:12:00.000000000Z",
+  "type": "digitalocean.database.fetched"
 }
 ```
 
