@@ -4493,7 +4493,7 @@ export function WorkflowPageV2() {
     const previewVersion = selectedCanvasVersion;
     const previewSpec = previewVersion?.spec;
     if (!previewVersion?.metadata?.id || !previewSpec) {
-      showErrorToast("Nothing to roll back to");
+      showErrorToast("This version cannot be opened for editing");
       return;
     }
     if (!previewVersion.metadata?.isPublished || isViewingCurrentLiveVersion) {
@@ -4503,7 +4503,7 @@ export function WorkflowPageV2() {
     const userHasDraft = draftVersions.some((v) => v.metadata?.owner?.id === currentUserId);
     if (userHasDraft) {
       const confirmed = window.confirm(
-        "Replace your current draft with this version? You can keep editing from there before publishing.",
+        "Replace your current draft with a copy of this version? You can keep editing before publishing.",
       );
       if (!confirmed) {
         return;
@@ -4571,7 +4571,7 @@ export function WorkflowPageV2() {
 
       const result = await enqueueCanvasSave(rolledBackWorkflow, newVersionId);
       if (result.status !== "saved") {
-        showErrorToast("Could not apply rolled-back canvas to the draft");
+        showErrorToast("Could not save this version as your draft");
         await recoverFromFailedRollback();
         return;
       }
@@ -4594,7 +4594,10 @@ export function WorkflowPageV2() {
       showErrorToast(
         getUsageLimitToastMessage(
           error,
-          getApiErrorMessage(error, createdNewDraftId ? "Could not save rolled-back draft" : "Failed to roll back"),
+          getApiErrorMessage(
+            error,
+            createdNewDraftId ? "Could not save draft from this version" : "Failed to start draft from this version",
+          ),
         ),
       );
     }
@@ -5774,6 +5777,7 @@ export function WorkflowPageV2() {
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
           readOnly={isReadOnly}
+          suppressComponentSidebarOnNodeClick={canvasStateMode === "previewing-previous-version"}
           hasFitToViewRef={hasFitToViewRef}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}

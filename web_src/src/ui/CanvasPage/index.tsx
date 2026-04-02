@@ -199,6 +199,8 @@ export interface CanvasPageProps {
   versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
+  /** When true, single-click / node search will not open the component sidebar (e.g. published history preview). */
+  suppressComponentSidebarOnNodeClick?: boolean;
   hideAddControls?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -356,7 +358,7 @@ export interface CanvasPageProps {
 
   /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
   onPreviewPreviousVersionViewDetails?: () => void;
-  /** Opens edit mode with a new draft whose graph/YAML matches the previewed published version. */
+  /** Opens edit mode with a new draft whose graph/YAML matches the previewed published version (not a live rollback). */
   onRollbackPreviewToEdit?: () => void;
   rollbackPreviewToEditDisabled?: boolean;
   rollbackPreviewToEditDisabledTooltip?: string;
@@ -1317,22 +1319,30 @@ function CanvasPage(props: CanvasPageProps) {
                         <TooltipTrigger asChild>
                           <span className="inline-flex shrink-0">
                             <Button type="button" variant="outline" size="sm" className="shrink-0" disabled>
-                              Roll back
+                              Edit from version
                             </Button>
                           </span>
                         </TooltipTrigger>
                         <TooltipContent side="top">{props.rollbackPreviewToEditDisabledTooltip}</TooltipContent>
                       </Tooltip>
                     ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => props.onRollbackPreviewToEdit?.()}
-                      >
-                        Roll back
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() => props.onRollbackPreviewToEdit?.()}
+                          >
+                            Edit from version
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          Open edit mode with a new draft that matches this version. Live stays unchanged until you
+                          publish.
+                        </TooltipContent>
+                      </Tooltip>
                     )
                   ) : null}
                   {!showAwaitingFloatingBar && props.onExitPreviewToLive ? (
@@ -1415,6 +1425,7 @@ function CanvasPage(props: CanvasPageProps) {
                 autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
                 autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
                 readOnly={props.readOnly}
+                suppressComponentSidebarOnNodeClick={props.suppressComponentSidebarOnNodeClick}
                 logEntries={props.logEntries}
                 focusRequest={props.focusRequest}
                 onExecutionChainHandled={props.onExecutionChainHandled}
@@ -2080,6 +2091,7 @@ function CanvasContent({
   autoLayoutOnUpdateDisabled,
   autoLayoutOnUpdateDisabledTooltip,
   readOnly,
+  suppressComponentSidebarOnNodeClick = false,
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
@@ -2174,6 +2186,7 @@ function CanvasContent({
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   readOnly?: boolean;
+  suppressComponentSidebarOnNodeClick?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
@@ -2201,6 +2214,7 @@ function CanvasContent({
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
+  const suppressSidebarFromNodeClick = suppressComponentSidebarOnNodeClick ?? false;
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)
@@ -2391,6 +2405,8 @@ function CanvasContent({
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
+      } else if (suppressSidebarFromNodeClick) {
+        stateRef.current.componentSidebar.close();
       } else {
         if (isTemplateNode && onTemplateNodeClick) {
           onTemplateNodeClick(nodeId);
@@ -2430,6 +2446,7 @@ function CanvasContent({
       onPendingConnectionNodeClick,
       onTemplateNodeClick,
       setCurrentTab,
+      suppressSidebarFromNodeClick,
     ],
   );
 
@@ -3058,6 +3075,10 @@ function CanvasContent({
                       const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
                       const isAnnotationNode = nodeData?.type === "annotation";
                       if (isAnnotationNode) {
+                        return;
+                      }
+                      if (suppressSidebarFromNodeClick) {
+                        state.componentSidebar.close();
                         return;
                       }
                       state.componentSidebar.open(node.id);
