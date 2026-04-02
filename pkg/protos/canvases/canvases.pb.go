@@ -4282,6 +4282,7 @@ type CanvasEvent struct {
 	CustomName    string                 `protobuf:"bytes,5,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
 	Data          *_struct.Struct        `protobuf:"bytes,6,opt,name=data,proto3" json:"data,omitempty"`
 	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Root          bool                   `protobuf:"varint,8,opt,name=root,proto3" json:"root,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4363,6 +4364,13 @@ func (x *CanvasEvent) GetCreatedAt() *timestamp.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *CanvasEvent) GetRoot() bool {
+	if x != nil {
+		return x.Root
+	}
+	return false
 }
 
 type CanvasEventWithExecutions struct {
@@ -5908,7 +5916,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x19DeleteCanvasMemoryRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1b\n" +
 	"\tmemory_id\x18\x02 \x01(\tR\bmemoryId\"\x1c\n" +
-	"\x1aDeleteCanvasMemoryResponse\"\xf6\x01\n" +
+	"\x1aDeleteCanvasMemoryResponse\"\x8a\x02\n" +
 	"\vCanvasEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
@@ -5918,7 +5926,8 @@ const file_canvases_proto_rawDesc = "" +
 	"customName\x12+\n" +
 	"\x04data\x18\x06 \x01(\v2\x17.google.protobuf.StructR\x04data\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\xd1\x02\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x12\n" +
+	"\x04root\x18\b \x01(\bR\x04root\"\xd1\x02\n" +
 	"\x19CanvasEventWithExecutions\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
