@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -28,15 +27,7 @@ type ListAlertRulesOutput struct {
 
 func decodeListAlertRulesSpec(input any) (ListAlertRulesSpec, error) {
 	spec := ListAlertRulesSpec{}
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:           &spec,
-		TagName:          "mapstructure",
-		WeaklyTypedInput: true,
-	})
-	if err != nil {
-		return ListAlertRulesSpec{}, err
-	}
-	if err := decoder.Decode(input); err != nil {
+	if err := decodeAlertRuleSpec(input, &spec); err != nil {
 		return ListAlertRulesSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 	spec.FolderUID = strings.TrimSpace(spec.FolderUID)

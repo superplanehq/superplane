@@ -123,13 +123,15 @@ Returns the created Grafana alert rule object, including identifiers and evaluat
 
 ### Example Output
 
+SuperPlane-managed alert rules use a three-step data pipeline: `A` is the source query, `B` is the reduce expression, and `C` is the threshold condition Grafana evaluates.
+
 ```json
 {
   "data": {
     "annotations": {
       "summary": "High error rate detected"
     },
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "datasourceUid": "prometheus-main",
@@ -144,6 +146,41 @@ Returns the created Grafana alert rule object, including identifiers and evaluat
         "refId": "A",
         "relativeTimeRange": {
           "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "reducer": "last",
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              }
+            }
+          ],
+          "expression": "B",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
           "to": 0
         }
       }
@@ -225,13 +262,15 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
 
 ### Example Output
 
+The returned structure depends on how the rule was created. SuperPlane-managed rules use the `A`/`B`/`C` pipeline shown below.
+
 ```json
 {
   "data": {
     "annotations": {
       "summary": "High error rate detected"
     },
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "datasourceUid": "prometheus-main",
@@ -246,6 +285,41 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
         "refId": "A",
         "relativeTimeRange": {
           "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "reducer": "last",
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              }
+            }
+          ],
+          "expression": "B",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
           "to": 0
         }
       }
@@ -423,7 +497,7 @@ Returns the updated Grafana alert rule object after the provisioning API applies
     "annotations": {
       "summary": "High error rate detected"
     },
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "datasourceUid": "prometheus-main",
@@ -438,6 +512,41 @@ Returns the updated Grafana alert rule object after the provisioning API applies
         "refId": "A",
         "relativeTimeRange": {
           "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "reducer": "last",
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              }
+            }
+          ],
+          "expression": "B",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
           "to": 0
         }
       }
