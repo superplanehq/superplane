@@ -45,7 +45,7 @@ func (t *OnAlertFiring) Documentation() string {
 
 1. SuperPlane automatically creates or updates a Grafana Webhook contact point and notification policy route for this trigger when provisioning succeeds.
 2. SuperPlane manages webhook bearer authentication automatically.
-3. If Grafana provisioning is unavailable or rejected, manual setup may still be required.
+3. Provisioning requires a Grafana integration with **Base URL** and **Service Account Token** and sufficient permissions for alerting and provisioning APIs.
 
 ## Configuration
 

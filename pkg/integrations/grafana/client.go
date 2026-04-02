@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,6 +18,10 @@ import (
 const (
 	maxResponseSize = 2 * 1024 * 1024 // 2MB
 )
+
+// notificationPolicyTreeMutex serializes read-modify-write on the Grafana notification
+// policy tree so concurrent webhook setup/cleanup cannot drop each other's routes.
+var notificationPolicyTreeMutex sync.Mutex
 
 type Client struct {
 	BaseURL  string
@@ -32,6 +37,16 @@ type contactPoint struct {
 type DataSource struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
+}
+
+type Folder struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type AlertRuleSummary struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
 }
 
 type apiStatusError struct {
@@ -184,7 +199,7 @@ func (c *Client) execRequestWithHeaders(
 	return responseBody, res.StatusCode, nil
 }
 
-func (c *Client) listContactPoints() ([]contactPoint, error) {
+func (c *Client) ListContactPoints() ([]contactPoint, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/contact-points", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing contact points: %v", err)
@@ -219,7 +234,7 @@ func (c *Client) listContactPoints() ([]contactPoint, error) {
 }
 
 func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string) (string, error) {
-	points, err := c.listContactPoints()
+	points, err := c.ListContactPoints()
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +308,7 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 		return strings.TrimSpace(created.UID), nil
 	}
 
-	refreshedPoints, err := c.listContactPoints()
+	refreshedPoints, err := c.ListContactPoints()
 	if err != nil {
 		return "", err
 	}
@@ -443,6 +458,9 @@ func (c *Client) putNotificationPolicies(root map[string]json.RawMessage) error 
 // =~ regex OR pattern; negative predicates (notEquals) become individual != matchers.
 // The route has continue=true so other routes still fire.
 func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNamePredicates []configuration.Predicate) error {
+	notificationPolicyTreeMutex.Lock()
+	defer notificationPolicyTreeMutex.Unlock()
+
 	root, err := c.getNotificationPolicies()
 	if err != nil {
 		return err
@@ -477,6 +495,120 @@ func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNam
 		return err
 	}
 	return c.putNotificationPolicies(root)
+}
+
+func (c *Client) ListAlertRules() ([]AlertRuleSummary, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/alert-rules", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing alert rules: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule list", status, responseBody)
+	}
+
+	var rules []AlertRuleSummary
+	if err := json.Unmarshal(responseBody, &rules); err != nil {
+		return nil, fmt.Errorf("error parsing alert rules response: %v", err)
+	}
+
+	return rules, nil
+}
+
+func (c *Client) GetAlertRule(uid string) (map[string]any, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule get", status, responseBody)
+	}
+
+	var rule map[string]any
+	if err := json.Unmarshal(responseBody, &rule); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return rule, nil
+}
+
+func (c *Client) CreateAlertRule(rule map[string]any) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPost,
+		"/api/v1/provisioning/alert-rules",
+		bytes.NewReader(body),
+		"application/json",
+		map[string]string{
+			"X-Disable-Provenance": "true",
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule create", status, responseBody)
+	}
+
+	var created map[string]any
+	if err := json.Unmarshal(responseBody, &created); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return created, nil
+}
+
+func (c *Client) UpdateAlertRule(uid string, rule map[string]any, disableProvenance bool) (map[string]any, error) {
+	body, err := json.Marshal(rule)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling alert rule payload: %v", err)
+	}
+
+	headers := map[string]string{}
+	if disableProvenance {
+		headers["X-Disable-Provenance"] = "true"
+	}
+
+	responseBody, status, err := c.execRequestWithHeaders(
+		http.MethodPut,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid),
+		bytes.NewReader(body),
+		"application/json",
+		headers,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error updating alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana alert rule update", status, responseBody)
+	}
+
+	var updated map[string]any
+	if err := json.Unmarshal(responseBody, &updated); err != nil {
+		return nil, fmt.Errorf("error parsing alert rule response: %v", err)
+	}
+
+	return updated, nil
+}
+
+func (c *Client) DeleteAlertRule(uid string) error {
+	responseBody, status, err := c.execRequest(http.MethodDelete, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	if err != nil {
+		return fmt.Errorf("error deleting alert rule: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return newAPIStatusError("grafana alert rule delete", status, responseBody)
+	}
+
+	return nil
 }
 
 // combinedPositiveAlertNameRegex builds the =~ pattern Grafana uses for object_matchers on
@@ -522,6 +654,9 @@ func buildAlertNameMatchers(predicates []configuration.Predicate) [][]string {
 // RemoveNotificationPolicyRoute removes any child route for contactPointName from the
 // root of the policy tree. No-op if no such route exists.
 func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
+	notificationPolicyTreeMutex.Lock()
+	defer notificationPolicyTreeMutex.Unlock()
+
 	root, err := c.getNotificationPolicies()
 	if err != nil {
 		return err
@@ -562,4 +697,22 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	}
 
 	return sources, nil
+}
+
+func (c *Client) ListFolders() ([]Folder, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing folders: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana folder list", status, responseBody)
+	}
+
+	var folders []Folder
+	if err := json.Unmarshal(responseBody, &folders); err != nil {
+		return nil, fmt.Errorf("error parsing folders response: %v", err)
+	}
+
+	return folders, nil
 }

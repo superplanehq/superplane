@@ -1,0 +1,20 @@
+{
+  "data": {
+    "alertRules": [
+      {
+        "uid": "cergr5pm79hj4d",
+        "title": "High error rate"
+      },
+      {
+        "uid": "aer9k2pm71sh2b",
+        "title": "High latency"
+      },
+      {
+        "uid": "bfg4m1rt63hj8q",
+        "title": "Service unavailable"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRules"
+}
