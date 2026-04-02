@@ -141,19 +141,6 @@ func (c *CreateKnowledgeBase) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "region",
-			Label:       "Region",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Default:     "tor1",
-			Description: "Datacenter region for the knowledge base. TOR1 is recommended — most Gradient AI Platform infrastructure is located there.",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: kbRegionOptions,
-				},
-			},
-		},
-		{
 			Name:        "projectId",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
@@ -220,6 +207,25 @@ func (c *CreateKnowledgeBase) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "region",
+			Label:       "Region",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "tor1",
+			Description: "Datacenter region where the new OpenSearch database and knowledge base will be provisioned. TOR1 is recommended — most Gradient AI Platform infrastructure is located there.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "databaseOption", Values: []string{"new"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "databaseOption", Values: []string{"new"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: kbRegionOptions,
+				},
+			},
+		},
+		{
 			Name:        "dataSources",
 			Label:       "Data Sources",
 			Type:        configuration.FieldTypeList,
@@ -252,12 +258,12 @@ func (c *CreateKnowledgeBase) Setup(ctx core.SetupContext) error {
 		return errors.New("embeddingModelUUID is required")
 	}
 
-	if spec.Region == "" {
-		return errors.New("region is required")
-	}
-
 	if spec.ProjectID == "" {
 		return errors.New("projectId is required")
+	}
+
+	if spec.DatabaseOption == "new" && spec.Region == "" {
+		return errors.New("region is required when creating a new database")
 	}
 
 	if spec.DatabaseOption == "existing" && spec.DatabaseID == "" {
@@ -297,10 +303,13 @@ func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 	req := CreateKnowledgeBaseRequest{
 		Name:               spec.Name,
 		EmbeddingModelUUID: spec.EmbeddingModelUUID,
-		Region:             spec.Region,
 		ProjectID:          spec.ProjectID,
 		Tags:               spec.Tags,
 		DataSources:        buildKBDataSources(spec.DataSources),
+	}
+
+	if spec.Region != "" {
+		req.Region = spec.Region
 	}
 
 	if spec.DatabaseOption == "existing" {

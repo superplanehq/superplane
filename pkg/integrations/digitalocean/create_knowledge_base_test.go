@@ -77,7 +77,7 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "embeddingModelUUID is required")
 	})
 
-	t.Run("missing region returns error", func(t *testing.T) {
+		t.Run("missing region with new database returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name":               "my-kb",
@@ -89,6 +89,21 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "region is required")
+	})
+
+	t.Run("missing region with existing database -> no error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":               "my-kb",
+				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption":     "existing",
+				"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
+				"dataSources":        []any{validSpacesSource},
+			},
+		})
+
+		require.NoError(t, err)
 	})
 
 	t.Run("missing projectId returns error", func(t *testing.T) {
@@ -373,12 +388,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("valid spaces source with existing database -> no error", func(t *testing.T) {
+	t.Run("valid spaces source with existing database -> no error (no region needed)", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name":               "my-kb",
 				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
 				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
 				"databaseOption":     "existing",
 				"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
@@ -574,7 +588,7 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		assert.Equal(t, "my-kb", stored.KBOutput["name"])
 	})
 
-	t.Run("existing database -> databaseId included in request", func(t *testing.T) {
+	t.Run("existing database -> databaseId included, region omitted from request", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: append([]*http.Response{
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(kbResponseWithDB))},
@@ -584,7 +598,6 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		_, _, err := executeKB(t, httpContext, map[string]any{
 			"name":               "my-kb",
 			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
 			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
 			"databaseOption":     "existing",
 			"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
@@ -597,6 +610,7 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
 		assert.Equal(t, "abf1055a-745d-4c24-a1db-1959ea819264", reqBody["database_id"])
+		assert.Empty(t, reqBody["region"], "region must not be sent when using an existing database")
 	})
 
 	t.Run("new database -> database_id omitted from request", func(t *testing.T) {
@@ -1001,21 +1015,43 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 	}
 
 	t.Run("has all top-level required fields", func(t *testing.T) {
-		for _, name := range []string{"name", "embeddingModelUUID", "region", "projectId"} {
+		for _, name := range []string{"name", "embeddingModelUUID", "projectId"} {
 			field := findField(name)
 			require.NotNil(t, field, "%s field must exist", name)
 			assert.True(t, field.Required, "%s must be required", name)
 		}
 	})
 
-	t.Run("region is a select with tor1 as default", func(t *testing.T) {
+	t.Run("region is a select with tor1 as default, visible and required only for new database", func(t *testing.T) {
 		field := findField("region")
 		require.NotNil(t, field)
 		assert.Equal(t, "select", field.Type)
 		assert.Equal(t, "tor1", field.Default)
+		assert.False(t, field.Required, "region must not be unconditionally required")
 		require.NotNil(t, field.TypeOptions)
 		require.NotNil(t, field.TypeOptions.Select)
 		assert.NotEmpty(t, field.TypeOptions.Select.Options)
+		require.Len(t, field.VisibilityConditions, 1)
+		assert.Equal(t, "databaseOption", field.VisibilityConditions[0].Field)
+		assert.Equal(t, []string{"new"}, field.VisibilityConditions[0].Values)
+		require.Len(t, field.RequiredConditions, 1)
+		assert.Equal(t, "databaseOption", field.RequiredConditions[0].Field)
+		assert.Equal(t, []string{"new"}, field.RequiredConditions[0].Values)
+	})
+
+	t.Run("region appears after databaseId in configuration order", func(t *testing.T) {
+		regionIdx, databaseIdIdx := -1, -1
+		for i, f := range fields {
+			switch f.Name {
+			case "region":
+				regionIdx = i
+			case "databaseId":
+				databaseIdIdx = i
+			}
+		}
+		require.NotEqual(t, -1, regionIdx, "region field must exist")
+		require.NotEqual(t, -1, databaseIdIdx, "databaseId field must exist")
+		assert.Greater(t, regionIdx, databaseIdIdx, "region must appear after databaseId")
 	})
 
 	t.Run("embeddingModelUUID is an integration resource field", func(t *testing.T) {
