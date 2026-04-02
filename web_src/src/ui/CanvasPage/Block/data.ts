@@ -1,4 +1,4 @@
-import { isRecord } from "@/lib/records";
+import { isRecord } from "@/pages/workflowv2/mappers/safeMappers";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
 import type { CompositeProps } from "../../composite";
@@ -60,10 +60,7 @@ export function getSafeTriggerProps(data: BlockData): TriggerProps {
   const trigger = data.trigger!;
   return {
     ...trigger,
-    title:
-      typeof trigger.title === "string" && trigger.title.trim()
-        ? trigger.title
-        : getBlockLabel(data, "Trigger"),
+    title: typeof trigger.title === "string" && trigger.title.trim() ? trigger.title : getBlockLabel(data, "Trigger"),
     iconSlug: typeof trigger.iconSlug === "string" ? trigger.iconSlug : "bolt",
     metadata: Array.isArray(trigger.metadata) ? trigger.metadata : [],
     error: typeof trigger.error === "string" ? trigger.error : "",
