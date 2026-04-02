@@ -35,6 +35,7 @@ from ai.jwt import JwtClaims, JwtValidator
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
+from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
@@ -413,13 +414,17 @@ def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         store = SessionStore()
+        tracker = ActiveStreamTracker()
         app.state.session_store = store
+        app.state.stream_tracker = tracker
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
         try:
             yield
         finally:
+            tracker.begin_shutdown()
+            await tracker.wait_for_drain()
             grpc_server.stop()
             store.close()
 
@@ -438,6 +443,10 @@ def _create_app() -> FastAPI:
 
     @app.post("/agents/chats/{chat_id}/stream")
     async def stream_repl(chat_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+        tracker: ActiveStreamTracker = request.app.state.stream_tracker
+        if tracker.is_shutting_down:
+            raise HTTPException(status_code=503, detail="Service is shutting down")
+
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
@@ -449,31 +458,38 @@ def _create_app() -> FastAPI:
             has_token=bool(_resolve_bearer_token(request)),
         )
 
-        async def event_generator() -> AsyncIterator[str]:
-            try:
-                async for event in _stream_agent_run(chat_id, payload, request):
-                    if await request.is_disconnected():
-                        _debug_log("client disconnected", chat_id=chat_id)
-                        break
-                    yield _encode_sse_event(event)
-            except Exception as error:
-                _debug_log("stream failed", chat_id=chat_id, error=str(error))
-                yield _encode_sse_event(
-                    {
-                        "type": "run_failed",
-                        "error": str(error),
-                    }
-                )
-                yield _encode_sse_event({"type": "done"})
+        await tracker.acquire()
+        try:
+            async def event_generator() -> AsyncIterator[str]:
+                try:
+                    async for event in _stream_agent_run(chat_id, payload, request):
+                        if await request.is_disconnected():
+                            _debug_log("client disconnected", chat_id=chat_id)
+                            break
+                        yield _encode_sse_event(event)
+                except Exception as error:
+                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                    yield _encode_sse_event(
+                        {
+                            "type": "run_failed",
+                            "error": str(error),
+                        }
+                    )
+                    yield _encode_sse_event({"type": "done"})
+                finally:
+                    await tracker.release()
 
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "cache-control": "no-cache",
-                "connection": "keep-alive",
-            },
-        )
+            return StreamingResponse(
+                event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "cache-control": "no-cache",
+                    "connection": "keep-alive",
+                },
+            )
+        except BaseException:
+            await tracker.release()
+            raise
 
     return app
 
