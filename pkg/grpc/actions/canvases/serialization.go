@@ -22,10 +22,10 @@ func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
 	//
 	// Get all users with a single query, to avoid N+1 queries.
 	//
-	userIDs := make([]uuid.UUID, len(canvases))
-	for i, canvas := range canvases {
+	userIDs := []uuid.UUID{}
+	for _, canvas := range canvases {
 		if canvas.CreatedBy != nil {
-			userIDs[i] = *canvas.CreatedBy
+			userIDs = append(userIDs, *canvas.CreatedBy)
 		}
 	}
 
@@ -44,12 +44,13 @@ func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
 	//
 	protoCanvases := make([]*pb.Canvas, len(canvases))
 	for i, canvas := range canvases {
-		var user models.User
+		var user *models.User
 		if canvas.CreatedBy != nil {
-			user, _ = usersByID[canvas.CreatedBy.String()]
+			u, _ := usersByID[canvas.CreatedBy.String()]
+			user = &u
 		}
 
-		protoCanvas, err := SerializeCanvas(&canvas, false, &user)
+		protoCanvas, err := SerializeCanvas(&canvas, false, user)
 		if err != nil {
 			return nil, err
 		}
