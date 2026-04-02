@@ -578,6 +578,10 @@ export function WorkflowPageV2() {
    * This ref persists across re-renders to prevent viewport changes on save.
    */
   const hasFitToViewRef = useRef(false);
+  /** When the viewed canvas version changes, clear fit flag so React Flow runs fit-all on the next init. */
+  const prevCanvasViewKeyRef = useRef<string | null>(null);
+  /** After a version change, skip ?node= deep-link zoom once so fit matches the zoom toolbar (fit all). */
+  const skipUrlNodeFocusForNextCanvasMountRef = useRef(false);
   const hasSyncedVersionFromURLRef = useRef(false);
 
   /**
@@ -5530,6 +5534,18 @@ export function WorkflowPageV2() {
   ) : null;
 
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
+  if (prevCanvasViewKeyRef.current !== null && prevCanvasViewKeyRef.current !== canvasViewKey) {
+    hasFitToViewRef.current = false;
+    skipUrlNodeFocusForNextCanvasMountRef.current = true;
+  }
+  prevCanvasViewKeyRef.current = canvasViewKey;
+
+  let canvasInitialFocusNodeId = initialFocusNodeIdRef.current;
+  if (skipUrlNodeFocusForNextCanvasMountRef.current) {
+    canvasInitialFocusNodeId = null;
+    skipUrlNodeFocusForNextCanvasMountRef.current = false;
+  }
+
   const headerBanners = [remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
@@ -5762,7 +5778,7 @@ export function WorkflowPageV2() {
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={viewportRef}
-          initialFocusNodeId={initialFocusNodeIdRef.current}
+          initialFocusNodeId={canvasInitialFocusNodeId}
           unsavedMessage={
             hasUnsavedChanges && !(canAutoSave && isAutoSaveQueued) ? "You have unsaved changes" : undefined
           }

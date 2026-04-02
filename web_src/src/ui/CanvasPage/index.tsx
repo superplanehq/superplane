@@ -2625,8 +2625,8 @@ function CanvasContent({
         if (focusNode) {
           fitView({ nodes: [focusNode], duration: 500, maxZoom: 1.2 });
         } else if (hasNodes) {
-          // Fit to view but don't zoom in too much (max zoom of 1.0)
-          fitView({ maxZoom: 1.0, padding: 0.5 });
+          // Match zoom toolbar "Fit all components" / Ctrl+1 (Eye button)
+          fitView({ duration: 300 });
         }
 
         if (hasNodes) {
