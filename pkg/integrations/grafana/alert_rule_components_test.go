@@ -93,6 +93,7 @@ func Test__CreateAlertRule__Configuration__DoesNotPrefillUserFields(t *testing.T
 
 	require.NotNil(t, pausedField)
 	assert.False(t, pausedField.Required)
+	assert.False(t, pausedField.Togglable)
 }
 
 func Test__CreateAlertRule__Execute(t *testing.T) {
@@ -372,6 +373,7 @@ func Test__UpdateAlertRule__Configuration__AllowsPartialUpdates(t *testing.T) {
 	assertFieldRequired(t, fields, "noDataState", false)
 	assertFieldRequired(t, fields, "execErrState", false)
 	assertFieldRequired(t, fields, "isPaused", false)
+	assertFieldTogglable(t, fields, "isPaused", true)
 }
 
 func Test__UpdateAlertRule__Setup__StoresAlertRuleTitleMetadata(t *testing.T) {
@@ -943,4 +945,19 @@ func assertFieldRequired(t *testing.T, fields []configuration.Field, name string
 
 	require.NotNil(t, field)
 	assert.Equal(t, required, field.Required)
+}
+
+func assertFieldTogglable(t *testing.T, fields []configuration.Field, name string, togglable bool) {
+	t.Helper()
+
+	var field *configuration.Field
+	for i := range fields {
+		if fields[i].Name == name {
+			field = &fields[i]
+			break
+		}
+	}
+
+	require.NotNil(t, field)
+	assert.Equal(t, togglable, field.Togglable)
 }

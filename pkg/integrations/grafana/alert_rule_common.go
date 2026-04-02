@@ -565,11 +565,13 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 			},
 		},
 		configuration.Field{
-			Name:        "isPaused",
-			Label:       "Paused",
-			Type:        configuration.FieldTypeBool,
-			Required:    false,
-			Togglable:   false,
+			Name:     "isPaused",
+			Label:    "Paused",
+			Type:     configuration.FieldTypeBool,
+			Required: false,
+			// Omit from update payloads unless the user enables the field; non-togglable bools always serialize
+			// as false and would otherwise unpause the rule on every partial update.
+			Togglable:   partialUpdate,
 			Description: "Whether the alert rule should be created or updated in a paused state",
 		},
 	)
