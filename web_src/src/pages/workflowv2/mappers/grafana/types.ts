@@ -34,3 +34,44 @@ export interface QueryDataSourceConfiguration {
   timezone?: string;
   format?: string;
 }
+
+export interface Annotation {
+  id: number;
+  dashboardUID?: string;
+  panelId?: number;
+  time?: number;
+  timeEnd?: number;
+  text: string;
+  tags?: string[];
+  type?: string;
+}
+
+export interface CreateAnnotationConfiguration {
+  text: string;
+  tags?: string[];
+  dashboardUID?: string;
+  panelId?: number;
+  time?: string;
+  timeEnd?: string;
+}
+
+export interface CreateAnnotationOutput {
+  id: number;
+}
+
+export interface ListAnnotationsConfiguration {
+  tags?: string[];
+  dashboardUID?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface ListAnnotationsOutput {
+  annotations: Annotation[];
+}
+
+export interface DeleteAnnotationOutput {
+  id: number;
+  deleted: boolean;
+}
