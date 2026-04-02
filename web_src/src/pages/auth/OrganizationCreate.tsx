@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
@@ -8,9 +8,28 @@ import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { getResponseErrorMessage } from "@/lib/errors";
 
 const OrganizationCreate: React.FC = () => {
+  const navigate = useNavigate();
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await fetch("/account", { credentials: "include" });
+        if (!res.ok) {
+          return;
+        }
+        const data = (await res.json()) as { managed_account?: boolean };
+        if (data.managed_account) {
+          navigate("/", { replace: true });
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void run();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,10 +53,14 @@ const OrganizationCreate: React.FC = () => {
         // Redirect to the new organization
         window.location.href = `/${org.id}`;
       } else {
-        const fallbackMessage =
-          response.status === 409 ? "An organization with this name already exists" : "Failed to create organization";
-        const errorMessage = await getResponseErrorMessage(response, fallbackMessage);
-        setError(errorMessage);
+        if (response.status === 403) {
+          setError("This account cannot create organizations. Contact your administrator.");
+        } else {
+          const fallbackMessage =
+            response.status === 409 ? "An organization with this name already exists" : "Failed to create organization";
+          const errorMessage = await getResponseErrorMessage(response, fallbackMessage);
+          setError(errorMessage);
+        }
       }
     } catch {
       setError("Network error occurred");

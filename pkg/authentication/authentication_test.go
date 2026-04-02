@@ -18,7 +18,7 @@ func setupAuthHandler(t *testing.T, blockSignup bool) (*Handler, *support.Resour
 	t.Cleanup(func() { r.Close() })
 
 	signer := jwt.NewSigner("test-secret")
-	handler := NewHandler(signer, r.Encryptor, r.AuthService, "test", "/templates", blockSignup, false, false)
+	handler := NewHandler(signer, r.Encryptor, r.AuthService, "test", "/templates", "https://app.test", blockSignup, false, false, false)
 	return handler, r
 }
 
