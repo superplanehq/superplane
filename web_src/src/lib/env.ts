@@ -9,3 +9,7 @@ export const isAgentReplEnabled = () => {
 export const isUsagePageForced = () => {
   return import.meta.env.VITE_FORCE_USAGE_PAGE === "true";
 };
+
+export const isInlineConfigAssistantEnabled = () => {
+  return import.meta.env.VITE_ENABLE_INLINE_CONFIG_ASSISTANT === "true";
+};
