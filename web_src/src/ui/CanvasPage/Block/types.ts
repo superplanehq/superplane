@@ -66,5 +66,3 @@ export interface BlockProps extends ComponentActionsProps {
   onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: (e: MouseEvent) => void;
 }
-
-export type UnknownRecord = Record<string, unknown>;

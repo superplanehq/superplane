@@ -1,3 +1,4 @@
+import { isRecord } from "@/lib/records";
 import { AnnotationComponent } from "../../annotationComponent";
 import { ComponentBase } from "../../componentBase";
 import { Composite } from "../../composite";
@@ -9,7 +10,6 @@ import {
   getSafeComponentProps,
   getSafeCompositeProps,
   getSafeTriggerProps,
-  isRecord,
 } from "./data";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {

@@ -1,4 +1,6 @@
 import React from "react";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
+import { isRecord, type UnknownRecord } from "@/lib/records";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
@@ -9,14 +11,6 @@ import type {
   TriggerRenderer,
   TriggerRendererContext,
 } from "./types";
-
-const FALLBACK_NODE_MESSAGE = "Can't display";
-
-type UnknownRecord = Record<string, unknown>;
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null;
-}
 
 function getFallbackComponentTitle(context: ComponentBaseContext): string {
   return context.node?.name || context.componentDefinition?.label || context.componentDefinition?.name || "Component";
@@ -140,7 +134,7 @@ function applyComponentBaseFallbacks(
 ): ComponentBaseProps {
   const fallbackEmptyStateProps: NonNullable<ComponentBaseProps["emptyStateProps"]> = {
     icon: undefined,
-    title: FALLBACK_NODE_MESSAGE,
+    title: CANVAS_NODE_FALLBACK_MESSAGE,
     description: undefined,
   };
   const isFallback = !isRecord(props) || typeof record.title !== "string";
@@ -198,44 +192,77 @@ function buildLastEventData(lastEventData: unknown, fallbackTitle: string): Trig
   };
 }
 
-function buildTriggerNormalizationContext(
+function normalizeTriggerCustomField(customField: unknown): ComponentBaseProps["customField"] {
+  if (typeof customField === "function") {
+    return customField as ComponentBaseProps["customField"];
+  }
+
+  return sanitizeReactNodeValue(customField as React.ReactNode);
+}
+
+function buildNormalizedTriggerProps(
+  record: UnknownRecord,
   context: TriggerRendererContext,
   fallbackProps: TriggerProps,
-): ComponentBaseContext {
+): TriggerProps {
+  const metadata = sanitizeArray<TriggerProps["metadata"][number]>(record.metadata) || [];
+  const normalizedTitle = sanitizeNonEmptyString(record.title, fallbackProps.title);
+  const normalizedIconSlug = sanitizeNonEmptyString(record.iconSlug, fallbackProps.iconSlug);
+
   return {
-    nodes: [],
-    node: context.node,
-    componentDefinition: {
-      name: context.definition?.name || "",
-      label: context.definition?.label || fallbackProps.title,
-      description: context.definition?.description || "",
-      icon: context.definition?.icon || fallbackProps.iconSlug || "bolt",
-      color: context.definition?.color || "",
+    ...record,
+    iconSrc: typeof record.iconSrc === "string" ? record.iconSrc : undefined,
+    iconSlug: normalizedIconSlug,
+    iconColor: typeof record.iconColor === "string" ? record.iconColor : undefined,
+    title: normalizedTitle,
+    showHeader: typeof record.showHeader === "boolean" ? record.showHeader : undefined,
+    paused: typeof record.paused === "boolean" ? record.paused : undefined,
+    specs: sanitizeArray(record.specs),
+    hideCount: typeof record.hideCount === "boolean" ? record.hideCount : undefined,
+    hideMetadataList: typeof record.hideMetadataList === "boolean" ? record.hideMetadataList : undefined,
+    collapsed: sanitizeBoolean(record.collapsed, context.node?.isCollapsed ?? false),
+    collapsedBackground: typeof record.collapsedBackground === "string" ? record.collapsedBackground : undefined,
+    selected: typeof record.selected === "boolean" ? record.selected : undefined,
+    metadata,
+    customField: normalizeTriggerCustomField(record.customField),
+    customFieldPosition: record.customFieldPosition === "before" ? "before" : "after",
+    eventStateMap: isRecord(record.eventStateMap)
+      ? (record.eventStateMap as ComponentBaseProps["eventStateMap"])
+      : undefined,
+    includeEmptyState: sanitizeBoolean(record.includeEmptyState, false),
+    emptyStateProps: normalizeEmptyStateProps(record.emptyStateProps),
+    error: sanitizeString(record.error),
+    warning: sanitizeString(record.warning),
+    lastEventData: buildLastEventData(record.lastEventData, normalizedTitle),
+  };
+}
+
+function applyTriggerFallbacks(
+  normalized: TriggerProps,
+  props: TriggerProps | unknown,
+  record: UnknownRecord,
+): TriggerProps {
+  if (isRecord(props) && typeof record.title === "string") {
+    return normalized;
+  }
+
+  return {
+    ...normalized,
+    includeEmptyState: true,
+    emptyStateProps: normalized.emptyStateProps || {
+      icon: undefined,
+      title: CANVAS_NODE_FALLBACK_MESSAGE,
+      description: undefined,
     },
-    lastExecutions: [],
   };
 }
 
 export function normalizeTriggerProps(props: TriggerProps | unknown, context: TriggerRendererContext): TriggerProps {
   const fallbackProps = buildFallbackTriggerProps(context);
   const record = isRecord(props) ? props : {};
-  const normalizedComponentProps = normalizeComponentBaseProps(
-    {
-      ...record,
-      title: sanitizeString(record.title, fallbackProps.title),
-      iconSlug: sanitizeString(record.iconSlug, fallbackProps.iconSlug),
-      metadata: sanitizeArray(record.metadata),
-    },
-    buildTriggerNormalizationContext(context, fallbackProps),
-  );
+  const normalizedTriggerProps = buildNormalizedTriggerProps(record, context, fallbackProps);
 
-  return {
-    ...normalizedComponentProps,
-    title: normalizedComponentProps.title,
-    iconSlug: normalizedComponentProps.iconSlug,
-    metadata: sanitizeArray(record.metadata) || [],
-    lastEventData: buildLastEventData(record.lastEventData, normalizedComponentProps.title),
-  };
+  return applyTriggerFallbacks(normalizedTriggerProps, props, record);
 }
 
 /**
@@ -263,7 +290,7 @@ export function createSafeComponentMapper(mapper: ComponentBaseMapper, mapperNam
             "Component",
           includeEmptyState: true,
           emptyStateProps: {
-            title: FALLBACK_NODE_MESSAGE,
+            title: CANVAS_NODE_FALLBACK_MESSAGE,
             description: undefined,
           },
         };
@@ -312,7 +339,7 @@ export function createSafeTriggerRenderer(renderer: TriggerRenderer, rendererNam
           metadata: [],
           includeEmptyState: true,
           emptyStateProps: {
-            title: FALLBACK_NODE_MESSAGE,
+            title: CANVAS_NODE_FALLBACK_MESSAGE,
             description: undefined,
           },
         };

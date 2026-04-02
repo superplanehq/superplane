@@ -61,6 +61,7 @@ import {
 } from "@/api-client";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import {
   AiCanvasOperation,
@@ -456,7 +457,7 @@ function createNodeRenderFallbackData(data: BlockData): BlockData {
     group: undefined,
     renderFallback: {
       source: "node-render",
-      message: "Can't display",
+      message: CANVAS_NODE_FALLBACK_MESSAGE,
     },
   };
 }

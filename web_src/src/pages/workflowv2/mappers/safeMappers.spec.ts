@@ -216,7 +216,7 @@ describe("createSafeComponentMapper", () => {
   });
 });
 
-describe("createSafeTriggerRenderer", () => {
+describe("createSafeTriggerRenderer core behavior", () => {
   it("delegates to the underlying renderer when no error occurs", () => {
     const expectedProps: TriggerProps = { title: "My Trigger", iconSlug: "bolt", metadata: [] };
     const underlying: TriggerRenderer = {
@@ -301,7 +301,9 @@ describe("createSafeTriggerRenderer", () => {
     expect(safe.getEventState!(makeTriggerEventContext())).toBe("triggered");
     consoleSpy.mockRestore();
   });
+});
 
+describe("createSafeTriggerRenderer normalization", () => {
   it("does not wrap getEventState when the underlying renderer does not define it", () => {
     const safe = createSafeTriggerRenderer(baseTriggerRenderer(), "no-state");
     expect(safe.getEventState).toBeUndefined();
@@ -340,6 +342,26 @@ describe("createSafeTriggerRenderer", () => {
     expect(result.title).toBe("Test Trigger");
     expect(result.iconSlug).toBe("bolt");
     expect(result.lastEventData?.title).toBe("Test Trigger");
+  });
+
+  it("preserves trigger customField identity and valid trigger-specific fields", () => {
+    const customField = vi.fn();
+    const result = normalizeTriggerProps(
+      {
+        title: "Trigger",
+        iconSlug: "bolt",
+        metadata: [{ title: "Region", value: "us-east-1" }],
+        customField,
+        warning: "be careful",
+        collapsed: true,
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(result.customField).toBe(customField);
+    expect(result.warning).toBe("be careful");
+    expect(result.collapsed).toBe(true);
+    expect(result.metadata).toEqual([{ title: "Region", value: "us-east-1" }]);
   });
 });
 

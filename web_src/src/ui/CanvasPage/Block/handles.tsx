@@ -249,6 +249,7 @@ export function LeftHandle({ data, nodeId }: Pick<BlockProps, "data" | "nodeId">
     connectingFrom,
     connectingFrom?.nodeId,
     nodeId,
+    connectingFrom?.handleId,
   );
   const isHighlighted =
     (hoveredEdge && hoveredEdge.target === nodeId) ||

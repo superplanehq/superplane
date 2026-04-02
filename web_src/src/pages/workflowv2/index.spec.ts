@@ -4,7 +4,7 @@ import type { ComponentsComponent, ComponentsNode } from "@/api-client";
 import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
 import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
-import { prepareComponentBaseNode } from "./lib/canvas-node-preparation";
+import { prepareComponentBaseNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderWorkflowNodeCustomField } from "./lib/render-workflow-node-custom-field";
 
 type FallbackComponentData = {
@@ -43,6 +43,20 @@ function makeComponent(overrides: Partial<ComponentsComponent> = {}): Components
     outputChannels: [{ name: "default" }],
     ...overrides,
   } as ComponentsComponent;
+}
+
+function makeTriggerNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
+  return {
+    id: "trigger-1",
+    name: "Incoming Event",
+    type: "TYPE_TRIGGER",
+    position: { x: 0, y: 0 },
+    trigger: {
+      name: "webhook",
+    },
+    configuration: {},
+    ...overrides,
+  } as ComponentsNode;
 }
 
 describe("workflow node preparation resilience", () => {
@@ -107,5 +121,30 @@ describe("workflow node preparation resilience", () => {
       expect.any(Error),
     );
     consoleSpy.mockRestore();
+  });
+
+  it("keeps trigger error and warning precedence on node state only", () => {
+    vi.spyOn(mappers, "getTriggerRenderer").mockReturnValue({
+      getTriggerProps: () => ({
+        title: "Webhook",
+        iconSlug: "bolt",
+        metadata: [],
+        error: "renderer error",
+        warning: "renderer warning",
+      }),
+      getRootEventValues: () => ({}),
+      getTitleAndSubtitle: () => ({ title: "Event", subtitle: "" }),
+    });
+
+    const result = prepareTriggerNode(
+      makeTriggerNode(),
+      [{ name: "webhook", label: "Webhook", icon: "bolt" }] as never,
+      {},
+    );
+
+    const triggerData = result.data as { trigger: { error?: string; warning?: string } };
+
+    expect(triggerData.trigger.error).toBeUndefined();
+    expect(triggerData.trigger.warning).toBeUndefined();
   });
 });

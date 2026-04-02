@@ -1,22 +1,21 @@
 import { Puzzle } from "lucide-react";
 import type { ComponentType } from "react";
 import type { ComponentsNode, ComponentsComponent, TriggersTrigger } from "@/api-client";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-
-const MINIMAL_FALLBACK_MESSAGE = "Can't display";
 
 function buildMinimalRenderFallback() {
   return {
     source: "mapper" as const,
-    message: MINIMAL_FALLBACK_MESSAGE,
+    message: CANVAS_NODE_FALLBACK_MESSAGE,
   };
 }
 
 function buildMinimalEmptyStateProps(icon?: ComponentType<{ size?: number }>) {
   return {
     icon,
-    title: MINIMAL_FALLBACK_MESSAGE,
+    title: CANVAS_NODE_FALLBACK_MESSAGE,
     description: undefined,
   };
 }

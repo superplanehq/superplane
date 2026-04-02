@@ -108,8 +108,8 @@ function buildPreparedTriggerCanvasNode(args: {
       trigger: {
         ...triggerProps,
         collapsed: node.isCollapsed,
-        error: node.errorMessage || triggerProps.error,
-        warning: node.warningMessage || triggerProps.warning,
+        error: node.errorMessage,
+        warning: node.warningMessage,
       },
     },
   };

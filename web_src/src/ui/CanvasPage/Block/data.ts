@@ -1,14 +1,10 @@
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
+import { isRecord } from "@/lib/records";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
 import type { CompositeProps } from "../../composite";
 import type { TriggerProps } from "../../trigger";
-import type { BlockData, UnknownRecord } from "./types";
-
-export const FALLBACK_NODE_MESSAGE = "Can't display";
-
-export function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null;
-}
+import type { BlockData } from "./types";
 
 export function getBlockLabel(data: BlockData, fallback: string): string {
   return typeof data.label === "string" && data.label.trim() ? data.label : fallback;
@@ -22,7 +18,7 @@ export function getOutputChannels(data: BlockData): string[] {
 }
 
 export function buildFallbackComponentProps(data: BlockData, fallbackTitle: string): ComponentBaseProps {
-  const message = data.renderFallback?.message || FALLBACK_NODE_MESSAGE;
+  const message = data.renderFallback?.message || CANVAS_NODE_FALLBACK_MESSAGE;
   return {
     iconSlug: "triangle-alert",
     collapsed: false,
