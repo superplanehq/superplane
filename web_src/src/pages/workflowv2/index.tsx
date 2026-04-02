@@ -131,7 +131,7 @@ import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
-import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-bundle";
+import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-node-preparation";
 import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";

@@ -16,8 +16,10 @@ import type { CanvasNode } from "@/ui/CanvasPage";
 import type { CompositeProps, LastRunState } from "@/ui/composite";
 import type { ComponentBaseMapper } from "../mappers/types";
 import { getComponentAdditionalDataBuilder, getComponentBaseMapper, getTriggerRenderer } from "../mappers";
-import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./canvas-bundle";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
+
+export const CANVAS_BUNDLE_ICON_SLUG = "component";
+export const CANVAS_BUNDLE_COLOR = "gray";
 import {
   buildComponentDefinition,
   buildEventInfo,
