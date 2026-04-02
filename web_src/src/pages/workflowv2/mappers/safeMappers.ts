@@ -26,11 +26,11 @@ function asBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
-function getFallbackComponentTitle(context: ComponentBaseContext): string {
+function getComponentTitle(context: ComponentBaseContext): string {
   return context.node?.name || context.componentDefinition?.label || context.componentDefinition?.name || "Component";
 }
 
-function getFallbackTriggerTitle(context: TriggerRendererContext): string {
+function getTriggerTitle(context: TriggerRendererContext): string {
   return context.node?.name || context.definition?.label || context.definition?.name || "Trigger";
 }
 
@@ -171,7 +171,7 @@ export function normalizeComponentBaseProps(
   props: ComponentBaseProps | unknown,
   context: ComponentBaseContext,
 ): ComponentBaseProps {
-  const fallbackTitle = getFallbackComponentTitle(context);
+  const fallbackTitle = getComponentTitle(context);
   const fallbackIconSlug = context.componentDefinition?.icon || "circle-off";
   const record = isRecord(props) ? props : {};
   const normalized = buildNormalizedComponentBaseProps(record, context, fallbackTitle, fallbackIconSlug);
@@ -181,7 +181,7 @@ export function normalizeComponentBaseProps(
 
 function buildFallbackTriggerProps(context: TriggerRendererContext): TriggerProps {
   return {
-    title: getFallbackTriggerTitle(context),
+    title: getTriggerTitle(context),
     iconSlug: context.definition?.icon || "bolt",
     metadata: [],
   };
