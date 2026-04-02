@@ -1,6 +1,6 @@
 {
   "data": {
-    "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "url": "https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?panelId=2&width=1000&height=500&tz=UTC",
     "dashboardUid": "cIBgcSjkk",
     "panelId": 2
   },

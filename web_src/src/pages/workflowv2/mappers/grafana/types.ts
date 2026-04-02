@@ -76,7 +76,7 @@ export interface CreateDashboardShareLinkOutput {
 }
 
 export interface RenderPanelOutput {
-  imageData?: string;
+  url?: string;
   dashboardUid?: string;
   panelId?: number;
 }

@@ -18,7 +18,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Dashboard Share Link" href="#create-dashboard-share-link" description="Construct a shareable URL for a Grafana dashboard or panel" />
   <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
-  <LinkCard title="Render Panel" href="#render-panel" description="Render a Grafana dashboard panel as a PNG image" />
+  <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
   <LinkCard title="Search Dashboards" href="#search-dashboards" description="Search Grafana dashboards by title, folder, or tag" />
 </CardGrid>
 
@@ -256,13 +256,13 @@ Returns the Grafana query API response JSON.
 
 ## Render Panel
 
-The Render Panel component renders a Grafana dashboard panel as a PNG image using the Grafana Image Renderer.
+The Render Panel component constructs a Grafana image render URL for a dashboard panel using the Grafana Image Renderer.
 
 ### Use Cases
 
-- **Incident snapshots**: attach a rendered panel image to incident tickets or Slack notifications
-- **Scheduled reports**: capture visual metric snapshots at regular intervals
-- **Workflow enrichment**: include panel images in approval or review workflows
+- **Incident snapshots**: attach or link a rendered panel image in tickets or notifications
+- **Scheduled reports**: generate a reusable render URL for panel snapshots
+- **Workflow enrichment**: pass a compact panel image URL through workflow steps
 
 ### Configuration
 
@@ -275,7 +275,7 @@ The Render Panel component renders a Grafana dashboard panel as a PNG image usin
 
 ### Output
 
-Returns a base64-encoded PNG image along with the dashboard UID and panel ID.
+Returns the Grafana render URL along with the dashboard UID and panel ID.
 
 ### Example Output
 
@@ -283,8 +283,8 @@ Returns a base64-encoded PNG image along with the dashboard UID and panel ID.
 {
   "data": {
     "dashboardUid": "cIBgcSjkk",
-    "imageData": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-    "panelId": 2
+    "panelId": 2,
+    "url": "https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?panelId=2\u0026width=1000\u0026height=500\u0026tz=UTC"
   },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.panel.image"

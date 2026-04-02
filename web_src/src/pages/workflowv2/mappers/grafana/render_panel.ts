@@ -62,6 +62,9 @@ export const renderPanelMapper: ComponentBaseMapper = {
     if (output.panelId !== undefined) {
       details["Panel ID"] = String(output.panelId);
     }
+    if (output.url) {
+      details.URL = output.url;
+    }
 
     return details;
   },

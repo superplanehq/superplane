@@ -1,10 +1,10 @@
 package grafana
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -25,7 +25,7 @@ type RenderPanelSpec struct {
 }
 
 type RenderPanelOutput struct {
-	ImageData    string `json:"imageData" mapstructure:"imageData"`
+	URL          string `json:"url" mapstructure:"url"`
 	DashboardUID string `json:"dashboardUid" mapstructure:"dashboardUid"`
 	PanelID      int    `json:"panelId" mapstructure:"panelId"`
 }
@@ -39,17 +39,17 @@ func (c *RenderPanel) Label() string {
 }
 
 func (c *RenderPanel) Description() string {
-	return "Render a Grafana dashboard panel as a PNG image"
+	return "Construct a Grafana image render URL for a dashboard panel"
 }
 
 func (c *RenderPanel) Documentation() string {
-	return `The Render Panel component renders a Grafana dashboard panel as a PNG image using the Grafana Image Renderer.
+	return `The Render Panel component constructs a Grafana image render URL for a dashboard panel using the Grafana Image Renderer.
 
 ## Use Cases
 
-- **Incident snapshots**: attach a rendered panel image to incident tickets or Slack notifications
-- **Scheduled reports**: capture visual metric snapshots at regular intervals
-- **Workflow enrichment**: include panel images in approval or review workflows
+- **Incident snapshots**: attach or link a rendered panel image in tickets or notifications
+- **Scheduled reports**: generate a reusable render URL for panel snapshots
+- **Workflow enrichment**: pass a compact panel image URL through workflow steps
 
 ## Configuration
 
@@ -62,7 +62,7 @@ func (c *RenderPanel) Documentation() string {
 
 ## Output
 
-Returns a base64-encoded PNG image along with the dashboard UID and panel ID.`
+Returns the Grafana render URL along with the dashboard UID and panel ID.`
 }
 
 func (c *RenderPanel) Icon() string {
@@ -172,18 +172,31 @@ func (c *RenderPanel) Execute(ctx core.ExecutionContext) error {
 		height = 500
 	}
 
-	imageBytes, err := client.RenderPanel(spec.DashboardUID, dashboardURLPathSlug(dashboard), spec.PanelID, width, height, spec.From, spec.To)
-	if err != nil {
-		return fmt.Errorf("error rendering panel: %w", err)
+	params := url.Values{}
+	params.Set("panelId", fmt.Sprintf("%d", spec.PanelID))
+	params.Set("width", fmt.Sprintf("%d", width))
+	params.Set("height", fmt.Sprintf("%d", height))
+	params.Set("tz", "UTC")
+	if spec.From != "" {
+		params.Set("from", spec.From)
+	}
+	if spec.To != "" {
+		params.Set("to", spec.To)
 	}
 
-	imageData := base64.StdEncoding.EncodeToString(imageBytes)
+	renderURL := fmt.Sprintf(
+		"%s/render/d-solo/%s/%s?%s",
+		strings.TrimSuffix(client.BaseURL, "/"),
+		spec.DashboardUID,
+		dashboardURLPathSlug(dashboard),
+		params.Encode(),
+	)
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.panel.image",
 		[]any{RenderPanelOutput{
-			ImageData:    imageData,
+			URL:          renderURL,
 			DashboardUID: spec.DashboardUID,
 			PanelID:      spec.PanelID,
 		}},
