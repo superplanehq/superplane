@@ -127,17 +127,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		return nil, err
 	}
 
-	// Fetch next queue items per node
-	nextQueueItems, err := models.FindNextQueueItemPerNode(canvas.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	serializedQueueItems, err := SerializeNodeQueueItems(nextQueueItems)
-	if err != nil {
-		return nil, err
-	}
-
 	// Fetch last events per node
 	lastEvents, err := models.FindLastEventPerNode(canvas.ID)
 	if err != nil {
@@ -170,7 +159,6 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		},
 		Status: &pb.Canvas_Status{
 			LastExecutions: serializedExecutions,
-			NextQueueItems: serializedQueueItems,
 			LastEvents:     serializedEvents,
 		},
 	}, nil
