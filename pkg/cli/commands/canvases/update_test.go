@@ -14,6 +14,56 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
+type requestExpectation struct {
+	method string
+	path   string
+	handle func(t *testing.T, w http.ResponseWriter, r *http.Request)
+}
+
+type apiTestServer struct {
+	t            *testing.T
+	expectations []requestExpectation
+	calls        []string
+	server       *httptest.Server
+}
+
+func newAPITestServer(t *testing.T, expectations ...requestExpectation) *apiTestServer {
+	t.Helper()
+
+	s := &apiTestServer{t: t, expectations: expectations}
+	s.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.calls = append(s.calls, r.Method+" "+r.URL.Path)
+
+		if len(s.expectations) == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		next := s.expectations[0]
+		require.Equal(t, next.method, r.Method)
+		require.Equal(t, next.path, r.URL.Path)
+
+		s.expectations = s.expectations[1:]
+		if next.handle != nil {
+			next.handle(t, w, r)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	t.Cleanup(s.server.Close)
+	return s
+}
+
+func (s *apiTestServer) URL() string {
+	return s.server.URL
+}
+
+func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
+	t.Helper()
+	require.Equal(t, calls, s.calls)
+	require.Len(t, s.expectations, 0, "unused request expectations")
+}
+
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
 	autoLayout := buildDefaultAutoLayout()
 
@@ -71,42 +121,51 @@ func TestUpdateFromFileAppliesVersioningEnabledAfterSpecUpdateWhenNotDraft(t *te
 
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 
-	calls := make([]string, 0, 4)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls = append(calls, r.Method+" "+r.URL.Path)
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":false}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID+"/versions":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			rawBody, _ := io.ReadAll(r.Body)
-			var payload map[string]any
-			_ = json.Unmarshal(rawBody, &payload)
-			require.Equal(t, true, payload["versioningEnabled"])
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(server.Close)
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":false}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				rawBody, _ := io.ReadAll(r.Body)
+				var payload map[string]any
+				_ = json.Unmarshal(rawBody, &payload)
+				require.Equal(t, true, payload["versioningEnabled"])
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
+			},
+		},
+	)
 
 	filePath := writeTestCanvasFileWithVersioningEnabled(t, canvasID, true)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, []string{
+	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
-	}, calls)
+	})
 }
 
 func TestUpdateFromFileDisablesVersioningBeforeSpecUpdate(t *testing.T) {
@@ -114,50 +173,69 @@ func TestUpdateFromFileDisablesVersioningBeforeSpecUpdate(t *testing.T) {
 
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 
-	calls := make([]string, 0, 4)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls = append(calls, r.Method+" "+r.URL.Path)
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/organizations/org-1":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","versioningEnabled":false}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			rawBody, _ := io.ReadAll(r.Body)
-			var payload map[string]any
-			_ = json.Unmarshal(rawBody, &payload)
-			require.Equal(t, false, payload["versioningEnabled"])
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":false}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID+"/versions":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(server.Close)
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/organizations/org-1",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","versioningEnabled":false}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				rawBody, _ := io.ReadAll(r.Body)
+				var payload map[string]any
+				_ = json.Unmarshal(rawBody, &payload)
+				require.Equal(t, false, payload["versioningEnabled"])
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":false}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"ver-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+	)
 
 	filePath := writeTestCanvasFileWithVersioningEnabled(t, canvasID, false)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, []string{
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/me",
 		http.MethodGet + " /api/v1/organizations/org-1",
-		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
-	}, calls)
+	})
 }
 
 func TestUpdateFromFileEnablesVersioningBeforeDraftUpdate(t *testing.T) {
@@ -165,50 +243,64 @@ func TestUpdateFromFileEnablesVersioningBeforeDraftUpdate(t *testing.T) {
 
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 
-	calls := make([]string, 0, 6)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls = append(calls, r.Method+" "+r.URL.Path)
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":false}}}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			rawBody, _ := io.ReadAll(r.Body)
-			var payload map[string]any
-			_ = json.Unmarshal(rawBody, &payload)
-			require.Equal(t, true, payload["versioningEnabled"])
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID+"/versions":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","isPublished":false}}]}`))
-		case r.Method == http.MethodPut && r.URL.Path == "/api/v1/canvases/"+canvasID+"/versions":
-			rawBody, _ := io.ReadAll(r.Body)
-			var payload map[string]any
-			_ = json.Unmarshal(rawBody, &payload)
-			require.Equal(t, "draft-1", payload["versionId"])
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(server.Close)
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":false}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				rawBody, _ := io.ReadAll(r.Body)
+				var payload map[string]any
+				_ = json.Unmarshal(rawBody, &payload)
+				require.Equal(t, true, payload["versioningEnabled"])
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `","isPublished":false}}]}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodPut,
+			path:   "/api/v1/canvases/" + canvasID + "/versions",
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				rawBody, _ := io.ReadAll(r.Body)
+				var payload map[string]any
+				_ = json.Unmarshal(rawBody, &payload)
+				require.Equal(t, "draft-1", payload["versionId"])
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version":{"metadata":{"id":"draft-1","canvasId":"` + canvasID + `"},"spec":{"nodes":[],"edges":[]}}}`))
+			},
+		},
+	)
 
 	filePath := writeTestCanvasFileWithVersioningEnabled(t, canvasID, true)
 	file := filePath
 	draft := true
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, []string{
+	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodPut + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/canvases/" + canvasID + "/versions",
 		http.MethodPut + " /api/v1/canvases/" + canvasID + "/versions",
-	}, calls)
+	})
 }
 
 func TestUpdateFromFileDisableVersioningFailsWhenOrganizationEnforcesVersioning(t *testing.T) {
@@ -216,38 +308,48 @@ func TestUpdateFromFileDisableVersioningFailsWhenOrganizationEnforcesVersioning(
 
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 
-	calls := make([]string, 0, 4)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls = append(calls, r.Method+" "+r.URL.Path)
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/canvases/"+canvasID:
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/me":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/organizations/org-1":
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","versioningEnabled":true}}}`))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	t.Cleanup(server.Close)
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/canvases/" + canvasID,
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"` + canvasID + `","name":"parse-check","versioningEnabled":true}}}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/me",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
+			},
+		},
+		requestExpectation{
+			method: http.MethodGet,
+			path:   "/api/v1/organizations/org-1",
+			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"organization":{"metadata":{"id":"org-1","versioningEnabled":true}}}`))
+			},
+		},
+	)
 
 	filePath := writeTestCanvasFileWithVersioningEnabled(t, canvasID, false)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "cannot disable canvas versioning")
 
-	require.Equal(t, []string{
+	server.AssertCalls(t, []string{
+		http.MethodGet + " /api/v1/canvases/" + canvasID,
 		http.MethodGet + " /api/v1/me",
 		http.MethodGet + " /api/v1/organizations/org-1",
-	}, calls)
+	})
 }
 
 func writeTestCanvasFileWithVersioningEnabled(t *testing.T, canvasID string, enabled bool) string {
