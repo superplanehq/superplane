@@ -32,8 +32,10 @@ const OwnerSetup: React.FC = () => {
 
   const isPasswordValid = (password: string) => {
     if (password.length < 8) return false;
-    if (!/[0-9]/.test(password)) return false;
     if (!/[A-Z]/.test(password)) return false;
+    if (!/[a-z]/.test(password)) return false;
+    if (!/[0-9]/.test(password)) return false;
+    if (!/[^A-Za-z0-9]/.test(password)) return false;
     return true;
   };
 
@@ -57,7 +59,8 @@ const OwnerSetup: React.FC = () => {
     if (!password) {
       errors.password = "Password is required.";
     } else if (!isPasswordValid(password)) {
-      errors.password = "Password must be 8+ characters with at least 1 number and 1 capital letter.";
+      errors.password =
+        "Password must be at least 8 characters and include uppercase, lowercase, a number, and a symbol.";
     }
 
     if (!confirmPassword) {
@@ -269,7 +272,7 @@ const OwnerSetup: React.FC = () => {
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
               ) : (
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  8+ characters, at least 1 number and 1 capital letter
+                  8+ characters, uppercase, lowercase, a number, and a symbol
                 </p>
               )}
             </div>

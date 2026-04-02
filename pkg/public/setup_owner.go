@@ -62,6 +62,11 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := crypto.ValidatePassword(req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if req.SMTPEnabled {
 		if req.SMTPHost == "" || req.SMTPPort == 0 || req.SMTPFromEmail == "" {
 			http.Error(w, "SMTP host, port, and from email are required", http.StatusBadRequest)

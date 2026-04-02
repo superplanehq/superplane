@@ -42,7 +42,7 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 		Email:                     "owner@example.com",
 		FirstName:                 "Owner",
 		LastName:                  "User",
-		Password:                  "Password1",
+		Password:                  "Password1!",
 		AllowPrivateNetworkAccess: true,
 	})
 	require.NoError(t, err)
