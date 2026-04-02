@@ -1,9 +1,20 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
 import { FieldRendererProps } from "./types";
+import { InlineFieldAssistant } from "@/ui/InlineFieldAssistant";
 
-export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
+export const CronFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  suggestFieldValue,
+  assistantEnabled = false,
+  labelRightRef,
+  labelRightReady = false,
+}) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
+  const fieldLabel = field.label || field.name || "Field";
+  const showAssistant = Boolean(assistantEnabled && suggestFieldValue && !field.sensitive && field.type === "cron");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -12,6 +23,16 @@ export const CronFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
 
   return (
     <div className="space-y-2">
+      {showAssistant ? (
+        <InlineFieldAssistant
+          fieldLabel={fieldLabel}
+          onApplyValue={(next) => onChange(next.trim() || undefined)}
+          suggestFieldValue={suggestFieldValue}
+          assistantEnabled={assistantEnabled}
+          labelRightRef={labelRightRef}
+          labelRightReady={labelRightReady}
+        />
+      ) : null}
       <Input
         type="text"
         value={currentValue}

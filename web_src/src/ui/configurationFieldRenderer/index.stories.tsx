@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { TooltipProvider } from "@/ui/tooltip";
+import { TooltipProvider } from "../../components/ui/tooltip";
 import { ConfigurationFieldRenderer } from "./index";
+import type { SuggestFieldValueFn } from "./types";
 import {
   ConfigurationStorySeed,
   STORY_AUTOCOMPLETE_CONTEXT,
@@ -16,7 +17,6 @@ import {
 
 const meta = {
   title: "ui/ConfigurationFieldRenderer",
-  component: ConfigurationFieldRenderer,
   tags: ["autodocs"],
   parameters: {
     layout: "padded",
@@ -38,13 +38,21 @@ const meta = {
       </ConfigurationStorySeed>
     ),
   ],
-} satisfies Meta<typeof ConfigurationFieldRenderer>;
+} satisfies Meta;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-function RendererPlayground({ example }: { example: RendererExample }) {
+function RendererPlayground({
+  example,
+  assistantEnabled,
+  suggestFieldValue,
+}: {
+  example: RendererExample;
+  assistantEnabled?: boolean;
+  suggestFieldValue?: SuggestFieldValueFn;
+}) {
   const [value, setValue] = useState<unknown>(example.initialValue);
   const allValues = useMemo(() => {
     const fieldName = example.field.name;
@@ -83,6 +91,8 @@ function RendererPlayground({ example }: { example: RendererExample }) {
           organizationId={STORY_DOMAIN_ID}
           integrationId={STORY_INTEGRATION_ID}
           autocompleteExampleObj={STORY_AUTOCOMPLETE_CONTEXT}
+          assistantEnabled={assistantEnabled}
+          suggestFieldValue={suggestFieldValue}
         />
       </div>
 

@@ -3,7 +3,6 @@ import {
   ComponentsIntegrationRef,
   ConfigurationField,
   OrganizationsIntegration,
-  configAssistantSuggestConfigurationField,
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,9 +19,8 @@ import {
   parseDefaultValues,
   validateFieldForSubmission,
 } from "@/lib/components";
-import { getApiErrorMessage } from "@/lib/errors";
 import { isInlineConfigAssistantEnabled } from "@/lib/env";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { useConfigAssistantSuggest } from "@/hooks/useConfigAssistantSuggest";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
@@ -121,6 +119,14 @@ export function SettingsTab({
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
   const inlineAssistantEnabled = isInlineConfigAssistantEnabled() && !isReadOnly;
+
+  const { isFieldAssistantEnabled, getSuggestFieldValue } = useConfigAssistantSuggest({
+    organizationId: domainId,
+    canvasId,
+    nodeId: _nodeId,
+    autocompleteExampleObj: resolvedAutocompleteExampleObj ?? null,
+    featureEnabled: inlineAssistantEnabled,
+  });
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -704,55 +710,8 @@ export function SettingsTab({
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
-                  suggestFieldValue={
-                    inlineAssistantEnabled
-                      ? async (instruction: string) => {
-                          const trimmedInstruction = instruction.trim();
-                          if (canvasId && _nodeId && domainId && trimmedInstruction.length > 0) {
-                            try {
-                              const { data } = await configAssistantSuggestConfigurationField(
-                                withOrganizationHeader({
-                                  organizationId: domainId,
-                                  body: {
-                                    canvasId,
-                                    nodeId: _nodeId,
-                                    instruction: trimmedInstruction,
-                                    fieldContextJson: JSON.stringify({
-                                      field: {
-                                        name: field.name,
-                                        label: field.label,
-                                        type: field.type,
-                                        description: field.description,
-                                      },
-                                      currentValue: nodeConfiguration[fieldName],
-                                      autocompleteExample: resolvedAutocompleteExampleObj,
-                                    }),
-                                  },
-                                }),
-                              );
-                              const value = data?.value?.trim();
-                              if (!value) {
-                                throw new Error("The assistant returned an empty value.");
-                              }
-                              return {
-                                value,
-                                explanation: data?.explanation?.trim() || undefined,
-                              };
-                            } catch (err) {
-                              throw new Error(getApiErrorMessage(err, "Suggestion failed"));
-                            }
-                          }
-
-                          await new Promise((resolve) => window.setTimeout(resolve, 450));
-                          return {
-                            value: trimmedInstruction.length > 0 ? trimmedInstruction : "true",
-                            explanation:
-                              "Mock response: open a workflow canvas with VITE_ENABLE_INLINE_CONFIG_ASSISTANT=true to call the API.",
-                          };
-                        }
-                      : undefined
-                  }
-                  assistantEnabled={inlineAssistantEnabled}
+                  suggestFieldValue={getSuggestFieldValue(field, () => nodeConfiguration[fieldName])}
+                  assistantEnabled={isFieldAssistantEnabled(field)}
                 />
               );
             })}
