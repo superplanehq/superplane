@@ -45,17 +45,22 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   }
 
   const fieldLabel = field.label || field.name || "Field";
+  const showAssistant = Boolean(
+    assistantEnabled && suggestFieldValue && !field.sensitive && field.type === "expression",
+  );
 
   return (
     <div className="space-y-2">
-      <InlineFieldAssistant
-        fieldLabel={fieldLabel}
-        onApplyValue={(next) => onChange(next || undefined)}
-        suggestFieldValue={suggestFieldValue}
-        assistantEnabled={assistantEnabled}
-        labelRightRef={labelRightRef}
-        labelRightReady={labelRightReady}
-      />
+      {showAssistant ? (
+        <InlineFieldAssistant
+          fieldLabel={fieldLabel}
+          onApplyValue={(next) => onChange(next || undefined)}
+          suggestFieldValue={suggestFieldValue}
+          assistantEnabled={assistantEnabled}
+          labelRightRef={labelRightRef}
+          labelRightReady={labelRightReady}
+        />
+      ) : null}
       <AutoCompleteInput
         exampleObj={autocompleteExampleObj ?? null}
         value={currentValue}

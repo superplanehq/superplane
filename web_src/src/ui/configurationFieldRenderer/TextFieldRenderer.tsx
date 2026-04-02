@@ -5,8 +5,20 @@ import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
+import { InlineFieldAssistant } from "@/ui/InlineFieldAssistant";
 
-export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, autocompleteExampleObj }) => {
+export const TextFieldRenderer: React.FC<FieldRendererProps> = ({
+  field,
+  value,
+  onChange,
+  autocompleteExampleObj,
+  suggestFieldValue,
+  assistantEnabled = false,
+  labelRightRef,
+  labelRightReady = false,
+}) => {
+  const fieldLabel = field.label || field.name || "Field";
+  const showAssistant = Boolean(assistantEnabled && suggestFieldValue && !field.sensitive && field.type === "text");
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
@@ -58,7 +70,17 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
   };
 
   return (
-    <>
+    <div className="space-y-2">
+      {showAssistant ? (
+        <InlineFieldAssistant
+          fieldLabel={fieldLabel}
+          onApplyValue={(next) => onChange(next || undefined)}
+          suggestFieldValue={suggestFieldValue}
+          assistantEnabled={assistantEnabled}
+          labelRightRef={labelRightRef}
+          labelRightReady={labelRightReady}
+        />
+      ) : null}
       <div className="flex flex-col gap-2 relative">
         <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: "200px" }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
@@ -122,6 +144,6 @@ export const TextFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, 
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 };

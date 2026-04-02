@@ -9,7 +9,7 @@ import { twMerge } from "tailwind-merge";
 
 export interface InlineFieldAssistantProps {
   fieldLabel: string;
-  onApplyValue: (value: string) => void;
+  onApplyValue: (value: string) => void | boolean;
   suggestFieldValue?: SuggestFieldValueFn;
   assistantEnabled?: boolean;
   labelRightRef?: RefObject<HTMLDivElement | null>;
@@ -63,7 +63,11 @@ export function InlineFieldAssistant({
 
   const handleConfirm = useCallback(() => {
     if (proposedValue == null) return;
-    onApplyValue(proposedValue);
+    const result = onApplyValue(proposedValue);
+    if (result === false) {
+      setError("This value is not valid for this field.");
+      return;
+    }
     handleClose();
   }, [proposedValue, onApplyValue, handleClose]);
 

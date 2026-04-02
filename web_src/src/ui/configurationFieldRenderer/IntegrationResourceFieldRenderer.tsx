@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/lib/testID";
+import { InlineFieldAssistant } from "@/ui/InlineFieldAssistant";
+import type { SuggestFieldValueFn } from "./types";
 import { type RefObject, useEffect, useMemo, useState } from "react";
 
 interface IntegrationResourceFieldRendererProps {
@@ -20,6 +22,8 @@ interface IntegrationResourceFieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   labelRightRef?: RefObject<HTMLDivElement | null>;
   labelRightReady?: boolean;
+  suggestFieldValue?: SuggestFieldValueFn;
+  assistantEnabled?: boolean;
 }
 
 type SelectOption = {
@@ -53,6 +57,8 @@ export const IntegrationResourceFieldRenderer = ({
   autocompleteExampleObj = null,
   labelRightRef,
   labelRightReady = false,
+  suggestFieldValue,
+  assistantEnabled = false,
 }: IntegrationResourceFieldRendererProps) => {
   const resourceType = field.typeOptions?.resource?.type;
   const useNameAsValue = field.typeOptions?.resource?.useNameAsValue ?? false;
@@ -220,20 +226,35 @@ export const IntegrationResourceFieldRenderer = ({
       </Select>
     );
 
+    const fieldLabel = field.label || field.name || "Field";
+    const showExpressionAssistant = Boolean(
+      useExpressionMode && assistantEnabled && suggestFieldValue && !field.sensitive && allowExpressions,
+    );
+
     const expressionInput = (
-      <AutoCompleteInput
-        exampleObj={autocompleteExampleObj}
-        value={expressionValue}
-        onChange={(nextValue) => onChange(nextValue || undefined)}
-        placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
-        startWord="{{"
-        prefix="{{ "
-        suffix=" }}"
-        inputSize="md"
-        showValuePreview
-        quickTip="Tip: type {{ to start an expression."
-        className=""
-      />
+      <div className="space-y-2">
+        {showExpressionAssistant ? (
+          <InlineFieldAssistant
+            fieldLabel={fieldLabel}
+            onApplyValue={(next) => onChange(next || undefined)}
+            suggestFieldValue={suggestFieldValue}
+            assistantEnabled={assistantEnabled}
+          />
+        ) : null}
+        <AutoCompleteInput
+          exampleObj={autocompleteExampleObj}
+          value={expressionValue}
+          onChange={(nextValue) => onChange(nextValue || undefined)}
+          placeholder={field.placeholder ?? `e.g. {{ $["node-name"].value }}`}
+          startWord="{{"
+          prefix="{{ "
+          suffix=" }}"
+          inputSize="md"
+          showValuePreview
+          quickTip="Tip: type {{ to start an expression."
+          className=""
+        />
+      </div>
     );
 
     if (allowExpressions) {
