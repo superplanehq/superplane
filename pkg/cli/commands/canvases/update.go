@@ -17,6 +17,98 @@ type updateCommand struct {
 	autoLayoutNodes *[]string
 }
 
+type versioningPlan struct {
+	effectiveEnabled      bool
+	enableAfterSpecUpdate bool
+}
+
+func updateCanvasVersioningEnabled(ctx core.CommandContext, canvasID string, enabled bool) error {
+	body := openapi_client.CanvasesUpdateCanvasBody{}
+	body.SetVersioningEnabled(enabled)
+
+	_, _, err := ctx.API.CanvasAPI.
+		CanvasesUpdateCanvas(ctx.Context, canvasID).
+		Body(body).
+		Execute()
+	return err
+}
+
+func resolveOrganizationVersioningEnabled(ctx core.CommandContext) (bool, error) {
+	organizationID, err := core.ResolveOrganizationID(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	response, _, err := ctx.API.OrganizationAPI.
+		OrganizationsDescribeOrganization(ctx.Context, organizationID).
+		Execute()
+	if err != nil {
+		return false, err
+	}
+
+	org := response.GetOrganization()
+	metadata, _ := org.GetMetadataOk()
+	if metadata == nil {
+		return false, fmt.Errorf("organization metadata not found")
+	}
+
+	return metadata.GetVersioningEnabled(), nil
+}
+
+func requestedCanvasVersioningEnabled(canvas openapi_client.CanvasesCanvas) (bool, bool) {
+	if canvas.Metadata == nil {
+		return false, false
+	}
+	value, ok := canvas.Metadata.GetVersioningEnabledOk()
+	if !ok || value == nil {
+		return false, false
+	}
+	return *value, true
+}
+
+func planCanvasVersioningUpdate(
+	ctx core.CommandContext,
+	canvasID string,
+	requestedEnabled bool,
+	requestedSet bool,
+	currentEffective bool,
+	draftMode bool,
+) (*versioningPlan, error) {
+	plan := &versioningPlan{effectiveEnabled: currentEffective}
+	if !requestedSet || requestedEnabled == currentEffective {
+		return plan, nil
+	}
+
+	if !requestedEnabled {
+		orgEnabled, err := resolveOrganizationVersioningEnabled(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if orgEnabled {
+			return nil, fmt.Errorf("cannot disable canvas versioning while organization versioning is enabled")
+		}
+		if draftMode {
+			return nil, fmt.Errorf("--draft cannot be used when disabling canvas versioning; remove --draft to update the live canvas directly")
+		}
+		if err := updateCanvasVersioningEnabled(ctx, canvasID, false); err != nil {
+			return nil, err
+		}
+		plan.effectiveEnabled = false
+		return plan, nil
+	}
+
+	if draftMode {
+		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+			return nil, err
+		}
+		plan.effectiveEnabled = true
+		return plan, nil
+	}
+
+	plan.enableAfterSpecUpdate = true
+	return plan, nil
+}
+
 func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
 	if c.file != nil {
@@ -48,6 +140,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
+
 	} else {
 		canvasID, canvas, err = loadCanvasFromExisting(ctx)
 		if err != nil {
@@ -60,8 +153,14 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
+	requestedEnabled, requestedSet := requestedCanvasVersioningEnabled(canvas)
+	plan, err := planCanvasVersioningUpdate(ctx, canvasID, requestedEnabled, requestedSet, versioningContext.versioningEnabled, draftMode)
+	if err != nil {
+		return err
+	}
+
 	targetVersionID := ""
-	if !versioningContext.versioningEnabled {
+	if !plan.effectiveEnabled {
 		if draftMode {
 			return fmt.Errorf("--draft cannot be used when effective canvas versioning is disabled; remove --draft to update the live canvas directly")
 		}
@@ -103,6 +202,13 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	version := response.GetVersion()
+
+	if plan.enableAfterSpecUpdate {
+		if err := updateCanvasVersioningEnabled(ctx, canvasID, true); err != nil {
+			return err
+		}
+	}
+
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(version)
 	}
@@ -111,7 +217,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
 
-		if versioningContext.versioningEnabled {
+		if targetVersionID != "" {
 			_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
 		}
 		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
