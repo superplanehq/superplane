@@ -80,7 +80,11 @@ blocks:
       jobs:
         - name: Unit Tests
           commands:
-            - make test.agent.unit
+            - make test.agent.unit AGENT_TEST_TARGETS="tests --junitxml=junit-report.xml"
+      epilogue:
+        always:
+          commands:
+            - "[ -f agent/junit-report.xml ] && test-results publish agent/junit-report.xml"
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
