@@ -17,9 +17,8 @@ func Test__UpdateDocument__Setup(t *testing.T) {
 	c := &UpdateDocument{}
 	integrationCtx := &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"url":      "https://elastic.example.com",
-			"authType": "apiKey",
-			"apiKey":   "test-api-key",
+			"url":    "https://elastic.example.com",
+			"apiKey": "test-api-key",
 		},
 	}
 
@@ -142,18 +141,11 @@ func Test__UpdateDocument__Configuration(t *testing.T) {
 }
 
 func Test__UpdateDocument__Execute(t *testing.T) {
-	integrationCtx := func(authType string) *contexts.IntegrationContext {
-		cfg := map[string]any{
-			"url":      "https://elastic.example.com",
-			"authType": authType,
-		}
-		if authType == "apiKey" {
-			cfg["apiKey"] = "test-api-key"
-		} else {
-			cfg["username"] = "elastic"
-			cfg["password"] = "secret"
-		}
-		return &contexts.IntegrationContext{Configuration: cfg}
+	integrationCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"url":    "https://elastic.example.com",
+			"apiKey": "test-api-key",
+		},
 	}
 
 	successResponse := func() *http.Response {
@@ -181,7 +173,7 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 				"fields":   map[string]any{"status": "done"},
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx,
 			ExecutionState: state,
 		})
 
@@ -202,31 +194,6 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 		assert.Equal(t, 4, data["version"])
 	})
 
-	t.Run("uses basic auth when authType is basic", func(t *testing.T) {
-		httpCtx := &contexts.HTTPContext{
-			Responses: []*http.Response{successResponse()},
-		}
-		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := (&UpdateDocument{}).Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"index":    "my-index",
-				"document": "doc-1",
-				"fields":   map[string]any{"k": "v"},
-			},
-			HTTP:           httpCtx,
-			Integration:    integrationCtx("basic"),
-			ExecutionState: state,
-		})
-
-		require.NoError(t, err)
-		req := httpCtx.Requests[0]
-		user, pass, ok := req.BasicAuth()
-		require.True(t, ok)
-		assert.Equal(t, "elastic", user)
-		assert.Equal(t, "secret", pass)
-	})
-
 	t.Run("Elasticsearch error -> fails execution", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -245,7 +212,7 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 				"fields":   map[string]any{"k": "v"},
 			},
 			HTTP:           httpCtx,
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx,
 			ExecutionState: state,
 		})
 
@@ -263,7 +230,7 @@ func Test__UpdateDocument__Execute(t *testing.T) {
 				"document": "doc-1",
 			},
 			HTTP:           &contexts.HTTPContext{},
-			Integration:    integrationCtx("apiKey"),
+			Integration:    integrationCtx,
 			ExecutionState: state,
 		})
 
