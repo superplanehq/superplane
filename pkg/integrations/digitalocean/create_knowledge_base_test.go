@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -22,6 +23,15 @@ func readCapturedBody(t *testing.T, httpCtx *contexts.HTTPContext) []byte {
 	body, err := io.ReadAll(httpCtx.Requests[0].Body)
 	require.NoError(t, err)
 	return body
+}
+
+// toStringSlice converts []any to []string.
+func toStringSlice(in []any) []string {
+	out := make([]string, len(in))
+	for i, v := range in {
+		out[i] = v.(string)
+	}
+	return out
 }
 
 func Test__CreateKnowledgeBase__Setup(t *testing.T) {
@@ -493,13 +503,12 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 	}`
 
-	// modelsResponse and projectsResponse are used to mock the two lookup calls
-	// that resolveDisplayNames makes after a successful create.
 	modelsResponse := `{"models": [{"uuid": "05700391-7aa8-11ef-bf8f-4e013e2ddde4", "name": "Multi QA MPNet Base Dot v1", "kb_min_chunk_size": 100, "kb_max_chunk_size": 512}]}`
 	projectsResponse := `{"projects": [{"id": "37455431-84bd-4fa2-94cf-e8486f8f8c5e", "name": "My Project", "is_default": false}]}`
 	databasesResponse := `{"databases": [{"id": "abf1055a-745d-4c24-a1db-1959ea819264", "name": "kb-search", "engine": "opensearch", "status": "online"}]}`
 
-	// lookupResponses returns the two mock responses appended after any create response.
+	// lookupResponses returns mock responses for the model and project name lookups
+	// that resolveDisplayNames makes after a successful create.
 	// For the "existing database" case, pass withDB=true to also mock the databases lookup.
 	lookupResponses := func(withDB bool) []*http.Response {
 		resps := []*http.Response{
@@ -515,128 +524,54 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		return resps
 	}
 
-	t.Run("spaces source with new database -> emits output immediately", func(t *testing.T) {
+	// executeKB runs Execute and returns the metadata context so tests can inspect stored state.
+	executeKB := func(t *testing.T, httpContext *contexts.HTTPContext, config map[string]any) (*contexts.MetadataContext, *contexts.RequestContext, error) {
+		t.Helper()
+		metaCtx := &contexts.MetadataContext{}
+		reqCtx := &contexts.RequestContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration:  config,
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Metadata:       metaCtx,
+			Requests:       reqCtx,
+		})
+		return metaCtx, reqCtx, err
+	}
+
+	baseConfig := map[string]any{
+		"name":               "my-kb",
+		"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+		"region":             "tor1",
+		"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+		"databaseOption":     "new",
+		"dataSources": []any{
+			map[string]any{
+				"type":         "spaces",
+				"spacesBucket": "tor1/my-bucket",
+			},
+		},
+	}
+
+	t.Run("creates KB and schedules poll", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: append([]*http.Response{
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(kbResponse))},
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-				},
-			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
-		})
+		meta, req, err := executeKB(t, httpContext, baseConfig)
 
 		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-		assert.Equal(t, "default", executionState.Channel)
-		assert.Equal(t, "digitalocean.knowledge_base.created", executionState.Type)
+		assert.Equal(t, "poll", req.Action)
+		assert.Equal(t, kbPollInterval, req.Duration)
 
-		require.Len(t, executionState.Payloads, 1)
-		wrapped, ok := executionState.Payloads[0].(map[string]any)
-		require.True(t, ok)
-		data, ok := wrapped["data"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", data["uuid"])
-		assert.Equal(t, "my-kb", data["name"])
-		assert.Equal(t, "tor1", data["region"])
-	})
-
-	t.Run("web seed source -> emits output", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: append([]*http.Response{
-				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(kbResponse))},
-			}, lookupResponses(false)...),
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":           "web",
-						"crawlType":      "seed",
-						"webURL":         "https://docs.example.com",
-						"crawlingOption": "SCOPED",
-					},
-				},
-			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-		assert.Equal(t, "digitalocean.knowledge_base.created", executionState.Type)
-	})
-
-	t.Run("web sitemap source -> emits output", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: append([]*http.Response{
-				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(kbResponse))},
-			}, lookupResponses(false)...),
-		}
-
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":      "web",
-						"crawlType": "sitemap",
-						"webURL":    "https://example.com/sitemap.xml",
-					},
-				},
-			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
-		})
-
-		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-		assert.Equal(t, "digitalocean.knowledge_base.created", executionState.Type)
+		// KB UUID and output stored in metadata
+		var stored kbMetadata
+		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
+		assert.Equal(t, "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", stored.KBUUID)
+		assert.Equal(t, "my-kb", stored.KBOutput["name"])
 	})
 
 	t.Run("existing database -> databaseId included in request", func(t *testing.T) {
@@ -646,45 +581,22 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(true)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "existing",
-				"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-				},
+		_, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "existing",
+			"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
+			"dataSources": []any{
+				map[string]any{"type": "spaces", "spacesBucket": "tor1/my-bucket"},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-
-		// Verify the database_id was included in the API request
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
 		assert.Equal(t, "abf1055a-745d-4c24-a1db-1959ea819264", reqBody["database_id"])
-
-		// Verify output contains the database ID from the response
-		require.Len(t, executionState.Payloads, 1)
-		wrapped := executionState.Payloads[0].(map[string]any)
-		data := wrapped["data"].(map[string]any)
-		assert.Equal(t, "abf1055a-745d-4c24-a1db-1959ea819264", data["databaseId"])
 	})
 
 	t.Run("new database -> database_id omitted from request", func(t *testing.T) {
@@ -694,35 +606,9 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-				},
-			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
-		})
+		_, _, err := executeKB(t, httpContext, baseConfig)
 
 		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-
-		// Verify database_id was not included in the API request
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
 		assert.Empty(t, reqBody["database_id"])
@@ -735,39 +621,19 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-					map[string]any{
-						"type":           "web",
-						"crawlType":      "seed",
-						"webURL":         "https://docs.example.com",
-						"crawlingOption": "SCOPED",
-					},
-				},
+		_, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "new",
+			"dataSources": []any{
+				map[string]any{"type": "spaces", "spacesBucket": "tor1/my-bucket"},
+				map[string]any{"type": "web", "crawlType": "seed", "webURL": "https://docs.example.com", "crawlingOption": "SCOPED"},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
 		sources, ok := reqBody["datasources"].([]any)
@@ -782,44 +648,30 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":              "spaces",
-						"spacesBucket":      "tor1/my-bucket",
-						"chunkingAlgorithm": chunkingHierarchical,
-						"parentChunkSize":   1000,
-						"childChunkSize":    350,
-					},
+		_, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "new",
+			"dataSources": []any{
+				map[string]any{
+					"type":              "spaces",
+					"spacesBucket":      "tor1/my-bucket",
+					"chunkingAlgorithm": chunkingHierarchical,
+					"parentChunkSize":   1000,
+					"childChunkSize":    350,
 				},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
 		sources := reqBody["datasources"].([]any)
 		require.Len(t, sources, 1)
-
 		source := sources[0].(map[string]any)
 		assert.Equal(t, chunkingHierarchical, source["chunking_algorithm"])
-
 		opts := source["chunking_options"].(map[string]any)
 		assert.Equal(t, float64(1000), opts["parent_chunk_size"])
 		assert.Equal(t, float64(350), opts["child_chunk_size"])
@@ -832,51 +684,26 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":               "web",
-						"crawlType":          "seed",
-						"webURL":             "https://docs.example.com",
-						"crawlingOption":     "SCOPED",
-						"webIncludeNavLinks": false,
-					},
-				},
+		_, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "new",
+			"dataSources": []any{
+				map[string]any{"type": "web", "crawlType": "seed", "webURL": "https://docs.example.com", "crawlingOption": "SCOPED", "webIncludeNavLinks": false},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
-		sources := reqBody["datasources"].([]any)
-		source := sources[0].(map[string]any)
-		crawler := source["web_crawler_data_source"].(map[string]any)
-
-		excludeTags := crawler["exclude_tags"].([]any)
-		excludeTagStrings := make([]string, len(excludeTags))
-		for i, tag := range excludeTags {
-			excludeTagStrings[i] = tag.(string)
-		}
-		assert.Contains(t, excludeTagStrings, "nav")
-		assert.Contains(t, excludeTagStrings, "header")
-		assert.Contains(t, excludeTagStrings, "footer")
-		assert.Contains(t, excludeTagStrings, "aside")
+		crawler := reqBody["datasources"].([]any)[0].(map[string]any)["web_crawler_data_source"].(map[string]any)
+		excludeTags := toStringSlice(crawler["exclude_tags"].([]any))
+		assert.Contains(t, excludeTags, "nav")
+		assert.Contains(t, excludeTags, "header")
+		assert.Contains(t, excludeTags, "footer")
+		assert.Contains(t, excludeTags, "aside")
 	})
 
 	t.Run("webIncludeNavLinks=true -> nav/header/footer are NOT in exclude_tags", func(t *testing.T) {
@@ -886,54 +713,27 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":               "web",
-						"crawlType":          "seed",
-						"webURL":             "https://docs.example.com",
-						"crawlingOption":     "SCOPED",
-						"webIncludeNavLinks": true,
-					},
-				},
+		_, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "new",
+			"dataSources": []any{
+				map[string]any{"type": "web", "crawlType": "seed", "webURL": "https://docs.example.com", "crawlingOption": "SCOPED", "webIncludeNavLinks": true},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
-		sources := reqBody["datasources"].([]any)
-		source := sources[0].(map[string]any)
-		crawler := source["web_crawler_data_source"].(map[string]any)
-
-		excludeTags := crawler["exclude_tags"].([]any)
-		excludeTagStrings := make([]string, len(excludeTags))
-		for i, tag := range excludeTags {
-			excludeTagStrings[i] = tag.(string)
-		}
-		assert.NotContains(t, excludeTagStrings, "nav")
-		assert.NotContains(t, excludeTagStrings, "header")
-		assert.NotContains(t, excludeTagStrings, "footer")
-		assert.NotContains(t, excludeTagStrings, "aside")
-		// non-content tags still excluded
-		assert.Contains(t, excludeTagStrings, "script")
-		assert.Contains(t, excludeTagStrings, "style")
+		crawler := reqBody["datasources"].([]any)[0].(map[string]any)["web_crawler_data_source"].(map[string]any)
+		excludeTags := toStringSlice(crawler["exclude_tags"].([]any))
+		assert.NotContains(t, excludeTags, "nav")
+		assert.NotContains(t, excludeTags, "header")
+		assert.NotContains(t, excludeTags, "footer")
+		assert.Contains(t, excludeTags, "script")
+		assert.Contains(t, excludeTags, "style")
 	})
 
 	t.Run("sitemap URL sets crawling_option to SITEMAP", func(t *testing.T) {
@@ -943,86 +743,51 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			}, lookupResponses(false)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":      "web",
-						"crawlType": "sitemap",
-						"webURL":    "https://example.com/sitemap.xml",
-					},
-				},
+		_, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "new",
+			"dataSources": []any{
+				map[string]any{"type": "web", "crawlType": "sitemap", "webURL": "https://example.com/sitemap.xml"},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-
 		var reqBody map[string]any
 		require.NoError(t, json.Unmarshal(readCapturedBody(t, httpContext), &reqBody))
-		sources := reqBody["datasources"].([]any)
-		require.Len(t, sources, 1)
-
-		source := sources[0].(map[string]any)
-		crawler := source["web_crawler_data_source"].(map[string]any)
+		crawler := reqBody["datasources"].([]any)[0].(map[string]any)["web_crawler_data_source"].(map[string]any)
 		assert.Equal(t, "SITEMAP", crawler["crawling_option"])
 		assert.Equal(t, "https://example.com/sitemap.xml", crawler["base_url"])
 	})
 
-	t.Run("display names are resolved and included in output", func(t *testing.T) {
+	t.Run("display names are resolved and stored in metadata output", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: append([]*http.Response{
 				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(kbResponseWithDB))},
 			}, lookupResponses(true)...),
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "existing",
-				"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-				},
+		meta, _, err := executeKB(t, httpContext, map[string]any{
+			"name":               "my-kb",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":             "tor1",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption":     "existing",
+			"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
+			"dataSources": []any{
+				map[string]any{"type": "spaces", "spacesBucket": "tor1/my-bucket"},
 			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
 		})
 
 		require.NoError(t, err)
-		require.Len(t, executionState.Payloads, 1)
-		wrapped := executionState.Payloads[0].(map[string]any)
-		data := wrapped["data"].(map[string]any)
-		assert.Equal(t, "Multi QA MPNet Base Dot v1", data["embeddingModelName"])
-		assert.Equal(t, "My Project", data["projectName"])
-		assert.Equal(t, "kb-search", data["databaseName"])
-		assert.Equal(t, "online", data["databaseStatus"])
+		var stored kbMetadata
+		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
+		assert.Equal(t, "Multi QA MPNet Base Dot v1", stored.KBOutput["embeddingModelName"])
+		assert.Equal(t, "My Project", stored.KBOutput["projectName"])
+		assert.Equal(t, "kb-search", stored.KBOutput["databaseName"])
+		assert.Equal(t, "online", stored.KBOutput["databaseStatus"])
 	})
 
 	t.Run("lookup failures do not block execution", func(t *testing.T) {
@@ -1034,41 +799,14 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			},
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
+		meta, _, err := executeKB(t, httpContext, baseConfig)
 
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-				},
-			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
-		})
-
-		// execution succeeds even though lookups failed
 		require.NoError(t, err)
-		assert.True(t, executionState.Passed)
-		require.Len(t, executionState.Payloads, 1)
-		wrapped := executionState.Payloads[0].(map[string]any)
-		data := wrapped["data"].(map[string]any)
-		// names absent, but UUIDs still present
-		assert.Nil(t, data["embeddingModelName"])
-		assert.Nil(t, data["projectName"])
-		assert.Equal(t, "05700391-7aa8-11ef-bf8f-4e013e2ddde4", data["embeddingModelUUID"])
+		var stored kbMetadata
+		require.NoError(t, mapstructure.Decode(meta.Get(), &stored))
+		assert.Nil(t, stored.KBOutput["embeddingModelName"])
+		assert.Nil(t, stored.KBOutput["projectName"])
+		assert.Equal(t, "05700391-7aa8-11ef-bf8f-4e013e2ddde4", stored.KBOutput["embeddingModelUUID"])
 	})
 
 	t.Run("API error -> returns error", func(t *testing.T) {
@@ -1081,33 +819,171 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 			},
 		}
 
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{"apiToken": "test-token"},
-		}
-
-		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-
-		err := component.Execute(core.ExecutionContext{
-			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources": []any{
-					map[string]any{
-						"type":         "spaces",
-						"spacesBucket": "tor1/my-bucket",
-					},
-				},
-			},
-			HTTP:           httpContext,
-			Integration:    integrationCtx,
-			ExecutionState: executionState,
-		})
+		_, _, err := executeKB(t, httpContext, baseConfig)
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create knowledge base")
+	})
+}
+
+func Test__CreateKnowledgeBase__Poll(t *testing.T) {
+	component := &CreateKnowledgeBase{}
+
+	storedOutput := map[string]any{
+		"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+		"name": "my-kb",
+		"region": "tor1",
+	}
+
+	// buildPollCtx builds an ActionContext for the poll action with pre-set metadata.
+	buildPollCtx := func(httpContext *contexts.HTTPContext) core.ActionContext {
+		return core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Metadata: &contexts.MetadataContext{Metadata: map[string]any{
+				"kbUUID":   "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"kbOutput": storedOutput,
+			}},
+			Requests: &contexts.RequestContext{},
+		}
+	}
+
+	// DO embeds the latest indexing job directly in the KB response as "last_indexing_job".
+	// Status values use the "INDEX_JOB_STATUS_" prefix (confirmed from the real API).
+	kbNoJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active"}}`
+	kbPendingJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_PENDING"}}}`
+	kbRunningJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_RUNNING"}}}`
+	kbCompletedJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_COMPLETED"}}}`
+	kbFailedJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_FAILED"}}}`
+	startJobResponse := `{"index_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_PENDING"}}`
+
+	kbProvisioningResponse := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "provisioning"}}`
+
+	t.Run("no last_indexing_job and KB ready -> starts one and reschedules poll", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbNoJob))},
+				{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(startJobResponse))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
+		// two requests: get KB, start job
+		assert.Len(t, httpContext.Requests, 2)
+	})
+
+	t.Run("no last_indexing_job and KB still provisioning -> waits without starting a job", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbProvisioningResponse))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
+		// only one request: get KB — no start job call
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("no last_indexing_job, KB ready, but start job fails -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbNoJob))},
+				{StatusCode: http.StatusUnprocessableEntity, Body: io.NopCloser(strings.NewReader(`{"message":"quota exceeded"}`))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to start indexing job")
+	})
+
+	t.Run("last_indexing_job is pending -> reschedules poll", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbPendingJob))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
+		// only one request: get KB
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("last_indexing_job is running -> reschedules poll", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbRunningJob))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
+		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("last_indexing_job is INDEX_JOB_STATUS_COMPLETED -> emits output", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbCompletedJob))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		execState := ctx.ExecutionState.(*contexts.ExecutionStateContext)
+		assert.True(t, execState.Passed)
+		assert.Equal(t, "digitalocean.knowledge_base.created", execState.Type)
+		require.Len(t, execState.Payloads, 1)
+		wrapped := execState.Payloads[0].(map[string]any)
+		data := wrapped["data"].(map[string]any)
+		assert.Equal(t, "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", data["uuid"])
+		assert.Equal(t, "my-kb", data["name"])
+	})
+
+	t.Run("last_indexing_job is failed -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbFailedJob))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "indexing job")
+	})
+
+	t.Run("already finished -> returns immediately without API calls", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		ctx := buildPollCtx(httpContext)
+		ctx.ExecutionState = &contexts.ExecutionStateContext{Finished: true, KVs: map[string]string{}}
+
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		assert.Empty(t, httpContext.Requests)
 	})
 }
 

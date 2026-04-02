@@ -2376,15 +2376,36 @@ func (c *Client) ListDatabasesByEngine(engine string) ([]Database, error) {
 
 // KnowledgeBase represents a DigitalOcean Gradient AI knowledge base
 type KnowledgeBase struct {
-	UUID               string   `json:"uuid"`
-	Name               string   `json:"name"`
-	EmbeddingModelUUID string   `json:"embedding_model_uuid"`
-	Region             string   `json:"region"`
-	ProjectID          string   `json:"project_id"`
-	Tags               []string `json:"tags"`
-	DatabaseID         string   `json:"database_id"`
-	CreatedAt          string   `json:"created_at"`
-	UpdatedAt          string   `json:"updated_at"`
+	UUID               string    `json:"uuid"`
+	Name               string    `json:"name"`
+	EmbeddingModelUUID string    `json:"embedding_model_uuid"`
+	Region             string    `json:"region"`
+	ProjectID          string    `json:"project_id"`
+	Tags               []string  `json:"tags"`
+	DatabaseID         string    `json:"database_id"`
+	Status             string    `json:"status"`
+	LastIndexingJob    *IndexJob `json:"last_indexing_job"`
+	CreatedAt          string    `json:"created_at"`
+	UpdatedAt          string    `json:"updated_at"`
+}
+
+// GetKnowledgeBase retrieves a knowledge base by its UUID
+func (c *Client) GetKnowledgeBase(kbUUID string) (*KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s", c.BaseURL, kbUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBase KnowledgeBase `json:"knowledge_base"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.KnowledgeBase, nil
 }
 
 // KBSpacesDataSource defines a Spaces bucket data source for a knowledge base
@@ -2451,6 +2472,37 @@ func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*Knowledge
 	}
 
 	return &response.KnowledgeBase, nil
+}
+
+// IndexJob represents a DigitalOcean Gradient AI knowledge base indexing job
+type IndexJob struct {
+	UUID   string `json:"uuid"`
+	Status string `json:"status"`
+}
+
+// StartIndexingJob triggers a new indexing job for a knowledge base
+func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
+	url := fmt.Sprintf("%s/gen-ai/index_jobs", c.BaseURL)
+
+	body, err := json.Marshal(map[string]string{"knowledge_base_uuid": kbUUID})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		IndexJob IndexJob `json:"index_job"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.IndexJob, nil
 }
 
 // AppNodeMetadata stores metadata about an app for display in the UI

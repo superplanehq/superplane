@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
+
+const kbPollInterval = 30 * time.Second
 
 type CreateKnowledgeBase struct{}
 
@@ -274,6 +277,12 @@ func (c *CreateKnowledgeBase) Setup(ctx core.SetupContext) error {
 	return nil
 }
 
+// kbMetadata is stored between poll ticks
+type kbMetadata struct {
+	KBUUID   string         `mapstructure:"kbUUID"`
+	KBOutput map[string]any `mapstructure:"kbOutput"`
+}
+
 func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 	spec := CreateKnowledgeBaseSpec{}
 	if err := mapstructure.WeakDecode(ctx.Configuration, &spec); err != nil {
@@ -316,11 +325,14 @@ func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 
 	resolveDisplayNames(client, spec, output)
 
-	return ctx.ExecutionState.Emit(
-		core.DefaultOutputChannel.Name,
-		"digitalocean.knowledge_base.created",
-		[]any{output},
-	)
+	if err := ctx.Metadata.Set(kbMetadata{
+		KBUUID:   kb.UUID,
+		KBOutput: output,
+	}); err != nil {
+		return fmt.Errorf("failed to store metadata: %v", err)
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, kbPollInterval)
 }
 
 // resolveDisplayNames enriches the output map with human-readable names for
@@ -549,12 +561,84 @@ func (c *CreateKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 	return ctx.DefaultProcessing()
 }
 
+// indexJobState normalises a DO indexing job status to a simple lowercase keyword.
+// The DO API returns prefixed enum values like "INDEXING_JOB_STATUS_COMPLETED",
+// but may also return plain values like "completed". We match by suffix so both
+// forms are handled correctly.
+func indexJobState(status string) string {
+	lower := strings.ToLower(status)
+	for _, state := range []string{"completed", "running", "pending", "failed", "cancelled"} {
+		if strings.HasSuffix(lower, state) {
+			return state
+		}
+	}
+	return lower
+}
+
 func (c *CreateKnowledgeBase) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		{
+			Name:           "poll",
+			UserAccessible: false,
+		},
+	}
 }
 
 func (c *CreateKnowledgeBase) HandleAction(ctx core.ActionContext) error {
-	return nil
+	if ctx.Name != "poll" {
+		return fmt.Errorf("unknown action: %s", ctx.Name)
+	}
+
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	var meta kbMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &meta); err != nil {
+		return fmt.Errorf("failed to decode metadata: %v", err)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	// The DO API embeds the latest indexing job directly in the KB response
+	// under the "last_indexing_job" field — no separate list endpoint needed.
+	kb, err := client.GetKnowledgeBase(meta.KBUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get knowledge base: %v", err)
+	}
+
+	if kb.LastIndexingJob != nil {
+		switch indexJobState(kb.LastIndexingJob.Status) {
+		case "completed":
+			return ctx.ExecutionState.Emit(
+				core.DefaultOutputChannel.Name,
+				"digitalocean.knowledge_base.created",
+				[]any{meta.KBOutput},
+			)
+		case "running", "pending":
+			return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, kbPollInterval)
+		case "failed", "cancelled":
+			return fmt.Errorf("indexing job %s for knowledge base %s", kb.LastIndexingJob.Status, meta.KBUUID)
+		default:
+			// Unknown status — wait and retry rather than failing
+			return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, kbPollInterval)
+		}
+	}
+
+	// No indexing job yet — database may still be provisioning.
+	if strings.Contains(strings.ToLower(kb.Status), "provisioning") || strings.Contains(strings.ToLower(kb.Status), "pending") {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, kbPollInterval)
+	}
+
+	// KB is ready but no job started yet — start one.
+	if _, err := client.StartIndexingJob(meta.KBUUID); err != nil {
+		return fmt.Errorf("failed to start indexing job: %v", err)
+	}
+
+	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, kbPollInterval)
 }
 
 func (c *CreateKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
