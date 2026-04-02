@@ -15,7 +15,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Get Data Source" href="#get-data-source" description="Retrieve details for a specific Grafana data source by UID" />
+  <LinkCard title="List Data Sources" href="#list-data-sources" description="List available Grafana data sources and their basic metadata" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
+  <LinkCard title="Query Logs" href="#query-logs" description="Run a LogQL query against a Loki data source and return structured log results" />
+  <LinkCard title="Query Traces" href="#query-traces" description="Run a TraceQL query against a Tempo data source and return matching traces" />
 </CardGrid>
 
 ## Instructions
@@ -85,6 +89,96 @@ The trigger emits the full Grafana webhook payload, including:
 }
 ```
 
+<a id="get-data-source"></a>
+
+## Get Data Source
+
+The Get Data Source component fetches the full details of a single Grafana data source by UID.
+
+### Use Cases
+
+- **Inspect source type**: Confirm the datasource type (Prometheus, Loki, Tempo, etc.) before deciding how to query it
+- **Validate connectivity**: Confirm the data source URL and configuration are present before running downstream queries
+- **Workflow routing**: Branch on datasource type to select the appropriate query component
+
+### Configuration
+
+- **Data Source**: The Grafana data source to inspect (required)
+
+### Output
+
+Returns the data source object including UID, name, type, URL, and whether it is the default.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 2,
+    "isDefault": false,
+    "name": "Loki",
+    "type": "loki",
+    "uid": "loki-uid",
+    "url": "http://loki:3100"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.data-source"
+}
+```
+
+<a id="list-data-sources"></a>
+
+## List Data Sources
+
+The List Data Sources component retrieves all data sources configured in your Grafana instance.
+
+### Use Cases
+
+- **Discover sources**: Find the correct metrics, logs, or traces data source before running targeted queries
+- **Validate sources**: Confirm a required data source exists before executing a query workflow
+- **Dynamic routing**: Branch workflow logic based on the type or presence of a specific data source
+
+### Output
+
+Returns a list of data source objects including UID, name, type, and whether the source is the default.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dataSources": [
+      {
+        "id": 1,
+        "isDefault": true,
+        "name": "Prometheus",
+        "type": "prometheus",
+        "uid": "prometheus-uid",
+        "url": "http://prometheus:9090"
+      },
+      {
+        "id": 2,
+        "isDefault": false,
+        "name": "Loki",
+        "type": "loki",
+        "uid": "loki-uid",
+        "url": "http://loki:3100"
+      },
+      {
+        "id": 3,
+        "isDefault": false,
+        "name": "Tempo",
+        "type": "tempo",
+        "uid": "tempo-uid",
+        "url": "http://tempo:3200"
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.data-sources"
+}
+```
+
 <a id="query-data-source"></a>
 
 ## Query Data Source
@@ -150,6 +244,172 @@ Returns the Grafana query API response JSON.
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.query.result"
+}
+```
+
+<a id="query-logs"></a>
+
+## Query Logs
+
+The Query Logs component executes a LogQL query against a Loki-backed Grafana data source.
+
+### Use Cases
+
+- **Incident investigation**: Search logs for errors or anomalies during an incident response workflow
+- **Deploy validation**: Confirm absence of error patterns following a deployment
+- **Log enrichment**: Pull relevant log lines into a workflow for summarization or downstream notification
+
+### Configuration
+
+- **Data Source**: The Loki data source to query (required)
+- **Query**: A LogQL query expression (required), e.g. `{app="myservice"} |= "error"`
+- **Time From / Time To**: Optional datetime range for the log query window
+- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Limit**: Maximum number of log lines to return (optional)
+
+### Output
+
+Returns the Grafana query API response containing matching log frames.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "data": {
+              "values": [
+                [
+                  "2026-02-12T16:17:00Z",
+                  "2026-02-12T16:17:30Z"
+                ],
+                [
+                  "error: connection refused to db",
+                  "error: timeout waiting for response"
+                ],
+                [
+                  {
+                    "app": "myservice",
+                    "level": "error"
+                  },
+                  {
+                    "app": "myservice",
+                    "level": "error"
+                  }
+                ]
+              ]
+            },
+            "schema": {
+              "fields": [
+                {
+                  "name": "Time",
+                  "type": "time"
+                },
+                {
+                  "name": "Line",
+                  "type": "string"
+                },
+                {
+                  "name": "labels",
+                  "type": "other"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.logs.result"
+}
+```
+
+<a id="query-traces"></a>
+
+## Query Traces
+
+The Query Traces component executes a TraceQL query against a Tempo-backed Grafana data source.
+
+### Use Cases
+
+- **Incident triage**: Find traces for a failing service during an incident to identify slow or erroring spans
+- **Deploy validation**: Confirm trace patterns look healthy after a deployment
+- **Latency investigation**: Search for high-latency traces matching a specific service or operation
+
+### Configuration
+
+- **Data Source**: The Tempo data source to query (required)
+- **Query**: A TraceQL query expression (required), e.g. `{ .http.status_code = 500 }`
+- **Time From / Time To**: Optional datetime range for the trace search window
+- **Timezone**: Interprets datetime picker values using the selected timezone offset
+
+### Output
+
+Returns the Grafana query API response containing matching trace frames.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "results": {
+      "A": {
+        "frames": [
+          {
+            "data": {
+              "values": [
+                [
+                  "abc123def456"
+                ],
+                [
+                  "0000000000000001"
+                ],
+                [
+                  "HTTP GET /api/orders"
+                ],
+                [
+                  1523000
+                ],
+                [
+                  "order-service"
+                ]
+              ]
+            },
+            "schema": {
+              "fields": [
+                {
+                  "name": "traceID",
+                  "type": "string"
+                },
+                {
+                  "name": "spanID",
+                  "type": "string"
+                },
+                {
+                  "name": "operationName",
+                  "type": "string"
+                },
+                {
+                  "name": "duration",
+                  "type": "number"
+                },
+                {
+                  "name": "serviceName",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.traces.result"
 }
 ```
 
