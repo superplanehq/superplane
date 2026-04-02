@@ -164,6 +164,7 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		request := httpContext.Requests[0]
 		assert.Equal(t, http.MethodPost, request.Method)
 		assert.True(t, strings.HasSuffix(request.URL.String(), "/api/ds/query"))
+		assert.Equal(t, "application/json", request.Header.Get("Content-Type"))
 
 		body := decodeJSONBody(t, request.Body)
 		queries := body["queries"].([]any)
