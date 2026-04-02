@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import threading
 import time
 from collections.abc import AsyncIterator
@@ -29,6 +28,7 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
+from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.models import CanvasAnswer
 from ai.jwt import JwtClaims, JwtValidator
@@ -49,7 +49,7 @@ class WebServerConfig:
 class ReplStreamRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     model: str = Field(
-        default=(os.getenv("AI_MODEL", "test").strip() or "test"),
+        default=config.ai_model,
         min_length=1,
         max_length=200,
     )
@@ -57,7 +57,7 @@ class ReplStreamRequest(BaseModel):
 
 
 def _debug_enabled() -> bool:
-    return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    return config.debug
 
 
 def _debug_log(message: str, **fields: Any) -> None:
@@ -70,8 +70,8 @@ def _debug_log(message: str, **fields: Any) -> None:
     print(f"[web] {message}", flush=True)
 
 
-def _resolve_required(value: str | None, env_name: str) -> str:
-    resolved = normalize_optional(value) or normalize_optional(os.getenv(env_name))
+def _resolve_required(value: str | None, fallback: str | None, env_name: str) -> str:
+    resolved = normalize_optional(value) or normalize_optional(fallback)
     if resolved is None:
         raise ValueError(f"Missing required setting: {env_name}")
     return resolved
@@ -144,7 +144,7 @@ def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, S
 
 
 def _build_deps(payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str) -> AgentDeps:
-    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+    base_url = _resolve_required(payload.base_url, config.superplane_base_url, "SUPERPLANE_BASE_URL")
     api_token = _resolve_required_bearer_token(request)
     client = SuperplaneClient(
         SuperplaneClientConfig(
@@ -429,8 +429,7 @@ def _create_app() -> FastAPI:
             store.close()
 
     app = FastAPI(lifespan=lifespan)
-    cors_origins_raw = os.getenv("REPL_WEB_CORS_ORIGINS", "*")
-    cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+    cors_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
     if not cors_origins:
         cors_origins = ["*"]
 
@@ -454,7 +453,7 @@ def _create_app() -> FastAPI:
             "incoming stream request",
             chat_id=chat_id,
             model=payload.model,
-            has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
+            has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(config.superplane_base_url)),
             has_token=bool(_resolve_bearer_token(request)),
         )
 

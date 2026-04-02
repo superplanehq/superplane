@@ -1,20 +1,10 @@
 import asyncio
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-_DEFAULT_DRAIN_TIMEOUT = 300.0
+from ai.config import config
+
 _DRAIN_LOG_INTERVAL = 5.0
-
-
-def _resolve_drain_timeout() -> float:
-    raw = os.getenv("DRAIN_TIMEOUT", "").strip()
-    if not raw:
-        return _DEFAULT_DRAIN_TIMEOUT
-    try:
-        return max(float(raw), 0.0)
-    except ValueError:
-        return _DEFAULT_DRAIN_TIMEOUT
 
 
 class ActiveStreamTracker:
@@ -26,9 +16,7 @@ class ActiveStreamTracker:
         self._drained = asyncio.Event()
         self._drained.set()
         self._shutting_down = False
-        self._drain_timeout = (
-            drain_timeout if drain_timeout is not None else _resolve_drain_timeout()
-        )
+        self._drain_timeout = drain_timeout if drain_timeout is not None else config.drain_timeout
 
     @property
     def is_shutting_down(self) -> bool:
