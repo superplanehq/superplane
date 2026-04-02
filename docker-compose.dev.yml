@@ -194,6 +194,9 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
+    volumes:
+      - ./scripts/docker/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./scripts/docker/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
     ports:
       - ${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}
       - ${RABBITMQ_MANAGEMENT_PORT:-15672}:${RABBITMQ_MANAGEMENT_PORT:-15672}

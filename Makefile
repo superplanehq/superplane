@@ -38,8 +38,6 @@ test.setup:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build
 	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) up -d rabbitmq
-	$(MAKE) rabbitmq.init
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
@@ -115,8 +113,6 @@ dev.setup:
 	@touch agent/.env
 	$(COMPOSE) build
 	$(COMPOSE) pull
-	$(COMPOSE) up -d rabbitmq
-	$(MAKE) rabbitmq.init
 	$(MAKE) dev.setup.app
 	$(MAKE) dev.setup.agent
 	$(MAKE) db.create DB_NAME=superplane_dev
@@ -135,8 +131,6 @@ dev.setup.no.cache:
 	rm -rf tmp
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) build --no-cache
-	$(COMPOSE) up -d rabbitmq
-	$(MAKE) rabbitmq.init
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) -C agent db.create DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
@@ -272,18 +266,6 @@ db.recreate.all.dangerous:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 	$(MAKE) -C agent db.migrate DB_NAME=agents_dev DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
-
-#
-# RabbitMQ target helpers
-#
-
-rabbitmq.init:
-	$(MAKE) rabbitmq.ensure.test.vhost
-
-rabbitmq.ensure.test.vhost:
-	$(COMPOSE) exec -T rabbitmq rabbitmqctl await_startup
-	$(COMPOSE) exec -T rabbitmq rabbitmqctl add_vhost superplane_test || true
-	$(COMPOSE) exec -T rabbitmq rabbitmqctl set_permissions -p superplane_test guest ".*" ".*" ".*"
 
 #
 # Protobuf compilation
