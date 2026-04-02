@@ -32,6 +32,10 @@ chmod +x "${TARGET_DIR}/install.sh"
 echo "* Injecting Caddyfile"
 cp "${TEMPLATES_DIR}/Caddyfile" "${TARGET_DIR}/Caddyfile"
 
+echo "* Injecting init-rabbitmq.sh"
+cp "${TEMPLATES_DIR}/init-rabbitmq.sh" "${TARGET_DIR}/init-rabbitmq.sh"
+chmod +x "${TARGET_DIR}/init-rabbitmq.sh"
+
 echo "* Injecting superplane-logo.txt"
 cp "${TEMPLATES_DIR}/superplane-logo.txt" "${TARGET_DIR}/superplane-logo.txt"
 
