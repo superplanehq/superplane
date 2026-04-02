@@ -108,9 +108,7 @@ class ReportBuilder:
 
             total_assertions += len(assertion_values)
             passed_assertions += sum(
-                1
-                for assertion in assertion_values
-                if bool(getattr(assertion, "value", False))
+                1 for assertion in assertion_values if bool(getattr(assertion, "value", False))
             )
             if duration_seconds is not None:
                 task_time_sum_seconds += duration_seconds
@@ -269,5 +267,3 @@ class ReportBuilder:
         if value is None:
             return "-"
         return f"${value:.4f}"
-
-  
