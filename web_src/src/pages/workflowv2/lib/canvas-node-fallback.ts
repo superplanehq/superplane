@@ -1,7 +1,7 @@
 import { Puzzle } from "lucide-react";
 import type { ComponentType } from "react";
 import type { ComponentsNode, ComponentsComponent, TriggersTrigger } from "@/api-client";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
+const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 

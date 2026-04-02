@@ -2,7 +2,7 @@ import type { OrganizationsIntegration, ComponentsNode } from "@/api-client";
 import type { CustomFieldRenderer } from "../mappers/types";
 import { buildNodeInfo } from "../utils";
 
-export function renderWorkflowNodeCustomField({
+export function renderCanvasNodeCustomField({
   renderer,
   node,
   configuration,

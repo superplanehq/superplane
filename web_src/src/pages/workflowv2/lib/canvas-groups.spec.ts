@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvas, ComponentsNode } from "@/api-client";
-import { deleteNodesFromWorkflow, groupWorkflowNodes, ungroupWorkflowNode } from "./canvas-groups";
+import { deleteNodesFromCanvas, groupCanvasNodes, ungroupCanvasNode } from "./canvas-groups";
 
-describe("deleteNodesFromWorkflow", () => {
+describe("deleteNodesFromCanvas", () => {
   it("deletes groups recursively and removes stale child references from surviving groups", () => {
     const nodes: ComponentsNode[] = [
       {
@@ -43,16 +43,16 @@ describe("deleteNodesFromWorkflow", () => {
       },
     ];
 
-    const result = deleteNodesFromWorkflow(nodes, ["group-root"]);
+    const result = deleteNodesFromCanvas(nodes, ["group-root"]);
 
     expect(result.map((node) => node.id)).toEqual(["group-survivor", "leaf-c"]);
     expect(result[0].configuration?.childNodeIds).toEqual(["leaf-c"]);
   });
 });
 
-describe("ungroupWorkflowNode", () => {
+describe("ungroupCanvasNode", () => {
   it("removes the group node and converts child positions back to canvas coordinates", () => {
-    const workflow: CanvasesCanvas = {
+    const canvas: CanvasesCanvas = {
       spec: {
         nodes: [
           {
@@ -73,7 +73,7 @@ describe("ungroupWorkflowNode", () => {
       },
     };
 
-    const result = ungroupWorkflowNode(workflow, "group-1");
+    const result = ungroupCanvasNode(canvas, "group-1");
 
     expect(result?.spec?.nodes).toEqual([
       {
@@ -85,15 +85,15 @@ describe("ungroupWorkflowNode", () => {
   });
 
   it("returns null when the group node cannot be found", () => {
-    expect(ungroupWorkflowNode({ spec: { nodes: [] } }, "missing-group")).toBeNull();
+    expect(ungroupCanvasNode({ spec: { nodes: [] } }, "missing-group")).toBeNull();
   });
 });
 
-describe("groupWorkflowNodes", () => {
+describe("groupCanvasNodes", () => {
   it("creates a new group node and converts selected node positions to group-relative coordinates", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.123456789);
 
-    const workflow: CanvasesCanvas = {
+    const canvas: CanvasesCanvas = {
       spec: {
         nodes: [
           {
@@ -118,7 +118,7 @@ describe("groupWorkflowNodes", () => {
       },
     };
 
-    const result = groupWorkflowNodes(workflow, { x: 100, y: 200, width: 300, height: 200 }, [
+    const result = groupCanvasNodes(canvas, { x: 100, y: 200, width: 300, height: 200 }, [
       { id: "child-1", x: 120, y: 220 },
       { id: "child-2", x: 200, y: 260 },
     ]);

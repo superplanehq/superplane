@@ -5,7 +5,7 @@ import type { CustomFieldRenderer } from "./mappers/types";
 import * as mappers from "./mappers";
 import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
 import { prepareComponentBaseNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
-import { renderWorkflowNodeCustomField } from "./lib/render-workflow-node-custom-field";
+import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 
 type FallbackComponentData = {
   renderFallback?: {
@@ -59,7 +59,7 @@ function makeTriggerNode(overrides: Partial<ComponentsNode> = {}): ComponentsNod
   } as ComponentsNode;
 }
 
-describe("workflow node preparation resilience", () => {
+describe("canvas node preparation resilience", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -84,7 +84,7 @@ describe("workflow node preparation resilience", () => {
       components: [makeComponent()],
       nodeExecutionsMap: {},
       nodeQueueItemsMap: {},
-      workflowId: "canvas-1",
+      canvasId: "canvas-1",
       queryClient: new QueryClient(),
       organizationId: "org-1",
     });
@@ -110,7 +110,7 @@ describe("workflow node preparation resilience", () => {
       "approval",
     );
 
-    const result = renderWorkflowNodeCustomField({
+    const result = renderCanvasNodeCustomField({
       renderer,
       node: makeNode(),
     });

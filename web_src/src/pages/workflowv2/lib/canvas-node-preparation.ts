@@ -33,7 +33,7 @@ type PrepareComponentNodeArgs = {
   components: ComponentsComponent[];
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
-  workflowId: string;
+  canvasId: string;
   queryClient: QueryClient;
   organizationId?: string;
   currentUser?: { id?: string; email?: string };
@@ -46,7 +46,7 @@ type PrepareComponentBaseNodeArgs = {
   components: ComponentsComponent[];
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>;
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
-  workflowId: string;
+  canvasId: string;
   queryClient: QueryClient;
   organizationId: string;
   currentUser?: { id?: string; email?: string };
@@ -255,13 +255,13 @@ function buildComponentAdditionalData(args: {
   node: ComponentsNode;
   nodes: ComponentsNode[];
   executions: CanvasesCanvasNodeExecution[];
-  workflowId: string;
+  canvasId: string;
   queryClient: QueryClient;
   organizationId: string;
   currentUser?: { id?: string; email?: string };
   edges?: ComponentsEdge[];
 }) {
-  const { componentDef, node, nodes, executions, workflowId, queryClient, organizationId, currentUser, edges } = args;
+  const { componentDef, node, nodes, executions, canvasId, queryClient, organizationId, currentUser, edges } = args;
 
   if (!componentDef) {
     return undefined;
@@ -273,7 +273,7 @@ function buildComponentAdditionalData(args: {
     componentDefinition: buildComponentDefinition(componentDef),
     lastExecutions: executions.map((e) => buildExecutionInfo(e)),
     edges,
-    canvasId: workflowId,
+    canvasId: canvasId,
     queryClient,
     organizationId,
     currentUser,
@@ -361,7 +361,7 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     components,
     nodeExecutionsMap,
     nodeQueueItemsMap,
-    workflowId,
+    canvasId,
     queryClient,
     organizationId,
     currentUser,
@@ -379,7 +379,7 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     components,
     nodeExecutionsMap,
     nodeQueueItemsMap,
-    workflowId,
+    canvasId,
     queryClient,
     organizationId: organizationId || "",
     currentUser,
@@ -394,7 +394,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     components,
     nodeExecutionsMap,
     nodeQueueItemsMap,
-    workflowId,
+    canvasId,
     queryClient,
     organizationId,
     currentUser,
@@ -416,7 +416,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
       node,
       nodes,
       executions,
-      workflowId,
+      canvasId,
       queryClient,
       organizationId,
       currentUser,

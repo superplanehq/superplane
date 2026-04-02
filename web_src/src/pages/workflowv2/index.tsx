@@ -135,12 +135,12 @@ import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-bundl
 import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
-import { renderWorkflowNodeCustomField } from "./lib/render-workflow-node-custom-field";
+import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import {
-  deleteNodesFromWorkflow,
-  groupWorkflowNodes,
+  deleteNodesFromCanvas,
+  groupCanvasNodes,
   prepareGroupNode,
-  ungroupWorkflowNode,
+  ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
@@ -3557,7 +3557,7 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromWorkflow(specNodes, [nodeId]);
+      const updatedNodes = deleteNodesFromCanvas(specNodes, [nodeId]);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
 
       const updatedEdges = canvas.spec?.edges?.filter(
@@ -3603,7 +3603,7 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromWorkflow(specNodes, nodeIds);
+      const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
       const updatedEdges = canvas.spec?.edges?.filter(
         (edge) =>
@@ -3686,7 +3686,7 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(latestWorkflow);
 
-      const updatedWorkflow = groupWorkflowNodes(latestWorkflow, bounds, nodePositions);
+      const updatedWorkflow = groupCanvasNodes(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (canAutoSave) {
@@ -3716,7 +3716,7 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(latestWorkflow);
 
-      const updatedWorkflow = ungroupWorkflowNode(latestWorkflow, groupNodeId);
+      const updatedWorkflow = ungroupCanvasNode(latestWorkflow, groupNodeId);
       if (!updatedWorkflow) return;
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -5133,7 +5133,7 @@ export function WorkflowPageV2() {
 
       // Return a function that takes the current configuration
       return (configuration?: Record<string, unknown>) => {
-        return renderWorkflowNodeCustomField({
+        return renderCanvasNodeCustomField({
           renderer,
           node,
           configuration,
@@ -6095,7 +6095,7 @@ function prepareNode(
         components,
         nodeExecutionsMap,
         nodeQueueItemsMap,
-        workflowId,
+        canvasId: workflowId,
         queryClient,
         organizationId,
         currentUser,

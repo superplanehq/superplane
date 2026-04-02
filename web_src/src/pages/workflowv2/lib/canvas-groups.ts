@@ -43,7 +43,7 @@ function getNodeIdsToDeleteIncludingGroupChildren(nodes: ComponentsNode[], seedI
  * then cleans up the remaining groups so they no longer reference deleted
  * child IDs.
  */
-export function deleteNodesFromWorkflow(nodes: ComponentsNode[], seedIds: string[]): ComponentsNode[] {
+export function deleteNodesFromCanvas(nodes: ComponentsNode[], seedIds: string[]): ComponentsNode[] {
   const removedIds = getNodeIdsToDeleteIncludingGroupChildren(nodes, seedIds);
   const survivingNodes = nodes.filter((node) => !node.id || !removedIds.has(node.id));
 
@@ -62,8 +62,8 @@ export function deleteNodesFromWorkflow(nodes: ComponentsNode[], seedIds: string
   });
 }
 
-export function ungroupWorkflowNode(workflow: CanvasesCanvas, groupNodeId: string): CanvasesCanvas | null {
-  const specNodes = workflow?.spec?.nodes || [];
+export function ungroupCanvasNode(canvas: CanvasesCanvas, groupNodeId: string): CanvasesCanvas | null {
+  const specNodes = canvas?.spec?.nodes || [];
   const groupNode = specNodes.find((node) => node.id === groupNodeId);
   if (!groupNode) {
     return null;
@@ -89,15 +89,15 @@ export function ungroupWorkflowNode(workflow: CanvasesCanvas, groupNodeId: strin
       };
     });
 
-  return { ...workflow, spec: { ...workflow.spec, nodes: updatedNodes } };
+  return { ...canvas, spec: { ...canvas.spec, nodes: updatedNodes } };
 }
 
-export function groupWorkflowNodes(
-  workflow: CanvasesCanvas,
+export function groupCanvasNodes(
+  canvas: CanvasesCanvas,
   bounds: { x: number; y: number; width: number; height: number },
   nodePositions: Array<{ id: string; x: number; y: number }>,
 ): CanvasesCanvas {
-  const specNodes = workflow?.spec?.nodes || [];
+  const specNodes = canvas?.spec?.nodes || [];
   const nodeIds = nodePositions.map((node) => node.id);
 
   const groupPadding = 40;
@@ -143,11 +143,11 @@ export function groupWorkflowNodes(
     };
   });
 
-  return { ...workflow, spec: { ...workflow.spec, nodes: [groupNode, ...updatedNodes] } };
+  return { ...canvas, spec: { ...canvas.spec, nodes: [groupNode, ...updatedNodes] } };
 }
 
-export function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
-  const groupChildMap = buildChildToGroupMap(workflow?.spec?.nodes || []);
+export function wireGroupParentChildRelationships(canvas: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
+  const groupChildMap = buildChildToGroupMap(canvas?.spec?.nodes || []);
 
   const wiredNodes = nodes.map((node) => {
     const parentId = groupChildMap.get(node.id);
