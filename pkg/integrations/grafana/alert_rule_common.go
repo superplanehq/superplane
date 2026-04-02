@@ -3,6 +3,7 @@ package grafana
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/mitchellh/mapstructure"
@@ -10,7 +11,9 @@ import (
 )
 
 const (
-	alertRuleConditionRefID  = "A"
+	alertRuleDataRefID       = "A" // raw datasource query
+	alertRuleReduceRefID     = "B" // reduce expression
+	alertRuleConditionRefID  = "C" // threshold condition — Grafana evaluates this refId
 	alertRuleQueryIntervalMS = 1000
 	alertRuleMaxDataPoints   = 43200
 	resourceTypeFolder       = "folder"
@@ -28,7 +31,12 @@ type CreateAlertRuleSpec struct {
 	DataSourceUID   string                   `json:"dataSourceUid" mapstructure:"dataSourceUid"`
 	Query           string                   `json:"query" mapstructure:"query"`
 	LookbackSeconds int                      `json:"lookbackSeconds" mapstructure:"lookbackSeconds"`
-	For             string                   `json:"for" mapstructure:"for"`
+	Reducer              string                   `json:"reducer" mapstructure:"reducer"`
+	ConditionType        string                   `json:"conditionType" mapstructure:"conditionType"`
+	Threshold            *float64                 `json:"threshold" mapstructure:"threshold"`
+	Threshold2           *float64                 `json:"threshold2,omitempty" mapstructure:"threshold2"`
+	NotificationReceiver string                   `json:"notificationReceiver,omitempty" mapstructure:"notificationReceiver"`
+	For                  string                   `json:"for" mapstructure:"for"`
 	NoDataState     string                   `json:"noDataState" mapstructure:"noDataState"`
 	ExecErrState    string                   `json:"execErrState" mapstructure:"execErrState"`
 	Labels          *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
@@ -48,7 +56,12 @@ type UpdateAlertRuleSpec struct {
 	DataSourceUID   *string                  `json:"dataSourceUid,omitempty" mapstructure:"dataSourceUid"`
 	Query           *string                  `json:"query,omitempty" mapstructure:"query"`
 	LookbackSeconds *int                     `json:"lookbackSeconds,omitempty" mapstructure:"lookbackSeconds"`
-	For             *string                  `json:"for,omitempty" mapstructure:"for"`
+	Reducer              *string                  `json:"reducer,omitempty" mapstructure:"reducer"`
+	ConditionType        *string                  `json:"conditionType,omitempty" mapstructure:"conditionType"`
+	Threshold            *float64                 `json:"threshold,omitempty" mapstructure:"threshold"`
+	Threshold2           *float64                 `json:"threshold2,omitempty" mapstructure:"threshold2"`
+	NotificationReceiver *string                  `json:"notificationReceiver,omitempty" mapstructure:"notificationReceiver"`
+	For                  *string                  `json:"for,omitempty" mapstructure:"for"`
 	NoDataState     *string                  `json:"noDataState,omitempty" mapstructure:"noDataState"`
 	ExecErrState    *string                  `json:"execErrState,omitempty" mapstructure:"execErrState"`
 	Labels          *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
@@ -103,6 +116,9 @@ func sanitizeCreateAlertRuleSpec(spec CreateAlertRuleSpec) CreateAlertRuleSpec {
 	spec.RuleGroup = strings.TrimSpace(spec.RuleGroup)
 	spec.DataSourceUID = strings.TrimSpace(spec.DataSourceUID)
 	spec.Query = strings.TrimSpace(spec.Query)
+	spec.Reducer = strings.TrimSpace(spec.Reducer)
+	spec.ConditionType = strings.TrimSpace(spec.ConditionType)
+	spec.NotificationReceiver = strings.TrimSpace(spec.NotificationReceiver)
 	spec.For = strings.TrimSpace(spec.For)
 	spec.NoDataState = strings.TrimSpace(spec.NoDataState)
 	spec.ExecErrState = strings.TrimSpace(spec.ExecErrState)
@@ -192,6 +208,24 @@ func validateCreateAlertRuleSpec(spec CreateAlertRuleSpec) error {
 	if spec.LookbackSeconds <= 0 {
 		return errors.New("lookbackSeconds must be greater than 0")
 	}
+	if spec.Reducer == "" {
+		return errors.New("reducer is required")
+	}
+	if !isValidReducer(spec.Reducer) {
+		return fmt.Errorf("invalid reducer %q: must be one of last, mean, min, max, sum, count", spec.Reducer)
+	}
+	if spec.ConditionType == "" {
+		return errors.New("conditionType is required")
+	}
+	if !isValidConditionType(spec.ConditionType) {
+		return fmt.Errorf("invalid conditionType %q: must be one of gt, lt, gte, lte, within_range, outside_range", spec.ConditionType)
+	}
+	if spec.Threshold == nil {
+		return errors.New("threshold is required")
+	}
+	if isRangeConditionType(spec.ConditionType) && spec.Threshold2 == nil {
+		return errors.New("threshold2 is required for range conditions")
+	}
 
 	return nil
 }
@@ -225,12 +259,59 @@ func (spec UpdateAlertRuleSpec) HasUpdates() bool {
 		spec.DataSourceUID != nil ||
 		spec.Query != nil ||
 		spec.LookbackSeconds != nil ||
+		spec.Reducer != nil ||
+		spec.ConditionType != nil ||
+		spec.Threshold != nil ||
+		spec.Threshold2 != nil ||
+		spec.NotificationReceiver != nil ||
 		spec.For != nil ||
 		spec.NoDataState != nil ||
 		spec.ExecErrState != nil ||
 		spec.Labels != nil ||
 		spec.Annotations != nil ||
 		spec.IsPaused != nil
+}
+
+func isValidReducer(r string) bool {
+	switch r {
+	case "last", "mean", "min", "max", "sum", "count":
+		return true
+	}
+	return false
+}
+
+func isValidConditionType(ct string) bool {
+	switch ct {
+	case "gt", "lt", "gte", "lte", "within_range", "outside_range":
+		return true
+	}
+	return false
+}
+
+func isRangeConditionType(ct string) bool {
+	return ct == "within_range" || ct == "outside_range"
+}
+
+func alertRuleReducerOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "Last", Value: "last"},
+		{Label: "Mean", Value: "mean"},
+		{Label: "Min", Value: "min"},
+		{Label: "Max", Value: "max"},
+		{Label: "Sum", Value: "sum"},
+		{Label: "Count", Value: "count"},
+	}
+}
+
+func alertRuleConditionTypeOptions() []configuration.FieldOption {
+	return []configuration.FieldOption{
+		{Label: "Is above", Value: "gt"},
+		{Label: "Is below", Value: "lt"},
+		{Label: "Is above or equal to", Value: "gte"},
+		{Label: "Is below or equal to", Value: "lte"},
+		{Label: "Is within range", Value: "within_range"},
+		{Label: "Is outside range", Value: "outside_range"},
+	}
 }
 
 func alertRuleNoDataStateOptions() []configuration.FieldOption {
@@ -341,6 +422,45 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 			Description: "How far back Grafana should query when evaluating the rule",
 		},
 		configuration.Field{
+			Name:        "reducer",
+			Label:       "Reducer",
+			Type:        configuration.FieldTypeSelect,
+			Required:    fieldRequired,
+			Description: "How to reduce the time series into a single value for condition evaluation",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: alertRuleReducerOptions(),
+				},
+			},
+		},
+		configuration.Field{
+			Name:        "conditionType",
+			Label:       "Condition",
+			Type:        configuration.FieldTypeSelect,
+			Required:    fieldRequired,
+			Description: "The condition type to evaluate the reduced value against the threshold",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: alertRuleConditionTypeOptions(),
+				},
+			},
+		},
+		configuration.Field{
+			Name:        "threshold",
+			Label:       "Threshold",
+			Type:        configuration.FieldTypeNumber,
+			Required:    fieldRequired,
+			Description: "The value to compare the reduced result against",
+		},
+		configuration.Field{
+			Name:        "threshold2",
+			Label:       "Upper Threshold",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Togglable:   true,
+			Description: "The upper bound for range conditions (within_range, outside_range)",
+		},
+		configuration.Field{
 			Name:        "for",
 			Label:       "For",
 			Type:        configuration.FieldTypeString,
@@ -370,6 +490,19 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 				},
 			},
 			Description: "How Grafana should behave when the query evaluation errors",
+		},
+		configuration.Field{
+			Name:        "notificationReceiver",
+			Label:       "Contact Point",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "The Grafana contact point to notify when this rule fires",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeContactPoint,
+				},
+			},
 		},
 		configuration.Field{
 			Name:        "labels",
@@ -419,7 +552,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 }
 
 func buildAlertRulePayload(spec CreateAlertRuleSpec) map[string]any {
-	return map[string]any{
+	payload := map[string]any{
 		"title":        spec.Title,
 		"folderUID":    spec.FolderUID,
 		"ruleGroup":    spec.RuleGroup,
@@ -432,6 +565,12 @@ func buildAlertRulePayload(spec CreateAlertRuleSpec) map[string]any {
 		"labels":       keyValuePairsToMap(spec.Labels),
 		"isPaused":     spec.IsPaused,
 	}
+	if spec.NotificationReceiver != "" {
+		payload["notification_settings"] = map[string]any{
+			"receiver": spec.NotificationReceiver,
+		}
+	}
+	return payload
 }
 
 func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (map[string]any, error) {
@@ -464,12 +603,24 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 	if spec.IsPaused != nil {
 		updated["isPaused"] = *spec.IsPaused
 	}
-	if spec.DataSourceUID != nil || spec.Query != nil || spec.LookbackSeconds != nil {
+	if spec.DataSourceUID != nil || spec.Query != nil || spec.LookbackSeconds != nil ||
+		spec.Reducer != nil || spec.ConditionType != nil || spec.Threshold != nil || spec.Threshold2 != nil {
 		queryData, err := mergeAlertRuleQueryData(existing["data"], spec)
 		if err != nil {
 			return nil, err
 		}
 		updated["data"] = queryData
+		updated["condition"] = alertRuleConditionRefID
+	}
+
+	if spec.NotificationReceiver != nil {
+		if *spec.NotificationReceiver == "" {
+			delete(updated, "notification_settings")
+		} else {
+			updated["notification_settings"] = map[string]any{
+				"receiver": *spec.NotificationReceiver,
+			}
+		}
 	}
 
 	updated["uid"] = spec.AlertRuleUID
@@ -500,25 +651,140 @@ func copyAlertRuleOrganizationFields(destination map[string]any, source map[stri
 }
 
 func buildAlertRuleQueryData(spec CreateAlertRuleSpec) []map[string]any {
+	params := thresholdParamsForConditionType(spec.ConditionType, spec.Threshold, spec.Threshold2)
 	return []map[string]any{
-		{
-			"refId":     alertRuleConditionRefID,
-			"queryType": "",
-			"relativeTimeRange": map[string]any{
-				"from": spec.LookbackSeconds,
-				"to":   0,
-			},
-			"datasourceUid": spec.DataSourceUID,
-			"model": map[string]any{
-				"editorMode":    "code",
-				"expr":          spec.Query,
-				"query":         spec.Query,
-				"intervalMs":    alertRuleQueryIntervalMS,
-				"maxDataPoints": alertRuleMaxDataPoints,
-				"refId":         alertRuleConditionRefID,
-			},
+		buildDataQuery(spec.DataSourceUID, spec.Query, spec.LookbackSeconds),
+		buildReduceExpression(alertRuleReduceRefID, alertRuleDataRefID, spec.Reducer),
+		buildThresholdExpression(alertRuleConditionRefID, alertRuleReduceRefID, spec.ConditionType, params),
+	}
+}
+
+func buildDataQuery(datasourceUID, query string, lookbackSeconds int) map[string]any {
+	return map[string]any{
+		"refId":     alertRuleDataRefID,
+		"queryType": "",
+		"relativeTimeRange": map[string]any{
+			"from": lookbackSeconds,
+			"to":   0,
+		},
+		"datasourceUid": datasourceUID,
+		"model": map[string]any{
+			"editorMode":    "code",
+			"expr":          query,
+			"query":         query,
+			"intervalMs":    alertRuleQueryIntervalMS,
+			"maxDataPoints": alertRuleMaxDataPoints,
+			"refId":         alertRuleDataRefID,
 		},
 	}
+}
+
+func buildReduceExpression(refID, inputRefID, reducer string) map[string]any {
+	return map[string]any{
+		"refId":     refID,
+		"queryType": "",
+		"relativeTimeRange": map[string]any{
+			"from": 0,
+			"to":   0,
+		},
+		"datasourceUid": "__expr__",
+		"model": map[string]any{
+			"id":         "reduce",
+			"type":       "reduce",
+			"expression": inputRefID,
+			"reducer":    reducer,
+			"settings": map[string]any{
+				"mode": "dropNN",
+			},
+			"refId": refID,
+		},
+	}
+}
+
+func buildThresholdExpression(refID, inputRefID, conditionType string, params []float64) map[string]any {
+	return map[string]any{
+		"refId":     refID,
+		"queryType": "",
+		"relativeTimeRange": map[string]any{
+			"from": 0,
+			"to":   0,
+		},
+		"datasourceUid": "__expr__",
+		"model": map[string]any{
+			"id":         "threshold",
+			"type":       "threshold",
+			"expression": inputRefID,
+			"conditions": []any{
+				map[string]any{
+					"evaluator": map[string]any{
+						"type":   conditionType,
+						"params": params,
+					},
+					"operator": map[string]any{
+						"type": "and",
+					},
+					"query": map[string]any{
+						"params": []any{refID},
+					},
+					"reducer": map[string]any{
+						"type": "last",
+					},
+					"type": "query",
+				},
+			},
+			"refId": refID,
+		},
+	}
+}
+
+func thresholdParamsForConditionType(conditionType string, threshold, threshold2 *float64) []float64 {
+	if threshold == nil {
+		return []float64{}
+	}
+	if isRangeConditionType(conditionType) && threshold2 != nil {
+		return []float64{*threshold, *threshold2}
+	}
+	return []float64{*threshold}
+}
+
+func extractExistingConditionFromData(data []any) (reducer, conditionType string, threshold, threshold2 *float64) {
+	if len(data) < 3 {
+		return
+	}
+
+	if reduceEntry, ok := data[1].(map[string]any); ok {
+		model := cloneAlertRuleMapFromValue(reduceEntry["model"])
+		if r, ok := model["reducer"].(string); ok && r != "" {
+			reducer = r
+		}
+	}
+
+	if thresholdEntry, ok := data[2].(map[string]any); ok {
+		model := cloneAlertRuleMapFromValue(thresholdEntry["model"])
+		if conditions, ok := model["conditions"].([]any); ok && len(conditions) > 0 {
+			if condition, ok := conditions[0].(map[string]any); ok {
+				if evaluator, ok := condition["evaluator"].(map[string]any); ok {
+					if ct, ok := evaluator["type"].(string); ok && ct != "" {
+						conditionType = ct
+					}
+					if params, ok := evaluator["params"].([]any); ok {
+						if len(params) >= 1 {
+							if v, ok := params[0].(float64); ok {
+								threshold = &v
+							}
+						}
+						if len(params) >= 2 {
+							if v, ok := params[1].(float64); ok {
+								threshold2 = &v
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return
 }
 
 func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any, error) {
@@ -531,9 +797,6 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 	if !ok {
 		return nil, errors.New("existing alert rule query data is invalid")
 	}
-
-	updatedData := make([]any, len(data))
-	copy(updatedData, data)
 
 	updatedQuery := cloneAlertRuleMap(firstQuery)
 	model := cloneAlertRuleMapFromValue(updatedQuery["model"])
@@ -559,7 +822,7 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 
 	if spec.Query != nil {
 		if _, exists := updatedQuery["refId"]; !exists {
-			updatedQuery["refId"] = alertRuleConditionRefID
+			updatedQuery["refId"] = alertRuleDataRefID
 		}
 
 		model["editorMode"] = "code"
@@ -585,16 +848,50 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 		updatedQuery["model"] = model
 	}
 
-	updatedData[0] = updatedQuery
-	return updatedData, nil
+	hasConditionUpdate := spec.Reducer != nil || spec.ConditionType != nil || spec.Threshold != nil || spec.Threshold2 != nil
+	if !hasConditionUpdate {
+		updatedData := make([]any, len(data))
+		copy(updatedData, data)
+		updatedData[0] = updatedQuery
+		return updatedData, nil
+	}
+
+	// Rebuild reduce and threshold expressions, using existing values as defaults when available.
+	var reducer, conditionType string
+	var threshold, threshold2 *float64
+
+	if len(data) >= 3 {
+		reducer, conditionType, threshold, threshold2 = extractExistingConditionFromData(data)
+	}
+
+	if spec.Reducer != nil {
+		reducer = *spec.Reducer
+	}
+	if spec.ConditionType != nil {
+		conditionType = *spec.ConditionType
+	}
+	if spec.Threshold != nil {
+		threshold = spec.Threshold
+	}
+	if spec.Threshold2 != nil {
+		threshold2 = spec.Threshold2
+	}
+
+	if reducer == "" || conditionType == "" || threshold == nil {
+		return nil, errors.New("reducer, conditionType, and threshold are required to update alert condition")
+	}
+
+	params := thresholdParamsForConditionType(conditionType, threshold, threshold2)
+	return []any{
+		updatedQuery,
+		buildReduceExpression(alertRuleReduceRefID, alertRuleDataRefID, reducer),
+		buildThresholdExpression(alertRuleConditionRefID, alertRuleReduceRefID, conditionType, params),
+	}, nil
 }
 
 func cloneAlertRuleMap(value map[string]any) map[string]any {
 	cloned := make(map[string]any, len(value))
-	for key, entry := range value {
-		cloned[key] = entry
-	}
-
+	maps.Copy(cloned, value)
 	return cloned
 }
 

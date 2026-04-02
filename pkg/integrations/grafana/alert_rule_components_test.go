@@ -133,7 +133,7 @@ func Test__CreateAlertRule__Execute(t *testing.T) {
 	assert.Equal(t, "High error rate", body["title"])
 	assert.Equal(t, "folder-1", body["folderUID"])
 	assert.Equal(t, "service-health", body["ruleGroup"])
-	assert.Equal(t, "A", body["condition"])
+	assert.Equal(t, "C", body["condition"])
 	assert.Equal(t, "5m", body["for"])
 	assert.Equal(t, "NoData", body["noDataState"])
 	assert.Equal(t, "Alerting", body["execErrState"])
@@ -141,8 +141,9 @@ func Test__CreateAlertRule__Execute(t *testing.T) {
 
 	data, ok := body["data"].([]any)
 	require.True(t, ok)
-	require.Len(t, data, 1)
+	require.Len(t, data, 3)
 
+	// Entry A: raw data query
 	queryData, ok := data[0].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "datasource-1", queryData["datasourceUid"])
@@ -157,6 +158,36 @@ func Test__CreateAlertRule__Execute(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, `sum(rate(http_requests_total{status=~"5.."}[5m]))`, model["expr"])
 	assert.Equal(t, `sum(rate(http_requests_total{status=~"5.."}[5m]))`, model["query"])
+
+	// Entry B: reduce expression
+	reduceData, ok := data[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "B", reduceData["refId"])
+	assert.Equal(t, "__expr__", reduceData["datasourceUid"])
+	reduceModel, ok := reduceData["model"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "reduce", reduceModel["type"])
+	assert.Equal(t, "A", reduceModel["expression"])
+	assert.Equal(t, "last", reduceModel["reducer"])
+
+	// Entry C: threshold expression
+	thresholdData, ok := data[2].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "C", thresholdData["refId"])
+	assert.Equal(t, "__expr__", thresholdData["datasourceUid"])
+	thresholdModel, ok := thresholdData["model"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "threshold", thresholdModel["type"])
+	assert.Equal(t, "B", thresholdModel["expression"])
+	conditions, ok := thresholdModel["conditions"].([]any)
+	require.True(t, ok)
+	require.Len(t, conditions, 1)
+	condition, ok := conditions[0].(map[string]any)
+	require.True(t, ok)
+	evaluator, ok := condition["evaluator"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "gt", evaluator["type"])
+	assert.Equal(t, []any{float64(1)}, evaluator["params"])
 
 	labels, ok := body["labels"].(map[string]any)
 	require.True(t, ok)
@@ -289,6 +320,11 @@ func Test__UpdateAlertRule__Configuration__AllowsPartialUpdates(t *testing.T) {
 	assertFieldRequired(t, fields, "dataSourceUid", false)
 	assertFieldRequired(t, fields, "query", false)
 	assertFieldRequired(t, fields, "lookbackSeconds", false)
+	assertFieldRequired(t, fields, "reducer", false)
+	assertFieldRequired(t, fields, "conditionType", false)
+	assertFieldRequired(t, fields, "threshold", false)
+	assertFieldRequired(t, fields, "threshold2", false)
+	assertFieldRequired(t, fields, "notificationReceiver", false)
 	assertFieldRequired(t, fields, "for", false)
 	assertFieldRequired(t, fields, "noDataState", false)
 	assertFieldRequired(t, fields, "execErrState", false)
@@ -787,6 +823,9 @@ func validCreateAlertRuleConfiguration() map[string]any {
 		"dataSourceUid":   "datasource-1",
 		"query":           `sum(rate(http_requests_total{status=~"5.."}[5m]))`,
 		"lookbackSeconds": 300,
+		"reducer":         "last",
+		"conditionType":   "gt",
+		"threshold":       float64(1),
 		"for":             "5m",
 		"noDataState":     "NoData",
 		"execErrState":    "Alerting",

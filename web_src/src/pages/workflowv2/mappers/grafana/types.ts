@@ -73,6 +73,11 @@ export interface CreateAlertRuleConfiguration {
   dataSourceUid?: string;
   query?: string;
   lookbackSeconds?: number;
+  reducer?: string;
+  conditionType?: string;
+  threshold?: number;
+  threshold2?: number;
+  notificationReceiver?: string;
   for?: string;
   noDataState?: string;
   execErrState?: string;

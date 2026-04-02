@@ -11,6 +11,7 @@ import (
 
 const resourceTypeDataSource = "data-source"
 const resourceTypeAlertRule = "alert-rule"
+const resourceTypeContactPoint = "contact-point"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -114,7 +115,7 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
-	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule:
+	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule, resourceTypeContactPoint:
 		// Known types require a Grafana API client.
 	default:
 		return []core.IntegrationResource{}, nil
@@ -144,6 +145,13 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 			return nil, err
 		}
 		return grafanaResourcesFromList(resourceTypeAlertRule, alertRules, func(r AlertRuleSummary) string { return r.UID }, func(r AlertRuleSummary) string { return r.Title }), nil
+	case resourceTypeContactPoint:
+		contactPoints, err := client.ListContactPoints()
+		if err != nil {
+			return nil, err
+		}
+		// Contact point name is the value used in notification_settings.receiver, so use name as ID.
+		return grafanaResourcesFromList(resourceTypeContactPoint, contactPoints, func(cp contactPoint) string { return cp.Name }, func(cp contactPoint) string { return cp.Name }), nil
 	}
 
 	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)

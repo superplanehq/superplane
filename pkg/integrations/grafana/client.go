@@ -199,7 +199,7 @@ func (c *Client) execRequestWithHeaders(
 	return responseBody, res.StatusCode, nil
 }
 
-func (c *Client) listContactPoints() ([]contactPoint, error) {
+func (c *Client) ListContactPoints() ([]contactPoint, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/contact-points", nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing contact points: %v", err)
@@ -234,7 +234,7 @@ func (c *Client) listContactPoints() ([]contactPoint, error) {
 }
 
 func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string) (string, error) {
-	points, err := c.listContactPoints()
+	points, err := c.ListContactPoints()
 	if err != nil {
 		return "", err
 	}
@@ -308,7 +308,7 @@ func (c *Client) UpsertWebhookContactPoint(name, webhookURL, bearerToken string)
 		return strings.TrimSpace(created.UID), nil
 	}
 
-	refreshedPoints, err := c.listContactPoints()
+	refreshedPoints, err := c.ListContactPoints()
 	if err != nil {
 		return "", err
 	}

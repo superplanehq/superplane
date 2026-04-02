@@ -172,7 +172,7 @@ func Test__Client__DeleteContactPoint__NotFoundIsIgnored(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func Test__Client__listContactPoints__AcceptsWrappedItemsFormat(t *testing.T) {
+func Test__Client__ListContactPoints__AcceptsWrappedItemsFormat(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -188,13 +188,13 @@ func Test__Client__listContactPoints__AcceptsWrappedItemsFormat(t *testing.T) {
 		http:     httpContext,
 	}
 
-	points, err := client.listContactPoints()
+	points, err := client.ListContactPoints()
 	require.NoError(t, err)
 	require.Len(t, points, 1)
 	require.Equal(t, "cp_1", points[0].UID)
 }
 
-func Test__Client__listContactPoints__ErrorsWhenWrappedItemsFieldMissing(t *testing.T) {
+func Test__Client__ListContactPoints__ErrorsWhenWrappedItemsFieldMissing(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{
@@ -210,7 +210,7 @@ func Test__Client__listContactPoints__ErrorsWhenWrappedItemsFieldMissing(t *test
 		http:     httpContext,
 	}
 
-	_, err := client.listContactPoints()
+	_, err := client.ListContactPoints()
 	require.ErrorContains(t, err, "error parsing contact points response")
 }
 
