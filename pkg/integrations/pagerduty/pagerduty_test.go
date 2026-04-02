@@ -112,7 +112,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://api.pagerduty.com/services?limit=100&offset=0", httpContext.Requests[0].URL.String())
 
 		metadata := integrationCtx.Metadata.(Metadata)
 		assert.Len(t, metadata.Services, 1)
@@ -148,7 +148,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		require.Error(t, err)
 		assert.NotEqual(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[0].URL.String())
+		assert.Equal(t, "https://api.pagerduty.com/services?limit=100&offset=0", httpContext.Requests[0].URL.String())
 		assert.Nil(t, integrationCtx.Metadata)
 	})
 
@@ -265,7 +265,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		assert.Nil(t, integrationCtx.Metadata)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://identity.pagerduty.com/oauth/token", httpContext.Requests[0].URL.String())
-		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[1].URL.String())
+		assert.Equal(t, "https://api.pagerduty.com/services?limit=100&offset=0", httpContext.Requests[1].URL.String())
 	})
 
 	t.Run("app oauth -> success creates access token, moves to ready, and sets metadata", func(t *testing.T) {
@@ -317,7 +317,7 @@ func Test__Pagerduty__Sync(t *testing.T) {
 		assert.Equal(t, "ready", integrationCtx.State)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://identity.pagerduty.com/oauth/token", httpContext.Requests[0].URL.String())
-		assert.Equal(t, "https://api.pagerduty.com/services", httpContext.Requests[1].URL.String())
+		assert.Equal(t, "https://api.pagerduty.com/services?limit=100&offset=0", httpContext.Requests[1].URL.String())
 		secret, ok := integrationCtx.Secrets[AppAccessToken]
 		require.True(t, ok)
 		assert.Equal(t, []byte("access-123"), secret.Value)
