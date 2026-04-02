@@ -1,6 +1,7 @@
 import React from "react";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
 import { isRecord, type UnknownRecord } from "@/lib/records";
+
+const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
