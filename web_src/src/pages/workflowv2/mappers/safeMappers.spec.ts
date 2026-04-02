@@ -359,7 +359,7 @@ describe("createSafeTriggerRenderer normalization", () => {
     );
 
     expect(typeof result.customField).toBe("function");
-    (result.customField as Function)();
+    (result.customField as (...args: unknown[]) => unknown)();
     expect(customField).toHaveBeenCalled();
     expect(result.warning).toBe("be careful");
     expect(result.collapsed).toBe(true);
