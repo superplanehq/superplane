@@ -734,7 +734,7 @@ func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
 	}, nil
 }
 
-func (c *Client) RenderPanel(uid, slug string, panelID, width, height int, from, to string) ([]byte, error) {
+func (c *Client) RenderPanelURL(uid, slug string, panelID, width, height int, from, to string) string {
 	params := url.Values{}
 	params.Set("panelId", fmt.Sprintf("%d", panelID))
 	params.Set("width", fmt.Sprintf("%d", width))
@@ -747,14 +747,11 @@ func (c *Client) RenderPanel(uid, slug string, panelID, width, height int, from,
 		params.Set("to", to)
 	}
 
-	path := fmt.Sprintf("/render/d-solo/%s/%s?%s", uid, slug, params.Encode())
-	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
-	if err != nil {
-		return nil, fmt.Errorf("error rendering panel: %v", err)
-	}
-	if status < 200 || status >= 300 {
-		return nil, newAPIStatusError("grafana panel render", status, responseBody)
-	}
-
-	return responseBody, nil
+	return fmt.Sprintf(
+		"%s/render/d-solo/%s/%s?%s",
+		strings.TrimSuffix(c.BaseURL, "/"),
+		uid,
+		slug,
+		params.Encode(),
+	)
 }

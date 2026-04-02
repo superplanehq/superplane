@@ -245,6 +245,18 @@ func Test__dashboardURLPathSlug(t *testing.T) {
 	require.Equal(t, "dashboard", dashboardURLPathSlug(nil))
 }
 
+func Test__Client__RenderPanelURL(t *testing.T) {
+	client := &Client{BaseURL: "https://grafana.example.com/"}
+
+	got := client.RenderPanelURL("cIBgcSjkk", "production-overview", 2, 1000, 500, "now-1h", "now")
+
+	require.Equal(
+		t,
+		"https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?from=now-1h&height=500&panelId=2&to=now&tz=UTC&width=1000",
+		got,
+	)
+}
+
 func Test__collectDashboardPanelSummaries__nestedUnderRows(t *testing.T) {
 	raw := []json.RawMessage{
 		json.RawMessage(`{"id":10,"title":"Resources","type":"row","panels":[{"id":1,"title":"CPU","type":"timeseries"},{"id":2,"title":"Memory","type":"timeseries"}]}`),

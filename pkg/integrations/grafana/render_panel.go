@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
@@ -172,24 +171,14 @@ func (c *RenderPanel) Execute(ctx core.ExecutionContext) error {
 		height = 500
 	}
 
-	params := url.Values{}
-	params.Set("panelId", fmt.Sprintf("%d", spec.PanelID))
-	params.Set("width", fmt.Sprintf("%d", width))
-	params.Set("height", fmt.Sprintf("%d", height))
-	params.Set("tz", "UTC")
-	if spec.From != "" {
-		params.Set("from", spec.From)
-	}
-	if spec.To != "" {
-		params.Set("to", spec.To)
-	}
-
-	renderURL := fmt.Sprintf(
-		"%s/render/d-solo/%s/%s?%s",
-		strings.TrimSuffix(client.BaseURL, "/"),
+	renderURL := client.RenderPanelURL(
 		spec.DashboardUID,
 		dashboardURLPathSlug(dashboard),
-		params.Encode(),
+		spec.PanelID,
+		width,
+		height,
+		spec.From,
+		spec.To,
 	)
 
 	return ctx.ExecutionState.Emit(
