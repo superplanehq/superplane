@@ -33,9 +33,12 @@ func DescribeCanvas(ctx context.Context, registry *registry.Registry, organizati
 		}
 	}
 
-	user, err := models.FindActiveUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
-	if err != nil {
-		return nil, err
+	var user *models.User
+	if canvas.CreatedBy != nil {
+		user, err = models.FindMaybeDeletedUserByID(canvas.OrganizationID.String(), canvas.CreatedBy.String())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	proto, err := SerializeCanvas(canvas, true, user)

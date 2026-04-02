@@ -24,7 +24,9 @@ func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
 	//
 	userIDs := make([]uuid.UUID, len(canvases))
 	for i, canvas := range canvases {
-		userIDs[i] = *canvas.CreatedBy
+		if canvas.CreatedBy != nil {
+			userIDs[i] = *canvas.CreatedBy
+		}
 	}
 
 	users, err := models.FindMaybeDeletedUsersByIDs(userIDs)
@@ -42,9 +44,9 @@ func SerializeCanvases(canvases []models.Canvas) ([]*pb.Canvas, error) {
 	//
 	protoCanvases := make([]*pb.Canvas, len(canvases))
 	for i, canvas := range canvases {
-		user, ok := usersByID[canvas.CreatedBy.String()]
-		if !ok {
-			return nil, fmt.Errorf("user %s not found for canvas %s", canvas.CreatedBy.String(), canvas.ID.String())
+		var user models.User
+		if canvas.CreatedBy != nil {
+			user, _ = usersByID[canvas.CreatedBy.String()]
 		}
 
 		protoCanvas, err := SerializeCanvas(&canvas, false, &user)
