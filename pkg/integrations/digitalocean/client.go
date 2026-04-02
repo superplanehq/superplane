@@ -2453,25 +2453,6 @@ func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*Knowledge
 	return &response.KnowledgeBase, nil
 }
 
-// ListKnowledgeBases retrieves all knowledge bases in the account
-func (c *Client) ListKnowledgeBases() ([]KnowledgeBase, error) {
-	url := fmt.Sprintf("%s/gen-ai/knowledge_bases?per_page=200", c.BaseURL)
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		KnowledgeBases []KnowledgeBase `json:"knowledge_bases"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	return response.KnowledgeBases, nil
-}
-
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
