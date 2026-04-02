@@ -1,4 +1,3 @@
-import { isRecord } from "@/lib/records";
 import { AnnotationComponent } from "../../annotationComponent";
 import { ComponentBase } from "../../componentBase";
 import { Composite } from "../../composite";
@@ -11,6 +10,7 @@ import {
   getSafeCompositeProps,
   getSafeTriggerProps,
 } from "./data";
+import { isRecord } from "@/pages/workflowv2/mappers/safeMappers";
 
 function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isCompactView"]) {
   if (isCompactView !== undefined) {
