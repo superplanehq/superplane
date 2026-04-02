@@ -8,10 +8,15 @@ class Config:
         self.cors_origins: str = self._parse_str("REPL_WEB_CORS_ORIGINS", default="*")
 
         self.superplane_base_url: str = self._parse_str("SUPERPLANE_BASE_URL")
-        self.superplane_user_agent: str = self._parse_str("SUPERPLANE_USER_AGENT", default="curl/8.7.1")
+        self.superplane_user_agent: str = self._parse_str(
+            "SUPERPLANE_USER_AGENT", default="curl/8.7.1"
+        )
 
         self.drain_timeout: float = self._parse_float(
-            "DRAIN_TIMEOUT", lower=0, upper=1000, default=300.0,
+            "DRAIN_TIMEOUT",
+            lower=0,
+            upper=1000,
+            default=300.0,
         )
 
         self.db_host: str = self._parse_str("DB_HOST", default="db")
@@ -25,7 +30,9 @@ class Config:
         self.jwt_secret: str = self._parse_str("JWT_SECRET")
 
         self.grpc_host: str = self._parse_str("INTERNAL_GRPC_HOST", default="0.0.0.0")
-        self.grpc_port: int = self._parse_int("INTERNAL_GRPC_PORT", lower=1, upper=65535, default=50061)
+        self.grpc_port: int = self._parse_int(
+            "INTERNAL_GRPC_PORT", lower=1, upper=65535, default=50061
+        )
 
         self.pattern_dir: str = self._parse_str("AGENT_PATTERN_DIR")
 

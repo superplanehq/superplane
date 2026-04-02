@@ -122,7 +122,9 @@ def coerce_value_for_field(field: dict[str, Any], value: Any) -> Any:
     return value
 
 
-def coerce_configuration(configuration: dict[str, Any], fields: list[dict[str, Any]]) -> dict[str, Any]:
+def coerce_configuration(
+    configuration: dict[str, Any], fields: list[dict[str, Any]]
+) -> dict[str, Any]:
     fields_by_name: dict[str, dict[str, Any]] = {}
     for item in fields:
         name = item.get("name")

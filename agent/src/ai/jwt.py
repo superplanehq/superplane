@@ -1,5 +1,6 @@
-import jwt
 from dataclasses import dataclass
+
+import jwt
 
 from ai.config import config
 from ai.text import normalize_optional
@@ -11,6 +12,7 @@ class JwtClaims:
     org_id: str
     purpose: str
     scopes: list[str]
+
 
 class JwtValidator:
     def __init__(self, jwt_secret: str, audience: str = "superplane_api") -> None:
@@ -119,4 +121,3 @@ class JwtValidator:
             raise ValueError("Scoped token does not allow the requested canvas.")
 
         return canvas_id
-

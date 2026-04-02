@@ -26,7 +26,7 @@ def color(text: str, ansi_code: str) -> str:
 
 
 def require_setting(value: str | None, env_name: str) -> str:
-    resolved = (value or os.getenv(env_name, "")).strip()
+    resolved = (value or os.getenv(env_name, "") or "").strip()
     if resolved:
         return resolved
     raise ValueError(f"Missing required setting: {env_name}")
@@ -41,7 +41,7 @@ def normalize_optional_setting(value: str | None) -> str | None:
 
 def require_canvas_id(value: str | None) -> str:
     resolved = (
-        value or os.getenv("SUPERPLANE_CANVAS_ID", "") or os.getenv("CANVAS_ID", "")
+        value or os.getenv("SUPERPLANE_CANVAS_ID", "") or os.getenv("CANVAS_ID", "") or ""
     ).strip()
     if resolved:
         return resolved
@@ -405,6 +405,8 @@ def main() -> None:
         print("ok")
         return
 
+    server: WebServer | None = None
+
     if args.server:
         server = WebServer(
             WebServerConfig(host=args.test_repl_web_host, port=args.test_repl_web_port)
@@ -419,7 +421,7 @@ def main() -> None:
         raise ValueError("Provide --question or --interactive.")
 
     web_url = normalize_optional_setting(args.repl_web_url)
-    server: WebServer | None = None
+    server = None
     should_use_local_repl_web = args.model == "test"
     should_start_server = (
         args.start_repl_web
@@ -443,7 +445,8 @@ def main() -> None:
     if should_use_local_repl_web:
         if web_url is None:
             raise ValueError(
-                "Missing REPL web URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
+                "Missing REPL web URL. Set --repl-web-url or "
+                "AI_REPL_WEB_URL, or pass --start-repl-web."
             )
     else:
         canvas_id = require_canvas_id(canvas_id_arg)
@@ -461,7 +464,8 @@ def main() -> None:
 
     if stream_url is None:
         raise ValueError(
-            "Missing REPL stream URL. Set --repl-web-url or AI_REPL_WEB_URL, or pass --start-repl-web."
+            "Missing REPL stream URL. Set --repl-web-url or "
+            "AI_REPL_WEB_URL, or pass --start-repl-web."
         )
 
     console_label = (

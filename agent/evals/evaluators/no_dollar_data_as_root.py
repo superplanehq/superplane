@@ -8,6 +8,7 @@ from evals.evaluators.workflow_utils import iter_config_strings_from_operations
 
 _FORBIDDEN_DOLLAR_DATA = "$.data."
 
+
 @dataclass
 class NoDollarDataAsRoot(Evaluator):
     """Reject proposals that treat $.data. as run-start payload (use root().data...)."""
