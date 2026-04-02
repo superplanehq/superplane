@@ -149,37 +149,58 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	request := grafanaQueryRequest{
-		Queries: []grafanaQuery{
-			{
-				RefID:      "A",
-				Datasource: map[string]string{"uid": strings.TrimSpace(spec.DataSourceUID)},
-				Query:      strings.TrimSpace(spec.Query),
+	dataSourceUID := strings.TrimSpace(spec.DataSourceUID)
+
+	source, err := client.GetDataSource(dataSourceUID)
+	if err != nil {
+		return fmt.Errorf("error getting data source: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(source.Type), "tempo") {
+		return fmt.Errorf("data source %q must be a Tempo data source, got %q", dataSourceUID, source.Type)
+	}
+
+	request := map[string]any{
+		"queries": []any{
+			map[string]any{
+				"refId":      "A",
+				"datasource": map[string]string{"uid": dataSourceUID},
+				"queryType":  "traceql",
+				"query":      strings.TrimSpace(spec.Query),
+				"filters":    []any{},
+				"limit":      20,
+				"spss":       3,
+				"tableType":  "traces",
 			},
 		},
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		request["from"] = timeFrom
+		err = resolveErr
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		request["to"] = timeTo
+		err = resolveErr
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}
 	}
 
-	if request.From == "" || request.To == "" {
+	fromValue, _ := request["from"].(string)
+	toValue, _ := request["to"].(string)
+	if fromValue == "" || toValue == "" {
 		from, to := defaultTimeRange()
-		if request.From == "" {
-			request.From = from
+		if fromValue == "" {
+			request["from"] = from
 		}
-		if request.To == "" {
-			request.To = to
+		if toValue == "" {
+			request["to"] = to
 		}
 	}
 
