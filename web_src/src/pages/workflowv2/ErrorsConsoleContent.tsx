@@ -1,10 +1,11 @@
 import React, { useMemo } from "react";
 import { CircleX } from "lucide-react";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
+import { TimeAgo } from "@/components/TimeAgo";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { findNode, formatRunTimestamp, getStatusBadgeProps, resolveNodeIconSlug } from "./canvasRunsUtils";
+import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { buildTriggerSidebarEvent } from "./utils";
 
 function NodeIcon({
@@ -52,7 +53,7 @@ function ErrorItemRow({
   onAcknowledgeErrors,
 }: {
   item: {
-    execution: CanvasesCanvasNodeExecution;
+    execution: CanvasesCanvasNodeExecutionRef;
     event: CanvasesCanvasEventWithExecutions;
     node: ComponentsNode | undefined;
     triggerNode: ComponentsNode | undefined;
@@ -120,7 +121,7 @@ function ErrorItemRow({
         <AcknowledgeButton executionId={item.execution.id} onAcknowledgeErrors={onAcknowledgeErrors} />
       )}
       <span className="text-xs text-gray-400 tabular-nums whitespace-nowrap">
-        {item.execution.createdAt ? formatRunTimestamp(item.execution.createdAt) : ""}
+        {item.execution.createdAt ? <TimeAgo date={item.execution.createdAt} /> : ""}
       </span>
     </div>
   );
@@ -151,7 +152,7 @@ export function ErrorsConsoleContent({
   const errorItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const items: {
-      execution: CanvasesCanvasNodeExecution;
+      execution: CanvasesCanvasNodeExecutionRef;
       event: CanvasesCanvasEventWithExecutions;
       node: ComponentsNode | undefined;
       triggerNode: ComponentsNode | undefined;
