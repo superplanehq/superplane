@@ -4613,6 +4613,9 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "root": {
+          "type": "boolean"
         }
       }
     },
