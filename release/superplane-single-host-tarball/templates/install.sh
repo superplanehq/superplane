@@ -97,7 +97,6 @@ POSTGRES_DB_SSL=false
 POSTGRES_PASSWORD=${DB_PASSWORD}
 
 RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
-RABBITMQ_ADDITIONAL_VHOSTS=
 
 SWAGGER_BASE_PATH=/app/api/swagger
 RBAC_MODEL_PATH=/app/rbac/rbac_model.conf
