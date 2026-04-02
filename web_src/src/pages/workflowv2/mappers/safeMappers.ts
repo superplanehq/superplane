@@ -1,5 +1,4 @@
 import React from "react";
-import { asString, isRecord, type UnknownRecord } from "@/lib/records";
 
 const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { ComponentBaseProps } from "@/ui/componentBase";
@@ -12,6 +11,16 @@ import type {
   TriggerRenderer,
   TriggerRendererContext,
 } from "./types";
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
 
 function getFallbackComponentTitle(context: ComponentBaseContext): string {
   return context.node?.name || context.componentDefinition?.label || context.componentDefinition?.name || "Component";
