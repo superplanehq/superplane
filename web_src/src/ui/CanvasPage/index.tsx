@@ -744,8 +744,10 @@ function CanvasPage(props: CanvasPageProps) {
   useEffect(() => {
     if (props.hideAddControls) {
       setIsBuildingBlocksSidebarOpen(false);
+    } else if (isSidebarOpenRef.current === true) {
+      setIsBuildingBlocksSidebarOpen(true);
     }
-  }, [props.hideAddControls]);
+  }, [props.hideAddControls, isSidebarOpenRef]);
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);

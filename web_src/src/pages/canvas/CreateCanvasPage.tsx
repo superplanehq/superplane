@@ -22,6 +22,7 @@ import { ImportYamlDialog } from "./ImportYamlDialog";
 import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
 import { LayoutTemplate, Monitor, Rainbow, Sparkles, Terminal, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { markCanvasPendingOpenInEditMode } from "@/lib/canvasPendingEdit";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "./templateMetadata";
 
@@ -91,8 +92,10 @@ export function CreateCanvasPage() {
         description: description.trim() || undefined,
       });
 
-      if (result?.data?.canvas?.metadata?.id) {
-        navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
+      const newCanvasId = result?.data?.canvas?.metadata?.id;
+      if (newCanvasId) {
+        markCanvasPendingOpenInEditMode(newCanvasId);
+        navigate(`/${organizationId}/canvases/${newCanvasId}`);
       }
     } catch (error) {
       const errorMessage = getApiErrorMessage(error, "Failed to create canvas");
@@ -321,7 +324,10 @@ export function CreateCanvasPage() {
                     open={isImportYamlOpen}
                     onOpenChange={setIsImportYamlOpen}
                     organizationId={organizationId}
-                    onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+                    onSuccess={(canvasId) => {
+                      markCanvasPendingOpenInEditMode(canvasId);
+                      navigate(`/${organizationId}/canvases/${canvasId}`);
+                    }}
                   />
                 )}
               </>

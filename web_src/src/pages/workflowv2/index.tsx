@@ -137,6 +137,11 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
+import {
+  consumeCanvasPendingOpenComponentsSidebar,
+  consumeCanvasPendingOpenInEditMode,
+  markCanvasPendingOpenInEditMode,
+} from "@/lib/canvasPendingEdit";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -573,6 +578,30 @@ export function WorkflowPageV2() {
   const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
   const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
+  const isInitialCanvasBootstrapLoading = useMemo(
+    () =>
+      !liveCanvas &&
+      (canvasLoading ||
+        triggersLoading ||
+        blueprintsLoading ||
+        componentsLoading ||
+        widgetsLoading ||
+        usersLoading ||
+        rolesLoading ||
+        groupsLoading),
+    [
+      liveCanvas,
+      canvasLoading,
+      triggersLoading,
+      blueprintsLoading,
+      componentsLoading,
+      widgetsLoading,
+      usersLoading,
+      rolesLoading,
+      groupsLoading,
+    ],
+  );
+
   /**
    * Track if we've already done the initial fit to view.
    * This ref persists across re-renders to prevent viewport changes on save.
@@ -618,6 +647,9 @@ export function WorkflowPageV2() {
   if (isSidebarOpenRef.current === null && canvas) {
     // Initialize on first render
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
+  }
+  if (canvasId && canvas && consumeCanvasPendingOpenComponentsSidebar(canvasId)) {
+    isSidebarOpenRef.current = true;
   }
 
   /**
@@ -799,6 +831,8 @@ export function WorkflowPageV2() {
     setIsCanvasSaveQueued(false);
     hasInitializedStoreRef.current = null;
     pendingStoreReinitRef.current = true;
+    prevCanvasViewKeyRef.current = null;
+    hasFitToViewRef.current = false;
   }, [canvasId]);
 
   useEffect(() => {
@@ -1414,6 +1448,32 @@ export function WorkflowPageV2() {
     queryClient,
     setSearchParams,
     isVersioningDisabled,
+  ]);
+
+  useEffect(() => {
+    if (!canvasId || !organizationId || isInitialCanvasBootstrapLoading) {
+      return;
+    }
+    if (isTemplate || !canUpdateCanvas || canvasDeletedRemotely || hasEditableVersion) {
+      return;
+    }
+    if (!liveCanvasVersionId) {
+      return;
+    }
+    if (!consumeCanvasPendingOpenInEditMode(canvasId)) {
+      return;
+    }
+    void handleCreateVersion();
+  }, [
+    canvasId,
+    organizationId,
+    isInitialCanvasBootstrapLoading,
+    isTemplate,
+    canUpdateCanvas,
+    canvasDeletedRemotely,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    handleCreateVersion,
   ]);
 
   const handleRevert = useCallback(() => {
@@ -5125,9 +5185,11 @@ export function WorkflowPageV2() {
         edges: latestWorkflow.spec?.edges,
       });
 
-      if (result?.data?.canvas?.metadata?.id) {
+      const newCanvasId = result?.data?.canvas?.metadata?.id;
+      if (newCanvasId) {
         setIsUseTemplateOpen(false);
-        navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
+        markCanvasPendingOpenInEditMode(newCanvasId);
+        navigate(`/${organizationId}/canvases/${newCanvasId}`);
       }
     },
     [canvas, organizationId, createWorkflowMutation, navigate, queryClient, canvasId],
@@ -5382,17 +5444,6 @@ export function WorkflowPageV2() {
     },
     [importYamlGuardError, canvas, activeCanvasVersionId, enqueueCanvasSave, organizationId, canvasId, queryClient],
   );
-
-  const isInitialCanvasBootstrapLoading =
-    !canvas &&
-    (canvasLoading ||
-      triggersLoading ||
-      blueprintsLoading ||
-      componentsLoading ||
-      widgetsLoading ||
-      usersLoading ||
-      rolesLoading ||
-      groupsLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
@@ -5685,7 +5736,7 @@ export function WorkflowPageV2() {
     <>
       <div className="relative h-full w-full">
         <CanvasPage
-          key={canvasViewKey}
+          key={`${canvasId}:${canvasViewKey}`}
           // Persist right sidebar in query params
           initialSidebar={{
             isOpen: searchParams.get("sidebar") === "1",

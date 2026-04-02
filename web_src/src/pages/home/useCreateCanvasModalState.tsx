@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+import { markCanvasPendingOpenInEditMode } from "@/lib/canvasPendingEdit";
 import { useCreateCanvas, useUpdateCanvas, useCanvasTemplates } from "../../hooks/useCanvasData";
 import type { ComponentsEdge, ComponentsNode } from "@/api-client";
 
@@ -58,9 +59,11 @@ export function useCreateCanvasModalState() {
       edges: selectedTemplate?.spec?.edges,
     });
 
-    if (result?.data?.canvas?.metadata?.id) {
+    const newCanvasId = result?.data?.canvas?.metadata?.id;
+    if (newCanvasId) {
       onClose();
-      navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
+      markCanvasPendingOpenInEditMode(newCanvasId);
+      navigate(`/${organizationId}/canvases/${newCanvasId}`);
     }
   };
 

@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAccount } from "@/contexts/AccountContext";
 import { canvasKeys, useCanvasTemplates } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
+import { markCanvasPendingOpenInEditMode } from "@/lib/canvasPendingEdit";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQueryClient } from "@tanstack/react-query";
@@ -263,6 +264,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
         queryClient.setQueryData(canvasKeys.eventList(canvasId, 50), eventsResponse.data);
       }
 
+      markCanvasPendingOpenInEditMode(canvasId);
       navigate(`/${organizationId}/canvases/${canvasId}`, { replace: true });
 
       queryClient.invalidateQueries({ queryKey: canvasKeys.lists() });
@@ -292,6 +294,7 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       if (!canvasId) return;
 
       queryClient.invalidateQueries({ queryKey: canvasKeys.lists() });
+      markCanvasPendingOpenInEditMode(canvasId);
       navigate(`/${organizationId}/canvases/${canvasId}`, { replace: true });
     } catch (error) {
       const message = (error as Error)?.message || "Failed to create canvas";
