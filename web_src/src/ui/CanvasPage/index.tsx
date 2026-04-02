@@ -61,8 +61,9 @@ import {
 } from "@/api-client";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
+
+const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import {
   AiCanvasOperation,
   BuildingBlock,

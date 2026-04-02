@@ -1,5 +1,6 @@
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/lib/canvas-node-fallback";
 import { isRecord } from "@/lib/records";
+
+const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
 import type { CompositeProps } from "../../composite";
@@ -36,20 +37,21 @@ export function getSafeComponentProps(data: BlockData): ComponentBaseProps {
     return buildFallbackComponentProps(data, "Component");
   }
 
+  const component = data.component!;
   return {
-    ...(data.component as ComponentBaseProps),
+    ...component,
     title:
-      typeof data.component.title === "string" && data.component.title.trim()
-        ? data.component.title
+      typeof component.title === "string" && component.title.trim()
+        ? component.title
         : getBlockLabel(data, "Component"),
-    error: typeof data.component.error === "string" ? data.component.error : "",
-    warning: typeof data.component.warning === "string" ? data.component.warning : "",
-    metadata: Array.isArray(data.component.metadata) ? data.component.metadata : undefined,
-    specs: Array.isArray(data.component.specs) ? data.component.specs : undefined,
-    eventSections: Array.isArray(data.component.eventSections) ? data.component.eventSections : undefined,
-    iconSlug: typeof data.component.iconSlug === "string" ? data.component.iconSlug : "box",
-    collapsed: typeof data.component.collapsed === "boolean" ? data.component.collapsed : false,
-    includeEmptyState: typeof data.component.includeEmptyState === "boolean" ? data.component.includeEmptyState : false,
+    error: typeof component.error === "string" ? component.error : "",
+    warning: typeof component.warning === "string" ? component.warning : "",
+    metadata: Array.isArray(component.metadata) ? component.metadata : undefined,
+    specs: Array.isArray(component.specs) ? component.specs : undefined,
+    eventSections: Array.isArray(component.eventSections) ? component.eventSections : undefined,
+    iconSlug: typeof component.iconSlug === "string" ? component.iconSlug : "box",
+    collapsed: typeof component.collapsed === "boolean" ? component.collapsed : false,
+    includeEmptyState: typeof component.includeEmptyState === "boolean" ? component.includeEmptyState : false,
   };
 }
 
@@ -63,16 +65,17 @@ export function getSafeTriggerProps(data: BlockData): TriggerProps {
     };
   }
 
+  const trigger = data.trigger!;
   return {
-    ...(data.trigger as TriggerProps),
+    ...trigger,
     title:
-      typeof data.trigger.title === "string" && data.trigger.title.trim()
-        ? data.trigger.title
+      typeof trigger.title === "string" && trigger.title.trim()
+        ? trigger.title
         : getBlockLabel(data, "Trigger"),
-    iconSlug: typeof data.trigger.iconSlug === "string" ? data.trigger.iconSlug : "bolt",
-    metadata: Array.isArray(data.trigger.metadata) ? data.trigger.metadata : [],
-    error: typeof data.trigger.error === "string" ? data.trigger.error : "",
-    warning: typeof data.trigger.warning === "string" ? data.trigger.warning : "",
+    iconSlug: typeof trigger.iconSlug === "string" ? trigger.iconSlug : "bolt",
+    metadata: Array.isArray(trigger.metadata) ? trigger.metadata : [],
+    error: typeof trigger.error === "string" ? trigger.error : "",
+    warning: typeof trigger.warning === "string" ? trigger.warning : "",
   };
 }
 
@@ -84,18 +87,19 @@ export function getSafeCompositeProps(data: BlockData): CompositeProps {
     };
   }
 
+  const composite = data.composite!;
   return {
-    ...(data.composite as CompositeProps),
+    ...composite,
     title:
-      typeof data.composite.title === "string" && data.composite.title.trim()
-        ? data.composite.title
+      typeof composite.title === "string" && composite.title.trim()
+        ? composite.title
         : getBlockLabel(data, "Composite"),
-    metadata: Array.isArray(data.composite.metadata) ? data.composite.metadata : undefined,
-    parameters: Array.isArray(data.composite.parameters) ? data.composite.parameters : [],
-    iconSlug: typeof data.composite.iconSlug === "string" ? data.composite.iconSlug : "component",
-    collapsed: typeof data.composite.collapsed === "boolean" ? data.composite.collapsed : false,
-    error: typeof data.composite.error === "string" ? data.composite.error : "",
-    warning: typeof data.composite.warning === "string" ? data.composite.warning : "",
+    metadata: Array.isArray(composite.metadata) ? composite.metadata : undefined,
+    parameters: Array.isArray(composite.parameters) ? composite.parameters : [],
+    iconSlug: typeof composite.iconSlug === "string" ? composite.iconSlug : "component",
+    collapsed: typeof composite.collapsed === "boolean" ? composite.collapsed : false,
+    error: typeof composite.error === "string" ? composite.error : "",
+    warning: typeof composite.warning === "string" ? composite.warning : "",
   };
 }
 
@@ -104,15 +108,16 @@ export function getSafeAnnotationProps(data: BlockData): AnnotationComponentProp
     return null;
   }
 
+  const annotation = data.annotation!;
   return {
-    ...(data.annotation as AnnotationComponentProps),
+    ...annotation,
     title:
-      typeof data.annotation.title === "string" && data.annotation.title.trim()
-        ? data.annotation.title
+      typeof annotation.title === "string" && annotation.title.trim()
+        ? annotation.title
         : getBlockLabel(data, "Annotation"),
-    annotationText: typeof data.annotation.annotationText === "string" ? data.annotation.annotationText : "",
-    annotationColor: typeof data.annotation.annotationColor === "string" ? data.annotation.annotationColor : "yellow",
-    width: typeof data.annotation.width === "number" ? data.annotation.width : 320,
-    height: typeof data.annotation.height === "number" ? data.annotation.height : 200,
+    annotationText: typeof annotation.annotationText === "string" ? annotation.annotationText : "",
+    annotationColor: typeof annotation.annotationColor === "string" ? annotation.annotationColor : "yellow",
+    width: typeof annotation.width === "number" ? annotation.width : 320,
+    height: typeof annotation.height === "number" ? annotation.height : 200,
   };
 }
