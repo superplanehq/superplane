@@ -1,0 +1,48 @@
+{
+  "status": "ok",
+  "series": [
+    {
+      "metric": "api.gateway.error_rate_5xx",
+      "display_name": "5xx Error Rate (%)",
+      "points": [
+        [1774973400, 0.1],
+        [1774973460, 0.3],
+        [1774973520, 2.1],
+        [1774973580, 8.7],
+        [1774973640, 15.3],
+        [1774973700, 14.8]
+      ],
+      "tags": ["service:api-gateway", "env:production"],
+      "unit": "percent"
+    },
+    {
+      "metric": "api.gateway.latency_p99",
+      "display_name": "P99 Latency (ms)",
+      "points": [
+        [1774973400, 120],
+        [1774973460, 145],
+        [1774973520, 890],
+        [1774973580, 2340],
+        [1774973640, 4500],
+        [1774973700, 4200]
+      ],
+      "tags": ["service:api-gateway", "env:production"],
+      "unit": "millisecond"
+    },
+    {
+      "metric": "api.gateway.request_count",
+      "display_name": "Request Count",
+      "points": [
+        [1774973400, 15234],
+        [1774973460, 14890],
+        [1774973520, 12456],
+        [1774973580, 8934],
+        [1774973640, 6721],
+        [1774973700, 7102]
+      ],
+      "tags": ["service:api-gateway", "env:production"],
+      "unit": "request"
+    }
+  ],
+  "query": "avg:api.gateway.error_rate_5xx{service:api-gateway,env:production}"
+}

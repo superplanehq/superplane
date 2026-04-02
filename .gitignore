@@ -18,3 +18,11 @@ CLAUDE.local.md
 .idea/
 .agents/
 .worktrees/
+
+# Additional ignores
+.devcontainer/
+.claude/
+.agentic-qe/
+.claude-flow/
+.mcp.json
+*.db

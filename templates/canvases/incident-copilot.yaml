@@ -1,0 +1,321 @@
+metadata:
+  name: "Incident Copilot"
+  description: "AI-powered incident triage: auto-collects context from PagerDuty, GitHub, and Datadog, then uses Claude to generate a structured severity assessment and evidence pack."
+  isTemplate: false
+spec:
+  nodes:
+    - id: "pagerduty-onincident-pagerduty-onincident-hk8x3p"
+      name: "Listen for incidents"
+      type: "TYPE_TRIGGER"
+      configuration:
+        events:
+          - "incident.triggered"
+        service: "PQEAM2I"
+        urgencies:
+          - "high"
+      metadata:
+        service:
+          html_url: "https://superplane-test.eu.pagerduty.com/service-directory/PQEAM2I"
+          id: "PQEAM2I"
+          name: "Default Service"
+      position:
+        x: 200
+        "y": 500
+      component: null
+      blueprint: null
+      trigger:
+        name: "pagerduty.onIncident"
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-f1lt3r"
+      name: "Is it P1 or P2"
+      type: "TYPE_COMPONENT"
+      configuration:
+        expression: "$[\"Listen for incidents\"].data.incident.priority.summary == \"P1\" || $[\"Listen for incidents\"].data.incident.priority.summary == \"P2\""
+      metadata: null
+      position:
+        x: 700
+        "y": 500
+      component:
+        name: "filter"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-gh8r3l"
+      name: "Get latest deploy"
+      type: "TYPE_COMPONENT"
+      configuration:
+        repository: "api-service"
+      metadata:
+        repository:
+          id: 1046188046
+          name: "api-service"
+          url: "https://github.com/acme-corp/api-service"
+      position:
+        x: 1200
+        "y": 350
+      component:
+        name: "github.getRelease"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-dd8m3t"
+      name: "Fetch Datadog metrics"
+      type: "TYPE_COMPONENT"
+      configuration:
+        method: "GET"
+        url: "https://api.datadoghq.com/api/v1/query?query=avg:system.cpu.user{service:api-gateway}&from=-3600"
+        headers:
+          DD-API-KEY: "{{ $secret.DATADOG_API_KEY }}"
+      metadata: null
+      position:
+        x: 1200
+        "y": 500
+      component:
+        name: "http"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-pd8l0g"
+      name: "Get incident timeline"
+      type: "TYPE_COMPONENT"
+      configuration:
+        incidentId: "{{ $[\"Listen for incidents\"].data.incident.id }}"
+      metadata: null
+      position:
+        x: 1200
+        "y": 650
+      component:
+        name: "pagerduty.listLogEntries"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "merge-merge-m3rg3x"
+      name: "Wait for all context"
+      type: "TYPE_COMPONENT"
+      configuration:
+        enableStopIf: false
+        enableTimeout: true
+        executionTimeout:
+          unit: "minutes"
+          value: 2
+      metadata: null
+      position:
+        x: 1700
+        "y": 500
+      component:
+        name: "merge"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-cl8ai9"
+      name: "AI Triage Assessment"
+      type: "TYPE_COMPONENT"
+      configuration:
+        model: "claude-sonnet-4-20250514"
+        maxTokens: 4096
+        temperature: 0.3
+        systemMessage: "You are an expert SRE incident triage assistant. Given incident details, recent deployments, metrics, and logs, produce a structured triage report with:\n\n1. SEVERITY ASSESSMENT (P1-P4 with justification)\n2. LIKELY ROOT CAUSE (top 3 hypotheses ranked by probability)\n3. AFFECTED SYSTEMS (services, endpoints, user segments)\n4. RECOMMENDED ACTIONS (ordered by priority, with estimated impact)\n5. ESCALATION RECOMMENDATION (who to page, what team)\n\nBe concise. Use bullet points. Include specific evidence for each claim."
+        prompt: "INCIDENT:\nTitle: {{ $[\"Listen for incidents\"].data.incident.title }}\nStatus: {{ $[\"Listen for incidents\"].data.incident.status }}\nUrgency: {{ $[\"Listen for incidents\"].data.incident.urgency }}\nPriority: {{ $[\"Listen for incidents\"].data.incident.priority.summary }}\nService: {{ $[\"Listen for incidents\"].data.incident.service.summary }}\n\nRECENT DEPLOYMENT:\n{{ $[\"Get latest deploy\"].data }}\n\nMETRICS:\n{{ $[\"Fetch Datadog metrics\"].data }}\n\nINCIDENT LOG:\n{{ $[\"Get incident timeline\"].data }}"
+      metadata: null
+      position:
+        x: 2200
+        "y": 500
+      component:
+        name: "claude.textPrompt"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-sl8ck1"
+      name: "Send evidence pack to Slack"
+      type: "TYPE_COMPONENT"
+      configuration:
+        channel: "C0APV7H889F"
+        text: ":rotating_light: *INCIDENT TRIAGE — AUTO-GENERATED*\n\n*{{ $[\"Listen for incidents\"].data.incident.title }}*\nPriority: {{ $[\"Listen for incidents\"].data.incident.priority.summary }}\nService: {{ $[\"Listen for incidents\"].data.incident.service.summary }}\n\n---\n\n{{ $[\"AI Triage Assessment\"].data.text }}\n\n---\n\n_Triage generated by SuperPlane Incident Copilot in < 60 seconds_"
+      metadata: null
+      position:
+        x: 2700
+        "y": 500
+      component:
+        name: "slack.sendTextMessage"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "component-node-apr0v1"
+      name: "Approve remediation"
+      type: "TYPE_COMPONENT"
+      configuration:
+        items:
+          - type: "anyone"
+      metadata: null
+      position:
+        x: 3200
+        "y": 500
+      component:
+        name: "approval"
+      blueprint: null
+      trigger: null
+      widget: null
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "annotation-annotation-hk1a1a"
+      name: "annotation"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 250
+        text: "### 1. Listen for production incidents\n\nThe PagerDuty trigger listens for new incidents. A filter ensures only P1 and P2 incidents proceed.\n\n___\nTo use this template:\n- Connect your PagerDuty account\n- Configure the service to monitor\n- Set urgency filters as needed"
+        width: 460
+      metadata: null
+      position:
+        x: 150
+        "y": 180
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "annotation-annotation2-hk2b2b"
+      name: "annotation2"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 250
+        text: "### 2. Collect context in parallel\n\nThree parallel branches fetch:\n- Latest deploy from GitHub\n- System metrics from Datadog\n- Incident timeline from PagerDuty\n\nA Merge component waits for all three to complete.\n\n___\nConfigure each data source with your credentials and endpoints."
+        width: 600
+      metadata: null
+      position:
+        x: 1150
+        "y": 100
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "annotation-annotation3-hk3c3c"
+      name: "annotation3"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 220
+        text: "### 3. AI-powered triage\n\nClaude receives all collected context and produces a structured severity assessment with root cause hypotheses and recommended actions.\n\n___\n- Review the system prompt to customize triage format\n- Adjust temperature for more/less creative analysis"
+        width: 500
+      metadata: null
+      position:
+        x: 2150
+        "y": 200
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+    - id: "annotation-annotation4-hk4d4d"
+      name: "annotation4"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        height: 220
+        text: "### 4. Notify and approve\n\nThe AI triage report is posted to Slack as an evidence pack. An approval gate prevents any automated remediation actions until a human reviews and approves.\n\n___\n- Set the Slack channel for notifications\n- Configure approval requirements"
+        width: 560
+      metadata: null
+      position:
+        x: 2650
+        "y": 200
+      component: null
+      blueprint: null
+      trigger: null
+      widget:
+        name: "annotation"
+      isCollapsed: false
+      integration: null
+      errorMessage: ""
+      warningMessage: ""
+
+  edges:
+    - sourceId: "pagerduty-onincident-pagerduty-onincident-hk8x3p"
+      targetId: "component-node-f1lt3r"
+      channel: "default"
+    - sourceId: "component-node-f1lt3r"
+      targetId: "component-node-gh8r3l"
+      channel: "default"
+    - sourceId: "component-node-f1lt3r"
+      targetId: "component-node-dd8m3t"
+      channel: "default"
+    - sourceId: "component-node-f1lt3r"
+      targetId: "component-node-pd8l0g"
+      channel: "default"
+    - sourceId: "component-node-gh8r3l"
+      targetId: "merge-merge-m3rg3x"
+      channel: "default"
+    - sourceId: "component-node-dd8m3t"
+      targetId: "merge-merge-m3rg3x"
+      channel: "default"
+    - sourceId: "component-node-pd8l0g"
+      targetId: "merge-merge-m3rg3x"
+      channel: "default"
+    - sourceId: "merge-merge-m3rg3x"
+      targetId: "component-node-cl8ai9"
+      channel: "success"
+    - sourceId: "component-node-cl8ai9"
+      targetId: "component-node-sl8ck1"
+      channel: "default"
+    - sourceId: "component-node-sl8ck1"
+      targetId: "component-node-apr0v1"
+      channel: "default"
