@@ -26,7 +26,7 @@ def _answer_with_expression(expression: str) -> CanvasAnswer:
         proposal=CanvasProposal(
             summary="Add filter with datetime expression.",
             operations=[
-                {
+                {  # type: ignore[list-item]
                     "type": "add_node",
                     "blockName": "filter",
                     "configuration": {"expression": expression},
@@ -86,7 +86,7 @@ def test_contains_datetime_expression_passes_iso_strings_with_actual_subtraction
 
 def test_contains_datetime_expression_fails_plain_expression() -> None:
     ev = ContainsDatetimeExpression()
-    expr = "payload.action == \"closed\""
+    expr = 'payload.action == "closed"'
     assert ev.evaluate(_ctx(_answer_with_expression(expr))).value is False
 
 

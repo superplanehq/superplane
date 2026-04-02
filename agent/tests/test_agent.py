@@ -38,13 +38,13 @@ def test_canvas_answer_serializes_proposal_with_aliases() -> None:
         proposal=CanvasProposal(
             summary="Add a webhook trigger and connect to Slack.",
             operations=[
-                {
+                {  # type: ignore[list-item]
                     "type": "add_node",
                     "blockName": "webhook.inbound",
                     "nodeKey": "trigger_1",
                     "nodeName": "Inbound Webhook",
                 },
-                {
+                {  # type: ignore[list-item]
                     "type": "add_node",
                     "blockName": "slack.send_message",
                     "nodeKey": "slack_1",

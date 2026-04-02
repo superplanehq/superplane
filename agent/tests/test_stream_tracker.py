@@ -41,8 +41,8 @@ class TestActiveStreamTracker:
                     await asyncio.sleep(delay)
                     finished_order.append(label)
 
-            stream1 = asyncio.create_task(simulate_stream(0.1, "fast"))
-            stream2 = asyncio.create_task(simulate_stream(0.3, "slow"))
+            _stream1 = asyncio.create_task(simulate_stream(0.1, "fast"))
+            _stream2 = asyncio.create_task(simulate_stream(0.3, "slow"))
 
             await asyncio.sleep(0.01)
             assert tracker.active_count == 2
