@@ -7,6 +7,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   gitlab: "GitLab",
   openai: "OpenAI",
   claude: "Claude",
+  logfire: "Logfire",
   cursor: "Cursor",
   pagerduty: "PagerDuty",
   slack: "Slack",
