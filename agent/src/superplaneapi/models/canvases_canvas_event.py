@@ -19,7 +19,7 @@ import re  # noqa: F401
 import json
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
@@ -35,7 +35,8 @@ class CanvasesCanvasEvent(BaseModel):
     custom_name: Optional[StrictStr] = Field(default=None, alias="customName")
     data: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
-    __properties: ClassVar[List[str]] = ["id", "canvasId", "nodeId", "channel", "customName", "data", "createdAt"]
+    root: Optional[StrictBool] = None
+    __properties: ClassVar[List[str]] = ["id", "canvasId", "nodeId", "channel", "customName", "data", "createdAt", "root"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -94,7 +95,8 @@ class CanvasesCanvasEvent(BaseModel):
             "channel": obj.get("channel"),
             "customName": obj.get("customName"),
             "data": obj.get("data"),
-            "createdAt": obj.get("createdAt")
+            "createdAt": obj.get("createdAt"),
+            "root": obj.get("root")
         })
         return _obj
 
