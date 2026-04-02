@@ -63,7 +63,6 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import {
   AiCanvasOperation,
   BuildingBlock,
@@ -87,6 +86,7 @@ import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSi
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { Sentry } from "@/sentry";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
