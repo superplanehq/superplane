@@ -380,32 +380,6 @@ func CountNodeQueueItemsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.
 	return count, nil
 }
 
-// FindNextQueueItemPerNode finds the next (oldest) queue item for each node in a workflow
-// using DISTINCT ON to get one queue item per node_id, ordered by created_at ASC
-// Only returns queue items for nodes that have not been deleted
-func FindNextQueueItemPerNode(workflowID uuid.UUID) ([]CanvasNodeQueueItem, error) {
-	var queueItems []CanvasNodeQueueItem
-	err := database.Conn().
-		Raw(`
-			SELECT DISTINCT ON (qi.node_id) qi.*
-			FROM workflow_node_queue_items qi
-			INNER JOIN workflow_nodes wn
-				ON qi.workflow_id = wn.workflow_id
-				AND qi.node_id = wn.node_id
-			WHERE qi.workflow_id = ?
-			AND wn.deleted_at IS NULL
-			ORDER BY qi.node_id, qi.created_at ASC
-		`, workflowID).
-		Scan(&queueItems).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return queueItems, nil
-}
-
 func FindNodeQueueItem(workflowID uuid.UUID, queueItemID uuid.UUID) (*CanvasNodeQueueItem, error) {
 	var queueItem CanvasNodeQueueItem
 	err := database.Conn().

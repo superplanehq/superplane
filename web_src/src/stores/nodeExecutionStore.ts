@@ -197,17 +197,6 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       });
     });
 
-    // Populate with next queue items from workflow.status
-    workflow.status?.nextQueueItems?.forEach((item) => {
-      if (!item.nodeId) return;
-
-      const existing = initialData.get(item.nodeId) || { ...emptyNodeData };
-      initialData.set(item.nodeId, {
-        ...existing,
-        queueItems: [item],
-      });
-    });
-
     // Populate with last events from workflow.status
     workflow.status?.lastEvents?.forEach((event) => {
       if (!event.nodeId) return;

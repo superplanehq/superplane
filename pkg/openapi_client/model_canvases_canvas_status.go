@@ -21,7 +21,6 @@ var _ MappedNullable = &CanvasesCanvasStatus{}
 // CanvasesCanvasStatus struct for CanvasesCanvasStatus
 type CanvasesCanvasStatus struct {
 	LastExecutions []CanvasesCanvasNodeExecution `json:"lastExecutions,omitempty"`
-	NextQueueItems []CanvasesCanvasNodeQueueItem `json:"nextQueueItems,omitempty"`
 	LastEvents     []CanvasesCanvasEvent         `json:"lastEvents,omitempty"`
 }
 
@@ -74,38 +73,6 @@ func (o *CanvasesCanvasStatus) SetLastExecutions(v []CanvasesCanvasNodeExecution
 	o.LastExecutions = v
 }
 
-// GetNextQueueItems returns the NextQueueItems field value if set, zero value otherwise.
-func (o *CanvasesCanvasStatus) GetNextQueueItems() []CanvasesCanvasNodeQueueItem {
-	if o == nil || IsNil(o.NextQueueItems) {
-		var ret []CanvasesCanvasNodeQueueItem
-		return ret
-	}
-	return o.NextQueueItems
-}
-
-// GetNextQueueItemsOk returns a tuple with the NextQueueItems field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesCanvasStatus) GetNextQueueItemsOk() ([]CanvasesCanvasNodeQueueItem, bool) {
-	if o == nil || IsNil(o.NextQueueItems) {
-		return nil, false
-	}
-	return o.NextQueueItems, true
-}
-
-// HasNextQueueItems returns a boolean if a field has been set.
-func (o *CanvasesCanvasStatus) HasNextQueueItems() bool {
-	if o != nil && !IsNil(o.NextQueueItems) {
-		return true
-	}
-
-	return false
-}
-
-// SetNextQueueItems gets a reference to the given []CanvasesCanvasNodeQueueItem and assigns it to the NextQueueItems field.
-func (o *CanvasesCanvasStatus) SetNextQueueItems(v []CanvasesCanvasNodeQueueItem) {
-	o.NextQueueItems = v
-}
-
 // GetLastEvents returns the LastEvents field value if set, zero value otherwise.
 func (o *CanvasesCanvasStatus) GetLastEvents() []CanvasesCanvasEvent {
 	if o == nil || IsNil(o.LastEvents) {
@@ -150,9 +117,6 @@ func (o CanvasesCanvasStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.LastExecutions) {
 		toSerialize["lastExecutions"] = o.LastExecutions
-	}
-	if !IsNil(o.NextQueueItems) {
-		toSerialize["nextQueueItems"] = o.NextQueueItems
 	}
 	if !IsNil(o.LastEvents) {
 		toSerialize["lastEvents"] = o.LastEvents

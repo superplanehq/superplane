@@ -4863,13 +4863,6 @@
             "$ref": "#/definitions/CanvasesCanvasNodeExecution"
           }
         },
-        "nextQueueItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasNodeQueueItem"
-          }
-        },
         "lastEvents": {
           "type": "array",
           "items": {
