@@ -45,8 +45,9 @@ type Folder struct {
 }
 
 type AlertRuleSummary struct {
-	UID   string `json:"uid"`
-	Title string `json:"title"`
+	UID       string `json:"uid"`
+	Title     string `json:"title"`
+	RuleGroup string `json:"ruleGroup"`
 }
 
 type apiStatusError struct {
@@ -525,6 +526,28 @@ func (c *Client) ListAlertRules(folderUID, group string) ([]AlertRuleSummary, er
 	}
 
 	return rules, nil
+}
+
+func (c *Client) ListRuleGroups() ([]string, error) {
+	rules, err := c.ListAlertRules("", "")
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, len(rules))
+	groups := make([]string, 0)
+	for _, rule := range rules {
+		g := strings.TrimSpace(rule.RuleGroup)
+		if g == "" {
+			continue
+		}
+		if _, exists := seen[g]; !exists {
+			seen[g] = struct{}{}
+			groups = append(groups, g)
+		}
+	}
+
+	return groups, nil
 }
 
 func (c *Client) GetAlertRule(uid string) (map[string]any, error) {

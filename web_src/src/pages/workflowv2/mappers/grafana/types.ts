@@ -104,6 +104,11 @@ export interface DeleteAlertRuleOutput {
   deleted?: boolean;
 }
 
+export interface ListAlertRulesConfiguration {
+  folderUID?: string;
+  group?: string;
+}
+
 export interface ListAlertRulesOutput {
   alertRules?: GrafanaAlertRuleSummary[];
 }

@@ -1,4 +1,5 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
 import type React from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getStateMap } from "..";
@@ -12,7 +13,7 @@ import type {
 } from "../types";
 import { formatTimestamp } from "../utils";
 import { buildGrafanaEventSections } from "./alert_rule_shared";
-import type { ListAlertRulesOutput } from "./types";
+import type { ListAlertRulesConfiguration, ListAlertRulesOutput } from "./types";
 
 export const listAlertRulesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -25,7 +26,7 @@ export const listAlertRulesMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: [],
+      metadata: buildListAlertRulesMetadata(context.node.configuration as ListAlertRulesConfiguration | undefined),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -67,3 +68,10 @@ export const listAlertRulesMapper: ComponentBaseMapper = {
       .join(" · ");
   },
 };
+
+function buildListAlertRulesMetadata(config: ListAlertRulesConfiguration | undefined): MetadataItem[] {
+  const items: MetadataItem[] = [];
+  if (config?.folderUID) items.push({ icon: "folder", label: config.folderUID });
+  if (config?.group) items.push({ icon: "layers-3", label: config.group });
+  return items;
+}

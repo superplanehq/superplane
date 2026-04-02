@@ -89,7 +89,6 @@ func (c *ListAlertRules) Configuration() []configuration.Field {
 			Label:       "Folder",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Togglable:   true,
 			Description: "Limit results to alert rules in this folder",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -100,10 +99,14 @@ func (c *ListAlertRules) Configuration() []configuration.Field {
 		{
 			Name:        "group",
 			Label:       "Rule Group",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Togglable:   true,
 			Description: "Limit results to alert rules in this rule group",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeRuleGroup,
+				},
+			},
 		},
 	}
 }

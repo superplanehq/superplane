@@ -300,6 +300,49 @@ func Test__ListAlertRules__Execute(t *testing.T) {
 	assert.Equal(t, "High error rate", firstRule["title"])
 }
 
+func Test__ListAlertRules__Configuration__UsesIntegrationResources(t *testing.T) {
+	component := ListAlertRules{}
+	fields := component.Configuration()
+
+	assertIntegrationResourceField(t, fields, "folderUID", resourceTypeFolder)
+	assertIntegrationResourceField(t, fields, "group", resourceTypeRuleGroup)
+}
+
+func Test__ListAlertRules__Execute__ForwardsFiltersAsQueryParams(t *testing.T) {
+	component := ListAlertRules{}
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"uid":"rule-1","title":"High error rate"}]`)),
+			},
+		},
+	}
+
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"folderUID": "folder-1",
+			"group":     "service-health",
+		},
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+				"baseURL":  "https://grafana.example.com",
+			},
+		},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "folderUID=folder-1")
+	assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "group=service-health")
+}
+
 func Test__UpdateAlertRule__Configuration__UsesIntegrationResources(t *testing.T) {
 	component := UpdateAlertRule{}
 	fields := component.Configuration()
