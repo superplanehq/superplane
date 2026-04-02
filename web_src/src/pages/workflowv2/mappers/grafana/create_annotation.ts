@@ -1,13 +1,11 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import { createElement } from "react";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
   OutputPayload,
   SubtitleContext,
 } from "../types";
@@ -17,6 +15,7 @@ import type { CreateAnnotationConfiguration, CreateAnnotationOutput } from "./ty
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
 import { GrafanaDashboardMetadataLabel } from "./DashboardMetadataLabel";
+import { baseEventSections } from "./base";
 
 export const createAnnotationMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -100,21 +99,4 @@ function metadataList(context: ComponentBaseContext): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
 }

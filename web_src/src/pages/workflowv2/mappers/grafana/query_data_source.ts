@@ -1,11 +1,10 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -15,6 +14,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { QueryDataSourceConfiguration } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
+import { baseEventSections } from "./base";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -104,23 +104,6 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
 }
 
 function buildQueryResultSummary(responseData: Record<string, unknown>): Record<string, string> {
