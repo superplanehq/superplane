@@ -1,6 +1,4 @@
 import { isRecord } from "@/lib/records";
-
-const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { AnnotationComponentProps } from "../../annotationComponent";
 import type { ComponentBaseProps } from "../../componentBase";
 import type { CompositeProps } from "../../composite";
@@ -19,16 +17,10 @@ export function getOutputChannels(data: BlockData): string[] {
 }
 
 export function buildFallbackComponentProps(data: BlockData, fallbackTitle: string): ComponentBaseProps {
-  const message = data.renderFallback?.message || CANVAS_NODE_FALLBACK_MESSAGE;
   return {
-    iconSlug: "triangle-alert",
-    collapsed: false,
     title: getBlockLabel(data, fallbackTitle),
-    includeEmptyState: true,
-    emptyStateProps: {
-      title: message,
-      description: undefined,
-    },
+    iconSlug: "circle-off",
+    metadata: [],
   };
 }
 
