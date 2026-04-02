@@ -38,6 +38,9 @@ func (e *DOAPIError) Error() string {
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("DigitalOcean integration is not configured — please re-select the integration in the component settings")
+	}
 	apiToken, err := ctx.GetConfig("apiToken")
 	if err != nil {
 		return nil, fmt.Errorf("error finding API token: %v", err)
@@ -1841,6 +1844,580 @@ func hmacSHA256(key []byte, data string) []byte {
 	h := hmac.New(sha256.New, key)
 	h.Write([]byte(data))
 	return h.Sum(nil)
+}
+
+const genAIBaseURL = "https://api.digitalocean.com/v2/gen-ai"
+
+// GradientAI types
+
+type GradientAIAgent struct {
+	UUID             string                `json:"uuid"`
+	Name             string                `json:"name"`
+	Description      string                `json:"description"`
+	Instruction      string                `json:"instruction"`
+	Model            *GradientAIModel      `json:"model"`
+	Deployment       *GradientAIDeployment `json:"deployment"`
+	Workspace        *GradientAIWorkspace  `json:"workspace"`
+	Tags             []string              `json:"tags"`
+	Temperature      float64               `json:"temperature"`
+	MaxTokens        int                   `json:"max_tokens"`
+	TopP             float64               `json:"top_p"`
+	K                int                   `json:"k"`
+	RetrievalMethod  string                `json:"retrieval_method"`
+	ProvideCitations bool                  `json:"provide_citations"`
+	URL              string                `json:"url"`
+	CreatedAt        string                `json:"created_at"`
+	UpdatedAt        string                `json:"updated_at"`
+}
+
+type GradientAIDeployment struct {
+	UUID       string `json:"uuid"`
+	Status     string `json:"status"`
+	Visibility string `json:"visibility"`
+	URL        string `json:"url"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+}
+
+type GradientAIModel struct {
+	UUID           string   `json:"uuid"`
+	Name           string   `json:"name"`
+	ParentUUID     string   `json:"parent_uuid"`
+	IsFoundational bool     `json:"is_foundational"`
+	Usecases       []string `json:"usecases"`
+}
+
+type GradientAIWorkspace struct {
+	UUID      string `json:"uuid"`
+	Name      string `json:"name"`
+	ProjectID string `json:"project_id"`
+	Region    string `json:"region"`
+}
+
+type GradientAIKnowledgeBase struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+type GradientAIGuardrail struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+type GradientAIAgentAPIKey struct {
+	UUID      string `json:"uuid"`
+	Name      string `json:"name"`
+	SecretKey string `json:"secret_key"`
+}
+
+type GradientAIDatacenterRegion struct {
+	Region             string `json:"region"`
+	InferenceURL       string `json:"inference_url"`
+	StreamInferenceURL string `json:"stream_inference_url"`
+	ServesInference    bool   `json:"serves_inference"`
+	ServesBatch        bool   `json:"serves_batch"`
+}
+
+type GradientAIAnthropicKey struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+type GradientAIOpenAIKey struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+// GradientAI request types
+
+type CreateGradientAIAgentRequest struct {
+	Name                 string   `json:"name"`
+	Description          string   `json:"description,omitempty"`
+	Instruction          string   `json:"instruction"`
+	ModelUUID            string   `json:"model_uuid"`
+	WorkspaceUUID        string   `json:"workspace_uuid,omitempty"`
+	ModelProviderKeyUUID string   `json:"model_provider_key_uuid,omitempty"`
+	AnthropicKeyUUID     string   `json:"anthropic_key_uuid,omitempty"`
+	OpenAIKeyUUID        string   `json:"open_ai_key_uuid,omitempty"`
+	KnowledgeBases       []string `json:"knowledge_base_uuid,omitempty"`
+	Region               string   `json:"region,omitempty"`
+	Tags                 []string `json:"tags,omitempty"`
+	ProjectID            string   `json:"project_id,omitempty"`
+}
+
+type UpdateGradientAIAgentRequest struct {
+	Name             string  `json:"name"`
+	Description      string  `json:"description,omitempty"`
+	Instruction      string  `json:"instruction"`
+	MaxTokens        int     `json:"max_tokens,omitempty"`
+	Temperature      float64 `json:"temperature,omitempty"`
+	TopP             float64 `json:"top_p,omitempty"`
+	K                int     `json:"k,omitempty"`
+	RetrievalMethod  string  `json:"retrieval_method,omitempty"`
+	ProvideCitations bool    `json:"provide_citations,omitempty"`
+}
+
+// GradientAI client methods
+
+func (c *Client) CreateGradientAIAgent(req CreateGradientAIAgentRequest) (*GradientAIAgent, error) {
+	url := fmt.Sprintf("%s/agents", genAIBaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agent GradientAIAgent `json:"agent"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Agent, nil
+}
+
+func (c *Client) GetGradientAIAgent(agentUUID string) (*GradientAIAgent, error) {
+	url := fmt.Sprintf("%s/agents/%s", genAIBaseURL, agentUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agent GradientAIAgent `json:"agent"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Agent, nil
+}
+
+func (c *Client) UpdateGradientAIAgent(agentUUID string, req UpdateGradientAIAgentRequest) (*GradientAIAgent, error) {
+	url := fmt.Sprintf("%s/agents/%s", genAIBaseURL, agentUUID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agent GradientAIAgent `json:"agent"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Agent, nil
+}
+
+func (c *Client) CreateGradientAIAgentAPIKey(agentUUID string) (*GradientAIAgentAPIKey, error) {
+	url := fmt.Sprintf("%s/agents/%s/api_keys", genAIBaseURL, agentUUID)
+
+	responseBody, err := c.execRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		APIKey GradientAIAgentAPIKey `json:"api_key_info"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.APIKey, nil
+}
+
+func (c *Client) AddGradientAIAgentToWorkspace(workspaceUUID, agentUUID string) error {
+	url := fmt.Sprintf("%s/workspaces/%s/agents", genAIBaseURL, workspaceUUID)
+
+	body, err := json.Marshal(map[string]any{"agent_uuid": agentUUID})
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	return err
+}
+
+func (c *Client) AttachGradientAIGuardrail(agentUUID, guardrailUUID string) error {
+	url := fmt.Sprintf("%s/agents/%s/guardrails", genAIBaseURL, agentUUID)
+
+	body, err := json.Marshal(map[string]any{"guardrail_uuid": guardrailUUID})
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	return err
+}
+
+func (c *Client) AddGradientAIAgentRoute(agentUUID, childAgentUUID string) error {
+	url := fmt.Sprintf("%s/agents/%s/routes", genAIBaseURL, agentUUID)
+
+	body, err := json.Marshal(map[string]any{"child_agent_uuid": childAgentUUID})
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	return err
+}
+
+func (c *Client) CreateGradientAIWorkspace(name string) (*GradientAIWorkspace, error) {
+	url := fmt.Sprintf("%s/workspaces", genAIBaseURL)
+
+	body, err := json.Marshal(map[string]any{"name": name})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Workspace GradientAIWorkspace `json:"workspace"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Workspace, nil
+}
+
+func (c *Client) GetGradientAIWorkspace(workspaceUUID string) (*GradientAIWorkspace, error) {
+	apiURL := fmt.Sprintf("%s/workspaces/%s", genAIBaseURL, workspaceUUID)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Workspace GradientAIWorkspace `json:"workspace"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Workspace, nil
+}
+
+func (c *Client) ListGradientAIWorkspaces() ([]GradientAIWorkspace, error) {
+	url := fmt.Sprintf("%s/workspaces", genAIBaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Workspaces []GradientAIWorkspace `json:"workspaces"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Workspaces, nil
+}
+
+// ListGradientAIModels returns all available models from the GradientAI API.
+func (c *Client) ListGradientAIModels() ([]GradientAIModel, error) {
+	apiURL := fmt.Sprintf("%s/models", genAIBaseURL)
+
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Models []GradientAIModel `json:"models"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Models, nil
+}
+
+// modelSupportsAgents returns true if the model can be used for agent creation.
+// A model is agent-capable when its usecases list contains MODEL_USECASE_AGENT.
+// If the usecases field is empty (older API response), we assume all models are
+// valid to maintain backwards compatibility.
+func modelSupportsAgents(m GradientAIModel) bool {
+	if len(m.Usecases) == 0 {
+		return true
+	}
+	for _, u := range m.Usecases {
+		if strings.EqualFold(u, "MODEL_USECASE_AGENT") {
+			return true
+		}
+	}
+	return false
+}
+
+// gradientAIProviderName extracts the provider label from a model name.
+// Model names follow the pattern "<Provider> <ModelFamily> <Version>"
+// (e.g. "Anthropic Claude Sonnet 4", "OpenAI GPT-oss-120b", "Llama 3.3 Instruct").
+// The first word is treated as the provider identifier.
+func gradientAIProviderName(modelName string) string {
+	if idx := strings.Index(modelName, " "); idx > 0 {
+		return modelName[:idx]
+	}
+	return modelName
+}
+
+// ListGradientAIModelProviders returns one synthetic provider entry per unique
+// provider prefix found in the model names returned by the API.
+// The UUID field of each entry holds a lowercase provider key (e.g. "anthropic"),
+// which is used as the parentUUID filter when listing models.
+func (c *Client) ListGradientAIModelProviders() ([]GradientAIModel, error) {
+	models, err := c.ListGradientAIModels()
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]bool)
+	providers := make([]GradientAIModel, 0)
+	for _, m := range models {
+		// Only expose providers that have at least one agent-capable model.
+		if !modelSupportsAgents(m) {
+			continue
+		}
+		providerLabel := gradientAIProviderName(m.Name)
+		providerKey := strings.ToLower(providerLabel)
+		if seen[providerKey] {
+			continue
+		}
+		seen[providerKey] = true
+		providers = append(providers, GradientAIModel{
+			UUID: providerKey,
+			Name: providerLabel,
+		})
+	}
+
+	return providers, nil
+}
+
+// GetGradientAIModelProviderName returns the lowercase provider key for the given
+// model UUID, derived from the model name prefix.
+func (c *Client) GetGradientAIModelProviderName(modelUUID string) (string, error) {
+	models, err := c.ListGradientAIModels()
+	if err != nil {
+		return "", err
+	}
+
+	for _, m := range models {
+		if m.UUID == modelUUID {
+			return strings.ToLower(gradientAIProviderName(m.Name)), nil
+		}
+	}
+
+	return "", nil
+}
+
+func (c *Client) ListGradientAIKnowledgeBases() ([]GradientAIKnowledgeBase, error) {
+	url := fmt.Sprintf("%s/knowledge_bases", genAIBaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBases []GradientAIKnowledgeBase `json:"knowledge_bases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.KnowledgeBases, nil
+}
+
+func (c *Client) ListGradientAIGuardrails() ([]GradientAIGuardrail, error) {
+	url := fmt.Sprintf("%s/guardrails", genAIBaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Guardrails []GradientAIGuardrail `json:"guardrails"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Guardrails, nil
+}
+
+func (c *Client) ListGradientAIAgents() ([]GradientAIAgent, error) {
+	url := fmt.Sprintf("%s/agents", genAIBaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agents []GradientAIAgent `json:"agents"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Agents, nil
+}
+
+func (c *Client) CreateGradientAIAnthropicKey(name, apiKey, projectID string) (*GradientAIAnthropicKey, error) {
+	url := fmt.Sprintf("%s/anthropic/keys", genAIBaseURL)
+
+	payload := map[string]any{"name": name, "api_key": apiKey}
+	if projectID != "" {
+		payload["project_id"] = projectID
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		AnthropicAPIKey GradientAIAnthropicKey `json:"api_key_info"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.AnthropicAPIKey, nil
+}
+
+func (c *Client) CreateGradientAIOpenAIKey(name, apiKey, projectID string) (*GradientAIOpenAIKey, error) {
+	url := fmt.Sprintf("%s/openai/keys", genAIBaseURL)
+
+	payload := map[string]any{"name": name, "api_key": apiKey}
+	if projectID != "" {
+		payload["project_id"] = projectID
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		OpenAIAPIKey GradientAIOpenAIKey `json:"api_key_info"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.OpenAIAPIKey, nil
+}
+
+func (c *Client) ListGradientAIDatacenterRegions() ([]GradientAIDatacenterRegion, error) {
+	url := fmt.Sprintf("%s/regions?serves_inference=true", genAIBaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Regions []GradientAIDatacenterRegion `json:"regions"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Regions, nil
+}
+
+// DOProject represents a DigitalOcean project
+type DOProject struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"is_default"`
+}
+
+// ListDOProjects returns all projects for the account.
+func (c *Client) ListDOProjects() ([]DOProject, error) {
+	apiURL := fmt.Sprintf("%s/projects", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Projects []DOProject `json:"projects"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Projects, nil
+}
+
+// GetDefaultProject returns the default project for the account.
+// The GradientAI API requires a project_id on agent creation.
+func (c *Client) GetDefaultProject() (*DOProject, error) {
+	apiURL := fmt.Sprintf("%s/projects", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Projects []DOProject `json:"projects"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	for _, p := range response.Projects {
+		if p.IsDefault {
+			return &p, nil
+		}
+	}
+
+	if len(response.Projects) > 0 {
+		return &response.Projects[0], nil
+	}
+
+	return nil, fmt.Errorf("no projects found on account")
 }
 
 // ListVPCs retrieves all VPCs in the account

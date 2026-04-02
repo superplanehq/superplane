@@ -256,3 +256,13 @@ var exampleOutputUpdateApp map[string]any
 func (u *UpdateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
 }
+
+//go:embed example_output_create_agent.json
+var exampleOutputCreateAgentBytes []byte
+
+var exampleOutputCreateAgentOnce sync.Once
+var exampleOutputCreateAgent map[string]any
+
+func (c *CreateAgent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAgentOnce, exampleOutputCreateAgentBytes, &exampleOutputCreateAgent)
+}

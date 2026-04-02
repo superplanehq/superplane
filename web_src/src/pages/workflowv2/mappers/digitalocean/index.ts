@@ -24,6 +24,7 @@ import { createAppMapper } from "./create_app";
 import { getAppMapper } from "./get_app";
 import { deleteAppMapper } from "./delete_app";
 import { updateAppMapper } from "./update_app";
+import { createAgentMapper } from "./create_agent";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -52,6 +53,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getApp: getAppMapper,
   deleteApp: deleteAppMapper,
   updateApp: updateAppMapper,
+  createAgent: createAgentMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -82,4 +84,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getApp: buildActionStateRegistry("fetched"),
   deleteApp: buildActionStateRegistry("deleted"),
   updateApp: buildActionStateRegistry("updated"),
+  createAgent: buildActionStateRegistry("created"),
 };

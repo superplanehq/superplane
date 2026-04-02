@@ -11,6 +11,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
   <LinkCard title="Copy Object" href="#copy-object" description="Copy or move an object within DigitalOcean Spaces Object Storage" />
+  <LinkCard title="Create Agent" href="#create-agent" description="Create and deploy a new GradientAI agent" />
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
@@ -53,6 +54,13 @@ Only required for **Spaces Object Storage** components.
 Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spaces/access_keys) and copy the generated pair.
 
 - Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
+
+## GradientAI Model Provider Keys (optional)
+
+Only required when creating GradientAI agents using **Anthropic** or **OpenAI** models.
+
+- **OpenAI API Key**: Generate one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- **Anthropic API Key**: Generate one at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
 
 > **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.
 
@@ -166,6 +174,83 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
   },
   "timestamp": "2026-03-25T09:00:00Z",
   "type": "digitalocean.spaces.object.copied"
+}
+```
+
+<a id="create-agent"></a>
+
+## Create Agent
+
+The Create Agent component creates and deploys a new GradientAI agent.
+
+### Use Cases
+
+- **Release agents**: Provision a dedicated AI assistant per release version
+- **App agents**: Create an agent for each deployed application
+- **Service agents**: Provision a support agent per microservice
+
+### Configuration
+
+- **Name**: The agent name
+- **Instructions**: System prompt that defines the agent's behavior
+- **Model Provider**: The provider of the AI model (Anthropic, OpenAI, etc.)
+- **Model**: The AI model to use
+- **Workspace**: Existing or new workspace to organize the agent
+- **Knowledge Bases**: Attach existing knowledge bases (optional)
+- **Guardrails**: Attach guardrails for content safety (optional)
+- **Agent Routes**: Child agents to route requests to (optional)
+
+### Provider API Keys
+
+If the selected model requires a third-party provider API key (e.g. Anthropic or OpenAI),
+set the corresponding key in the **DigitalOcean integration configuration** — not here.
+The component will automatically use the key stored in the integration when creating the agent.
+
+### Output
+
+Returns the deployed agent including:
+- **uuid**: Agent identifier
+- **url**: Agent endpoint URL
+- **deployment.status**: Deployment status
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deployment": {
+      "status": "running",
+      "url": "https://agent-a1b2c3d4.agents.do-ai.run",
+      "uuid": "d1e2f3a4-b5c6-7890-def0-123456789abc",
+      "visibility": "VISIBILITY_PRIVATE"
+    },
+    "description": "AI assistant for release v2.0",
+    "instruction": "You are an assistant that helps with release v2.0 questions.",
+    "k": 10,
+    "max_tokens": 2048,
+    "model": {
+      "name": "llama3-70b-instruct",
+      "provider": "MODEL_PROVIDER_DIGITALOCEAN",
+      "uuid": "m1n2o3p4-q5r6-7890-stuv-wx1234567890"
+    },
+    "name": "release-v2-assistant",
+    "provide_citations": false,
+    "retrieval_method": "RETRIEVAL_METHOD_NONE",
+    "tags": [
+      "release",
+      "v2"
+    ],
+    "temperature": 0.7,
+    "top_p": 0.9,
+    "url": "https://agent-a1b2c3d4.agents.do-ai.run",
+    "uuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "workspace": {
+      "name": "release-v2",
+      "uuid": "w1x2y3z4-a5b6-7890-cdef-012345678901"
+    }
+  },
+  "timestamp": "2026-03-12T21:10:00.000000000Z",
+  "type": "digitalocean.gradientai.agent"
 }
 ```
 
