@@ -208,7 +208,15 @@ function buildLastEventData(lastEventData: unknown, fallbackTitle: string): Trig
 
 function normalizeTriggerCustomField(customField: unknown): ComponentBaseProps["customField"] {
   if (typeof customField === "function") {
-    return customField as ComponentBaseProps["customField"];
+    return (onRun, nodeId) => {
+      try {
+        const fn = customField as (onRun?: () => void, nodeId?: string) => React.ReactNode;
+        return sanitizeReactNodeValue(fn(onRun, nodeId));
+      } catch (error) {
+        console.error("[SafeMapper] Trigger customField() threw:", error);
+        return null;
+      }
+    };
   }
 
   return sanitizeReactNodeValue(customField as React.ReactNode);
