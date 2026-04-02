@@ -134,6 +134,8 @@ export const ConfigurationFieldRenderer = ({
   enableRealtimeValidation = false,
   autocompleteExampleObj,
   allowExpressions = false,
+  suggestFieldValue,
+  assistantEnabled = false,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -272,6 +274,8 @@ export const ConfigurationFieldRenderer = ({
       integrationId,
       organizationId,
       allowExpressions,
+      suggestFieldValue,
+      assistantEnabled,
     };
 
     switch (field.type) {
@@ -279,7 +283,9 @@ export const ConfigurationFieldRenderer = ({
         return <StringFieldRenderer {...commonProps} />;
 
       case "expression":
-        return <ExpressionFieldRenderer {...commonProps} />;
+        return (
+          <ExpressionFieldRenderer {...commonProps} labelRightRef={labelRightRef} labelRightReady={labelRightReady} />
+        );
 
       case "text":
         return <TextFieldRenderer {...commonProps} />;

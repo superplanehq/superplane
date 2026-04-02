@@ -1,4 +1,9 @@
+import type { RefObject } from "react";
 import type { AuthorizationDomainType, ConfigurationField } from "../../api-client";
+
+export type FieldSuggestResult = { value: string; explanation?: string };
+
+export type SuggestFieldValueFn = (instruction: string) => Promise<FieldSuggestResult>;
 
 export interface ValidationError {
   field: string;
@@ -20,4 +25,8 @@ export interface FieldRendererProps {
   fieldPath?: string;
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
+  suggestFieldValue?: SuggestFieldValueFn;
+  assistantEnabled?: boolean;
+  labelRightRef?: RefObject<HTMLDivElement | null>;
+  labelRightReady?: boolean;
 }

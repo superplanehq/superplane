@@ -19,6 +19,8 @@ import {
   parseDefaultValues,
   validateFieldForSubmission,
 } from "@/lib/components";
+import { isInlineConfigAssistantEnabled } from "@/lib/env";
+import type { SuggestFieldValueFn } from "@/ui/configurationFieldRenderer/types";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
@@ -112,6 +114,17 @@ export function SettingsTab({
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
+
+  const inlineAssistantEnabled = isInlineConfigAssistantEnabled() && !isReadOnly;
+
+  const suggestFieldValue = useCallback<SuggestFieldValueFn>(async (instruction: string) => {
+    await new Promise((resolve) => window.setTimeout(resolve, 450));
+    const trimmed = instruction.trim();
+    return {
+      value: trimmed.length > 0 ? trimmed : "true",
+      explanation: "Mock assistant response (set VITE_ENABLE_INLINE_CONFIG_ASSISTANT=true to try this in dev).",
+    };
+  }, []);
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -695,6 +708,8 @@ export function SettingsTab({
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  suggestFieldValue={inlineAssistantEnabled ? suggestFieldValue : undefined}
+                  assistantEnabled={inlineAssistantEnabled}
                 />
               );
             })}
