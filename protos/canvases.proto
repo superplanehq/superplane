@@ -560,7 +560,8 @@ message Canvas {
 
   message Status {
     repeated CanvasNodeExecution last_executions = 1;
-    repeated CanvasEvent last_events = 2;
+    reserved 2;
+    repeated CanvasEvent last_events = 3;
   }
 
   Metadata metadata = 1;
