@@ -49,15 +49,6 @@ export const createKnowledgeBaseMapper: ComponentBaseMapper = {
     details["Embedding Model"] = String(result.embeddingModelName || result.embeddingModelUUID || "-");
     details["Project"] = String(result.projectName || result.projectId || "-");
 
-    if (result.databaseId) {
-      const dbLabel = result.databaseName
-        ? result.databaseStatus
-          ? `${String(result.databaseName)} (${String(result.databaseStatus)})`
-          : String(result.databaseName)
-        : String(result.databaseId);
-      details["OpenSearch Database"] = dbLabel;
-    }
-
     const tags = result.tags as string[] | undefined;
     if (tags && tags.length > 0) {
       details["Tags"] = tags.join(", ");
