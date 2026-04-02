@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -723,11 +724,19 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 		}
 
 		if node.Configuration != nil {
-			result[i].Configuration, _ = structpb.NewStruct(node.Configuration)
+			var err error
+			result[i].Configuration, err = structpb.NewStruct(node.Configuration)
+			if err != nil {
+				log.Errorf("NodesToProto: failed to convert configuration for node %s: %v", node.ID, err)
+			}
 		}
 
 		if node.Metadata != nil {
-			result[i].Metadata, _ = structpb.NewStruct(node.Metadata)
+			var err error
+			result[i].Metadata, err = structpb.NewStruct(node.Metadata)
+			if err != nil {
+				log.Errorf("NodesToProto: failed to convert metadata for node %s: %v", node.ID, err)
+			}
 		}
 
 		if node.IntegrationID != nil && *node.IntegrationID != "" {
