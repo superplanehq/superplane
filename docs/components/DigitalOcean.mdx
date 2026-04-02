@@ -14,6 +14,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
+  <LinkCard title="Create Database Cluster" href="#create-database-cluster" description="Create a new database cluster" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
@@ -26,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
+  <LinkCard title="Get Database Cluster" href="#get-database-cluster" description="Retrieve details of a specific database cluster" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
@@ -396,6 +398,74 @@ Returns the created DNS record including:
   },
   "timestamp": "2026-03-16T09:50:03.222782653Z",
   "type": "digitalocean.dns.record.created"
+}
+```
+
+<a id="create-database-cluster"></a>
+
+## Create Database Cluster
+
+The Create Database Cluster component provisions a new DigitalOcean Managed Database cluster and waits until it is online.
+
+### Use Cases
+
+- **Environment bootstrap**: Provision a managed database cluster before creating apps or databases
+- **Platform setup**: Create a dedicated cluster for a service, team, or customer environment
+- **Migration workflows**: Stand up a new cluster before importing data or cutover
+
+### Configuration
+
+- **Name**: The database cluster name (required)
+- **Engine**: The database engine to provision, such as PostgreSQL or MySQL (required)
+- **Version**: The engine version to provision (required)
+- **Region**: The DigitalOcean region for the cluster (required)
+- **Size**: The node size slug for the cluster, for example `db-s-1vcpu-1gb` (required)
+- **Node Count**: The number of nodes in the cluster (required)
+
+### Output
+
+Returns the created database cluster including:
+- **id**: The cluster UUID
+- **name**: The cluster name
+- **engine**: The provisioned engine
+- **version**: The engine version
+- **region**: The cluster region
+- **size**: The selected node size slug
+- **num_nodes**: The number of nodes
+- **status**: The current cluster status
+- **connection**: Connection information when available
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:create` and `database:read`
+- Valid versions, sizes, and node counts depend on the selected engine. Use the DigitalOcean Database Options API or dashboard values when configuring this component
+- The component polls until the cluster status becomes `online`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connection": {
+      "host": "superplane-db-do-user-123456-0.j.db.ondigitalocean.com",
+      "port": 25060,
+      "ssl": true,
+      "uri": "postgres://doadmin:[email protected]:25060/defaultdb?sslmode=require",
+      "user": "doadmin"
+    },
+    "created_at": "2026-03-27T13:00:00Z",
+    "engine": "pg",
+    "id": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "name": "superplane-db",
+    "num_nodes": 1,
+    "private_network_uuid": "7e6d2691-182b-4dd1-8452-529f88feb996",
+    "region": "nyc1",
+    "size": "db-s-1vcpu-1gb",
+    "status": "creating",
+    "version": "18.0"
+  },
+  "timestamp": "2026-03-27T13:00:05Z",
+  "type": "digitalocean.database.cluster.created"
 }
 ```
 
@@ -1122,6 +1192,68 @@ Returns the app object including:
   },
   "timestamp": "2026-03-26T08:21:30.077395918Z",
   "type": "digitalocean.app.fetched"
+}
+```
+
+<a id="get-database-cluster"></a>
+
+## Get Database Cluster
+
+The Get Database Cluster component retrieves the details of an existing DigitalOcean Managed Database cluster.
+
+### Use Cases
+
+- **Status checks**: Verify a cluster is online before creating databases or users
+- **Information retrieval**: Fetch connection details, sizing, engine, and region information
+- **Pre-flight validation**: Confirm a cluster exists before downstream operations
+
+### Configuration
+
+- **Database Cluster**: The managed database cluster to retrieve (required)
+
+### Output
+
+Returns the database cluster including:
+- **id**: The cluster UUID
+- **name**: The cluster name
+- **engine**: The configured engine
+- **version**: The engine version
+- **region**: The cluster region
+- **size**: The node size slug
+- **num_nodes**: The number of nodes
+- **status**: The cluster status
+- **connection**: Connection information when available
+
+### Important Notes
+
+- If you use custom token scopes, this action requires `database:read`
+- The returned connection information depends on the cluster type and provisioning state.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "connection": {
+      "host": "superplane-db-do-user-123456-0.j.db.ondigitalocean.com",
+      "port": 25060,
+      "ssl": true,
+      "uri": "postgres://doadmin:[email protected]:25060/defaultdb?sslmode=require",
+      "user": "doadmin"
+    },
+    "created_at": "2026-03-27T13:00:00Z",
+    "engine": "pg",
+    "id": "65b497a5-1674-4b1a-a122-01aebe761ef7",
+    "name": "superplane-db",
+    "num_nodes": 1,
+    "private_network_uuid": "7e6d2691-182b-4dd1-8452-529f88feb996",
+    "region": "nyc1",
+    "size": "db-s-1vcpu-1gb",
+    "status": "online",
+    "version": "18.0"
+  },
+  "timestamp": "2026-03-27T13:05:00Z",
+  "type": "digitalocean.database.cluster.fetched"
 }
 ```
 
