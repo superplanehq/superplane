@@ -211,9 +211,12 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 
 func formatAnnotationResourceName(a Annotation) string {
 	text := strings.TrimSpace(a.Text)
-	const maxLen = 72
-	if len(text) > maxLen {
-		text = text[:maxLen] + "…"
+	const maxRunes = 72
+	if text != "" {
+		r := []rune(text)
+		if len(r) > maxRunes {
+			text = string(r[:maxRunes]) + "…"
+		}
 	}
 	if text == "" {
 		return fmt.Sprintf("#%d", a.ID)

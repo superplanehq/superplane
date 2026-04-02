@@ -1,7 +1,9 @@
 package grafana
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -32,6 +34,18 @@ func Test__formatAnnotationResourceName__TextAndEmpty(t *testing.T) {
 	require.Contains(t, formatAnnotationResourceName(Annotation{ID: 3, Text: "hello"}), "#3")
 	require.Contains(t, formatAnnotationResourceName(Annotation{ID: 3, Text: "hello"}), "hello")
 	require.Equal(t, "#9", formatAnnotationResourceName(Annotation{ID: 9, Text: "   "}))
+}
+
+func Test__formatAnnotationResourceName__TruncatesByRunesPreservesUTF8(t *testing.T) {
+	long := strings.Repeat("あ", 100)
+	out := formatAnnotationResourceName(Annotation{ID: 1, Text: long})
+	require.True(t, utf8.ValidString(out), "truncation must not split UTF-8 codepoints")
+	require.Contains(t, out, "…")
+	// "あ" is one rune each; truncated body is 72 runes + ellipsis
+	idx := strings.Index(out, " · ")
+	require.Greater(t, idx, 0)
+	body := out[idx+len(" · "):]
+	require.LessOrEqual(t, utf8.RuneCountInString(body), 73)
 }
 
 func Test__DeleteAnnotation__Setup__AllowsExpression(t *testing.T) {
