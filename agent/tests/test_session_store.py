@@ -1,6 +1,10 @@
 from datetime import UTC, datetime
+from typing import Any
 
-import ai.session_store as session_store
+import psycopg
+import pytest
+from pydantic_ai.messages import UserPromptPart
+
 from ai.session_store import SessionStore, SessionStoreConfig, StoredAgentChatMessageRecord
 
 
@@ -126,7 +130,9 @@ def test_flatten_message_record_ignores_output_tool_returns() -> None:
     assert messages[0].tool_status == "completed"
 
 
-def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> None:
+def test_list_agent_chat_messages_skips_unflattenable_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     now = datetime.now(UTC)
     store = _build_store()
     records = [
@@ -161,7 +167,9 @@ def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> No
         ),
     ]
 
-    monkeypatch.setattr(store, "describe_agent_chat", lambda org_id, user_id, canvas_id, chat_id: None)
+    monkeypatch.setattr(
+        store, "describe_agent_chat", lambda org_id, user_id, canvas_id, chat_id: None
+    )
     monkeypatch.setattr(store, "list_agent_chat_message_records", lambda chat_id: records)
 
     messages = store.list_agent_chat_messages("org-123", "user-123", "canvas-123", "chat-123")
@@ -171,7 +179,9 @@ def test_list_agent_chat_messages_skips_unflattenable_records(monkeypatch) -> No
     assert messages[0].content == "What is in my canvas?"
 
 
-def test_load_agent_chat_message_history_skips_undeserializable_records(monkeypatch) -> None:
+def test_load_agent_chat_message_history_skips_undeserializable_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     now = datetime.now(UTC)
     store = _build_store()
     records = [
@@ -211,10 +221,11 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(monkeypa
     history = store.load_agent_chat_message_history("chat-123")
 
     assert len(history) == 1
+    assert isinstance(history[0].parts[0], UserPromptPart)
     assert history[0].parts[0].content == "What is in my canvas?"
 
 
-def test_connect_reuses_open_connection_until_closed(monkeypatch) -> None:
+def test_connect_reuses_open_connection_until_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     store = _build_store()
     created_connections: list[object] = []
 
@@ -226,12 +237,12 @@ def test_connect_reuses_open_connection_until_closed(monkeypatch) -> None:
         def close(self) -> None:
             self.closed = True
 
-    def fake_connect(**kwargs):
+    def fake_connect(**kwargs: Any) -> FakeConnection:
         connection = FakeConnection()
         created_connections.append(connection)
         return connection
 
-    monkeypatch.setattr(session_store.psycopg, "connect", fake_connect)
+    monkeypatch.setattr(psycopg, "connect", fake_connect)
 
     first = store._connect()
     second = store._connect()
