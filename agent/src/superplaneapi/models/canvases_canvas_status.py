@@ -22,7 +22,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
 from superplaneapi.models.canvases_canvas_event import CanvasesCanvasEvent
 from superplaneapi.models.canvases_canvas_node_execution import CanvasesCanvasNodeExecution
-from superplaneapi.models.canvases_canvas_node_queue_item import CanvasesCanvasNodeQueueItem
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -31,9 +30,8 @@ class CanvasesCanvasStatus(BaseModel):
     CanvasesCanvasStatus
     """ # noqa: E501
     last_executions: Optional[List[CanvasesCanvasNodeExecution]] = Field(default=None, alias="lastExecutions")
-    next_queue_items: Optional[List[CanvasesCanvasNodeQueueItem]] = Field(default=None, alias="nextQueueItems")
     last_events: Optional[List[CanvasesCanvasEvent]] = Field(default=None, alias="lastEvents")
-    __properties: ClassVar[List[str]] = ["lastExecutions", "nextQueueItems", "lastEvents"]
+    __properties: ClassVar[List[str]] = ["lastExecutions", "lastEvents"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -81,13 +79,6 @@ class CanvasesCanvasStatus(BaseModel):
                 if _item_last_executions:
                     _items.append(_item_last_executions.to_dict())
             _dict['lastExecutions'] = _items
-        # override the default output from pydantic by calling `to_dict()` of each item in next_queue_items (list)
-        _items = []
-        if self.next_queue_items:
-            for _item_next_queue_items in self.next_queue_items:
-                if _item_next_queue_items:
-                    _items.append(_item_next_queue_items.to_dict())
-            _dict['nextQueueItems'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in last_events (list)
         _items = []
         if self.last_events:
@@ -108,7 +99,6 @@ class CanvasesCanvasStatus(BaseModel):
 
         _obj = cls.model_validate({
             "lastExecutions": [CanvasesCanvasNodeExecution.from_dict(_item) for _item in obj["lastExecutions"]] if obj.get("lastExecutions") is not None else None,
-            "nextQueueItems": [CanvasesCanvasNodeQueueItem.from_dict(_item) for _item in obj["nextQueueItems"]] if obj.get("nextQueueItems") is not None else None,
             "lastEvents": [CanvasesCanvasEvent.from_dict(_item) for _item in obj["lastEvents"]] if obj.get("lastEvents") is not None else None
         })
         return _obj
