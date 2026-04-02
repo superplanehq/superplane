@@ -140,7 +140,7 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 		return grafanaResourcesFromList(resourceTypeDataSource, dataSources, func(ds DataSource) string { return ds.UID }, func(ds DataSource) string { return ds.Name }), nil
 	case resourceTypeAlertRule:
-		alertRules, err := client.ListAlertRules()
+		alertRules, err := client.ListAlertRules("", "")
 		if err != nil {
 			return nil, err
 		}

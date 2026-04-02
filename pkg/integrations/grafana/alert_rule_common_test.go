@@ -46,6 +46,22 @@ func strPtr(s string) *string {
 	return &s
 }
 
+func Test__decodeUpdateAlertRuleSpec__whitespaceOnlyReducerConditionAndNotificationBecomeNil(t *testing.T) {
+	ws := "   "
+	spec, err := decodeUpdateAlertRuleSpec(map[string]any{
+		"alertRuleUid":         "rule-1",
+		"title":                "Updated",
+		"reducer":              ws,
+		"conditionType":        ws,
+		"notificationReceiver": ws,
+	})
+	require.NoError(t, err)
+	assert.Nil(t, spec.Reducer)
+	assert.Nil(t, spec.ConditionType)
+	assert.Nil(t, spec.NotificationReceiver)
+	assert.NotNil(t, spec.Title)
+}
+
 func Test__alertRuleFieldConfiguration__noDataAndExecErrStateSelectOptions(t *testing.T) {
 	fields := alertRuleFieldConfiguration(false, false)
 	noDataVals := alertRuleSelectOptionValues(t, fields, "noDataState")

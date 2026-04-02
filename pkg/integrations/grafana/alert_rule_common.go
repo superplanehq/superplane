@@ -25,23 +25,23 @@ type AlertRuleKeyValuePair struct {
 }
 
 type CreateAlertRuleSpec struct {
-	Title           string                   `json:"title" mapstructure:"title"`
-	FolderUID       string                   `json:"folderUID" mapstructure:"folderUID"`
-	RuleGroup       string                   `json:"ruleGroup" mapstructure:"ruleGroup"`
-	DataSourceUID   string                   `json:"dataSourceUid" mapstructure:"dataSourceUid"`
-	Query           string                   `json:"query" mapstructure:"query"`
-	LookbackSeconds int                      `json:"lookbackSeconds" mapstructure:"lookbackSeconds"`
+	Title                string                   `json:"title" mapstructure:"title"`
+	FolderUID            string                   `json:"folderUID" mapstructure:"folderUID"`
+	RuleGroup            string                   `json:"ruleGroup" mapstructure:"ruleGroup"`
+	DataSourceUID        string                   `json:"dataSourceUid" mapstructure:"dataSourceUid"`
+	Query                string                   `json:"query" mapstructure:"query"`
+	LookbackSeconds      int                      `json:"lookbackSeconds" mapstructure:"lookbackSeconds"`
 	Reducer              string                   `json:"reducer" mapstructure:"reducer"`
 	ConditionType        string                   `json:"conditionType" mapstructure:"conditionType"`
 	Threshold            *float64                 `json:"threshold" mapstructure:"threshold"`
 	Threshold2           *float64                 `json:"threshold2,omitempty" mapstructure:"threshold2"`
 	NotificationReceiver string                   `json:"notificationReceiver,omitempty" mapstructure:"notificationReceiver"`
 	For                  string                   `json:"for" mapstructure:"for"`
-	NoDataState     string                   `json:"noDataState" mapstructure:"noDataState"`
-	ExecErrState    string                   `json:"execErrState" mapstructure:"execErrState"`
-	Labels          *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
-	Annotations     *[]AlertRuleKeyValuePair `json:"annotations,omitempty" mapstructure:"annotations"`
-	IsPaused        bool                     `json:"isPaused" mapstructure:"isPaused"`
+	NoDataState          string                   `json:"noDataState" mapstructure:"noDataState"`
+	ExecErrState         string                   `json:"execErrState" mapstructure:"execErrState"`
+	Labels               *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
+	Annotations          *[]AlertRuleKeyValuePair `json:"annotations,omitempty" mapstructure:"annotations"`
+	IsPaused             bool                     `json:"isPaused" mapstructure:"isPaused"`
 }
 
 type GetAlertRuleSpec struct {
@@ -49,24 +49,24 @@ type GetAlertRuleSpec struct {
 }
 
 type UpdateAlertRuleSpec struct {
-	AlertRuleUID    string                   `json:"alertRuleUid" mapstructure:"alertRuleUid"`
-	Title           *string                  `json:"title,omitempty" mapstructure:"title"`
-	FolderUID       *string                  `json:"folderUID,omitempty" mapstructure:"folderUID"`
-	RuleGroup       *string                  `json:"ruleGroup,omitempty" mapstructure:"ruleGroup"`
-	DataSourceUID   *string                  `json:"dataSourceUid,omitempty" mapstructure:"dataSourceUid"`
-	Query           *string                  `json:"query,omitempty" mapstructure:"query"`
-	LookbackSeconds *int                     `json:"lookbackSeconds,omitempty" mapstructure:"lookbackSeconds"`
+	AlertRuleUID         string                   `json:"alertRuleUid" mapstructure:"alertRuleUid"`
+	Title                *string                  `json:"title,omitempty" mapstructure:"title"`
+	FolderUID            *string                  `json:"folderUID,omitempty" mapstructure:"folderUID"`
+	RuleGroup            *string                  `json:"ruleGroup,omitempty" mapstructure:"ruleGroup"`
+	DataSourceUID        *string                  `json:"dataSourceUid,omitempty" mapstructure:"dataSourceUid"`
+	Query                *string                  `json:"query,omitempty" mapstructure:"query"`
+	LookbackSeconds      *int                     `json:"lookbackSeconds,omitempty" mapstructure:"lookbackSeconds"`
 	Reducer              *string                  `json:"reducer,omitempty" mapstructure:"reducer"`
 	ConditionType        *string                  `json:"conditionType,omitempty" mapstructure:"conditionType"`
 	Threshold            *float64                 `json:"threshold,omitempty" mapstructure:"threshold"`
 	Threshold2           *float64                 `json:"threshold2,omitempty" mapstructure:"threshold2"`
 	NotificationReceiver *string                  `json:"notificationReceiver,omitempty" mapstructure:"notificationReceiver"`
 	For                  *string                  `json:"for,omitempty" mapstructure:"for"`
-	NoDataState     *string                  `json:"noDataState,omitempty" mapstructure:"noDataState"`
-	ExecErrState    *string                  `json:"execErrState,omitempty" mapstructure:"execErrState"`
-	Labels          *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
-	Annotations     *[]AlertRuleKeyValuePair `json:"annotations,omitempty" mapstructure:"annotations"`
-	IsPaused        *bool                    `json:"isPaused,omitempty" mapstructure:"isPaused"`
+	NoDataState          *string                  `json:"noDataState,omitempty" mapstructure:"noDataState"`
+	ExecErrState         *string                  `json:"execErrState,omitempty" mapstructure:"execErrState"`
+	Labels               *[]AlertRuleKeyValuePair `json:"labels,omitempty" mapstructure:"labels"`
+	Annotations          *[]AlertRuleKeyValuePair `json:"annotations,omitempty" mapstructure:"annotations"`
+	IsPaused             *bool                    `json:"isPaused,omitempty" mapstructure:"isPaused"`
 }
 
 func decodeCreateAlertRuleSpec(input any) (CreateAlertRuleSpec, error) {
@@ -143,6 +143,9 @@ func sanitizeUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) UpdateAlertRuleSpec {
 	spec.RuleGroup = sanitizeOptionalAlertRuleString(spec.RuleGroup)
 	spec.DataSourceUID = sanitizeOptionalAlertRuleString(spec.DataSourceUID)
 	spec.Query = sanitizeOptionalAlertRuleString(spec.Query)
+	spec.Reducer = sanitizeOptionalAlertRuleString(spec.Reducer)
+	spec.ConditionType = sanitizeOptionalAlertRuleString(spec.ConditionType)
+	spec.NotificationReceiver = sanitizeOptionalAlertRuleString(spec.NotificationReceiver)
 	spec.For = sanitizeOptionalAlertRuleString(spec.For)
 	spec.NoDataState = sanitizeOptionalAlertRuleString(spec.NoDataState)
 	spec.ExecErrState = sanitizeOptionalAlertRuleString(spec.ExecErrState)

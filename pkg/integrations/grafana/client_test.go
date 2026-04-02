@@ -279,7 +279,7 @@ func Test__Client__ListAlertRules(t *testing.T) {
 		http:     httpContext,
 	}
 
-	alertRules, err := client.ListAlertRules()
+	alertRules, err := client.ListAlertRules("", "")
 	require.NoError(t, err)
 	require.Len(t, alertRules, 2)
 	require.Equal(t, "rule-1", alertRules[0].UID)

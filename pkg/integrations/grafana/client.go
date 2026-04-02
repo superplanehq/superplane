@@ -497,8 +497,20 @@ func (c *Client) UpsertNotificationPolicyRoute(contactPointName string, alertNam
 	return c.putNotificationPolicies(root)
 }
 
-func (c *Client) ListAlertRules() ([]AlertRuleSummary, error) {
-	responseBody, status, err := c.execRequest(http.MethodGet, "/api/v1/provisioning/alert-rules", nil, "")
+func (c *Client) ListAlertRules(folderUID, group string) ([]AlertRuleSummary, error) {
+	path := "/api/v1/provisioning/alert-rules"
+	params := url.Values{}
+	if folderUID != "" {
+		params.Set("folderUID", folderUID)
+	}
+	if group != "" {
+		params.Set("group", group)
+	}
+	if len(params) > 0 {
+		path = path + "?" + params.Encode()
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error listing alert rules: %v", err)
 	}

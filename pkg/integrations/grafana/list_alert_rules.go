@@ -3,16 +3,41 @@ package grafana
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 type ListAlertRules struct{}
 
+type ListAlertRulesSpec struct {
+	FolderUID string `json:"folderUID,omitempty" mapstructure:"folderUID"`
+	Group     string `json:"group,omitempty" mapstructure:"group"`
+}
+
 type ListAlertRulesOutput struct {
 	AlertRules []AlertRuleSummary `json:"alertRules" mapstructure:"alertRules"`
+}
+
+func decodeListAlertRulesSpec(input any) (ListAlertRulesSpec, error) {
+	spec := ListAlertRulesSpec{}
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:           &spec,
+		TagName:          "mapstructure",
+		WeaklyTypedInput: true,
+	})
+	if err != nil {
+		return ListAlertRulesSpec{}, err
+	}
+	if err := decoder.Decode(input); err != nil {
+		return ListAlertRulesSpec{}, fmt.Errorf("error decoding configuration: %v", err)
+	}
+	spec.FolderUID = strings.TrimSpace(spec.FolderUID)
+	spec.Group = strings.TrimSpace(spec.Group)
+	return spec, nil
 }
 
 func (c *ListAlertRules) Name() string {
@@ -58,7 +83,29 @@ func (c *ListAlertRules) OutputChannels(configuration any) []core.OutputChannel 
 }
 
 func (c *ListAlertRules) Configuration() []configuration.Field {
-	return []configuration.Field{}
+	return []configuration.Field{
+		{
+			Name:        "folderUID",
+			Label:       "Folder",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Limit results to alert rules in this folder",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeFolder,
+				},
+			},
+		},
+		{
+			Name:        "group",
+			Label:       "Rule Group",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Description: "Limit results to alert rules in this rule group",
+		},
+	}
 }
 
 func (c *ListAlertRules) Setup(ctx core.SetupContext) error {
@@ -66,12 +113,17 @@ func (c *ListAlertRules) Setup(ctx core.SetupContext) error {
 }
 
 func (c *ListAlertRules) Execute(ctx core.ExecutionContext) error {
+	spec, err := decodeListAlertRulesSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	rules, err := client.ListAlertRules()
+	rules, err := client.ListAlertRules(spec.FolderUID, spec.Group)
 	if err != nil {
 		return fmt.Errorf("error listing alert rules: %w", err)
 	}
