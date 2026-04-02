@@ -9,8 +9,6 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
-
-from ai.config import config
 from psycopg.types.json import Jsonb
 from pydantic_ai.messages import (
     ModelMessage,
@@ -22,6 +20,8 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
+
+from ai.config import config
 
 
 def _utcnow() -> datetime:
@@ -201,11 +201,11 @@ class SessionStore:
         self._connections_lock = threading.Lock()
 
     def _connect(self) -> psycopg.Connection[Any]:
-        connection = getattr(self._thread_local, "connection", None)
-        if connection is not None and not connection.closed and not connection.broken:
-            return connection
+        existing = getattr(self._thread_local, "connection", None)
+        if existing is not None and not existing.closed and not existing.broken:
+            return existing  # type: ignore[no-any-return]
 
-        connection = psycopg.connect(
+        connection: psycopg.Connection[Any] = psycopg.connect(
             host=self._config.host,
             port=self._config.port,
             dbname=self._config.dbname,
@@ -245,7 +245,9 @@ class SessionStore:
 
         self._thread_local.connection = None
 
-    def create_agent_chat(self, org_id: str, user_id: str, canvas_id: str, chat_id: str | None = None) -> StoredAgentChat:
+    def create_agent_chat(
+        self, org_id: str, user_id: str, canvas_id: str, chat_id: str | None = None
+    ) -> StoredAgentChat:
         now = _utcnow()
         chat = StoredAgentChat(
             id=chat_id or str(uuid.uuid4()),
@@ -292,7 +294,9 @@ class SessionStore:
 
         return [self._row_to_agent_chat(row) for row in rows]
 
-    def describe_agent_chat(self, org_id: str, user_id: str, canvas_id: str, chat_id: str) -> StoredAgentChat:
+    def describe_agent_chat(
+        self, org_id: str, user_id: str, canvas_id: str, chat_id: str
+    ) -> StoredAgentChat:
         chat = self.get_agent_chat(chat_id)
         if chat.org_id != org_id or chat.user_id != user_id or chat.canvas_id != canvas_id:
             raise AgentChatNotFoundError(chat_id)
@@ -341,7 +345,9 @@ class SessionStore:
 
         return [self._row_to_message_record(row) for row in rows]
 
-    def list_agent_chat_messages(self, org_id: str, user_id: str, canvas_id: str, chat_id: str) -> list[StoredAgentChatMessage]:
+    def list_agent_chat_messages(
+        self, org_id: str, user_id: str, canvas_id: str, chat_id: str
+    ) -> list[StoredAgentChatMessage]:
         self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
         records = self.list_agent_chat_message_records(chat_id)
 
@@ -351,7 +357,8 @@ class SessionStore:
                 flattened.extend(self._flatten_message_record(record))
             except Exception as error:
                 print(
-                    f"[agent] failed to flatten chat message record chat_id={chat_id} message_id={record.id}: {error}",
+                    f"[agent] failed to flatten chat message record "
+                    f"chat_id={chat_id} message_id={record.id}: {error}",
                     flush=True,
                 )
         return flattened
@@ -364,12 +371,15 @@ class SessionStore:
                 history.append(_deserialize_model_message(record.message))
             except Exception as error:
                 print(
-                    f"[agent] failed to deserialize chat history record chat_id={chat_id} message_id={record.id}: {error}",
+                    f"[agent] failed to deserialize chat history record "
+                    f"chat_id={chat_id} message_id={record.id}: {error}",
                     flush=True,
                 )
         return history
 
-    def create_agent_chat_model_message(self, chat_id: str, message: ModelMessage) -> StoredAgentChatMessageRecord:
+    def create_agent_chat_model_message(
+        self, chat_id: str, message: ModelMessage
+    ) -> StoredAgentChatMessageRecord:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
         created_at = _message_timestamp(message)
@@ -425,7 +435,9 @@ class SessionStore:
             )
             row = cur.fetchone()
             if row is not None:
-                cur.execute("UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, row["chat_id"]))
+                cur.execute(
+                    "UPDATE agent_chats SET updated_at = %s WHERE id = %s", (now, row["chat_id"])
+                )
 
     def replace_agent_chat_messages_after(
         self,
@@ -484,7 +496,9 @@ class SessionStore:
                 (initial_message.strip(), now, chat_id),
             )
 
-    def _flatten_message_record(self, record: StoredAgentChatMessageRecord) -> list[StoredAgentChatMessage]:
+    def _flatten_message_record(
+        self, record: StoredAgentChatMessageRecord
+    ) -> list[StoredAgentChatMessage]:
         model_message = _deserialize_model_message(record.message)
         flattened: list[StoredAgentChatMessage] = []
 
@@ -541,7 +555,11 @@ class SessionStore:
             return flattened
 
         if isinstance(model_message, ModelResponse):
-            assistant_parts = [part.content for part in model_message.parts if isinstance(part, TextPart) and part.content]
+            assistant_parts = [
+                part.content
+                for part in model_message.parts
+                if isinstance(part, TextPart) and part.content
+            ]
             assistant_content = "".join(assistant_parts)
             if not assistant_content:
                 assistant_content = _extract_output_tool_answer(record.message)
@@ -566,7 +584,9 @@ class SessionStore:
             org_id=str(row["org_id"]),
             user_id=str(row["user_id"]),
             canvas_id=str(row["canvas_id"]),
-            initial_message=str(row["initial_message"]) if row["initial_message"] is not None else None,
+            initial_message=str(row["initial_message"])
+            if row["initial_message"] is not None
+            else None,
             created_at=_from_db_time(row["created_at"]),
             updated_at=_from_db_time(row["updated_at"]),
         )
