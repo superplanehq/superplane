@@ -255,14 +255,3 @@ export interface KnowledgeBaseDataSource {
   parentChunkSize?: number;
   childChunkSize?: number;
 }
-
-export interface CreateKnowledgeBaseOutput {
-  uuid?: string;
-  name?: string;
-  region?: string;
-  embeddingModelUUID?: string;
-  projectId?: string;
-  databaseId?: string;
-  tags?: string[];
-  createdAt?: string;
-}
