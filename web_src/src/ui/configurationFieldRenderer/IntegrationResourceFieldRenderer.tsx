@@ -63,6 +63,8 @@ export const IntegrationResourceFieldRenderer = ({
   // Fixed vs Expression mode for single-select when expressions are allowed
   const initialIsExpression = allowExpressions && !isMulti && isExpressionValue(value);
   const [useExpressionMode, setUseExpressionMode] = useState(initialIsExpression);
+  const [cachedFixedValue, setCachedFixedValue] = useState<string | string[] | undefined>(undefined);
+  const [cachedExpressionValue, setCachedExpressionValue] = useState<string | string[] | undefined>(undefined);
 
   const additionalQueryParameters = useMemo(() => {
     if (!resourceParameters.length) return undefined;
@@ -253,7 +255,13 @@ export const IntegrationResourceFieldRenderer = ({
       const handleTabChange = (v: string) => {
         const nextExpression = v === "expression";
         if (nextExpression !== useExpressionMode) {
-          onChange(undefined);
+          if (useExpressionMode) {
+            setCachedExpressionValue(value);
+            onChange(cachedFixedValue);
+          } else {
+            setCachedFixedValue(value);
+            onChange(cachedExpressionValue);
+          }
         }
         setUseExpressionMode(nextExpression);
       };
