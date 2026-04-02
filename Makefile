@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check test.agent.unit
+.PHONY: lint test test.coverage test.license.check test.agent.unit agent.evals.bootstrap
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
@@ -78,6 +78,9 @@ test.watch:
 
 test.agent.evals:
 	$(COMPOSE) exec agent uv run python -m evals.runner
+
+agent.evals.bootstrap:
+	bash "$(CURDIR)/agent/scripts/run_bootstrap_eval_env.sh" $(ARGS)
 
 test.agent.unit:
 	$(COMPOSE) run --rm -e DB_NAME=agents_test agent uv run --group dev python -m pytest $(AGENT_TEST_TARGETS)
