@@ -864,6 +864,7 @@ message CanvasEvent {
   string custom_name = 5;
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
+  bool root = 8;
 }
 
 message CanvasEventWithExecutions {

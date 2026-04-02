@@ -223,6 +223,7 @@ export type CanvasesCanvasEvent = {
     [key: string]: unknown;
   };
   createdAt?: string;
+  root?: boolean;
 };
 
 export type CanvasesCanvasEventWithExecutions = {
