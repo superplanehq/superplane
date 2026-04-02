@@ -132,6 +132,9 @@ import type {
   ComponentsListComponentsData,
   ComponentsListComponentsErrors,
   ComponentsListComponentsResponses,
+  ConfigAssistantSuggestConfigurationFieldData,
+  ConfigAssistantSuggestConfigurationFieldErrors,
+  ConfigAssistantSuggestConfigurationFieldResponses,
   GroupsAddUserToGroupData,
   GroupsAddUserToGroupErrors,
   GroupsAddUserToGroupResponses,
@@ -1005,6 +1008,27 @@ export const componentsListComponentActions = <ThrowOnError extends boolean = tr
     ComponentsListComponentActionsErrors,
     ThrowOnError
   >({ url: "/api/v1/components/{name}/actions", ...options });
+
+/**
+ * Suggest a value for a configuration field
+ *
+ * Uses the AI config assistant to propose a field value from context and a natural-language instruction.
+ */
+export const configAssistantSuggestConfigurationField = <ThrowOnError extends boolean = true>(
+  options: Options<ConfigAssistantSuggestConfigurationFieldData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    ConfigAssistantSuggestConfigurationFieldResponses,
+    ConfigAssistantSuggestConfigurationFieldErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/config-assistant/suggest",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
 
 /**
  * List groups

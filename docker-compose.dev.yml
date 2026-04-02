@@ -69,7 +69,7 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
+      AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://agent:8090}
       AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -84,6 +84,7 @@ services:
       OWNER_SETUP_ENABLED: "yes"
       USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
       VITE_ENABLE_CUSTOM_COMPONENTS: "true"
+      VITE_ENABLE_INLINE_CONFIG_ASSISTANT: "true"
       VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
 
