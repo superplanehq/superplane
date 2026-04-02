@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -9,7 +10,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const resourceTypeDataSource = "data-source"
+const (
+	resourceTypeDataSource = "data-source"
+	resourceTypeDashboard  = "dashboard"
+	resourceTypeAnnotation = "annotation"
+)
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -80,6 +85,9 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
 		&QueryDataSource{},
+		&CreateAnnotation{},
+		&ListAnnotations{},
+		&DeleteAnnotation{},
 	}
 }
 
@@ -107,38 +115,108 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeDataSource {
+	switch resourceType {
+	case resourceTypeDataSource:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		dataSources, err := client.ListDataSources()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(dataSources))
+		for _, source := range dataSources {
+			id := strings.TrimSpace(source.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(source.Name)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeDataSource,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+
+	case resourceTypeDashboard:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		dashboards, err := client.SearchDashboards()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(dashboards))
+		for _, d := range dashboards {
+			id := strings.TrimSpace(d.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(d.Title)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeDashboard,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+
+	case resourceTypeAnnotation:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		annotations, err := client.ListAnnotations(nil, "", 0, 0, 5000)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(annotations))
+		for _, a := range annotations {
+			idStr := strconv.FormatInt(a.ID, 10)
+			name := formatAnnotationResourceName(a)
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeAnnotation,
+				Name: name,
+				ID:   idStr,
+			})
+		}
+
+		return resources, nil
+
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %w", err)
+func formatAnnotationResourceName(a Annotation) string {
+	text := strings.TrimSpace(a.Text)
+	const maxLen = 72
+	if len(text) > maxLen {
+		text = text[:maxLen] + "…"
 	}
-
-	dataSources, err := client.ListDataSources()
-	if err != nil {
-		return nil, err
+	if text == "" {
+		return fmt.Sprintf("#%d", a.ID)
 	}
-
-	resources := make([]core.IntegrationResource, 0, len(dataSources))
-	for _, source := range dataSources {
-		id := strings.TrimSpace(source.UID)
-		if id == "" {
-			continue
-		}
-
-		name := strings.TrimSpace(source.Name)
-		if name == "" {
-			name = id
-		}
-
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceTypeDataSource,
-			Name: name,
-			ID:   id,
-		})
-	}
-
-	return resources, nil
+	return fmt.Sprintf("#%d · %s", a.ID, text)
 }
