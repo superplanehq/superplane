@@ -123,8 +123,11 @@ export function CanvasVersionControlSidebar({
         return;
       }
 
-      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
-      const newWidth = event.clientX - sidebarLeft;
+      const rect = sidebarRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+      const newWidth = rect.right - event.clientX;
       const clampedWidth = Math.max(
         MIN_CANVAS_VERSION_CONTROL_WIDTH,
         Math.min(MAX_CANVAS_VERSION_CONTROL_WIDTH, newWidth),
@@ -172,7 +175,7 @@ export function CanvasVersionControlSidebar({
     <aside
       ref={sidebarRef}
       className={cn(
-        "z-20 h-full border-r bg-white relative",
+        "z-20 h-full shrink-0 border-l bg-white relative",
         isResizeHandleHovered || isResizing ? "border-slate-800" : "border-slate-950/15",
       )}
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
@@ -181,8 +184,8 @@ export function CanvasVersionControlSidebar({
         onMouseDown={handleMouseDown}
         onMouseEnter={() => setIsResizeHandleHovered(true)}
         onMouseLeave={() => setIsResizeHandleHovered(false)}
-        className="absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize bg-transparent transition-colors z-30"
-        style={{ marginRight: "-8px" }}
+        className="absolute left-0 top-0 bottom-0 w-4 cursor-ew-resize bg-transparent transition-colors z-30"
+        style={{ marginLeft: "-8px" }}
       />
       <div className="flex h-full flex-col">
         <div className="flex h-12 items-center justify-between px-3">

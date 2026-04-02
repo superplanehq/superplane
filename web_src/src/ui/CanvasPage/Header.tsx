@@ -1,7 +1,7 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Copy, Download, ChevronDown, Palette, Plus, Undo2, Pencil } from "lucide-react";
+import { Copy, Download, ChevronDown, GitBranch, Palette, Plus, Undo2, Pencil } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
@@ -28,7 +28,6 @@ interface HeaderProps {
   onSave?: () => void;
   onCreateVersion?: () => void;
   onPublishVersion?: () => void;
-  onDiscardVersion?: () => void;
   onUndo?: () => void;
   canUndo?: boolean;
   onLogoClick?: () => void;
@@ -43,8 +42,6 @@ interface HeaderProps {
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
@@ -71,13 +68,18 @@ interface HeaderProps {
   draftLastEditedAt?: Date | string | null;
   /** When true, the publish button shows "Submit for Review" instead of "Publish". */
   isChangeManagementEnabled?: boolean;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
+  /** When false, hides the Versions header trigger (e.g. templates). */
+  showBottomStatusControls?: boolean;
 }
 
 export function Header({
   breadcrumbs,
   onSave,
   onPublishVersion,
-  onDiscardVersion,
   onUndo,
   canUndo,
   onLogoClick,
@@ -87,10 +89,12 @@ export function Header({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
+  versionLabel: _versionLabel,
+  onCreateVersion: _onCreateVersion,
+  createVersionDisabled: _createVersionDisabled,
+  createVersionDisabledTooltip: _createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
   topViewMode,
   onTopViewModeChange,
   onExportYamlCopy,
@@ -109,6 +113,11 @@ export function Header({
   hasDraft = false,
   draftLastEditedAt = null,
   isChangeManagementEnabled = false,
+  isVersionControlOpen = false,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount = 0,
+  showBottomStatusControls = true,
 }: HeaderProps) {
   const { workflowId } = useParams<{ workflowId?: string }>();
   const { data: workflows = [], isLoading: workflowsLoading } = useCanvases(organizationId || "");
@@ -461,27 +470,18 @@ export function Header({
                 {unpublishedDraftChangeCount > 0 ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <UIButton
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={exitEditModeDisabled}
-                      >
+                      <UIButton type="button" variant="outline" size="sm" disabled={exitEditModeDisabled}>
                         Exit
                         <ChevronDown className="h-3.5 w-3.5" />
                       </UIButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48 p-1">
-                      <DropdownMenuItem
-                        onClick={() => onExitEditMode?.()}
-                      >
-                        Save Draft and exit
-                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onExitEditMode?.()}>Save Draft and exit</DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-red-600 focus:text-red-600"
                         onClick={() => onDiscardAndExitEditMode?.()}
                       >
-                        Exit without saving
+                        Discard Draft and exit
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -501,6 +501,41 @@ export function Header({
                   )
                 )}
               </div>
+            ) : null}
+
+            {showEditButton && showBottomStatusControls && onOpenVersionControl ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="relative inline-flex">
+                    <UIButton
+                      type="button"
+                      variant={isVersionControlOpen ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => onOpenVersionControl()}
+                      className="gap-1.5"
+                      aria-pressed={isVersionControlOpen}
+                      aria-label={
+                        isVersionControlOpen
+                          ? "Close versions sidebar"
+                          : versionControlButtonTooltip || "Open versions sidebar"
+                      }
+                    >
+                      <GitBranch className="size-3.5" />
+                      Versions
+                    </UIButton>
+                    {versionControlNotificationCount > 0 ? (
+                      <span className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-none text-white">
+                        {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
+                      </span>
+                    ) : null}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {isVersionControlOpen
+                    ? "Close versions sidebar"
+                    : versionControlButtonTooltip || "Open versions sidebar"}
+                </TooltipContent>
+              </Tooltip>
             ) : null}
 
             {showEditButton ? (

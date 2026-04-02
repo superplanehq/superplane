@@ -19,7 +19,6 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   CircleX,
-  GitBranch,
   Group,
   LayoutDashboard,
   Loader2,
@@ -165,13 +164,10 @@ export interface CanvasPageProps {
   versionLabel?: string;
   onCreateVersion?: () => void;
   onPublishVersion?: () => void;
-  onDiscardVersion?: () => void;
   createVersionDisabled?: boolean;
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
@@ -737,6 +733,12 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
+  useEffect(() => {
+    if (props.hideAddControls) {
+      setIsBuildingBlocksSidebarOpen(false);
+    }
+  }, [props.hideAddControls]);
+
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
   const [emitModalData, setEmitModalData] = useState<{
@@ -1202,13 +1204,10 @@ function CanvasPage(props: CanvasPageProps) {
           versionLabel={props.versionLabel}
           onCreateVersion={props.onCreateVersion}
           onPublishVersion={props.onPublishVersion}
-          onDiscardVersion={props.onDiscardVersion}
           createVersionDisabled={props.createVersionDisabled}
           createVersionDisabledTooltip={props.createVersionDisabledTooltip}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-          discardVersionDisabled={props.discardVersionDisabled}
-          discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
           saveState={props.saveState}
           onEnterEditMode={props.onEnterEditMode}
@@ -1227,20 +1226,23 @@ function CanvasPage(props: CanvasPageProps) {
           hasDraft={props.hasDraft}
           draftLastEditedAt={props.draftLastEditedAt}
           isChangeManagementEnabled={props.isChangeManagementEnabled}
+          isVersionControlOpen={props.isVersionControlOpen}
+          onOpenVersionControl={props.onOpenVersionControl}
+          versionControlButtonTooltip={props.versionControlButtonTooltip}
+          versionControlNotificationCount={props.versionControlNotificationCount}
+          showBottomStatusControls={props.showBottomStatusControls}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-
       {/* Main content area with sidebar and canvas/memory/settings views */}
       {props.topViewMode && props.topViewMode !== "canvas" ? (
         <div className="flex-1 flex relative overflow-hidden">
-          {props.versionControlSidebar}
           <div className="flex-1 overflow-auto bg-slate-100">{props.dataViewContent}</div>
+          {props.versionControlSidebar}
         </div>
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
-          {props.versionControlSidebar}
           {props.hideAddControls ? null : (
             <BuildingBlocksSidebar
               isOpen={isBuildingBlocksSidebarOpen}
@@ -1260,7 +1262,7 @@ function CanvasPage(props: CanvasPageProps) {
             />
           )}
 
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-w-0">
             {showPreviewFloatingBar || showAwaitingFloatingBar ? (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
                 <div
@@ -1352,13 +1354,10 @@ function CanvasPage(props: CanvasPageProps) {
                 versionLabel={props.versionLabel}
                 onCreateVersion={props.onCreateVersion}
                 onPublishVersion={props.onPublishVersion}
-                onDiscardVersion={props.onDiscardVersion}
                 createVersionDisabled={props.createVersionDisabled}
                 createVersionDisabledTooltip={props.createVersionDisabledTooltip}
                 publishVersionDisabled={props.publishVersionDisabled}
                 publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-                discardVersionDisabled={props.discardVersionDisabled}
-                discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
                 onEnterEditMode={props.onEnterEditMode}
@@ -1369,10 +1368,6 @@ function CanvasPage(props: CanvasPageProps) {
                 exitEditModeDisabled={props.exitEditModeDisabled}
                 exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
                 unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
-                isVersionControlOpen={props.isVersionControlOpen}
-                onOpenVersionControl={props.onOpenVersionControl}
-                versionControlButtonTooltip={props.versionControlButtonTooltip}
-                versionControlNotificationCount={props.versionControlNotificationCount}
                 showBottomStatusControls={props.showBottomStatusControls}
                 isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
                 onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
@@ -1453,6 +1448,7 @@ function CanvasPage(props: CanvasPageProps) {
               canUpdateIntegrations={props.canUpdateIntegrations}
             />
           </div>
+          {props.versionControlSidebar}
         </div>
       )}
 
@@ -1799,13 +1795,10 @@ function CanvasContentHeader({
   versionLabel,
   onCreateVersion,
   onPublishVersion,
-  onDiscardVersion,
   createVersionDisabled,
   createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
   headerMode,
   saveState,
   onEnterEditMode,
@@ -1824,6 +1817,11 @@ function CanvasContentHeader({
   hasDraft,
   draftLastEditedAt,
   isChangeManagementEnabled,
+  isVersionControlOpen,
+  onOpenVersionControl,
+  versionControlButtonTooltip,
+  versionControlNotificationCount,
+  showBottomStatusControls = true,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1838,13 +1836,10 @@ function CanvasContentHeader({
   versionLabel?: string;
   onCreateVersion?: () => void;
   onPublishVersion?: () => void;
-  onDiscardVersion?: () => void;
   createVersionDisabled?: boolean;
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   onEnterEditMode?: () => void;
@@ -1863,6 +1858,11 @@ function CanvasContentHeader({
   hasDraft?: boolean;
   draftLastEditedAt?: Date | string | null;
   isChangeManagementEnabled?: boolean;
+  isVersionControlOpen?: boolean;
+  onOpenVersionControl?: () => void;
+  versionControlButtonTooltip?: string;
+  versionControlNotificationCount?: number;
+  showBottomStatusControls?: boolean;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1907,13 +1907,10 @@ function CanvasContentHeader({
       versionLabel={versionLabel}
       onCreateVersion={onCreateVersion}
       onPublishVersion={onPublishVersion}
-      onDiscardVersion={onDiscardVersion}
       createVersionDisabled={createVersionDisabled}
       createVersionDisabledTooltip={createVersionDisabledTooltip}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-      discardVersionDisabled={discardVersionDisabled}
-      discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
       saveState={saveState}
       onEnterEditMode={onEnterEditMode}
@@ -1932,6 +1929,11 @@ function CanvasContentHeader({
       hasDraft={hasDraft}
       draftLastEditedAt={draftLastEditedAt ?? undefined}
       isChangeManagementEnabled={isChangeManagementEnabled}
+      isVersionControlOpen={isVersionControlOpen}
+      onOpenVersionControl={onOpenVersionControl}
+      versionControlButtonTooltip={versionControlButtonTooltip}
+      versionControlNotificationCount={versionControlNotificationCount}
+      showBottomStatusControls={showBottomStatusControls}
     />
   );
 }
@@ -2017,13 +2019,10 @@ function CanvasContent({
   versionLabel,
   onCreateVersion,
   onPublishVersion,
-  onDiscardVersion,
   createVersionDisabled,
   createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
   headerMode,
   saveState,
   onEnterEditMode,
@@ -2034,10 +2033,6 @@ function CanvasContent({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
   showBottomStatusControls = true,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
@@ -2118,13 +2113,10 @@ function CanvasContent({
   versionLabel?: string;
   onCreateVersion?: () => void;
   onPublishVersion?: () => void;
-  onDiscardVersion?: () => void;
   createVersionDisabled?: boolean;
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   onEnterEditMode?: () => void;
@@ -2135,10 +2127,6 @@ function CanvasContent({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
@@ -2870,8 +2858,6 @@ function CanvasContent({
     setIsLogSidebarOpen(true);
   }, []);
 
-  const showVersionControlTrigger = showBottomStatusControls && !!onOpenVersionControl && !isVersionControlOpen;
-
   return (
     <div className="h-full w-full relative">
       {/* Header */}
@@ -2890,13 +2876,10 @@ function CanvasContent({
           versionLabel={versionLabel}
           onCreateVersion={onCreateVersion}
           onPublishVersion={onPublishVersion}
-          onDiscardVersion={onDiscardVersion}
           createVersionDisabled={createVersionDisabled}
           createVersionDisabledTooltip={createVersionDisabledTooltip}
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-          discardVersionDisabled={discardVersionDisabled}
-          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
           mode={headerMode}
           saveState={saveState}
           onEnterEditMode={onEnterEditMode}
@@ -2976,31 +2959,6 @@ function CanvasContent({
                 </div>
               )}
               <div className="flex items-center gap-3">
-                {showVersionControlTrigger ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center rounded-md p-0.5 h-8">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="relative inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 items-center text-xs font-medium gap-1.5"
-                            onClick={onOpenVersionControl}
-                            aria-label="Open version control"
-                          >
-                            <GitBranch className="h-3 w-3" />
-                          </Button>
-                          {versionControlNotificationCount > 0 ? (
-                            <span className="absolute left-6 -top-2 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
-                              {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
-                            </span>
-                          ) : null}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>{versionControlButtonTooltip || "Open version control"}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                ) : null}
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"

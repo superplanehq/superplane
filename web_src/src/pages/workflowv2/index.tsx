@@ -201,7 +201,6 @@ export function WorkflowPageV2() {
   const [createChangeRequestTitle, setCreateChangeRequestTitle] = useState("");
   const [createChangeRequestDescription, setCreateChangeRequestDescription] = useState("");
   const hasInitializedCreateChangeRequestFormRef = useRef(false);
-  const [isResetDraftPending, setIsResetDraftPending] = useState(false);
   const createCanvasVersionMutation = useCreateCanvasVersion(organizationId!, canvasId!);
   const updateCanvasVersionMutation = useUpdateCanvasVersion(organizationId!, canvasId!);
   const [isCanvasSaveInFlight, setIsCanvasSaveInFlight] = useState(false);
@@ -4827,12 +4826,7 @@ export function WorkflowPageV2() {
       next.delete("version");
       return next;
     });
-  }, [
-    clearPendingAutoSaveWork,
-    discardCanvasDraftMutation,
-    setActiveCanvasVersion,
-    setSearchParams,
-  ]);
+  }, [clearPendingAutoSaveWork, discardCanvasDraftMutation, setActiveCanvasVersion, setSearchParams]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
@@ -4906,57 +4900,6 @@ export function WorkflowPageV2() {
     setIsDraftDialogOpen(false);
     await handleCreateVersion();
   }, [handleCreateVersion]);
-
-  const handleResetDraftChanges = useCallback(async () => {
-    if (!organizationId || !canvasId) {
-      return;
-    }
-
-    if (!canUpdateCanvas) {
-      showErrorToast("You don't have permission to edit this canvas");
-      return;
-    }
-
-    if (isTemplate) {
-      showErrorToast("Template canvases are read-only");
-      return;
-    }
-
-    const shouldDiscard = window.confirm("Discard your draft? This will permanently delete all draft changes.");
-    if (!shouldDiscard) {
-      return;
-    }
-
-    clearPendingAutoSaveWork();
-
-    try {
-      setIsResetDraftPending(true);
-      await discardCanvasDraftMutation.mutateAsync();
-
-      setIsCreateChangeRequestMode(false);
-      setSelectedChangeRequestId("");
-      setHasUnsavedChanges(false);
-      setHasNonPositionalUnsavedChanges(false);
-      setInitialWorkflowSnapshot(null);
-      lastSavedWorkflowRef.current = null;
-
-      await handleCreateVersion();
-
-      showSuccessToast("Draft discarded");
-    } catch (error) {
-      showErrorToast(getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to discard draft")));
-    } finally {
-      setIsResetDraftPending(false);
-    }
-  }, [
-    organizationId,
-    canvasId,
-    canUpdateCanvas,
-    isTemplate,
-    discardCanvasDraftMutation,
-    handleCreateVersion,
-    clearPendingAutoSaveWork,
-  ]);
 
   const getYamlExportPayload = useCallback(
     (canvasNodes: CanvasNode[]) => {
@@ -5462,23 +5405,6 @@ export function WorkflowPageV2() {
       : hasEditableVersion && !liveCanvasVersionId
         ? "No live version available."
         : undefined;
-  const resetDraftDisabled =
-    !hasEditableVersion ||
-    !canUpdateCanvas ||
-    canvasDeletedRemotely ||
-    discardCanvasDraftMutation.isPending ||
-    hasLocalSaveActivity ||
-    isResetDraftPending ||
-    !activeCanvasVersionId;
-  const resetDraftDisabledTooltip = !canUpdateCanvas
-    ? "You don't have permission to edit this canvas."
-    : canvasDeletedRemotely
-      ? "This canvas was deleted in another session."
-      : !activeCanvasVersionId
-        ? "Draft version not found."
-        : !hasEditableVersion
-          ? "Enable edit mode to discard draft."
-          : undefined;
   const unpublishedDraftChangeCount =
     !suppressUnpublishedChangesBadge && !!latestDraftVersion ? pendingDraftDiffSummary.items.length : 0;
   const createChangeRequestDisabled =
@@ -5613,12 +5539,12 @@ export function WorkflowPageV2() {
           }}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={
-            !hasEditableVersion && topViewMode === "canvas" ? () => setIsVersionControlOpen(true) : undefined
+            !hasEditableVersion && topViewMode === "canvas" ? () => setIsVersionControlOpen((open) => !open) : undefined
           }
-          versionControlButtonTooltip="Open versions"
+          versionControlButtonTooltip="Open versions sidebar"
           versionControlNotificationCount={pendingApprovalVersions.length}
           showBottomStatusControls={!isTemplate}
-          hideAddControls={isTemplate}
+          hideAddControls={isTemplate || !hasEditableVersion}
           memoryItemCount={canvasMemoryEntries.length}
           dataViewContent={dataViewContent}
           nodes={nodes}
@@ -5684,9 +5610,6 @@ export function WorkflowPageV2() {
           onPublishVersion={handleCreateChangeRequest}
           publishVersionDisabled={createChangeRequestDisabled}
           publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
-          onDiscardVersion={handleResetDraftChanges}
-          discardVersionDisabled={resetDraftDisabled}
-          discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
           headerMode={headerMode}
