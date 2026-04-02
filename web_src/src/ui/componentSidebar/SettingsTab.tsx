@@ -3,6 +3,7 @@ import {
   ComponentsIntegrationRef,
   ConfigurationField,
   OrganizationsIntegration,
+  configAssistantSuggestConfigurationField,
 } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -19,8 +20,9 @@ import {
   parseDefaultValues,
   validateFieldForSubmission,
 } from "@/lib/components";
+import { getApiErrorMessage } from "@/lib/errors";
 import { isInlineConfigAssistantEnabled } from "@/lib/env";
-import type { SuggestFieldValueFn } from "@/ui/configurationFieldRenderer/types";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
 
@@ -53,6 +55,8 @@ interface SettingsTabProps {
   canUpdateIntegrations?: boolean;
   /** Canvas uses debounced autosave without a footer Save; Custom Component Builder keeps explicit Save. */
   configurationSaveMode?: "manual" | "auto";
+  /** When set (workflow canvas), inline assistant calls the config-assistant API. */
+  canvasId?: string;
 }
 
 function buildAutosaveSnapshot(
@@ -74,6 +78,7 @@ function buildAutosaveSnapshot(
 
 export function SettingsTab({
   nodeId: _nodeId,
+  canvasId,
   nodeName,
   nodeLabel: _nodeLabel,
   configuration,
@@ -116,15 +121,6 @@ export function SettingsTab({
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
   const inlineAssistantEnabled = isInlineConfigAssistantEnabled() && !isReadOnly;
-
-  const suggestFieldValue = useCallback<SuggestFieldValueFn>(async (instruction: string) => {
-    await new Promise((resolve) => window.setTimeout(resolve, 450));
-    const trimmed = instruction.trim();
-    return {
-      value: trimmed.length > 0 ? trimmed : "true",
-      explanation: "Mock assistant response (set VITE_ENABLE_INLINE_CONFIG_ASSISTANT=true to try this in dev).",
-    };
-  }, []);
 
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
@@ -708,7 +704,54 @@ export function SettingsTab({
                   realtimeValidationErrors={realtimeValidationErrors}
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
-                  suggestFieldValue={inlineAssistantEnabled ? suggestFieldValue : undefined}
+                  suggestFieldValue={
+                    inlineAssistantEnabled
+                      ? async (instruction: string) => {
+                          const trimmedInstruction = instruction.trim();
+                          if (canvasId && _nodeId && domainId && trimmedInstruction.length > 0) {
+                            try {
+                              const { data } = await configAssistantSuggestConfigurationField(
+                                withOrganizationHeader({
+                                  organizationId: domainId,
+                                  body: {
+                                    canvasId,
+                                    nodeId: _nodeId,
+                                    instruction: trimmedInstruction,
+                                    fieldContextJson: JSON.stringify({
+                                      field: {
+                                        name: field.name,
+                                        label: field.label,
+                                        type: field.type,
+                                        description: field.description,
+                                      },
+                                      currentValue: nodeConfiguration[fieldName],
+                                      autocompleteExample: resolvedAutocompleteExampleObj,
+                                    }),
+                                  },
+                                }),
+                              );
+                              const value = data?.value?.trim();
+                              if (!value) {
+                                throw new Error("The assistant returned an empty value.");
+                              }
+                              return {
+                                value,
+                                explanation: data?.explanation?.trim() || undefined,
+                              };
+                            } catch (err) {
+                              throw new Error(getApiErrorMessage(err, "Suggestion failed"));
+                            }
+                          }
+
+                          await new Promise((resolve) => window.setTimeout(resolve, 450));
+                          return {
+                            value: trimmedInstruction.length > 0 ? trimmedInstruction : "true",
+                            explanation:
+                              "Mock response: open a workflow canvas with VITE_ENABLE_INLINE_CONFIG_ASSISTANT=true to call the API.",
+                          };
+                        }
+                      : undefined
+                  }
                   assistantEnabled={inlineAssistantEnabled}
                 />
               );

@@ -609,6 +609,21 @@ export type ComponentsPosition = {
   y?: number;
 };
 
+export type ConfigAssistantSuggestConfigurationFieldRequest = {
+  canvasId?: string;
+  nodeId?: string;
+  instruction?: string;
+  /**
+   * JSON blob: field metadata, current value, autocompleteExampleObj, etc.
+   */
+  fieldContextJson?: string;
+};
+
+export type ConfigAssistantSuggestConfigurationFieldResponse = {
+  value?: string;
+  explanation?: string;
+};
+
 export type ConfigurationAnyPredicateListTypeOptions = {
   operators?: Array<ConfigurationSelectOption>;
 };
@@ -2680,6 +2695,33 @@ export type ComponentsListComponentActionsResponses = {
 
 export type ComponentsListComponentActionsResponse2 =
   ComponentsListComponentActionsResponses[keyof ComponentsListComponentActionsResponses];
+
+export type ConfigAssistantSuggestConfigurationFieldData = {
+  body: ConfigAssistantSuggestConfigurationFieldRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/config-assistant/suggest";
+};
+
+export type ConfigAssistantSuggestConfigurationFieldErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type ConfigAssistantSuggestConfigurationFieldError =
+  ConfigAssistantSuggestConfigurationFieldErrors[keyof ConfigAssistantSuggestConfigurationFieldErrors];
+
+export type ConfigAssistantSuggestConfigurationFieldResponses = {
+  /**
+   * A successful response.
+   */
+  200: ConfigAssistantSuggestConfigurationFieldResponse;
+};
+
+export type ConfigAssistantSuggestConfigurationFieldResponse2 =
+  ConfigAssistantSuggestConfigurationFieldResponses[keyof ConfigAssistantSuggestConfigurationFieldResponses];
 
 export type GroupsListGroupsData = {
   body?: never;

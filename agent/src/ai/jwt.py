@@ -1,9 +1,11 @@
 import os
-import jwt
 from dataclasses import dataclass
 
+import jwt
 
 from ai.text import normalize_optional
+
+ALLOWED_JWT_PURPOSES = frozenset({"agent-builder", "config-assistant"})
 
 
 @dataclass(frozen=True)
@@ -51,8 +53,8 @@ class JwtValidator:
             raise ValueError("Invalid JWT type.")
 
         purpose = payload.get("purpose")
-        if not isinstance(purpose, str) or purpose.strip() != "agent-builder":
-            raise ValueError("purpose is required.")
+        if not isinstance(purpose, str) or purpose.strip() not in ALLOWED_JWT_PURPOSES:
+            raise ValueError("purpose is invalid.")
 
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():

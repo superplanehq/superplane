@@ -18,6 +18,7 @@ import (
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
+	pbConfigAssistant "github.com/superplanehq/superplane/pkg/protos/config_assistant"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	mepb "github.com/superplanehq/superplane/pkg/protos/me"
@@ -154,6 +155,9 @@ func RunServer(
 
 	agentsService := NewAgentsService(authService, jwtSigner)
 	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
+
+	configAssistantService := NewConfigAssistantService(authService, jwtSigner)
+	pbConfigAssistant.RegisterConfigAssistantServer(grpcServer, configAssistantService)
 
 	reflection.Register(grpcServer)
 

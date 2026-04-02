@@ -159,6 +159,7 @@ interface ComponentSidebarProps {
   canUpdateIntegrations?: boolean;
   autocompleteExampleObj?: Record<string, unknown> | null;
   configurationSaveMode?: "manual" | "auto";
+  canvasId?: string;
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
@@ -244,6 +245,7 @@ export const ComponentSidebar = ({
   canUpdateIntegrations,
   autocompleteExampleObj,
   configurationSaveMode = "manual",
+  canvasId,
   componentDescription,
   componentExamplePayload,
   componentPayloadLabel,
@@ -788,6 +790,7 @@ export const ComponentSidebar = ({
                 <SettingsTab
                   mode={nodeConfigMode}
                   nodeId={nodeId}
+                  canvasId={canvasId}
                   nodeName={nodeName}
                   nodeLabel={nodeLabel}
                   configuration={nodeConfiguration}

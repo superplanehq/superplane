@@ -289,8 +289,8 @@ gen.components.local.update: gen.components.docs
 	rm -rf ../docs/src/content/docs/components
 	cp -R docs/components ../docs/src/content/docs/components
 
-MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,usage,private/agents
-REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents
+MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,config_assistant,usage,private/agents
+REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,triggers,widgets,blueprints,canvases,service_accounts,agents,config_assistant
 pb.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)

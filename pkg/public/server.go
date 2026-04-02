@@ -40,6 +40,7 @@ import (
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
+	pbConfigAssistant "github.com/superplanehq/superplane/pkg/protos/config_assistant"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -311,6 +312,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbConfigAssistant.RegisterConfigAssistantHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -338,6 +344,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/blueprints").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/service-accounts").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/config-assistant").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
 	return nil
