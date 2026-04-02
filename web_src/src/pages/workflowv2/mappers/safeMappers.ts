@@ -1,6 +1,4 @@
 import React from "react";
-
-const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
@@ -13,6 +11,8 @@ import type {
 } from "./types";
 
 type UnknownRecord = Record<string, unknown>;
+
+const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
