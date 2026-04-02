@@ -1,4 +1,3 @@
-import os
 import re
 import warnings
 from dataclasses import dataclass
@@ -16,6 +15,7 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
+from ai.config import config as app_config
 from ai.models import (
     CanvasEdge,
     CanvasNode,
@@ -64,7 +64,7 @@ from superplaneapi.models.triggers_trigger import TriggersTrigger
 
 
 def _debug_enabled() -> bool:
-    return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    return app_config.debug
 
 
 def _debug_log(message: str) -> None:
@@ -91,10 +91,7 @@ class SuperplaneClient:
         self._api_client.set_default_header("Authorization", f"Bearer {self._config.api_token}")
         self._api_client.set_default_header("x-organization-id", self._config.organization_id)
         self._api_client.set_default_header("Accept", "application/json")
-        self._api_client.set_default_header(
-            "User-Agent",
-            os.getenv("SUPERPLANE_USER_AGENT", "curl/8.7.1"),
-        )
+        self._api_client.set_default_header("User-Agent", app_config.superplane_user_agent)
         self._canvas_api = CanvasApi(self._api_client)
         self._canvas_node_api = CanvasNodeApi(self._api_client)
         self._component_api = ComponentApi(self._api_client)

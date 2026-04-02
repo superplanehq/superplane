@@ -1,4 +1,3 @@
-import os
 import threading
 import uuid
 
@@ -8,6 +7,7 @@ from dataclasses import dataclass
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
+from ai.config import config
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat, StoredAgentChatMessage
 from private import agents_pb2
 
@@ -133,9 +133,7 @@ class InternalAgentServer:
 
     @classmethod
     def from_env(cls, store: SessionStore) -> "InternalAgentServer":
-        host = os.getenv("INTERNAL_GRPC_HOST", "0.0.0.0").strip() or "0.0.0.0"
-        port = int(os.getenv("INTERNAL_GRPC_PORT", "50061"))
-        return cls(AgentServiceConfig(host=host, port=port), store)
+        return cls(AgentServiceConfig(host=config.grpc_host, port=config.grpc_port), store)
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():

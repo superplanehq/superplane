@@ -1,5 +1,4 @@
 import json
-import os
 import threading
 import uuid
 from collections.abc import Iterator
@@ -10,6 +9,8 @@ from typing import Any
 
 import psycopg
 from psycopg.rows import dict_row
+
+from ai.config import config
 from psycopg.types.json import Jsonb
 from pydantic_ai.messages import (
     ModelMessage,
@@ -164,20 +165,12 @@ class SessionStoreConfig:
 
     @classmethod
     def from_env(cls) -> "SessionStoreConfig":
-        host = (os.getenv("DB_HOST") or "db").strip()
-        port = int((os.getenv("DB_PORT") or "5432").strip())
-        dbname = (os.getenv("DB_NAME") or "").strip()
-        user = (os.getenv("DB_USERNAME") or "").strip()
-        password = (os.getenv("DB_PASSWORD") or "").strip()
-        sslmode = (os.getenv("DB_SSLMODE") or "disable").strip() or "disable"
-        application_name = (os.getenv("APPLICATION_NAME") or "superplane-agent").strip() or "superplane-agent"
-
         missing_fields = [
             name
             for name, value in (
-                ("DB_NAME", dbname),
-                ("DB_USERNAME", user),
-                ("DB_PASSWORD", password),
+                ("DB_NAME", config.db_name),
+                ("DB_USERNAME", config.db_username),
+                ("DB_PASSWORD", config.db_password),
             )
             if not value
         ]
@@ -186,13 +179,13 @@ class SessionStoreConfig:
             raise ValueError(f"Missing required agent database settings: {joined}")
 
         return cls(
-            host=host,
-            port=port,
-            dbname=dbname,
-            user=user,
-            password=password,
-            sslmode=sslmode,
-            application_name=application_name,
+            host=config.db_host,
+            port=config.db_port,
+            dbname=config.db_name,
+            user=config.db_username,
+            password=config.db_password,
+            sslmode=config.db_sslmode,
+            application_name=config.application_name,
         )
 
 
