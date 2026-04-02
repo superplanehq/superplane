@@ -648,7 +648,8 @@ CREATE TABLE public.workflows (
     is_template boolean DEFAULT false NOT NULL,
     live_version_id uuid NOT NULL,
     versioning_enabled boolean DEFAULT false NOT NULL,
-    change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL
+    change_request_approvers jsonb DEFAULT '[{"type": "anyone"}]'::jsonb NOT NULL,
+    change_management_enabled boolean DEFAULT false NOT NULL
 );
 
 
@@ -1988,7 +1989,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260402003713	f
+20260402144531	f
 \.
 
 

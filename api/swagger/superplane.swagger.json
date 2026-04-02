@@ -696,6 +696,38 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/draft": {
+      "delete": {
+        "summary": "Discard canvas draft",
+        "description": "Deletes the current user's draft for this canvas, returning to the live version.",
+        "operationId": "Canvases_DiscardCanvasDraft",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDiscardCanvasDraftResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/events": {
       "get": {
         "summary": "List canvas events",
@@ -1522,6 +1554,46 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/CanvasesUpdateCanvasVersionBody"
+            }
+          }
+        ],
+        "tags": [
+          "CanvasVersion"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasId}/versions/publish": {
+      "post": {
+        "summary": "Publish canvas version",
+        "description": "Publishes the user's draft version directly to live, bypassing the change request approval flow. Only available when change management is disabled.",
+        "operationId": "Canvases_PublishCanvasVersion",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesPublishCanvasVersionResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CanvasesPublishCanvasVersionBody"
             }
           }
         ],
@@ -4699,6 +4771,9 @@
         },
         "changeRequestApprovalConfig": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
+        },
+        "changeManagementEnabled": {
+          "type": "boolean"
         }
       }
     },
@@ -4997,6 +5072,9 @@
         }
       }
     },
+    "CanvasesDiscardCanvasDraftResponse": {
+      "type": "object"
+    },
     "CanvasesEmitNodeEventBody": {
       "type": "object",
       "properties": {
@@ -5232,6 +5310,25 @@
         }
       }
     },
+    "CanvasesPublishCanvasVersionBody": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesPublishCanvasVersionResponse": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
     "CanvasesResolveCanvasChangeRequestBody": {
       "type": "object",
       "properties": {
@@ -5282,6 +5379,9 @@
         },
         "changeRequestApprovalConfig": {
           "$ref": "#/definitions/CanvasesCanvasChangeRequestApprovalConfig"
+        },
+        "changeManagementEnabled": {
+          "type": "boolean"
         }
       }
     },

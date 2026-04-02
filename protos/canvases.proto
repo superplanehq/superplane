@@ -181,6 +181,29 @@ service Canvases {
     };
   }
 
+  rpc PublishCanvasVersion(PublishCanvasVersionRequest) returns (PublishCanvasVersionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/versions/publish"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Publish canvas version";
+      description: "Publishes the user's draft version directly to live, bypassing the change request approval flow. Only available when change management is disabled.";
+      tags: "CanvasVersion";
+    };
+  }
+
+  rpc DiscardCanvasDraft(DiscardCanvasDraftRequest) returns (DiscardCanvasDraftResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id}/draft"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Discard canvas draft";
+      description: "Deletes the current user's draft for this canvas, returning to the live version.";
+      tags: "CanvasVersion";
+    };
+  }
+
   rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{id}"
@@ -388,6 +411,7 @@ message UpdateCanvasRequest {
   optional string description = 3;
   optional bool versioning_enabled = 4;
   optional CanvasChangeRequestApprovalConfig change_request_approval_config = 5;
+  optional bool change_management_enabled = 6;
 }
 
 message UpdateCanvasResponse {
@@ -460,6 +484,23 @@ message UpdateCanvasVersionRequest {
 message UpdateCanvasVersionResponse {
   CanvasVersion version = 1;
 }
+
+message PublishCanvasVersionRequest {
+  string canvas_id = 1;
+  optional string title = 2;
+  optional string description = 3;
+}
+
+message PublishCanvasVersionResponse {
+  CanvasVersion version = 1;
+}
+
+message DiscardCanvasDraftRequest {
+  string canvas_id = 1;
+}
+
+message DiscardCanvasDraftResponse {}
+
 
 message CreateCanvasChangeRequestRequest {
   string canvas_id = 1;
@@ -551,6 +592,7 @@ message Canvas {
     bool is_template = 8;
     bool versioning_enabled = 9;
     CanvasChangeRequestApprovalConfig change_request_approval_config = 10;
+    bool change_management_enabled = 11;
   }
 
   message Spec {

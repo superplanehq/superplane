@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
+import { DraftDialog } from "./DraftDialog";
 import type { DraftNodeDiffSummary } from "./draftNodeDiff";
 
 interface CanvasPageModalsProps {
@@ -32,6 +33,12 @@ interface CanvasPageModalsProps {
   onSubmitCreateChangeRequest: () => void;
   canvasDeletedRemotely: boolean;
   onGoToCanvases: () => void;
+  isDraftDialogOpen: boolean;
+  draftLastEditedAt?: string | null;
+  onContinueDraft: () => void;
+  onStartFresh: () => void;
+  onCloseDraftDialog: () => void;
+  isChangeManagementEnabled?: boolean;
 }
 
 export function CanvasPageModals({
@@ -54,6 +61,12 @@ export function CanvasPageModals({
   onSubmitCreateChangeRequest,
   canvasDeletedRemotely,
   onGoToCanvases,
+  isDraftDialogOpen,
+  draftLastEditedAt,
+  onContinueDraft,
+  onStartFresh,
+  onCloseDraftDialog,
+  isChangeManagementEnabled,
 }: CanvasPageModalsProps) {
   return (
     <>
@@ -76,6 +89,13 @@ export function CanvasPageModals({
           fromTemplate
         />
       ) : null}
+      <DraftDialog
+        isOpen={isDraftDialogOpen}
+        draftLastEditedAt={draftLastEditedAt}
+        onContinueDraft={onContinueDraft}
+        onStartFresh={onStartFresh}
+        onClose={onCloseDraftDialog}
+      />
       <CreateChangeRequestModal
         open={isCreateChangeRequestMode}
         onOpenChange={onCreateChangeRequestModeChange}
@@ -88,6 +108,7 @@ export function CanvasPageModals({
         diffSummary={createChangeRequestNodeDiffSummary}
         isDraftOutdated={isCreateChangeRequestDraftOutdated}
         onPublish={onSubmitCreateChangeRequest}
+        isChangeManagementEnabled={isChangeManagementEnabled}
       />
       <Dialog open={canvasDeletedRemotely} onOpenChange={() => {}}>
         <DialogContent showCloseButton={false}>

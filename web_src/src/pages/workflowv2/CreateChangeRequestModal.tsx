@@ -31,6 +31,8 @@ interface CreateChangeRequestModalProps {
   diffSummary: DraftNodeDiffSummary;
   isDraftOutdated?: boolean;
   onPublish: () => void;
+  /** When false (default), shows "Publish Changes" mode. When true, shows "Submit for Review" mode. */
+  isChangeManagementEnabled?: boolean;
 }
 
 export function CreateChangeRequestModal({
@@ -45,7 +47,14 @@ export function CreateChangeRequestModal({
   diffSummary,
   isDraftOutdated = false,
   onPublish,
+  isChangeManagementEnabled = false,
 }: CreateChangeRequestModalProps) {
+  const modalTitle = isChangeManagementEnabled ? "Create Change Request" : "Publish Changes";
+  const modalDescription = isChangeManagementEnabled
+    ? "Add a title and summary. This will create a change request snapshot from your current draft."
+    : "Review your changes and publish to make them live.";
+  const submitButtonLabel = isChangeManagementEnabled ? "Create" : "Publish";
+  const submitButtonLoadingLabel = isChangeManagementEnabled ? "Creating..." : "Publishing...";
   const [isDescriptionEditorOpen, setIsDescriptionEditorOpen] = useState(false);
 
   useEffect(() => {
@@ -72,10 +81,8 @@ export function CreateChangeRequestModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="min-w-[70vw] max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Change Request</DialogTitle>
-          <DialogDescription className="text-gray-500">
-            Add a title and summary. This will create a change request snapshot from your current draft.
-          </DialogDescription>
+          <DialogTitle>{modalTitle}</DialogTitle>
+          <DialogDescription className="text-gray-500">{modalDescription}</DialogDescription>
         </DialogHeader>
 
         {!version ? (
@@ -181,9 +188,9 @@ export function CreateChangeRequestModal({
             onClick={handlePublish}
             disabled={!version || !title.trim()}
             loading={pending}
-            loadingText="Creating..."
+            loadingText={submitButtonLoadingLabel}
           >
-            Create
+            {submitButtonLabel}
           </LoadingButton>
         </DialogFooter>
       </DialogContent>

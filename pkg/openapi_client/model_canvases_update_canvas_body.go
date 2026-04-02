@@ -24,6 +24,7 @@ type CanvasesUpdateCanvasBody struct {
 	Description                 *string                                    `json:"description,omitempty"`
 	VersioningEnabled           *bool                                      `json:"versioningEnabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
+	ChangeManagementEnabled     *bool                                      `json:"changeManagementEnabled,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasBody instantiates a new CanvasesUpdateCanvasBody object
@@ -171,6 +172,38 @@ func (o *CanvasesUpdateCanvasBody) SetChangeRequestApprovalConfig(v CanvasesCanv
 	o.ChangeRequestApprovalConfig = &v
 }
 
+// GetChangeManagementEnabled returns the ChangeManagementEnabled field value if set, zero value otherwise.
+func (o *CanvasesUpdateCanvasBody) GetChangeManagementEnabled() bool {
+	if o == nil || IsNil(o.ChangeManagementEnabled) {
+		var ret bool
+		return ret
+	}
+	return *o.ChangeManagementEnabled
+}
+
+// GetChangeManagementEnabledOk returns a tuple with the ChangeManagementEnabled field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesUpdateCanvasBody) GetChangeManagementEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.ChangeManagementEnabled) {
+		return nil, false
+	}
+	return o.ChangeManagementEnabled, true
+}
+
+// HasChangeManagementEnabled returns a boolean if a field has been set.
+func (o *CanvasesUpdateCanvasBody) HasChangeManagementEnabled() bool {
+	if o != nil && !IsNil(o.ChangeManagementEnabled) {
+		return true
+	}
+
+	return false
+}
+
+// SetChangeManagementEnabled gets a reference to the given bool and assigns it to the ChangeManagementEnabled field.
+func (o *CanvasesUpdateCanvasBody) SetChangeManagementEnabled(v bool) {
+	o.ChangeManagementEnabled = &v
+}
+
 func (o CanvasesUpdateCanvasBody) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -192,6 +225,9 @@ func (o CanvasesUpdateCanvasBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ChangeRequestApprovalConfig) {
 		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig
+	}
+	if !IsNil(o.ChangeManagementEnabled) {
+		toSerialize["changeManagementEnabled"] = o.ChangeManagementEnabled
 	}
 	return toSerialize, nil
 }

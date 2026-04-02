@@ -31,6 +31,7 @@ type CanvasesCanvasMetadata struct {
 	IsTemplate                  *bool                                      `json:"isTemplate,omitempty"`
 	VersioningEnabled           *bool                                      `json:"versioningEnabled,omitempty"`
 	ChangeRequestApprovalConfig *CanvasesCanvasChangeRequestApprovalConfig `json:"changeRequestApprovalConfig,omitempty"`
+	ChangeManagementEnabled     *bool                                      `json:"changeManagementEnabled,omitempty"`
 }
 
 // NewCanvasesCanvasMetadata instantiates a new CanvasesCanvasMetadata object
@@ -370,6 +371,38 @@ func (o *CanvasesCanvasMetadata) SetChangeRequestApprovalConfig(v CanvasesCanvas
 	o.ChangeRequestApprovalConfig = &v
 }
 
+// GetChangeManagementEnabled returns the ChangeManagementEnabled field value if set, zero value otherwise.
+func (o *CanvasesCanvasMetadata) GetChangeManagementEnabled() bool {
+	if o == nil || IsNil(o.ChangeManagementEnabled) {
+		var ret bool
+		return ret
+	}
+	return *o.ChangeManagementEnabled
+}
+
+// GetChangeManagementEnabledOk returns a tuple with the ChangeManagementEnabled field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasMetadata) GetChangeManagementEnabledOk() (*bool, bool) {
+	if o == nil || IsNil(o.ChangeManagementEnabled) {
+		return nil, false
+	}
+	return o.ChangeManagementEnabled, true
+}
+
+// HasChangeManagementEnabled returns a boolean if a field has been set.
+func (o *CanvasesCanvasMetadata) HasChangeManagementEnabled() bool {
+	if o != nil && !IsNil(o.ChangeManagementEnabled) {
+		return true
+	}
+
+	return false
+}
+
+// SetChangeManagementEnabled gets a reference to the given bool and assigns it to the ChangeManagementEnabled field.
+func (o *CanvasesCanvasMetadata) SetChangeManagementEnabled(v bool) {
+	o.ChangeManagementEnabled = &v
+}
+
 func (o CanvasesCanvasMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -409,6 +442,9 @@ func (o CanvasesCanvasMetadata) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ChangeRequestApprovalConfig) {
 		toSerialize["changeRequestApprovalConfig"] = o.ChangeRequestApprovalConfig
+	}
+	if !IsNil(o.ChangeManagementEnabled) {
+		toSerialize["changeManagementEnabled"] = o.ChangeManagementEnabled
 	}
 	return toSerialize, nil
 }

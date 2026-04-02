@@ -6,7 +6,6 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 
 type ChangeRequestApproverType = "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE";
 
@@ -19,7 +18,7 @@ type CanvasSettingsApprover = {
 type CanvasSettingsValues = {
   name: string;
   description: string;
-  versioningEnabled: boolean;
+  changeManagementEnabled: boolean;
   changeRequestApprovalConfig?: {
     items?: CanvasSettingsApprover[];
   };
@@ -110,14 +109,13 @@ function validateApproverConfig(
 interface CanvasSettingsViewProps {
   initialValues: CanvasSettingsValues;
   canUpdateCanvas: boolean;
-  orgVersioningEnabled?: boolean;
   isSaving: boolean;
   availableUsers: Array<{ id: string; name: string }>;
   availableRoles: Array<{ name: string; label: string }>;
   onSave: (values: {
     name: string;
     description: string;
-    versioningEnabled?: boolean;
+    changeManagementEnabled?: boolean;
     changeRequestApprovalConfig?: {
       items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
     };
@@ -140,7 +138,6 @@ function normalizeApprovers(items?: CanvasSettingsApprover[]): CanvasSettingsApp
 export function CanvasSettingsView({
   initialValues,
   canUpdateCanvas,
-  orgVersioningEnabled,
   isSaving,
   availableUsers,
   availableRoles,
@@ -148,22 +145,20 @@ export function CanvasSettingsView({
 }: CanvasSettingsViewProps) {
   const [name, setName] = useState(initialValues.name);
   const [description, setDescription] = useState(initialValues.description);
-  const [versioningEnabled, setVersioningEnabled] = useState(initialValues.versioningEnabled);
+  const [changeManagementEnabled, setChangeManagementEnabled] = useState(initialValues.changeManagementEnabled);
   const [approvers, setApprovers] = useState<CanvasSettingsApprover[]>(
     normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
   );
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const isVersioningEnforcedByOrganization = orgVersioningEnabled === true;
-  const effectiveCanvasVersioningEnabled = isVersioningEnforcedByOrganization ? true : versioningEnabled;
-  const isVersioningToggleDisabled = !canUpdateCanvas || isVersioningEnforcedByOrganization;
-  const versioningEnforcedTooltip = "Versioning is enabled by your organization settings for all canvases.";
+  const isChangeManagementToggleDisabled = !canUpdateCanvas;
+  const effectiveChangeManagementEnabled = changeManagementEnabled;
 
   useEffect(() => {
     setName(initialValues.name);
     setDescription(initialValues.description);
-    setVersioningEnabled(isVersioningEnforcedByOrganization ? true : initialValues.versioningEnabled);
+    setChangeManagementEnabled(initialValues.changeManagementEnabled);
     setApprovers(normalizeApprovers(initialValues.changeRequestApprovalConfig?.items));
-  }, [initialValues, isVersioningEnforcedByOrganization]);
+  }, [initialValues]);
 
   const normalizedInitialApprovers = useMemo(
     () => normalizeApprovers(initialValues.changeRequestApprovalConfig?.items),
@@ -174,26 +169,25 @@ export function CanvasSettingsView({
     return (
       name !== initialValues.name ||
       description !== initialValues.description ||
-      effectiveCanvasVersioningEnabled !== initialValues.versioningEnabled ||
+      changeManagementEnabled !== initialValues.changeManagementEnabled ||
       JSON.stringify(approvers) !== JSON.stringify(normalizedInitialApprovers)
     );
   }, [
     description,
-    initialValues.versioningEnabled,
+    initialValues.changeManagementEnabled,
     initialValues.description,
     initialValues.name,
-    isVersioningEnforcedByOrganization,
     name,
     approvers,
     normalizedInitialApprovers,
-    versioningEnabled,
+    changeManagementEnabled,
   ]);
   const approverValidation = useMemo(() => {
-    if (!effectiveCanvasVersioningEnabled) {
+    if (!effectiveChangeManagementEnabled) {
       return { formErrors: [], itemErrors: [] };
     }
     return validateApproverConfig(approvers, availableUsers, availableRoles);
-  }, [approvers, availableRoles, availableUsers, effectiveCanvasVersioningEnabled]);
+  }, [approvers, availableRoles, availableUsers, effectiveChangeManagementEnabled]);
   const hasApproverValidationErrors = useMemo(
     () =>
       approverValidation.formErrors.length > 0 ||
@@ -216,8 +210,8 @@ export function CanvasSettingsView({
       await onSave({
         name,
         description,
-        versioningEnabled: isVersioningEnforcedByOrganization ? undefined : versioningEnabled,
-        changeRequestApprovalConfig: effectiveCanvasVersioningEnabled
+        changeManagementEnabled,
+        changeRequestApprovalConfig: effectiveChangeManagementEnabled
           ? {
               items: normalizeApprovers(approvers),
             }
@@ -275,26 +269,22 @@ export function CanvasSettingsView({
     });
   };
 
-  const versioningContent = (
+  const changeManagementContent = (
     <div className="flex items-start justify-between gap-6">
       <div>
-        <Label className="mb-1 block text-sm font-medium text-gray-700">Canvas Versioning</Label>
+        <Label className="mb-1 block text-sm font-medium text-gray-700">Change Management</Label>
         <p className="text-[13px] text-gray-500">
-          Manage canvas edits with drafts and publish flow. When disabled, users edit the live canvas directly.
-          {isVersioningEnforcedByOrganization
-            ? " Versioning is enabled by your organization settings for all canvases."
-            : " This toggle controls versioning for this canvas."}
+          Require approvals before publishing changes. When enabled, changes must be reviewed and approved before going
+          live.
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-500">
-          {isVersioningEnforcedByOrganization ? "Enabled" : versioningEnabled ? "Enabled" : "Disabled"}
-        </span>
+        <span className="text-xs text-gray-500">{changeManagementEnabled ? "Enabled" : "Disabled"}</span>
         <Switch
-          checked={isVersioningEnforcedByOrganization ? true : versioningEnabled}
-          onCheckedChange={setVersioningEnabled}
-          disabled={isVersioningToggleDisabled}
-          aria-label="Toggle canvas versioning"
+          checked={changeManagementEnabled}
+          onCheckedChange={setChangeManagementEnabled}
+          disabled={isChangeManagementToggleDisabled}
+          aria-label="Toggle change management"
         />
       </div>
     </div>
@@ -327,17 +317,8 @@ export function CanvasSettingsView({
         </Fieldset>
 
         <Fieldset className="rounded-lg border border-slate-950/15 bg-white p-6">
-          {isVersioningEnforcedByOrganization ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="cursor-not-allowed opacity-60">{versioningContent}</div>
-              </TooltipTrigger>
-              <TooltipContent side="top">{versioningEnforcedTooltip}</TooltipContent>
-            </Tooltip>
-          ) : (
-            versioningContent
-          )}
-          {effectiveCanvasVersioningEnabled ? (
+          {changeManagementContent}
+          {effectiveChangeManagementEnabled ? (
             <div className="mt-6 border-t border-slate-950/10 pt-6 space-y-4">
               <div>
                 <Label className="mb-1 block text-sm font-medium text-gray-700">Who can approve changes</Label>

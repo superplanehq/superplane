@@ -174,14 +174,13 @@ export interface CanvasPageProps {
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
+  onDiscardAndExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
@@ -352,6 +351,12 @@ export interface CanvasPageProps {
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
+
+  /** When true, shows an orange dot badge next to the Edit button indicating a saved draft exists. */
+  hasDraft?: boolean;
+  draftLastEditedAt?: Date | string | null;
+  /** When true, the publish button shows "Submit for Review" instead of "Publish". */
+  isChangeManagementEnabled?: boolean;
 
   /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
   onPreviewPreviousVersionViewDetails?: () => void;
@@ -1206,54 +1211,26 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
           saveState={props.saveState}
-          lastSavedAt={props.lastSavedAt}
-          saveErrorMessage={props.saveErrorMessage}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+          onExitEditMode={props.onExitEditMode}
+          onDiscardAndExitEditMode={props.onDiscardAndExitEditMode}
+          exitEditModeDisabled={props.exitEditModeDisabled}
+          exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
           topViewMode={props.topViewMode}
           onTopViewModeChange={props.onTopViewModeChange}
           memoryItemCount={props.memoryItemCount}
           onExportYamlCopy={props.onExportYamlCopy}
           onExportYamlDownload={props.onExportYamlDownload}
+          hasDraft={props.hasDraft}
+          draftLastEditedAt={props.draftLastEditedAt}
+          isChangeManagementEnabled={props.isChangeManagementEnabled}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
-      {canvasStateMode === "editing" ? (
-        <div
-          className="shrink-0 flex min-h-8 items-center justify-center gap-2 bg-amber-200 px-4 py-1.5 text-[13px] font-medium text-amber-700"
-          role="status"
-        >
-          <p className="m-0 text-amber-700">You’re editing the canvas</p>
-          <span className="select-none text-amber-700" aria-hidden>
-            ·
-          </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="min-h-0 shrink-0 gap-1 rounded-sm border border-amber-700 px-1.5 h-5 text-[13px] font-medium !text-amber-700 underline-offset-2 hover:!text-amber-700 hover:bg-white/10 hover:no-underline"
-                  onClick={() => props.onExitEditMode?.()}
-                  disabled={props.exitEditModeDisabled}
-                  aria-label="Exit edit mode"
-                >
-                  Exit
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {props.exitEditModeDisabled && props.exitEditModeDisabledTooltip
-                ? props.exitEditModeDisabledTooltip
-                : "Return to the live version. Draft will be preserved."}
-            </TooltipContent>
-          </Tooltip>
-        </div>
-      ) : null}
 
       {/* Main content area with sidebar and canvas/memory/settings views */}
       {props.topViewMode && props.topViewMode !== "canvas" ? (
@@ -1384,11 +1361,13 @@ function CanvasPage(props: CanvasPageProps) {
                 discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
-                lastSavedAt={props.lastSavedAt}
-                saveErrorMessage={props.saveErrorMessage}
                 onEnterEditMode={props.onEnterEditMode}
                 enterEditModeDisabled={props.enterEditModeDisabled}
                 enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+                onExitEditMode={props.onExitEditMode}
+                onDiscardAndExitEditMode={props.onDiscardAndExitEditMode}
+                exitEditModeDisabled={props.exitEditModeDisabled}
+                exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
                 unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
@@ -1829,17 +1808,22 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip,
   headerMode,
   saveState,
-  lastSavedAt,
-  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  onExitEditMode,
+  onDiscardAndExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount,
   topViewMode,
   onTopViewModeChange,
   memoryItemCount,
   onExportYamlCopy,
   onExportYamlDownload,
+  hasDraft,
+  draftLastEditedAt,
+  isChangeManagementEnabled,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -1863,17 +1847,22 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  onDiscardAndExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
   topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   memoryItemCount?: number;
   onExportYamlCopy?: (nodes: CanvasNode[]) => void;
   onExportYamlDownload?: (nodes: CanvasNode[]) => void;
+  hasDraft?: boolean;
+  draftLastEditedAt?: Date | string | null;
+  isChangeManagementEnabled?: boolean;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1927,17 +1916,22 @@ function CanvasContentHeader({
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
       saveState={saveState}
-      lastSavedAt={lastSavedAt}
-      saveErrorMessage={saveErrorMessage}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+      onExitEditMode={onExitEditMode}
+      onDiscardAndExitEditMode={onDiscardAndExitEditMode}
+      exitEditModeDisabled={exitEditModeDisabled}
+      exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       unpublishedDraftChangeCount={unpublishedDraftChangeCount}
       topViewMode={topViewMode}
       onTopViewModeChange={onTopViewModeChange}
       memoryItemCount={memoryItemCount}
       onExportYamlCopy={onExportYamlCopy ? handleExportYamlCopy : undefined}
       onExportYamlDownload={onExportYamlDownload ? handleExportYamlDownload : undefined}
+      hasDraft={hasDraft}
+      draftLastEditedAt={draftLastEditedAt ?? undefined}
+      isChangeManagementEnabled={isChangeManagementEnabled}
     />
   );
 }
@@ -2032,11 +2026,13 @@ function CanvasContent({
   discardVersionDisabledTooltip,
   headerMode,
   saveState,
-  lastSavedAt,
-  saveErrorMessage,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  onExitEditMode,
+  onDiscardAndExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
   unpublishedDraftChangeCount,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -2131,11 +2127,13 @@ function CanvasContent({
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  onDiscardAndExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
   unpublishedDraftChangeCount?: number;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -2901,11 +2899,13 @@ function CanvasContent({
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
           mode={headerMode}
           saveState={saveState}
-          lastSavedAt={lastSavedAt}
-          saveErrorMessage={saveErrorMessage}
           onEnterEditMode={onEnterEditMode}
           enterEditModeDisabled={enterEditModeDisabled}
           enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+          onExitEditMode={onExitEditMode}
+          onDiscardAndExitEditMode={onDiscardAndExitEditMode}
+          exitEditModeDisabled={exitEditModeDisabled}
+          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           unpublishedDraftChangeCount={unpublishedDraftChangeCount}
         />
       )}

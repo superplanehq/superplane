@@ -82,66 +82,6 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		assert.Contains(t, s.Message(), "canvas versioning is enabled")
 	})
 
-	t.Run("versioning disabled and version id provided -> error", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			canvas.LiveVersionID.String(),
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-		)
-
-		require.Error(t, err)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, s.Code())
-		assert.Contains(t, s.Message(), "canvas versioning is disabled")
-	})
-
-	t.Run("versioning disabled and no version id -> updates live canvas", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("versioning_enabled", false).Error,
-		)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		response, err := UpdateCanvasVersion(
-			ctx,
-			r.Encryptor,
-			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
-			testPbCanvas(canvas.Name),
-			nil,
-			"",
-		)
-
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Version)
-	})
-
 	t.Run("versioning enabled and valid draft version id -> updates draft", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(

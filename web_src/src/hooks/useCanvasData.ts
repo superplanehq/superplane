@@ -23,6 +23,8 @@ import {
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
+  canvasesPublishCanvasVersion,
+  canvasesDiscardCanvasDraft,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -369,6 +371,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
       name?: string;
       description?: string;
       versioningEnabled?: boolean;
+      changeManagementEnabled?: boolean;
       changeRequestApprovalConfig?: {
         items?: Array<{ type: "TYPE_ANYONE" | "TYPE_USER" | "TYPE_ROLE"; userId?: string; roleName?: string }>;
       };
@@ -380,6 +383,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
             name: data.name,
             description: data.description,
             versioningEnabled: data.versioningEnabled,
+            changeManagementEnabled: data.changeManagementEnabled,
             changeRequestApprovalConfig: data.changeRequestApprovalConfig,
           },
         }),
@@ -410,6 +414,10 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
                 updatedMetadata?.versioningEnabled ??
                 variables.versioningEnabled ??
                 current.metadata?.versioningEnabled,
+              changeManagementEnabled:
+                updatedMetadata?.changeManagementEnabled ??
+                variables.changeManagementEnabled ??
+                current.metadata?.changeManagementEnabled,
               changeRequestApprovalConfig:
                 updatedMetadata?.changeRequestApprovalConfig ??
                 variables.changeRequestApprovalConfig ??
@@ -438,6 +446,47 @@ export const useCreateCanvasVersion = (organizationId: string, canvasId: string)
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    },
+  });
+};
+
+export const usePublishCanvasVersion = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { title?: string; description?: string }) => {
+      return await canvasesPublishCanvasVersion(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            title: data.title,
+            description: data.description,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+    },
+  });
+};
+
+export const useDiscardCanvasDraft = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      return await canvasesDiscardCanvasDraft(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
     },
   });
 };

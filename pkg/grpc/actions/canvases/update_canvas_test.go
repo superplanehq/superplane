@@ -21,7 +21,7 @@ func Test__UpdateCanvas(t *testing.T) {
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
 		name := "name"
 		description := "description"
-		_, err := UpdateCanvas(context.Background(), r.AuthService, r.Organization.ID.String(), "invalid-id", &name, &description, nil, nil)
+		_, err := UpdateCanvas(context.Background(), r.AuthService, r.Organization.ID.String(), "invalid-id", &name, &description, nil, nil, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -35,6 +35,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			uuid.New().String(),
 			stringPointer("updated-name"),
 			stringPointer("updated-description"),
+			nil,
 			nil,
 			nil,
 		)
@@ -55,6 +56,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			stringPointer("description"),
 			nil,
 			nil,
+			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -73,6 +75,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			canvas.ID.String(),
 			&newName,
 			&newDescription,
+			nil,
 			nil,
 			nil,
 		)
@@ -103,6 +106,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			&targetCanvas.Description,
 			nil,
 			nil,
+			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -125,6 +129,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			nil,
 			nil,
 			&enabled,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -155,6 +160,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			nil,
 			&enabled,
 			nil,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -167,6 +173,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			nil,
 			nil,
 			&disabled,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -196,6 +203,7 @@ func Test__UpdateCanvas(t *testing.T) {
 			nil,
 			nil,
 			&enabled,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -229,6 +237,7 @@ func Test__UpdateCanvas(t *testing.T) {
 					},
 				},
 			},
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -259,6 +268,7 @@ func Test__UpdateCanvas(t *testing.T) {
 					},
 				},
 			},
+			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -282,6 +292,7 @@ func Test__UpdateCanvas(t *testing.T) {
 					{Type: pb.CanvasChangeRequestApprover_TYPE_ANYONE},
 				},
 			},
+			nil,
 		)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)

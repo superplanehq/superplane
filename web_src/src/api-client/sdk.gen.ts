@@ -66,6 +66,9 @@ import type {
   CanvasesDescribeCanvasVersionData,
   CanvasesDescribeCanvasVersionErrors,
   CanvasesDescribeCanvasVersionResponses,
+  CanvasesDiscardCanvasDraftData,
+  CanvasesDiscardCanvasDraftErrors,
+  CanvasesDiscardCanvasDraftResponses,
   CanvasesEmitNodeEventData,
   CanvasesEmitNodeEventErrors,
   CanvasesEmitNodeEventResponses,
@@ -105,6 +108,9 @@ import type {
   CanvasesListNodeQueueItemsData,
   CanvasesListNodeQueueItemsErrors,
   CanvasesListNodeQueueItemsResponses,
+  CanvasesPublishCanvasVersionData,
+  CanvasesPublishCanvasVersionErrors,
+  CanvasesPublishCanvasVersionResponses,
   CanvasesResolveCanvasChangeRequestData,
   CanvasesResolveCanvasChangeRequestErrors,
   CanvasesResolveCanvasChangeRequestResponses,
@@ -597,6 +603,20 @@ export const canvasesResolveCanvasChangeRequest = <ThrowOnError extends boolean 
   });
 
 /**
+ * Discard canvas draft
+ *
+ * Deletes the current user's draft for this canvas, returning to the live version.
+ */
+export const canvasesDiscardCanvasDraft = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDiscardCanvasDraftData, ThrowOnError>,
+) =>
+  (options.client ?? client).delete<
+    CanvasesDiscardCanvasDraftResponses,
+    CanvasesDiscardCanvasDraftErrors,
+    ThrowOnError
+  >({ url: "/api/v1/canvases/{canvasId}/draft", ...options });
+
+/**
  * List canvas events
  *
  * Returns a list of root events that triggered executions in a canvas
@@ -884,6 +904,27 @@ export const canvasesUpdateCanvasVersion2 = <ThrowOnError extends boolean = true
     ThrowOnError
   >({
     url: "/api/v1/canvases/{canvasId}/versions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Publish canvas version
+ *
+ * Publishes the user's draft version directly to live, bypassing the change request approval flow. Only available when change management is disabled.
+ */
+export const canvasesPublishCanvasVersion = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesPublishCanvasVersionData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CanvasesPublishCanvasVersionResponses,
+    CanvasesPublishCanvasVersionErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/canvases/{canvasId}/versions/publish",
     ...options,
     headers: {
       "Content-Type": "application/json",

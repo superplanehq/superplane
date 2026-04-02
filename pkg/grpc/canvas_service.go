@@ -59,6 +59,7 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 		req.Description,
 		req.VersioningEnabled,
 		req.ChangeRequestApprovalConfig,
+		req.ChangeManagementEnabled,
 	)
 }
 
@@ -103,6 +104,33 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 		req.AutoLayout,
 		s.webhookBaseURL,
 	)
+}
+
+func (s *CanvasService) PublishCanvasVersion(ctx context.Context, req *pb.PublishCanvasVersionRequest) (*pb.PublishCanvasVersionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	title := ""
+	if req.Title != nil {
+		title = *req.Title
+	}
+	description := ""
+	if req.Description != nil {
+		description = *req.Description
+	}
+	return canvases.PublishCanvasVersion(
+		ctx,
+		s.encryptor,
+		s.registry,
+		organizationID,
+		req.CanvasId,
+		title,
+		description,
+		s.webhookBaseURL,
+	)
+}
+
+func (s *CanvasService) DiscardCanvasDraft(ctx context.Context, req *pb.DiscardCanvasDraftRequest) (*pb.DiscardCanvasDraftResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DiscardCanvasDraft(ctx, organizationID, req.CanvasId)
 }
 
 func (s *CanvasService) CreateCanvasChangeRequest(ctx context.Context, req *pb.CreateCanvasChangeRequestRequest) (*pb.CreateCanvasChangeRequestResponse, error) {

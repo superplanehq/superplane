@@ -32,6 +32,8 @@ const (
 	Canvases_DescribeCanvasChangeRequest_FullMethodName = "/Superplane.Canvases.Canvases/DescribeCanvasChangeRequest"
 	Canvases_ActOnCanvasChangeRequest_FullMethodName    = "/Superplane.Canvases.Canvases/ActOnCanvasChangeRequest"
 	Canvases_ResolveCanvasChangeRequest_FullMethodName  = "/Superplane.Canvases.Canvases/ResolveCanvasChangeRequest"
+	Canvases_PublishCanvasVersion_FullMethodName        = "/Superplane.Canvases.Canvases/PublishCanvasVersion"
+	Canvases_DiscardCanvasDraft_FullMethodName          = "/Superplane.Canvases.Canvases/DiscardCanvasDraft"
 	Canvases_DeleteCanvas_FullMethodName                = "/Superplane.Canvases.Canvases/DeleteCanvas"
 	Canvases_ListNodeQueueItems_FullMethodName          = "/Superplane.Canvases.Canvases/ListNodeQueueItems"
 	Canvases_DeleteNodeQueueItem_FullMethodName         = "/Superplane.Canvases.Canvases/DeleteNodeQueueItem"
@@ -67,6 +69,8 @@ type CanvasesClient interface {
 	DescribeCanvasChangeRequest(ctx context.Context, in *DescribeCanvasChangeRequestRequest, opts ...grpc.CallOption) (*DescribeCanvasChangeRequestResponse, error)
 	ActOnCanvasChangeRequest(ctx context.Context, in *ActOnCanvasChangeRequestRequest, opts ...grpc.CallOption) (*ActOnCanvasChangeRequestResponse, error)
 	ResolveCanvasChangeRequest(ctx context.Context, in *ResolveCanvasChangeRequestRequest, opts ...grpc.CallOption) (*ResolveCanvasChangeRequestResponse, error)
+	PublishCanvasVersion(ctx context.Context, in *PublishCanvasVersionRequest, opts ...grpc.CallOption) (*PublishCanvasVersionResponse, error)
+	DiscardCanvasDraft(ctx context.Context, in *DiscardCanvasDraftRequest, opts ...grpc.CallOption) (*DiscardCanvasDraftResponse, error)
 	DeleteCanvas(ctx context.Context, in *DeleteCanvasRequest, opts ...grpc.CallOption) (*DeleteCanvasResponse, error)
 	ListNodeQueueItems(ctx context.Context, in *ListNodeQueueItemsRequest, opts ...grpc.CallOption) (*ListNodeQueueItemsResponse, error)
 	DeleteNodeQueueItem(ctx context.Context, in *DeleteNodeQueueItemRequest, opts ...grpc.CallOption) (*DeleteNodeQueueItemResponse, error)
@@ -217,6 +221,26 @@ func (c *canvasesClient) ResolveCanvasChangeRequest(ctx context.Context, in *Res
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResolveCanvasChangeRequestResponse)
 	err := c.cc.Invoke(ctx, Canvases_ResolveCanvasChangeRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) PublishCanvasVersion(ctx context.Context, in *PublishCanvasVersionRequest, opts ...grpc.CallOption) (*PublishCanvasVersionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PublishCanvasVersionResponse)
+	err := c.cc.Invoke(ctx, Canvases_PublishCanvasVersion_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *canvasesClient) DiscardCanvasDraft(ctx context.Context, in *DiscardCanvasDraftRequest, opts ...grpc.CallOption) (*DiscardCanvasDraftResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DiscardCanvasDraftResponse)
+	err := c.cc.Invoke(ctx, Canvases_DiscardCanvasDraft_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -400,6 +424,8 @@ type CanvasesServer interface {
 	DescribeCanvasChangeRequest(context.Context, *DescribeCanvasChangeRequestRequest) (*DescribeCanvasChangeRequestResponse, error)
 	ActOnCanvasChangeRequest(context.Context, *ActOnCanvasChangeRequestRequest) (*ActOnCanvasChangeRequestResponse, error)
 	ResolveCanvasChangeRequest(context.Context, *ResolveCanvasChangeRequestRequest) (*ResolveCanvasChangeRequestResponse, error)
+	PublishCanvasVersion(context.Context, *PublishCanvasVersionRequest) (*PublishCanvasVersionResponse, error)
+	DiscardCanvasDraft(context.Context, *DiscardCanvasDraftRequest) (*DiscardCanvasDraftResponse, error)
 	DeleteCanvas(context.Context, *DeleteCanvasRequest) (*DeleteCanvasResponse, error)
 	ListNodeQueueItems(context.Context, *ListNodeQueueItemsRequest) (*ListNodeQueueItemsResponse, error)
 	DeleteNodeQueueItem(context.Context, *DeleteNodeQueueItemRequest) (*DeleteNodeQueueItemResponse, error)
@@ -463,6 +489,12 @@ func (UnimplementedCanvasesServer) ActOnCanvasChangeRequest(context.Context, *Ac
 }
 func (UnimplementedCanvasesServer) ResolveCanvasChangeRequest(context.Context, *ResolveCanvasChangeRequestRequest) (*ResolveCanvasChangeRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveCanvasChangeRequest not implemented")
+}
+func (UnimplementedCanvasesServer) PublishCanvasVersion(context.Context, *PublishCanvasVersionRequest) (*PublishCanvasVersionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PublishCanvasVersion not implemented")
+}
+func (UnimplementedCanvasesServer) DiscardCanvasDraft(context.Context, *DiscardCanvasDraftRequest) (*DiscardCanvasDraftResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DiscardCanvasDraft not implemented")
 }
 func (UnimplementedCanvasesServer) DeleteCanvas(context.Context, *DeleteCanvasRequest) (*DeleteCanvasResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteCanvas not implemented")
@@ -762,6 +794,42 @@ func _Canvases_ResolveCanvasChangeRequest_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CanvasesServer).ResolveCanvasChangeRequest(ctx, req.(*ResolveCanvasChangeRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_PublishCanvasVersion_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishCanvasVersionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).PublishCanvasVersion(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_PublishCanvasVersion_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).PublishCanvasVersion(ctx, req.(*PublishCanvasVersionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Canvases_DiscardCanvasDraft_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DiscardCanvasDraftRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CanvasesServer).DiscardCanvasDraft(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Canvases_DiscardCanvasDraft_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CanvasesServer).DiscardCanvasDraft(ctx, req.(*DiscardCanvasDraftRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1112,6 +1180,14 @@ var Canvases_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolveCanvasChangeRequest",
 			Handler:    _Canvases_ResolveCanvasChangeRequest_Handler,
+		},
+		{
+			MethodName: "PublishCanvasVersion",
+			Handler:    _Canvases_PublishCanvasVersion_Handler,
+		},
+		{
+			MethodName: "DiscardCanvasDraft",
+			Handler:    _Canvases_DiscardCanvasDraft_Handler,
 		},
 		{
 			MethodName: "DeleteCanvas",
