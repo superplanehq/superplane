@@ -1,7 +1,7 @@
 {
-  "maxAllowedTotalIssues": 1025,
+  "maxAllowedTotalIssues": 1000,
   "maxAllowedByRule": {
-    "@typescript-eslint/no-explicit-any": 344,
+    "@typescript-eslint/no-explicit-any": 319,
     "complexity": 270,
     "max-statements": 102,
     "max-lines-per-function": 96,
@@ -12,5 +12,5 @@
     "max-depth": 10,
     "max-params": 6
   },
-  "updatedAt": "2026-04-03T12:57:25.507Z"
+  "updatedAt": "2026-04-03T13:58:39.442Z"
 }
