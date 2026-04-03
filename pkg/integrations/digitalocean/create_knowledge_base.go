@@ -101,7 +101,7 @@ Returns the created knowledge base including:
 - **region**: Datacenter region
 - **embeddingModelUUID**: UUID of the embedding model used
 - **projectId**: Associated project ID
-- **databaseId**: UUID of the OpenSearch database (empty when creating new)
+- **databaseId**: UUID of the OpenSearch database (populated after provisioning completes for new databases)
 - **createdAt**: Creation timestamp`
 }
 
@@ -347,6 +347,17 @@ func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 // resolveDisplayNames enriches the output map with human-readable names for
 // the embedding model, project, and OpenSearch database. Failures are ignored
 // so a lookup error never blocks the execution result.
+// mergeCreateKBOutputFromFetchedKB updates the Execute-time output map with fields that the create
+// response may omit until async provisioning finishes (e.g. databaseId for a newly created OpenSearch cluster).
+func mergeCreateKBOutputFromFetchedKB(output map[string]any, kb *KnowledgeBase) {
+	if output == nil || kb == nil {
+		return
+	}
+	if kb.DatabaseID != "" {
+		output["databaseId"] = kb.DatabaseID
+	}
+}
+
 func resolveDisplayNames(client *Client, spec CreateKnowledgeBaseSpec, output map[string]any) {
 	if models, err := client.ListEmbeddingModels(); err == nil {
 		for _, m := range models {
@@ -624,6 +635,8 @@ func (c *CreateKnowledgeBase) HandleAction(ctx core.ActionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to get knowledge base: %v", err)
 	}
+
+	mergeCreateKBOutputFromFetchedKB(meta.KBOutput, kb)
 
 	if kb.LastIndexingJob != nil {
 		switch indexJobState(kb.LastIndexingJob.Status) {

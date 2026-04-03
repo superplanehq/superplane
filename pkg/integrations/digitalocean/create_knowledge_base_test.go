@@ -1019,6 +1019,42 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		assert.Equal(t, "my-kb", data["name"])
 	})
 
+	t.Run("completed poll merges databaseId from GET when create output had empty databaseId", func(t *testing.T) {
+		kbCompletedWithDB := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "database_id": "abf1055a-745d-4c24-a1db-1959ea819264", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_COMPLETED"}}}`
+		output := map[string]any{
+			"uuid":               "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+			"name":               "my-kb",
+			"region":             "tor1",
+			"databaseId":         "",
+			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+		}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbCompletedWithDB))},
+			},
+		}
+		ctx := core.ActionContext{
+			Name:           "poll",
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+			Metadata: &contexts.MetadataContext{Metadata: map[string]any{
+				"kbUUID":   "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"kbOutput": output,
+			}},
+			Requests: &contexts.RequestContext{},
+		}
+
+		err := component.HandleAction(ctx)
+		require.NoError(t, err)
+		execState := ctx.ExecutionState.(*contexts.ExecutionStateContext)
+		require.Len(t, execState.Payloads, 1)
+		wrapped := execState.Payloads[0].(map[string]any)
+		data := wrapped["data"].(map[string]any)
+		assert.Equal(t, "abf1055a-745d-4c24-a1db-1959ea819264", data["databaseId"])
+	})
+
 	t.Run("last_indexing_job is failed -> returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
