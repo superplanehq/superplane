@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { reportMetricMapper } from "./report_metric";
 import { runNRQLQueryMapper } from "./run_nrql_query";
 import { onIssueTriggerRenderer, onIssueCustomFieldRenderer } from "./on_issue";

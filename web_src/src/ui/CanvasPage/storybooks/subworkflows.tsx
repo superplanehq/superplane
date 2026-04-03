@@ -1,4 +1,4 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import { navigateToStory } from "./navigation";
 import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 

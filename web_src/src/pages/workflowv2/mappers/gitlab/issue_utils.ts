@@ -1,4 +1,4 @@
-import { Issue } from "./types";
+import type { Issue } from "./types";
 
 /**
  * Shared interface for webhook event issue data (object_attributes).

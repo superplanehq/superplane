@@ -2,7 +2,8 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
-import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import * as yaml from "js-yaml";
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
-import {
+import type {
   BlueprintsBlueprint,
   ComponentsIntegrationRef,
   ComponentsComponent,
@@ -26,10 +27,9 @@ import {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  canvasesEmitNodeEvent,
-  canvasesUpdateNodePause,
   OrganizationsIntegration,
 } from "@/api-client";
+import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import {
   useOrganization,
   useOrganizationGroups,
@@ -66,20 +66,12 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
+import type { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
-import {
-  CANVAS_SIDEBAR_STORAGE_KEY,
-  CanvasEdge,
-  CanvasNode,
-  CanvasPage,
-  NewNodeData,
-  NodeEditData,
-  SidebarData,
-  type MissingIntegration,
-} from "@/ui/CanvasPage";
-import { EventState, EventStateMap } from "@/ui/componentBase";
-import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
+import type { EventState, EventStateMap } from "@/ui/componentBase";
+import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
 import { filterVisibleConfiguration } from "@/lib/components";
@@ -120,8 +112,8 @@ import {
   buildExecutionInfo,
   buildChildToGroupMap,
 } from "./utils";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
+import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
