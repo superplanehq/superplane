@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import pytest
 
 from ai.proposal_configuration_coerce import coerce_configuration
 
-_ACTIONS_FIELD: dict = {"name": "actions", "type": "multi-select", "type_options": {}}
+_ACTIONS_FIELD: dict[str, Any] = {"name": "actions", "type": "multi-select", "type_options": {}}
 
 
 @pytest.mark.parametrize(

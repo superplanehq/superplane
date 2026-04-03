@@ -81,6 +81,15 @@ blocks:
         - name: Unit Tests
           commands:
             - make test.agent.unit AGENT_TEST_TARGETS="tests --junitxml=junit-report.xml"
+        - name: Lint
+          commands:
+            - make -C agent lint
+        - name: Format Check
+          commands:
+            - make -C agent format.check
+        - name: Type Check
+          commands:
+            - make -C agent typecheck
       epilogue:
         always:
           commands:

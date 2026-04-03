@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Dataset
 
 from ai.agent import AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.case_logger import CaseLogger
+from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.cases import dataset
 from evals.report import ReportBuilder
 
@@ -24,6 +24,7 @@ def load_env() -> dict[str, str]:
         "organization_id": os.getenv("EVAL_ORG_ID", "").strip(),
         "canvas_id": os.getenv("EVAL_CANVAS_ID", "").strip(),
     }
+
 
 async def runner() -> None:
     env = load_env()
@@ -48,7 +49,7 @@ async def runner() -> None:
     question_to_case_name, case_names = build_case_name_index(cases)
 
     case_logger = CaseLogger(
-        run_id=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"),
+        run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%S_%fZ"),
         case_names=case_names,
     )
 
@@ -76,8 +77,10 @@ async def runner() -> None:
     finally:
         case_logger.close()
 
+
 def main() -> None:
     asyncio.run(runner())
+
 
 if __name__ == "__main__":
     main()
