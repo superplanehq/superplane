@@ -1,5 +1,4 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
-import { createElement } from "react";
 import type React from "react";
 import { getStateMap } from "..";
 import type {
@@ -11,10 +10,9 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import type { DeleteAnnotationConfiguration, DeleteAnnotationOutput } from "./types";
+import type { AnnotationNodeMetadata, DeleteAnnotationConfiguration, DeleteAnnotationOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
-import { AnnotationMetadataLabel } from "./AnnotationMetadataLabel";
 import { baseEventSections } from "./base";
 
 export const deleteAnnotationMapper: ComponentBaseMapper = {
@@ -65,18 +63,16 @@ export const deleteAnnotationMapper: ComponentBaseMapper = {
 };
 
 function metadataList(context: ComponentBaseContext): MetadataItem[] {
+  const nodeMetadata = context.node.metadata as AnnotationNodeMetadata | undefined;
   const configuration = context.node.configuration as DeleteAnnotationConfiguration | undefined;
-  if (!configuration?.annotationId?.trim()) {
+  const annotationLabel = nodeMetadata?.annotationLabel || configuration?.annotationId?.trim();
+  if (!annotationLabel) {
     return [];
   }
   return [
     {
       icon: "bookmark",
-      label: createElement(AnnotationMetadataLabel, {
-        organizationId: context.organizationId,
-        integrationId: context.integrationId,
-        annotationId: configuration.annotationId.trim(),
-      }),
+      label: `Annotation: ${annotationLabel}`,
     },
   ];
 }

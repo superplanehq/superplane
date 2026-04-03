@@ -1,12 +1,15 @@
 package grafana
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__normalizeAnnotationIDRaw__StringAndNumber(t *testing.T) {
@@ -50,12 +53,15 @@ func Test__formatAnnotationResourceName__TruncatesByRunesPreservesUTF8(t *testin
 
 func Test__DeleteAnnotation__Setup__AllowsExpression(t *testing.T) {
 	d := &DeleteAnnotation{}
+	metadata := &contexts.MetadataContext{}
 	err := d.Setup(core.SetupContext{
 		Configuration: map[string]any{
 			"annotationId": "{{ $['Create Annotation'].data.id }}",
 		},
+		Metadata: metadata,
 	})
 	require.NoError(t, err)
+	require.Equal(t, AnnotationNodeMetadata{AnnotationLabel: "{{ $['Create Annotation'].data.id }}"}, metadata.Metadata)
 }
 
 func Test__parseAnnotationIDForExecute__RejectsUnresolvedExpression(t *testing.T) {
@@ -68,4 +74,35 @@ func Test__isExpressionValue__Brackets(t *testing.T) {
 	require.True(t, isExpressionValue("{{ foo }}"))
 	require.True(t, isExpressionValue("$['a'].b"))
 	require.False(t, isExpressionValue("42"))
+}
+
+func Test__DeleteAnnotation__Setup__StoresAnnotationLabelMetadata(t *testing.T) {
+	d := &DeleteAnnotation{}
+	metadata := &contexts.MetadataContext{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"id":42,"text":"Deploy finished","time":0}
+				]`)),
+			},
+		},
+	}
+
+	err := d.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"annotationId": "42",
+		},
+		Metadata: metadata,
+		HTTP:     httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, AnnotationNodeMetadata{AnnotationLabel: "#42 · Deploy finished"}, metadata.Metadata)
 }

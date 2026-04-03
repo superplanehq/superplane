@@ -115,8 +115,6 @@ const createBlockData = (node: any, component: ComponentsComponent | undefined):
     lastExecutions: [],
     nodeQueueItems: [],
     additionalData: undefined,
-    organizationId: undefined,
-    integrationId: undefined,
   });
 
   const baseData: BlockData = {
@@ -692,8 +690,6 @@ export const CustomComponent = () => {
             lastExecutions: [],
             nodeQueueItems: [],
             additionalData: undefined,
-            organizationId: undefined,
-            integrationId: undefined,
           });
         }
 

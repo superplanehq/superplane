@@ -153,7 +153,11 @@ func (c *CreateAnnotation) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateCreateAnnotationSpec(spec)
+	if err := validateCreateAnnotationSpec(spec); err != nil {
+		return err
+	}
+
+	return setDashboardNodeMetadata(ctx, spec.DashboardUID)
 }
 
 func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {

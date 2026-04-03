@@ -137,8 +137,12 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 }
 
 func (l *ListAnnotations) Setup(ctx core.SetupContext) error {
-	_, err := decodeListAnnotationsSpec(ctx.Configuration)
-	return err
+	spec, err := decodeListAnnotationsSpec(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	return setDashboardNodeMetadata(ctx, spec.DashboardUID)
 }
 
 func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {

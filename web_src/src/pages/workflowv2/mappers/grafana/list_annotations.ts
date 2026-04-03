@@ -1,5 +1,4 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
-import { createElement } from "react";
 import type React from "react";
 import { getStateMap } from "..";
 import type {
@@ -11,10 +10,9 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import type { ListAnnotationsConfiguration, ListAnnotationsOutput } from "./types";
+import type { AnnotationNodeMetadata, ListAnnotationsConfiguration, ListAnnotationsOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
-import { GrafanaDashboardMetadataLabel } from "./DashboardMetadataLabel";
 import { baseEventSections } from "./base";
 
 export const listAnnotationsMapper: ComponentBaseMapper = {
@@ -78,20 +76,15 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
 function metadataList(context: ComponentBaseContext): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = context.node.configuration as ListAnnotationsConfiguration | undefined;
+  const nodeMetadata = context.node.metadata as AnnotationNodeMetadata | undefined;
 
   if (configuration?.tags && configuration.tags.length > 0) {
     metadata.push({ icon: "tag", label: `Tags: ${configuration.tags.join(", ")}` });
   }
 
-  if (configuration?.dashboardUID) {
-    metadata.push({
-      icon: "layout-dashboard",
-      label: createElement(GrafanaDashboardMetadataLabel, {
-        organizationId: context.organizationId,
-        integrationId: context.integrationId,
-        dashboardUid: configuration.dashboardUID,
-      }),
-    });
+  const dashboardTitle = nodeMetadata?.dashboardTitle || configuration?.dashboardUID;
+  if (dashboardTitle) {
+    metadata.push({ icon: "layout-dashboard", label: `Dashboard: ${dashboardTitle}` });
   }
 
   return metadata;

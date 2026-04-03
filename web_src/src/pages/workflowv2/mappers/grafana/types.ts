@@ -79,3 +79,8 @@ export interface DeleteAnnotationOutput {
   id: number;
   deleted: boolean;
 }
+
+export interface AnnotationNodeMetadata {
+  dashboardTitle?: string;
+  annotationLabel?: string;
+}

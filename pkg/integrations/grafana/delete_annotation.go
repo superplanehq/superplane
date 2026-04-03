@@ -89,7 +89,11 @@ func (d *DeleteAnnotation) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateDeleteAnnotationSpec(spec)
+	if err := validateDeleteAnnotationSpec(spec); err != nil {
+		return err
+	}
+
+	return setAnnotationNodeMetadata(ctx, spec.AnnotationID)
 }
 
 func (d *DeleteAnnotation) Execute(ctx core.ExecutionContext) error {
