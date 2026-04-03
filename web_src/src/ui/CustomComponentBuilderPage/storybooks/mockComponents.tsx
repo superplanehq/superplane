@@ -1,4 +1,4 @@
-import { ComponentsComponent } from "@/api-client";
+import type { ComponentsComponent } from "@/api-client";
 
 export const mockComponents: ComponentsComponent[] = [
   {

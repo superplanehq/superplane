@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { indexDocumentMapper } from "./index_document";
 import { createCaseMapper } from "./create_case";
 import { getCaseMapper } from "./get_case";

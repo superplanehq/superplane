@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeQueueItems } from "./useCanvasData";
-import { ComponentsNode, CanvasesListNodeQueueItemsResponse } from "@/api-client";
+import type { ComponentsNode, CanvasesListNodeQueueItemsResponse } from "@/api-client";
 import { mapQueueItemsToSidebarEvents } from "@/pages/workflowv2/utils";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 interface UseQueueHistoryProps {
   canvasId: string;

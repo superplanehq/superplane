@@ -1,10 +1,11 @@
-import {
+import type {
   AuthorizationDomainType,
   ComponentsIntegrationRef,
   ConfigurationField,
   OrganizationsIntegration,
 } from "@/api-client";
-import { useCallback, useEffect, useMemo, useState, ReactNode, useRef } from "react";
+import type { ReactNode} from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";

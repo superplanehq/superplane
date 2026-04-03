@@ -1,4 +1,4 @@
-import {
+import type {
   CanvasesCanvasChangeRequest,
   CanvasesCanvasChangeRequestApprovalConfig,
   CanvasesCanvasVersion,
@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Ellipsis, GitBranch, X } from "lucide-react";
-import {
+import type {
   KeyboardEvent as ReactKeyboardEvent,
-  MouseEvent as ReactMouseEvent,
+  MouseEvent as ReactMouseEvent} from "react";
+import {
   useCallback,
   useEffect,
   useRef,

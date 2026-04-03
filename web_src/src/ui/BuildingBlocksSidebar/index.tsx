@@ -11,10 +11,11 @@ import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
-import {
+import type {
   AiChatSession,
   AiBuilderMessage,
-  AiBuilderProposal,
+  AiBuilderProposal} from "./agentChat";
+import {
   loadChatConversation,
   loadChatSessions,
   pushAiMessages,

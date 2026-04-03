@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import React, { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { SidebarEvent } from "../types";
+import type { SidebarEvent } from "../types";
 import { DEFAULT_EVENT_STATE_MAP } from "../../componentBase";
 
 const meta: Meta<typeof SidebarEventItem> = {
