@@ -15,7 +15,6 @@ import { getTriggerRenderer, getState, getStateMap } from ".";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "./utils";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 type FilterOutputs = Record<string, OutputPayload[]>;

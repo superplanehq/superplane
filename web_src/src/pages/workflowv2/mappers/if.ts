@@ -14,7 +14,6 @@ import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "./utils";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 type IfOutputs = Record<string, OutputPayload[]>;
