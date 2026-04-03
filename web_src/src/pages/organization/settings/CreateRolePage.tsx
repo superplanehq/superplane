@@ -513,8 +513,14 @@ export function CreateRolePage() {
               <div className="space-y-1">
                 {/* Role Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role Name *</label>
+                  <label
+                    htmlFor="role-name-input"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Role Name *
+                  </label>
                   <Input
+                    id="role-name-input"
                     type="text"
                     placeholder={isEditMode ? "Enter role display name" : "Enter role name"}
                     value={roleName}

@@ -187,10 +187,14 @@ export function CreateCanvasPage() {
                     </Alert>
                   ) : null}
                   <Field>
-                    <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <Label
+                      htmlFor="create-canvas-page-name-input"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                    >
                       Canvas name *
                     </Label>
                     <Input
+                      id="create-canvas-page-name-input"
                       data-testid="canvas-name-input"
                       type="text"
                       autoComplete="off"
@@ -224,10 +228,14 @@ export function CreateCanvasPage() {
                   </Field>
 
                   <Field>
-                    <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <Label
+                      htmlFor="create-canvas-page-description-input"
+                      className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                    >
                       Description
                     </Label>
                     <Textarea
+                      id="create-canvas-page-description-input"
                       value={description}
                       onChange={(e) => {
                         if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {
