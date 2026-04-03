@@ -1,4 +1,4 @@
-import { ConfigurationField, ConfigurationSelectOption } from "@/api-client";
+import type { ConfigurationField, ConfigurationSelectOption } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";

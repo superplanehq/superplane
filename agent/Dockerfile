@@ -62,4 +62,4 @@ USER nobody
 EXPOSE 8090
 EXPOSE 50061
 
-CMD ["bash", "-lc", "uvicorn ai.web:create_app --factory --host 0.0.0.0 --port ${APP_PORT:-8090}"]
+CMD ["bash", "-lc", "uvicorn ai.web:create_app --factory --host 0.0.0.0 --port ${APP_PORT:-8090} --timeout-graceful-shutdown ${UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT:-310}"]

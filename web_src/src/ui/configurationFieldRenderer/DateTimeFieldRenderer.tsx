@@ -1,6 +1,6 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 
 export const DateTimeFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, allValues = {} }) => {
   // Calculate min/max datetime based on other fields for components like time gates

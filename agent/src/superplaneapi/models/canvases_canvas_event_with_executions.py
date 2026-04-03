@@ -21,7 +21,7 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_node_execution import CanvasesCanvasNodeExecution
+from superplaneapi.models.canvases_canvas_node_execution_ref import CanvasesCanvasNodeExecutionRef
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -35,7 +35,7 @@ class CanvasesCanvasEventWithExecutions(BaseModel):
     channel: Optional[StrictStr] = None
     data: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
-    executions: Optional[List[CanvasesCanvasNodeExecution]] = None
+    executions: Optional[List[CanvasesCanvasNodeExecutionRef]] = None
     custom_name: Optional[StrictStr] = Field(default=None, alias="customName")
     __properties: ClassVar[List[str]] = ["id", "canvasId", "nodeId", "channel", "data", "createdAt", "executions", "customName"]
 
@@ -103,7 +103,7 @@ class CanvasesCanvasEventWithExecutions(BaseModel):
             "channel": obj.get("channel"),
             "data": obj.get("data"),
             "createdAt": obj.get("createdAt"),
-            "executions": [CanvasesCanvasNodeExecution.from_dict(_item) for _item in obj["executions"]] if obj.get("executions") is not None else None,
+            "executions": [CanvasesCanvasNodeExecutionRef.from_dict(_item) for _item in obj["executions"]] if obj.get("executions") is not None else None,
             "customName": obj.get("customName")
         })
         return _obj

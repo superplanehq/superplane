@@ -1,4 +1,4 @@
-import { IntegrationsIntegration, SecretsSecret } from "../../src/api-client";
+import type { IntegrationsIntegration, SecretsSecret } from "../../src/api-client";
 
 export const createMockSecrets = (): SecretsSecret[] => [
   {

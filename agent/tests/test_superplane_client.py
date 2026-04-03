@@ -3,7 +3,9 @@ from typing import Any
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
-from superplaneapi.models.components_list_components_response import ComponentsListComponentsResponse
+from superplaneapi.models.components_list_components_response import (
+    ComponentsListComponentsResponse,
+)
 from superplaneapi.models.superplane_integrations_list_integrations_response import (
     SuperplaneIntegrationsListIntegrationsResponse,
 )
@@ -21,7 +23,9 @@ class FakeCanvasApi:
         payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}")
         if payload is None:
             raise ValueError(f"Missing payload for canvas: {canvas_id}")
-        return CanvasesDescribeCanvasResponse.from_dict(payload)
+        result = CanvasesDescribeCanvasResponse.from_dict(payload)
+        assert result is not None
+        return result
 
 
 class FakeCanvasNodeApi:
@@ -40,7 +44,9 @@ class FakeCanvasNodeApi:
         payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}/nodes/{node_id}/events")
         if payload is None:
             raise ValueError(f"Missing payload for node events: {canvas_id}/{node_id}")
-        return CanvasesListNodeEventsResponse.from_dict(payload)
+        result = CanvasesListNodeEventsResponse.from_dict(payload)
+        assert result is not None
+        return result
 
 
 class FakeComponentApi:
@@ -54,7 +60,9 @@ class FakeComponentApi:
         payload = self._payloads.get("/api/v1/components")
         if payload is None:
             raise ValueError("Missing payload for components list.")
-        return ComponentsListComponentsResponse.from_dict(payload)
+        result = ComponentsListComponentsResponse.from_dict(payload)
+        assert result is not None
+        return result
 
 
 class FakeTriggerApi:
@@ -68,7 +76,9 @@ class FakeTriggerApi:
         payload = self._payloads.get("/api/v1/triggers")
         if payload is None:
             raise ValueError("Missing payload for triggers list.")
-        return TriggersListTriggersResponse.from_dict(payload)
+        result = TriggersListTriggersResponse.from_dict(payload)
+        assert result is not None
+        return result
 
 
 class FakeIntegrationApi:
@@ -82,7 +92,9 @@ class FakeIntegrationApi:
         payload = self._payloads.get("/api/v1/integrations")
         if payload is None:
             raise ValueError("Missing payload for integration catalog list.")
-        return SuperplaneIntegrationsListIntegrationsResponse.from_dict(payload)
+        result = SuperplaneIntegrationsListIntegrationsResponse.from_dict(payload)
+        assert result is not None
+        return result
 
 
 class FakeSuperplaneClient(SuperplaneClient):
@@ -94,11 +106,11 @@ class FakeSuperplaneClient(SuperplaneClient):
                 organization_id="org-id",
             )
         )
-        self._canvas_api = FakeCanvasApi(payloads)
-        self._canvas_node_api = FakeCanvasNodeApi(payloads)
-        self._component_api = FakeComponentApi(payloads)
-        self._trigger_api = FakeTriggerApi(payloads)
-        self._integration_api = FakeIntegrationApi(payloads)
+        self._canvas_api = FakeCanvasApi(payloads)  # type: ignore[assignment]
+        self._canvas_node_api = FakeCanvasNodeApi(payloads)  # type: ignore[assignment]
+        self._component_api = FakeComponentApi(payloads)  # type: ignore[assignment]
+        self._trigger_api = FakeTriggerApi(payloads)  # type: ignore[assignment]
+        self._integration_api = FakeIntegrationApi(payloads)  # type: ignore[assignment]
 
 
 def test_describe_canvas_maps_nodes_and_edges() -> None:
@@ -326,4 +338,3 @@ def test_matches_filters_excludes_unrelated_block() -> None:
         provider=None,
         query="slack",
     )
-

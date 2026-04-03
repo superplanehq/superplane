@@ -1,4 +1,4 @@
-import { ComponentBaseSpecValue } from "../ui/componentBase";
+import type { ComponentBaseSpecValue } from "../ui/componentBase";
 
 const operators = new Set([
   ">=",

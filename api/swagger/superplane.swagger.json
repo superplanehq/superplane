@@ -4613,6 +4613,9 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "root": {
+          "type": "boolean"
         }
       }
     },
@@ -4642,7 +4645,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+            "$ref": "#/definitions/CanvasesCanvasNodeExecutionRef"
           }
         },
         "customName": {
@@ -4762,7 +4765,40 @@
         "cancelledBy": {
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
         }
-      }
+      },
+      "description": "Full description of a canvas node execution.\nShould only be used for endpoints specific to executions."
+    },
+    "CanvasesCanvasNodeExecutionRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/CanvasesCanvasNodeExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/CanvasNodeExecutionResult"
+        },
+        "resultReason": {
+          "$ref": "#/definitions/CanvasNodeExecutionResultReason"
+        },
+        "resultMessage": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "More succint description of a canvas node execution.\nNo input, outputs, root event, children.\nUsed to embed execution information into other messages."
     },
     "CanvasesCanvasNodeExecutionState": {
       "type": "string",
@@ -4825,13 +4861,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasNodeExecution"
-          }
-        },
-        "nextQueueItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasNodeQueueItem"
           }
         },
         "lastEvents": {

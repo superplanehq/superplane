@@ -1,4 +1,4 @@
-import { BuildingBlockCategory } from "../../BuildingBlocksSidebar";
+import type { BuildingBlockCategory } from "../../BuildingBlocksSidebar";
 
 export const mockBuildingBlockCategories: BuildingBlockCategory[] = [
   {

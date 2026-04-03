@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 import { toTestId } from "@/lib/testID";
 
 // Function to get user's current timezone offset as a string (e.g., "-5", "0", "5.5")

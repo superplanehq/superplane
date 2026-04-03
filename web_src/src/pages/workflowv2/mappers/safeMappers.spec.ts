@@ -1,8 +1,19 @@
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import { createSafeComponentMapper, createSafeTriggerRenderer } from "./safeMappers";
+import type { ReactNode } from "react";
+import {
+  createSafeAdditionalDataBuilder,
+  createSafeComponentMapper,
+  createSafeCustomFieldRenderer,
+  createSafeTriggerRenderer,
+  normalizeComponentBaseProps,
+  normalizeTriggerProps,
+} from "./safeMappers";
 import type {
+  AdditionalDataBuilderContext,
   ComponentBaseContext,
   ComponentBaseMapper,
+  CustomFieldRenderer,
   ExecutionDetailsContext,
   ExecutionInfo,
   SubtitleContext,
@@ -58,6 +69,18 @@ function makeTriggerEventContext(): TriggerEventContext {
   return { event: { id: "ev1", createdAt: new Date().toISOString(), data: {}, nodeId: "n1", type: "test" } };
 }
 
+function makeAdditionalDataContext(): AdditionalDataBuilderContext {
+  return {
+    nodes: [DEFAULT_NODE],
+    node: DEFAULT_NODE,
+    componentDefinition: DEFAULT_DEFINITION,
+    lastExecutions: [],
+    canvasId: "canvas-1",
+    queryClient: new QueryClient(),
+    organizationId: "org-1",
+  };
+}
+
 function throwingMapper(method: "props" | "subtitle" | "getExecutionDetails"): ComponentBaseMapper {
   const noop: ComponentBaseMapper = {
     props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
@@ -95,7 +118,7 @@ describe("createSafeComponentMapper", () => {
     };
     const safe = createSafeComponentMapper(underlying, "test");
 
-    expect(safe.props(makeComponentBaseContext())).toBe(expected);
+    expect(safe.props(makeComponentBaseContext())).toMatchObject(expected);
     expect(safe.subtitle(makeSubtitleContext())).toBe("Sub");
     expect(safe.getExecutionDetails(makeExecutionDetailsContext())).toEqual({ Key: "Value" });
   });
@@ -168,9 +191,32 @@ describe("createSafeComponentMapper", () => {
     expect(safe.props(ctx).title).toBe("Test Node");
     consoleSpy.mockRestore();
   });
+
+  it("normalizes malformed mapper props into safe values", () => {
+    const result = normalizeComponentBaseProps(
+      {
+        title: undefined,
+        metadata: "bad",
+        specs: "bad",
+        eventSections: "bad",
+        error: { message: "boom" },
+        warning: 123,
+      } as unknown as ComponentBaseProps,
+      makeComponentBaseContext(),
+    );
+
+    expect(result.title).toBe("Test Node");
+    expect(result.metadata).toBeUndefined();
+    expect(result.specs).toBeUndefined();
+    expect(result.eventSections).toBeUndefined();
+    expect(result.error).toBe("");
+    expect(result.warning).toBe("");
+    expect(result.includeEmptyState).toBe(true);
+    expect(result.emptyStateProps?.title).toBe("Can't display");
+  });
 });
 
-describe("createSafeTriggerRenderer", () => {
+describe("createSafeTriggerRenderer core behavior", () => {
   it("delegates to the underlying renderer when no error occurs", () => {
     const expectedProps: TriggerProps = { title: "My Trigger", iconSlug: "bolt", metadata: [] };
     const underlying: TriggerRenderer = {
@@ -181,7 +227,7 @@ describe("createSafeTriggerRenderer", () => {
     };
     const safe = createSafeTriggerRenderer(underlying, "test");
 
-    expect(safe.getTriggerProps(makeTriggerRendererContext())).toBe(expectedProps);
+    expect(safe.getTriggerProps(makeTriggerRendererContext())).toMatchObject(expectedProps);
     expect(safe.getRootEventValues(makeTriggerEventContext())).toEqual({ key: "val" });
     expect(safe.getTitleAndSubtitle(makeTriggerEventContext())).toEqual({ title: "T", subtitle: "S" });
   });
@@ -255,10 +301,69 @@ describe("createSafeTriggerRenderer", () => {
     expect(safe.getEventState!(makeTriggerEventContext())).toBe("triggered");
     consoleSpy.mockRestore();
   });
+});
 
+describe("createSafeTriggerRenderer normalization", () => {
   it("does not wrap getEventState when the underlying renderer does not define it", () => {
     const safe = createSafeTriggerRenderer(baseTriggerRenderer(), "no-state");
     expect(safe.getEventState).toBeUndefined();
+  });
+
+  it("normalizes malformed trigger props into safe values", () => {
+    const result = normalizeTriggerProps(
+      {
+        title: undefined,
+        iconSlug: undefined,
+        metadata: "bad",
+        error: 1,
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(result.title).toBe("Test Trigger");
+    expect(result.iconSlug).toBe("bolt");
+    expect(result.metadata).toEqual([]);
+    expect(result.error).toBe("");
+  });
+
+  it("preserves fallback trigger title and icon when renderer returns empty strings", () => {
+    const result = normalizeTriggerProps(
+      {
+        title: "",
+        iconSlug: "",
+        metadata: [],
+        lastEventData: {
+          title: "",
+        },
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(result.title).toBe("Test Trigger");
+    expect(result.iconSlug).toBe("bolt");
+    expect(result.lastEventData?.title).toBe("Test Trigger");
+  });
+
+  it("preserves trigger customField identity and valid trigger-specific fields", () => {
+    const customField = vi.fn();
+    const result = normalizeTriggerProps(
+      {
+        title: "Trigger",
+        iconSlug: "bolt",
+        metadata: [{ title: "Region", value: "us-east-1" }],
+        customField,
+        warning: "be careful",
+        collapsed: true,
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(typeof result.customField).toBe("function");
+    (result.customField as (...args: unknown[]) => unknown)();
+    expect(customField).toHaveBeenCalled();
+    expect(result.warning).toBe("be careful");
+    expect(result.collapsed).toBe(true);
+    expect(result.metadata).toEqual([{ title: "Region", value: "us-east-1" }]);
   });
 });
 
@@ -280,5 +385,56 @@ describe("safe mapper canvas resilience", () => {
     expect(safeWorking.props(ctx).title).toBe("Works");
     expect(safeWorking.props(ctx).iconSlug).toBe("check");
     consoleSpy.mockRestore();
+  });
+});
+
+describe("additional data and custom field safety", () => {
+  it("returns undefined when an additional data builder throws", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const safe = createSafeAdditionalDataBuilder(
+      {
+        buildAdditionalData: () => {
+          throw new Error("builder failed");
+        },
+      },
+      "approval",
+    );
+
+    expect(safe.buildAdditionalData(makeAdditionalDataContext())).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Additional data builder "approval" threw in buildAdditionalData()'),
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("returns null when a custom field renderer throws", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const safe = createSafeCustomFieldRenderer(
+      {
+        render: () => {
+          throw new Error("render failed");
+        },
+      } satisfies CustomFieldRenderer,
+      "github.runWorkflow",
+    );
+
+    expect(safe.render(DEFAULT_NODE)).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Custom field renderer "github.runWorkflow" threw in render()'),
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("returns null when a custom field renderer returns a non-renderable object", () => {
+    const safe = createSafeCustomFieldRenderer(
+      {
+        render: () => ({ invalid: true }) as unknown as ReactNode,
+      } satisfies CustomFieldRenderer,
+      "broken.customField",
+    );
+
+    expect(safe.render(DEFAULT_NODE)).toBeNull();
   });
 });

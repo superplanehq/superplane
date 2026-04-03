@@ -415,11 +415,11 @@ export const ConfigurationFieldRenderer = ({
         }
         return (
           <SecretKeyFieldRenderer
+            field={field}
+            isRequired={isRequired}
             value={value as SecretKeyRefValue}
             onChange={(v) => onChange(v)}
             organizationId={organizationId ?? domainId}
-            placeholder={field.placeholder ?? "Select credential"}
-            allowClear={!isRequired}
           />
         );
 

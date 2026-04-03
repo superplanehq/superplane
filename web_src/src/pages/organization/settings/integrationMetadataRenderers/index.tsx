@@ -1,6 +1,6 @@
 import { dash0MetadataRenderer } from "./dash0";
-import { OrganizationsIntegration } from "@/api-client";
-import { IntegrationMetadataRenderer } from "./types";
+import type { OrganizationsIntegration } from "@/api-client";
+import type { IntegrationMetadataRenderer } from "./types";
 
 const integrationMetadataRenderers: Record<string, IntegrationMetadataRenderer> = {
   dash0: dash0MetadataRenderer,

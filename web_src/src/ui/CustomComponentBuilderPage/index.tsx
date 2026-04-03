@@ -13,7 +13,7 @@ import { ZoomSlider } from "@/components/zoom-slider";
 import { NodeSearch } from "@/components/node-search";
 import "./blueprint-canvas-reset.css";
 
-import {
+import type {
   ComponentsComponent,
   ComponentsNode,
   ConfigurationField,
@@ -23,15 +23,15 @@ import {
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
-import { BuildingBlock, BuildingBlockCategory, BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
-import { Block, BlockData } from "../CanvasPage/Block";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
+import type { BlockData } from "../CanvasPage/Block";
+import { Block } from "../CanvasPage/Block";
 import { CustomEdge } from "../CanvasPage/CustomEdge";
-import { BreadcrumbItem, Header } from "../CanvasPage/Header";
-import {
-  BlueprintMetadata,
-  CustomComponentConfigurationSidebar,
-  OutputChannel,
-} from "../CustomComponentConfigurationSidebar";
+import type { BreadcrumbItem } from "../CanvasPage/Header";
+import { Header } from "../CanvasPage/Header";
+import type { BlueprintMetadata, OutputChannel } from "../CustomComponentConfigurationSidebar";
+import { CustomComponentConfigurationSidebar } from "../CustomComponentConfigurationSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import { buildBuildingBlockCategories } from "../buildingBlocks";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";

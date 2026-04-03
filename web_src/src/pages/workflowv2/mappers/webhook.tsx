@@ -406,11 +406,15 @@ curl -X POST \\
 
             {/* Webhook URL Copy Field */}
             <div className="mt-3">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              <label
+                htmlFor="webhook-url-input"
+                className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide"
+              >
                 Webhook URL
               </label>
               <div className="relative group mt-1">
                 <input
+                  id="webhook-url-input"
                   type="text"
                   value={webhookUrl}
                   readOnly
@@ -421,9 +425,9 @@ curl -X POST \\
             </div>
 
             <div className="relative group mt-3">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                 Code Example
-              </label>
+              </p>
               <div className="relative group mt-1">
                 <pre className="text-xs text-gray-800 dark:text-gray-100 mt-1 border-1 border-orange-950/20 px-2.5 py-2 bg-orange-50 dark:bg-amber-800 rounded-md font-mono whitespace-pre overflow-x-auto">
                   {code}

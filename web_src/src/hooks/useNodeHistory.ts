@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useCanvasData";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
-import {
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
+import type {
   ComponentsComponent,
   ComponentsNode,
   CanvasesListNodeEventsResponse,
@@ -14,7 +14,7 @@ import {
   buildExecutionInfo,
   buildNodeInfo,
 } from "@/pages/workflowv2/utils";
-import { QueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
 import { useAccount } from "@/contexts/AccountContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
