@@ -3,15 +3,12 @@ package merge
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
-	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -239,19 +236,9 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	// configs created before the toggle will still work if they have an expression.
 	//
 	if spec.StopIfExpression != "" {
-		env, err := expressionEnv(ctx, spec.StopIfExpression)
+		out, err := ctx.Expressions.Run(spec.StopIfExpression)
 		if err != nil {
 			return nil, err
-		}
-
-		vm, err := expr.Compile(spec.StopIfExpression, expressionOptions(env)...)
-		if err != nil {
-			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
-		}
-
-		out, err := expr.Run(vm, env)
-		if err != nil {
-			return nil, fmt.Errorf("stopIfExpression evaluation failed: %w", err)
 		}
 
 		//
@@ -282,117 +269,6 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	}
 
 	return nil, nil
-}
-
-func expressionEnv(ctx core.ProcessQueueContext, expression string) (map[string]any, error) {
-	if ctx.ExpressionEnv != nil {
-		return ctx.ExpressionEnv(expression)
-	}
-
-	return buildExpressionEnv(ctx.Input, ctx.SourceNodeID), nil
-}
-
-func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
-	if sourceNodeID == "" {
-		return map[string]any{"$": input}
-	}
-
-	if inputMap, ok := input.(map[string]any); ok {
-		envData := make(map[string]any, len(inputMap)+1)
-		for key, value := range inputMap {
-			envData[key] = value
-		}
-		if _, exists := envData[sourceNodeID]; !exists {
-			envData[sourceNodeID] = input
-		}
-		return map[string]any{"$": envData}
-	}
-
-	if inputMap, ok := input.(map[string]string); ok {
-		envData := make(map[string]any, len(inputMap)+1)
-		for key, value := range inputMap {
-			envData[key] = value
-		}
-		if _, exists := envData[sourceNodeID]; !exists {
-			envData[sourceNodeID] = input
-		}
-		return map[string]any{"$": envData}
-	}
-
-	return map[string]any{"$": map[string]any{sourceNodeID: input}}
-}
-
-func expressionOptions(env map[string]any) []expr.Option {
-	return []expr.Option{
-		expr.Env(env),
-		expr.AsBool(),
-		expr.WithContext("ctx"),
-		expr.Timezone(time.UTC.String()),
-		exprruntime.DateFunctionOption(),
-		expr.Function("root", func(params ...any) (any, error) {
-			if len(params) != 0 {
-				return nil, fmt.Errorf("root() takes no arguments")
-			}
-
-			rootPayload, ok := env["__root"]
-			if !ok {
-				return nil, fmt.Errorf("no root event found")
-			}
-			return rootPayload, nil
-		}),
-		expr.Function("previous", func(params ...any) (any, error) {
-			depth := 1
-			if len(params) > 1 {
-				return nil, fmt.Errorf("previous() accepts zero or one argument")
-			}
-			if len(params) == 1 {
-				parsedDepth, err := parseDepthValue(params[0])
-				if err != nil {
-					return nil, err
-				}
-				depth = parsedDepth
-			}
-
-			previousByDepth, ok := env["__previousByDepth"]
-			if !ok {
-				return nil, nil
-			}
-			if values, ok := previousByDepth.(map[string]any); ok {
-				return values[strconv.Itoa(depth)], nil
-			}
-			if values, ok := previousByDepth.(map[int]any); ok {
-				return values[depth], nil
-			}
-
-			return nil, nil
-		}),
-	}
-}
-
-func parseDepthValue(param any) (int, error) {
-	switch value := param.(type) {
-	case int:
-		if value < 1 {
-			return 0, fmt.Errorf("depth must be >= 1")
-		}
-		return value, nil
-	case int64:
-		if value < 1 {
-			return 0, fmt.Errorf("depth must be >= 1")
-		}
-		return int(value), nil
-	case float64:
-		parsed := int(value)
-		if value != float64(parsed) {
-			return 0, fmt.Errorf("depth must be an integer")
-		}
-		if parsed < 1 {
-			return 0, fmt.Errorf("depth must be >= 1")
-		}
-		return parsed, nil
-	default:
-		return 0, fmt.Errorf("depth must be an integer")
-	}
 }
 
 func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {
