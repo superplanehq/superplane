@@ -84,8 +84,14 @@ export function CreateCustomComponentModal({
         <div className="space-y-6">
           {/* Blueprint Name */}
           <Field>
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Bundle name *</Label>
+            <Label
+              htmlFor="create-bundle-name-input"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Bundle name *
+            </Label>
             <Input
+              id="create-bundle-name-input"
               data-testid="component-name-input"
               type="text"
               autoComplete="off"
@@ -111,8 +117,14 @@ export function CreateCustomComponentModal({
 
           {/* Blueprint Description */}
           <Field>
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
+            <Label
+              htmlFor="create-bundle-description-input"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Description
+            </Label>
             <Textarea
+              id="create-bundle-description-input"
               value={blueprintDescription}
               onChange={(e) => {
                 if (e.target.value.length <= MAX_BLUEPRINT_DESCRIPTION_LENGTH) {
