@@ -492,6 +492,309 @@ func Test__ListResources__Snapshots(t *testing.T) {
 	})
 }
 
+func Test__ListResources__EmbeddingModels(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful listing -> returns embedding models", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"models": [
+							{"uuid": "05700391-7aa8-11ef-bf8f-4e013e2ddde4", "name": "Multi QA MPNet Base Dot v1", "kb_min_chunk_size": 100, "kb_max_chunk_size": 512},
+							{"uuid": "c4e7f3a1-9bb2-11ef-bf8f-4e013e2ddde4", "name": "GTE Large EN v1.5", "kb_min_chunk_size": 100, "kb_max_chunk_size": 1024},
+							{"uuid": "d5f8a4b2-1cc3-11f0-bf8f-4e013e2ddde4", "name": "All MiniLM L6 v2", "kb_min_chunk_size": 0, "kb_max_chunk_size": 0}
+						]
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("embedding_model", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 3)
+		assert.Equal(t, "embedding_model", resources[0].Type)
+		assert.Equal(t, "Multi QA MPNet Base Dot v1 (100–512 tokens)", resources[0].Name)
+		assert.Equal(t, "05700391-7aa8-11ef-bf8f-4e013e2ddde4", resources[0].ID)
+		assert.Equal(t, "GTE Large EN v1.5 (100–1024 tokens)", resources[1].Name)
+		// model without chunk size info -> name shown as-is
+		assert.Equal(t, "All MiniLM L6 v2", resources[2].Name)
+	})
+
+	t.Run("verifies usecases=embedding query parameter is used", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"models": []}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		_, err := integration.ListResources("embedding_model", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.RawQuery, "usecases=MODEL_USECASE_KNOWLEDGEBASE")
+	})
+
+	t.Run("API error -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"server_error","message":"Internal server error"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("embedding_model", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error listing embedding models")
+		assert.Nil(t, resources)
+	})
+}
+
+func Test__ListResources__Projects(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful listing -> returns projects, default project marked", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"projects": [
+							{"id": "37455431-84bd-4fa2-94cf-e8486f8f8c5e", "name": "My Project", "is_default": false},
+							{"id": "aabbccdd-1234-5678-abcd-ef0123456789", "name": "Default Project", "is_default": true}
+						]
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("project", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "project", resources[0].Type)
+		assert.Equal(t, "My Project", resources[0].Name)
+		assert.Equal(t, "37455431-84bd-4fa2-94cf-e8486f8f8c5e", resources[0].ID)
+		assert.Equal(t, "Default Project (default)", resources[1].Name)
+		assert.Equal(t, "aabbccdd-1234-5678-abcd-ef0123456789", resources[1].ID)
+	})
+
+	t.Run("API error -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusUnauthorized,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"unauthorized","message":"Unable to authenticate you"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("project", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error listing projects")
+		assert.Nil(t, resources)
+	})
+}
+
+func Test__ListResources__OpenSearchDatabases(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful listing -> returns OpenSearch databases", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"databases": [
+							{"id": "abf1055a-745d-4c24-a1db-1959ea819264", "name": "kb-search", "engine": "opensearch", "status": "online"},
+							{"id": "ccdd1234-745d-4c24-a1db-1959ea819264", "name": "kb-search-2", "engine": "opensearch", "status": "online"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("opensearch_database", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "opensearch_database", resources[0].Type)
+		assert.Equal(t, "kb-search", resources[0].Name)
+		assert.Equal(t, "abf1055a-745d-4c24-a1db-1959ea819264", resources[0].ID)
+		assert.Equal(t, "kb-search-2", resources[1].Name)
+	})
+
+	t.Run("API error -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"server_error","message":"Internal server error"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("opensearch_database", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "error listing OpenSearch databases")
+		assert.Nil(t, resources)
+	})
+}
+
+func Test__ListResources__AgentAvailableKnowledgeBases(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("missing agentId -> returns empty list", func(t *testing.T) {
+		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 0)
+	})
+
+	t.Run("filters out already attached knowledge bases", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					// GetAgent
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"agent": {
+							"uuid": "agent-uuid",
+							"name": "my-agent",
+							"knowledge_bases": [
+								{"uuid": "kb-attached-uuid", "name": "attached-kb"}
+							]
+						}
+					}`)),
+				},
+				{
+					// ListKnowledgeBases
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"knowledge_bases": [
+							{"uuid": "kb-attached-uuid", "name": "attached-kb"},
+							{"uuid": "kb-available-uuid", "name": "available-kb"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"agentId": "agent-uuid"},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, "agent_available_knowledge_base", resources[0].Type)
+		assert.Equal(t, "available-kb", resources[0].Name)
+		assert.Equal(t, "kb-available-uuid", resources[0].ID)
+	})
+
+	t.Run("all knowledge bases already attached -> returns empty list", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					// GetAgent
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"agent": {
+							"uuid": "agent-uuid",
+							"name": "my-agent",
+							"knowledge_bases": [
+								{"uuid": "kb-uuid", "name": "my-kb"}
+							]
+						}
+					}`)),
+				},
+				{
+					// ListKnowledgeBases
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"knowledge_bases": [
+							{"uuid": "kb-uuid", "name": "my-kb"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"agentId": "agent-uuid"},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 0)
+	})
+}
+
 func Test__ListResources__ClientCreationError(t *testing.T) {
 	integration := &DigitalOcean{}
 
