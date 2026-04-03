@@ -700,6 +700,101 @@ func Test__ListResources__OpenSearchDatabases(t *testing.T) {
 	})
 }
 
+func Test__ListResources__AgentAvailableKnowledgeBases(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("missing agentId -> returns empty list", func(t *testing.T) {
+		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
+			HTTP:        &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 0)
+	})
+
+	t.Run("filters out already attached knowledge bases", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					// GetAgent
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"agent": {
+							"uuid": "agent-uuid",
+							"name": "my-agent",
+							"knowledge_bases": [
+								{"uuid": "kb-attached-uuid", "name": "attached-kb"}
+							]
+						}
+					}`)),
+				},
+				{
+					// ListKnowledgeBases
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"knowledge_bases": [
+							{"uuid": "kb-attached-uuid", "name": "attached-kb"},
+							{"uuid": "kb-available-uuid", "name": "available-kb"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"agentId": "agent-uuid"},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, "agent_available_knowledge_base", resources[0].Type)
+		assert.Equal(t, "available-kb", resources[0].Name)
+		assert.Equal(t, "kb-available-uuid", resources[0].ID)
+	})
+
+	t.Run("all knowledge bases already attached -> returns empty list", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					// GetAgent
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"agent": {
+							"uuid": "agent-uuid",
+							"name": "my-agent",
+							"knowledge_bases": [
+								{"uuid": "kb-uuid", "name": "my-kb"}
+							]
+						}
+					}`)),
+				},
+				{
+					// ListKnowledgeBases
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"knowledge_bases": [
+							{"uuid": "kb-uuid", "name": "my-kb"}
+						]
+					}`)),
+				},
+			},
+		}
+
+		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Parameters:  map[string]string{"agentId": "agent-uuid"},
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 0)
+	})
+}
+
 func Test__ListResources__ClientCreationError(t *testing.T) {
 	integration := &DigitalOcean{}
 

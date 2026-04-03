@@ -230,6 +230,21 @@ export interface UpdateAppConfiguration {
   gitHubBranch?: string;
 }
 
+export interface AgentNodeMetadata {
+  agentId?: string;
+  agentName?: string;
+  oldKnowledgeBaseId?: string;
+  oldKnowledgeBaseName?: string;
+  newKnowledgeBaseId?: string;
+  newKnowledgeBaseName?: string;
+}
+
+export interface UpdateAgentConfiguration {
+  agentId: string;
+  oldKnowledgeBaseId: string;
+  newKnowledgeBaseId: string;
+}
+
 export interface CreateKnowledgeBaseConfiguration {
   name: string;
   embeddingModelUUID: string;

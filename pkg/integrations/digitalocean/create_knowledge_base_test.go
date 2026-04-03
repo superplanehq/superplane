@@ -77,7 +77,7 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "embeddingModelUUID is required")
 	})
 
-		t.Run("missing region with new database returns error", func(t *testing.T) {
+	t.Run("missing region with new database returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"name":               "my-kb",
@@ -888,17 +888,17 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 	component := &CreateKnowledgeBase{}
 
 	storedOutput := map[string]any{
-		"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-		"name": "my-kb",
+		"uuid":   "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+		"name":   "my-kb",
 		"region": "tor1",
 	}
 
 	// buildPollCtx builds an ActionContext for the poll action with pre-set metadata.
 	buildPollCtx := func(httpContext *contexts.HTTPContext) core.ActionContext {
 		return core.ActionContext{
-			Name: "poll",
-			HTTP: httpContext,
-			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
+			Name:           "poll",
+			HTTP:           httpContext,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
 			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 			Metadata: &contexts.MetadataContext{Metadata: map[string]any{
 				"kbUUID":   "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",

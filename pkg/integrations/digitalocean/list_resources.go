@@ -42,6 +42,14 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listProjects(ctx)
 	case "opensearch_database":
 		return listOpenSearchDatabases(ctx)
+	case "agent":
+		return listAgents(ctx)
+	case "knowledge_base":
+		return listKnowledgeBases(ctx)
+	case "agent_available_knowledge_base":
+		return listAgentAvailableKnowledgeBases(ctx)
+	case "agent_knowledge_base":
+		return listAgentKnowledgeBases(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -460,6 +468,120 @@ func listOpenSearchDatabases(ctx core.ListResourcesContext) ([]core.IntegrationR
 			Type: "opensearch_database",
 			Name: db.Name,
 			ID:   db.ID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAgents(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agents, err := client.ListAgents()
+	if err != nil {
+		return nil, fmt.Errorf("error listing agents: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agents))
+	for _, agent := range agents {
+		resources = append(resources, core.IntegrationResource{
+			Type: "agent",
+			Name: agent.Name,
+			ID:   agent.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAgentKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	agentID := ctx.Parameters["agentId"]
+	if agentID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agent, err := client.GetAgent(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching agent: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(agent.KnowledgeBases))
+	for _, kb := range agent.KnowledgeBases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "agent_knowledge_base",
+			Name: kb.Name,
+			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listAgentAvailableKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	agentID := ctx.Parameters["agentId"]
+	if agentID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agent, err := client.GetAgent(agentID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching agent: %w", err)
+	}
+
+	attached := make(map[string]bool, len(agent.KnowledgeBases))
+	for _, kb := range agent.KnowledgeBases {
+		attached[kb.UUID] = true
+	}
+
+	kbs, err := client.ListKnowledgeBases()
+	if err != nil {
+		return nil, fmt.Errorf("error listing knowledge bases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(kbs))
+	for _, kb := range kbs {
+		if !attached[kb.UUID] {
+			resources = append(resources, core.IntegrationResource{
+				Type: "agent_available_knowledge_base",
+				Name: kb.Name,
+				ID:   kb.UUID,
+			})
+		}
+	}
+
+	return resources, nil
+}
+
+func listKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	kbs, err := client.ListKnowledgeBases()
+	if err != nil {
+		return nil, fmt.Errorf("error listing knowledge bases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(kbs))
+	for _, kb := range kbs {
+		resources = append(resources, core.IntegrationResource{
+			Type: "knowledge_base",
+			Name: kb.Name,
+			ID:   kb.UUID,
 		})
 	}
 

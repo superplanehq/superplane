@@ -2505,6 +2505,155 @@ func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
 	return &response.IndexJob, nil
 }
 
+// AgentKnowledgeBase represents a knowledge base attached to a GradientAI agent
+type AgentKnowledgeBase struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+// Agent represents a DigitalOcean GradientAI agent
+type Agent struct {
+	UUID           string               `json:"uuid"`
+	Name           string               `json:"name"`
+	KnowledgeBases []AgentKnowledgeBase `json:"knowledge_bases"`
+}
+
+// GetAgent retrieves a GradientAI agent by its UUID
+func (c *Client) GetAgent(agentUUID string) (*Agent, error) {
+	url := fmt.Sprintf("%s/gen-ai/agents/%s", c.BaseURL, agentUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agent Agent `json:"agent"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Agent, nil
+}
+
+// ListAgents retrieves all GradientAI agents in the account
+func (c *Client) ListAgents() ([]Agent, error) {
+	url := fmt.Sprintf("%s/gen-ai/agents?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agents []Agent `json:"agents"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Agents, nil
+}
+
+// ListKnowledgeBases retrieves all GradientAI knowledge bases in the account
+func (c *Client) ListKnowledgeBases() ([]KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBases []KnowledgeBase `json:"knowledge_bases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.KnowledgeBases, nil
+}
+
+// AttachKnowledgeBase attaches a knowledge base to a GradientAI agent.
+// Uses POST /v2/gen-ai/agents/{agent_uuid}/knowledge_bases/{knowledge_base_uuid}
+func (c *Client) AttachKnowledgeBase(agentUUID, kbUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/agents/%s/knowledge_bases/%s", c.BaseURL, agentUUID, kbUUID)
+
+	body, err := json.Marshal(map[string]string{"agent_uuid": agentUUID})
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	return err
+}
+
+// DetachKnowledgeBase detaches a knowledge base from a GradientAI agent
+func (c *Client) DetachKnowledgeBase(agentUUID, kbUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/agents/%s/knowledge_bases/%s", c.BaseURL, agentUUID, kbUUID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// AgentNodeMetadata stores metadata about a GradientAI agent for display in the UI
+type AgentNodeMetadata struct {
+	AgentID                 string `json:"agentId" mapstructure:"agentId"`
+	AgentName               string `json:"agentName" mapstructure:"agentName"`
+	OldKnowledgeBaseID      string `json:"oldKnowledgeBaseId" mapstructure:"oldKnowledgeBaseId"`
+	OldKnowledgeBaseName    string `json:"oldKnowledgeBaseName" mapstructure:"oldKnowledgeBaseName"`
+	NewKnowledgeBaseID      string `json:"newKnowledgeBaseId" mapstructure:"newKnowledgeBaseId"`
+	NewKnowledgeBaseName    string `json:"newKnowledgeBaseName" mapstructure:"newKnowledgeBaseName"`
+}
+
+// resolveAgentMetadata fetches the agent name and KB names from the API and stores them in metadata
+func resolveAgentMetadata(ctx core.SetupContext, agentID, oldKBID, newKBID string) error {
+	var metadata AgentNodeMetadata
+
+	// If any ID is an expression placeholder, skip all API calls — no HTTP context is guaranteed
+	if strings.Contains(agentID, "{{") || strings.Contains(oldKBID, "{{") || strings.Contains(newKBID, "{{") {
+		metadata.AgentName = agentID
+		metadata.OldKnowledgeBaseName = oldKBID
+		metadata.NewKnowledgeBaseName = newKBID
+		return ctx.Metadata.Set(metadata)
+	}
+
+	var existing AgentNodeMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if existing.AgentID == agentID && existing.AgentName != "" &&
+		existing.OldKnowledgeBaseID == oldKBID && existing.NewKnowledgeBaseID == newKBID {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+
+	agent, err := client.GetAgent(agentID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch agent %q: %w", agentID, err)
+	}
+	metadata.AgentID = agentID
+	metadata.AgentName = agent.Name
+
+	if oldKBID != "" {
+		if kb, err := client.GetKnowledgeBase(oldKBID); err == nil {
+			metadata.OldKnowledgeBaseID = oldKBID
+			metadata.OldKnowledgeBaseName = kb.Name
+		}
+	}
+
+	if newKBID != "" {
+		if kb, err := client.GetKnowledgeBase(newKBID); err == nil {
+			metadata.NewKnowledgeBaseID = newKBID
+			metadata.NewKnowledgeBaseName = kb.Name
+		}
+	}
+
+	return ctx.Metadata.Set(metadata)
+}
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`

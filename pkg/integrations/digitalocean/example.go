@@ -266,3 +266,13 @@ var exampleOutputCreateKnowledgeBase map[string]any
 func (c *CreateKnowledgeBase) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateKnowledgeBaseOnce, exampleOutputCreateKnowledgeBaseBytes, &exampleOutputCreateKnowledgeBase)
 }
+
+//go:embed example_output_update_agent.json
+var exampleOutputUpdateAgentBytes []byte
+
+var exampleOutputUpdateAgentOnce sync.Once
+var exampleOutputUpdateAgent map[string]any
+
+func (u *UpdateAgent) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAgentOnce, exampleOutputUpdateAgentBytes, &exampleOutputUpdateAgent)
+}
