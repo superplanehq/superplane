@@ -120,7 +120,7 @@ export const ifMapper: ComponentBaseMapper = {
     const configuration = context.execution.configuration as IfConfiguration;
     const details: Record<string, any> = {
       "Evaluated at": stringOrDash(context.execution.createdAt),
-      "Expression": configuration.expression,
+      Expression: configuration.expression,
     };
 
     // Error (if present) - placed at the end, after Evaluation

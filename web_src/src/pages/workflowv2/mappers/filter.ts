@@ -114,7 +114,7 @@ export const filterMapper: ComponentBaseMapper = {
     const configuration = context.execution.configuration as FilterConfiguration;
     const details: Record<string, any> = {
       "Evaluated at": stringOrDash(context.execution.createdAt),
-      "Expression": configuration.expression,
+      Expression: configuration.expression,
     };
 
     // Error (if present) - placed at the end, after Evaluation
