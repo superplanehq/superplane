@@ -237,6 +237,40 @@ func Test__Client__ListDataSources(t *testing.T) {
 	require.Equal(t, "Prometheus", dataSources[0].Name)
 }
 
+func Test__dashboardURLPathSlug(t *testing.T) {
+	require.Equal(t, "my-slug", dashboardURLPathSlug(&DashboardDetails{Slug: "my-slug", UID: "abc"}))
+	require.Equal(t, "abc", dashboardURLPathSlug(&DashboardDetails{Slug: "", UID: "abc"}))
+	require.Equal(t, "abc", dashboardURLPathSlug(&DashboardDetails{Slug: "   ", UID: "abc"}))
+	require.Equal(t, "dashboard", dashboardURLPathSlug(&DashboardDetails{Slug: "", UID: ""}))
+	require.Equal(t, "dashboard", dashboardURLPathSlug(nil))
+}
+
+func Test__Client__RenderPanelURL(t *testing.T) {
+	client := &Client{BaseURL: "https://grafana.example.com/"}
+
+	got := client.RenderPanelURL("cIBgcSjkk", "production-overview", 2, 1000, 500, "now-1h", "now")
+
+	require.Equal(
+		t,
+		"https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?from=now-1h&height=500&panelId=2&to=now&tz=UTC&width=1000",
+		got,
+	)
+}
+
+func Test__collectDashboardPanelSummaries__nestedUnderRows(t *testing.T) {
+	raw := []json.RawMessage{
+		json.RawMessage(`{"id":10,"title":"Resources","type":"row","panels":[{"id":1,"title":"CPU","type":"timeseries"},{"id":2,"title":"Memory","type":"timeseries"}]}`),
+		json.RawMessage(`{"id":3,"title":"Standalone","type":"gauge"}`),
+	}
+	got := collectDashboardPanelSummaries(raw)
+	require.Len(t, got, 3)
+	require.Equal(t, 1, got[0].ID)
+	require.Equal(t, "CPU", got[0].Title)
+	require.Equal(t, "timeseries", got[0].Type)
+	require.Equal(t, 2, got[1].ID)
+	require.Equal(t, 3, got[2].ID)
+}
+
 func Test__Grafana__ListResources(t *testing.T) {
 	g := &Grafana{}
 
