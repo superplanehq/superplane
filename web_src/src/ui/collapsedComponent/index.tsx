@@ -1,6 +1,6 @@
 import React from "react";
 import { resolveIcon } from "@/lib/utils";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 
 export interface CollapsedComponentProps extends ComponentActionsProps {
   iconSrc?: string;

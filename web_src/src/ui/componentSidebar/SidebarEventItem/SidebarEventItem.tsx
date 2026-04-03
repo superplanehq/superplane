@@ -3,12 +3,13 @@ import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isCancelledError } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { SidebarEvent } from "../types";
+import type { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
-import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export interface ExecutionChainItem extends EventStateStyle {
   name: string;

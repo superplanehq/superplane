@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { createDropletMapper } from "./create_droplet";
 import { getDropletMapper } from "./get_droplet";
 import { deleteDropletMapper } from "./delete_droplet";

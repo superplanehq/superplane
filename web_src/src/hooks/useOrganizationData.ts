@@ -28,7 +28,7 @@ import {
   organizationsSetAgentOpenAiKey,
   organizationsDeleteAgentOpenAiKey,
 } from "../api-client/sdk.gen";
-import { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
+import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { canvasKeys } from "./useCanvasData";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 

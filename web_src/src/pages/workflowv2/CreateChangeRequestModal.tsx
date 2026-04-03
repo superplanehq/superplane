@@ -1,4 +1,4 @@
-import { CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import {
@@ -15,7 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
-import { DraftNodeDiffSummary, DraftNodeDiffView } from "./draftNodeDiff";
+import type { DraftNodeDiffSummary } from "./draftNodeDiff";
+import { DraftNodeDiffView } from "./draftNodeDiff";
 import { NodeDiffSummaryCounts } from "./VersionNodeDiff";
 
 interface CreateChangeRequestModalProps {

@@ -1,5 +1,6 @@
-import { MetadataItem } from "@/ui/metadataList";
-import { Predicate, formatPredicate, buildSubtitle, buildExecutionSubtitle } from "../utils";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { Predicate } from "../utils";
+import { formatPredicate, buildSubtitle, buildExecutionSubtitle } from "../utils";
 
 export function createGithubMetadataItems(
   repositoryName: string | undefined,

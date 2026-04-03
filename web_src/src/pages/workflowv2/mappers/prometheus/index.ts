@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { getAlertMapper } from "./get_alert";
 import { createSilenceMapper } from "./create_silence";
 import { expireSilenceMapper } from "./expire_silence";

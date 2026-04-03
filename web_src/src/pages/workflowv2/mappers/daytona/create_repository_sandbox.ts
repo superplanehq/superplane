@@ -1,7 +1,7 @@
-import { MetadataItem } from "@/ui/metadataList";
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
-import { ComponentBaseSpec } from "@/ui/componentBase";
+import type { ComponentBaseSpec } from "@/ui/componentBase";
 
 interface CreateRepositorySandboxConfiguration {
   snapshot?: string;

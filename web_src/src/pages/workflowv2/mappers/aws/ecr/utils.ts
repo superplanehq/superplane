@@ -1,5 +1,5 @@
-import { MetadataItem } from "@/ui/metadataList";
-import { EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { EcrRepositoryConfiguration, EcrRepositoryMetadata } from "./types";
 
 export function getRepositoryLabel(
   metadata?: EcrRepositoryMetadata,
