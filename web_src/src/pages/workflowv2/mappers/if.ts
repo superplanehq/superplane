@@ -13,8 +13,8 @@ import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import type React from "react";
-import { parseExpression, substituteExpressionValues, evaluateIndividualComparisons } from "@/lib/expressionParser";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { stringOrDash } from "./utils";
 
 type IfOutputs = Record<string, OutputPayload[]>;
 
@@ -82,19 +82,13 @@ export const ifMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const componentName = context.componentDefinition.name || "if";
     const configuration = context.node.configuration as IfConfiguration;
-
-    // Prefer expression from execution metadata (stored at execution time)
-    // Fall back to node configuration if metadata is not available
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const metadata = lastExecution?.metadata as Record<string, any> | undefined;
-    const expression = (metadata?.expression as string) || (configuration.expression as string) || undefined;
-    const conditions = expression ? parseExpression(expression) : [];
-    const specs = expression
+    const specs = configuration.expression
       ? [
           {
-            title: "condition",
-            tooltipTitle: "conditions applied",
-            values: conditions,
+            title: "Expression",
+            tooltipTitle: "Expression",
+            value: configuration.expression,
           },
         ]
       : undefined;
@@ -123,87 +117,11 @@ export const ifMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const configuration = context.node.configuration as IfConfiguration;
-
-    // Evaluated at
-    if (context.execution.createdAt) {
-      const evaluatedAt = new Date(context.execution.createdAt);
-      details["Evaluated at"] = evaluatedAt.toLocaleString("en-US", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      });
-    } else {
-      details["Evaluated at"] = "N/A";
-    }
-
-    // Get the expression from execution metadata (stored at execution time)
-    // Fall back to node configuration or execution configuration if metadata is not available
-    const metadata = context.execution.metadata as Record<string, any> | undefined;
-    const expression =
-      (metadata?.expression as string) ||
-      (configuration.expression as string) ||
-      (context.execution.configuration?.expression as string) ||
-      "";
-
-    // Evaluation (with values replaced) - formatted with badges and color-coded
-    if (expression) {
-      // Get the input data (payload) that was evaluated
-      // Try execution.input first, then fall back to rootEvent.data
-      let inputData: any = null;
-
-      if (context.execution.input) {
-        // Input might be an object directly or nested
-        inputData = context.execution.input;
-      } else if (context.execution.rootEvent?.data) {
-        inputData = context.execution.rootEvent.data;
-      }
-
-      // Substitute values in the expression
-      if (inputData) {
-        const substitutedExpression = substituteExpressionValues(expression, inputData, {
-          root: context.execution.rootEvent?.data,
-          previousByDepth: { "1": inputData },
-        });
-        const parsedEvaluation = parseExpression(substitutedExpression);
-
-        // Determine if the if condition evaluated to true (has outputs on "true" channel)
-        const outputs = context.execution.outputs as IfOutputs | undefined;
-        const trueOutputs = outputs?.true;
-        const hasTrueOutputs = Array.isArray(trueOutputs) && trueOutputs.length > 0;
-        const passed = hasTrueOutputs;
-
-        // Evaluate individual comparisons to determine which parts should be red
-        const failedParts = evaluateIndividualComparisons(substitutedExpression);
-
-        details["Evaluation"] = {
-          __type: "evaluationBadges",
-          values: parsedEvaluation,
-          passed,
-          failedParts: Array.from(failedParts),
-        };
-      } else {
-        // If no input data available, show the expression as-is with badges
-        const parsedExpression = parseExpression(expression);
-        const outputs = context.execution.outputs as IfOutputs | undefined;
-        const trueOutputs = outputs?.true;
-        const hasTrueOutputs = Array.isArray(trueOutputs) && trueOutputs.length > 0;
-        const passed = hasTrueOutputs;
-
-        details["Evaluation"] = {
-          __type: "evaluationBadges",
-          values: parsedExpression,
-          passed,
-        };
-      }
-    } else {
-      details["Evaluation"] = "N/A";
-    }
+    const configuration = context.execution.configuration as IfConfiguration;
+    const details: Record<string, any> = {
+      "Evaluated at": stringOrDash(context.execution.createdAt),
+      "Expression": configuration.expression,
+    };
 
     // Error (if present) - placed at the end, after Evaluation
     if (
