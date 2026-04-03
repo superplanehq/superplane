@@ -286,3 +286,13 @@ var exampleOutputDetachKnowledgeBase map[string]any
 func (d *DetachKnowledgeBase) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDetachKnowledgeBaseOnce, exampleOutputDetachKnowledgeBaseBytes, &exampleOutputDetachKnowledgeBase)
 }
+
+//go:embed example_output_delete_knowledge_base.json
+var exampleOutputDeleteKnowledgeBaseBytes []byte
+
+var exampleOutputDeleteKnowledgeBaseOnce sync.Once
+var exampleOutputDeleteKnowledgeBase map[string]any
+
+func (d *DeleteKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteKnowledgeBaseOnce, exampleOutputDeleteKnowledgeBaseBytes, &exampleOutputDeleteKnowledgeBase)
+}

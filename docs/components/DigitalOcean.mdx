@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
+  <LinkCard title="Attach Knowledge Base" href="#attach-knowledge-base" description="Attach a knowledge base to a DigitalOcean Gradient AI agent" />
   <LinkCard title="Copy Object" href="#copy-object" description="Copy or move an object within DigitalOcean Spaces Object Storage" />
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
@@ -22,9 +23,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete Knowledge Base" href="#delete-knowledge-base" description="Delete a DigitalOcean Gradient AI knowledge base and optionally its OpenSearch database" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
+  <LinkCard title="Detach Knowledge Base" href="#detach-knowledge-base" description="Detach a knowledge base from a DigitalOcean Gradient AI agent" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
@@ -32,7 +35,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
-  <LinkCard title="Update Agent" href="#update-agent" description="Swap the knowledge base attached to a DigitalOcean Gradient AI agent" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
@@ -108,6 +110,42 @@ Returns the action result including:
   },
   "timestamp": "2026-03-13T10:10:08.000000000Z",
   "type": "digitalocean.reservedip.assign"
+}
+```
+
+<a id="attach-knowledge-base"></a>
+
+## Attach Knowledge Base
+
+The Attach Knowledge Base component connects a knowledge base to an existing Gradient AI agent, enabling the agent to use it for retrieval-augmented generation (RAG).
+
+### Use Cases
+
+- **Post-creation wiring**: After creating a new knowledge base, attach it to an agent to make it immediately available
+- **Blue/green KB deployment**: Attach a newly indexed knowledge base to an agent as part of a promotion pipeline
+- **Multi-KB agents**: Add additional knowledge bases to an agent that already has others attached
+
+### Configuration
+
+- **Agent**: The agent to attach the knowledge base to (required)
+- **Knowledge Base**: The knowledge base to attach — only shows knowledge bases not already attached to the selected agent (required)
+
+### Output
+
+Returns confirmation of the attachment including:
+- **agentId**: UUID of the agent
+- **knowledgeBaseId**: UUID of the attached knowledge base
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.attached"
 }
 ```
 
@@ -821,6 +859,54 @@ Returns information about the deleted droplet:
 }
 ```
 
+<a id="delete-knowledge-base"></a>
+
+## Delete Knowledge Base
+
+The Delete Knowledge Base component removes a knowledge base from the DigitalOcean Gradient AI Platform.
+
+### How it works
+
+Deletes the specified knowledge base. Optionally, you can also delete the associated OpenSearch database that stores the vector embeddings.
+
+### Use Cases
+
+- **Cleanup**: Remove knowledge bases that are no longer needed
+- **Resource management**: Free up resources by deleting unused knowledge bases and their databases
+- **Rotation**: Delete an old knowledge base after a new one has been verified and attached
+
+### Configuration
+
+- **Knowledge Base**: The knowledge base to delete (required)
+- **Delete OpenSearch Database**: Whether to also delete the associated OpenSearch database (optional, defaults to off)
+
+### Output
+
+Returns confirmation of the deletion including:
+- **knowledgeBaseId**: UUID of the deleted knowledge base
+- **databaseDeleted**: Whether the OpenSearch database was also deleted
+- **databaseId**: UUID of the deleted database (if applicable)
+
+### Notes
+
+- If the knowledge base is currently attached to any agents, it will automatically be removed from those agents upon deletion. Consider using the Detach Knowledge Base component first if you need more control over the detachment process.
+- Deleting the OpenSearch database is irreversible and will remove all vector embeddings
+
+### Example Output
+
+```json
+{
+  "data": {
+    "databaseDeleted": true,
+    "databaseId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseName": "my-knowledge-base-os",
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.deleted"
+}
+```
+
 <a id="delete-load-balancer"></a>
 
 ## Delete Load Balancer
@@ -938,6 +1024,42 @@ Returns confirmation of the deleted snapshot including:
   },
   "timestamp": "2026-03-13T06:27:06.208635289Z",
   "type": "digitalocean.snapshot.deleted"
+}
+```
+
+<a id="detach-knowledge-base"></a>
+
+## Detach Knowledge Base
+
+The Detach Knowledge Base component removes a knowledge base from an existing Gradient AI agent.
+
+### Use Cases
+
+- **Rollback**: Remove a knowledge base that is causing poor agent responses
+- **Cleanup**: Detach an outdated knowledge base before attaching a freshly indexed one
+- **Rotation**: As part of a blue/green pipeline, detach the old knowledge base after the new one is verified
+
+### Configuration
+
+- **Agent**: The agent to detach the knowledge base from (required)
+- **Knowledge Base**: The knowledge base to detach — only shows knowledge bases currently attached to the selected agent (required)
+
+### Output
+
+Returns confirmation of the detachment including:
+- **agentId**: UUID of the agent
+- **knowledgeBaseId**: UUID of the detached knowledge base
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.detached"
 }
 ```
 
@@ -1507,50 +1629,6 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
   },
   "timestamp": "2026-03-25T09:00:00Z",
   "type": "digitalocean.spaces.object.uploaded"
-}
-```
-
-<a id="update-agent"></a>
-
-## Update Agent
-
-The Update Agent component swaps the knowledge base attached to an existing Gradient AI agent.
-
-### Use Cases
-
-- **Blue/green KB deployment**: Point the agent at a newly indexed knowledge base after validation passes
-- **Rollback**: Revert an agent back to a previous knowledge base if evaluation fails
-- **Environment promotion**: Promote a staging agent to use the production knowledge base
-
-### Configuration
-
-- **Agent**: The agent to update (required)
-- **Current Knowledge Base**: The knowledge base currently attached to the agent that will be detached (required)
-- **New Knowledge Base**: The knowledge base to attach to the agent (required)
-
-### Output
-
-Returns confirmation of the swap including:
-- **agentId**: The ID of the updated agent
-- **previousKnowledgeBaseId**: The knowledge base that was detached
-- **newKnowledgeBaseId**: The knowledge base that was attached
-
-### Notes
-
-- If the current knowledge base is already detached, the component proceeds and attaches the new one
-- The agent and both knowledge bases must exist in the same DigitalOcean account
-
-### Example Output
-
-```json
-{
-  "data": {
-    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-    "newKnowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000002",
-    "previousKnowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
-  },
-  "timestamp": "2025-01-01T00:00:00Z",
-  "type": "digitalocean.agent.updated"
 }
 ```
 

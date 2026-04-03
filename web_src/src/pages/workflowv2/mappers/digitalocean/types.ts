@@ -248,6 +248,16 @@ export interface CreateKnowledgeBaseConfiguration {
   dataSources?: KnowledgeBaseDataSource[];
 }
 
+export interface DeleteKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface DeleteKnowledgeBaseConfiguration {
+  knowledgeBaseId: string;
+  deleteOpenSearchDatabase?: boolean;
+}
+
 export interface KnowledgeBaseDataSource {
   type: "spaces" | "web";
   spacesBucket?: string;

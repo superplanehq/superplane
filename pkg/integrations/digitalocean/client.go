@@ -2596,6 +2596,20 @@ func (c *Client) DetachKnowledgeBase(agentUUID, kbUUID string) error {
 	return err
 }
 
+// DeleteKnowledgeBase deletes a knowledge base by its UUID
+func (c *Client) DeleteKnowledgeBase(kbUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s", c.BaseURL, kbUUID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// DeleteDatabase deletes a managed database cluster by its ID
+func (c *Client) DeleteDatabase(databaseID string) error {
+	url := fmt.Sprintf("%s/databases/%s", c.BaseURL, databaseID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
