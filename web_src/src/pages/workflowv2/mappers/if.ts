@@ -15,6 +15,7 @@ import { getTriggerRenderer, getState, getStateMap } from ".";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { stringOrDash } from "./utils";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 
 type IfOutputs = Record<string, OutputPayload[]>;
 
@@ -119,7 +120,7 @@ export const ifMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const configuration = context.execution.configuration as IfConfiguration;
     const details: Record<string, any> = {
-      "Evaluated at": stringOrDash(context.execution.createdAt),
+      "Evaluated at": context.execution.createdAt ? formatTimestampInUserTimezone(context.execution.createdAt) : "-",
       Expression: configuration.expression,
     };
 
