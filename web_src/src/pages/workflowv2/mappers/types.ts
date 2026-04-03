@@ -124,6 +124,9 @@ export type ComponentBaseContext = {
   lastExecutions: ExecutionInfo[];
   nodeQueueItems?: QueueItemInfo[];
   additionalData?: unknown;
+  /** Set on canvas nodes so mappers can resolve integration resource IDs to labels (e.g. Grafana dashboards). */
+  organizationId?: string;
+  integrationId?: string;
 };
 
 export type SubtitleContext = {
