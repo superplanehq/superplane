@@ -27,6 +27,17 @@ export const componentKeys = {
   detail: (orgId: string, name: string) => [...componentKeys.details(), orgId, name] as const,
 };
 
+type BlueprintMutationData = {
+  name: string;
+  description?: string;
+  nodes?: unknown[];
+  edges?: unknown[];
+  configuration?: unknown[];
+  outputChannels?: unknown[];
+  icon?: string;
+  color?: string;
+};
+
 export const useBlueprints = (organizationId: string) => {
   return useQuery({
     queryKey: blueprintKeys.list(organizationId),
@@ -57,16 +68,7 @@ export const useCreateBlueprint = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: {
-      name: string;
-      description?: string;
-      nodes?: any[];
-      edges?: any[];
-      configuration?: any[];
-      outputChannels?: any[];
-      icon?: string;
-      color?: string;
-    }) => {
+    mutationFn: async (data: BlueprintMutationData) => {
       const payload = {
         name: data.name,
         description: data.description || "",
@@ -96,16 +98,7 @@ export const useUpdateBlueprint = (organizationId: string, blueprintId: string) 
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: {
-      name: string;
-      description?: string;
-      nodes?: any[];
-      edges?: any[];
-      configuration?: any[];
-      outputChannels?: any[];
-      icon?: string;
-      color?: string;
-    }) => {
+    mutationFn: async (data: BlueprintMutationData) => {
       return await blueprintsUpdateBlueprint(
         withOrganizationHeader({
           path: { id: blueprintId },
