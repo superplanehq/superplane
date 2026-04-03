@@ -24,6 +24,7 @@ import { LayoutTemplate, Monitor, Rainbow, Sparkles, Terminal, Upload } from "lu
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "./templateMetadata";
+import { NodeCountLabel, TagBadges } from "./components/TemplateCardMeta";
 
 const MAX_CANVAS_NAME_LENGTH = 50;
 const MAX_CANVAS_DESCRIPTION_LENGTH = 200;
@@ -351,14 +352,6 @@ interface TemplateCardProps {
   showTags?: boolean;
 }
 
-function NodeCountLabel({ components, triggers }: { components: number; triggers: number }) {
-  const parts: string[] = [];
-  if (components > 0) parts.push(`${components} ${components === 1 ? "component" : "components"}`);
-  if (triggers > 0) parts.push(`${triggers} ${triggers === 1 ? "trigger" : "triggers"}`);
-  if (parts.length === 0) return null;
-  return <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">{parts.join(" · ")}</div>;
-}
-
 function IntegrationIcons({ integrations }: { integrations: string[] }) {
   if (integrations.length === 0) {
     return <span className="text-[11px] text-gray-400 dark:text-gray-500">No integrations needed</span>;
@@ -382,19 +375,6 @@ function IntegrationIcons({ integrations }: { integrations: string[] }) {
           </Tooltip>
         );
       })}
-    </div>
-  );
-}
-
-function TagBadges({ tags }: { tags: string[] }) {
-  if (tags.length === 0) return <div />;
-  return (
-    <div className="flex flex-wrap gap-1">
-      {tags.map((tag) => (
-        <Badge key={tag} variant="outline" className="text-[11px] px-1.5 py-0 text-gray-600 dark:text-gray-400">
-          {tag}
-        </Badge>
-      ))}
     </div>
   );
 }

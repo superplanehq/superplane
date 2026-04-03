@@ -17,6 +17,83 @@ interface CreateCustomComponentModalProps {
 const MAX_BLUEPRINT_NAME_LENGTH = 50;
 const MAX_BLUEPRINT_DESCRIPTION_LENGTH = 200;
 
+interface BlueprintNameFieldProps {
+  blueprintName: string;
+  nameError: string;
+  onNameChange: (value: string) => void;
+  clearNameError: () => void;
+}
+
+function BlueprintNameField({ blueprintName, nameError, onNameChange, clearNameError }: BlueprintNameFieldProps) {
+  return (
+    <Field>
+      <Label
+        htmlFor="create-bundle-name-input"
+        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+      >
+        Bundle name *
+      </Label>
+      <Input
+        id="create-bundle-name-input"
+        data-testid="component-name-input"
+        type="text"
+        autoComplete="off"
+        value={blueprintName}
+        onChange={(e) => {
+          if (e.target.value.length <= MAX_BLUEPRINT_NAME_LENGTH) {
+            onNameChange(e.target.value);
+          }
+          if (nameError) {
+            clearNameError();
+          }
+        }}
+        placeholder="Give this Bundle a clear name for reuse"
+        className={`w-full ${nameError ? "border-red-500" : ""}`}
+        autoFocus
+        maxLength={MAX_BLUEPRINT_NAME_LENGTH}
+      />
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        {blueprintName.length}/{MAX_BLUEPRINT_NAME_LENGTH} characters
+      </div>
+      {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
+    </Field>
+  );
+}
+
+interface BlueprintDescriptionFieldProps {
+  blueprintDescription: string;
+  onDescriptionChange: (value: string) => void;
+}
+
+function BlueprintDescriptionField({ blueprintDescription, onDescriptionChange }: BlueprintDescriptionFieldProps) {
+  return (
+    <Field>
+      <Label
+        htmlFor="create-bundle-description-input"
+        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+      >
+        Description
+      </Label>
+      <Textarea
+        id="create-bundle-description-input"
+        value={blueprintDescription}
+        onChange={(e) => {
+          if (e.target.value.length <= MAX_BLUEPRINT_DESCRIPTION_LENGTH) {
+            onDescriptionChange(e.target.value);
+          }
+        }}
+        placeholder="Note the purpose of this Bundle (optional)"
+        rows={3}
+        className="w-full"
+        maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}
+      />
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        {blueprintDescription.length}/{MAX_BLUEPRINT_DESCRIPTION_LENGTH} characters
+      </div>
+    </Field>
+  );
+}
+
 export function CreateCustomComponentModal({
   isOpen,
   onClose,
@@ -82,64 +159,16 @@ export function CreateCustomComponentModal({
 
       <DialogBody>
         <div className="space-y-6">
-          {/* Blueprint Name */}
-          <Field>
-            <Label
-              htmlFor="create-bundle-name-input"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Bundle name *
-            </Label>
-            <Input
-              id="create-bundle-name-input"
-              data-testid="component-name-input"
-              type="text"
-              autoComplete="off"
-              value={blueprintName}
-              onChange={(e) => {
-                if (e.target.value.length <= MAX_BLUEPRINT_NAME_LENGTH) {
-                  setBlueprintName(e.target.value);
-                }
-                if (nameError) {
-                  setNameError("");
-                }
-              }}
-              placeholder="Give this Bundle a clear name for reuse"
-              className={`w-full ${nameError ? "border-red-500" : ""}`}
-              autoFocus
-              maxLength={MAX_BLUEPRINT_NAME_LENGTH}
-            />
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {blueprintName.length}/{MAX_BLUEPRINT_NAME_LENGTH} characters
-            </div>
-            {nameError && <div className="text-xs text-red-600 mt-1">{nameError}</div>}
-          </Field>
-
-          {/* Blueprint Description */}
-          <Field>
-            <Label
-              htmlFor="create-bundle-description-input"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Description
-            </Label>
-            <Textarea
-              id="create-bundle-description-input"
-              value={blueprintDescription}
-              onChange={(e) => {
-                if (e.target.value.length <= MAX_BLUEPRINT_DESCRIPTION_LENGTH) {
-                  setBlueprintDescription(e.target.value);
-                }
-              }}
-              placeholder="Note the purpose of this Bundle (optional)"
-              rows={3}
-              className="w-full"
-              maxLength={MAX_BLUEPRINT_DESCRIPTION_LENGTH}
-            />
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              {blueprintDescription.length}/{MAX_BLUEPRINT_DESCRIPTION_LENGTH} characters
-            </div>
-          </Field>
+          <BlueprintNameField
+            blueprintName={blueprintName}
+            nameError={nameError}
+            onNameChange={setBlueprintName}
+            clearNameError={() => setNameError("")}
+          />
+          <BlueprintDescriptionField
+            blueprintDescription={blueprintDescription}
+            onDescriptionChange={setBlueprintDescription}
+          />
         </div>
       </DialogBody>
 
