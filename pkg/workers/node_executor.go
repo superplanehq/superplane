@@ -358,6 +358,14 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
+	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithRootEvent(&execution.RootEventID).
+		WithInput(map[string]any{inputEvent.NodeID: input})
+	if execution.PreviousExecutionID != nil {
+		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
+	}
+
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -379,16 +387,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-	}
-	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
-		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
-			WithNodeID(node.NodeID).
-			WithRootEvent(&execution.RootEventID).
-			WithInput(map[string]any{inputEvent.NodeID: input})
-		if execution.PreviousExecutionID != nil {
-			builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
-		}
-		return builder.BuildExpressionEnv(expression)
+		Expressions:    contexts.NewExpressionContext(tx, builder),
 	}
 
 	if node.AppInstallationID != nil {
