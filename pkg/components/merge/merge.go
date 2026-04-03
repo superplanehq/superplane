@@ -242,10 +242,26 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		}
 
 		//
+		// If the stop expression does not evaluate to a boolean value,
+		// we fail the execution and mark the merge as stopped early.
+		//
+		stopEarly, ok := out.(bool)
+		if !ok {
+			md.StopEarly = true
+			err := executionCtx.Metadata.Set(md)
+			if err != nil {
+				return nil, err
+			}
+
+			executionCtx.ExecutionState.Fail("error", fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
+			return &executionCtx.ID, nil
+		}
+
+		//
 		// If stopExpression is truthy,
 		// we mark metadata and emit to fail channel
 		//
-		if b, ok := out.(bool); ok && b {
+		if stopEarly {
 			md.StopEarly = true
 			err := executionCtx.Metadata.Set(md)
 			if err != nil {

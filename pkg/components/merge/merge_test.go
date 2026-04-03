@@ -69,6 +69,42 @@ func Test_Merge_StopIfExpression(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_BadStopIfExpression(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+	steps.CreateWorkflow()
+
+	//
+	// Set up an expression that does not evaluate to a boolean value.
+	//
+	steps.SetMergeConfiguration(map[string]any{
+		"stopIfExpression": "$[\"process-1\"].result",
+	})
+
+	steps.CreateEventsWithData(
+		map[string]any{"result": "fail"},
+		map[string]any{"result": "ok"},
+	)
+	steps.CreateQueueItems()
+
+	m := &Merge{}
+
+	//
+	// First event should fail the execution and mark the merge as stopped early.
+	//
+	steps.ProcessFirstEventExpectFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFailedWithError("stop expression must evaluate to boolean, got string: fail")
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	// Second event should be dequeued and not re-finish the execution
+	steps.ProcessSecondEventExpectNoFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.AssertQueueIsEmpty()
+}
+
 func Test_Merge_StopIfExpression_SourceNodeReference(t *testing.T) {
 	steps := NewMergeTestSteps(t)
 
@@ -513,6 +549,15 @@ func (s *MergeTestSteps) AssertExecutionFinished() {
 	var execution models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
 	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+}
+
+func (s *MergeTestSteps) AssertExecutionFailedWithError(errorMessage string) {
+	var execution models.CanvasNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
+	assert.Equal(s.t, "error", execution.ResultReason)
+	assert.Equal(s.t, errorMessage, execution.ResultMessage)
 }
 
 // AssertExecutionFailed checks that the execution finished and emitted to the fail channel.
