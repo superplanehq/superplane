@@ -263,7 +263,7 @@ func (r *RunEvaluation) HandleAction(ctx core.ActionContext) error {
 
 	switch state {
 	case "successful", "completed":
-		return r.handleCompleted(ctx, client, meta, run)
+		return r.handleCompleted(ctx, client, meta)
 	case "running", "queued", "in_progress", "pending":
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, evalPollInterval)
 	case "failed", "cancelled":
@@ -274,7 +274,7 @@ func (r *RunEvaluation) HandleAction(ctx core.ActionContext) error {
 	}
 }
 
-func (r *RunEvaluation) handleCompleted(ctx core.ActionContext, client *Client, meta evalRunMetadata, run *EvaluationRun) error {
+func (r *RunEvaluation) handleCompleted(ctx core.ActionContext, client *Client, meta evalRunMetadata) error {
 	results, err := client.GetEvaluationRunResults(meta.EvalRunUUID)
 	if err != nil {
 		return fmt.Errorf("failed to get evaluation run results: %v", err)
