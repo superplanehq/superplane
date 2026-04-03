@@ -2580,7 +2580,10 @@ func (c *Client) ListKnowledgeBases() ([]KnowledgeBase, error) {
 func (c *Client) AttachKnowledgeBase(agentUUID, kbUUID string) error {
 	url := fmt.Sprintf("%s/gen-ai/agents/%s/knowledge_bases/%s", c.BaseURL, agentUUID, kbUUID)
 
-	body, err := json.Marshal(map[string]string{"agent_uuid": agentUUID})
+	body, err := json.Marshal(map[string]string{
+		"agent_uuid":          agentUUID,
+		"knowledge_base_uuid": kbUUID,
+	})
 	if err != nil {
 		return fmt.Errorf("error marshaling request: %v", err)
 	}
