@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { RefObject } from "react";
 import { Sparkles } from "lucide-react";
@@ -30,6 +30,7 @@ export function InlineFieldAssistant({
   const [explanation, setExplanation] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const generationRef = useRef(0);
 
   const resetPanel = useCallback(() => {
     setInstruction("");
@@ -40,24 +41,30 @@ export function InlineFieldAssistant({
   }, []);
 
   const handleClose = useCallback(() => {
+    generationRef.current += 1;
     setOpen(false);
     resetPanel();
   }, [resetPanel]);
 
   const handleGenerate = useCallback(async () => {
     if (!suggestFieldValue) return;
+    const gen = ++generationRef.current;
     setLoading(true);
     setError(null);
     setProposedValue(null);
     setExplanation(null);
     try {
       const out = await suggestFieldValue(instruction);
+      if (generationRef.current !== gen) return;
       setProposedValue(out.value);
       setExplanation(out.explanation ?? null);
     } catch (e) {
+      if (generationRef.current !== gen) return;
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
-      setLoading(false);
+      if (generationRef.current === gen) {
+        setLoading(false);
+      }
     }
   }, [instruction, suggestFieldValue]);
 
@@ -79,6 +86,7 @@ export function InlineFieldAssistant({
       className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
       aria-label={`Open assistant for ${fieldLabel}`}
       aria-expanded={open}
+      disabled={open && loading}
       onClick={() => (open ? handleClose() : setOpen(true))}
     >
       <Sparkles className="h-4 w-4" />
