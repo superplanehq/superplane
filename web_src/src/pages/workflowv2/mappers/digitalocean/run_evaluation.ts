@@ -59,6 +59,20 @@ export const RUN_EVALUATION_STATE_REGISTRY: EventStateRegistry = {
   },
 };
 
+function getEvalResult(outputs: RunEvaluationOutputs | undefined): Record<string, unknown> | undefined {
+  return (
+    (outputs?.passed?.[0]?.data as Record<string, unknown> | undefined) ??
+    (outputs?.failed?.[0]?.data as Record<string, unknown> | undefined)
+  );
+}
+
+function formatStarMetric(result: Record<string, unknown>): string | undefined {
+  const starMetric = result.starMetric as { metricName?: string; numberValue?: number } | undefined;
+  if (!starMetric?.metricName) return undefined;
+  const score = starMetric.numberValue != null ? `${Math.round(starMetric.numberValue * 100) / 100}%` : "-";
+  return `${starMetric.metricName}: ${score}`;
+}
+
 export const runEvaluationMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -83,20 +97,15 @@ export const runEvaluationMapper: ComponentBaseMapper = {
       details["Started At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const outputs = context.execution.outputs as RunEvaluationOutputs | undefined;
-    const result =
-      (outputs?.passed?.[0]?.data as Record<string, unknown> | undefined) ??
-      (outputs?.failed?.[0]?.data as Record<string, unknown> | undefined);
-
+    const result = getEvalResult(context.execution.outputs as RunEvaluationOutputs | undefined);
     if (!result) return details;
 
     details["Test Case"] = String(result.testCaseName || result.testCaseId || "-");
     details["Agent"] = String(result.agentName || result.agentId || "-");
 
-    const starMetric = result.starMetric as { metricName?: string; numberValue?: number } | undefined;
-    if (starMetric?.metricName) {
-      const score = starMetric.numberValue != null ? `${Math.round(starMetric.numberValue * 100) / 100}%` : "-";
-      details["Star Metric"] = `${starMetric.metricName}: ${score}`;
+    const starMetricLabel = formatStarMetric(result);
+    if (starMetricLabel) {
+      details["Star Metric"] = starMetricLabel;
     }
 
     const prompts = result.prompts as unknown[] | undefined;
@@ -108,9 +117,8 @@ export const runEvaluationMapper: ComponentBaseMapper = {
       details["Finished At"] = new Date(String(result.finishedAt)).toLocaleString();
     }
 
-    const errorDesc = result.errorDescription as string | undefined;
-    if (errorDesc) {
-      details["Error"] = errorDesc;
+    if (result.errorDescription) {
+      details["Error"] = String(result.errorDescription);
     }
 
     return details;
