@@ -1,4 +1,4 @@
-import { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import { CreateCanvasModal } from "@/components/CreateCanvasModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CreateChangeRequestModal } from "./CreateChangeRequestModal";
-import { DraftNodeDiffSummary } from "./draftNodeDiff";
+import type { DraftNodeDiffSummary } from "./draftNodeDiff";
 
 interface CanvasPageModalsProps {
   organizationId: string;

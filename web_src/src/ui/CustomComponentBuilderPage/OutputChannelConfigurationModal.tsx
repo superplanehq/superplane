@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import { Dialog, DialogContent, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SuperplaneBlueprintsOutputChannel } from "@/api-client";
+import type { SuperplaneBlueprintsOutputChannel } from "@/api-client";
 
 interface OutputChannelConfigurationModalProps {
   isOpen: boolean;

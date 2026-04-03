@@ -4613,6 +4613,9 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "root": {
+          "type": "boolean"
         }
       }
     },
@@ -4858,13 +4861,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasNodeExecution"
-          }
-        },
-        "nextQueueItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasNodeQueueItem"
           }
         },
         "lastEvents": {

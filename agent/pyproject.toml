@@ -43,6 +43,9 @@ extend-exclude = ["src/private", "src/superplaneapi"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/ai/superplane_client.py" = ["E402"]
+
 [tool.mypy]
 python_version = "3.13"
 strict = true

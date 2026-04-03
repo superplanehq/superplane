@@ -1,9 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   Background,
+  type Connection,
   Panel,
   ReactFlow,
   ReactFlowProvider,
+  type Viewport,
   ViewportPortal,
   useOnSelectionChange,
   useReactFlow,
@@ -33,9 +34,20 @@ import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
-
 import {
+  Component,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
+
+import type {
   ConfigurationField,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
@@ -50,28 +62,28 @@ import {
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
-import {
-  AiCanvasOperation,
-  BuildingBlock,
-  BuildingBlockCategory,
-  BuildingBlocksSidebar,
-} from "../BuildingBlocksSidebar";
+
+import type { AiCanvasOperation, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
-import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { EventState, EventStateMap } from "../componentBase";
-import { Block, BlockData } from "./Block";
+import type { EventState, EventStateMap } from "../componentBase";
+import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import { GroupNode } from "../groupNode";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
-import { Simulation } from "./storybooks/useSimulation";
-import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { SidebarEvent } from "../componentSidebar/types";
+import type { Simulation } from "./storybooks/useSimulation";
+import type { CanvasPageState } from "./useCanvasState";
+import { useCanvasState } from "./useCanvasState";
+import type { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
+import { Sentry } from "@/sentry";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -111,7 +123,7 @@ export interface NodeEditData {
   nodeId: string;
   nodeName: string;
   displayLabel?: string;
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
   configurationFields: ConfigurationField[];
   integrationName?: string;
   /** Integration catalog label; used to resolve docs.superplane.com path for integration components. */
@@ -125,7 +137,7 @@ export interface NewNodeData {
   buildingBlock: BuildingBlock;
   nodeName: string;
   displayLabel?: string;
-  configuration: Record<string, any>;
+  configuration: Record<string, unknown>;
   position?: { x: number; y: number };
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
@@ -213,7 +225,7 @@ export interface CanvasPageProps {
   getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onNodeConfigurationSave?: (
     nodeId: string,
-    configuration: Record<string, any>,
+    configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
@@ -265,7 +277,7 @@ export interface CanvasPageProps {
   supportsPushThrough?: (nodeId: string) => boolean;
   onDirty?: () => void;
 
-  onRun?: (nodeId: string, channel: string, data: any) => void | Promise<void>;
+  onRun?: (nodeId: string, channel: string, data: unknown) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
@@ -290,7 +302,7 @@ export interface CanvasPageProps {
     placeholderId: string;
     buildingBlock: BuildingBlock;
     nodeName: string;
-    configuration: Record<string, any>;
+    configuration: Record<string, unknown>;
     integrationName?: string;
   }) => Promise<void>;
 
@@ -323,7 +335,7 @@ export interface CanvasPageProps {
     nodeId?: string,
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
-  ) => Promise<any[]>;
+  ) => Promise<unknown[]>;
 
   // State registry function for determining execution states
   getExecutionState?: (
@@ -378,57 +390,262 @@ const EDGE_STYLE = {
 const DEFAULT_CANVAS_ZOOM = 0.8;
 const MIN_CANVAS_ZOOM = 0.1;
 
+type CanvasAnnotationUpdate = {
+  text?: string;
+  color?: string;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+};
+
+type CanvasGroupUpdate = {
+  label?: string;
+  description?: string;
+  color?: string;
+};
+
+type PendingRunData = {
+  nodeId?: string;
+  initialData?: string;
+};
+
+type CanvasNodeRendererCallbacks = {
+  handleNodeExpand: NonNullable<BlockProps["onExpand"]>;
+  handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
+  onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
+  onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
+  onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
+  onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
+  onConfigure: React.MutableRefObject<CanvasPageProps["onConfigure"] | undefined>;
+  onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
+  onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
+  onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
+  onToggleCollapse: React.MutableRefObject<CanvasPageProps["onToggleCollapse"] | undefined>;
+  onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
+  onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
+  onGroupUpdate: React.MutableRefObject<CanvasPageProps["onGroupUpdate"] | undefined>;
+  onUngroupNodes: React.MutableRefObject<CanvasPageProps["onUngroupNodes"] | undefined>;
+  runDisabled?: boolean;
+  runDisabledTooltip?: string;
+  showHeader: boolean;
+  hasMultiSelection: boolean;
+};
+
+type CanvasBlockNodeData = CanvasBlockData & {
+  _callbacksRef?: React.MutableRefObject<CanvasNodeRendererCallbacks>;
+  nodeName?: string;
+};
+
+declare global {
+  interface Window {
+    __pendingRunData?: PendingRunData;
+  }
+}
+
+function createNodeRenderFallbackData(data: BlockData): BlockData {
+  return {
+    ...data,
+    label: typeof data.label === "string" && data.label.trim() ? data.label : "Component",
+    outputChannels: Array.isArray(data.outputChannels) ? data.outputChannels : undefined,
+    trigger: undefined,
+    component: undefined,
+    composite: undefined,
+    annotation: undefined,
+    group: undefined,
+    renderFallback: {
+      source: "node-render",
+      message: CANVAS_NODE_FALLBACK_MESSAGE,
+    },
+  };
+}
+
+function getNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+const NODE_ERROR_LABEL_GETTERS: Record<BlockData["type"], (data: BlockData) => string | undefined> = {
+  trigger: (data) => getNonEmptyString(data.trigger?.title),
+  component: (data) => getNonEmptyString(data.component?.title),
+  composite: (data) => getNonEmptyString(data.composite?.title),
+  annotation: (data) => getNonEmptyString(data.annotation?.title),
+  group: (data) => getNonEmptyString(data.group?.groupLabel),
+};
+
+function getNodeErrorDisplayName(data: BlockData): string {
+  const labelGetter = NODE_ERROR_LABEL_GETTERS[data.type as BlockData["type"]];
+
+  return labelGetter?.(data) || getNonEmptyString(data.label) || "unknown";
+}
+
+function areOutputChannelsEqual(previous: string[] | undefined, next: string[] | undefined) {
+  if (previous === next) {
+    return true;
+  }
+
+  if (!previous || !next || previous.length !== next.length) {
+    return false;
+  }
+
+  return previous.every((channel, index) => channel === next[index]);
+}
+
+function didNodeErrorBoundaryDataChange(previous: BlockData, next: BlockData) {
+  return (
+    previous.type !== next.type ||
+    previous.label !== next.label ||
+    previous.trigger !== next.trigger ||
+    previous.component !== next.component ||
+    previous.composite !== next.composite ||
+    previous.annotation !== next.annotation ||
+    previous.group !== next.group ||
+    previous.renderFallback?.source !== next.renderFallback?.source ||
+    previous.renderFallback?.message !== next.renderFallback?.message ||
+    !areOutputChannelsEqual(previous.outputChannels, next.outputChannels)
+  );
+}
+
+function getNodeAction<TArgs extends unknown[]>(
+  actionRef: React.MutableRefObject<((...args: TArgs) => void) | undefined> | undefined,
+  ...args: TArgs
+) {
+  return actionRef?.current ? () => actionRef.current?.(...args) : undefined;
+}
+
+function getVoidAction(actionRef: React.MutableRefObject<(() => void) | undefined> | undefined) {
+  return actionRef?.current ? () => actionRef.current?.() : undefined;
+}
+
+function getAnnotationUpdateAction(callbacks?: CanvasNodeRendererCallbacks) {
+  return callbacks?.onAnnotationUpdate.current
+    ? (annotationNodeId: string, updates: CanvasAnnotationUpdate) =>
+        callbacks.onAnnotationUpdate.current?.(annotationNodeId, updates)
+    : undefined;
+}
+
+function buildInteractiveNodeBlockProps(
+  callbacks: CanvasNodeRendererCallbacks | undefined,
+  nodeId: string,
+): Omit<BlockProps, "data" | "nodeId" | "selected" | "runDisabled" | "runDisabledTooltip"> {
+  if (!callbacks) {
+    return {};
+  }
+
+  return {
+    showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
+    onExpand: (expandedNodeId, nodeData) => callbacks.handleNodeExpand(expandedNodeId, nodeData),
+    onClick: (event) => callbacks.handleNodeClick(nodeId, event),
+    onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
+    onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
+    onRun: getNodeAction(callbacks.onRun, nodeId),
+    onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
+    onConfigure: getNodeAction(callbacks.onConfigure, nodeId),
+    onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
+    onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
+    onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
+    onToggleCollapse: getVoidAction(callbacks.onToggleCollapse),
+    onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
+    onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
+  };
+}
+
+function buildDefaultNodeBlockProps(args: {
+  nodeId: string;
+  selected?: boolean;
+  callbacks?: CanvasNodeRendererCallbacks;
+}): Omit<BlockProps, "data"> {
+  const { nodeId, selected, callbacks } = args;
+
+  return {
+    nodeId,
+    selected,
+    runDisabled: callbacks?.runDisabled,
+    runDisabledTooltip: callbacks?.runDisabledTooltip,
+    ...buildInteractiveNodeBlockProps(callbacks, nodeId),
+  };
+}
+
+type CanvasNodeErrorBoundaryProps = {
+  nodeId: string;
+  nodeData: BlockData;
+  fallback: ReactNode;
+  children: ReactNode;
+};
+
+type CanvasNodeErrorBoundaryState = {
+  hasError: boolean;
+};
+
+export class CanvasNodeErrorBoundary extends Component<CanvasNodeErrorBoundaryProps, CanvasNodeErrorBoundaryState> {
+  state: CanvasNodeErrorBoundaryState = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError(): CanvasNodeErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const nodeType = this.props.nodeData.type || "unknown";
+    const nodeLabel = getNodeErrorDisplayName(this.props.nodeData);
+
+    console.error(`[CanvasPage] Node "${this.props.nodeId}" failed to render:`, error);
+
+    Sentry.withScope((scope) => {
+      scope.setTag("canvas.node_id", this.props.nodeId);
+      scope.setTag("canvas.node_type", nodeType);
+      scope.setExtra("nodeLabel", nodeLabel);
+      scope.setExtra("componentStack", errorInfo.componentStack);
+      Sentry.captureException(error);
+    });
+  }
+
+  componentDidUpdate(prevProps: CanvasNodeErrorBoundaryProps) {
+    if (
+      this.state.hasError &&
+      (prevProps.nodeId !== this.props.nodeId ||
+        didNodeErrorBoundaryDataChange(prevProps.nodeData, this.props.nodeData))
+    ) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <div data-testid="canvas-node-fallback">{this.props.fallback}</div>;
+    }
+
+    return this.props.children;
+  }
+}
+
 /*
  * nodeTypes must be defined outside of the component to prevent
  * react-flow from remounting the node types on every render.
  */
 const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: {
-  data: BlockData & { _callbacksRef?: any };
+  data: CanvasBlockNodeData;
   id: string;
   selected?: boolean;
 }) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
-
-  if (!callbacks) {
-    return <Block data={blockData} nodeId={nodeProps.id} selected={nodeProps.selected} />;
-  }
+  const blockProps = buildDefaultNodeBlockProps({
+    nodeId: nodeProps.id,
+    selected: nodeProps.selected,
+    callbacks,
+  });
+  const fallback = <Block {...blockProps} data={createNodeRenderFallbackData(blockData)} />;
 
   return (
-    <Block
-      data={blockData}
-      nodeId={nodeProps.id}
-      selected={nodeProps.selected}
-      runDisabled={callbacks?.runDisabled}
-      runDisabledTooltip={callbacks?.runDisabledTooltip}
-      showHeader={callbacks?.showHeader && !callbacks?.hasMultiSelection}
-      onExpand={callbacks.handleNodeExpand}
-      onClick={(e) => callbacks.handleNodeClick(nodeProps.id, e)}
-      onEdit={() => callbacks.onNodeEdit.current?.(nodeProps.id)}
-      onDelete={callbacks.onNodeDelete.current ? () => callbacks.onNodeDelete.current?.(nodeProps.id) : undefined}
-      onRun={callbacks.onRun.current ? () => callbacks.onRun.current?.(nodeProps.id) : undefined}
-      onDuplicate={callbacks.onDuplicate.current ? () => callbacks.onDuplicate.current?.(nodeProps.id) : undefined}
-      onConfigure={callbacks.onConfigure.current ? () => callbacks.onConfigure.current?.(nodeProps.id) : undefined}
-      onDeactivate={callbacks.onDeactivate.current ? () => callbacks.onDeactivate.current?.(nodeProps.id) : undefined}
-      onTogglePause={
-        callbacks.onTogglePause.current ? () => callbacks.onTogglePause.current?.(nodeProps.id) : undefined
-      }
-      onToggleView={callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined}
-      onToggleCollapse={
-        callbacks.onToggleView.current ? () => callbacks.onToggleView.current?.(nodeProps.id) : undefined
-      }
-      onAnnotationUpdate={
-        callbacks.onAnnotationUpdate.current
-          ? (nodeId: string, updates: any) => callbacks.onAnnotationUpdate.current?.(nodeId, updates)
-          : undefined
-      }
-      onAnnotationBlur={callbacks.onAnnotationBlur.current ? () => callbacks.onAnnotationBlur.current?.() : undefined}
-    />
+    <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
+      <Block {...blockProps} data={blockData} />
+    </CanvasNodeErrorBoundary>
   );
 });
 
 const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
-  data: BlockData & { _callbacksRef?: any };
+  data: CanvasBlockNodeData;
   id: string;
   selected?: boolean;
   width?: number;
@@ -439,7 +656,7 @@ const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
   const groupData = blockData.group || {};
 
   const handleGroupUpdate = callbacks?.onGroupUpdate?.current
-    ? (updates: any) => callbacks.onGroupUpdate.current?.(nodeProps.id, updates)
+    ? (updates: CanvasGroupUpdate) => callbacks.onGroupUpdate.current?.(nodeProps.id, updates)
     : undefined;
 
   const handleUngroup = callbacks?.onUngroupNodes?.current
@@ -449,17 +666,24 @@ const GroupNodeRenderer = memo(function GroupNodeRenderer(nodeProps: {
   const handleDelete = callbacks?.onNodeDelete?.current
     ? () => callbacks.onNodeDelete.current?.(nodeProps.id)
     : undefined;
+  const fallback = (
+    <div style={{ width: nodeProps.width, height: nodeProps.height }}>
+      <Block data={createNodeRenderFallbackData(blockData)} nodeId={nodeProps.id} selected={nodeProps.selected} />
+    </div>
+  );
 
   return (
-    <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
-      <GroupNode
-        {...groupData}
-        selected={nodeProps.selected}
-        onGroupUpdate={handleGroupUpdate}
-        onUngroup={handleUngroup}
-        onDelete={handleDelete}
-      />
-    </div>
+    <CanvasNodeErrorBoundary nodeId={nodeProps.id} nodeData={blockData} fallback={fallback}>
+      <div data-testid="canvas-group-node" style={{ width: nodeProps.width, height: nodeProps.height }}>
+        <GroupNode
+          {...groupData}
+          selected={nodeProps.selected}
+          onGroupUpdate={handleGroupUpdate}
+          onUngroup={handleUngroup}
+          onDelete={handleDelete}
+        />
+      </div>
+    </CanvasNodeErrorBoundary>
   );
 });
 
@@ -477,11 +701,14 @@ function CanvasPage(props: CanvasPageProps) {
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
+  const localHasFitToViewRef = useRef(false);
+  const localHasUserToggledSidebarRef = useRef(false);
+  const localIsSidebarOpenRef = useRef<boolean | null>(null);
 
   // Use refs from props if provided, otherwise create local ones
-  const hasFitToViewRef = props.hasFitToViewRef || useRef(false);
-  const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef || useRef(false);
-  const isSidebarOpenRef = props.isSidebarOpenRef || useRef<boolean | null>(null);
+  const hasFitToViewRef = props.hasFitToViewRef ?? localHasFitToViewRef;
+  const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef ?? localHasUserToggledSidebarRef;
+  const isSidebarOpenRef = props.isSidebarOpenRef ?? localIsSidebarOpenRef;
 
   if (isSidebarOpenRef.current === null && typeof window !== "undefined") {
     const storedSidebarState = window.localStorage.getItem(CANVAS_SIDEBAR_STORAGE_KEY);
@@ -590,7 +817,7 @@ function CanvasPage(props: CanvasPageProps) {
       // Check for pending run data from custom field
       // Note: This uses a window property as a workaround to pass nodeId and initialData
       // through the onRun callback chain without breaking existing signatures
-      const pendingData = (window as any).__pendingRunData;
+      const pendingData = window.__pendingRunData;
       const actualNodeId = nodeId || pendingData?.nodeId;
       const actualInitialData = initialData || pendingData?.initialData;
 
@@ -600,8 +827,9 @@ function CanvasPage(props: CanvasPageProps) {
       const node = state.nodes.find((n) => n.id === actualNodeId);
       if (!node) return;
 
-      const nodeName = (node.data as any).label || actualNodeId;
-      const channels = (node.data as any).outputChannels || ["default"];
+      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+      const nodeName = nodeData?.label || actualNodeId;
+      const channels = nodeData?.outputChannels || ["default"];
 
       setEmitModalData({
         nodeId: actualNodeId,
@@ -614,7 +842,7 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleEmit = useCallback(
-    async (channel: string, data: any) => {
+    async (channel: string, data: unknown) => {
       if (!emitModalData || !props.onRun) return;
 
       // Call the onRun prop with nodeId, channel, and data
@@ -877,7 +1105,7 @@ function CanvasPage(props: CanvasPageProps) {
   );
 
   const handleSaveConfiguration = useCallback(
-    (configuration: Record<string, any>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
+    (configuration: Record<string, unknown>, nodeName: string, integrationRef?: ComponentsIntegrationRef) => {
       if (!editingNodeData || !props.onNodeConfigurationSave) {
         return;
       }
@@ -1348,7 +1576,7 @@ function Sidebar({
   getAllQueueEvents?: (nodeId: string) => SidebarEvent[];
   getHasMoreQueue?: (nodeId: string) => boolean;
   getLoadingMoreQueue?: (nodeId: string) => boolean;
-  loadExecutionChain?: (eventId: string) => Promise<any[]>;
+  loadExecutionChain?: (eventId: string) => Promise<unknown[]>;
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
@@ -1356,7 +1584,7 @@ function Sidebar({
   onSidebarClose?: () => void;
   editingNodeData?: NodeEditData | null;
   onSaveConfiguration?: (
-    configuration: Record<string, any>,
+    configuration: Record<string, unknown>,
     nodeName: string,
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
@@ -1524,9 +1752,7 @@ function Sidebar({
       getLoadingMoreQueue={() => getLoadingMoreQueue?.(state.componentSidebar.selectedNodeId!) || false}
       onReEmit={onReEmit}
       loadExecutionChain={loadExecutionChain}
-      getExecutionState={
-        getExecutionState ? (nodeId: string, execution: any) => getExecutionState(nodeId, execution) : undefined
-      }
+      getExecutionState={getExecutionState}
       showSettingsTab={true}
       nodeConfigMode="edit"
       nodeName={editingNodeData?.nodeName || ""}
@@ -1981,9 +2207,10 @@ function CanvasContent({
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
   stateRef.current = state;
+  const localViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
 
   // Use viewport ref from props if provided, otherwise create local one
-  const viewportRef = viewportRefProp || useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
+  const viewportRef = viewportRefProp ?? localViewportRef;
 
   if (!viewportRef.current && (stateRef.current.nodes?.length ?? 0) === 0) {
     viewportRef.current = { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
@@ -2092,10 +2319,11 @@ function CanvasContent({
     restoreActiveNoteFocus();
   }, [state.nodes]);
 
-  const handleNodeExpand = useCallback((nodeId: string) => {
+  const handleNodeExpand = useCallback<NonNullable<BlockProps["onExpand"]>>((nodeId: string, nodeData: BlockData) => {
     const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
-    if (node && stateRef.current.onNodeExpand) {
-      stateRef.current.onNodeExpand(nodeId, node.data);
+    const expandedNodeData = (node?.data as BlockData | undefined) ?? nodeData;
+    if (stateRef.current.onNodeExpand) {
+      stateRef.current.onNodeExpand(nodeId, expandedNodeData);
     }
   }, []);
 
@@ -2201,6 +2429,8 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+  const onToggleCollapseRef = useRef(onToggleCollapse);
+  onToggleCollapseRef.current = onToggleCollapse;
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
@@ -2218,7 +2448,7 @@ function CanvasContent({
   }, [onSave]);
 
   const handleConnect = useCallback(
-    (connection: any) => {
+    (connection: Connection) => {
       if (isReadOnly) return;
       connectionCompletedRef.current = true;
       if (onEdgeCreate && connection.source && connection.target) {
@@ -2274,7 +2504,7 @@ function CanvasContent({
   );
 
   const handleMove = useCallback(
-    (_event: any, newViewport: { x: number; y: number; zoom: number }) => {
+    (_event: unknown, newViewport: Viewport) => {
       viewportRef.current = newViewport;
       reportZoom(newViewport.zoom);
     },
@@ -2358,7 +2588,7 @@ function CanvasContent({
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
-    (reactFlowInstance: any) => {
+    (reactFlowInstance: { setViewport: (viewport: Viewport) => void }) => {
       if (!hasFitToViewRef.current) {
         const hasNodes = (stateRef.current.nodes?.length ?? 0) > 0;
 
@@ -2413,6 +2643,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onToggleCollapse: onToggleCollapseRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
@@ -2433,6 +2664,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onToggleCollapse: onToggleCollapseRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     onGroupUpdate: onGroupUpdateRef,
@@ -2459,7 +2691,7 @@ function CanvasContent({
     handleType: "source" | "target" | null;
   } | null>(null);
 
-  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: any) => {
+  const handleEdgeMouseEnter = useCallback((_event: React.MouseEvent, edge: CanvasEdge) => {
     setHoveredEdgeId(edge.id);
   }, []);
 
@@ -2469,7 +2701,7 @@ function CanvasContent({
 
   const handleConnectStart = useCallback(
     (
-      _event: any,
+      _event: unknown,
       params: { nodeId: string | null; handleId: string | null; handleType: "source" | "target" | null },
     ) => {
       if (isReadOnly) return;
@@ -2816,14 +3048,16 @@ function CanvasContent({
                     onSearch={(searchString) => {
                       const query = searchString.toLowerCase();
                       return state.nodes.filter((node) => {
-                        const label = ((node.data?.label as string) || "").toLowerCase();
-                        const nodeName = ((node.data as any)?.nodeName || "").toLowerCase();
+                        const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+                        const label = (nodeData?.label || "").toLowerCase();
+                        const nodeName = (nodeData?.nodeName || "").toLowerCase();
                         const id = (node.id || "").toLowerCase();
                         return label.includes(query) || nodeName.includes(query) || id.includes(query);
                       });
                     }}
                     onSelectNode={(node) => {
-                      const isAnnotationNode = (node.data as any)?.type === "annotation";
+                      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
+                      const isAnnotationNode = nodeData?.type === "annotation";
                       if (isAnnotationNode) {
                         return;
                       }

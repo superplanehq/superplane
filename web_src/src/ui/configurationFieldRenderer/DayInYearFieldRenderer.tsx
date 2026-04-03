@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { AutoCompleteSelect } from "@/components/AutoCompleteSelect/AutoCompleteSelect";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 
 export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";

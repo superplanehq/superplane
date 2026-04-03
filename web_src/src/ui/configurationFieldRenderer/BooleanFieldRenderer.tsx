@@ -1,6 +1,6 @@
 import { Switch } from "@/ui/switch";
 import React from "react";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 
 export const BooleanFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
   const fieldName = field?.name || "";

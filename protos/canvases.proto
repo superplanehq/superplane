@@ -560,8 +560,7 @@ message Canvas {
 
   message Status {
     repeated CanvasNodeExecution last_executions = 1;
-    repeated CanvasNodeQueueItem next_queue_items = 2;
-    repeated CanvasEvent last_events = 3;
+    repeated CanvasEvent last_events = 2;
   }
 
   Metadata metadata = 1;
@@ -864,6 +863,7 @@ message CanvasEvent {
   string custom_name = 5;
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
+  bool root = 8;
 }
 
 message CanvasEventWithExecutions {

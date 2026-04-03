@@ -18,14 +18,10 @@ func ListCanvases(ctx context.Context, registry *registry.Registry, organization
 		return nil, status.Error(codes.Internal, "failed to list canvases")
 	}
 
-	protoCanvases := make([]*pb.Canvas, len(canvases))
-	for i, canvas := range canvases {
-		protoCanvas, err := SerializeCanvas(&canvas, false)
-		if err != nil {
-			return nil, err
-		}
-
-		protoCanvases[i] = protoCanvas
+	protoCanvases, err := SerializeCanvases(canvases)
+	if err != nil {
+		log.Errorf("failed to serialize canvases for organization %s: %v", organizationID, err)
+		return nil, status.Error(codes.Internal, "failed to serialize canvases")
 	}
 
 	return &pb.ListCanvasesResponse{

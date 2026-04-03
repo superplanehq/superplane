@@ -223,6 +223,7 @@ export type CanvasesCanvasEvent = {
     [key: string]: unknown;
   };
   createdAt?: string;
+  root?: boolean;
 };
 
 export type CanvasesCanvasEventWithExecutions = {
@@ -326,7 +327,6 @@ export type CanvasesCanvasSpec = {
 
 export type CanvasesCanvasStatus = {
   lastExecutions?: Array<CanvasesCanvasNodeExecution>;
-  nextQueueItems?: Array<CanvasesCanvasNodeQueueItem>;
   lastEvents?: Array<CanvasesCanvasEvent>;
 };
 

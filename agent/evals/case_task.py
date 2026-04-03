@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import textwrap
-from typing import Any
+from typing import Any, cast
 
 from pydantic_ai.messages import (
     FinalResultEvent,
@@ -40,7 +40,9 @@ def build_case_name_index(cases: list[Any]) -> tuple[dict[str, str], list[str]]:
 
 def read_agent_system_prompt(agent: Any) -> str:
     raw_system_prompts = getattr(agent, "_system_prompts", ())
-    return "\n\n".join(prompt for prompt in raw_system_prompts if isinstance(prompt, str) and prompt)
+    return "\n\n".join(
+        prompt for prompt in raw_system_prompts if isinstance(prompt, str) and prompt
+    )
 
 
 def build_case_task(
@@ -94,7 +96,7 @@ def build_case_task(
                 f"output_tokens={run_usage.output_tokens}"
             ),
         )
-        return result.output
+        return cast(CanvasAnswer, result.output)
 
     return task
 

@@ -1,6 +1,7 @@
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator, Literal
+from typing import Any, Literal
 
 from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorContext
 
@@ -8,6 +9,7 @@ from ai.models import AddNodeOperation, CanvasAnswer, CanvasOperation
 
 _BRACKET_SINGLE_QUOTED = re.compile(r"\$\[\s*'([^']*)'\s*\]")
 _BRACKET_DOUBLE_QUOTED = re.compile(r'\$\[\s*"([^"]*)"\s*\]')
+
 
 @dataclass
 class BracketSelectorsMatchCanvasNames(Evaluator):
