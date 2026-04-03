@@ -14,9 +14,9 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { AgentNodeMetadata } from "./types";
+import type { KBNodeMetadata } from "./types";
 
-export const updateAgentMapper: ComponentBaseMapper = {
+export const detachKnowledgeBaseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "digitalocean";
@@ -44,11 +44,10 @@ export const updateAgentMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    const nodeMetadata = context.node.metadata as AgentNodeMetadata | undefined;
+    const nodeMetadata = context.node.metadata as KBNodeMetadata | undefined;
 
     details["Agent"] = nodeMetadata?.agentName || String(result.agentId || "-");
-    details["Previous Knowledge Base"] = nodeMetadata?.oldKnowledgeBaseName || String(result.previousKnowledgeBaseId || "-");
-    details["New Knowledge Base"] = nodeMetadata?.newKnowledgeBaseName || String(result.newKnowledgeBaseId || "-");
+    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseId || "-");
 
     return details;
   },
@@ -61,10 +60,14 @@ export const updateAgentMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as AgentNodeMetadata | undefined;
+  const nodeMetadata = node.metadata as KBNodeMetadata | undefined;
 
   if (nodeMetadata?.agentName) {
     metadata.push({ icon: "bot", label: nodeMetadata.agentName });
+  }
+
+  if (nodeMetadata?.knowledgeBaseName) {
+    metadata.push({ icon: "brain", label: nodeMetadata.knowledgeBaseName });
   }
 
   return metadata;

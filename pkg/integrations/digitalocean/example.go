@@ -267,12 +267,22 @@ func (c *CreateKnowledgeBase) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateKnowledgeBaseOnce, exampleOutputCreateKnowledgeBaseBytes, &exampleOutputCreateKnowledgeBase)
 }
 
-//go:embed example_output_update_agent.json
-var exampleOutputUpdateAgentBytes []byte
+//go:embed example_output_attach_knowledge_base.json
+var exampleOutputAttachKnowledgeBaseBytes []byte
 
-var exampleOutputUpdateAgentOnce sync.Once
-var exampleOutputUpdateAgent map[string]any
+var exampleOutputAttachKnowledgeBaseOnce sync.Once
+var exampleOutputAttachKnowledgeBase map[string]any
 
-func (u *UpdateAgent) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAgentOnce, exampleOutputUpdateAgentBytes, &exampleOutputUpdateAgent)
+func (a *AttachKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAttachKnowledgeBaseOnce, exampleOutputAttachKnowledgeBaseBytes, &exampleOutputAttachKnowledgeBase)
+}
+
+//go:embed example_output_detach_knowledge_base.json
+var exampleOutputDetachKnowledgeBaseBytes []byte
+
+var exampleOutputDetachKnowledgeBaseOnce sync.Once
+var exampleOutputDetachKnowledgeBase map[string]any
+
+func (d *DetachKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDetachKnowledgeBaseOnce, exampleOutputDetachKnowledgeBaseBytes, &exampleOutputDetachKnowledgeBase)
 }

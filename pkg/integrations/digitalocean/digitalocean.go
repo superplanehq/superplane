@@ -117,7 +117,8 @@ func (d *DigitalOcean) Components() []core.Component {
 		&DeleteApp{},
 		&UpdateApp{},
 		&CreateKnowledgeBase{},
-		&UpdateAgent{},
+		&AttachKnowledgeBase{},
+		&DetachKnowledgeBase{},
 	}
 }
 

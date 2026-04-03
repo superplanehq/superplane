@@ -2596,64 +2596,6 @@ func (c *Client) DetachKnowledgeBase(agentUUID, kbUUID string) error {
 	return err
 }
 
-// AgentNodeMetadata stores metadata about a GradientAI agent for display in the UI
-type AgentNodeMetadata struct {
-	AgentID              string `json:"agentId" mapstructure:"agentId"`
-	AgentName            string `json:"agentName" mapstructure:"agentName"`
-	OldKnowledgeBaseID   string `json:"oldKnowledgeBaseId" mapstructure:"oldKnowledgeBaseId"`
-	OldKnowledgeBaseName string `json:"oldKnowledgeBaseName" mapstructure:"oldKnowledgeBaseName"`
-	NewKnowledgeBaseID   string `json:"newKnowledgeBaseId" mapstructure:"newKnowledgeBaseId"`
-	NewKnowledgeBaseName string `json:"newKnowledgeBaseName" mapstructure:"newKnowledgeBaseName"`
-}
-
-// resolveAgentMetadata fetches the agent name and KB names from the API and stores them in metadata
-func resolveAgentMetadata(ctx core.SetupContext, agentID, oldKBID, newKBID string) error {
-	var metadata AgentNodeMetadata
-
-	// If any ID is an expression placeholder, skip all API calls — no HTTP context is guaranteed
-	if strings.Contains(agentID, "{{") || strings.Contains(oldKBID, "{{") || strings.Contains(newKBID, "{{") {
-		metadata.AgentName = agentID
-		metadata.OldKnowledgeBaseName = oldKBID
-		metadata.NewKnowledgeBaseName = newKBID
-		return ctx.Metadata.Set(metadata)
-	}
-
-	var existing AgentNodeMetadata
-	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
-	if existing.AgentID == agentID && existing.AgentName != "" &&
-		existing.OldKnowledgeBaseID == oldKBID && existing.NewKnowledgeBaseID == newKBID {
-		return nil
-	}
-
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client: %w", err)
-	}
-
-	agent, err := client.GetAgent(agentID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch agent %q: %w", agentID, err)
-	}
-	metadata.AgentID = agentID
-	metadata.AgentName = agent.Name
-
-	if oldKBID != "" {
-		if kb, err := client.GetKnowledgeBase(oldKBID); err == nil {
-			metadata.OldKnowledgeBaseID = oldKBID
-			metadata.OldKnowledgeBaseName = kb.Name
-		}
-	}
-
-	if newKBID != "" {
-		if kb, err := client.GetKnowledgeBase(newKBID); err == nil {
-			metadata.NewKnowledgeBaseID = newKBID
-			metadata.NewKnowledgeBaseName = kb.Name
-		}
-	}
-
-	return ctx.Metadata.Set(metadata)
-}
-
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
