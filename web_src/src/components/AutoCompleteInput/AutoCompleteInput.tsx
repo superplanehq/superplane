@@ -29,6 +29,8 @@ const suggestionSortPriority = {
   previous: 3,
 } as const;
 
+type IndexableValue = Record<string, unknown> | null | undefined;
+
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
     const {
@@ -653,7 +655,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           if (!next) return cur;
           if (next.t !== "ident") return undefined;
           try {
-            cur = (cur as any)?.[next.v];
+            cur = (cur as IndexableValue)?.[next.v];
           } catch {
             return undefined;
           }
@@ -663,7 +665,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
         if (tok.t === "key") {
           try {
-            cur = (cur as any)?.[tok.v];
+            cur = (cur as IndexableValue)?.[tok.v];
           } catch {
             return undefined;
           }
