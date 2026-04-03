@@ -70,10 +70,11 @@ interface HeaderProps {
   /** When true, the publish button shows "Submit for Review" instead of "Publish". */
   isChangeManagementEnabled?: boolean;
   isVersionControlOpen?: boolean;
+  /** When set, shows the Versions sidebar toggle in version-edit header (next to publish / exit). */
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
-  /** When false, hides the Versions header trigger (e.g. templates). */
+  /** When false, hides the Versions toggle and related bottom controls (e.g. templates). */
   showBottomStatusControls?: boolean;
 }
 
@@ -456,6 +457,40 @@ export function Header({
 
             {showVersionEditActions ? (
               <div className="flex items-center gap-2">
+                {showBottomStatusControls && onOpenVersionControl ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="relative inline-flex">
+                        <UIButton
+                          type="button"
+                          variant={isVersionControlOpen ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => onOpenVersionControl()}
+                          className="gap-1.5"
+                          aria-pressed={isVersionControlOpen}
+                          aria-label={
+                            isVersionControlOpen
+                              ? "Close versions sidebar"
+                              : versionControlButtonTooltip || "Open versions sidebar"
+                          }
+                        >
+                          <GitBranch className="size-3.5" />
+                          Versions
+                        </UIButton>
+                        {versionControlNotificationCount > 0 ? (
+                          <span className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-none text-white">
+                            {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
+                          </span>
+                        ) : null}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {isVersionControlOpen
+                        ? "Close versions sidebar"
+                        : versionControlButtonTooltip || "Open versions sidebar"}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
                 {publishWarnings && publishWarnings.length > 0 && (
                   <TooltipProvider>
                     <Tooltip>
@@ -522,41 +557,6 @@ export function Header({
                   )
                 )}
               </div>
-            ) : null}
-
-            {showEditButton && showBottomStatusControls && onOpenVersionControl ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="relative inline-flex">
-                    <UIButton
-                      type="button"
-                      variant={isVersionControlOpen ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => onOpenVersionControl()}
-                      className="gap-1.5"
-                      aria-pressed={isVersionControlOpen}
-                      aria-label={
-                        isVersionControlOpen
-                          ? "Close versions sidebar"
-                          : versionControlButtonTooltip || "Open versions sidebar"
-                      }
-                    >
-                      <GitBranch className="size-3.5" />
-                      Versions
-                    </UIButton>
-                    {versionControlNotificationCount > 0 ? (
-                      <span className="pointer-events-none absolute -right-1.5 -top-1.5 inline-flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-none text-white">
-                        {versionControlNotificationCount > 99 ? "99+" : versionControlNotificationCount}
-                      </span>
-                    ) : null}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {isVersionControlOpen
-                    ? "Close versions sidebar"
-                    : versionControlButtonTooltip || "Open versions sidebar"}
-                </TooltipContent>
-              </Tooltip>
             ) : null}
 
             {showEditButton ? (

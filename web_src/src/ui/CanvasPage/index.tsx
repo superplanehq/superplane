@@ -306,6 +306,8 @@ export interface CanvasPageProps {
 
   // Refs to persist state across re-renders
   hasFitToViewRef?: React.MutableRefObject<boolean>;
+  /** True while canvas / mapper deps are still loading — avoids marking fit complete with an empty graph before nodes arrive. */
+  isWorkflowGraphPending?: boolean;
   hasUserToggledSidebarRef?: React.MutableRefObject<boolean>;
   isSidebarOpenRef?: React.MutableRefObject<boolean | null>;
   viewportRef?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
@@ -717,6 +719,7 @@ function CanvasPage(props: CanvasPageProps) {
 
   // Use refs from props if provided, otherwise create local ones
   const hasFitToViewRef = props.hasFitToViewRef ?? localHasFitToViewRef;
+  const isWorkflowGraphPending = props.isWorkflowGraphPending ?? false;
   const hasUserToggledSidebarRef = props.hasUserToggledSidebarRef ?? localHasUserToggledSidebarRef;
   const isSidebarOpenRef = props.isSidebarOpenRef ?? localIsSidebarOpenRef;
 
@@ -1394,6 +1397,7 @@ function CanvasPage(props: CanvasPageProps) {
                 onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
                 onZoomChange={setCanvasZoom}
                 hasFitToViewRef={hasFitToViewRef}
+                isWorkflowGraphPending={isWorkflowGraphPending}
                 viewportRefProp={props.viewportRef}
                 highlightedNodeIds={highlightedNodeIds}
                 workflowNodes={props.workflowNodes}
@@ -2059,6 +2063,7 @@ function CanvasContent({
   onConnectionDropInEmptySpace,
   onZoomChange,
   hasFitToViewRef,
+  isWorkflowGraphPending = false,
   viewportRefProp,
   templateNodeId,
   runDisabled,
@@ -2155,6 +2160,7 @@ function CanvasContent({
   ) => void;
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
+  isWorkflowGraphPending?: boolean;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
   templateNodeId?: string | null;
   runDisabled?: boolean;
@@ -2661,14 +2667,18 @@ function CanvasContent({
           const initialViewport = getViewport();
           viewportRef.current = initialViewport;
           reportZoom(initialViewport.zoom);
+          hasFitToViewRef.current = true;
         } else {
           const defaultViewport = viewportRef.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM };
           viewportRef.current = defaultViewport;
           reactFlowInstance.setViewport(defaultViewport);
           reportZoom(defaultViewport.zoom);
+          // If the graph is still loading, nodes may arrive after init — keep false so deferred fit runs.
+          if (!isWorkflowGraphPending) {
+            hasFitToViewRef.current = true;
+          }
         }
 
-        hasFitToViewRef.current = true;
         setIsInitialized(true);
       } else {
         // If we've already fit to view once and have a stored viewport, restore it
@@ -2678,8 +2688,29 @@ function CanvasContent({
         setIsInitialized(true);
       }
     },
-    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
+    [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId, isWorkflowGraphPending],
   );
+
+  useEffect(() => {
+    if (hasFitToViewRef.current) {
+      return;
+    }
+    if (isWorkflowGraphPending) {
+      return;
+    }
+
+    const count = state.nodes?.length ?? 0;
+    if (count === 0) {
+      hasFitToViewRef.current = true;
+      return;
+    }
+
+    fitView({ duration: 300 });
+    const initialViewport = getViewport();
+    viewportRef.current = initialViewport;
+    reportZoom(initialViewport.zoom);
+    hasFitToViewRef.current = true;
+  }, [isWorkflowGraphPending, state.nodes.length, fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef]);
 
   const showHeader = !isReadOnly;
 

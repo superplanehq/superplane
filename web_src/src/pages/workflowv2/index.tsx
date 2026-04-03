@@ -603,7 +603,7 @@ export function WorkflowPageV2() {
    */
   const hasFitToViewRef = useRef(false);
   /** When the viewed canvas version changes, clear fit flag so React Flow runs fit-all on the next init. */
-  const prevCanvasViewKeyRef = useRef<string | null>(null);
+  const prevCanvasPageKeyRef = useRef<string | null>(null);
   /** After a version change, skip ?node= deep-link zoom once so fit matches the zoom toolbar (fit all). */
   const skipUrlNodeFocusForNextCanvasMountRef = useRef(false);
   const hasSyncedVersionFromURLRef = useRef(false);
@@ -709,11 +709,12 @@ export function WorkflowPageV2() {
   ]);
 
   useEffect(() => {
-    if (!hasEditableVersion || !isVersionControlOpen) {
+    if (hasEditableVersion) {
       return;
     }
-
-    setIsVersionControlOpen(false);
+    if (isVersionControlOpen) {
+      setIsVersionControlOpen(false);
+    }
   }, [hasEditableVersion, isVersionControlOpen]);
 
   // Revert functionality - track initial workflow snapshot
@@ -826,7 +827,7 @@ export function WorkflowPageV2() {
     setIsCanvasSaveQueued(false);
     hasInitializedStoreRef.current = null;
     pendingStoreReinitRef.current = true;
-    prevCanvasViewKeyRef.current = null;
+    prevCanvasPageKeyRef.current = null;
     hasFitToViewRef.current = false;
   }, [canvasId]);
 
@@ -5597,11 +5598,15 @@ export function WorkflowPageV2() {
   ) : null;
 
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  if (prevCanvasViewKeyRef.current !== null && prevCanvasViewKeyRef.current !== canvasViewKey) {
+  const versionGraphReady = isViewingDraftVersion || !activeCanvasVersionId || Boolean(selectedCanvasVersion?.spec);
+  const canvasPageKey = `${canvasViewKey}:${versionGraphReady ? "g" : "p"}`;
+  const isWorkflowGraphPending =
+    !canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading;
+  if (prevCanvasPageKeyRef.current !== null && prevCanvasPageKeyRef.current !== canvasPageKey) {
     hasFitToViewRef.current = false;
     skipUrlNodeFocusForNextCanvasMountRef.current = true;
   }
-  prevCanvasViewKeyRef.current = canvasViewKey;
+  prevCanvasPageKeyRef.current = canvasPageKey;
 
   let canvasInitialFocusNodeId = initialFocusNodeIdRef.current;
   if (skipUrlNodeFocusForNextCanvasMountRef.current) {
@@ -5748,7 +5753,7 @@ export function WorkflowPageV2() {
     <>
       <div className="relative h-full w-full">
         <CanvasPage
-          key={`${canvasId}:${canvasViewKey}`}
+          key={`${canvasId}:${canvasPageKey}`}
           // Persist right sidebar in query params
           initialSidebar={{
             isOpen: searchParams.get("sidebar") === "1",
@@ -5784,7 +5789,7 @@ export function WorkflowPageV2() {
           }}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={
-            !hasEditableVersion && topViewMode === "canvas" ? () => setIsVersionControlOpen((open) => !open) : undefined
+            hasEditableVersion && topViewMode === "canvas" ? () => setIsVersionControlOpen((open) => !open) : undefined
           }
           versionControlButtonTooltip="Open versions sidebar"
           versionControlNotificationCount={pendingApprovalVersions.length}
@@ -5842,6 +5847,7 @@ export function WorkflowPageV2() {
           readOnly={isReadOnly}
           suppressComponentSidebarOnNodeClick={canvasStateMode === "previewing-previous-version"}
           hasFitToViewRef={hasFitToViewRef}
+          isWorkflowGraphPending={isWorkflowGraphPending}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={viewportRef}
@@ -5919,7 +5925,7 @@ export function WorkflowPageV2() {
             },
           ]}
           versionControlSidebar={
-            !hasEditableVersion && topViewMode === "canvas" ? (
+            hasEditableVersion && topViewMode === "canvas" ? (
               <CanvasVersionControlSidebar
                 isOpen={isVersionControlOpen}
                 onToggle={setIsVersionControlOpen}
