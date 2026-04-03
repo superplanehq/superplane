@@ -1,5 +1,5 @@
 {
-  "maxAllowedTotalIssues": 1031,
+  "maxAllowedTotalIssues": 1025,
   "maxAllowedByRule": {
     "@typescript-eslint/no-explicit-any": 344,
     "complexity": 270,
@@ -10,8 +10,7 @@
     "max-lines": 26,
     "react-refresh/only-export-components": 25,
     "max-depth": 10,
-    "jsx-a11y/label-has-associated-control": 6,
     "max-params": 6
   },
-  "updatedAt": "2026-04-03T11:17:00.214Z"
+  "updatedAt": "2026-04-03T12:57:25.507Z"
 }
