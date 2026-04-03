@@ -32,6 +32,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
+  <LinkCard title="Update Agent" href="#update-agent" description="Swap the knowledge base attached to a DigitalOcean Gradient AI agent" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
@@ -1506,6 +1507,50 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
   },
   "timestamp": "2026-03-25T09:00:00Z",
   "type": "digitalocean.spaces.object.uploaded"
+}
+```
+
+<a id="update-agent"></a>
+
+## Update Agent
+
+The Update Agent component swaps the knowledge base attached to an existing Gradient AI agent.
+
+### Use Cases
+
+- **Blue/green KB deployment**: Point the agent at a newly indexed knowledge base after validation passes
+- **Rollback**: Revert an agent back to a previous knowledge base if evaluation fails
+- **Environment promotion**: Promote a staging agent to use the production knowledge base
+
+### Configuration
+
+- **Agent**: The agent to update (required)
+- **Current Knowledge Base**: The knowledge base currently attached to the agent that will be detached (required)
+- **New Knowledge Base**: The knowledge base to attach to the agent (required)
+
+### Output
+
+Returns confirmation of the swap including:
+- **agentId**: The ID of the updated agent
+- **previousKnowledgeBaseId**: The knowledge base that was detached
+- **newKnowledgeBaseId**: The knowledge base that was attached
+
+### Notes
+
+- If the current knowledge base is already detached, the component proceeds and attaches the new one
+- The agent and both knowledge bases must exist in the same DigitalOcean account
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "newKnowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000002",
+    "previousKnowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.agent.updated"
 }
 ```
 

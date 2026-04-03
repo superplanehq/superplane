@@ -2598,12 +2598,12 @@ func (c *Client) DetachKnowledgeBase(agentUUID, kbUUID string) error {
 
 // AgentNodeMetadata stores metadata about a GradientAI agent for display in the UI
 type AgentNodeMetadata struct {
-	AgentID                 string `json:"agentId" mapstructure:"agentId"`
-	AgentName               string `json:"agentName" mapstructure:"agentName"`
-	OldKnowledgeBaseID      string `json:"oldKnowledgeBaseId" mapstructure:"oldKnowledgeBaseId"`
-	OldKnowledgeBaseName    string `json:"oldKnowledgeBaseName" mapstructure:"oldKnowledgeBaseName"`
-	NewKnowledgeBaseID      string `json:"newKnowledgeBaseId" mapstructure:"newKnowledgeBaseId"`
-	NewKnowledgeBaseName    string `json:"newKnowledgeBaseName" mapstructure:"newKnowledgeBaseName"`
+	AgentID              string `json:"agentId" mapstructure:"agentId"`
+	AgentName            string `json:"agentName" mapstructure:"agentName"`
+	OldKnowledgeBaseID   string `json:"oldKnowledgeBaseId" mapstructure:"oldKnowledgeBaseId"`
+	OldKnowledgeBaseName string `json:"oldKnowledgeBaseName" mapstructure:"oldKnowledgeBaseName"`
+	NewKnowledgeBaseID   string `json:"newKnowledgeBaseId" mapstructure:"newKnowledgeBaseId"`
+	NewKnowledgeBaseName string `json:"newKnowledgeBaseName" mapstructure:"newKnowledgeBaseName"`
 }
 
 // resolveAgentMetadata fetches the agent name and KB names from the API and stores them in metadata

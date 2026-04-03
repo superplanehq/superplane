@@ -182,7 +182,7 @@ func (u *UpdateAgent) Execute(ctx core.ExecutionContext) error {
 		core.DefaultOutputChannel.Name,
 		"digitalocean.agent.updated",
 		[]any{map[string]any{
-			"agentId":                spec.AgentID,
+			"agentId":                 spec.AgentID,
 			"previousKnowledgeBaseId": spec.OldKnowledgeBaseID,
 			"newKnowledgeBaseId":      spec.NewKnowledgeBaseID,
 		}},
