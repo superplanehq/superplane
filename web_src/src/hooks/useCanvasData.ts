@@ -164,6 +164,7 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       return response.data?.canvas;
     },
     staleTime: 0,
+    refetchOnWindowFocus: false,
     enabled: !!organizationId && !!canvasId,
   });
 };
