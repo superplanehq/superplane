@@ -281,7 +281,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		)
 	}
 
-	return nil, nil
+	return &executionCtx.ID, nil
 }
 
 func expressionEnv(ctx core.ProcessQueueContext, expression string) (map[string]any, error) {
