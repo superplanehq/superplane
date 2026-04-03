@@ -5,6 +5,7 @@ import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { SuggestFieldValueFn } from "@/ui/configurationFieldRenderer/types";
+import { SuggestedValuePanel } from "./SuggestedValuePanel";
 import { twMerge } from "tailwind-merge";
 
 export interface InlineFieldAssistantProps {
@@ -114,21 +115,12 @@ export function InlineFieldAssistant({
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {proposedValue != null ? (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Suggested value</p>
-          <pre className="max-h-40 overflow-auto rounded-md bg-muted/50 p-2 text-xs whitespace-pre-wrap break-all">
-            {proposedValue}
-          </pre>
-          {explanation ? <p className="text-xs text-muted-foreground">{explanation}</p> : null}
-          <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" size="sm" variant="outline" onClick={handleClose}>
-              Discard
-            </Button>
-            <Button type="button" size="sm" onClick={handleConfirm}>
-              Use this value
-            </Button>
-          </div>
-        </div>
+        <SuggestedValuePanel
+          proposedValue={proposedValue}
+          explanation={explanation}
+          onDiscard={handleClose}
+          onUseValue={handleConfirm}
+        />
       ) : !loading && !error ? (
         <p className="text-xs text-muted-foreground">The result will show up here.</p>
       ) : null}
