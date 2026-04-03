@@ -79,11 +79,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           };
         }
 
-        // Preserve selected state from existing node
+        // Preserve selected state and position of actively dragged nodes
         return {
           ...newNode,
           data: nodeData,
           selected: existingNode?.selected ?? newNode.selected,
+          position: (existingNode?.dragging && existingNode.position) || newNode.position,
+          dragging: existingNode?.dragging,
         };
       });
 
