@@ -28,7 +28,12 @@ import {
   widgetsListWidgets,
   widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
-import type { CanvasesCanvasVersion } from "../api-client/types.gen";
+import type {
+  CanvasesCanvas,
+  CanvasesCanvasVersion,
+  ComponentsNode,
+  ComponentsPosition,
+} from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
@@ -249,6 +254,16 @@ export const useCanvasChangeRequests = (organizationId: string, canvasId: string
 
 type CanvasChangeRequestFilter = "open" | "rejected" | "merged" | "all";
 
+type CanvasGraphData = {
+  nodes?: unknown[];
+  edges?: unknown[];
+};
+
+type PositionedNode = ComponentsNode & {
+  id: string;
+  position: ComponentsPosition;
+};
+
 const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
   const raw = version?.metadata?.publishedAt || version?.metadata?.updatedAt || version?.metadata?.createdAt;
   if (!raw) return 0;
@@ -327,7 +342,7 @@ export const useCreateCanvas = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[] }) => {
+    mutationFn: async (data: { name: string; description?: string } & CanvasGraphData) => {
       const payload = {
         metadata: {
           name: data.name,
@@ -394,7 +409,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
 
       const updatedCanvas = response?.data?.canvas;
       if (updatedCanvas) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
           if (!current) {
             return current;
           }
@@ -451,8 +466,8 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       versionId?: string;
       name: string;
       description?: string;
-      nodes?: any[];
-      edges?: any[];
+      nodes?: unknown[];
+      edges?: unknown[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
       preserveLocalCanvasState?: boolean;
       invalidateRelatedQueries?: boolean;
@@ -499,7 +514,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
       }
 
-      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: any[] | undefined) => {
+      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
         if (!current) {
           return current;
         }
@@ -522,7 +537,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       });
 
       if (!variables.preserveLocalCanvasState) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
           if (!current) {
             return current;
           }
@@ -536,10 +551,12 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
           }
 
           const currentPositionsByNodeId = new Map(
-            (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
+            (current.spec?.nodes ?? [])
+              .filter((node): node is PositionedNode => Boolean(node.id && node.position))
+              .map((node) => [node.id, node.position] as const),
           );
 
-          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
+          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
             const localPosition = currentPositionsByNodeId.get(serverNode.id);
             if (localPosition) {
               return { ...serverNode, position: localPosition };
@@ -629,8 +646,8 @@ export const useResolveCanvasChangeRequest = (organizationId: string, canvasId: 
       changeRequestId: string;
       name: string;
       description?: string;
-      nodes?: any[];
-      edges?: any[];
+      nodes?: unknown[];
+      edges?: unknown[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
     }) => {
       return await canvasesResolveCanvasChangeRequest(
