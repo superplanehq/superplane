@@ -167,7 +167,7 @@ func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configu
 func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 	switch v := value.(type) {
 	case string:
-		return b.ResolveAllExpressions(v)
+		return b.ResolveTemplateExpressions(v)
 
 	case map[string]any:
 		return b.resolve(v)
@@ -210,7 +210,7 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
-func (b *NodeConfigurationBuilder) ResolveAllExpressions(expression string) (any, error) {
+func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil
 	}

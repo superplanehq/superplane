@@ -253,7 +253,11 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 				return nil, err
 			}
 
-			executionCtx.ExecutionState.Fail("error", fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
+			err = executionCtx.ExecutionState.Fail("error", fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
+			if err != nil {
+				return nil, err
+			}
+
 			return &executionCtx.ID, nil
 		}
 

@@ -87,7 +87,7 @@ func BuildProcessQueueContext(
 		EventID:       event.ID.String(),
 		SourceNodeID:  event.NodeID,
 		Input:         event.Data.Data(),
-		Expressions:   NewExpressionContext(tx, builder),
+		Expressions:   NewExpressionContext(builder),
 	}
 
 	ctx.CreateExecution = func() (*core.ExecutionContext, error) {

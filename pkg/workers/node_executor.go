@@ -387,7 +387,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-		Expressions:    contexts.NewExpressionContext(tx, builder),
+		Expressions:    contexts.NewExpressionContext(builder),
 	}
 
 	if node.AppInstallationID != nil {
