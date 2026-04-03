@@ -71,6 +71,14 @@ func BuildProcessQueueContext(
 		}
 	}
 
+	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithRootEvent(&queueItem.RootEventID).
+		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+	if event.ExecutionID != nil {
+		builder = builder.WithPreviousExecution(event.ExecutionID)
+	}
+
 	ctx := &core.ProcessQueueContext{
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
@@ -79,16 +87,7 @@ func BuildProcessQueueContext(
 		EventID:       event.ID.String(),
 		SourceNodeID:  event.NodeID,
 		Input:         event.Data.Data(),
-	}
-	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
-		builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
-			WithNodeID(node.NodeID).
-			WithRootEvent(&queueItem.RootEventID).
-			WithInput(map[string]any{event.NodeID: event.Data.Data()})
-		if event.ExecutionID != nil {
-			builder = builder.WithPreviousExecution(event.ExecutionID)
-		}
-		return builder.BuildExpressionEnv(expression)
+		Expressions:   NewExpressionContext(builder),
 	}
 
 	ctx.CreateExecution = func() (*core.ExecutionContext, error) {
