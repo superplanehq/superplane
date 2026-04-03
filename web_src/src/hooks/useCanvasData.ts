@@ -28,6 +28,7 @@ import {
   widgetsListWidgets,
   widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
+import type { CanvasesCanvasVersion } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
@@ -248,7 +249,7 @@ export const useCanvasChangeRequests = (organizationId: string, canvasId: string
 
 type CanvasChangeRequestFilter = "open" | "rejected" | "merged" | "all";
 
-const versionSortTimestamp = (version: any): number => {
+const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
   const raw = version?.metadata?.publishedAt || version?.metadata?.updatedAt || version?.metadata?.createdAt;
   if (!raw) return 0;
   const parsed = Date.parse(raw);
