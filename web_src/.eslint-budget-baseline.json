@@ -1,5 +1,5 @@
 {
-  "maxAllowedTotalIssues": 1033,
+  "maxAllowedTotalIssues": 1032,
   "maxAllowedByRule": {
     "@typescript-eslint/no-explicit-any": 344,
     "complexity": 270,
@@ -9,10 +9,10 @@
     "react-hooks/exhaustive-deps": 59,
     "max-lines": 26,
     "react-refresh/only-export-components": 25,
-    "max-depth": 11,
+    "max-depth": 10,
     "jsx-a11y/label-has-associated-control": 6,
     "max-params": 6,
     "@typescript-eslint/consistent-type-imports": 1
   },
-  "updatedAt": "2026-04-03T09:58:29.195Z"
+  "updatedAt": "2026-04-03T11:00:38.658Z"
 }
