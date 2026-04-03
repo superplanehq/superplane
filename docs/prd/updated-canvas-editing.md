@@ -66,6 +66,7 @@ Detailed behavior lives in engineering specs; this document is the product brief
 - Entering **edit** works with a **draft**; saves target the **draft**.
 - Exiting: **save and leave**, or **discard** and return to live; **unsaved** work triggers prompts.
 - If a draft **already exists** when entering edit: user chooses **continue draft** or **start over from live**.
+- Users can also create a new draft from a **previous published version**.
 
 ### Publishing
 
@@ -131,3 +132,256 @@ Detailed behavior lives in engineering specs; this document is the product brief
 
 - [Video overview](https://drive.google.com/file/d/1M16kKRp_g9oE61m8FTnK7tonisFPk9Zx/view?usp=sharing)
 - [Prototype branch (not mergeable, illustrative only)](https://github.com/superplanehq/superplane/tree/feat--new-canvas-edit)
+
+# Technical Proposal
+
+## High-level architecture
+
+This section describes only the architectural changes introduced by this proposal.
+
+### Data model changes
+
+- The edited graph is no longer treated as the same thing as the live graph in the product flow.
+- Entering **edit mode** always attaches the user to a **draft version**, and all edit-mode writes target that draft.
+- Exiting edit mode no longer depends on a manual save as the persistence boundary; the draft is the persisted working state.
+- Versioning becomes unconditional.
+- The persisted policy is `enable_change_request`.
+- The policy exists at the canvas level and at the organization level.
+- Organization policy overrides canvas policy.
+
+### Database changes
+
+- **V1 has database schema changes**.
+- Remove canvas-level `versioning_enabled`.
+- Remove organization-level `versioning_enabled` for canvases.
+- Add a canvas-level `enable_change_request` flag.
+- Add an organization-level `enable_change_request` flag.
+- Draft/version tables stay the same.
+- That means:
+  - **no new tables** for v1,
+  - **one new canvas policy column** for v1,
+  - **one new organization policy column** for v1,
+  - **existing versioning columns are removed**,
+  - **existing canvases are migrated to `enable_change_request = false`**,
+  - **existing organizations are migrated to `enable_change_request = false`**.
+
+Example: schema delta for v1
+
+```sql
+ALTER TABLE workflows
+  DROP COLUMN versioning_enabled;
+
+ALTER TABLE workflows
+  ADD COLUMN enable_change_request boolean NOT NULL DEFAULT false;
+
+ALTER TABLE organizations
+  ADD COLUMN enable_change_request boolean NOT NULL DEFAULT false;
+
+ALTER TABLE organizations
+  DROP COLUMN versioning_enabled;
+```
+
+### API behavior changes
+
+- Edit-mode saves continue to use `UpdateCanvasVersion`.
+- The change is in how the UI calls it: in edit mode it always sends `version_id`.
+- Entering edit mode continues to reuse the current draft when it exists and create a draft when it does not.
+- The user can also create a draft from a selected previous published version.
+- “Go live” splits into two behaviors:
+  - **Publish draft directly** when `enable_change_request = false`.
+  - **Create/submit a change request** when `enable_change_request = true`.
+- The publish action enforces a **pre-publish validation gate** so blocking graph issues prevent promotion to live.
+- Version browsing becomes **edit-mode scoped**:
+  - live mode shows the entry point into edit,
+  - edit mode shows versions, draft, history, and open change requests.
+
+### API changes
+
+- `UpdateCanvasRequest` changes.
+- Remove `versioning_enabled`.
+- Add `enable_change_request`.
+
+```proto
+message UpdateCanvasRequest {
+  string id = 1;
+  optional string name = 2;
+  optional string description = 3;
+  optional bool enable_change_request = 4;
+  optional CanvasChangeRequestApprovalConfig change_request_approval_config = 5;
+}
+```
+
+- `Canvas.Metadata` changes in the same way.
+
+```proto
+message Canvas {
+  message Metadata {
+    string id = 1;
+    string organization_id = 2;
+    string name = 3;
+    string description = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+    UserRef created_by = 7;
+    bool is_template = 8;
+    bool enable_change_request = 9;
+    CanvasChangeRequestApprovalConfig change_request_approval_config = 10;
+  }
+}
+```
+
+- Organization settings add the same field.
+
+```proto
+message UpdateOrganizationRequest {
+  // ...
+  optional bool enable_change_request = <new_field_number>;
+}
+```
+
+- `UpdateCanvasVersionRequest` stays unchanged.
+- The frontend change is simple: in edit mode it always calls this endpoint with `version_id`.
+- The empty-`version_id` live-update path is no longer part of the draft-first canvas flow.
+
+```http
+PUT /api/v1/canvases/{canvas_id}/versions/{version_id}
+Content-Type: application/json
+
+{
+  "canvasId": "canvas_123",
+  "versionId": "ver_draft_456",
+  "canvas": {
+    "metadata": {
+      "name": "Incident Router",
+      "description": "Routes incidents by severity"
+    },
+    "spec": {
+      "nodes": [ ... ],
+      "edges": [ ... ]
+    }
+  }
+}
+```
+
+- Entering edit mode continues to use the existing draft creation endpoint.
+- No request change is needed there.
+- Creating a draft from a previous version needs API support to specify the source version.
+
+Example: create draft from a previous published version
+
+```proto
+message CreateCanvasVersionRequest {
+  string canvas_id = 1;
+  string source_version_id = 2;
+}
+```
+
+- If `source_version_id` is empty, the draft is created from the current live version.
+- If `source_version_id` is set, the draft is created from that published version.
+
+```http
+POST /api/v1/canvases/{canvas_id}/versions
+```
+
+- `CreateCanvasChangeRequest` and `ActOnCanvasChangeRequest` stay unchanged for the change-request flow.
+- The new API work is the direct-publish flow. That flow needs a direct draft publish endpoint because the current API only publishes through change requests.
+- The CLI changes too.
+- Canvas settings commands must stop reading and writing `versioning_enabled`.
+- Canvas settings commands must read and write `enable_change_request`.
+- Canvas publish commands must follow the new split:
+  - publish draft directly when `enable_change_request = false`,
+  - create and act on change requests when `enable_change_request = true`.
+
+Example: new direct draft publish API
+
+```proto
+rpc PublishCanvasVersion(PublishCanvasVersionRequest) returns (PublishCanvasVersionResponse) {
+  option (google.api.http) = {
+    patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}/publish"
+    body: "*"
+  };
+}
+
+message PublishCanvasVersionRequest {
+  string canvas_id = 1;
+  string version_id = 2;
+}
+
+message PublishCanvasVersionResponse {
+  CanvasVersion version = 1;
+  Canvas canvas = 2;
+}
+```
+
+- This endpoint calls the existing draft-publish backend logic and moves the draft to live when `enable_change_request = false`.
+- The backend model helper already exists. The missing piece is wiring it into the API/service layer.
+- This endpoint is allowed only when `enable_change_request = false`.
+- If `enable_change_request = true`, the API returns `FailedPrecondition` and the user must create a change request instead.
+
+Example: direct-publish path
+
+```text
+Enter edit mode
+-> create/reuse draft version
+-> autosave draft with PUT /versions/{version_id}
+-> PATCH /versions/{version_id}/publish
+```
+
+Example: change-request path
+
+```text
+Enter edit mode
+-> create/reuse draft version
+-> autosave draft with PUT /versions/{version_id}
+-> POST /change-requests
+-> PATCH /change-requests/{id}/actions { action: ACTION_APPROVE }
+-> PATCH /change-requests/{id}/actions { action: ACTION_PUBLISH }
+```
+
+- Publish validation is a real API change.
+- It does not exist today.
+- Expose it on `CanvasVersion` so the UI gets publish blockers from the existing version fetch/save flow instead of calling a separate check endpoint.
+
+Example: `CanvasVersion` response delta
+
+```proto
+message CanvasVersion {
+  message PublishBlocker {
+    string node_id = 1;
+    string message = 2;
+  }
+
+  message Metadata {
+    string id = 1;
+    string canvas_id = 2;
+    UserRef owner = 4;
+    bool is_published = 6;
+    google.protobuf.Timestamp published_at = 7;
+    google.protobuf.Timestamp created_at = 8;
+    google.protobuf.Timestamp updated_at = 9;
+    bool can_publish = 10;
+  }
+
+  Metadata metadata = 1;
+  Canvas.Spec spec = 2;
+  repeated PublishBlocker publish_blockers = 3;
+}
+```
+
+- Example response
+
+```json
+{
+  "metadata": {
+    "id": "ver_draft_456",
+    "canvasId": "canvas_123",
+    "canPublish": false
+  },
+  "publishBlockers": [
+    {
+      "nodeId": "slack-send-message",
+      "message": "Slack channel is required"
+    }
+  ]
+}
+```
