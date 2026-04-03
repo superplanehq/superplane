@@ -41,6 +41,46 @@ func Test__AttachKnowledgeBase__Setup(t *testing.T) {
 				"agentId":         "{{ $.trigger.data.agentId }}",
 				"knowledgeBaseId": "kb-uuid",
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						// GetKnowledgeBase (literal KB id still resolved for display)
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"knowledge_base": {"uuid": "kb-uuid", "name": "my-kb"}
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("expression knowledgeBaseId is accepted at setup time", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"agentId":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"knowledgeBaseId": "{{ $.steps.create_kb.id }}",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						// GetAgent (literal agent id still resolved for display)
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"agent": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "name": "my-agent"}
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
 			Metadata: &contexts.MetadataContext{},
 		})
 

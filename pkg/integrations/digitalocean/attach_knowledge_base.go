@@ -181,20 +181,31 @@ type KBNodeMetadata struct {
 
 // resolveKBNodeMetadata fetches the agent and knowledge base names from the API and stores them in metadata
 func resolveKBNodeMetadata(ctx core.SetupContext, agentID, kbID string) error {
-	var meta KBNodeMetadata
-
-	// If either ID is an expression placeholder, skip API calls
-	if strings.Contains(agentID, "{{") || strings.Contains(kbID, "{{") {
-		meta.AgentName = agentID
-		meta.KnowledgeBaseName = kbID
-		return ctx.Metadata.Set(meta)
+	meta := KBNodeMetadata{
+		AgentID:         agentID,
+		KnowledgeBaseID: kbID,
 	}
 
-	// Return early if metadata is already up to date
+	isAgentExpr := strings.Contains(agentID, "{{")
+	isKbExpr := strings.Contains(kbID, "{{")
+
+	if isAgentExpr {
+		meta.AgentName = agentID
+	}
+	if isKbExpr {
+		meta.KnowledgeBaseName = kbID
+	}
+
 	var existing KBNodeMetadata
-	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
-	if existing.AgentID == agentID && existing.KnowledgeBaseID == kbID && existing.AgentName != "" {
+	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	if err == nil &&
+		existing.AgentID == agentID && existing.AgentName != "" &&
+		existing.KnowledgeBaseID == kbID && existing.KnowledgeBaseName != "" {
 		return nil
+	}
+
+	if isAgentExpr && isKbExpr {
+		return ctx.Metadata.Set(meta)
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -202,17 +213,18 @@ func resolveKBNodeMetadata(ctx core.SetupContext, agentID, kbID string) error {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	agent, err := client.GetAgent(agentID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch agent %q: %w", agentID, err)
+	if !isAgentExpr {
+		agent, err := client.GetAgent(agentID)
+		if err != nil {
+			return fmt.Errorf("failed to fetch agent %q: %w", agentID, err)
+		}
+		meta.AgentName = agent.Name
 	}
 
-	meta.AgentID = agentID
-	meta.AgentName = agent.Name
-
-	if kb, err := client.GetKnowledgeBase(kbID); err == nil {
-		meta.KnowledgeBaseID = kbID
-		meta.KnowledgeBaseName = kb.Name
+	if !isKbExpr {
+		if kb, err := client.GetKnowledgeBase(kbID); err == nil {
+			meta.KnowledgeBaseName = kb.Name
+		}
 	}
 
 	return ctx.Metadata.Set(meta)
