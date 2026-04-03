@@ -50,6 +50,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listAgentAvailableKnowledgeBases(ctx)
 	case "agent_knowledge_base":
 		return listAgentKnowledgeBases(ctx)
+	case "evaluation_test_case":
+		return listEvaluationTestCases(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -582,6 +584,29 @@ func listKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResour
 			Type: "knowledge_base",
 			Name: kb.Name,
 			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listEvaluationTestCases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	testCases, err := client.ListEvaluationTestCases()
+	if err != nil {
+		return nil, fmt.Errorf("error listing evaluation test cases: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(testCases))
+	for _, tc := range testCases {
+		resources = append(resources, core.IntegrationResource{
+			Type: "evaluation_test_case",
+			Name: tc.Name,
+			ID:   tc.UUID,
 		})
 	}
 

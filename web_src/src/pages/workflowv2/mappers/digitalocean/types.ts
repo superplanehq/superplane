@@ -258,6 +258,19 @@ export interface DeleteKnowledgeBaseConfiguration {
   deleteOpenSearchDatabase?: boolean;
 }
 
+export interface EvalNodeMetadata {
+  testCaseId?: string;
+  testCaseName?: string;
+  agentId?: string;
+  agentName?: string;
+}
+
+export interface RunEvaluationConfiguration {
+  testCaseId: string;
+  agentId: string;
+  runName: string;
+}
+
 export interface KnowledgeBaseDataSource {
   type: "spaces" | "web";
   spacesBucket?: string;

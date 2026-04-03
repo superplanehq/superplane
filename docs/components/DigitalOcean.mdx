@@ -35,6 +35,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
+  <LinkCard title="Run Evaluation" href="#run-evaluation" description="Run a Gradient AI evaluation test case against an agent and report pass or fail" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
@@ -885,7 +886,8 @@ Deletes the specified knowledge base. Optionally, you can also delete the associ
 Returns confirmation of the deletion including:
 - **knowledgeBaseId**: UUID of the deleted knowledge base
 - **databaseDeleted**: Whether the OpenSearch database was also deleted
-- **databaseId**: UUID of the deleted database (if applicable)
+- **databaseId**: UUID of the deleted database (included when the database was deleted)
+- **databaseName**: Name of the deleted database (included when the database was deleted)
 
 ### Notes
 
@@ -1629,6 +1631,131 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
   },
   "timestamp": "2026-03-25T09:00:00Z",
   "type": "digitalocean.spaces.object.uploaded"
+}
+```
+
+<a id="run-evaluation"></a>
+
+## Run Evaluation
+
+The Run Evaluation component triggers a Gradient AI evaluation test case against an agent, waits for it to complete, and reports whether the agent passed or failed.
+
+### How it works
+
+Runs a pre-configured evaluation test case against the selected agent. The test case already defines the prompts, metrics, and pass/fail thresholds. The component polls until the evaluation finishes, then fetches the results and routes to the appropriate output channel.
+
+### Use Cases
+
+- **Blue/green deployments**: Evaluate a staging agent before promoting it to production
+- **Regression testing**: Automatically verify agent quality after knowledge base or configuration changes
+- **Continuous validation**: Schedule periodic evaluations to detect quality drift
+
+### Configuration
+
+- **Test Case**: A pre-configured evaluation test case with prompts, metrics, and thresholds (required)
+- **Agent**: The agent to evaluate (required)
+- **Run Name**: A name for this evaluation run, visible in the DigitalOcean console (required, max 64 characters). Supports expressions for dynamic naming.
+
+### Output Channels
+
+- **Passed**: The evaluation completed and the agent met all pass criteria defined in the test case
+- **Failed**: The evaluation completed but the agent did not meet the pass criteria, or the evaluation run itself errored
+
+### Output
+
+Returns the evaluation results including:
+- **evaluationRunId**: UUID of the evaluation run
+- **testCaseId / testCaseName**: The test case that was run
+- **agentId / agentName**: The agent that was evaluated
+- **passed**: Whether the agent passed the evaluation
+- **status**: Final status of the evaluation run
+- **starMetric**: The primary metric result (name, numberValue, stringValue)
+- **runLevelMetrics**: All run-level metric results (name, numberValue, stringValue)
+- **prompts**: Per-prompt results including input, output, ground truth, and per-prompt metric scores
+- **startedAt / finishedAt**: Timing information
+- **errorDescription**: Present on the Failed channel if the run itself errored
+
+### Notes
+
+- The evaluation typically takes 1–5 minutes depending on the number of prompts and complexity
+- The component polls every 30 seconds until completion
+- If the evaluation run itself fails (API error, timeout, etc.), the result is emitted to the Failed channel with the error description
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
+    "agentName": "support-agent",
+    "evaluationRunId": "ba42b577-9dab-40a9-a375-315a5be1922e",
+    "finishedAt": "2025-01-01T00:03:44Z",
+    "passed": true,
+    "prompts": [
+      {
+        "groundTruth": "A Droplet is a virtual machine that runs on DigitalOcean's cloud infrastructure.",
+        "input": "What is a Droplet?",
+        "metrics": [
+          {
+            "metricName": "Correctness (general hallucinations)",
+            "numberValue": 100,
+            "stringValue": ""
+          },
+          {
+            "metricName": "Retrieved context relevance",
+            "numberValue": 0,
+            "stringValue": ""
+          }
+        ],
+        "output": "A Droplet is a type of virtual private server (VPS) provided by a cloud platform."
+      },
+      {
+        "groundTruth": "Droplets have flexible pricing based on instance type, region, and options you select.",
+        "input": "What is the pricing for Droplet?",
+        "metrics": [
+          {
+            "metricName": "Correctness (general hallucinations)",
+            "numberValue": 66.67,
+            "stringValue": ""
+          },
+          {
+            "metricName": "Retrieved context relevance",
+            "numberValue": 0,
+            "stringValue": ""
+          }
+        ],
+        "output": "The pricing for Droplet starts at $5/month for a basic plan."
+      }
+    ],
+    "runLevelMetrics": [
+      {
+        "metricName": "Retrieved context relevance",
+        "numberValue": 0,
+        "stringValue": ""
+      },
+      {
+        "metricName": "Response-context completeness",
+        "numberValue": 0,
+        "stringValue": ""
+      },
+      {
+        "metricName": "Correctness (general hallucinations)",
+        "numberValue": 93.33,
+        "stringValue": ""
+      }
+    ],
+    "starMetric": {
+      "metricName": "Correctness (general hallucinations)",
+      "numberValue": 93.33,
+      "stringValue": ""
+    },
+    "startedAt": "2025-01-01T00:00:00Z",
+    "status": "successful",
+    "testCaseId": "c6d75370-2f3e-11f1-b074-4e013e2ddde4",
+    "testCaseName": "Product Knowledge Baseline"
+  },
+  "timestamp": "2025-01-01T00:03:44Z",
+  "type": "digitalocean.evaluation.passed"
 }
 ```
 

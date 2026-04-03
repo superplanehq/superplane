@@ -28,6 +28,7 @@ import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
 import { detachKnowledgeBaseMapper } from "./detach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
+import { runEvaluationMapper, RUN_EVALUATION_STATE_REGISTRY } from "./run_evaluation";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
@@ -60,6 +61,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   attachKnowledgeBase: attachKnowledgeBaseMapper,
   detachKnowledgeBase: detachKnowledgeBaseMapper,
   deleteKnowledgeBase: deleteKnowledgeBaseMapper,
+  runEvaluation: runEvaluationMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -94,4 +96,5 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   attachKnowledgeBase: buildActionStateRegistry("attached"),
   detachKnowledgeBase: buildActionStateRegistry("detached"),
   deleteKnowledgeBase: buildActionStateRegistry("deleted"),
+  runEvaluation: RUN_EVALUATION_STATE_REGISTRY,
 };

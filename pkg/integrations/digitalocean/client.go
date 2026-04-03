@@ -2610,6 +2610,147 @@ func (c *Client) DeleteDatabase(databaseID string) error {
 	return err
 }
 
+// EvaluationTestCase represents a Gradient AI evaluation test case
+type EvaluationTestCase struct {
+	UUID        string `json:"test_case_uuid"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// EvaluationMetricResult represents a single metric score in an evaluation run
+type EvaluationMetricResult struct {
+	MetricName       string  `json:"metric_name"`
+	MetricValueType  string  `json:"metric_value_type"`
+	NumberValue      float64 `json:"number_value"`
+	StringValue      string  `json:"string_value"`
+	Reasoning        string  `json:"reasoning"`
+	ErrorDescription string  `json:"error_description"`
+}
+
+// EvaluationRun represents a Gradient AI evaluation run
+type EvaluationRun struct {
+	UUID                string                   `json:"evaluation_run_uuid"`
+	Status              string                   `json:"status"`
+	PassStatus          bool                     `json:"pass_status"`
+	AgentUUID           string                   `json:"agent_uuid"`
+	AgentName           string                   `json:"agent_name"`
+	TestCaseUUID        string                   `json:"test_case_uuid"`
+	TestCaseName        string                   `json:"test_case_name"`
+	TestCaseDescription string                   `json:"test_case_description"`
+	RunName             string                   `json:"run_name"`
+	StarMetricResult    *EvaluationMetricResult  `json:"star_metric_result"`
+	RunLevelMetrics     []EvaluationMetricResult `json:"run_level_metric_results"`
+	ErrorDescription    string                   `json:"error_description"`
+	QueuedAt            string                   `json:"queued_at"`
+	StartedAt           string                   `json:"started_at"`
+	FinishedAt          string                   `json:"finished_at"`
+}
+
+// EvaluationPrompt represents a single prompt and its results in an evaluation run
+type EvaluationPrompt struct {
+	PromptID     int                      `json:"prompt_id"`
+	Input        string                   `json:"input"`
+	Output       string                   `json:"output"`
+	GroundTruth  string                   `json:"ground_truth"`
+	InputTokens  string                   `json:"input_tokens"`
+	OutputTokens string                   `json:"output_tokens"`
+	Metrics      []EvaluationMetricResult `json:"prompt_level_metric_results"`
+}
+
+// EvaluationRunResults contains the full evaluation run results including per-prompt details
+type EvaluationRunResults struct {
+	EvaluationRun EvaluationRun      `json:"evaluation_run"`
+	Prompts       []EvaluationPrompt `json:"prompts"`
+}
+
+// ListEvaluationTestCases retrieves all evaluation test cases
+func (c *Client) ListEvaluationTestCases() ([]EvaluationTestCase, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_test_cases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		EvaluationTestCases []EvaluationTestCase `json:"evaluation_test_cases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.EvaluationTestCases, nil
+}
+
+// RunEvaluation starts an evaluation run for a test case against the specified agents.
+// The API returns only the UUIDs of the created runs, not the full run objects.
+func (c *Client) RunEvaluation(testCaseUUID string, agentUUIDs []string, runName string) (string, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_runs", c.BaseURL)
+
+	body, err := json.Marshal(map[string]any{
+		"test_case_uuid": testCaseUUID,
+		"agent_uuids":    agentUUIDs,
+		"run_name":       runName,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+
+	var response struct {
+		EvaluationRunUUIDs []string `json:"evaluation_run_uuids"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return "", fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if len(response.EvaluationRunUUIDs) == 0 {
+		return "", fmt.Errorf("no evaluation run UUIDs returned")
+	}
+
+	return response.EvaluationRunUUIDs[0], nil
+}
+
+// GetEvaluationRun retrieves the status of an evaluation run
+func (c *Client) GetEvaluationRun(runUUID string) (*EvaluationRun, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_runs/%s", c.BaseURL, runUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		EvaluationRun EvaluationRun `json:"evaluation_run"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.EvaluationRun, nil
+}
+
+// GetEvaluationRunResults retrieves the full results of an evaluation run including per-prompt details
+func (c *Client) GetEvaluationRunResults(runUUID string) (*EvaluationRunResults, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_runs/%s/results", c.BaseURL, runUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response EvaluationRunResults
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
