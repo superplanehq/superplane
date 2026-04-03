@@ -225,6 +225,7 @@ type DeleteKBNodeMetadata struct {
 func resolveDeleteKBMetadata(ctx core.SetupContext, kbID string) error {
 	if strings.Contains(kbID, "{{") {
 		return ctx.Metadata.Set(DeleteKBNodeMetadata{
+			KnowledgeBaseID:   kbID,
 			KnowledgeBaseName: kbID,
 		})
 	}

@@ -25,14 +25,19 @@ func Test__DeleteKnowledgeBase__Setup(t *testing.T) {
 	})
 
 	t.Run("expression knowledgeBaseId is accepted at setup time", func(t *testing.T) {
+		metaCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"knowledgeBaseId": "{{ $.trigger.data.kbId }}",
 			},
-			Metadata: &contexts.MetadataContext{},
+			Metadata: metaCtx,
 		})
 
 		require.NoError(t, err)
+		meta, ok := metaCtx.Metadata.(DeleteKBNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "{{ $.trigger.data.kbId }}", meta.KnowledgeBaseID)
+		assert.Equal(t, "{{ $.trigger.data.kbId }}", meta.KnowledgeBaseName)
 	})
 
 	t.Run("valid knowledgeBaseId -> no error", func(t *testing.T) {
