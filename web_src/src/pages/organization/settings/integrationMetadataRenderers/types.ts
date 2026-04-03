@@ -1,5 +1,5 @@
-import { OrganizationsIntegration } from "@/api-client";
-import { ReactNode } from "react";
+import type { OrganizationsIntegration } from "@/api-client";
+import type { ReactNode } from "react";
 
 export interface IntegrationMetadataRendererContext {
   integration: OrganizationsIntegration;

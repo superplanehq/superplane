@@ -1,4 +1,4 @@
-import {
+import type {
   CanvasesCanvasChangeRequest,
   CanvasesCanvasChangeRequestApprovalConfig,
   CanvasesCanvasVersion,
@@ -7,14 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Ellipsis, GitBranch, X } from "lucide-react";
-import {
-  KeyboardEvent as ReactKeyboardEvent,
-  MouseEvent as ReactMouseEvent,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { formatVersionLabel, formatVersionTimestamp } from "./lib/canvas-versions";

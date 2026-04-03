@@ -1,4 +1,4 @@
-import { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";

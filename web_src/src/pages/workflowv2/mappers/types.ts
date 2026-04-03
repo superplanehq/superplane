@@ -3,6 +3,7 @@ import type {
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionState,
   ComponentsEdge,
+  OrganizationsIntegration,
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
@@ -184,7 +185,7 @@ export interface EventStateRegistry {
 export interface CustomFieldRendererContext {
   onRun?: (initialData?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
-  integration?: import("@/api-client").OrganizationsIntegration;
+  integration?: OrganizationsIntegration;
 }
 
 export interface CustomFieldRenderer {

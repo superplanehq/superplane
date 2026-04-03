@@ -1,4 +1,4 @@
-import { PackageVersionDetail } from "./types";
+import type { PackageVersionDetail } from "./types";
 
 export function formatPackageName(namespace?: string | null, name?: string): string | undefined {
   if (!name) {

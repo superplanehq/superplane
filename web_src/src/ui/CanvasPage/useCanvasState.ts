@@ -1,8 +1,8 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CanvasPageProps } from ".";
-import { BreadcrumbItem } from "../../components/Breadcrumbs";
+import type { CanvasPageProps } from ".";
+import type { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
   title: string;
@@ -79,11 +79,13 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
           };
         }
 
-        // Preserve selected state from existing node
+        // Preserve selected state and position of actively dragged nodes
         return {
           ...newNode,
           data: nodeData,
           selected: existingNode?.selected ?? newNode.selected,
+          position: (existingNode?.dragging && existingNode.position) || newNode.position,
+          dragging: existingNode?.dragging,
         };
       });
 

@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onWorkflowCompletedTriggerRenderer } from "./on_workflow_completed";
 import { RUN_PIPELINE_STATE_REGISTRY, runPipelineMapper } from "./run_pipeline";
 import { getWorkflowMapper } from "./get_workflow";

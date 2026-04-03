@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { AuthorizationPermission, RolesRole } from "../../../api-client/types.gen";
+import type { AuthorizationPermission, RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";

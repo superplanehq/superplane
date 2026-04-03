@@ -6,7 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 
 const DEFAULT_WIDTH = 320;
 const DEFAULT_HEIGHT = 200;

@@ -268,7 +268,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		)
 	}
 
-	return nil, nil
+	return &executionCtx.ID, nil
 }
 
 func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {

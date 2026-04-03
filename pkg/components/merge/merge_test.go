@@ -465,7 +465,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 
 	execution, err := m.ProcessQueueItem(*ctx1)
 	require.NoError(s.t, err)
-	require.Nil(s.t, execution)
+	require.NotNil(s.t, execution)
 }
 
 // ProcessFirstEventExpectFinish is used when the first event should

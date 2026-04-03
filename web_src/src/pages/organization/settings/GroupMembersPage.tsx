@@ -20,7 +20,8 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
+import type { AddMembersSectionRef } from "./AddMembersSection";
+import { AddMembersSection } from "./AddMembersSection";
 import { showErrorToast } from "@/lib/toast";
 
 export function GroupMembersPage() {

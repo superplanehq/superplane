@@ -1,6 +1,6 @@
-import { ComponentBaseProps } from "@/ui/componentBase";
-import { MetadataItem } from "@/ui/metadataList";
-import { ComponentBaseContext, ComponentBaseMapper, NodeInfo } from "../types";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo } from "../types";
 import { cloudBuildBaseMapper } from "./base";
 
 export const runTriggerMapper: ComponentBaseMapper = {
