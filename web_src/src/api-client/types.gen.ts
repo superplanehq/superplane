@@ -327,7 +327,6 @@ export type CanvasesCanvasSpec = {
 
 export type CanvasesCanvasStatus = {
   lastExecutions?: Array<CanvasesCanvasNodeExecution>;
-  nextQueueItems?: Array<CanvasesCanvasNodeQueueItem>;
   lastEvents?: Array<CanvasesCanvasEvent>;
 };
 

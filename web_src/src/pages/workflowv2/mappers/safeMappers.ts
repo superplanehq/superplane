@@ -12,9 +12,9 @@ import type {
 
 type UnknownRecord = Record<string, unknown>;
 
-const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
+export const CANVAS_NODE_FALLBACK_MESSAGE = "Can't display";
 
-function isRecord(value: unknown): value is UnknownRecord {
+export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
