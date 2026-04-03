@@ -144,7 +144,6 @@ type ExecutionContext struct {
 	BaseURL        string
 	Data           any
 	Configuration  any
-	ExpressionEnv  func(expression string) (map[string]any, error)
 	Logger         *log.Entry
 	HTTP           HTTPContext
 	Metadata       MetadataContext
@@ -157,6 +156,11 @@ type ExecutionContext struct {
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
 	Webhook        NodeWebhookContext
+	Expressions    ExpressionContext
+}
+
+type ExpressionContext interface {
+	Run(expression string) (any, error)
 }
 
 /*
@@ -277,7 +281,7 @@ type ProcessQueueContext struct {
 	SourceNodeID  string
 	Configuration any
 	Input         any
-	ExpressionEnv func(expression string) (map[string]any, error)
+	Expressions   ExpressionContext
 
 	//
 	// Deletes the queue item
