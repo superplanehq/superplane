@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { canvasesInvokeNodeExecutionAction, CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas } from "@/api-client";
+import { canvasesInvokeNodeExecutionAction } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";

@@ -1,8 +1,8 @@
 import type { Edge, EdgeChange, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import { applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CanvasPageProps } from ".";
-import { BreadcrumbItem } from "../../components/Breadcrumbs";
+import type { CanvasPageProps } from ".";
+import type { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
   title: string;

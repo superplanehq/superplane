@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { onPushTriggerRenderer } from "./on_push";
 import { onPullRequestTriggerRenderer } from "./on_pull_request";
 import { onIssueTriggerRenderer } from "./on_issue";

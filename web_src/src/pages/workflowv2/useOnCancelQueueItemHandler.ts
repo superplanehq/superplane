@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
-import { canvasesDeleteNodeQueueItem, CanvasesCanvas } from "@/api-client";
+import type { CanvasesCanvas } from "@/api-client";
+import { canvasesDeleteNodeQueueItem } from "@/api-client";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";

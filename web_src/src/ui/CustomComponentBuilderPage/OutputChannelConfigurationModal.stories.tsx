@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
-import { Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import { OutputChannelConfigurationModal } from "./OutputChannelConfigurationModal";
-import { SuperplaneBlueprintsOutputChannel } from "@/api-client";
+import type { SuperplaneBlueprintsOutputChannel } from "@/api-client";
 import { Button } from "@/components/ui/button";
 
 const meta = {

@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
+import type { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
 import { canvasesResolveExecutionErrors } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { queryPrometheusMapper } from "./query_prometheus";
