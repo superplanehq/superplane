@@ -90,6 +90,7 @@ func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 		CustomName: valueOrEmpty(event.CustomName),
 		Data:       s,
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
+		Root:       event.ExecutionID == nil,
 	}, nil
 }
 

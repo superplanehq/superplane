@@ -124,7 +124,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		//
 		require.NotNil(t, response.Canvas.Status)
 		assert.NotNil(t, response.Canvas.Status.LastExecutions)
-		assert.NotNil(t, response.Canvas.Status.NextQueueItems)
 		assert.NotNil(t, response.Canvas.Status.LastEvents)
 	})
 
@@ -204,83 +203,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		require.NotNil(t, node1Execution)
 		require.NotNil(t, node2Execution)
 		assert.NotEqual(t, oldExecution.ID.String(), node1Execution.ID.String(), "Should return the latest execution, not the old one")
-	})
-
-	t.Run("status includes next queue item per node", func(t *testing.T) {
-		//
-		// Create a canvas with two nodes
-		//
-		canvas, _ := support.CreateCanvas(
-			t,
-			r.Organization.ID,
-			r.User,
-			[]models.CanvasNode{
-				{
-					NodeID: "node-1",
-					Name:   "First Node",
-					Type:   models.NodeTypeComponent,
-					Ref: datatypes.NewJSONType(models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					}),
-				},
-				{
-					NodeID: "node-2",
-					Name:   "Second Node",
-					Type:   models.NodeTypeComponent,
-					Ref: datatypes.NewJSONType(models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					}),
-				},
-			},
-			[]models.Edge{},
-		)
-
-		//
-		// Create events for queue items
-		//
-		rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
-		rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
-		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "node-2", "default", nil)
-
-		//
-		// Create multiple queue items for node-1 (oldest one first)
-		//
-		support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
-		// Wait a bit to ensure different timestamps
-		support.CreateQueueItem(t, canvas.ID, "node-1", rootEvent1.ID, event1.ID)
-
-		//
-		// Create one queue item for node-2
-		//
-		support.CreateQueueItem(t, canvas.ID, "node-2", rootEvent2.ID, event2.ID)
-
-		//
-		// Describe the canvas
-		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
-		require.NoError(t, err)
-		require.NotNil(t, response.Canvas.Status)
-
-		//
-		// Verify we get exactly one queue item per node (the oldest/next one)
-		//
-		assert.Len(t, response.Canvas.Status.NextQueueItems, 2)
-
-		// Verify each node has a queue item
-		var node1QueueItem *models.CanvasNodeQueueItem
-		var node2QueueItem *models.CanvasNodeQueueItem
-		for _, item := range response.Canvas.Status.NextQueueItems {
-			if item.NodeId == "node-1" {
-				node1QueueItem = &models.CanvasNodeQueueItem{ID: uuid.MustParse(item.Id)}
-			}
-			if item.NodeId == "node-2" {
-				node2QueueItem = &models.CanvasNodeQueueItem{ID: uuid.MustParse(item.Id)}
-			}
-		}
-
-		require.NotNil(t, node1QueueItem)
-		require.NotNil(t, node2QueueItem)
 	})
 
 	t.Run("status includes last event per node", func(t *testing.T) {
@@ -385,7 +307,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		// Verify status exists but is empty
 		//
 		assert.Empty(t, response.Canvas.Status.LastExecutions)
-		assert.Empty(t, response.Canvas.Status.NextQueueItems)
 		assert.Empty(t, response.Canvas.Status.LastEvents)
 	})
 
@@ -480,99 +401,6 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.True(t, executionIDs[activeExec1.ID.String()])
 		assert.True(t, executionIDs[activeExec2.ID.String()])
 		assert.False(t, executionIDs[deletedExec.ID.String()])
-	})
-
-	t.Run("status excludes queue items for deleted nodes", func(t *testing.T) {
-		//
-		// Create a canvas with three nodes
-		//
-		canvas, canvasNodes := support.CreateCanvas(
-			t,
-			r.Organization.ID,
-			r.User,
-			[]models.CanvasNode{
-				{
-					NodeID: "active-node-1",
-					Name:   "Active Node 1",
-					Type:   models.NodeTypeComponent,
-					Ref: datatypes.NewJSONType(models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					}),
-				},
-				{
-					NodeID: "active-node-2",
-					Name:   "Active Node 2",
-					Type:   models.NodeTypeComponent,
-					Ref: datatypes.NewJSONType(models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					}),
-				},
-				{
-					NodeID: "deleted-node",
-					Name:   "Deleted Node",
-					Type:   models.NodeTypeComponent,
-					Ref: datatypes.NewJSONType(models.NodeRef{
-						Component: &models.ComponentRef{Name: "noop"},
-					}),
-				},
-			},
-			[]models.Edge{},
-		)
-
-		//
-		// Create events for queue items
-		//
-		rootEvent1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
-		event1 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-1", "default", nil)
-		rootEvent2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
-		event2 := support.EmitCanvasEventForNode(t, canvas.ID, "active-node-2", "default", nil)
-		rootEvent3 := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
-		event3 := support.EmitCanvasEventForNode(t, canvas.ID, "deleted-node", "default", nil)
-
-		//
-		// Create queue items for all nodes
-		//
-		activeQI1 := support.CreateQueueItem(t, canvas.ID, "active-node-1", rootEvent1.ID, event1.ID)
-		activeQI2 := support.CreateQueueItem(t, canvas.ID, "active-node-2", rootEvent2.ID, event2.ID)
-		deletedQI := support.CreateQueueItem(t, canvas.ID, "deleted-node", rootEvent3.ID, event3.ID)
-
-		//
-		// Delete one node (soft delete)
-		//
-		var deletedNode *models.CanvasNode
-		for i := range canvasNodes {
-			if canvasNodes[i].NodeID == "deleted-node" {
-				deletedNode = &canvasNodes[i]
-				break
-			}
-		}
-		require.NotNil(t, deletedNode)
-		err := database.Conn().Delete(deletedNode).Error
-		require.NoError(t, err)
-
-		//
-		// Describe the canvas
-		//
-		response, err := DescribeCanvas(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String())
-		require.NoError(t, err)
-		require.NotNil(t, response.Canvas.Status)
-
-		//
-		// Verify we only get queue items for active nodes, not deleted ones
-		//
-		assert.Len(t, response.Canvas.Status.NextQueueItems, 2)
-
-		// Verify active node queue items are included
-		queueItemIDs := make(map[string]bool)
-		for _, item := range response.Canvas.Status.NextQueueItems {
-			queueItemIDs[item.Id] = true
-			// Verify it's not the deleted node's queue item
-			assert.NotEqual(t, "deleted-node", item.NodeId)
-		}
-
-		assert.True(t, queueItemIDs[activeQI1.ID.String()])
-		assert.True(t, queueItemIDs[activeQI2.ID.String()])
-		assert.False(t, queueItemIDs[deletedQI.ID.String()])
 	})
 
 	t.Run("status excludes events for deleted nodes", func(t *testing.T) {
