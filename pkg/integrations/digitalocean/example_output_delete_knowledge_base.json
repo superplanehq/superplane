@@ -1,0 +1,10 @@
+{
+  "data": {
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001",
+    "databaseDeleted": true,
+    "databaseId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseName": "my-knowledge-base-os"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.deleted"
+}
