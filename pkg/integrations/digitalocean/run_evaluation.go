@@ -170,11 +170,11 @@ func (r *RunEvaluation) Setup(ctx core.SetupContext) error {
 
 // evalRunMetadata is stored between poll ticks
 type evalRunMetadata struct {
-	EvalRunUUID  string `mapstructure:"evalRunUUID"`
-	TestCaseID   string `mapstructure:"testCaseId"`
-	TestCaseName string `mapstructure:"testCaseName"`
-	AgentID      string `mapstructure:"agentId"`
-	AgentName    string `mapstructure:"agentName"`
+	EvalRunUUID  string `json:"evalRunUUID" mapstructure:"evalRunUUID"`
+	TestCaseID   string `json:"testCaseId" mapstructure:"testCaseId"`
+	TestCaseName string `json:"testCaseName" mapstructure:"testCaseName"`
+	AgentID      string `json:"agentId" mapstructure:"agentId"`
+	AgentName    string `json:"agentName" mapstructure:"agentName"`
 }
 
 func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {

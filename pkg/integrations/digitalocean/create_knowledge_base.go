@@ -285,8 +285,8 @@ func (c *CreateKnowledgeBase) Setup(ctx core.SetupContext) error {
 
 // kbMetadata is stored between poll ticks
 type kbMetadata struct {
-	KBUUID   string         `mapstructure:"kbUUID"`
-	KBOutput map[string]any `mapstructure:"kbOutput"`
+	KBUUID   string         `json:"kbUUID" mapstructure:"kbUUID"`
+	KBOutput map[string]any `json:"kbOutput" mapstructure:"kbOutput"`
 }
 
 func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
