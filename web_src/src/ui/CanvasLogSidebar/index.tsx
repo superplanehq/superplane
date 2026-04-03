@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, CircleX, Play, Search, TriangleAlert, X } fr
 
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeQueueItem, ComponentsNode } from "@/api-client";
 import { Button } from "@/components/ui/button";
+import { TimeAgo } from "@/components/TimeAgo";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
@@ -72,25 +73,6 @@ export interface CanvasLogSidebarProps {
     triggerEvent?: SidebarEvent;
   }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
-}
-
-function formatLogTimestamp(value: string) {
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) {
-    return value;
-  }
-
-  const date = new Date(parsed);
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const weekday = weekdays[date.getDay()];
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-
-  return `${weekday} ${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 export function CanvasLogSidebar({
@@ -450,7 +432,7 @@ function LogEntryRow({ entry }: { entry: LogEntry }) {
             <div className="flex-1 min-w-0 text-xs font-mono mt-0.5">{entry.title}</div>
           )}
           <span className="text-xs text-gray-500 tabular-nums whitespace-nowrap">
-            {formatLogTimestamp(entry.timestamp)}
+            {entry.timestamp ? <TimeAgo date={entry.timestamp} /> : ""}
           </span>
         </div>
         {entry.detail && isDetailExpanded && <div className="mt-2 text-[13px] text-gray-500">{entry.detail}</div>}
