@@ -1387,7 +1387,7 @@ function listKeys(value: unknown): string[] {
 function getProp(obj: unknown, key: string): unknown {
   if (obj == null) return undefined;
   try {
-    return (obj as any)[key];
+    return (obj as Record<string, unknown>)[key];
   } catch {
     return undefined;
   }
