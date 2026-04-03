@@ -54,11 +54,7 @@ func DiscardCanvasDraft(
 			return deleteVersionErr
 		}
 
-		if deleteDraftErr := tx.Delete(&models.CanvasUserDraft{}, "workflow_id = ? AND user_id = ?", canvasUUID, userUUID).Error; deleteDraftErr != nil {
-			return deleteDraftErr
-		}
-
-		return nil
+		return tx.Delete(&models.CanvasUserDraft{}, "workflow_id = ? AND user_id = ?", canvasUUID, userUUID).Error
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {

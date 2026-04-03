@@ -168,6 +168,7 @@ export interface CanvasPageProps {
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
+  publishWarnings?: string[];
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
@@ -1218,6 +1219,7 @@ function CanvasPage(props: CanvasPageProps) {
           createVersionDisabledTooltip={props.createVersionDisabledTooltip}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+          publishWarnings={props.publishWarnings}
           headerMode={props.headerMode}
           saveState={props.saveState}
           onEnterEditMode={props.onEnterEditMode}
@@ -1411,6 +1413,7 @@ function CanvasPage(props: CanvasPageProps) {
                 createVersionDisabledTooltip={props.createVersionDisabledTooltip}
                 publishVersionDisabled={props.publishVersionDisabled}
                 publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+                publishWarnings={props.publishWarnings}
                 headerMode={props.headerMode}
                 saveState={props.saveState}
                 onEnterEditMode={props.onEnterEditMode}
@@ -1853,6 +1856,7 @@ function CanvasContentHeader({
   createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  publishWarnings,
   headerMode,
   saveState,
   onEnterEditMode,
@@ -1894,6 +1898,7 @@ function CanvasContentHeader({
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
+  publishWarnings?: string[];
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   onEnterEditMode?: () => void;
@@ -1965,6 +1970,7 @@ function CanvasContentHeader({
       createVersionDisabledTooltip={createVersionDisabledTooltip}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+      publishWarnings={publishWarnings}
       mode={headerMode}
       saveState={saveState}
       onEnterEditMode={onEnterEditMode}
@@ -2077,6 +2083,7 @@ function CanvasContent({
   createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  publishWarnings,
   headerMode,
   saveState,
   onEnterEditMode,
@@ -2172,6 +2179,7 @@ function CanvasContent({
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
+  publishWarnings?: string[];
   headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
   saveState?: "saved" | "saving" | "unsaved" | "error";
   onEnterEditMode?: () => void;
@@ -2940,6 +2948,7 @@ function CanvasContent({
           createVersionDisabledTooltip={createVersionDisabledTooltip}
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          publishWarnings={publishWarnings}
           mode={headerMode}
           saveState={saveState}
           onEnterEditMode={onEnterEditMode}

@@ -1,13 +1,13 @@
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { Copy, Download, ChevronDown, GitBranch, Palette, Plus, Undo2, Pencil } from "lucide-react";
+import { Copy, Download, ChevronDown, GitBranch, Palette, Plus, Undo2, Pencil, TriangleAlert } from "lucide-react";
 import { Button } from "../button";
 import { Button as UIButton } from "@/components/ui/button";
 import { useCanvases } from "@/hooks/useCanvasData";
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 
@@ -42,6 +42,7 @@ interface HeaderProps {
   createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
+  publishWarnings?: string[];
   isAutoSaveEnabled?: boolean;
   onToggleAutoSave?: () => void;
   autoSaveDisabled?: boolean;
@@ -95,6 +96,7 @@ export function Header({
   createVersionDisabledTooltip: _createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
+  publishWarnings,
   topViewMode,
   onTopViewModeChange,
   onExportYamlCopy,
@@ -454,6 +456,25 @@ export function Header({
 
             {showVersionEditActions ? (
               <div className="flex items-center gap-2">
+                {publishWarnings && publishWarnings.length > 0 && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex items-center gap-1 text-amber-600 cursor-default select-none">
+                          <TriangleAlert className="size-4" />
+                          <span className="text-sm font-medium">{publishWarnings.length}</span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs space-y-1">
+                        {publishWarnings.map((w, i) => (
+                          <p key={i} className="text-xs">
+                            {w}
+                          </p>
+                        ))}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 {wrapWithTooltip(
                   publishVersionDisabled,
                   publishVersionDisabledTooltip,

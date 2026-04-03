@@ -30,12 +30,7 @@ import type {
   OrganizationsIntegration,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import {
-  useOrganization,
-  useOrganizationGroups,
-  useOrganizationRoles,
-  useOrganizationUsers,
-} from "@/hooks/useOrganizationData";
+import { useOrganizationGroups, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -2185,6 +2180,20 @@ export function WorkflowPageV2() {
     canvas?.spec?.nodes,
     canvasEventsResponse?.events,
   ]);
+
+  const draftWarnings = useMemo(() => {
+    const nodes = canvas?.spec?.nodes || [];
+    const warnings: string[] = [];
+    nodes.forEach((node) => {
+      if (node.errorMessage) {
+        warnings.push(`${node.name || node.id}: ${node.errorMessage}`);
+      }
+      if (node.warningMessage) {
+        warnings.push(`${node.name || node.id}: ${node.warningMessage}`);
+      }
+    });
+    return warnings;
+  }, [canvas?.spec?.nodes]);
 
   const nodeHistoryQuery = useNodeHistory({
     canvasId: canvasId || "",
@@ -5632,7 +5641,8 @@ export function WorkflowPageV2() {
     hasPendingLocalCanvasState ||
     createCanvasChangeRequestMutation.isPending ||
     canvasDeletedRemotely ||
-    unpublishedDraftChangeCount === 0;
+    unpublishedDraftChangeCount === 0 ||
+    draftWarnings.length > 0;
   const createChangeRequestDisabledTooltip = canvasDeletedRemotely
     ? "This canvas was deleted in another session."
     : !hasEditableVersion
@@ -5641,9 +5651,11 @@ export function WorkflowPageV2() {
         ? "Wait for the current save to finish."
         : hasUnsavedChanges
           ? "Save your version before creating a change request."
-          : unpublishedDraftChangeCount === 0
-            ? "No changes to publish."
-            : undefined;
+          : draftWarnings.length > 0
+            ? "Resolve all warnings before publishing."
+            : unpublishedDraftChangeCount === 0
+              ? "No changes to publish."
+              : undefined;
   const headerMode = hasEditableVersion ? "version-edit" : "version-live";
   const headerSaveState =
     hasLocalSaveActivity || holdSavingDisplay
@@ -5844,6 +5856,7 @@ export function WorkflowPageV2() {
           onPublishVersion={handleCreateChangeRequest}
           publishVersionDisabled={createChangeRequestDisabled}
           publishVersionDisabledTooltip={createChangeRequestDisabledTooltip}
+          publishWarnings={isViewingDraftVersion ? draftWarnings : undefined}
           onUndo={!isReadOnly ? handleRevert : undefined}
           canUndo={canUndo}
           headerMode={headerMode}
