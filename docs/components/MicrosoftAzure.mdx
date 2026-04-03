@@ -26,6 +26,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Virtual Machine" href="#create-virtual-machine" description="Creates a new Azure Virtual Machine with the specified configuration" />
   <LinkCard title="Deallocate Virtual Machine" href="#deallocate-virtual-machine" description="Deallocates an Azure Virtual Machine, releasing compute resources" />
   <LinkCard title="Delete Virtual Machine" href="#delete-virtual-machine" description="Deletes an existing Azure Virtual Machine" />
+  <LinkCard title="Invoke Function" href="#invoke-function" description="Invokes an HTTP-triggered Azure Function" />
   <LinkCard title="Restart Virtual Machine" href="#restart-virtual-machine" description="Restarts an Azure Virtual Machine" />
   <LinkCard title="Start Virtual Machine" href="#start-virtual-machine" description="Starts a stopped or deallocated Azure Virtual Machine" />
   <LinkCard title="Stop Virtual Machine" href="#stop-virtual-machine" description="Powers off an Azure Virtual Machine without deallocating" />
@@ -919,6 +920,55 @@ Returns the deleted VM information including:
   },
   "timestamp": "2026-02-12T12:10:00Z",
   "type": "azure.vm"
+}
+```
+
+<a id="invoke-function"></a>
+
+## Invoke Function
+
+The Invoke Function component calls an HTTP-triggered Azure Function using the
+integration's Azure AD access token for authentication.
+
+### Use Cases
+
+- **Trigger serverless workflows**: Kick off Azure Functions from SuperPlane workflows
+- **Call custom logic**: Execute business logic hosted in Azure Functions
+- **Integrate with services**: Bridge SuperPlane with any system reachable via Azure Functions
+
+### How It Works
+
+1. Resolves the function app name from the resource group
+2. Constructs the function URL: https://&lbrace;functionApp&rbrace;.azurewebsites.net/api/&lbrace;functionName&rbrace;
+3. Sends the HTTP request with the Azure AD Bearer token
+4. Returns the HTTP status code and response body
+
+### Configuration
+
+- **Resource Group**: The Azure resource group containing the function app
+- **Function App**: The function app to invoke
+- **Function Name**: The name of the HTTP-triggered function
+- **HTTP Method**: The HTTP method to use (GET, POST, PUT, DELETE, PATCH)
+- **Payload**: Optional request body (for POST/PUT requests)
+
+### Output
+
+Returns the function response including:
+- **statusCode**: The HTTP status code returned by the function
+- **body**: The response body (parsed as JSON if possible, otherwise as a string)
+- **functionApp**: The function app name
+- **functionName**: The function name
+
+### Example Output
+
+```json
+{
+  "body": {
+    "result": "ok"
+  },
+  "functionApp": "my-function-app",
+  "functionName": "my-function",
+  "statusCode": 200
 }
 ```
 
