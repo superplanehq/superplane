@@ -1,5 +1,5 @@
 import React from "react";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 import { cn } from "@/lib/utils";
 
 const DAYS_OF_WEEK = [

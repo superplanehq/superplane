@@ -1,5 +1,5 @@
-import { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import {
+import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
+import type {
   TriggersTrigger,
   ComponentsComponent,
   BlueprintsBlueprint,

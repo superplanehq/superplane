@@ -2,10 +2,10 @@
 import React from "react";
 import { Plus } from "lucide-react";
 import { SidebarEventItem } from "../SidebarEventItem";
-import { SidebarEvent } from "../types";
-import { TabData } from "../SidebarEventItem/SidebarEventItem";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { EventState, EventStateMap } from "../../componentBase";
+import type { SidebarEvent } from "../types";
+import type { TabData } from "../SidebarEventItem/SidebarEventItem";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { EventState, EventStateMap } from "../../componentBase";
 
 interface HistoryQueuePageProps {
   page: "history" | "queue";

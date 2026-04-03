@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 
-import { BuildingBlocksSidebar, BuildingBlock, BuildingBlockCategory } from "./index";
+import type { BuildingBlock, BuildingBlockCategory } from "./index";
+import { BuildingBlocksSidebar } from "./index";
 import React from "react";
 
 const sampleTriggers: BuildingBlock[] = [
