@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
-import { getSuggestions, Suggestion } from "./core";
+import type { Suggestion } from "./core";
+import { getSuggestions } from "./core";
 import { Eye, EyeOff } from "lucide-react";
 import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
 

@@ -1,10 +1,10 @@
-import { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
-import { MetadataItem } from "@/ui/metadataList";
-import { NodeInfo, ComponentDefinition, ExecutionInfo } from "../types";
-import { GitLabNodeMetadata } from "./types";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { NodeInfo, ComponentDefinition, ExecutionInfo } from "../types";
+import type { GitLabNodeMetadata } from "./types";
 import { buildGitlabExecutionSubtitle } from "./utils";
 
 export function baseProps(

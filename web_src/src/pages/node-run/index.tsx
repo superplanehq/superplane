@@ -1,12 +1,13 @@
 import { useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 
-import { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { BlueprintsBlueprint, ComponentsComponent, ComponentsEdge, ComponentsNode } from "@/api-client";
 import { useBlueprint, useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useChildExecutions, useCanvas } from "@/hooks/useCanvasData";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
-import { CanvasEdge, CanvasNode, CanvasPage } from "@/ui/CanvasPage";
+import type { CanvasEdge, CanvasNode} from "@/ui/CanvasPage";
+import { CanvasPage } from "@/ui/CanvasPage";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { buildEventInfo } from "../workflowv2/utils";
 

@@ -4,7 +4,7 @@ import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteIn
 import { MultiCombobox, MultiComboboxLabel } from "@/components/MultiCombobox/multi-combobox";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ConfigurationField } from "../../api-client";
+import type { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/lib/testID";
 import { type RefObject, useEffect, useMemo, useState } from "react";

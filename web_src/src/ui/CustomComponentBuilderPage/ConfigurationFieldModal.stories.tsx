@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { ConfigurationFieldModal } from "./ConfigurationFieldModal";
-import { ComponentsConfigurationField } from "@/api-client";
+import type { ComponentsConfigurationField } from "@/api-client";
 import { Button } from "@/components/ui/button";
 
 const meta = {

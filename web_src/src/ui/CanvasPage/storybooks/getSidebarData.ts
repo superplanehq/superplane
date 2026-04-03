@@ -1,7 +1,8 @@
-import { CanvasNode, SidebarData } from "../index";
+import type { CanvasNode, SidebarData } from "../index";
 import { genCommit } from "./commits";
-import { DockerImage, genDockerImage } from "./dockerImages";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
+import type { DockerImage} from "./dockerImages";
+import { genDockerImage } from "./dockerImages";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
 
 const isGitSha = (subtitle: string) => (subtitle?.length || 0) === 8;
 

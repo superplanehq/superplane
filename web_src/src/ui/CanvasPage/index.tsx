@@ -47,7 +47,7 @@ import {
   type SyntheticEvent,
 } from "react";
 
-import {
+import type {
   ConfigurationField,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
@@ -63,25 +63,27 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import {
+import type {
   AiCanvasOperation,
   BuildingBlock,
-  BuildingBlockCategory,
+  BuildingBlockCategory} from "../BuildingBlocksSidebar";
+import {
   BuildingBlocksSidebar,
 } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
-import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { EventState, EventStateMap } from "../componentBase";
+import type { EventState, EventStateMap } from "../componentBase";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import { GroupNode } from "../groupNode";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
-import { Simulation } from "./storybooks/useSimulation";
-import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { SidebarEvent } from "../componentSidebar/types";
+import type { Simulation } from "./storybooks/useSimulation";
+import type { CanvasPageState} from "./useCanvasState";
+import { useCanvasState } from "./useCanvasState";
+import type { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";

@@ -21,14 +21,14 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
-import { ChildEventsState } from "../composite";
-import { TabData } from "./SidebarEventItem/SidebarEventItem";
-import { SidebarEvent } from "./types";
+import type { ChildEventsState } from "../composite";
+import type { TabData } from "./SidebarEventItem/SidebarEventItem";
+import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
-import {
+import type {
   AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
@@ -39,8 +39,8 @@ import {
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
-import { EventState, EventStateMap } from "../componentBase";
-import { ReactNode } from "react";
+import type { EventState, EventStateMap } from "../componentBase";
+import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 

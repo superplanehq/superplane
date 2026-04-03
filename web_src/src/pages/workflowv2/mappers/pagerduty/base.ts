@@ -1,6 +1,6 @@
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { OutputPayload } from "../types";
-import { Incident, ResourceRef } from "./types";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { OutputPayload } from "../types";
+import type { Incident, ResourceRef } from "./types";
 
 /**
  * Extracts an incident from execution outputs with proper null checks.

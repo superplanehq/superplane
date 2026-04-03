@@ -9,7 +9,8 @@ import KubernetesIcon from "@/assets/icons/integrations/kubernetes.svg";
 
 import { useCallback, useMemo, useState } from "react";
 import type { BlockData } from "../Block";
-import { CanvasNode, CanvasPage } from "../index";
+import type { CanvasNode} from "../index";
+import { CanvasPage } from "../index";
 import { mockBuildingBlockCategories } from "./buildingBlocks";
 import { genCommit } from "./commits";
 import { genDockerImage } from "./dockerImages";
