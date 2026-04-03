@@ -838,6 +838,7 @@ func dataSourceItemSchema() []configuration.Field {
 			Label:       "Maximum Parent Chunk Size (tokens)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
+			Placeholder: "e.g. 256 for All MiniLM, 750 for GTE Large / Qwen3",
 			Description: "Maximum tokens in the parent (context) chunk. The valid range is shown in the selected embedding model above. Must be larger than the child chunk size.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "chunkingAlgorithm", Values: []string{chunkingHierarchical}},
@@ -851,6 +852,7 @@ func dataSourceItemSchema() []configuration.Field {
 			Label:       "Maximum Child Chunk Size (tokens)",
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
+			Placeholder: "e.g. 128 for All MiniLM, 375 for GTE Large / Qwen3",
 			Description: "Maximum tokens in the child (retrieval) chunk. The valid range is shown in the selected embedding model above. Must be smaller than the parent chunk size.",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "chunkingAlgorithm", Values: []string{chunkingHierarchical}},
