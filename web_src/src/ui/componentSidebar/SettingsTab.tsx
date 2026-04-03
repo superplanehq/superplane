@@ -122,7 +122,6 @@ export function SettingsTab({
     const trimmed = instruction.trim();
     return {
       value: trimmed.length > 0 ? trimmed : "true",
-      explanation: "Mock assistant response (set VITE_ENABLE_INLINE_CONFIG_ASSISTANT=true to try this in dev).",
     };
   }, []);
 
@@ -709,7 +708,6 @@ export function SettingsTab({
                   enableRealtimeValidation={true}
                   autocompleteExampleObj={resolvedAutocompleteExampleObj}
                   suggestFieldValue={inlineAssistantEnabled ? suggestFieldValue : undefined}
-                  assistantEnabled={inlineAssistantEnabled}
                 />
               );
             })}

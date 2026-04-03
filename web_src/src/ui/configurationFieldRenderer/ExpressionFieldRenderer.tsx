@@ -12,7 +12,6 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
   autocompleteExampleObj,
   allowExpressions = false,
   suggestFieldValue,
-  assistantEnabled = false,
   labelRightRef,
   labelRightReady = false,
 }) => {
@@ -52,7 +51,6 @@ export const ExpressionFieldRenderer: React.FC<FieldRendererProps> = ({
         fieldLabel={fieldLabel}
         onApplyValue={(next) => onChange(next || undefined)}
         suggestFieldValue={suggestFieldValue}
-        assistantEnabled={assistantEnabled}
         labelRightRef={labelRightRef}
         labelRightReady={labelRightReady}
       />

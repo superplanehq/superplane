@@ -26,7 +26,6 @@ export interface FieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
   suggestFieldValue?: SuggestFieldValueFn;
-  assistantEnabled?: boolean;
   labelRightRef?: RefObject<HTMLDivElement | null>;
   labelRightReady?: boolean;
 }

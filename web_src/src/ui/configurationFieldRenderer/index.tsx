@@ -135,7 +135,6 @@ export const ConfigurationFieldRenderer = ({
   autocompleteExampleObj,
   allowExpressions = false,
   suggestFieldValue,
-  assistantEnabled = false,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -275,7 +274,6 @@ export const ConfigurationFieldRenderer = ({
       organizationId,
       allowExpressions,
       suggestFieldValue,
-      assistantEnabled,
     };
 
     switch (field.type) {

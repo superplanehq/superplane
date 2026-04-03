@@ -11,7 +11,6 @@ export interface InlineFieldAssistantProps {
   fieldLabel: string;
   onApplyValue: (value: string) => void;
   suggestFieldValue?: SuggestFieldValueFn;
-  assistantEnabled?: boolean;
   labelRightRef?: RefObject<HTMLDivElement | null>;
   labelRightReady?: boolean;
 }
@@ -20,7 +19,6 @@ export function InlineFieldAssistant({
   fieldLabel,
   onApplyValue,
   suggestFieldValue,
-  assistantEnabled = false,
   labelRightRef,
   labelRightReady = false,
 }: InlineFieldAssistantProps) {
@@ -74,7 +72,7 @@ export function InlineFieldAssistant({
     handleClose();
   }, [proposedValue, onApplyValue, handleClose]);
 
-  if (!assistantEnabled || !suggestFieldValue) {
+  if (!suggestFieldValue) {
     return null;
   }
 
