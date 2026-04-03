@@ -83,3 +83,8 @@ Iterate speed and dry run stay separate from this checklist until that follow-up
 ---
 
 Details live in specs; this is the short version.
+
+
+## 8. Refference:
+- [Video overview](https://drive.google.com/file/d/1M16kKRp_g9oE61m8FTnK7tonisFPk9Zx/view?usp=sharing)
+- [Prototype branch (not mergable, just ilustrative)](https://github.com/superplanehq/superplane/tree/feat--new-canvas-edit)
