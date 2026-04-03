@@ -2442,7 +2442,7 @@ type KBDataSource struct {
 type CreateKnowledgeBaseRequest struct {
 	Name               string         `json:"name"`
 	EmbeddingModelUUID string         `json:"embedding_model_uuid"`
-	Region             string         `json:"region"`
+	Region             string         `json:"region,omitempty"`
 	ProjectID          string         `json:"project_id"`
 	Tags               []string       `json:"tags,omitempty"`
 	DatabaseID         string         `json:"database_id,omitempty"`
