@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	DefaultLimit = 25
-	MaxLimit     = 50
+	DefaultLimit = 10
+	MaxLimit     = 25
 )
 
 func ListNodeExecutions(ctx context.Context, registry *registry.Registry, workflowID, nodeID string, pbStates []pb.CanvasNodeExecution_State, pbResults []pb.CanvasNodeExecution_Result, limit uint32, before *timestamppb.Timestamp) (*pb.ListNodeExecutionsResponse, error) {

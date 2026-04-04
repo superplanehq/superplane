@@ -244,7 +244,7 @@ export const useCanvasChangeRequests = (organizationId: string, canvasId: string
       const response = await canvasesListCanvasChangeRequests(
         withOrganizationHeader({
           path: { canvasId },
-          query: { limit: 100, statusFilter: "all" },
+          query: { limit: 25, statusFilter: "all" },
         }),
       );
       return response.data?.changeRequests || [];
@@ -720,7 +720,7 @@ export const useDeleteCanvas = (organizationId: string) => {
 };
 
 export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
-  const limit = 50;
+  const limit = 25;
 
   return useInfiniteQuery({
     queryKey: canvasKeys.infiniteEvents(canvasId),
