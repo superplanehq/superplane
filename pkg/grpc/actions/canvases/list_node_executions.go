@@ -92,8 +92,8 @@ func SerializeNodeExecutionsForSingleNode(node *models.CanvasNode, executions []
 }
 
 func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecutions []models.CanvasNodeExecution) ([]*pb.CanvasNodeExecution, error) {
-	var rootEvents, inputEvents, outputEvents []models.CanvasEvent
-	var rootEventsErr, inputEventsErr, outputEventsErr error
+	var rootEvents, outputEvents []models.CanvasEvent
+	var rootEventsErr, outputEventsErr error
 	var cancelledByUsers []models.User
 	var cancelledByUsersErr error
 	var wg sync.WaitGroup
@@ -101,7 +101,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 	//
 	// Fetch all execution resources in parallel
 	//
-	wg.Add(4)
+	wg.Add(3)
 
 	//
 	// Root events
@@ -109,14 +109,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 	go func() {
 		defer wg.Done()
 		rootEvents, rootEventsErr = models.FindCanvasEvents(rootEventIDs(executions))
-	}()
-
-	//
-	// Input events
-	//
-	go func() {
-		defer wg.Done()
-		inputEvents, inputEventsErr = models.FindCanvasEvents(eventIDs(executions))
 	}()
 
 	//
@@ -140,9 +132,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 	if rootEventsErr != nil {
 		return nil, fmt.Errorf("error finding root events: %v", rootEventsErr)
 	}
-	if inputEventsErr != nil {
-		return nil, fmt.Errorf("error finding input events: %v", inputEventsErr)
-	}
 	if outputEventsErr != nil {
 		return nil, fmt.Errorf("error finding output events: %v", outputEventsErr)
 	}
@@ -158,11 +147,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 	cancelledByUsersByID := make(map[uuid.UUID]models.User, len(cancelledByUsers))
 	for _, user := range cancelledByUsers {
 		cancelledByUsersByID[user.ID] = user
-	}
-
-	inputEventsByID := make(map[string]models.CanvasEvent, len(inputEvents))
-	for _, inputEvent := range inputEvents {
-		inputEventsByID[inputEvent.ID.String()] = inputEvent
 	}
 
 	rootEventsByID := make(map[string]models.CanvasEvent, len(rootEvents))
@@ -185,11 +169,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 	result := make([]*pb.CanvasNodeExecution, 0, len(executions))
 	for _, execution := range executions {
 		rootEvent, err := getRootEventForExecution(execution, rootEventsByID)
-		if err != nil {
-			return nil, err
-		}
-
-		input, err := getInputForExecution(execution, inputEventsByID)
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +203,6 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 			UpdatedAt:           timestamppb.New(*execution.UpdatedAt),
 			Metadata:            metadata,
 			Configuration:       configuration,
-			Input:               input,
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, cancelledByUsersByID),
@@ -412,15 +390,6 @@ func cancelledByIDs(executions []models.CanvasNodeExecution) []uuid.UUID {
 	return ids
 }
 
-func eventIDs(executions []models.CanvasNodeExecution) []string {
-	ids := make([]string, len(executions))
-	for i, execution := range executions {
-		ids[i] = execution.EventID.String()
-	}
-
-	return ids
-}
-
 func rootEventIDs(executions []models.CanvasNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
@@ -442,25 +411,6 @@ func cancelledByRef(id *uuid.UUID, users map[uuid.UUID]models.User) *pb.UserRef 
 	}
 
 	return &pb.UserRef{Id: id.String(), Name: name}
-}
-
-func getInputForExecution(execution models.CanvasNodeExecution, events map[string]models.CanvasEvent) (*structpb.Struct, error) {
-	event, ok := events[execution.EventID.String()]
-	if !ok {
-		return nil, fmt.Errorf("input not found for execution %s", execution.ID.String())
-	}
-
-	eventData, ok := event.Data.Data().(map[string]any)
-	if !ok {
-		return nil, fmt.Errorf("event data cannot be turned into input for execution %s", execution.ID.String())
-	}
-
-	data, err := structpb.NewStruct(eventData)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
 
 func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents map[string]models.CanvasEvent) (*pb.CanvasEvent, error) {
