@@ -236,7 +236,7 @@ import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
-import { mergeDataBuilder, mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
+import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
@@ -409,7 +409,6 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
 
 const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
   approval: approvalDataBuilder,
-  merge: mergeDataBuilder,
 };
 
 const eventStateRegistries: Record<string, EventStateRegistry> = {
