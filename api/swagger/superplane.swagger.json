@@ -64,7 +64,7 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents/chats": {
+    "/api/v1/agents/builder/chats": {
       "get": {
         "summary": "List agent chats for the authenticated user",
         "description": "Returns a list of agent chats for the authenticated user",
@@ -128,7 +128,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}": {
+    "/api/v1/agents/builder/chats/{chatId}": {
       "get": {
         "summary": "Describes an agent chat for the authenticated user",
         "description": "Describes an agent chat for the authenticated user",
@@ -166,7 +166,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}/messages": {
+    "/api/v1/agents/builder/chats/{chatId}/messages": {
       "get": {
         "summary": "List the messages in an agent chat",
         "description": "List the messages in an agent chat",
@@ -204,7 +204,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}/resume": {
+    "/api/v1/agents/builder/chats/{chatId}/resume": {
       "post": {
         "summary": "Resume an agent chat",
         "description": "Resumes an agent chat. The response includes the URL and token for resuming the chat",
@@ -236,6 +236,40 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/AgentsResumeAgentChatBody"
+            }
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/config/suggest-field": {
+      "post": {
+        "summary": "Suggest a value for a configuration field",
+        "description": "Uses the AI config assistant to propose a field value from context and a natural-language instruction.",
+        "operationId": "Agents_SuggestConfigurationField",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsSuggestConfigurationFieldResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AgentsSuggestConfigurationFieldRequest"
             }
           }
         ],
@@ -4195,6 +4229,35 @@
           "type": "string"
         },
         "url": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsSuggestConfigurationFieldRequest": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "fieldContextJson": {
+          "type": "string",
+          "description": "JSON blob: field metadata, current value, autocompleteExampleObj, etc."
+        }
+      }
+    },
+    "AgentsSuggestConfigurationFieldResponse": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "explanation": {
           "type": "string"
         }
       }

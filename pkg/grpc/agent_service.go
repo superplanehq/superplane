@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	configassistant "github.com/superplanehq/superplane/pkg/grpc/actions/configassistant"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
@@ -131,4 +132,30 @@ func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListA
 	}
 
 	return agents.ListAgentChatMessages(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+}
+
+func (s *AgentsService) SuggestConfigurationField(
+	ctx context.Context,
+	req *pb.SuggestConfigurationFieldRequest,
+) (*pb.SuggestConfigurationFieldResponse, error) {
+	configAssistantHTTPURL := config.ConfigAssistantHTTPURL()
+	if configAssistantHTTPURL == "" {
+		return nil, status.Error(codes.Unavailable, "CONFIG_ASSISTANT_HTTP_URL is not set")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return configassistant.SuggestConfigurationField(
+		ctx,
+		s.authService,
+		s.jwtSigner,
+		configAssistantHTTPURL,
+		userID,
+		organizationID,
+		req,
+	)
 }
