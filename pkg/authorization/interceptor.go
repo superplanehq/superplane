@@ -13,7 +13,6 @@ import (
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
-	pbConfigAssistant "github.com/superplanehq/superplane/pkg/protos/config_assistant"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -159,7 +158,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAgents.Agents_DescribeAgentChat_FullMethodName:     {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 
-		pbConfigAssistant.ConfigAssistant_SuggestConfigurationField_FullMethodName: {
+		pbAgents.Agents_SuggestConfigurationField_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,

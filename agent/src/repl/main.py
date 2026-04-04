@@ -295,7 +295,7 @@ def _create_agent_chat(
 ) -> tuple[str, str]:
     request_body = json.dumps({"canvas_id": canvas_id}).encode("utf-8")
     request = Request(
-        url=f"{base_url.rstrip('/')}/api/v1/agents/chats",
+        url=f"{base_url.rstrip('/')}/api/v1/agents/builder/chats",
         data=request_body,
         method="POST",
         headers={

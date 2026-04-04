@@ -15,11 +15,11 @@ import (
 	"encoding/json"
 )
 
-// checks if the ConfigAssistantSuggestConfigurationFieldRequest type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ConfigAssistantSuggestConfigurationFieldRequest{}
+// checks if the AgentsSuggestConfigurationFieldRequest type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &AgentsSuggestConfigurationFieldRequest{}
 
-// ConfigAssistantSuggestConfigurationFieldRequest struct for ConfigAssistantSuggestConfigurationFieldRequest
-type ConfigAssistantSuggestConfigurationFieldRequest struct {
+// AgentsSuggestConfigurationFieldRequest struct for AgentsSuggestConfigurationFieldRequest
+type AgentsSuggestConfigurationFieldRequest struct {
 	CanvasId    *string `json:"canvasId,omitempty"`
 	NodeId      *string `json:"nodeId,omitempty"`
 	Instruction *string `json:"instruction,omitempty"`
@@ -27,25 +27,25 @@ type ConfigAssistantSuggestConfigurationFieldRequest struct {
 	FieldContextJson *string `json:"fieldContextJson,omitempty"`
 }
 
-// NewConfigAssistantSuggestConfigurationFieldRequest instantiates a new ConfigAssistantSuggestConfigurationFieldRequest object
+// NewAgentsSuggestConfigurationFieldRequest instantiates a new AgentsSuggestConfigurationFieldRequest object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewConfigAssistantSuggestConfigurationFieldRequest() *ConfigAssistantSuggestConfigurationFieldRequest {
-	this := ConfigAssistantSuggestConfigurationFieldRequest{}
+func NewAgentsSuggestConfigurationFieldRequest() *AgentsSuggestConfigurationFieldRequest {
+	this := AgentsSuggestConfigurationFieldRequest{}
 	return &this
 }
 
-// NewConfigAssistantSuggestConfigurationFieldRequestWithDefaults instantiates a new ConfigAssistantSuggestConfigurationFieldRequest object
+// NewAgentsSuggestConfigurationFieldRequestWithDefaults instantiates a new AgentsSuggestConfigurationFieldRequest object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewConfigAssistantSuggestConfigurationFieldRequestWithDefaults() *ConfigAssistantSuggestConfigurationFieldRequest {
-	this := ConfigAssistantSuggestConfigurationFieldRequest{}
+func NewAgentsSuggestConfigurationFieldRequestWithDefaults() *AgentsSuggestConfigurationFieldRequest {
+	this := AgentsSuggestConfigurationFieldRequest{}
 	return &this
 }
 
 // GetCanvasId returns the CanvasId field value if set, zero value otherwise.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetCanvasId() string {
+func (o *AgentsSuggestConfigurationFieldRequest) GetCanvasId() string {
 	if o == nil || IsNil(o.CanvasId) {
 		var ret string
 		return ret
@@ -55,7 +55,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetCanvasId() string {
 
 // GetCanvasIdOk returns a tuple with the CanvasId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetCanvasIdOk() (*string, bool) {
+func (o *AgentsSuggestConfigurationFieldRequest) GetCanvasIdOk() (*string, bool) {
 	if o == nil || IsNil(o.CanvasId) {
 		return nil, false
 	}
@@ -63,7 +63,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetCanvasIdOk() (*stri
 }
 
 // HasCanvasId returns a boolean if a field has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasCanvasId() bool {
+func (o *AgentsSuggestConfigurationFieldRequest) HasCanvasId() bool {
 	if o != nil && !IsNil(o.CanvasId) {
 		return true
 	}
@@ -72,12 +72,12 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasCanvasId() bool {
 }
 
 // SetCanvasId gets a reference to the given string and assigns it to the CanvasId field.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) SetCanvasId(v string) {
+func (o *AgentsSuggestConfigurationFieldRequest) SetCanvasId(v string) {
 	o.CanvasId = &v
 }
 
 // GetNodeId returns the NodeId field value if set, zero value otherwise.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetNodeId() string {
+func (o *AgentsSuggestConfigurationFieldRequest) GetNodeId() string {
 	if o == nil || IsNil(o.NodeId) {
 		var ret string
 		return ret
@@ -87,7 +87,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetNodeId() string {
 
 // GetNodeIdOk returns a tuple with the NodeId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetNodeIdOk() (*string, bool) {
+func (o *AgentsSuggestConfigurationFieldRequest) GetNodeIdOk() (*string, bool) {
 	if o == nil || IsNil(o.NodeId) {
 		return nil, false
 	}
@@ -95,7 +95,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetNodeIdOk() (*string
 }
 
 // HasNodeId returns a boolean if a field has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasNodeId() bool {
+func (o *AgentsSuggestConfigurationFieldRequest) HasNodeId() bool {
 	if o != nil && !IsNil(o.NodeId) {
 		return true
 	}
@@ -104,12 +104,12 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasNodeId() bool {
 }
 
 // SetNodeId gets a reference to the given string and assigns it to the NodeId field.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) SetNodeId(v string) {
+func (o *AgentsSuggestConfigurationFieldRequest) SetNodeId(v string) {
 	o.NodeId = &v
 }
 
 // GetInstruction returns the Instruction field value if set, zero value otherwise.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetInstruction() string {
+func (o *AgentsSuggestConfigurationFieldRequest) GetInstruction() string {
 	if o == nil || IsNil(o.Instruction) {
 		var ret string
 		return ret
@@ -119,7 +119,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetInstruction() strin
 
 // GetInstructionOk returns a tuple with the Instruction field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetInstructionOk() (*string, bool) {
+func (o *AgentsSuggestConfigurationFieldRequest) GetInstructionOk() (*string, bool) {
 	if o == nil || IsNil(o.Instruction) {
 		return nil, false
 	}
@@ -127,7 +127,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetInstructionOk() (*s
 }
 
 // HasInstruction returns a boolean if a field has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasInstruction() bool {
+func (o *AgentsSuggestConfigurationFieldRequest) HasInstruction() bool {
 	if o != nil && !IsNil(o.Instruction) {
 		return true
 	}
@@ -136,12 +136,12 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasInstruction() bool 
 }
 
 // SetInstruction gets a reference to the given string and assigns it to the Instruction field.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) SetInstruction(v string) {
+func (o *AgentsSuggestConfigurationFieldRequest) SetInstruction(v string) {
 	o.Instruction = &v
 }
 
 // GetFieldContextJson returns the FieldContextJson field value if set, zero value otherwise.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetFieldContextJson() string {
+func (o *AgentsSuggestConfigurationFieldRequest) GetFieldContextJson() string {
 	if o == nil || IsNil(o.FieldContextJson) {
 		var ret string
 		return ret
@@ -151,7 +151,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetFieldContextJson() 
 
 // GetFieldContextJsonOk returns a tuple with the FieldContextJson field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetFieldContextJsonOk() (*string, bool) {
+func (o *AgentsSuggestConfigurationFieldRequest) GetFieldContextJsonOk() (*string, bool) {
 	if o == nil || IsNil(o.FieldContextJson) {
 		return nil, false
 	}
@@ -159,7 +159,7 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) GetFieldContextJsonOk(
 }
 
 // HasFieldContextJson returns a boolean if a field has been set.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasFieldContextJson() bool {
+func (o *AgentsSuggestConfigurationFieldRequest) HasFieldContextJson() bool {
 	if o != nil && !IsNil(o.FieldContextJson) {
 		return true
 	}
@@ -168,11 +168,11 @@ func (o *ConfigAssistantSuggestConfigurationFieldRequest) HasFieldContextJson() 
 }
 
 // SetFieldContextJson gets a reference to the given string and assigns it to the FieldContextJson field.
-func (o *ConfigAssistantSuggestConfigurationFieldRequest) SetFieldContextJson(v string) {
+func (o *AgentsSuggestConfigurationFieldRequest) SetFieldContextJson(v string) {
 	o.FieldContextJson = &v
 }
 
-func (o ConfigAssistantSuggestConfigurationFieldRequest) MarshalJSON() ([]byte, error) {
+func (o AgentsSuggestConfigurationFieldRequest) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -180,7 +180,7 @@ func (o ConfigAssistantSuggestConfigurationFieldRequest) MarshalJSON() ([]byte, 
 	return json.Marshal(toSerialize)
 }
 
-func (o ConfigAssistantSuggestConfigurationFieldRequest) ToMap() (map[string]interface{}, error) {
+func (o AgentsSuggestConfigurationFieldRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.CanvasId) {
 		toSerialize["canvasId"] = o.CanvasId
@@ -197,38 +197,38 @@ func (o ConfigAssistantSuggestConfigurationFieldRequest) ToMap() (map[string]int
 	return toSerialize, nil
 }
 
-type NullableConfigAssistantSuggestConfigurationFieldRequest struct {
-	value *ConfigAssistantSuggestConfigurationFieldRequest
+type NullableAgentsSuggestConfigurationFieldRequest struct {
+	value *AgentsSuggestConfigurationFieldRequest
 	isSet bool
 }
 
-func (v NullableConfigAssistantSuggestConfigurationFieldRequest) Get() *ConfigAssistantSuggestConfigurationFieldRequest {
+func (v NullableAgentsSuggestConfigurationFieldRequest) Get() *AgentsSuggestConfigurationFieldRequest {
 	return v.value
 }
 
-func (v *NullableConfigAssistantSuggestConfigurationFieldRequest) Set(val *ConfigAssistantSuggestConfigurationFieldRequest) {
+func (v *NullableAgentsSuggestConfigurationFieldRequest) Set(val *AgentsSuggestConfigurationFieldRequest) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableConfigAssistantSuggestConfigurationFieldRequest) IsSet() bool {
+func (v NullableAgentsSuggestConfigurationFieldRequest) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableConfigAssistantSuggestConfigurationFieldRequest) Unset() {
+func (v *NullableAgentsSuggestConfigurationFieldRequest) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableConfigAssistantSuggestConfigurationFieldRequest(val *ConfigAssistantSuggestConfigurationFieldRequest) *NullableConfigAssistantSuggestConfigurationFieldRequest {
-	return &NullableConfigAssistantSuggestConfigurationFieldRequest{value: val, isSet: true}
+func NewNullableAgentsSuggestConfigurationFieldRequest(val *AgentsSuggestConfigurationFieldRequest) *NullableAgentsSuggestConfigurationFieldRequest {
+	return &NullableAgentsSuggestConfigurationFieldRequest{value: val, isSet: true}
 }
 
-func (v NullableConfigAssistantSuggestConfigurationFieldRequest) MarshalJSON() ([]byte, error) {
+func (v NullableAgentsSuggestConfigurationFieldRequest) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableConfigAssistantSuggestConfigurationFieldRequest) UnmarshalJSON(src []byte) error {
+func (v *NullableAgentsSuggestConfigurationFieldRequest) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

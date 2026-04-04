@@ -69,7 +69,7 @@ func (a *AgentAPIService) AgentsCreateAgentChatExecute(r ApiAgentsCreateAgentCha
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats"
+	localVarPath := localBasePath + "/api/v1/agents/builder/chats"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -191,7 +191,7 @@ func (a *AgentAPIService) AgentsDescribeAgentChatExecute(r ApiAgentsDescribeAgen
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}"
+	localVarPath := localBasePath + "/api/v1/agents/builder/chats/{chatId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -312,7 +312,7 @@ func (a *AgentAPIService) AgentsListAgentChatMessagesExecute(r ApiAgentsListAgen
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}/messages"
+	localVarPath := localBasePath + "/api/v1/agents/builder/chats/{chatId}/messages"
 	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -430,7 +430,7 @@ func (a *AgentAPIService) AgentsListAgentChatsExecute(r ApiAgentsListAgentChatsR
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats"
+	localVarPath := localBasePath + "/api/v1/agents/builder/chats"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -550,7 +550,7 @@ func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentCha
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/chats/{chatId}/resume"
+	localVarPath := localBasePath + "/api/v1/agents/builder/chats/{chatId}/resume"
 	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -624,31 +624,31 @@ func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentCha
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiConfigAssistantSuggestConfigurationFieldRequest struct {
+type ApiAgentsSuggestConfigurationFieldRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	body       *ConfigAssistantSuggestConfigurationFieldRequest
+	body       *AgentsSuggestConfigurationFieldRequest
 }
 
-func (r ApiConfigAssistantSuggestConfigurationFieldRequest) Body(body ConfigAssistantSuggestConfigurationFieldRequest) ApiConfigAssistantSuggestConfigurationFieldRequest {
+func (r ApiAgentsSuggestConfigurationFieldRequest) Body(body AgentsSuggestConfigurationFieldRequest) ApiAgentsSuggestConfigurationFieldRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiConfigAssistantSuggestConfigurationFieldRequest) Execute() (*ConfigAssistantSuggestConfigurationFieldResponse, *http.Response, error) {
-	return r.ApiService.ConfigAssistantSuggestConfigurationFieldExecute(r)
+func (r ApiAgentsSuggestConfigurationFieldRequest) Execute() (*AgentsSuggestConfigurationFieldResponse, *http.Response, error) {
+	return r.ApiService.AgentsSuggestConfigurationFieldExecute(r)
 }
 
 /*
-ConfigAssistantSuggestConfigurationField Suggest a value for a configuration field
+AgentsSuggestConfigurationField Suggest a value for a configuration field
 
 Uses the AI config assistant to propose a field value from context and a natural-language instruction.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiConfigAssistantSuggestConfigurationFieldRequest
+	@return ApiAgentsSuggestConfigurationFieldRequest
 */
-func (a *AgentAPIService) ConfigAssistantSuggestConfigurationField(ctx context.Context) ApiConfigAssistantSuggestConfigurationFieldRequest {
-	return ApiConfigAssistantSuggestConfigurationFieldRequest{
+func (a *AgentAPIService) AgentsSuggestConfigurationField(ctx context.Context) ApiAgentsSuggestConfigurationFieldRequest {
+	return ApiAgentsSuggestConfigurationFieldRequest{
 		ApiService: a,
 		ctx:        ctx,
 	}
@@ -656,21 +656,21 @@ func (a *AgentAPIService) ConfigAssistantSuggestConfigurationField(ctx context.C
 
 // Execute executes the request
 //
-//	@return ConfigAssistantSuggestConfigurationFieldResponse
-func (a *AgentAPIService) ConfigAssistantSuggestConfigurationFieldExecute(r ApiConfigAssistantSuggestConfigurationFieldRequest) (*ConfigAssistantSuggestConfigurationFieldResponse, *http.Response, error) {
+//	@return AgentsSuggestConfigurationFieldResponse
+func (a *AgentAPIService) AgentsSuggestConfigurationFieldExecute(r ApiAgentsSuggestConfigurationFieldRequest) (*AgentsSuggestConfigurationFieldResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *ConfigAssistantSuggestConfigurationFieldResponse
+		localVarReturnValue *AgentsSuggestConfigurationFieldResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.ConfigAssistantSuggestConfigurationField")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsSuggestConfigurationField")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/suggest-field"
+	localVarPath := localBasePath + "/api/v1/agents/config/suggest-field"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
