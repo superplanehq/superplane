@@ -1,0 +1,26 @@
+{
+  "vhosts": [
+    {
+      "name": "/"
+    },
+    {
+      "name": "superplane_test"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "guest",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "guest",
+      "vhost": "superplane_test",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ]
+}

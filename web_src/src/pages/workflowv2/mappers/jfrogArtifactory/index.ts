@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
+import type { ComponentBaseMapper, TriggerRenderer, EventStateRegistry } from "../types";
 import { jfrogArtifactoryBaseMapper } from "./base";
 import { DEFAULT_STATE_REGISTRY } from "../stateRegistry";
 import { onArtifactUploadedTriggerRenderer } from "./on_artifact_uploaded";

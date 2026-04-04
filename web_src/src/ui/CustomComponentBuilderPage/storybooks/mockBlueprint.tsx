@@ -1,5 +1,4 @@
 import type { Node, Edge } from "@xyflow/react";
-import { parseExpression } from "@/lib/expressionParser";
 
 export const mockNodes: Node[] = [
   {
@@ -18,7 +17,7 @@ export const mockNodes: Node[] = [
           {
             title: "condition",
             tooltipTitle: "conditions applied",
-            values: parseExpression("config.environment == prod"),
+            value: "config.environment == prod",
           },
         ],
         eventSections: [
@@ -96,7 +95,7 @@ export const mockNodes: Node[] = [
           {
             title: "filter",
             tooltipTitle: "filters applied",
-            values: parseExpression("service.enabled == true"),
+            value: "service.enabled == true",
           },
         ],
         eventSections: [

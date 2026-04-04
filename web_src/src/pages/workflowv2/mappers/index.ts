@@ -1,4 +1,4 @@
-import {
+import type {
   ComponentBaseMapper,
   TriggerRenderer,
   ComponentAdditionalDataBuilder,
@@ -7,7 +7,7 @@ import {
   TriggerRendererContext,
   TriggerEventContext,
 } from "./types";
-import { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
 import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
@@ -246,7 +246,12 @@ import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
-import { createSafeComponentMapper, createSafeTriggerRenderer } from "./safeMappers";
+import {
+  createSafeAdditionalDataBuilder,
+  createSafeComponentMapper,
+  createSafeCustomFieldRenderer,
+  createSafeTriggerRenderer,
+} from "./safeMappers";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -477,19 +482,7 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
  * to prevent a single component mapper failure from breaking the entire canvas.
  */
 export function getComponentBaseMapper(name: string): ComponentBaseMapper {
-  const parts = name?.split(".");
-  if (parts?.length === 1) {
-    return createSafeComponentMapper(componentBaseMappers[name] || noopMapper, name || "noop");
-  }
-
-  const appName = parts[0];
-  const appMapper = appMappers[appName];
-  if (!appMapper) {
-    return createSafeComponentMapper(noopMapper, name);
-  }
-
-  const componentName = parts.slice(1).join(".");
-  return createSafeComponentMapper(appMapper[componentName] || noopMapper, name);
+  return createSafeComponentMapper(findRegisteredComponentMapper(name) || noopMapper, name || "noop");
 }
 
 /**
@@ -497,7 +490,8 @@ export function getComponentBaseMapper(name: string): ComponentBaseMapper {
  * Returns undefined if no specific builder is registered.
  */
 export function getComponentAdditionalDataBuilder(componentName: string): ComponentAdditionalDataBuilder | undefined {
-  return componentAdditionalDataBuilders[componentName];
+  const builder = componentAdditionalDataBuilders[componentName];
+  return builder ? createSafeAdditionalDataBuilder(builder, componentName) : undefined;
 }
 
 /**
@@ -543,7 +537,8 @@ export function getState(componentName: string) {
 export function getCustomFieldRenderer(componentName: string): CustomFieldRenderer | undefined {
   const parts = componentName?.split(".");
   if (parts?.length === 1) {
-    return customFieldRenderers[componentName];
+    const renderer = customFieldRenderers[componentName];
+    return renderer ? createSafeCustomFieldRenderer(renderer, componentName) : undefined;
   }
 
   const appName = parts[0];
@@ -553,7 +548,8 @@ export function getCustomFieldRenderer(componentName: string): CustomFieldRender
   }
 
   const name = parts.slice(1).join(".");
-  return appRenderers[name];
+  const renderer = appRenderers[name];
+  return renderer ? createSafeCustomFieldRenderer(renderer, componentName) : undefined;
 }
 
 /**
@@ -566,33 +562,35 @@ export function getExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   node: ComponentsNode,
   nodes?: ComponentsNode[],
-): Record<string, any> | undefined {
-  const parts = componentName?.split(".");
-  let mapper: ComponentBaseMapper | undefined;
-
-  if (parts?.length === 1) {
-    mapper = componentBaseMappers[componentName];
-  } else {
-    const appName = parts[0];
-    const appMapper = appMappers[appName];
-    if (appMapper) {
-      const componentNamePart = parts.slice(1).join(".");
-      mapper = appMapper[componentNamePart];
-    }
+): Record<string, unknown> | undefined {
+  const mapper = findRegisteredComponentMapper(componentName);
+  if (!mapper) {
+    return undefined;
   }
 
-  if (!mapper) return undefined;
+  return createSafeComponentMapper(mapper, componentName).getExecutionDetails({
+    execution: buildExecutionInfo(execution),
+    node: buildNodeInfo(node),
+    nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
+  });
+}
 
-  try {
-    return mapper.getExecutionDetails({
-      execution: buildExecutionInfo(execution),
-      node: buildNodeInfo(node),
-      nodes: nodes?.map((n) => buildNodeInfo(n)) || [],
-    });
-  } catch (error) {
-    console.error(`[SafeMapper] Component mapper "${componentName}" threw in getExecutionDetails():`, error);
-    return {};
+function findRegisteredComponentMapper(name: string): ComponentBaseMapper | undefined {
+  const parts = name?.split(".");
+  if (!parts?.length) {
+    return undefined;
   }
+
+  if (parts.length === 1) {
+    return componentBaseMappers[name];
+  }
+
+  const appMapper = appMappers[parts[0]];
+  if (!appMapper) {
+    return undefined;
+  }
+
+  return appMapper[parts.slice(1).join(".")];
 }
 
 function withCustomName(renderer: TriggerRenderer): TriggerRenderer {

@@ -1,4 +1,3 @@
-import os
 import re
 import warnings
 from dataclasses import dataclass
@@ -16,6 +15,7 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
+from ai.config import config as app_config
 from ai.models import (
     CanvasEdge,
     CanvasNode,
@@ -35,17 +35,15 @@ from superplaneapi.api.trigger_api import TriggerApi
 from superplaneapi.api_client import ApiClient
 from superplaneapi.configuration import Configuration
 from superplaneapi.exceptions import ApiException
+from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
+from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.components_component import ComponentsComponent
 from superplaneapi.models.components_describe_component_response import (
     ComponentsDescribeComponentResponse,
 )
-from superplaneapi.models.canvases_canvas_memory import CanvasesCanvasMemory
-from superplaneapi.models.components_list_components_response import ComponentsListComponentsResponse
-from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
-from superplaneapi.models.canvases_list_canvas_memories_response import (
-    CanvasesListCanvasMemoriesResponse,
+from superplaneapi.models.components_list_components_response import (
+    ComponentsListComponentsResponse,
 )
-from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
 from superplaneapi.models.components_node_type import ComponentsNodeType
 from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.organizations_integration import OrganizationsIntegration
@@ -64,7 +62,7 @@ from superplaneapi.models.triggers_trigger import TriggersTrigger
 
 
 def _debug_enabled() -> bool:
-    return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    return app_config.debug
 
 
 def _debug_log(message: str) -> None:
@@ -88,13 +86,10 @@ class SuperplaneClient:
             ignore_operation_servers=True,
         )
         self._api_client = ApiClient(configuration=configuration)
-        self._api_client.set_default_header("Authorization", f"Bearer {self._config.api_token}")
-        self._api_client.set_default_header("x-organization-id", self._config.organization_id)
-        self._api_client.set_default_header("Accept", "application/json")
-        self._api_client.set_default_header(
-            "User-Agent",
-            os.getenv("SUPERPLANE_USER_AGENT", "curl/8.7.1"),
-        )
+        self._api_client.set_default_header("Authorization", f"Bearer {self._config.api_token}")  # type: ignore[no-untyped-call]
+        self._api_client.set_default_header("x-organization-id", self._config.organization_id)  # type: ignore[no-untyped-call]
+        self._api_client.set_default_header("Accept", "application/json")  # type: ignore[no-untyped-call]
+        self._api_client.set_default_header("User-Agent", app_config.superplane_user_agent)  # type: ignore[no-untyped-call]
         self._canvas_api = CanvasApi(self._api_client)
         self._canvas_node_api = CanvasNodeApi(self._api_client)
         self._component_api = ComponentApi(self._api_client)
@@ -102,7 +97,9 @@ class SuperplaneClient:
         self._integration_api = IntegrationApi(self._api_client)
         self._organization_api = OrganizationApi(self._api_client)
 
-    def _api_request(self, callback: Any, operation: str, fields: dict[str, Any] | None = None) -> Any:
+    def _api_request(
+        self, callback: Any, operation: str, fields: dict[str, Any] | None = None
+    ) -> Any:
         org_id = self._config.organization_id
         fields_str = " ".join([f"{key}={value}" for key, value in fields.items()]) if fields else ""
 
@@ -112,11 +109,17 @@ class SuperplaneClient:
             return response
         except ApiException as error:
             status = error.status if isinstance(error.status, int) else "unknown"
-            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status={status} reason={error}")
+            _debug_log(
+                f"[api] org={org_id} operation={operation} "
+                f"{fields_str} status={status} reason={error}"
+            )
 
             raise RuntimeError("Superplane API request failed.") from error
         except Exception as error:
-            _debug_log(f"[api] org={org_id} operation={operation} {fields_str} status=unknown_error reason={error}")
+            _debug_log(
+                f"[api] org={org_id} operation={operation} "
+                f"{fields_str} status=unknown_error reason={error}"
+            )
 
             raise RuntimeError("Failed to reach Superplane API.") from error
 
@@ -161,12 +164,12 @@ class SuperplaneClient:
 
         raw_edges = spec.edges if spec is not None and spec.edges is not None else []
         edges: list[CanvasEdge] = []
-        for item in raw_edges:
-            source_id = item.source_id
-            target_id = item.target_id
+        for edge_item in raw_edges:
+            source_id = edge_item.source_id
+            target_id = edge_item.target_id
             if not isinstance(source_id, str) or not isinstance(target_id, str):
                 continue
-            channel = item.channel
+            channel = edge_item.channel
             edges.append(
                 CanvasEdge(
                     source_id=source_id,
@@ -177,9 +180,7 @@ class SuperplaneClient:
 
         return CanvasSummary(
             canvas_id=(
-                metadata.id
-                if metadata is not None and isinstance(metadata.id, str)
-                else canvas_id
+                metadata.id if metadata is not None and isinstance(metadata.id, str) else canvas_id
             ),
             name=metadata.name if metadata is not None and isinstance(metadata.name, str) else None,
             description=metadata.description
@@ -239,7 +240,9 @@ class SuperplaneClient:
         return [m.lower() for m in re.findall(r"[A-Za-z0-9]+", spaced) if m]
 
     @staticmethod
-    def _catalog_entry_haystack(name: str | None, label: str | None, description: str | None) -> str:
+    def _catalog_entry_haystack(
+        name: str | None, label: str | None, description: str | None
+    ) -> str:
         parts: list[str] = []
         for field in (name, label, description):
             if isinstance(field, str) and field.strip():
@@ -268,7 +271,9 @@ class SuperplaneClient:
         provider: str | None,
         query: str | None,
     ) -> bool:
-        resolved_provider = provider.strip().lower() if isinstance(provider, str) and provider.strip() else None
+        resolved_provider = (
+            provider.strip().lower() if isinstance(provider, str) and provider.strip() else None
+        )
         resolved_query = query.strip().lower() if isinstance(query, str) and query.strip() else None
         provider_from_name = SuperplaneClient._provider_from_name(name)
         if resolved_provider and provider_from_name != resolved_provider:
@@ -285,7 +290,9 @@ class SuperplaneClient:
         return all(token in haystack for token in tokens)
 
     @staticmethod
-    def _serialize_configuration_fields(fields: list[ConfigurationField] | None) -> list[dict[str, Any]]:
+    def _serialize_configuration_fields(
+        fields: list[ConfigurationField] | None,
+    ) -> list[dict[str, Any]]:
         if not isinstance(fields, list):
             return []
         serialized: list[dict[str, Any]] = []
@@ -353,8 +360,12 @@ class SuperplaneClient:
     @staticmethod
     def _serialize_component(component: ComponentsComponent) -> dict[str, Any]:
         output_channels = component.output_channels or []
-        configuration_fields = SuperplaneClient._serialize_configuration_fields(component.configuration)
-        required_fields = [field["name"] for field in configuration_fields if field["required"] and field["name"]]
+        configuration_fields = SuperplaneClient._serialize_configuration_fields(
+            component.configuration
+        )
+        required_fields = [
+            field["name"] for field in configuration_fields if field["required"] and field["name"]
+        ]
         return {
             "name": component.name,
             "provider": SuperplaneClient._provider_from_name(component.name),
@@ -378,8 +389,12 @@ class SuperplaneClient:
 
     @staticmethod
     def _serialize_trigger(trigger: TriggersTrigger) -> dict[str, Any]:
-        configuration_fields = SuperplaneClient._serialize_configuration_fields(trigger.configuration)
-        required_fields = [field["name"] for field in configuration_fields if field["required"] and field["name"]]
+        configuration_fields = SuperplaneClient._serialize_configuration_fields(
+            trigger.configuration
+        )
+        required_fields = [
+            field["name"] for field in configuration_fields if field["required"] and field["name"]
+        ]
         return {
             "name": trigger.name,
             "provider": SuperplaneClient._provider_from_name(trigger.name),
@@ -460,7 +475,9 @@ class SuperplaneClient:
             integration_definitions = []
 
         for integration in integration_definitions:
-            scoped_components = integration.components if isinstance(integration.components, list) else []
+            scoped_components = (
+                integration.components if isinstance(integration.components, list) else []
+            )
             for component in scoped_components:
                 if not isinstance(component, ComponentsComponent):
                     continue
@@ -684,9 +701,7 @@ class SuperplaneClient:
                     id=item.id if isinstance(item.id, str) else None,
                     node_id=item.node_id if isinstance(item.node_id, str) else None,
                     channel=item.channel if isinstance(item.channel, str) else None,
-                    created_at=item.created_at.isoformat()
-                    if item.created_at is not None
-                    else None,
+                    created_at=item.created_at.isoformat() if item.created_at is not None else None,
                     data=data if isinstance(data, dict) else {},
                 )
             )

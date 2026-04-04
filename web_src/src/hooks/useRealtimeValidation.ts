@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConfigurationField } from "@/api-client";
+import type { ConfigurationField } from "@/api-client";
 import { isFieldRequired, isFieldVisible, validateFieldForSubmission } from "@/lib/components";
 
 interface ValidationError {

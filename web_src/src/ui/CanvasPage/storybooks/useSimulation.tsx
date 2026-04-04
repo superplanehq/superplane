@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CanvasEdge, CanvasNode } from "..";
+import type { CanvasEdge, CanvasNode } from "..";
 
 export type UpdateDataFn = (path: string, data: any) => void;
 export type OutputFn = (data: any) => void;

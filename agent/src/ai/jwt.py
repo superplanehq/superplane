@@ -1,8 +1,8 @@
-import os
-import jwt
 from dataclasses import dataclass
 
+import jwt
 
+from ai.config import config
 from ai.text import normalize_optional
 
 
@@ -13,6 +13,7 @@ class JwtClaims:
     purpose: str
     scopes: list[str]
 
+
 class JwtValidator:
     def __init__(self, jwt_secret: str, audience: str = "superplane_api") -> None:
         self._jwt_secret = jwt_secret
@@ -20,7 +21,7 @@ class JwtValidator:
 
     @classmethod
     def from_env(cls) -> "JwtValidator":
-        jwt_secret = normalize_optional(os.getenv("JWT_SECRET"))
+        jwt_secret = normalize_optional(config.jwt_secret)
         if jwt_secret is None:
             raise ValueError("Missing required setting: JWT_SECRET")
         return cls(jwt_secret=jwt_secret)
@@ -120,4 +121,3 @@ class JwtValidator:
             raise ValueError("Scoped token does not allow the requested canvas.")
 
         return canvas_id
-

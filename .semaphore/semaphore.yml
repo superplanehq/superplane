@@ -67,6 +67,33 @@ blocks:
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
             - "cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright"
+  - name: "\U0001F9EA Agent Tests"
+    dependencies: []
+    task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+      prologue:
+        commands:
+          - checkout
+          - make test.agent.setup
+      jobs:
+        - name: Unit Tests
+          commands:
+            - make test.agent.unit AGENT_TEST_TARGETS="tests --junitxml=junit-report.xml"
+        - name: Lint
+          commands:
+            - make -C agent lint
+        - name: Format Check
+          commands:
+            - make -C agent format.check
+        - name: Type Check
+          commands:
+            - make -C agent typecheck
+      epilogue:
+        always:
+          commands:
+            - "[ -f agent/junit-report.xml ] && test-results publish agent/junit-report.xml"
   - name: "\U0001F528 Frontend Build"
     dependencies: []
     task:
