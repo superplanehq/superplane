@@ -390,15 +390,6 @@ func cancelledByIDs(executions []models.CanvasNodeExecution) []uuid.UUID {
 	return ids
 }
 
-func eventIDs(executions []models.CanvasNodeExecution) []string {
-	ids := make([]string, len(executions))
-	for i, execution := range executions {
-		ids[i] = execution.EventID.String()
-	}
-
-	return ids
-}
-
 func rootEventIDs(executions []models.CanvasNodeExecution) []string {
 	ids := make([]string, len(executions))
 	for i, execution := range executions {
