@@ -253,7 +253,9 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     details["Pipeline File"] = stringOrDash(formatPipelineFile(pipelineData.pipeline));
     details["Repository URL"] = pipelineData.repository?.url;
     details["Workflow URL"] = pipelineData.workflow?.url;
-    details["Finished At"] = pipelineData.pipeline?.done_at ? stringOrDash(formatTimestampInUserTimezone(pipelineData.pipeline.done_at)) : "-";
+    details["Finished At"] = pipelineData.pipeline?.done_at
+      ? stringOrDash(formatTimestampInUserTimezone(pipelineData.pipeline.done_at))
+      : "-";
 
     return withBlockDetails(details, pipelineData.blocks || []);
   },
