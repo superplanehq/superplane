@@ -24,6 +24,20 @@ import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
+import { stringOrDash } from "../utils";
+
+interface Configuration {
+  project: string;
+  pipelineFile: string;
+  ref: string;
+  commitSha: string;
+  parameters: Array<{ name: string; value: string }>;
+}
+
+interface NodeMetadata {
+  project?: Project;
+}
 
 interface ExecutionMetadata {
   workflow?: {
@@ -34,6 +48,75 @@ interface ExecutionMetadata {
     state: string;
     result: string;
   };
+}
+
+interface Outputs {
+  passed?: OutputPayload[];
+  failed?: OutputPayload[];
+  default?: OutputPayload[];
+}
+
+interface PipelineData {
+  project: Project;
+  repository: Repository;
+  revision: Revision;
+  pipeline: Pipeline;
+  workflow: Workflow;
+  blocks: PipelineBlock[];
+}
+
+interface Project {
+  id: string;
+  name: string;
+}
+
+interface Workflow {
+  id: string;
+  url: string;
+}
+
+interface Pipeline {
+  done_at: string;
+  id: string;
+  name: string;
+  result: string;
+  result_reason: string;
+  state: string;
+  working_directory: string;
+  yaml_file_name: string;
+}
+
+interface Repository {
+  slug: string;
+  url: string;
+}
+
+interface Revision {
+  branch: {
+    commit_range: string;
+    name: string;
+  };
+  commit_message: string;
+  commit_sha: string;
+  reference: string;
+  reference_type: string;
+}
+
+interface PipelineBlock {
+  name: string;
+  jobs: Job[];
+}
+
+interface Job {
+  id: string;
+  index: number;
+  name: string;
+  result: string;
+  status: string;
+}
+
+function getPipelineData(outputs: Outputs): PipelineData | undefined {
+  return outputs?.passed?.[0].data ?? outputs?.failed?.[0].data ?? outputs?.default?.[0].data;
 }
 
 export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
@@ -136,72 +219,50 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const outputs = context.execution.outputs as
-      | { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
-      | undefined;
-    const payload =
-      (outputs?.passed?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.failed?.[0]?.data as Record<string, any> | undefined) ||
-      (outputs?.default?.[0]?.data as Record<string, any> | undefined);
-    const payloadData =
-      payload && typeof payload === "object" && payload.data && typeof payload.data === "object"
-        ? payload.data
-        : payload;
-    const metadataFallback =
-      (!payloadData || typeof payloadData !== "object") && context.execution.metadata
-        ? (context.execution.metadata as Record<string, any>)
-        : undefined;
+    //
+    // If the execution is not finished, we just show
+    // the information from the metadata.
+    //
+    if (context.execution.state !== "STATE_FINISHED") {
+      const metadata = context.execution.metadata as ExecutionMetadata;
+      return {
+        "Workflow ID": metadata?.workflow?.id,
+        "Workflow URL": metadata?.workflow?.url,
+      };
+    }
 
-    const sourceData =
-      payloadData && typeof payloadData === "object"
-        ? payloadData
-        : metadataFallback && typeof metadataFallback === "object"
-          ? metadataFallback
-          : undefined;
-
-    if (!sourceData || typeof sourceData !== "object") {
+    //
+    // If the execution is finished, we use the outputs to display more information.
+    //
+    const outputs = context.execution.outputs as Outputs;
+    const pipelineData = getPipelineData(outputs);
+    const details: Record<string, string> = {};
+    if (!pipelineData) {
       return details;
     }
 
-    const pipeline = sourceData.pipeline as Record<string, any> | undefined;
-    const repository = sourceData.repository as Record<string, any> | undefined;
-    const project = sourceData.project as Record<string, any> | undefined;
-    const organization = sourceData.organization as Record<string, any> | undefined;
-    const revision = sourceData.revision as Record<string, any> | undefined;
-    const blocks = sourceData.blocks as Array<Record<string, any>> | undefined;
-    const workflow = sourceData.workflow as Record<string, any> | undefined;
-
-    const addDetail = (key: string, value?: string) => {
-      if (value) {
-        details[key] = value;
-      }
-    };
-
-    addDetail("Done At", formatDate(pipeline?.done_at));
-    addDetail(
-      "Workflow URL",
-      (context.execution.metadata as ExecutionMetadata | undefined)?.workflow?.url || workflow?.url,
-    );
-    addDetail("Repository URL", repository?.url);
-    addDetail("Project", project?.name);
-    addDetail("Organization", organization?.name);
-    addDetail("Branch", revision?.branch?.name || revision?.reference);
-    addDetail("Commit", formatCommit(revision));
-    addDetail("Pipeline File", formatPipelineFile(pipeline));
-    const blockDetails = buildBlocksDetails(blocks);
-    if (blockDetails) {
-      details["Blocks"] = blockDetails;
+    if (pipelineData.project) {
+      details["Project"] = pipelineData.project.name;
     }
 
-    return details;
+    if (pipelineData.revision?.branch) {
+      details["Branch"] = pipelineData.revision.branch.name;
+    }
+
+    details["Revision"] = stringOrDash(formatRevision(pipelineData.revision));
+    details["Pipeline File"] = stringOrDash(formatPipelineFile(pipelineData.pipeline));
+    details["Repository URL"] = pipelineData.repository?.url;
+    details["Workflow URL"] = pipelineData.workflow?.url;
+    details["Finished At"] = pipelineData.pipeline?.done_at ? stringOrDash(formatTimestampInUserTimezone(pipelineData.pipeline.done_at)) : "-";
+
+    return withBlockDetails(details, pipelineData.blocks || []);
   },
 };
 
 function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const configuration = node.configuration as any;
-  const nodeMetadata = node.metadata as any;
+  const configuration = node.configuration as Configuration;
+  const nodeMetadata = node.metadata as NodeMetadata;
 
   if (nodeMetadata?.project?.name) {
     metadata.push({ icon: "folder", label: nodeMetadata.project.name });
@@ -226,15 +287,14 @@ function runWorkflowMetadataList(node: NodeInfo): MetadataItem[] {
 
 function runWorkflowSpecs(node: NodeInfo): ComponentBaseSpec[] {
   const specs: ComponentBaseSpec[] = [];
-  const configuration = node.configuration as any;
+  const configuration = node.configuration as Configuration;
 
-  const parameters = configuration?.parameters as Array<{ name: string; value: string }> | undefined;
-  if (parameters && parameters.length > 0) {
+  if (configuration?.parameters && configuration?.parameters.length > 0) {
     specs.push({
       title: "parameter",
       tooltipTitle: "workflow parameters",
       iconSlug: "settings",
-      values: parameters.map((param) => ({
+      values: configuration?.parameters.map((param) => ({
         badges: [
           {
             label: param.name,
@@ -262,7 +322,7 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   const sections: EventSection[] = [];
 
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const executionState = runWorkflowStateFunction(execution);
   const subtitleTimestamp =
@@ -280,48 +340,41 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
   return sections;
 }
 
-function formatDate(value?: string): string | undefined {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date.toLocaleString();
-}
-
-function formatCommit(revision?: Record<string, any>): string | undefined {
+function formatRevision(revision?: Revision): string | undefined {
   if (!revision) return undefined;
-  const sha = revision.commit_sha as string | undefined;
-  const message = revision.commit_message as string | undefined;
-  const shortSha = sha ? sha.slice(0, 7) : undefined;
-  if (shortSha && message) return `${shortSha} · ${message}`;
-  return shortSha || message;
+  return `${revision.commit_sha.slice(0, 7)} · ${revision.commit_message}`;
 }
 
-function formatPipelineFile(pipeline?: Record<string, any>): string | undefined {
+function formatPipelineFile(pipeline?: Pipeline): string | undefined {
   if (!pipeline) return undefined;
-  const workingDirectory = pipeline.working_directory as string | undefined;
-  const yamlFileName = pipeline.yaml_file_name as string | undefined;
-  if (workingDirectory && yamlFileName) return `${workingDirectory}/${yamlFileName}`.replace("//", "/");
-  return yamlFileName || workingDirectory;
+  return `${pipeline.working_directory}/${pipeline.yaml_file_name}`.replace("//", "/");
 }
 
-function buildBlocksDetails(blocks?: Array<Record<string, any>>): Record<string, any> | undefined {
-  if (!blocks || blocks.length === 0) return undefined;
+function withBlockDetails(details: Record<string, string>, blocks?: PipelineBlock[]): Record<string, string> {
+  if (!blocks || blocks.length === 0) return details;
 
-  return {
-    __type: "semaphoreBlocks",
-    blocks: blocks.map((block) => {
-      const jobs = (block?.jobs as Array<Record<string, any>> | undefined) || [];
-      return {
-        name: block?.name as string | undefined,
-        result: block?.result as string | undefined,
-        resultReason: block?.result_reason as string | undefined,
-        state: block?.state as string | undefined,
-        jobs: jobs.map((job) => ({
-          name: job?.name as string | undefined,
-          result: job?.result as string | undefined,
-          status: job?.status as string | undefined,
-        })),
-      };
-    }),
-  };
+  for (const block of blocks) {
+    const jobSummary = getJobSummaryForBlock(block);
+    details[block.name] = `${jobSummary.passed} / ${jobSummary.total} jobs passed`;
+  }
+
+  return details;
+}
+
+interface JobCounts {
+  total: number;
+  passed: number;
+  failed: number;
+}
+
+function getJobSummaryForBlock(block: PipelineBlock): JobCounts {
+  const counts: JobCounts = { total: 0, passed: 0, failed: 0 };
+
+  for (const job of block.jobs) {
+    counts.total++;
+    if (job.result === "passed") counts.passed++;
+    if (job.result === "failed") counts.failed++;
+  }
+
+  return counts;
 }
