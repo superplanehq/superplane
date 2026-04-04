@@ -116,7 +116,19 @@ interface Job {
 }
 
 function getPipelineData(outputs: Outputs): PipelineData | undefined {
-  return outputs?.passed?.[0].data ?? outputs?.failed?.[0].data ?? outputs?.default?.[0].data;
+  if (outputs.passed && outputs.passed.length > 0) {
+    return outputs.passed[0].data as PipelineData;
+  }
+
+  if (outputs.failed && outputs.failed.length > 0) {
+    return outputs.failed[0].data as PipelineData;
+  }
+
+  if (outputs.default && outputs.default.length > 0) {
+    return outputs.default[0].data as PipelineData;
+  }
+
+  return undefined;
 }
 
 export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
@@ -225,10 +237,14 @@ export const runWorkflowMapper: ComponentBaseMapper = {
     //
     if (context.execution.state !== "STATE_FINISHED") {
       const metadata = context.execution.metadata as ExecutionMetadata;
-      return {
-        "Workflow ID": metadata?.workflow?.id,
-        "Workflow URL": metadata?.workflow?.url,
-      };
+      if (metadata?.workflow) {
+        return {
+          "Workflow ID": metadata.workflow.id,
+          "Workflow URL": metadata.workflow.url,
+        };
+      }
+
+      return {};
     }
 
     //
@@ -343,8 +359,11 @@ function runWorkflowEventSections(nodes: NodeInfo[], execution: ExecutionInfo): 
 }
 
 function formatRevision(revision?: Revision): string | undefined {
-  if (!revision) return undefined;
-  return `${revision.commit_sha.slice(0, 7)} · ${revision.commit_message}`;
+  if (revision?.commit_sha) {
+    return `${revision.commit_sha.slice(0, 7)} · ${revision.commit_message}`;
+  }
+
+  return undefined;
 }
 
 function formatPipelineFile(pipeline?: Pipeline): string | undefined {
