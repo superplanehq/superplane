@@ -28,3 +28,29 @@ def test_jwt_validator_decodes_agent_builder_token() -> None:
     assert claims.org_id == "org-123"
     assert claims.purpose == "agent-builder"
     assert claims.scopes == ["canvases:read:canvas-123", "org:read"]
+
+
+def test_jwt_validator_decodes_config_assistant_token() -> None:
+    jwt_secret = "test-jwt-secret-with-at-least-32-bytes"
+    token = jwt.encode(
+        {
+            "aud": "superplane_api",
+            "token_type": "scoped",
+            "purpose": "config-assistant",
+            "sub": "user-456",
+            "org_id": "org-456",
+            "scopes": [
+                "canvases:read:canvas-456",
+                "org:read",
+            ],
+        },
+        jwt_secret,
+        algorithm="HS256",
+    )
+
+    claims = JwtValidator(jwt_secret=jwt_secret).decode(token)
+
+    assert claims.subject == "user-456"
+    assert claims.org_id == "org-456"
+    assert claims.purpose == "config-assistant"
+    assert claims.scopes == ["canvases:read:canvas-456", "org:read"]

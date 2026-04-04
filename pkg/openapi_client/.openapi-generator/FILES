@@ -1,5 +1,4 @@
 .gitignore
-.openapi-generator-ignore
 .travis.yml
 README.md
 api/openapi.yaml
@@ -123,6 +122,8 @@ docs/ComponentsListComponentsResponse.md
 docs/ComponentsNode.md
 docs/ComponentsNodeType.md
 docs/ComponentsPosition.md
+docs/ConfigAssistantSuggestConfigurationFieldRequest.md
+docs/ConfigAssistantSuggestConfigurationFieldResponse.md
 docs/ConfigurationAnyPredicateListTypeOptions.md
 docs/ConfigurationDateTimeTypeOptions.md
 docs/ConfigurationDateTypeOptions.md
@@ -361,6 +362,8 @@ model_components_list_components_response.go
 model_components_node.go
 model_components_node_type.go
 model_components_position.go
+model_config_assistant_suggest_configuration_field_request.go
+model_config_assistant_suggest_configuration_field_response.go
 model_configuration_any_predicate_list_type_options.go
 model_configuration_date_time_type_options.go
 model_configuration_date_type_options.go
@@ -499,23 +502,4 @@ model_widgets_describe_widget_response.go
 model_widgets_list_widgets_response.go
 model_widgets_widget.go
 response.go
-test/api_agent_test.go
-test/api_blueprint_test.go
-test/api_canvas_change_request_test.go
-test/api_canvas_event_test.go
-test/api_canvas_node_execution_test.go
-test/api_canvas_node_test.go
-test/api_canvas_test.go
-test/api_canvas_version_test.go
-test/api_component_test.go
-test/api_groups_test.go
-test/api_integration_test.go
-test/api_me_test.go
-test/api_organization_test.go
-test/api_roles_test.go
-test/api_secret_test.go
-test/api_service_accounts_test.go
-test/api_trigger_test.go
-test/api_users_test.go
-test/api_widget_test.go
 utils.go

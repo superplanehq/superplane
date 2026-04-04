@@ -40,6 +40,7 @@ import (
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbComponents "github.com/superplanehq/superplane/pkg/protos/components"
+	pbConfigAssistant "github.com/superplanehq/superplane/pkg/protos/config_assistant"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -307,6 +308,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}
 
 	err = pbAgents.RegisterAgentsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbConfigAssistant.RegisterConfigAssistantHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
