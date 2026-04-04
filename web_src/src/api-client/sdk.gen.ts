@@ -18,6 +18,9 @@ import type {
   AgentsResumeAgentChatData,
   AgentsResumeAgentChatErrors,
   AgentsResumeAgentChatResponses,
+  AgentsSuggestConfigurationFieldData,
+  AgentsSuggestConfigurationFieldErrors,
+  AgentsSuggestConfigurationFieldResponses,
   BlueprintsCreateBlueprintData,
   BlueprintsCreateBlueprintErrors,
   BlueprintsCreateBlueprintResponses,
@@ -340,7 +343,7 @@ export const agentsListAgentChats = <ThrowOnError extends boolean = true>(
   options?: Options<AgentsListAgentChatsData, ThrowOnError>,
 ) =>
   (options?.client ?? client).get<AgentsListAgentChatsResponses, AgentsListAgentChatsErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats",
+    url: "/api/v1/agents/builder/chats",
     ...options,
   });
 
@@ -353,7 +356,7 @@ export const agentsCreateAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsCreateAgentChatData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<AgentsCreateAgentChatResponses, AgentsCreateAgentChatErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats",
+    url: "/api/v1/agents/builder/chats",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -370,7 +373,7 @@ export const agentsDescribeAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsDescribeAgentChatData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<AgentsDescribeAgentChatResponses, AgentsDescribeAgentChatErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats/{chatId}",
+    url: "/api/v1/agents/builder/chats/{chatId}",
     ...options,
   });
 
@@ -383,7 +386,7 @@ export const agentsListAgentChatMessages = <ThrowOnError extends boolean = true>
   options: Options<AgentsListAgentChatMessagesData, ThrowOnError>,
 ) =>
   (options.client ?? client).get<AgentsListAgentChatMessagesResponses, AgentsListAgentChatMessagesErrors, ThrowOnError>(
-    { url: "/api/v1/agents/chats/{chatId}/messages", ...options },
+    { url: "/api/v1/agents/builder/chats/{chatId}/messages", ...options },
   );
 
 /**
@@ -395,7 +398,28 @@ export const agentsResumeAgentChat = <ThrowOnError extends boolean = true>(
   options: Options<AgentsResumeAgentChatData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<AgentsResumeAgentChatResponses, AgentsResumeAgentChatErrors, ThrowOnError>({
-    url: "/api/v1/agents/chats/{chatId}/resume",
+    url: "/api/v1/agents/builder/chats/{chatId}/resume",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Suggest a value for a configuration field
+ *
+ * Uses the AI config assistant to propose a field value from context and a natural-language instruction.
+ */
+export const agentsSuggestConfigurationField = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsSuggestConfigurationFieldData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    AgentsSuggestConfigurationFieldResponses,
+    AgentsSuggestConfigurationFieldErrors,
+    ThrowOnError
+  >({
+    url: "/api/v1/agents/config/suggest-field",
     ...options,
     headers: {
       "Content-Type": "application/json",
