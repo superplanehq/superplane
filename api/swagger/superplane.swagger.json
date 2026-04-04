@@ -4732,9 +4732,6 @@
         "resultMessage": {
           "type": "string"
         },
-        "input": {
-          "type": "object"
-        },
         "outputs": {
           "type": "object"
         },

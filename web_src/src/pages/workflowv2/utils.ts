@@ -1242,7 +1242,6 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
     resultMessage: execution.resultMessage!,
     metadata: execution.metadata!,
     configuration: execution.configuration!,
-    input: execution.input!,
     outputs: execution.outputs!,
     rootEvent: buildEventInfo(execution.rootEvent!),
   };

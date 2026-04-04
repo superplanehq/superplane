@@ -81,9 +81,6 @@ export type ExecutionInfo = {
   metadata: any;
   configuration: any;
   rootEvent: EventInfo;
-  input?: {
-    [key: string]: unknown;
-  };
   outputs?: {
     [key: string]: unknown;
   };
