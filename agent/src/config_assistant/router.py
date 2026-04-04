@@ -19,9 +19,9 @@ def build_config_assistant_router() -> APIRouter:
     ) -> FieldSuggestOutput:
         from ai.repl_web import _resolve_required_bearer_token  # noqa: PLC0415
 
-        token = _resolve_required_bearer_token(request)
-        validator = JwtValidator.from_env()
         try:
+            token = _resolve_required_bearer_token(request)
+            validator = JwtValidator.from_env()
             claims = validator.decode_config_assistant_token(token)
         except WrongScopedPurposeError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
