@@ -312,11 +312,11 @@ type ProcessQueueContext struct {
 	DefaultProcessing func() (*uuid.UUID, error)
 
 	//
-	// CountDistinctIncomingSources returns the number of distinct upstream
+	// DistinctIncomingSources returns the distinct upstream
 	// source nodes connected to this node (ignoring multiple channels from the
 	// same source)
 	//
-	CountDistinctIncomingSources func() (int, error)
+	DistinctIncomingSources func() ([]Node, error)
 }
 
 type AuthContext interface {
@@ -345,4 +345,8 @@ type User struct {
 	ID    string `mapstructure:"id" json:"id"`
 	Name  string `mapstructure:"name" json:"name"`
 	Email string `mapstructure:"email" json:"email"`
+}
+
+type Node struct {
+	ID string `mapstructure:"id" json:"id"`
 }
