@@ -28,9 +28,9 @@ func (s *ConfigAssistantService) SuggestConfigurationField(
 	ctx context.Context,
 	req *pb.SuggestConfigurationFieldRequest,
 ) (*pb.SuggestConfigurationFieldResponse, error) {
-	agentHTTPURL := config.AgentHTTPURL()
-	if agentHTTPURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
+	configAssistantHTTPURL := config.ConfigAssistantHTTPURL()
+	if configAssistantHTTPURL == "" {
+		return nil, status.Error(codes.Unavailable, "CONFIG_ASSISTANT_HTTP_URL is not set")
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
@@ -43,7 +43,7 @@ func (s *ConfigAssistantService) SuggestConfigurationField(
 		ctx,
 		s.authService,
 		s.jwtSigner,
-		agentHTTPURL,
+		configAssistantHTTPURL,
 		userID,
 		organizationID,
 		req,

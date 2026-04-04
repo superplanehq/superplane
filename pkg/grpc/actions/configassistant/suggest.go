@@ -41,14 +41,14 @@ func SuggestConfigurationField(
 	ctx context.Context,
 	authService authorization.Authorization,
 	jwtSigner *jwt.Signer,
-	agentHTTPURL string,
+	configAssistantBaseURL string,
 	userID string,
 	organizationID string,
 	req *pb.SuggestConfigurationFieldRequest,
 ) (*pb.SuggestConfigurationFieldResponse, error) {
-	baseURL := strings.TrimSpace(agentHTTPURL)
+	baseURL := strings.TrimSpace(configAssistantBaseURL)
 	if baseURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
+		return nil, status.Error(codes.Unavailable, "CONFIG_ASSISTANT_HTTP_URL is not set")
 	}
 
 	canvasID := strings.TrimSpace(req.GetCanvasId())

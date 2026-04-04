@@ -70,6 +70,7 @@ services:
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
+      CONFIG_ASSISTANT_HTTP_URL: ${CONFIG_ASSISTANT_HTTP_URL:-http://agent:8090}
       AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
