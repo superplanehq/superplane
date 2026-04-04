@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { httpMapper } from "./http";
-import type { ExecutionDetailsContext, NodeInfo, OutputPayload, SubtitleContext } from "./types";
+import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "./types";
 
 function buildNode(): NodeInfo {
   return {
@@ -14,24 +14,30 @@ function buildNode(): NodeInfo {
   };
 }
 
+type TestExecution = Omit<ExecutionInfo, "updatedAt"> & { updatedAt?: string };
+
 function buildExecution({
   outputs,
   state = "STATE_FINISHED",
-  result = "RESULT_SUCCEEDED",
-  resultReason = "RESULT_REASON_UNSPECIFIED",
+  result = "RESULT_PASSED",
+  resultReason = "RESULT_REASON_OK",
   resultMessage = "",
   updatedAt,
+  configuration,
+  createdAt,
 }: {
   outputs?: { success?: OutputPayload[]; failure?: OutputPayload[] };
-  state?: string;
-  result?: string;
-  resultReason?: string;
+  state?: ExecutionInfo["state"];
+  result?: ExecutionInfo["result"];
+  resultReason?: ExecutionInfo["resultReason"];
   resultMessage?: string;
   updatedAt?: string;
+  configuration?: Record<string, unknown>;
+  createdAt?: string;
 }) {
-  const now = new Date().toISOString();
+  const now = createdAt ?? new Date().toISOString();
 
-  const execution: any = {
+  const execution: TestExecution = {
     id: "exec-1",
     createdAt: now,
     state,
@@ -39,7 +45,7 @@ function buildExecution({
     resultReason,
     resultMessage,
     metadata: {},
-    configuration: {},
+    configuration: configuration ?? {},
     rootEvent: undefined,
     outputs,
   };
@@ -48,7 +54,7 @@ function buildExecution({
     execution.updatedAt = updatedAt;
   }
 
-  return execution;
+  return execution as ExecutionInfo;
 }
 
 describe("httpMapper.getExecutionDetails", () => {
@@ -146,7 +152,42 @@ describe("httpMapper.getExecutionDetails", () => {
       }),
     };
 
-    expect(httpMapper.getExecutionDetails(ctx)).toEqual({ Response: "200" });
+    expect(httpMapper.getExecutionDetails(ctx)).toMatchObject({ Response: "200" });
+  });
+
+  it("includes Request from execution configuration", () => {
+    const node = buildNode();
+    const ctx: ExecutionDetailsContext = {
+      nodes: [node],
+      node,
+      execution: buildExecution({
+        outputs: {
+          success: [{ type: "json", timestamp: new Date().toISOString(), data: { status: 200 } }],
+        },
+        configuration: { method: "POST", url: "https://example.com/api" },
+      }),
+    };
+
+    const details = httpMapper.getExecutionDetails(ctx);
+    expect(details["Request"]).toBe("POST https://example.com/api");
+    expect(details["Response"]).toBe("200");
+  });
+
+  it("does not include Request when configuration is missing url", () => {
+    const node = buildNode();
+    const ctx: ExecutionDetailsContext = {
+      nodes: [node],
+      node,
+      execution: buildExecution({
+        outputs: {
+          success: [{ type: "json", timestamp: new Date().toISOString(), data: { status: 200 } }],
+        },
+        configuration: { method: "GET" },
+      }),
+    };
+
+    const details = httpMapper.getExecutionDetails(ctx);
+    expect(details["Request"]).toBeUndefined();
   });
 });
 

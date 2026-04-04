@@ -140,6 +140,14 @@ interface Metadata {
   };
 }
 
+function getHTTPRequestLabel(configuration?: Partial<HTTPConfiguration>): string | null {
+  if (!configuration?.method || !configuration?.url) {
+    return null;
+  }
+
+  return `${configuration.method} ${configuration.url}`;
+}
+
 function getHTTPResponseStatusString(
   outputs: { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined,
 ): string | null {
@@ -192,6 +200,12 @@ export const httpMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Metadata | undefined;
     const outputs = context.execution.outputs as { success?: OutputPayload[]; failure?: OutputPayload[] } | undefined;
+    const configuration = context.execution.configuration as Partial<HTTPConfiguration> | undefined;
+
+    const requestLabel = getHTTPRequestLabel(configuration);
+    if (requestLabel) {
+      details["Request"] = requestLabel;
+    }
 
     const responseStatusString = getHTTPResponseStatusString(outputs) ?? "";
     if (responseStatusString) {
@@ -261,10 +275,11 @@ function getHTTPMetadataList(node: NodeInfo): MetadataItem[] {
   const metadata: Array<{ icon: string; label: string }> = [];
 
   // Method and URL
-  if (configuration.url && configuration.method) {
+  const requestLabel = getHTTPRequestLabel(configuration);
+  if (requestLabel) {
     metadata.push({
       icon: "link",
-      label: `${configuration.method} ${configuration.url}`,
+      label: requestLabel,
     });
   }
 
