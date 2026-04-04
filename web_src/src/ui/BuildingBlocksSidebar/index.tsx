@@ -253,6 +253,7 @@ function OpenBuildingBlocksSidebar({
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [isLoadingChatSessions, setIsLoadingChatSessions] = useState(false);
   const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
+  const [hasOpenedAiTab, setHasOpenedAiTab] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [isApplyingProposal, setIsApplyingProposal] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -420,12 +421,20 @@ function OpenBuildingBlocksSidebar({
   }, [showAiBuilderTab, activeTab]);
 
   useEffect(() => {
+    if (showAiBuilderTab && activeTab === "ai") {
+      setHasOpenedAiTab(true);
+    }
+  }, [activeTab, showAiBuilderTab]);
+
+  useEffect(() => {
     setActiveTab("components");
+    setChatSessions([]);
     setCurrentChatId(null);
     setAiMessages([]);
     setPendingProposal(null);
     setAiError(null);
     setAiInput("");
+    setHasOpenedAiTab(false);
   }, [canvasId]);
 
   useEffect(() => {
@@ -449,10 +458,8 @@ function OpenBuildingBlocksSidebar({
   useEffect(() => {
     let cancelled = false;
 
-    if (!canvasId || !organizationId) {
-      setChatSessions([]);
-      setCurrentChatId(null);
-      setAiMessages([]);
+    if (!showAiBuilderTab || !hasOpenedAiTab || !canvasId || !organizationId) {
+      setIsLoadingChatSessions(false);
       return () => {
         cancelled = true;
       };
@@ -461,10 +468,7 @@ function OpenBuildingBlocksSidebar({
     void (async () => {
       setIsLoadingChatSessions(true);
       try {
-        const sessions = await loadChatSessions({
-          canvasId,
-          organizationId,
-        });
+        const sessions = await loadChatSessions({ canvasId, organizationId });
         if (cancelled) {
           return;
         }
@@ -491,16 +495,17 @@ function OpenBuildingBlocksSidebar({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, organizationId]);
+  }, [canvasId, hasOpenedAiTab, organizationId, showAiBuilderTab]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!canvasId || !organizationId || !currentChatId) {
-      if (!currentChatId) {
-        setAiMessages([]);
-        setPendingProposal(null);
-      }
+    if (!currentChatId) {
+      setAiMessages([]);
+      setPendingProposal(null);
+    }
+
+    if (!showAiBuilderTab || !hasOpenedAiTab || !canvasId || !organizationId || !currentChatId) {
       setIsLoadingChatMessages(false);
       return () => {
         cancelled = true;
@@ -536,7 +541,7 @@ function OpenBuildingBlocksSidebar({
     return () => {
       cancelled = true;
     };
-  }, [canvasId, currentChatId, organizationId]);
+  }, [canvasId, currentChatId, hasOpenedAiTab, organizationId, showAiBuilderTab]);
 
   // Auto-focus search input when sidebar opens
   useEffect(() => {
