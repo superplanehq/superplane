@@ -201,7 +201,7 @@ func BuildProcessQueueContext(
 				for _, e := range bp.Edges {
 					if e.TargetID == childID {
 						sources = append(sources, core.Node{
-							ID: e.SourceID,
+							ID: fmt.Sprintf("%s:%s", parent.NodeID, e.SourceID),
 						})
 					}
 				}
@@ -271,7 +271,11 @@ func BuildProcessQueueContext(
 }
 
 func uniqueSourceNodes(nodes []core.Node) []core.Node {
-	return slices.CompactFunc(nodes, func(a, b core.Node) bool {
-		return a.ID == b.ID
-	})
+	unique := []core.Node{}
+	for _, node := range nodes {
+		if !slices.ContainsFunc(unique, func(a core.Node) bool { return a.ID == node.ID }) {
+			unique = append(unique, node)
+		}
+	}
+	return unique
 }
