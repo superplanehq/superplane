@@ -38,6 +38,7 @@ from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentCh
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
+from config_assistant.router import build_config_assistant_router
 
 
 @dataclass(frozen=True)
@@ -504,6 +505,8 @@ def _create_app() -> FastAPI:
         except BaseException:
             await tracker.release()
             raise
+
+    app.include_router(build_config_assistant_router())
 
     return app
 

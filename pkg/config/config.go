@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 func RabbitMQURL() (string, error) {
@@ -20,6 +21,10 @@ func UsageGRPCURL() string {
 
 func AgentHTTPURL() string {
 	return os.Getenv("AGENT_HTTP_URL")
+}
+
+func ConfigAssistantHTTPURL() string {
+	return strings.TrimSpace(os.Getenv("CONFIG_ASSISTANT_HTTP_URL"))
 }
 
 func AgentGRPCURL() string {

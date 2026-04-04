@@ -51,6 +51,9 @@
     },
     {
       "name": "Agents"
+    },
+    {
+      "name": "ConfigAssistant"
     }
   ],
   "schemes": [
@@ -236,6 +239,40 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/AgentsResumeAgentChatBody"
+            }
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/suggest-field": {
+      "post": {
+        "summary": "Suggest a value for a configuration field",
+        "description": "Uses the AI config assistant to propose a field value from context and a natural-language instruction.",
+        "operationId": "ConfigAssistant_SuggestConfigurationField",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/ConfigAssistantSuggestConfigurationFieldResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ConfigAssistantSuggestConfigurationFieldRequest"
             }
           }
         ],
@@ -5510,6 +5547,35 @@
         "y": {
           "type": "integer",
           "format": "int32"
+        }
+      }
+    },
+    "ConfigAssistantSuggestConfigurationFieldRequest": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "instruction": {
+          "type": "string"
+        },
+        "fieldContextJson": {
+          "type": "string",
+          "description": "JSON blob: field metadata, current value, autocompleteExampleObj, etc."
+        }
+      }
+    },
+    "ConfigAssistantSuggestConfigurationFieldResponse": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
         }
       }
     },
