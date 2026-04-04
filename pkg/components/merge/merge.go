@@ -40,15 +40,15 @@ type ExecutionMetadata struct {
 	// EventIDs collects upstream event ids that reached this merge
 	EventIDs []string `json:"eventIDs,omitempty" mapstructure:"eventIDs"`
 
-	// Sources collects distinct upstream source node ids that reached this merge
-	Sources []SourceMetadata `json:"sources,omitempty" mapstructure:"sources"`
+	// Sources collects distinct upstream source nodes that reached this merge
+	SourceNodes []SourceNode `json:"sourceNodes,omitempty" mapstructure:"sourceNodes"`
 
 	// StopEarly indicates the merge was short-circuited based on a stop condition
 	StopEarly bool `json:"stopEarly,omitempty" mapstructure:"stopEarly"`
 }
 
 func (m *ExecutionMetadata) HasReceivedAll() bool {
-	for _, s := range m.Sources {
+	for _, s := range m.SourceNodes {
 		if s.ReceivedAt == nil {
 			return false
 		}
@@ -58,7 +58,13 @@ func (m *ExecutionMetadata) HasReceivedAll() bool {
 }
 
 func (m *ExecutionMetadata) UpdateSource(nodeID string) {
-	i := slices.IndexFunc(m.Sources, func(s SourceMetadata) bool {
+	if m.SourceNodes == nil {
+		m.SourceNodes = []SourceNode{
+			{NodeID: nodeID},
+		}
+	}
+
+	i := slices.IndexFunc(m.SourceNodes, func(s SourceNode) bool {
 		return s.NodeID == nodeID
 	})
 
@@ -67,10 +73,10 @@ func (m *ExecutionMetadata) UpdateSource(nodeID string) {
 	}
 
 	now := time.Now().Format(time.RFC3339)
-	m.Sources[i].ReceivedAt = &now
+	m.SourceNodes[i].ReceivedAt = &now
 }
 
-type SourceMetadata struct {
+type SourceNode struct {
 	NodeID     string  `json:"nodeId,omitempty" mapstructure:"nodeId"`
 	ReceivedAt *string `json:"receivedAt,omitempty" mapstructure:"receivedAt"`
 }
@@ -263,7 +269,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		return nil, fmt.Errorf("error updating node state: %v", err)
 	}
 
-	md, err := m.addEventToMetadata(ctx, executionCtx, incomingSources)
+	md, err := m.addEventToMetadata(ctx, executionCtx)
 	if err != nil {
 		return nil, fmt.Errorf("error adding event to metadata: %v", err)
 	}
@@ -364,18 +370,18 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 		return nil, err
 	}
 
-	sources := []SourceMetadata{}
+	sourceNodes := []SourceNode{}
 	for _, source := range incomingSources {
-		sources = append(sources, SourceMetadata{
+		sourceNodes = append(sourceNodes, SourceNode{
 			NodeID:     source.ID,
 			ReceivedAt: nil,
 		})
 	}
 
 	md := &ExecutionMetadata{
-		GroupKey: mergeGroup,
-		EventIDs: []string{},
-		Sources:  sources,
+		GroupKey:    mergeGroup,
+		EventIDs:    []string{},
+		SourceNodes: sourceNodes,
 	}
 
 	err = executionCtx.Metadata.Set(md)
@@ -386,7 +392,7 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 	return executionCtx, nil
 }
 
-func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *core.ExecutionContext, incomingSources []core.Node) (*ExecutionMetadata, error) {
+func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *core.ExecutionContext) (*ExecutionMetadata, error) {
 	md := &ExecutionMetadata{}
 	err := mapstructure.Decode(executionCtx.Metadata.Get(), md)
 	if err != nil {

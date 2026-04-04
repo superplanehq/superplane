@@ -37,11 +37,11 @@ type Outputs = {
 interface ExecutionMetadata {
   groupKey?: string;
   eventIDs?: string[];
-  sources?: Source[];
+  sourceNodes?: SourceNode[];
   stopEarly?: boolean;
 }
 
-interface Source {
+interface SourceNode {
   nodeId: string;
   receivedAt?: string;
 }
@@ -212,9 +212,9 @@ function sourceSummary(metadata: ExecutionMetadata | undefined): SourceSummary {
     received: 0,
   };
 
-  if (metadata?.sources) {
-    summary.expected = metadata.sources.length;
-    summary.received = metadata.sources.filter((s) => s.receivedAt).length;
+  if (metadata?.sourceNodes) {
+    summary.expected = metadata.sourceNodes.length;
+    summary.received = metadata.sourceNodes.filter((s) => s.receivedAt).length;
   }
 
   return summary;
@@ -238,15 +238,15 @@ function withSources(
   metadata: ExecutionMetadata | undefined,
   nodes: NodeInfo[],
 ): Record<string, string> {
-  if (!metadata?.sources) {
+  if (!metadata?.sourceNodes) {
     return details;
   }
 
-  const received = metadata.sources
+  const received = metadata.sourceNodes
     .filter((s) => s.receivedAt)
     .sort((a, b) => new Date(a.receivedAt!).getTime() - new Date(b.receivedAt!).getTime());
 
-  const unreceived = metadata.sources.filter((s) => !s.receivedAt);
+  const unreceived = metadata.sourceNodes.filter((s) => !s.receivedAt);
 
   //
   // Add the received sources first.
