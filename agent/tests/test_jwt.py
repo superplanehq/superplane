@@ -1,6 +1,7 @@
 import jwt
+import pytest
 
-from ai.jwt import JwtValidator
+from ai.jwt import JwtValidator, WrongScopedPurposeError
 
 
 def test_jwt_validator_decodes_agent_builder_token() -> None:
@@ -54,3 +55,81 @@ def test_jwt_validator_decodes_config_assistant_token() -> None:
     assert claims.org_id == "org-456"
     assert claims.purpose == "config-assistant"
     assert claims.scopes == ["canvases:read:canvas-456", "org:read"]
+
+
+def test_decode_agent_builder_token_accepts_builder_purpose() -> None:
+    jwt_secret = "test-jwt-secret-with-at-least-32-bytes"
+    token = jwt.encode(
+        {
+            "aud": "superplane_api",
+            "token_type": "scoped",
+            "purpose": "agent-builder",
+            "sub": "user-123",
+            "org_id": "org-123",
+            "scopes": ["canvases:read:canvas-123", "org:read"],
+        },
+        jwt_secret,
+        algorithm="HS256",
+    )
+
+    claims = JwtValidator(jwt_secret=jwt_secret).decode_agent_builder_token(token)
+
+    assert claims.purpose == "agent-builder"
+
+
+def test_decode_agent_builder_token_rejects_config_assistant_purpose() -> None:
+    jwt_secret = "test-jwt-secret-with-at-least-32-bytes"
+    token = jwt.encode(
+        {
+            "aud": "superplane_api",
+            "token_type": "scoped",
+            "purpose": "config-assistant",
+            "sub": "user-123",
+            "org_id": "org-123",
+            "scopes": ["canvases:read:canvas-123", "org:read"],
+        },
+        jwt_secret,
+        algorithm="HS256",
+    )
+
+    with pytest.raises(WrongScopedPurposeError, match="not valid for AI Builder"):
+        JwtValidator(jwt_secret=jwt_secret).decode_agent_builder_token(token)
+
+
+def test_decode_config_assistant_token_accepts_config_assistant_purpose() -> None:
+    jwt_secret = "test-jwt-secret-with-at-least-32-bytes"
+    token = jwt.encode(
+        {
+            "aud": "superplane_api",
+            "token_type": "scoped",
+            "purpose": "config-assistant",
+            "sub": "user-456",
+            "org_id": "org-456",
+            "scopes": ["canvases:read:canvas-456", "org:read"],
+        },
+        jwt_secret,
+        algorithm="HS256",
+    )
+
+    claims = JwtValidator(jwt_secret=jwt_secret).decode_config_assistant_token(token)
+
+    assert claims.purpose == "config-assistant"
+
+
+def test_decode_config_assistant_token_rejects_agent_builder_purpose() -> None:
+    jwt_secret = "test-jwt-secret-with-at-least-32-bytes"
+    token = jwt.encode(
+        {
+            "aud": "superplane_api",
+            "token_type": "scoped",
+            "purpose": "agent-builder",
+            "sub": "user-123",
+            "org_id": "org-123",
+            "scopes": ["canvases:read:canvas-123", "org:read"],
+        },
+        jwt_secret,
+        algorithm="HS256",
+    )
+
+    with pytest.raises(WrongScopedPurposeError, match="not valid for config assistant"):
+        JwtValidator(jwt_secret=jwt_secret).decode_config_assistant_token(token)

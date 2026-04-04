@@ -135,7 +135,7 @@ def _load_message_history(store: SessionStore, chat_id: str) -> Any:
 def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, StoredAgentChat]:
     api_token = _resolve_required_bearer_token(request)
     jwt_validator = JwtValidator.from_env()
-    claims = jwt_validator.decode(api_token)
+    claims = jwt_validator.decode_agent_builder_token(api_token)
     store: SessionStore = request.app.state.session_store
     chat = store.get_agent_chat(chat_id)
     if chat.org_id != claims.org_id or chat.user_id != claims.subject:

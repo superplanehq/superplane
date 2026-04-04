@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 
-from ai.jwt import JwtValidator
+from ai.jwt import JwtValidator, WrongScopedPurposeError
 from config_assistant.agent import (
     build_config_assistant_agent,
     build_user_prompt,
@@ -22,12 +22,11 @@ def build_config_assistant_router() -> APIRouter:
         token = _resolve_required_bearer_token(request)
         validator = JwtValidator.from_env()
         try:
-            claims = validator.decode(token)
+            claims = validator.decode_config_assistant_token(token)
+        except WrongScopedPurposeError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=401, detail=str(exc)) from exc
-
-        if claims.purpose != "config-assistant":
-            raise HTTPException(status_code=403, detail="Invalid token purpose.")
 
         try:
             canvas_id = validator.validate_canvas(payload.canvas_id, claims)
