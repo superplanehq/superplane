@@ -272,9 +272,6 @@ export type CanvasesCanvasNodeExecution = {
   result?: CanvasNodeExecutionResult;
   resultReason?: CanvasNodeExecutionResultReason;
   resultMessage?: string;
-  input?: {
-    [key: string]: unknown;
-  };
   outputs?: {
     [key: string]: unknown;
   };
