@@ -26,6 +26,7 @@ docker buildx build \
   --provenance=false \
   --push \
   --target dev-base \
+  --cache-to type=inline \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
   -f Dockerfile \
   .
