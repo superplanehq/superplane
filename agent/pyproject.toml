@@ -2,13 +2,13 @@
 name = "pydanticai-bootstrap"
 version = "0.1.0"
 description = "Bootstrap repository for PydanticAI services"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi>=0.135.1",
   "grpcio>=1.71.0",
   "PyJWT>=2.10.1",
   "protobuf>=5.29.0",
-  "psycopg[binary]>=3.2.9",
+  "psycopg[binary]>=3.2.9,<3.3.0",
   "python-dateutil>=2.9.0",
   "pydantic>=2.11.0",
   "pydantic-ai>=0.4.0",
@@ -37,17 +37,14 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py312"
 extend-exclude = ["src/private", "src/superplaneapi"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
-[tool.ruff.lint.per-file-ignores]
-"src/ai/superplane_client.py" = ["E402"]
-
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.12"
 strict = true
 files = ["src", "tests", "evals"]
 exclude = ["src/private", "src/superplaneapi"]
