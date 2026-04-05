@@ -93,10 +93,6 @@ test.agent.unit:
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
 
-setup.playwright:
-	$(COMPOSE) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
-	$(COMPOSE) exec app bash -c "if [ -d /app/tmp/ms-playwright ] && [ \"$(ls -A /app/tmp/ms-playwright 2>/dev/null)\" ]; then echo \"Playwright browsers cache present, skipping install\"; else bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps; fi"
-
 #
 # Code formatting
 #
