@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { GroupsGroup, RolesRole, SuperplaneUsersUser, CanvasesCanvasNodeExecution } from "@/api-client";
 import { groupsListGroupUsers, canvasesInvokeNodeExecutionAction } from "@/api-client";
 import type {
@@ -12,6 +11,7 @@ import type {
   NodeInfo,
   StateFunction,
   SubtitleContext,
+  User,
 } from "./types";
 import type {
   ComponentBaseProps,
@@ -32,10 +32,37 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { showErrorToast } from "@/lib/toast";
+import { formatRelativeTime } from "@/lib/timezone";
 
-type ApprovalConfiguration = {
+type Configuration = {
   items: ApprovalItem[];
 };
+
+type Metadata = {
+  result: string;
+  records: ApprovalRecord[];
+};
+
+type ApprovalRecord = {
+  index: number;
+  state: string;
+  type: string;
+  user?: User;
+  role?: string;
+  group?: string;
+  approval?: ApprovalDetail;
+  rejection?: RejectionDetail;
+};
+
+type ApprovalDetail = {
+  approvedAt?: string;
+  comment?: string;
+}
+
+type RejectionDetail = {
+  rejectedAt?: string;
+  reason?: string;
+}
 
 type ApprovalItem = {
   type: string;
@@ -86,7 +113,6 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 /**
  * Approval-specific state logic function
  */
-// eslint-disable-next-line complexity
 export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
   if (
     execution.resultMessage &&
@@ -112,7 +138,7 @@ export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNo
 
   // Check execution outputs for approval/rejection decision
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const metadata = execution.metadata as Record<string, any> | undefined;
+    const metadata = execution.metadata as Metadata | undefined;
     if (metadata?.result === "approved") {
       return "approved";
     }
@@ -140,7 +166,7 @@ export const APPROVAL_STATE_REGISTRY: EventStateRegistry = {
 export const approvalMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const configuration = context.node.configuration as ApprovalConfiguration;
+    const configuration = context.node.configuration as Configuration;
     const items = (configuration.items || []) as ApprovalItem[];
     const approvals = (context.additionalData as { approvals?: ApprovalItemProps[] })?.approvals || [];
 
@@ -165,9 +191,8 @@ export const approvalMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const metadata = context.execution.metadata as Record<string, unknown> | undefined;
-    const records = (metadata?.records as ApprovalRecord[] | undefined) || [];
+    const details: Record<string, string> = {};
+    const metadata = context.execution.metadata as Metadata | undefined;
 
     if (context.execution.createdAt) {
       details["Started at"] = new Date(context.execution.createdAt).toLocaleString();
@@ -177,13 +202,68 @@ export const approvalMapper: ComponentBaseMapper = {
       details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
 
-    if (context.execution.result !== "RESULT_CANCELLED") {
-      details["Approvals"] = buildApprovalTimeline(records);
-    }
-
-    return details;
+    return withApprovals(details, metadata);
   },
 };
+
+function getRecordTypeLabel(record: ApprovalRecord): string {
+  switch (record.type) {
+    case "role":
+      return ` as ${record.role || "Role"}`;
+    case "group":
+      return ` as ${record.group || "Group"}`;
+    default:
+      return "";
+  }
+}
+
+function getApprovalDetail(detail: ApprovalDetail, record: ApprovalRecord): string {
+  if (!detail.approvedAt) {
+    return "-"
+  }
+
+  let label = `Approved ${formatRelativeTime(detail.approvedAt, true)}` + getRecordTypeLabel(record);
+  if (detail.comment) {
+    label += ` - ${detail.comment}`;
+  }
+
+  return label;
+}
+
+function getRejectionDetail(detail: RejectionDetail, record: ApprovalRecord): string {
+  if (!detail.rejectedAt) {
+    return "-"
+  }
+
+  let label = `Rejected ${formatRelativeTime(detail.rejectedAt, true)}` + getRecordTypeLabel(record);
+  if (detail.reason) {
+    label += ` - ${detail.reason}`;
+  }
+  return label;
+}
+
+function withApprovals(details: Record<string, string>, metadata: Metadata | undefined): Record<string, string> {
+  if (!metadata) return details;
+
+  details["Result"] = metadata.result;
+
+  for (const record of metadata.records) {
+    if (record.approval) {
+      const userLabel = record.user?.name || record.user?.email || "User";
+      details[userLabel] = getApprovalDetail(record.approval, record)
+      continue
+    }
+
+    if (record.rejection) {
+      const userLabel = record.user?.name || record.user?.email || "User";
+      details[userLabel] = getRejectionDetail(record.rejection, record)
+      continue;
+    }
+  }
+    
+
+  return details;
+}
 
 function getApprovalCustomField(
   lastExecution: ExecutionInfo | null,
@@ -206,26 +286,24 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
       title: "approvals required",
       tooltipTitle: "approvals required",
       values: items.map(
-        // eslint-disable-next-line complexity
         (item) => {
-          const type = (item.type || "").toString();
           let value =
-            type === "anyone"
+            item.type === "anyone"
               ? "Anyone"
-              : type === "user"
+              : item.type === "user"
                 ? item.user || ""
-                : type === "role"
+                : item.type === "role"
                   ? item.role || ""
-                  : type === "group"
+                  : item.type === "group"
                     ? item.group || ""
                     : "";
-          const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+          const label = item.type ? `${item.type[0].toUpperCase()}${item.type.slice(1)}` : "Item";
 
           // Pretty-print values
-          if (type === "user" && value && usersById[value]) {
+          if (item.type === "user" && value && usersById[value]) {
             value = usersById[value].email || usersById[value].name || value;
           }
-          if (type === "role" && value) {
+          if (item.type === "role" && value) {
             value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
             // Fallback to simple suffix mapping when not found
             const suffix = (item.role || "").split("_").pop();
@@ -304,7 +382,6 @@ function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown
   return "";
 }
 
-// eslint-disable-next-line complexity
 function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLabelMaps): string {
   const rolesByName = labelMaps?.rolesByName;
   const groupsByName = labelMaps?.groupsByName;
@@ -331,102 +408,6 @@ function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLa
 
   return "Approver";
 }
-
-function buildApprovalTimeline(records: ApprovalRecord[]) {
-  return [...records]
-    .sort((a, b) => {
-      const aTimestamp = getApprovalDecisionTimestampValue(a);
-      const bTimestamp = getApprovalDecisionTimestampValue(b);
-
-      if (aTimestamp === null && bTimestamp === null) return 0;
-      if (aTimestamp === null) return 1;
-      if (bTimestamp === null) return -1;
-
-      return aTimestamp - bTimestamp;
-    })
-    .map((record) => {
-      const meta = getApprovalDecisionMeta(record);
-      return {
-        label: getApprovalDecisionLabel(record),
-        status: meta.status,
-        timestamp: meta.timestamp,
-        comment: meta.comment,
-      };
-    });
-}
-
-function getApprovalDecisionMeta(record: ApprovalRecord): {
-  status: string;
-  timestamp?: string | React.ReactNode;
-  comment?: string;
-} {
-  const approvalComment = record.approval?.comment?.trim();
-  const rejectionReason = record.rejection?.reason?.trim();
-  const comment = approvalComment || rejectionReason;
-
-  if (record.state === "approved") {
-    return {
-      status: "Approved",
-      timestamp: formatDecisionTimestamp(record.approval?.approvedAt),
-      comment,
-    };
-  }
-
-  if (record.state === "rejected") {
-    return {
-      status: "Rejected",
-      timestamp: formatDecisionTimestamp(record.rejection?.rejectedAt),
-      comment,
-    };
-  }
-
-  return {
-    status: "Pending",
-    comment,
-  };
-}
-
-function formatDecisionTimestamp(timestamp?: string): string | React.ReactNode | undefined {
-  if (!timestamp) return undefined;
-
-  const parsed = new Date(timestamp);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-
-  return renderTimeAgo(parsed);
-}
-
-function getApprovalDecisionTimestampValue(record: ApprovalRecord): number | null {
-  const timestamp =
-    record.state === "approved"
-      ? record.approval?.approvedAt
-      : record.state === "rejected"
-        ? record.rejection?.rejectedAt
-        : undefined;
-
-  if (!timestamp) {
-    return null;
-  }
-
-  const parsed = new Date(timestamp).getTime();
-  if (Number.isNaN(parsed)) {
-    return null;
-  }
-
-  return parsed;
-}
-
-// ----------------------- Data Builder -----------------------
-
-type ApprovalRecord = {
-  index: number;
-  state: string;
-  type: string;
-  user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
-  role?: string;
-  group?: string;
-  approval?: { approvedAt?: string; comment?: string };
-  rejection?: { rejectedAt?: string; reason?: string };
-};
 
 export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
   buildAdditionalData(context: AdditionalDataBuilderContext) {
@@ -566,7 +547,7 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
         approved: record.state === "approved",
         rejected: record.state === "rejected",
         approverName: record.user?.name,
-        approverAvatar: record.user?.avatarUrl,
+        // approverAvatar: record.user?.avatarUrl,
         rejectionComment: record.rejection?.reason,
         interactive: canAct,
         requireArtifacts: canAct

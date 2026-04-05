@@ -374,10 +374,10 @@ func (a *Approval) Configuration() []configuration.Field {
 								TypeOptions: &configuration.TypeOptions{
 									Select: &configuration.SelectTypeOptions{
 										Options: []configuration.FieldOption{
-											{Value: "anyone", Label: "Everyone"},
-											{Value: "user", Label: "Specific user"},
-											{Value: "group", Label: "Group"},
-											{Value: "role", Label: "Role"},
+											{Value: ItemTypeAnyone, Label: "Any one"},
+											{Value: ItemTypeUser, Label: "Specific user"},
+											{Value: ItemTypeGroup, Label: "Group"},
+											{Value: ItemTypeRole, Label: "Role"},
 										},
 									},
 								},
@@ -389,7 +389,7 @@ func (a *Approval) Configuration() []configuration.Field {
 								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
-										Values: []string{"user"},
+										Values: []string{ItemTypeUser},
 									},
 								},
 							},
@@ -400,7 +400,7 @@ func (a *Approval) Configuration() []configuration.Field {
 								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
-										Values: []string{"role"},
+										Values: []string{ItemTypeRole},
 									},
 								},
 							},
@@ -411,7 +411,7 @@ func (a *Approval) Configuration() []configuration.Field {
 								VisibilityConditions: []configuration.VisibilityCondition{
 									{
 										Field:  "type",
-										Values: []string{"group"},
+										Values: []string{ItemTypeGroup},
 									},
 								},
 							},
@@ -423,6 +423,7 @@ func (a *Approval) Configuration() []configuration.Field {
 	}
 }
 
+// TODO: no validation here?
 func (a *Approval) Setup(ctx core.SetupContext) error {
 	return nil
 }
