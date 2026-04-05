@@ -1,12 +1,7 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: dev
-
+    image: ghcr.io/superplanehq/superplane-dev-base:v7
     tty: true
-
     command: bash /app/docker-entrypoint.dev.sh
     environment:
       DB_HOST: "db"
@@ -29,7 +24,7 @@ services:
       GOCACHE: "/app/tmp/go-build"
       XDG_CACHE_HOME: "/app/tmp"
       # Lock Playwright browsers location so install and runtime match
-      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
+      PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
@@ -113,10 +108,7 @@ services:
       - /tmp:/tmp
 
   agent:
-    build:
-      context: agent
-      dockerfile: Dockerfile
-      target: dev
+    image: ghcr.io/superplanehq/superplane-dev-base:v7
     working_dir: /app/agent
     env_file:
       - agent/.env
@@ -139,11 +131,9 @@ services:
       --factory
       --host 0.0.0.0
       --port 8090
-      --timeout-graceful-shutdown 310
       --reload
       --reload-dir /app/agent/src
       --reload-dir /app/agent/evals"
-    stop_grace_period: 330s
     tty: true
     stdin_open: true
     ports:
@@ -194,9 +184,6 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
-    volumes:
-      - ./scripts/docker/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
-      - ./scripts/docker/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
     ports:
       - ${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}
       - ${RABBITMQ_MANAGEMENT_PORT:-15672}:${RABBITMQ_MANAGEMENT_PORT:-15672}
