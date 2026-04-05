@@ -10,6 +10,7 @@ export interface ComponentHeaderProps extends ComponentActionsProps {
   title: string;
   onDoubleClick?: () => void;
   statusBadgeColor?: string;
+  isRunning?: boolean;
 }
 
 export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
@@ -19,6 +20,7 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   title,
   onDoubleClick,
   statusBadgeColor,
+  isRunning = false,
   isCompactView = false,
 }) => {
   const Icon = React.useMemo(() => {
@@ -47,7 +49,10 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
           <h2 className="text-sm font-semibold">{title}</h2>
         </div>
         {isCompactView && statusBadgeColor ? (
-          <span className={`h-2.5 w-2.5 rounded-full ${statusBadgeColor}`} aria-hidden="true" />
+          <span
+            className={`h-2.5 w-2.5 rounded-full ${statusBadgeColor} ${isRunning ? "animate-pulse" : ""}`}
+            aria-hidden="true"
+          />
         ) : null}
       </div>
     </div>
