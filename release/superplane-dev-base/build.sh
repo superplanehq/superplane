@@ -25,6 +25,8 @@ docker buildx build \
   --progress=plain \
   --provenance=false \
   --push \
+  --target dev-base \
+  --cache-to type=inline \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
-  -f release/superplane-dev-base/Dockerfile \
+  -f Dockerfile \
   .
