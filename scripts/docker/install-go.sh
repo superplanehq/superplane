@@ -21,4 +21,4 @@ tar -C /usr/local -xzf go.tar.gz
 rm go.tar.gz
 
 apt-get clean
-rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/*
+rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
