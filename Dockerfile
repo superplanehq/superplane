@@ -8,7 +8,7 @@ ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 # Used for local development and testing.
 # ----------------------------------------------------------------------------------------------------------------------
 
-FROM ${UBUNTU_VERSION} AS dev-base
+FROM ubuntu:${UBUNTU_VERSION} AS dev-base
 
 ARG GO_VERSION
 ARG PLAYWRIGHT_GO_VERSION
