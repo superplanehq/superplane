@@ -2289,6 +2289,471 @@ func (c *Client) ListApps() ([]App, error) {
 	return response.Apps, nil
 }
 
+// EmbeddingModel represents a DigitalOcean Gradient AI embedding model
+type EmbeddingModel struct {
+	UUID               string `json:"uuid"`
+	Name               string `json:"name"`
+	Description        string `json:"description"`
+	KBMinChunkSize     int    `json:"kb_min_chunk_size"`
+	KBMaxChunkSize     int    `json:"kb_max_chunk_size"`
+	KBDefaultChunkSize int    `json:"kb_default_chunk_size"`
+}
+
+// ListEmbeddingModels retrieves all embedding models available for knowledge base vectorization
+func (c *Client) ListEmbeddingModels() ([]EmbeddingModel, error) {
+	url := fmt.Sprintf("%s/gen-ai/models?usecases=MODEL_USECASE_KNOWLEDGEBASE&per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Models []EmbeddingModel `json:"models"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Models, nil
+}
+
+// Project represents a DigitalOcean project
+type Project struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Purpose     string `json:"purpose"`
+	Environment string `json:"environment"`
+	IsDefault   bool   `json:"is_default"`
+}
+
+// ListProjects retrieves all projects in the account
+func (c *Client) ListProjects() ([]Project, error) {
+	url := fmt.Sprintf("%s/projects?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Projects []Project `json:"projects"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Projects, nil
+}
+
+// Database represents a DigitalOcean managed database cluster
+type Database struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Engine string `json:"engine"`
+	Status string `json:"status"`
+}
+
+// ListDatabasesByEngine retrieves all managed database clusters filtered by engine
+func (c *Client) ListDatabasesByEngine(engine string) ([]Database, error) {
+	url := fmt.Sprintf("%s/databases?engine=%s&per_page=200", c.BaseURL, engine)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Databases []Database `json:"databases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Databases, nil
+}
+
+// KnowledgeBase represents a DigitalOcean Gradient AI knowledge base
+type KnowledgeBase struct {
+	UUID               string    `json:"uuid"`
+	Name               string    `json:"name"`
+	EmbeddingModelUUID string    `json:"embedding_model_uuid"`
+	Region             string    `json:"region"`
+	ProjectID          string    `json:"project_id"`
+	Tags               []string  `json:"tags"`
+	DatabaseID         string    `json:"database_id"`
+	Status             string    `json:"status"`
+	LastIndexingJob    *IndexJob `json:"last_indexing_job"`
+	CreatedAt          string    `json:"created_at"`
+	UpdatedAt          string    `json:"updated_at"`
+}
+
+// GetKnowledgeBase retrieves a knowledge base by its UUID
+func (c *Client) GetKnowledgeBase(kbUUID string) (*KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s", c.BaseURL, kbUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBase KnowledgeBase `json:"knowledge_base"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.KnowledgeBase, nil
+}
+
+// KBSpacesDataSource defines a Spaces bucket data source for a knowledge base
+type KBSpacesDataSource struct {
+	BucketName string `json:"bucket_name"`
+	Region     string `json:"region"`
+}
+
+// KBWebCrawlerDataSource defines a web crawler data source for a knowledge base
+type KBWebCrawlerDataSource struct {
+	BaseURL        string   `json:"base_url"`
+	CrawlingOption string   `json:"crawling_option,omitempty"`
+	EmbedMedia     bool     `json:"embed_media"`
+	ExcludeTags    []string `json:"exclude_tags,omitempty"`
+}
+
+// KBChunkingOptions defines chunking configuration for a knowledge base data source
+type KBChunkingOptions struct {
+	MaxChunkSize      int     `json:"max_chunk_size,omitempty"`
+	SemanticThreshold float64 `json:"semantic_threshold,omitempty"`
+	ParentChunkSize   int     `json:"parent_chunk_size,omitempty"`
+	ChildChunkSize    int     `json:"child_chunk_size,omitempty"`
+}
+
+// KBDataSource represents a single data source in a knowledge base
+type KBDataSource struct {
+	SpacesDataSource     *KBSpacesDataSource     `json:"spaces_data_source,omitempty"`
+	WebCrawlerDataSource *KBWebCrawlerDataSource `json:"web_crawler_data_source,omitempty"`
+	ChunkingAlgorithm    string                  `json:"chunking_algorithm,omitempty"`
+	ChunkingOptions      *KBChunkingOptions      `json:"chunking_options,omitempty"`
+}
+
+// CreateKnowledgeBaseRequest is the payload for POST /v2/gen-ai/knowledge_bases
+type CreateKnowledgeBaseRequest struct {
+	Name               string         `json:"name"`
+	EmbeddingModelUUID string         `json:"embedding_model_uuid"`
+	Region             string         `json:"region,omitempty"`
+	ProjectID          string         `json:"project_id"`
+	Tags               []string       `json:"tags,omitempty"`
+	DatabaseID         string         `json:"database_id,omitempty"`
+	DataSources        []KBDataSource `json:"datasources,omitempty"`
+}
+
+// CreateKnowledgeBase creates a new Gradient AI knowledge base
+func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases", c.BaseURL)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBase KnowledgeBase `json:"knowledge_base"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.KnowledgeBase, nil
+}
+
+// IndexJob represents a DigitalOcean Gradient AI knowledge base indexing job
+type IndexJob struct {
+	UUID   string `json:"uuid"`
+	Status string `json:"status"`
+}
+
+// StartIndexingJob triggers a new indexing job for a knowledge base
+func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
+	url := fmt.Sprintf("%s/gen-ai/index_jobs", c.BaseURL)
+
+	body, err := json.Marshal(map[string]string{"knowledge_base_uuid": kbUUID})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		IndexJob IndexJob `json:"index_job"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.IndexJob, nil
+}
+
+// AgentKnowledgeBase represents a knowledge base attached to a GradientAI agent
+type AgentKnowledgeBase struct {
+	UUID string `json:"uuid"`
+	Name string `json:"name"`
+}
+
+// Agent represents a DigitalOcean GradientAI agent
+type Agent struct {
+	UUID           string               `json:"uuid"`
+	Name           string               `json:"name"`
+	KnowledgeBases []AgentKnowledgeBase `json:"knowledge_bases"`
+}
+
+// GetAgent retrieves a GradientAI agent by its UUID
+func (c *Client) GetAgent(agentUUID string) (*Agent, error) {
+	url := fmt.Sprintf("%s/gen-ai/agents/%s", c.BaseURL, agentUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agent Agent `json:"agent"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Agent, nil
+}
+
+// ListAgents retrieves all GradientAI agents in the account
+func (c *Client) ListAgents() ([]Agent, error) {
+	url := fmt.Sprintf("%s/gen-ai/agents?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Agents []Agent `json:"agents"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Agents, nil
+}
+
+// ListKnowledgeBases retrieves all GradientAI knowledge bases in the account
+func (c *Client) ListKnowledgeBases() ([]KnowledgeBase, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		KnowledgeBases []KnowledgeBase `json:"knowledge_bases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.KnowledgeBases, nil
+}
+
+// AttachKnowledgeBase attaches a knowledge base to a GradientAI agent.
+// Uses POST /v2/gen-ai/agents/{agent_uuid}/knowledge_bases/{knowledge_base_uuid}
+func (c *Client) AttachKnowledgeBase(agentUUID, kbUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/agents/%s/knowledge_bases/%s", c.BaseURL, agentUUID, kbUUID)
+
+	body, err := json.Marshal(map[string]string{
+		"agent_uuid":          agentUUID,
+		"knowledge_base_uuid": kbUUID,
+	})
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	return err
+}
+
+// DetachKnowledgeBase detaches a knowledge base from a GradientAI agent
+func (c *Client) DetachKnowledgeBase(agentUUID, kbUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/agents/%s/knowledge_bases/%s", c.BaseURL, agentUUID, kbUUID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// DeleteKnowledgeBase deletes a knowledge base by its UUID
+func (c *Client) DeleteKnowledgeBase(kbUUID string) error {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s", c.BaseURL, kbUUID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// DeleteDatabase deletes a managed database cluster by its ID
+func (c *Client) DeleteDatabase(databaseID string) error {
+	url := fmt.Sprintf("%s/databases/%s", c.BaseURL, databaseID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+// EvaluationTestCase represents a Gradient AI evaluation test case
+type EvaluationTestCase struct {
+	UUID        string `json:"test_case_uuid"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// EvaluationMetricResult represents a single metric score in an evaluation run
+type EvaluationMetricResult struct {
+	MetricName       string  `json:"metric_name"`
+	MetricValueType  string  `json:"metric_value_type"`
+	NumberValue      float64 `json:"number_value"`
+	StringValue      string  `json:"string_value"`
+	Reasoning        string  `json:"reasoning"`
+	ErrorDescription string  `json:"error_description"`
+}
+
+// EvaluationRun represents a Gradient AI evaluation run
+type EvaluationRun struct {
+	UUID                string                   `json:"evaluation_run_uuid"`
+	Status              string                   `json:"status"`
+	PassStatus          bool                     `json:"pass_status"`
+	AgentUUID           string                   `json:"agent_uuid"`
+	AgentName           string                   `json:"agent_name"`
+	TestCaseUUID        string                   `json:"test_case_uuid"`
+	TestCaseName        string                   `json:"test_case_name"`
+	TestCaseDescription string                   `json:"test_case_description"`
+	RunName             string                   `json:"run_name"`
+	StarMetricResult    *EvaluationMetricResult  `json:"star_metric_result"`
+	RunLevelMetrics     []EvaluationMetricResult `json:"run_level_metric_results"`
+	ErrorDescription    string                   `json:"error_description"`
+	QueuedAt            string                   `json:"queued_at"`
+	StartedAt           string                   `json:"started_at"`
+	FinishedAt          string                   `json:"finished_at"`
+}
+
+// EvaluationPrompt represents a single prompt and its results in an evaluation run
+type EvaluationPrompt struct {
+	PromptID     int                      `json:"prompt_id"`
+	Input        string                   `json:"input"`
+	Output       string                   `json:"output"`
+	GroundTruth  string                   `json:"ground_truth"`
+	InputTokens  string                   `json:"input_tokens"`
+	OutputTokens string                   `json:"output_tokens"`
+	Metrics      []EvaluationMetricResult `json:"prompt_level_metric_results"`
+}
+
+// EvaluationRunResults contains the full evaluation run results including per-prompt details
+type EvaluationRunResults struct {
+	EvaluationRun EvaluationRun      `json:"evaluation_run"`
+	Prompts       []EvaluationPrompt `json:"prompts"`
+}
+
+// ListEvaluationTestCases retrieves all evaluation test cases
+func (c *Client) ListEvaluationTestCases() ([]EvaluationTestCase, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_test_cases?per_page=200", c.BaseURL)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		EvaluationTestCases []EvaluationTestCase `json:"evaluation_test_cases"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.EvaluationTestCases, nil
+}
+
+// RunEvaluation starts an evaluation run for a test case against the specified agents.
+// The API returns only the UUIDs of the created runs, not the full run objects.
+func (c *Client) RunEvaluation(testCaseUUID string, agentUUIDs []string, runName string) (string, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_runs", c.BaseURL)
+
+	body, err := json.Marshal(map[string]any{
+		"test_case_uuid": testCaseUUID,
+		"agent_uuids":    agentUUIDs,
+		"run_name":       runName,
+	})
+	if err != nil {
+		return "", fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+
+	var response struct {
+		EvaluationRunUUIDs []string `json:"evaluation_run_uuids"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return "", fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if len(response.EvaluationRunUUIDs) == 0 {
+		return "", fmt.Errorf("no evaluation run UUIDs returned")
+	}
+
+	return response.EvaluationRunUUIDs[0], nil
+}
+
+// GetEvaluationRun retrieves the status of an evaluation run
+func (c *Client) GetEvaluationRun(runUUID string) (*EvaluationRun, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_runs/%s", c.BaseURL, runUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		EvaluationRun EvaluationRun `json:"evaluation_run"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.EvaluationRun, nil
+}
+
+// GetEvaluationRunResults retrieves the full results of an evaluation run including per-prompt details
+func (c *Client) GetEvaluationRunResults(runUUID string) (*EvaluationRunResults, error) {
+	url := fmt.Sprintf("%s/gen-ai/evaluation_runs/%s/results", c.BaseURL, runUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response EvaluationRunResults
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response, nil
+}
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
