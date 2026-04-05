@@ -657,7 +657,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         kind: "variable",
         insertText: "$",
         detail: getValueTypeLabel(globals),
-        description: "Root selector for accessing payload data from all connected components.",
+        description: "Access output data from all nodes in the workflow.",
         nodeCount,
       });
     }

@@ -1292,7 +1292,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
                       <>
                         <div className="text-sm font-medium text-gray-950 dark:text-white mb-1">$ (Event Data)</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                          Root selector for accessing payload data from all connected components.
+                          Access output data from all nodes in the workflow.
                         </div>
                         <div className="text-xs font-mono bg-gray-900 dark:bg-gray-900 rounded px-2.5 py-2 text-sky-400">
                           {highlightedSuggestion.nodeCount ?? 0} node
