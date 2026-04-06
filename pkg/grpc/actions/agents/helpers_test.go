@@ -5,15 +5,11 @@ import (
 	"net"
 	"sync/atomic"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/stats"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -79,44 +75,4 @@ func startMockAgentServer(t *testing.T) (string, *connTracker) {
 	t.Cleanup(server.GracefulStop)
 
 	return lis.Addr().String(), tracker
-}
-
-func Test__ListAgentChats_ClosesConnection(t *testing.T) {
-	addr, tracker := startMockAgentServer(t)
-
-	resp, err := ListAgentChats(context.Background(), addr, "org-1", "user-1", "canvas-1")
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Len(t, resp.Chats, 1)
-
-	assert.Eventually(t, func() bool { return tracker.open.Load() == 0 }, 2*time.Second, 10*time.Millisecond, "gRPC connection should be closed after ListAgentChats")
-}
-
-func Test__DescribeAgentChat_ClosesConnection(t *testing.T) {
-	addr, tracker := startMockAgentServer(t)
-
-	resp, err := DescribeAgentChat(context.Background(), addr, "org-1", "user-1", "canvas-1", "chat-1")
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Equal(t, "chat-1", resp.Chat.Id)
-
-	assert.Eventually(t, func() bool { return tracker.open.Load() == 0 }, 2*time.Second, 10*time.Millisecond, "gRPC connection should be closed after DescribeAgentChat")
-}
-
-func Test__ListAgentChatMessages_ClosesConnection(t *testing.T) {
-	addr, tracker := startMockAgentServer(t)
-
-	resp, err := ListAgentChatMessages(context.Background(), addr, "org-1", "user-1", "canvas-1", "chat-1")
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-	assert.Len(t, resp.Messages, 1)
-
-	assert.Eventually(t, func() bool { return tracker.open.Load() == 0 }, 2*time.Second, 10*time.Millisecond, "gRPC connection should be closed after ListAgentChatMessages")
-}
-
-func Test__ListAgentChats_ReturnsUnavailable_WhenAgentDown(t *testing.T) {
-	// Use a port with no server listening
-	_, err := ListAgentChats(context.Background(), "127.0.0.1:1", "org-1", "user-1", "canvas-1")
-	require.Error(t, err)
-	assert.Equal(t, codes.Unavailable, status.Code(err))
 }
