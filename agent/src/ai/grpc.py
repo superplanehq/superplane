@@ -114,7 +114,7 @@ class AgentsServicer:
         except Exception as error:
             print(f"[agent] failed to load org usage for org {request.org_id}: {error}", flush=True)
             context.abort(grpc.StatusCode.UNAVAILABLE, "failed to load organization usage")
-            return agents_pb2.DescribeOrganizationAgentUsageResponse()  # type: ignore[attr-defined]
+            raise error
 
         return agents_pb2.DescribeOrganizationAgentUsageResponse(  # type: ignore[attr-defined]
             usage=agents_pb2.ChatUsage(  # type: ignore[attr-defined]
