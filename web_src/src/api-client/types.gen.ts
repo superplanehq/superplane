@@ -1367,13 +1367,6 @@ export type UsersAccountProvider = {
   updatedAt?: string;
 };
 
-export type UsersListUserRolesResponse = {
-  userId?: string;
-  domainType?: AuthorizationDomainType;
-  domainId?: string;
-  roles?: Array<RolesRole>;
-};
-
 export type UsersListUsersResponse = {
   users?: Array<SuperplaneUsersUser>;
 };
@@ -4311,36 +4304,6 @@ export type UsersListUsersResponses = {
 };
 
 export type UsersListUsersResponse2 = UsersListUsersResponses[keyof UsersListUsersResponses];
-
-export type UsersListUserRolesData = {
-  body?: never;
-  path: {
-    userId: string;
-  };
-  query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
-    domainId?: string;
-  };
-  url: "/api/v1/users/{userId}/roles";
-};
-
-export type UsersListUserRolesErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type UsersListUserRolesError = UsersListUserRolesErrors[keyof UsersListUserRolesErrors];
-
-export type UsersListUserRolesResponses = {
-  /**
-   * A successful response.
-   */
-  200: UsersListUserRolesResponse;
-};
-
-export type UsersListUserRolesResponse2 = UsersListUserRolesResponses[keyof UsersListUserRolesResponses];
 
 export type WidgetsListWidgetsData = {
   body?: never;

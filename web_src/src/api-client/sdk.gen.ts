@@ -300,9 +300,6 @@ import type {
   TriggersListTriggersData,
   TriggersListTriggersErrors,
   TriggersListTriggersResponses,
-  UsersListUserRolesData,
-  UsersListUserRolesErrors,
-  UsersListUserRolesResponses,
   UsersListUsersData,
   UsersListUsersErrors,
   UsersListUsersResponses,
@@ -1879,19 +1876,6 @@ export const usersListUsers = <ThrowOnError extends boolean = true>(
 ) =>
   (options?.client ?? client).get<UsersListUsersResponses, UsersListUsersErrors, ThrowOnError>({
     url: "/api/v1/users",
-    ...options,
-  });
-
-/**
- * Get user roles
- *
- * Returns the roles a user has within a specific domain
- */
-export const usersListUserRoles = <ThrowOnError extends boolean = true>(
-  options: Options<UsersListUserRolesData, ThrowOnError>,
-) =>
-  (options.client ?? client).get<UsersListUserRolesResponses, UsersListUserRolesErrors, ThrowOnError>({
-    url: "/api/v1/users/{userId}/roles",
     ...options,
   });
 

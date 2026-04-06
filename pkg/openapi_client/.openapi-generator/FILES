@@ -262,7 +262,6 @@ docs/TriggersListTriggersResponse.md
 docs/TriggersTrigger.md
 docs/UsersAPI.md
 docs/UsersAccountProvider.md
-docs/UsersListUserRolesResponse.md
 docs/UsersListUsersResponse.md
 docs/UsersUserMetadata.md
 docs/UsersUserRoleAssignment.md
@@ -493,7 +492,6 @@ model_triggers_describe_trigger_response.go
 model_triggers_list_triggers_response.go
 model_triggers_trigger.go
 model_users_account_provider.go
-model_users_list_user_roles_response.go
 model_users_list_users_response.go
 model_users_user_metadata.go
 model_users_user_role_assignment.go

@@ -29,21 +29,6 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Users {
 
   //
-  // Endpoint for getting user roles within a domain
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/roles"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get user roles";
-      description: "Returns the roles a user has within a specific domain";
-      tags: "Users";
-    };
-  }
-
-  //
   // Endpoint for getting all users in a domain
   // Operation is synchronous and idempotent.
   //
