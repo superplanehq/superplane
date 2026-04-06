@@ -9,6 +9,19 @@ if TYPE_CHECKING:
 # Client sends tokens like @[node:some-node-id]
 _NODE_TOKEN_RE = re.compile(r"@\[node:([^\]]+)\]")
 
+# Must match expand_node_mentions_in_prompt (stripped before this marker for UI list API).
+REFERENCED_NODES_APPENDIX_MARKER = "\n\n### Referenced nodes"
+
+
+def strip_referenced_nodes_appendix_for_display(text: str) -> str:
+    """Remove server-only mention expansion; full text stays in stored model messages for the LLM."""
+    if not text.strip():
+        return text
+    idx = text.find(REFERENCED_NODES_APPENDIX_MARKER)
+    if idx == -1:
+        return text
+    return text[:idx].rstrip()
+
 
 def parse_node_mention_ids(question: str) -> list[str]:
     return list(dict.fromkeys(_NODE_TOKEN_RE.findall(question)))
@@ -38,4 +51,7 @@ def expand_node_mentions_in_prompt(question: str, deps: AgentDeps) -> str:
             f"- **{label}** (`{node.id}`): type={node.type or 'n/a'}, block={node.block_name or 'n/a'}"
         )
 
-    return f"{question.rstrip()}\n\n" + "\n".join(lines)
+    return (
+        f"{question.rstrip()}{REFERENCED_NODES_APPENDIX_MARKER}\n\n"
+        + "\n".join(lines[2:])
+    )

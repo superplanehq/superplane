@@ -22,6 +22,7 @@ from pydantic_ai.messages import (
 )
 
 from ai.config import config
+from ai.node_mentions import strip_referenced_nodes_appendix_for_display
 
 
 def _utcnow() -> datetime:
@@ -505,7 +506,9 @@ class SessionStore:
         if isinstance(model_message, ModelRequest):
             for index, part in enumerate(model_message.parts):
                 if isinstance(part, UserPromptPart):
-                    content = _user_content_to_text(part.content)
+                    content = strip_referenced_nodes_appendix_for_display(
+                        _user_content_to_text(part.content)
+                    )
                     if not content:
                         continue
                     flattened.append(
