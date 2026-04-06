@@ -14,14 +14,22 @@ from ai.session_store import SessionStore
 
 
 class PersistedRunRecorder:
-    def __init__(self, store: SessionStore, chat_id: str, user_prompt: str) -> None:
+    def __init__(
+        self,
+        store: SessionStore,
+        chat_id: str,
+        user_prompt: str,
+        *,
+        initial_message: str | None = None,
+    ) -> None:
         self._store = store
         self._chat_id = chat_id
         self._history_count_before_run = self._store.count_chat_model_messages(chat_id)
         self._authoritative_messages_saved = False
         self._current_response_message_id: str | None = None
         self._current_response: ModelResponse | None = None
-        self._store.set_initial_chat_message_if_missing(chat_id, user_prompt)
+        preview = (initial_message or user_prompt).strip()
+        self._store.set_initial_chat_message_if_missing(chat_id, preview)
         self._store.create_agent_chat_model_message(
             chat_id,
             ModelRequest(parts=[UserPromptPart(user_prompt)]),
