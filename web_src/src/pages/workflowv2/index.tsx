@@ -357,7 +357,7 @@ export function WorkflowPageV2() {
 
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
-        avatarUrl: user.spec?.accountProviders?.[0]?.avatarUrl || undefined,
+        avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
       });
     });
     return profilesByID;

@@ -29,7 +29,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       data: orgUsers = [],
       isLoading: loadingOrgUsers,
       error: orgUsersError,
-    } = useOrganizationUsers(organizationId, true);
+    } = useOrganizationUsers(organizationId);
     const {
       data: groupUsers = [],
       isLoading: loadingGroupUsers,
@@ -173,7 +173,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                         }}
                       />
                       <Avatar
-                        src={member.spec?.accountProviders?.[0]?.avatarUrl}
+                        src={member.status?.accountProviders?.[0]?.avatarUrl}
                         initials={member.spec?.displayName?.charAt(0) || "U"}
                         className="size-8"
                       />
