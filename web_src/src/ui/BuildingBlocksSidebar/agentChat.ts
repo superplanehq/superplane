@@ -22,7 +22,10 @@ import {
   clearChatPrompt,
   prependChatSession,
 } from "./agentChatUi";
+import { transcodeAiNodeMentions, type AiBuilderMentionNode } from "@/lib/aiBuilderNodeMentions";
 import type { AiCanvasOperation } from "./index";
+
+export type { AiBuilderMentionNode };
 
 export type AiBuilderMessage = {
   id: string;
@@ -237,6 +240,7 @@ type SendChatPromptArgs = {
   currentChatId: string | null;
   canvasId?: string;
   organizationId?: string;
+  canvasNodes?: AiBuilderMentionNode[];
   isGeneratingResponse: boolean;
   setChatSessions?: Dispatch<SetStateAction<AiChatSession[]>>;
   setCurrentChatId: Dispatch<SetStateAction<string | null>>;
@@ -309,11 +313,16 @@ async function fetchChatStreamResponse({
   nextPrompt,
   token,
   url,
+  canvasNodes,
 }: {
   nextPrompt: string;
   token: string;
   url: string;
+  canvasNodes?: AiBuilderMentionNode[];
 }): Promise<Response> {
+  const question =
+    canvasNodes && canvasNodes.length > 0 ? transcodeAiNodeMentions(nextPrompt, canvasNodes) : nextPrompt;
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -322,7 +331,7 @@ async function fetchChatStreamResponse({
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      question: nextPrompt,
+      question,
     }),
   });
 
@@ -340,6 +349,7 @@ export async function sendChatPrompt({
   currentChatId,
   canvasId,
   organizationId,
+  canvasNodes,
   isGeneratingResponse,
   setChatSessions,
   setCurrentChatId,
@@ -400,6 +410,7 @@ export async function sendChatPrompt({
       nextPrompt,
       token: session.token,
       url: session.url,
+      canvasNodes,
     });
 
     const { assistantContentSnapshot, streamedAnyAnswer, runModel } = await consumeChatResponseStream({
