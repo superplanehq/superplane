@@ -206,10 +206,6 @@ function appendCompositeLastRunItem(
     receivedAt: new Date(execution.createdAt!),
     state: getRunItemState(execution),
     values: rootTriggerRenderer.getRootEventValues({ event: eventInfo }),
-    childEventsInfo: {
-      count: execution.childExecutions?.length || 0,
-      waitingInfos: [],
-    },
   };
 }
 

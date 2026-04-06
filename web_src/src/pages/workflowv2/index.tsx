@@ -5605,17 +5605,6 @@ export function WorkflowPageV2() {
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
-          onNodeExpand={(nodeId) => {
-            if (isViewingDraftVersion) {
-              return;
-            }
-
-            const latestExecution = visibleNodeExecutionsMap[nodeId]?.[0];
-            const executionId = latestExecution?.id;
-            if (executionId) {
-              navigate(`/${organizationId}/canvases/${canvasId}/nodes/${nodeId}/${executionId}`);
-            }
-          }}
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
           topViewMode={topViewMode}
