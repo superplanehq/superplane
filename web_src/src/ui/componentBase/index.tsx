@@ -255,7 +255,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   runDisabledTooltip: _runDisabledTooltip,
   onTogglePause,
   onEdit: _onEdit,
-  onConfigure: _onConfigure,
   onDuplicate,
   onDeactivate: _onDeactivate,
   onToggleView,

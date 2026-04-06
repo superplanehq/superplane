@@ -281,7 +281,6 @@ export interface CanvasPageProps {
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
@@ -417,7 +416,6 @@ type CanvasNodeRendererCallbacks = {
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
-  onConfigure: React.MutableRefObject<CanvasPageProps["onConfigure"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
@@ -539,7 +537,6 @@ function buildInteractiveNodeBlockProps(
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
     onRun: getNodeAction(callbacks.onRun, nodeId),
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
-    onConfigure: getNodeAction(callbacks.onConfigure, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
@@ -1344,7 +1341,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onToggleCollapse={props.onToggleCollapse}
                 onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
-                onConfigure={props.onConfigure}
                 onDeactivate={props.onDeactivate}
                 onAnnotationUpdate={props.onAnnotationUpdate}
                 onAnnotationBlur={props.onAnnotationBlur}
@@ -1434,7 +1430,6 @@ function CanvasPage(props: CanvasPageProps) {
               onRun={handleNodeRun}
               onDuplicate={props.onDuplicate}
               onDocs={props.onDocs}
-              onConfigure={props.onConfigure}
               onDeactivate={props.onDeactivate}
               onToggleView={handleToggleView}
               onDelete={handleNodeDelete}
@@ -1510,7 +1505,6 @@ function Sidebar({
   onRun,
   onDuplicate,
   onDocs,
-  onConfigure,
   onDeactivate,
   onToggleView,
   onDelete,
@@ -1561,7 +1555,6 @@ function Sidebar({
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onDelete?: (nodeId: string) => void;
@@ -1736,9 +1729,6 @@ function Sidebar({
       runDisabledTooltip={runDisabledTooltip}
       onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
       onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
-      onConfigure={
-        onConfigure && sidebarData?.isComposite ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined
-      }
       onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
       onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
       onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
@@ -1988,7 +1978,6 @@ function CanvasContent({
   hideHeader,
   onRun,
   onDuplicate,
-  onConfigure,
   onDeactivate,
   onTogglePause,
   onToggleView,
@@ -2077,7 +2066,6 @@ function CanvasContent({
   hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
@@ -2418,9 +2406,6 @@ function CanvasContent({
   const onDuplicateRef = useRef(onDuplicate);
   onDuplicateRef.current = onDuplicate;
 
-  const onConfigureRef = useRef(onConfigure);
-  onConfigureRef.current = onConfigure;
-
   const onDeactivateRef = useRef(onDeactivate);
   onDeactivateRef.current = onDeactivate;
 
@@ -2639,7 +2624,6 @@ function CanvasContent({
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
     onDuplicate: onDuplicateRef,
-    onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
@@ -2660,7 +2644,6 @@ function CanvasContent({
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
     onDuplicate: onDuplicateRef,
-    onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
