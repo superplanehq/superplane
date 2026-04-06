@@ -53,7 +53,7 @@ func Test__ListIntegrationResources(t *testing.T) {
 		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	})
 
-	t.Run("integration list failure returns failed precondition", func(t *testing.T) {
+	t.Run("integration list failure returns internal error", func(t *testing.T) {
 		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
 			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 				return nil, errors.New("boom")
@@ -78,6 +78,6 @@ func Test__ListIntegrationResources(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+		assert.Equal(t, codes.Internal, status.Code(err))
 	})
 }

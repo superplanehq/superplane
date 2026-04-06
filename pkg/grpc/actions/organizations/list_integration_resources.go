@@ -69,8 +69,8 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	resources, err := integration.ListResources(resourceType, listCtx)
 	if err != nil {
-		log.WithError(err).Errorf("failed to list resources for integration %s", instance.ID)
-		return nil, status.Error(codes.FailedPrecondition, "failed to list integration resources")
+		log.WithError(err).WithField("integration_id", instance.ID).Errorf("failed to list resources: %v", err)
+		return nil, status.Error(codes.Internal, "failed to list integration resources")
 	}
 
 	return &pb.ListIntegrationResourcesResponse{
