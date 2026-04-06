@@ -102,8 +102,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbGroups.Groups_DeleteGroup_FullMethodName:         {Resource: "groups", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Users rules
-		pbUsers.Users_ListUserRoles_FullMethodName: {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbUsers.Users_ListUsers_FullMethodName:     {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbUsers.Users_ListUsers_FullMethodName: {Resource: "members", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Roles rules
 		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "members", Action: "update", DomainType: models.DomainTypeOrganization},

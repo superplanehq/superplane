@@ -19,17 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Users_ListUserRoles_FullMethodName = "/Superplane.Users.Users/ListUserRoles"
-	Users_ListUsers_FullMethodName     = "/Superplane.Users.Users/ListUsers"
+	Users_ListUsers_FullMethodName = "/Superplane.Users.Users/ListUsers"
 )
 
 // UsersClient is the client API for Users service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UsersClient interface {
-	// Endpoint for getting user roles within a domain
-	// Operation is synchronous and idempotent.
-	ListUserRoles(ctx context.Context, in *ListUserRolesRequest, opts ...grpc.CallOption) (*ListUserRolesResponse, error)
 	// Endpoint for getting all users in a domain
 	// Operation is synchronous and idempotent.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
@@ -41,16 +37,6 @@ type usersClient struct {
 
 func NewUsersClient(cc grpc.ClientConnInterface) UsersClient {
 	return &usersClient{cc}
-}
-
-func (c *usersClient) ListUserRoles(ctx context.Context, in *ListUserRolesRequest, opts ...grpc.CallOption) (*ListUserRolesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListUserRolesResponse)
-	err := c.cc.Invoke(ctx, Users_ListUserRoles_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *usersClient) ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error) {
@@ -67,9 +53,6 @@ func (c *usersClient) ListUsers(ctx context.Context, in *ListUsersRequest, opts 
 // All implementations should embed UnimplementedUsersServer
 // for forward compatibility.
 type UsersServer interface {
-	// Endpoint for getting user roles within a domain
-	// Operation is synchronous and idempotent.
-	ListUserRoles(context.Context, *ListUserRolesRequest) (*ListUserRolesResponse, error)
 	// Endpoint for getting all users in a domain
 	// Operation is synchronous and idempotent.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
@@ -82,9 +65,6 @@ type UsersServer interface {
 // pointer dereference when methods are called.
 type UnimplementedUsersServer struct{}
 
-func (UnimplementedUsersServer) ListUserRoles(context.Context, *ListUserRolesRequest) (*ListUserRolesResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListUserRoles not implemented")
-}
 func (UnimplementedUsersServer) ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListUsers not implemented")
 }
@@ -106,24 +86,6 @@ func RegisterUsersServer(s grpc.ServiceRegistrar, srv UsersServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Users_ServiceDesc, srv)
-}
-
-func _Users_ListUserRoles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListUserRolesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(UsersServer).ListUserRoles(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Users_ListUserRoles_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UsersServer).ListUserRoles(ctx, req.(*ListUserRolesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _Users_ListUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -151,10 +113,6 @@ var Users_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Superplane.Users.Users",
 	HandlerType: (*UsersServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "ListUserRoles",
-			Handler:    _Users_ListUserRoles_Handler,
-		},
 		{
 			MethodName: "ListUsers",
 			Handler:    _Users_ListUsers_Handler,
