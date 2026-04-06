@@ -75,7 +75,6 @@ import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
-import type { Simulation } from "./storybooks/useSimulation";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 import type { SidebarEvent } from "../componentSidebar/types";
@@ -99,9 +98,10 @@ export interface SidebarData {
   isComposite?: boolean;
 }
 
-export interface CanvasNode extends ReactFlowNode {
-  __simulation?: Simulation;
-}
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type --
+   Having a specific type allows us to extend it with additional properties without breaking consumers.
+ */
+export interface CanvasNode extends ReactFlowNode {}
 
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
@@ -1424,14 +1424,6 @@ function CanvasPage(props: CanvasPageProps) {
               onPushThrough={handlePushThrough}
               onCancelExecution={handleCancelExecution}
               supportsPushThrough={props.supportsPushThrough}
-              onRun={handleNodeRun}
-              onDuplicate={props.onDuplicate}
-              onDocs={props.onDocs}
-              onDeactivate={props.onDeactivate}
-              onToggleView={handleToggleView}
-              onDelete={handleNodeDelete}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
               getAllHistoryEvents={props.getAllHistoryEvents}
               onLoadMoreHistory={props.onLoadMoreHistory}
               getHasMoreHistory={props.getHasMoreHistory}
@@ -1447,7 +1439,6 @@ function CanvasPage(props: CanvasPageProps) {
               editingNodeData={editingNodeData}
               onSaveConfiguration={handleSaveConfiguration}
               configurationSaveMode={props.configurationSaveMode}
-              onEdit={handleNodeEdit}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
               organizationId={props.organizationId}
@@ -1499,15 +1490,7 @@ function Sidebar({
   onPushThrough,
   onCancelExecution,
   supportsPushThrough,
-  onRun,
-  onDuplicate,
-  onDocs,
-  onDeactivate,
-  onToggleView,
-  onDelete,
   onReEmit,
-  runDisabled,
-  runDisabledTooltip,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1522,7 +1505,6 @@ function Sidebar({
   editingNodeData,
   onSaveConfiguration,
   configurationSaveMode = "manual",
-  onEdit,
   currentTab,
   onTabChange,
   organizationId,
@@ -1549,15 +1531,7 @@ function Sidebar({
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
   supportsPushThrough?: (nodeId: string) => boolean;
-  onRun?: (nodeId: string) => void;
-  onDuplicate?: (nodeId: string) => void;
-  onDocs?: (nodeId: string) => void;
-  onDeactivate?: (nodeId: string) => void;
-  onToggleView?: (nodeId: string) => void;
-  onDelete?: (nodeId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1579,7 +1553,6 @@ function Sidebar({
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
-  onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   organizationId?: string;
@@ -1710,7 +1683,6 @@ function Sidebar({
       nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
       iconSlug={isAnnotationNode ? "sticky-note" : sidebarData.iconSlug}
-      iconColor={isAnnotationNode ? "text-yellow-600" : sidebarData.iconColor}
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
@@ -1721,14 +1693,6 @@ function Sidebar({
       onPushThrough={onPushThrough}
       onCancelExecution={onCancelExecution}
       supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
-      onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
-      onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
-      onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
-      onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
-      onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
-      onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
       getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
       onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
       getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
@@ -1750,7 +1714,6 @@ function Sidebar({
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       configurationSaveMode={configurationSaveMode}
-      onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
