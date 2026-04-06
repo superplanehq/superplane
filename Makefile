@@ -36,7 +36,7 @@ test.setup:
 	@touch agent/.env
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
-	$(COMPOSE) build
+	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test

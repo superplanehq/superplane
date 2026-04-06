@@ -1,6 +1,10 @@
 services:
   app:
-    image: ghcr.io/superplanehq/superplane-dev-base:v7
+    build:
+      context: .
+      target: dev-base
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
     command: bash /app/docker-entrypoint.dev.sh
     environment:
@@ -108,7 +112,12 @@ services:
       - /tmp:/tmp
 
   agent:
-    image: ghcr.io/superplanehq/superplane-dev-base:v7
+    build:
+      context: agent
+      dockerfile: Dockerfile
+      target: dev
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:agent-latest
     working_dir: /app/agent
     env_file:
       - agent/.env
