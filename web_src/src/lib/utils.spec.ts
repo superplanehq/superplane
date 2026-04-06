@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Puzzle, X } from "lucide-react";
+import { Building2, Puzzle, X } from "lucide-react";
 import { calcRelativeTimeFromDiff, cn, flattenObject, formatTimestamp, isUrl, resolveIcon } from "@/lib/utils";
 
 describe("utils", () => {
@@ -13,6 +13,7 @@ describe("utils", () => {
 
   it("resolves known icon aliases and falls back to Puzzle", () => {
     expect(resolveIcon("x-mark")).toBe(X);
+    expect(resolveIcon("business")).toBe(Building2);
     expect(resolveIcon("does-not-exist")).toBe(Puzzle);
   });
 
