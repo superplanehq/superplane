@@ -7,7 +7,12 @@ import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
+import {
+  formatTokenCount,
+  type AiBuilderMessage,
+  type AiBuilderProposal,
+  type AiChatSession,
+} from "@/ui/BuildingBlocksSidebar/agentChat";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
@@ -264,6 +269,11 @@ function ConversationList({
                     <TimeAgo date={session.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
                   ) : null}
                 </div>
+                {session.totalTokens ? (
+                  <div className="mt-0.5 text-[11px] tabular-nums text-slate-400">
+                    {formatTokenCount(session.totalTokens)}
+                  </div>
+                ) : null}
               </button>
             );
           })}
@@ -305,7 +315,9 @@ function ConversationContent({
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
-      <AiMessages messages={aiMessages} />
+      {aiMessages.map((message) => (
+        <AiMessage key={message.id} message={message} />
+      ))}
 
       {isGeneratingResponse ? (
         <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
@@ -326,16 +338,6 @@ function ConversationContent({
 
       {!pendingProposal && aiError ? <p className="text-xs text-red-700 px-1">{aiError}</p> : null}
     </div>
-  );
-}
-
-function AiMessages({ messages }: { messages: AiBuilderMessage[] }) {
-  return (
-    <>
-      {messages.map((message) => (
-        <AiMessage key={message.id} message={message} />
-      ))}
-    </>
   );
 }
 
