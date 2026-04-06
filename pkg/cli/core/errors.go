@@ -37,12 +37,12 @@ func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
 		return nil
 	}
 
-	message := strings.TrimSpace(strings.ToLower(status.GetMessage()))
+	message := strings.TrimSpace(status.GetMessage())
 	if message == "" {
 		return nil
 	}
 
-	switch message {
+	switch strings.ToLower(message) {
 	case "account organization limit exceeded":
 		return usageLimitError("usage limit reached: this account has reached its organization limit")
 	case "organization canvas limit exceeded":
@@ -55,8 +55,37 @@ func formatGoogleRPCStatusError(status *openapi_client.GooglerpcStatus) error {
 		return usageLimitError("usage limit reached: this organization has reached its integration limit")
 	case "organization exceeds configured account usage limits":
 		return usageLimitError("usage limit reached: this organization is blocked by account-level usage limits")
+	}
+
+	if prefix := grpcCodePrefix(status.GetCode()); prefix != "" {
+		return fmt.Errorf("%s: %s", prefix, message)
+	}
+
+	return fmt.Errorf("%s", message)
+}
+
+// grpcCodePrefix returns a user-friendly prefix for known gRPC status codes.
+// See https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+func grpcCodePrefix(code int32) string {
+	switch code {
+	case 3: // InvalidArgument
+		return "invalid request"
+	case 5: // NotFound
+		return "not found"
+	case 6: // AlreadyExists
+		return "already exists"
+	case 7: // PermissionDenied
+		return "permission denied"
+	case 12: // Unimplemented
+		return "not supported"
+	case 13: // Internal
+		return "internal error"
+	case 14: // Unavailable
+		return "service unavailable"
+	case 16: // Unauthenticated
+		return "authentication required"
 	default:
-		return nil
+		return ""
 	}
 }
 
