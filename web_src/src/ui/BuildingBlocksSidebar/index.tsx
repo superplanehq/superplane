@@ -92,6 +92,7 @@ export function BuildingBlocksSidebar({
   showAiBuilderTab = false,
   canvasId,
   organizationId,
+  canvasNodes,
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -120,6 +121,7 @@ export function BuildingBlocksSidebar({
       showAiBuilderTab={showAiBuilderTab}
       canvasId={canvasId}
       organizationId={organizationId}
+      canvasNodes={canvasNodes}
       onApplyAiOperations={onApplyAiOperations}
       integrations={integrations}
       canvasZoom={canvasZoom}
@@ -206,6 +208,7 @@ interface OpenBuildingBlocksSidebarProps {
   showAiBuilderTab: boolean;
   canvasId?: string;
   organizationId?: string;
+  canvasNodes?: BuildingBlocksSidebarProps["canvasNodes"];
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations: OrganizationsIntegration[];
   canvasZoom: number;
@@ -220,6 +223,7 @@ function OpenBuildingBlocksSidebar({
   showAiBuilderTab,
   canvasId,
   organizationId,
+  canvasNodes,
   onApplyAiOperations,
   integrations,
   canvasZoom,
@@ -273,6 +277,7 @@ function OpenBuildingBlocksSidebar({
         aiInput,
         canvasId,
         organizationId,
+        canvasNodes,
         currentChatId,
         isGeneratingResponse,
         setChatSessions,
@@ -285,7 +290,7 @@ function OpenBuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, canvasNodes, currentChatId, isGeneratingResponse, organizationId],
   );
 
   const handleStartNewChatSession = useCallback(() => {
@@ -826,6 +831,7 @@ function OpenBuildingBlocksSidebar({
             aiError={aiError}
             disabled={disabled}
             canvasId={canvasId}
+            canvasNodes={canvasNodes}
             aiInput={aiInput}
             onAiInputChange={setAiInput}
             onSelectChat={handleSelectChatSession}
