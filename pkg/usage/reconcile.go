@@ -1,27 +1,13 @@
 package usage
 
 import (
-	"sync"
-	"time"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-const reconcileCooldown = 5 * time.Minute
-
-var reconcileLastRun sync.Map
-
 func ReconcileCanvasCount(orgID string, usageServiceCount int32) {
-	if lastRun, ok := reconcileLastRun.Load(orgID); ok {
-		if time.Since(lastRun.(time.Time)) < reconcileCooldown {
-			return
-		}
-	}
-
 	reconcileCanvasCount(orgID, usageServiceCount, publishCanvasCreated)
-	reconcileLastRun.Store(orgID, time.Now())
 }
 
 func reconcileCanvasCount(orgID string, usageServiceCount int32, publish func(canvasID, orgID string) error) {
