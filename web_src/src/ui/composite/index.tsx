@@ -63,7 +63,6 @@ export interface CompositeProps extends ComponentActionsProps {
   warning?: string;
   paused?: boolean;
 
-  onReRunChildEvents?: () => void;
   onToggleCollapse?: () => void;
   onViewMoreEvents?: () => void;
 }
@@ -82,7 +81,6 @@ export const Composite: React.FC<CompositeProps> = ({
   nextInQueue,
   collapsed = false,
   collapsedBackground,
-  onReRunChildEvents,
   onToggleCollapse,
   onViewMoreEvents,
   selected = false,
@@ -153,7 +151,7 @@ export const Composite: React.FC<CompositeProps> = ({
     }
 
     return sections;
-  }, [visibleEvents, hiddenEventsCount, nextInQueue, onReRunChildEvents, onViewMoreEvents]);
+  }, [visibleEvents, hiddenEventsCount, nextInQueue, onViewMoreEvents]);
 
   // Convert parameters to specs format
   const specs = React.useMemo(() => {
