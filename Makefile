@@ -219,10 +219,12 @@ ui.start:
 #
 
 db.create:
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	@$(COMPOSE) run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app bash -c '\
+		psql -h db -p 5432 -U postgres -c "ALTER DATABASE template1 REFRESH COLLATION VERSION"; \
+		psql -h db -p 5432 -U postgres -c "ALTER DATABASE postgres REFRESH COLLATION VERSION"; \
+		createdb -h db -p 5432 -U postgres $(DB_NAME) || true; \
+		psql -h db -p 5432 -U postgres $(DB_NAME) -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" \
+	'
 
 db.migration.create:
 	$(COMPOSE) run --rm app mkdir -p db/migrations
@@ -236,12 +238,13 @@ db.data_migration.create:
 
 db.migrate:
 	rm -f db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
-	# echo dump schema to db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	@$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c '\
+		migrate -source file://db/migrations -database "postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable" up && \
+		migrate -source file://db/data_migrations -database "postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable&x-migrations-table=data_migrations" up && \
+		pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME) > db/structure.sql && \
+		pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME) >> db/structure.sql && \
+		pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME) >> db/structure.sql \
+	'
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
