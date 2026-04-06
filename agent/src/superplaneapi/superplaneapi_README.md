@@ -162,7 +162,6 @@ Class | Method | HTTP request | Description
 *ServiceAccountsApi* | [**service_accounts_update_service_account**](superplaneapi/docs/ServiceAccountsApi.md#service_accounts_update_service_account) | **PATCH** /api/v1/service-accounts/{id} | Update a service account
 *TriggerApi* | [**triggers_describe_trigger**](superplaneapi/docs/TriggerApi.md#triggers_describe_trigger) | **GET** /api/v1/triggers/{name} | Describe trigger
 *TriggerApi* | [**triggers_list_triggers**](superplaneapi/docs/TriggerApi.md#triggers_list_triggers) | **GET** /api/v1/triggers | List triggers
-*UsersApi* | [**users_list_user_roles**](superplaneapi/docs/UsersApi.md#users_list_user_roles) | **GET** /api/v1/users/{userId}/roles | Get user roles
 *UsersApi* | [**users_list_users**](superplaneapi/docs/UsersApi.md#users_list_users) | **GET** /api/v1/users | List users
 *WidgetApi* | [**widgets_describe_widget**](superplaneapi/docs/WidgetApi.md#widgets_describe_widget) | **GET** /api/v1/widgets/{name} | Describe widget
 *WidgetApi* | [**widgets_list_widgets**](superplaneapi/docs/WidgetApi.md#widgets_list_widgets) | **GET** /api/v1/widgets | List widgets
@@ -388,7 +387,6 @@ Class | Method | HTTP request | Description
  - [TriggersListTriggersResponse](superplaneapi/docs/TriggersListTriggersResponse.md)
  - [TriggersTrigger](superplaneapi/docs/TriggersTrigger.md)
  - [UsersAccountProvider](superplaneapi/docs/UsersAccountProvider.md)
- - [UsersListUserRolesResponse](superplaneapi/docs/UsersListUserRolesResponse.md)
  - [UsersListUsersResponse](superplaneapi/docs/UsersListUsersResponse.md)
  - [UsersUserMetadata](superplaneapi/docs/UsersUserMetadata.md)
  - [UsersUserRoleAssignment](superplaneapi/docs/UsersUserRoleAssignment.md)
