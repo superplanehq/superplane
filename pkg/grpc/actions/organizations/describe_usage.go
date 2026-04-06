@@ -42,7 +42,7 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 	canvasCount, err := models.CountCanvasesByOrganization(orgID)
 	if err != nil {
 		log.Warnf("Failed to count canvases for organization %s, falling back to usage service value: %v", orgID, err)
-		canvasCount = int64(orgUsage.Canvases)
+		canvasCount = int64(orgUsage.GetCanvases())
 	}
 
 	if err := usage.MarkOrganizationSyncedIfUnset(orgID); err != nil {
