@@ -4,7 +4,8 @@ import { TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { aiBuilderNodeDisplayName, type AiBuilderMentionNode } from "@/lib/aiBuilderNodeMentions";
 import { Activity, ArrowLeft, ArrowUp, User } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -26,6 +27,28 @@ function getActiveMentionSegment(value: string, cursor: number): { start: number
     return null;
   }
   return { start: at, query: afterAt };
+}
+
+/** `@Name` is finished (typed fully or picked); stop treating it as an active filter. */
+function isMentionSegmentComplete(query: string, nodes: AiBuilderMentionNode[]): boolean {
+  const names = nodes
+    .map((n) => aiBuilderNodeDisplayName(n).trim())
+    .filter((name) => name.length > 0)
+    .sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    if (query === name || query.startsWith(`${name} `)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function mentionQueryHasAnyMatch(query: string, nodes: AiBuilderMentionNode[]): boolean {
+  const q = query.trim().toLowerCase();
+  return nodes.some((n) => {
+    const name = aiBuilderNodeDisplayName(n).toLowerCase();
+    return !q || name.includes(q);
+  });
 }
 
 type AiBuilderChatPanelProps = {
@@ -516,6 +539,13 @@ function InputForm({
   maxAiInputHeight,
   expanded = false,
 }: InputFormProps) {
+  const mentionAnchorRef = useRef<HTMLDivElement>(null);
+  const [mentionMenuPlacement, setMentionMenuPlacement] = useState<{
+    left: number;
+    width: number;
+    bottom: number;
+  } | null>(null);
+
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionStart, setMentionStart] = useState(0);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -529,6 +559,14 @@ function InputForm({
       }
       const seg = getActiveMentionSegment(value, cursor);
       if (!seg) {
+        setMentionOpen(false);
+        return;
+      }
+      if (isMentionSegmentComplete(seg.query, canvasNodes)) {
+        setMentionOpen(false);
+        return;
+      }
+      if (!mentionQueryHasAnyMatch(seg.query, canvasNodes)) {
         setMentionOpen(false);
         return;
       }
@@ -571,10 +609,46 @@ function InputForm({
       requestAnimationFrame(() => {
         el.focus();
         el.setSelectionRange(pos, pos);
+        syncMentionUi(next, pos);
       });
     },
-    [aiInput, aiInputRef, mentionStart, onAiInputChange],
+    [aiInput, aiInputRef, mentionStart, onAiInputChange, syncMentionUi],
   );
+
+  const updateMentionMenuPlacement = useCallback(() => {
+    if (!mentionOpen || filteredMentionNodes.length === 0) {
+      setMentionMenuPlacement(null);
+      return;
+    }
+    const anchor = mentionAnchorRef.current;
+    if (!anchor) {
+      setMentionMenuPlacement(null);
+      return;
+    }
+    const rect = anchor.getBoundingClientRect();
+    setMentionMenuPlacement({
+      left: rect.left,
+      width: rect.width,
+      bottom: window.innerHeight - rect.top + 4,
+    });
+  }, [mentionOpen, filteredMentionNodes.length]);
+
+  useLayoutEffect(() => {
+    updateMentionMenuPlacement();
+  }, [updateMentionMenuPlacement, aiInput, mentionOpen, filteredMentionNodes.length]);
+
+  useEffect(() => {
+    if (!mentionOpen || filteredMentionNodes.length === 0) {
+      return;
+    }
+    const onReposition = () => updateMentionMenuPlacement();
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
+    return () => {
+      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("resize", onReposition);
+    };
+  }, [mentionOpen, filteredMentionNodes.length, updateMentionMenuPlacement]);
 
   const isDisabled = disabled || isGeneratingResponse || !canvasId || !aiInput.trim();
 
@@ -629,34 +703,43 @@ function InputForm({
         onSubmit={submitHandler}
         className={cn("rounded-md border border-slate-300 bg-white p-1.5", expanded && "p-3 shadow-sm")}
       >
-        <div className="relative">
-          {mentionOpen && filteredMentionNodes.length > 0 ? (
-            <div
-              className="absolute bottom-full left-0 right-0 z-50 mb-1 max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-popover py-1 shadow-md"
-              role="listbox"
-            >
-              {filteredMentionNodes.map((node, index) => {
-                const label = aiBuilderNodeDisplayName(node);
-                return (
-                  <button
-                    key={node.id}
-                    type="button"
-                    role="option"
-                    aria-selected={index === mentionSelectedIndex}
-                    className={cn(
-                      "block w-full px-2 py-1.5 text-left text-sm text-slate-800",
-                      index === mentionSelectedIndex ? "bg-slate-100" : "hover:bg-slate-50",
-                    )}
-                    onMouseDown={(ev) => ev.preventDefault()}
-                    onMouseEnter={() => setMentionSelectedIndex(index)}
-                    onClick={() => applyMention(node)}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
+        <div ref={mentionAnchorRef} className="relative">
+          {mentionOpen &&
+            filteredMentionNodes.length > 0 &&
+            mentionMenuPlacement &&
+            createPortal(
+              <div
+                className="fixed z-[300] max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-popover py-1 shadow-lg"
+                role="listbox"
+                style={{
+                  left: mentionMenuPlacement.left,
+                  width: mentionMenuPlacement.width,
+                  bottom: mentionMenuPlacement.bottom,
+                }}
+              >
+                {filteredMentionNodes.map((node, index) => {
+                  const label = aiBuilderNodeDisplayName(node);
+                  return (
+                    <button
+                      key={node.id}
+                      type="button"
+                      role="option"
+                      aria-selected={index === mentionSelectedIndex}
+                      className={cn(
+                        "block w-full px-2 py-1.5 text-left text-sm text-slate-800",
+                        index === mentionSelectedIndex ? "bg-slate-100" : "hover:bg-slate-50",
+                      )}
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onMouseEnter={() => setMentionSelectedIndex(index)}
+                      onClick={() => applyMention(node)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>,
+              document.body,
+            )}
 
           <Textarea
             ref={aiInputRef}
