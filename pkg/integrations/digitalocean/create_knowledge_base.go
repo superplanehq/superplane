@@ -593,7 +593,7 @@ func (c *CreateKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*u
 // forms are handled correctly.
 func indexJobState(status string) string {
 	lower := strings.ToLower(status)
-	for _, state := range []string{"completed", "running", "pending", "failed", "cancelled"} {
+	for _, state := range []string{"completed", "successful", "running", "pending", "failed", "cancelled"} {
 		if strings.HasSuffix(lower, state) {
 			return state
 		}
@@ -640,7 +640,7 @@ func (c *CreateKnowledgeBase) HandleAction(ctx core.ActionContext) error {
 
 	if kb.LastIndexingJob != nil {
 		switch indexJobState(kb.LastIndexingJob.Status) {
-		case "completed":
+		case "completed", "successful":
 			return ctx.ExecutionState.Emit(
 				core.DefaultOutputChannel.Name,
 				"digitalocean.knowledge_base.created",

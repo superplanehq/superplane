@@ -125,7 +125,7 @@ func (r *RunEvaluation) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "agentId",
-			Label:       "Agent",
+			Label:       "Agent UUID",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select an agent",
@@ -170,11 +170,12 @@ func (r *RunEvaluation) Setup(ctx core.SetupContext) error {
 
 // evalRunMetadata is stored between poll ticks
 type evalRunMetadata struct {
-	EvalRunUUID  string `json:"evalRunUUID" mapstructure:"evalRunUUID"`
-	TestCaseID   string `json:"testCaseId" mapstructure:"testCaseId"`
-	TestCaseName string `json:"testCaseName" mapstructure:"testCaseName"`
-	AgentID      string `json:"agentId" mapstructure:"agentId"`
-	AgentName    string `json:"agentName" mapstructure:"agentName"`
+	EvalRunUUID   string `json:"evalRunUUID" mapstructure:"evalRunUUID"`
+	TestCaseID    string `json:"testCaseId" mapstructure:"testCaseId"`
+	TestCaseName  string `json:"testCaseName" mapstructure:"testCaseName"`
+	WorkspaceUUID string `json:"workspaceUUID" mapstructure:"workspaceUUID"`
+	AgentID       string `json:"agentId" mapstructure:"agentId"`
+	AgentName     string `json:"agentName" mapstructure:"agentName"`
 }
 
 func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
@@ -196,14 +197,31 @@ func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
 
 	// Get names from the node metadata set during Setup
 	var nodeMeta EvalNodeMetadata
-	_ = mapstructure.Decode(ctx.Metadata.Get(), &nodeMeta)
+	_ = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMeta)
+
+	// If agentId was configured via an expression, the name stored during Setup
+	// is the raw expression string. Fall back to the resolved UUID instead.
+	// Also resolve workspace UUID from the agent if not already set.
+	agentName := nodeMeta.AgentName
+	workspaceUUID := nodeMeta.WorkspaceUUID
+	if strings.Contains(agentName, "{{") {
+		agentName = spec.AgentID
+		if workspaceUUID == "" {
+			if agent, agentErr := client.GetAgent(spec.AgentID); agentErr == nil {
+				if agent.Workspace != nil {
+					workspaceUUID = agent.Workspace.UUID
+				}
+			}
+		}
+	}
 
 	meta := evalRunMetadata{
-		EvalRunUUID:  runUUID,
-		TestCaseID:   spec.TestCaseID,
-		TestCaseName: nodeMeta.TestCaseName,
-		AgentID:      spec.AgentID,
-		AgentName:    nodeMeta.AgentName,
+		EvalRunUUID:   runUUID,
+		TestCaseID:    spec.TestCaseID,
+		TestCaseName:  nodeMeta.TestCaseName,
+		WorkspaceUUID: workspaceUUID,
+		AgentID:       spec.AgentID,
+		AgentName:     agentName,
 	}
 
 	if err := ctx.Metadata.Set(meta); err != nil {
@@ -313,6 +331,7 @@ func buildEvalOutput(meta evalRunMetadata, run *EvaluationRun, prompts []Evaluat
 		"evaluationRunId": meta.EvalRunUUID,
 		"testCaseId":      meta.TestCaseID,
 		"testCaseName":    meta.TestCaseName,
+		"workspaceId":     meta.WorkspaceUUID,
 		"agentId":         meta.AgentID,
 		"agentName":       meta.AgentName,
 		"passed":          run.PassStatus,
@@ -388,10 +407,11 @@ func (r *RunEvaluation) Cleanup(ctx core.SetupContext) error {
 
 // EvalNodeMetadata stores metadata about an evaluation for display in the UI
 type EvalNodeMetadata struct {
-	TestCaseID   string `json:"testCaseId" mapstructure:"testCaseId"`
-	TestCaseName string `json:"testCaseName" mapstructure:"testCaseName"`
-	AgentID      string `json:"agentId" mapstructure:"agentId"`
-	AgentName    string `json:"agentName" mapstructure:"agentName"`
+	TestCaseID    string `json:"testCaseId" mapstructure:"testCaseId"`
+	TestCaseName  string `json:"testCaseName" mapstructure:"testCaseName"`
+	WorkspaceUUID string `json:"workspaceUUID" mapstructure:"workspaceUUID"`
+	AgentID       string `json:"agentId" mapstructure:"agentId"`
+	AgentName     string `json:"agentName" mapstructure:"agentName"`
 }
 
 // resolveEvalMetadata fetches the test case and agent names from the API
@@ -437,6 +457,7 @@ func resolveEvalMetadata(ctx core.SetupContext, spec RunEvaluationSpec) error {
 		for _, tc := range testCases {
 			if tc.UUID == spec.TestCaseID {
 				meta.TestCaseName = tc.Name
+				meta.WorkspaceUUID = tc.WorkspaceUUID
 				break
 			}
 		}
@@ -451,6 +472,9 @@ func resolveEvalMetadata(ctx core.SetupContext, spec RunEvaluationSpec) error {
 			return fmt.Errorf("failed to fetch agent %q: %w", spec.AgentID, err)
 		}
 		meta.AgentName = agent.Name
+		if agent.Workspace != nil && meta.WorkspaceUUID == "" {
+			meta.WorkspaceUUID = agent.Workspace.UUID
+		}
 	}
 
 	return ctx.Metadata.Set(meta)

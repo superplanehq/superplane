@@ -100,8 +100,15 @@ export const runEvaluationMapper: ComponentBaseMapper = {
     const result = getEvalResult(context.execution.outputs as RunEvaluationOutputs | undefined);
     if (!result) return details;
 
+    if (result.finishedAt) {
+      details["Finished At"] = new Date(String(result.finishedAt)).toLocaleString();
+    }
+
     details["Test Case"] = String(result.testCaseName || result.testCaseId || "-");
-    details["Agent"] = String(result.agentName || result.agentId || "-");
+
+    if (result.workspaceId && result.testCaseId && result.evaluationRunId) {
+      details["View Evaluation"] = `https://cloud.digitalocean.com/gen-ai/workspaces/${result.workspaceId}/evaluations/${result.testCaseId}/runs/${result.evaluationRunId}`;
+    }
 
     const starMetricLabel = formatStarMetric(result);
     if (starMetricLabel) {
@@ -111,10 +118,6 @@ export const runEvaluationMapper: ComponentBaseMapper = {
     const prompts = result.prompts as unknown[] | undefined;
     if (prompts) {
       details["Prompts Evaluated"] = String(prompts.length);
-    }
-
-    if (result.finishedAt) {
-      details["Finished At"] = new Date(String(result.finishedAt)).toLocaleString();
     }
 
     if (result.errorDescription) {

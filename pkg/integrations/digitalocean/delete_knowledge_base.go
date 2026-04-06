@@ -79,7 +79,7 @@ func (d *DeleteKnowledgeBase) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "knowledgeBaseId",
-			Label:       "Knowledge Base",
+			Label:       "Knowledge Base UUID",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select a knowledge base",

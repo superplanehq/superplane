@@ -44,7 +44,16 @@ export const createKnowledgeBaseMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    details["Name"] = String(result.name || "-");
+    details["Knowledge Base"] = String(result.name || "-");
+
+    if (result.uuid) {
+      details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${result.uuid}`;
+    }
+
+    if (result.databaseId) {
+      details["View OpenSearch Database"] = `https://cloud.digitalocean.com/databases/${result.databaseId}`;
+    }
+
     details["Region"] = String(result.region || "-");
     details["Embedding Model"] = String(result.embeddingModelName || result.embeddingModelUUID || "-");
     details["Project"] = String(result.projectName || result.projectId || "-");
@@ -52,10 +61,6 @@ export const createKnowledgeBaseMapper: ComponentBaseMapper = {
     const tags = result.tags as string[] | undefined;
     if (tags && tags.length > 0) {
       details["Tags"] = tags.join(", ");
-    }
-
-    if (result.createdAt) {
-      details["Created At"] = new Date(String(result.createdAt)).toLocaleString();
     }
 
     return details;

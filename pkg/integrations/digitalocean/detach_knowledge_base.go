@@ -67,7 +67,7 @@ func (d *DetachKnowledgeBase) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "agentId",
-			Label:       "Agent",
+			Label:       "Agent UUID",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select an agent",
@@ -80,7 +80,7 @@ func (d *DetachKnowledgeBase) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "knowledgeBaseId",
-			Label:       "Knowledge Base",
+			Label:       "Knowledge Base UUID",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select a knowledge base to detach",

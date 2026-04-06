@@ -914,6 +914,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 	kbPendingJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_PENDING"}}}`
 	kbRunningJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_RUNNING"}}}`
 	kbCompletedJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_COMPLETED"}}}`
+	kbSuccessfulJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_SUCCESSFUL"}}}`
 	kbFailedJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_FAILED"}}}`
 	startJobResponse := `{"index_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_PENDING"}}`
 
@@ -996,6 +997,22 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "poll", ctx.Requests.(*contexts.RequestContext).Action)
 		assert.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("last_indexing_job is INDEX_JOB_STATUS_SUCCESSFUL -> emits output", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbSuccessfulJob))},
+			},
+		}
+
+		ctx := buildPollCtx(httpContext)
+		err := component.HandleAction(ctx)
+
+		require.NoError(t, err)
+		execState := ctx.ExecutionState.(*contexts.ExecutionStateContext)
+		assert.True(t, execState.Passed)
+		assert.Equal(t, "digitalocean.knowledge_base.created", execState.Type)
 	})
 
 	t.Run("last_indexing_job is INDEX_JOB_STATUS_COMPLETED -> emits output", func(t *testing.T) {

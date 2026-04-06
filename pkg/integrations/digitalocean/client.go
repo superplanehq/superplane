@@ -2511,11 +2511,17 @@ type AgentKnowledgeBase struct {
 	Name string `json:"name"`
 }
 
+// AgentWorkspace represents the workspace an agent belongs to
+type AgentWorkspace struct {
+	UUID string `json:"uuid"`
+}
+
 // Agent represents a DigitalOcean GradientAI agent
 type Agent struct {
 	UUID           string               `json:"uuid"`
 	Name           string               `json:"name"`
 	KnowledgeBases []AgentKnowledgeBase `json:"knowledge_bases"`
+	Workspace      *AgentWorkspace      `json:"workspace"`
 }
 
 // GetAgent retrieves a GradientAI agent by its UUID
@@ -2615,9 +2621,10 @@ func (c *Client) DeleteDatabase(databaseID string) error {
 
 // EvaluationTestCase represents a Gradient AI evaluation test case
 type EvaluationTestCase struct {
-	UUID        string `json:"test_case_uuid"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	UUID          string `json:"test_case_uuid"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	WorkspaceUUID string `json:"workspace_uuid"`
 }
 
 // EvaluationMetricResult represents a single metric score in an evaluation run
