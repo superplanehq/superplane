@@ -163,6 +163,7 @@ docs/IntegrationAPI.md
 docs/IntegrationNodeRef.md
 docs/IntegrationsIntegrationDefinition.md
 docs/MeAPI.md
+docs/MeMeResponse.md
 docs/MeRegenerateTokenResponse.md
 docs/NodeBlueprintRef.md
 docs/NodeComponentRef.md
@@ -259,8 +260,6 @@ docs/TriggersListTriggersResponse.md
 docs/TriggersTrigger.md
 docs/UsersAPI.md
 docs/UsersAccountProvider.md
-docs/UsersListUserPermissionsResponse.md
-docs/UsersListUserRolesResponse.md
 docs/UsersListUsersResponse.md
 docs/UsersUserMetadata.md
 docs/UsersUserRoleAssignment.md
@@ -398,6 +397,7 @@ model_groups_update_group_body.go
 model_groups_update_group_response.go
 model_integration_node_ref.go
 model_integrations_integration_definition.go
+model_me_me_response.go
 model_me_regenerate_token_response.go
 model_node_blueprint_ref.go
 model_node_component_ref.go
@@ -488,8 +488,6 @@ model_triggers_describe_trigger_response.go
 model_triggers_list_triggers_response.go
 model_triggers_trigger.go
 model_users_account_provider.go
-model_users_list_user_permissions_response.go
-model_users_list_user_roles_response.go
 model_users_list_users_response.go
 model_users_user_metadata.go
 model_users_user_role_assignment.go

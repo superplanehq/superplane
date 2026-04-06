@@ -184,7 +184,7 @@ func TestUpdateFromFileDisablesVersioningBeforeSpecUpdate(t *testing.T) {
 			path:   "/api/v1/me",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
 			},
 		},
 		requestExpectation{
@@ -319,7 +319,7 @@ func TestUpdateFromFileDisableVersioningFailsWhenOrganizationEnforcesVersioning(
 			path:   "/api/v1/me",
 			handle: func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-1"}`))
+				_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-1"}}`))
 			},
 		},
 		requestExpectation{

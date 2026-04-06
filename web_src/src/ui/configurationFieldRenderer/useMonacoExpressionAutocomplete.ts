@@ -19,6 +19,16 @@ type UseMonacoExpressionAutocompleteProps = {
   allowOutsideExpression?: boolean;
 };
 
+type MonacoKeyEvent = {
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  browserEvent: {
+    key?: string;
+  };
+  keyCode: number;
+};
+
 const suggestionSortPriority = {
   $: 1,
   root: 2,
@@ -65,7 +75,7 @@ const normalizeBracketQuotes = (insertText: string) => {
   return next;
 };
 
-const shouldTriggerForKey = (event: any, monaco: Monaco) => {
+const shouldTriggerForKey = (event: MonacoKeyEvent, monaco: Monaco) => {
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return false;
   }

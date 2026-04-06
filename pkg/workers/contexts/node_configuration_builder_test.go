@@ -1216,7 +1216,7 @@ func Test_NodeConfigurationBuilder_MemoryFind(t *testing.T) {
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).WithInput(map[string]any{})
 
-	result, err := builder.resolveExpression(`memory.find("machines", {"sandbox_id": "12121"})`)
+	result, err := builder.ResolveExpression(`memory.find("machines", {"sandbox_id": "12121"})`)
 	require.NoError(t, err)
 	assert.Equal(t, []any{map[string]any{"sandbox_id": "12121"}}, result)
 }
@@ -1242,15 +1242,15 @@ func Test_NodeConfigurationBuilder_MemoryFindFirst(t *testing.T) {
 
 	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).WithInput(map[string]any{})
 
-	result, err := builder.resolveExpression(`memory.findFirst("machines", {"sandbox_id": "12121"})`)
+	result, err := builder.ResolveExpression(`memory.findFirst("machines", {"sandbox_id": "12121"})`)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{"sandbox_id": "12121", "creator": "igor"}, result)
 
-	matched, err := builder.resolveExpression(`memory.findFirst("machines", {"creator": "igor"}).sandbox_id`)
+	matched, err := builder.ResolveExpression(`memory.findFirst("machines", {"creator": "igor"}).sandbox_id`)
 	require.NoError(t, err)
 	assert.Equal(t, "12121", matched)
 
-	missing, err := builder.resolveExpression(`memory.findFirst("missing", {"sandbox_id": "does-not-exist"})`)
+	missing, err := builder.ResolveExpression(`memory.findFirst("missing", {"sandbox_id": "does-not-exist"})`)
 	require.NoError(t, err)
 	assert.Nil(t, missing)
 }

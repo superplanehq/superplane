@@ -3,15 +3,13 @@ package merge
 import (
 	"fmt"
 	"net/http"
-	"strconv"
+	"slices"
 	"time"
 
-	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -29,6 +27,58 @@ const (
 
 func init() {
 	registry.RegisterComponent("merge", &Merge{})
+}
+
+/*
+ * The execution metadata associated with a merge component
+ * holds information about the grouping of events.
+ */
+type ExecutionMetadata struct {
+	// GroupKey is a logical key used to correlate queue items into a single execution
+	GroupKey string `json:"groupKey,omitempty" mapstructure:"groupKey"`
+
+	// EventIDs collects upstream event ids that reached this merge
+	EventIDs []string `json:"eventIDs,omitempty" mapstructure:"eventIDs"`
+
+	// Sources collects distinct upstream source nodes that reached this merge
+	SourceNodes []SourceNode `json:"sourceNodes,omitempty" mapstructure:"sourceNodes"`
+
+	// StopEarly indicates the merge was short-circuited based on a stop condition
+	StopEarly bool `json:"stopEarly,omitempty" mapstructure:"stopEarly"`
+}
+
+func (m *ExecutionMetadata) HasReceivedAll() bool {
+	for _, s := range m.SourceNodes {
+		if s.ReceivedAt == nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (m *ExecutionMetadata) UpdateSource(nodeID string) {
+	if m.SourceNodes == nil {
+		m.SourceNodes = []SourceNode{
+			{NodeID: nodeID},
+		}
+	}
+
+	i := slices.IndexFunc(m.SourceNodes, func(s SourceNode) bool {
+		return s.NodeID == nodeID
+	})
+
+	if i == -1 {
+		return
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	m.SourceNodes[i].ReceivedAt = &now
+}
+
+type SourceNode struct {
+	NodeID     string  `json:"nodeId,omitempty" mapstructure:"nodeId"`
+	ReceivedAt *string `json:"receivedAt,omitempty" mapstructure:"receivedAt"`
 }
 
 type Merge struct{}
@@ -192,7 +242,12 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		return nil, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	executionCtx, err := m.findOrCreateExecution(ctx, ctx.RootEventID)
+	incomingSources, err := ctx.DistinctIncomingSources()
+	if err != nil {
+		return nil, fmt.Errorf("error counting distinct incoming sources: %v", err)
+	}
+
+	executionCtx, err := m.findOrCreateExecution(ctx, ctx.RootEventID, incomingSources)
 	if err != nil {
 		return nil, fmt.Errorf("error finding or creating execution: %v", err)
 	}
@@ -212,11 +267,6 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 
 	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
 		return nil, fmt.Errorf("error updating node state: %v", err)
-	}
-
-	incoming, err := ctx.CountDistinctIncomingSources()
-	if err != nil {
-		return nil, fmt.Errorf("error counting distinct incoming sources: %v", err)
 	}
 
 	md, err := m.addEventToMetadata(ctx, executionCtx)
@@ -239,26 +289,36 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	// configs created before the toggle will still work if they have an expression.
 	//
 	if spec.StopIfExpression != "" {
-		env, err := expressionEnv(ctx, spec.StopIfExpression)
+		out, err := ctx.Expressions.Run(spec.StopIfExpression)
 		if err != nil {
 			return nil, err
 		}
 
-		vm, err := expr.Compile(spec.StopIfExpression, expressionOptions(env)...)
-		if err != nil {
-			return nil, fmt.Errorf("stopIfExpression compilation failed: %w", err)
-		}
+		//
+		// If the stop expression does not evaluate to a boolean value,
+		// we fail the execution and mark the merge as stopped early.
+		//
+		stopEarly, ok := out.(bool)
+		if !ok {
+			md.StopEarly = true
+			err := executionCtx.Metadata.Set(md)
+			if err != nil {
+				return nil, err
+			}
 
-		out, err := expr.Run(vm, env)
-		if err != nil {
-			return nil, fmt.Errorf("stopIfExpression evaluation failed: %w", err)
+			err = executionCtx.ExecutionState.Fail("error", fmt.Sprintf("stop expression must evaluate to boolean, got %T: %v", out, out))
+			if err != nil {
+				return nil, err
+			}
+
+			return &executionCtx.ID, nil
 		}
 
 		//
 		// If stopExpression is truthy,
 		// we mark metadata and emit to fail channel
 		//
-		if b, ok := out.(bool); ok && b {
+		if stopEarly {
 			md.StopEarly = true
 			err := executionCtx.Metadata.Set(md)
 			if err != nil {
@@ -273,7 +333,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		}
 	}
 
-	if len(md.Sources) >= incoming {
+	if md.HasReceivedAll() {
 		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
 			ChannelNameSuccess,
 			"merge.finished",
@@ -281,121 +341,10 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		)
 	}
 
-	return nil, nil
+	return &executionCtx.ID, nil
 }
 
-func expressionEnv(ctx core.ProcessQueueContext, expression string) (map[string]any, error) {
-	if ctx.ExpressionEnv != nil {
-		return ctx.ExpressionEnv(expression)
-	}
-
-	return buildExpressionEnv(ctx.Input, ctx.SourceNodeID), nil
-}
-
-func buildExpressionEnv(input any, sourceNodeID string) map[string]any {
-	if sourceNodeID == "" {
-		return map[string]any{"$": input}
-	}
-
-	if inputMap, ok := input.(map[string]any); ok {
-		envData := make(map[string]any, len(inputMap)+1)
-		for key, value := range inputMap {
-			envData[key] = value
-		}
-		if _, exists := envData[sourceNodeID]; !exists {
-			envData[sourceNodeID] = input
-		}
-		return map[string]any{"$": envData}
-	}
-
-	if inputMap, ok := input.(map[string]string); ok {
-		envData := make(map[string]any, len(inputMap)+1)
-		for key, value := range inputMap {
-			envData[key] = value
-		}
-		if _, exists := envData[sourceNodeID]; !exists {
-			envData[sourceNodeID] = input
-		}
-		return map[string]any{"$": envData}
-	}
-
-	return map[string]any{"$": map[string]any{sourceNodeID: input}}
-}
-
-func expressionOptions(env map[string]any) []expr.Option {
-	return []expr.Option{
-		expr.Env(env),
-		expr.AsBool(),
-		expr.WithContext("ctx"),
-		expr.Timezone(time.UTC.String()),
-		exprruntime.DateFunctionOption(),
-		expr.Function("root", func(params ...any) (any, error) {
-			if len(params) != 0 {
-				return nil, fmt.Errorf("root() takes no arguments")
-			}
-
-			rootPayload, ok := env["__root"]
-			if !ok {
-				return nil, fmt.Errorf("no root event found")
-			}
-			return rootPayload, nil
-		}),
-		expr.Function("previous", func(params ...any) (any, error) {
-			depth := 1
-			if len(params) > 1 {
-				return nil, fmt.Errorf("previous() accepts zero or one argument")
-			}
-			if len(params) == 1 {
-				parsedDepth, err := parseDepthValue(params[0])
-				if err != nil {
-					return nil, err
-				}
-				depth = parsedDepth
-			}
-
-			previousByDepth, ok := env["__previousByDepth"]
-			if !ok {
-				return nil, nil
-			}
-			if values, ok := previousByDepth.(map[string]any); ok {
-				return values[strconv.Itoa(depth)], nil
-			}
-			if values, ok := previousByDepth.(map[int]any); ok {
-				return values[depth], nil
-			}
-
-			return nil, nil
-		}),
-	}
-}
-
-func parseDepthValue(param any) (int, error) {
-	switch value := param.(type) {
-	case int:
-		if value < 1 {
-			return 0, fmt.Errorf("depth must be >= 1")
-		}
-		return value, nil
-	case int64:
-		if value < 1 {
-			return 0, fmt.Errorf("depth must be >= 1")
-		}
-		return int(value), nil
-	case float64:
-		parsed := int(value)
-		if value != float64(parsed) {
-			return 0, fmt.Errorf("depth must be an integer")
-		}
-		if parsed < 1 {
-			return 0, fmt.Errorf("depth must be >= 1")
-		}
-		return parsed, nil
-	default:
-		return 0, fmt.Errorf("depth must be an integer")
-	}
-}
-
-func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {
+func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string, incomingSources []core.Node) (*core.ExecutionContext, error) {
 	executionCtx, err := ctx.FindExecutionByKV("merge_group", mergeGroup)
 	if err != nil {
 		return nil, err
@@ -421,10 +370,18 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 		return nil, err
 	}
 
+	sourceNodes := []SourceNode{}
+	for _, source := range incomingSources {
+		sourceNodes = append(sourceNodes, SourceNode{
+			NodeID:     source.ID,
+			ReceivedAt: nil,
+		})
+	}
+
 	md := &ExecutionMetadata{
-		GroupKey: mergeGroup,
-		EventIDs: []string{},
-		Sources:  []string{},
+		GroupKey:    mergeGroup,
+		EventIDs:    []string{},
+		SourceNodes: sourceNodes,
 	}
 
 	err = executionCtx.Metadata.Set(md)
@@ -448,16 +405,7 @@ func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *c
 	// Track distinct source nodes that reached this merge
 	//
 	if ctx.SourceNodeID != "" {
-		exists := false
-		for _, s := range md.Sources {
-			if s == ctx.SourceNodeID {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			md.Sources = append(md.Sources, ctx.SourceNodeID)
-		}
+		md.UpdateSource(ctx.SourceNodeID)
 	}
 
 	err = executionCtx.Metadata.Set(md)

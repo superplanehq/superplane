@@ -1175,6 +1175,15 @@ export function WorkflowPageV2() {
         return;
       }
 
+      // Mark the saved version as already applied so the version sync effect
+      // (which replaces canvas spec with loadedCanvasVersion.spec) doesn't
+      // overwrite the merged positions we set below.
+      const versionId = version.metadata?.id;
+      lastAppliedVersionSnapshotRef.current =
+        versionId && versionId === activeCanvasVersionIdRef.current
+          ? `${versionId}:${version.metadata?.updatedAt || ""}`
+          : lastAppliedVersionSnapshotRef.current;
+
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
         if (!current || getWorkflowSaveSignature(current) !== getWorkflowSaveSignature(workflow)) {
           return current;
@@ -1731,8 +1740,8 @@ export function WorkflowPageV2() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints, availableIntegrations),
-    [triggers, components, blueprints, availableIntegrations],
+    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
+    [triggers, components, availableIntegrations],
   );
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
@@ -2596,7 +2605,6 @@ export function WorkflowPageV2() {
 
         return result;
       } catch (error: any) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         setLastCanvasSaveError(displayMessage);
@@ -4061,22 +4069,6 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const handleConfigure = useCallback(
-    (nodeId: string) => {
-      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId && canvas) {
-        // Pass workflow info as URL parameters
-        const params = new URLSearchParams({
-          fromWorkflow: canvasId!,
-          workflowName: canvas.metadata?.name || "Canvas",
-        });
-        navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
-      }
-    },
-    [canvas, organizationId, canvasId, navigate],
-  );
-
   const handleRun = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!canvasId) return;
@@ -4329,7 +4321,6 @@ export function WorkflowPageV2() {
           setInitialWorkflowSnapshot(null);
         }
       } catch (error) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }
@@ -5681,7 +5672,6 @@ export function WorkflowPageV2() {
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
-          onConfigure={!isReadOnly ? handleConfigure : undefined}
           buildingBlocks={buildingBlocks}
           showAiBuilderTab={showAiBuilderTab}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}

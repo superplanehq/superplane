@@ -1,7 +1,5 @@
 import type {
-  AdditionalDataBuilderContext,
   ComponentBaseContext,
-  ComponentAdditionalDataBuilder,
   ComponentBaseMapper,
   EventStateRegistry,
   ExecutionDetailsContext,
@@ -9,13 +7,15 @@ import type {
   NodeInfo,
   StateFunction,
   SubtitleContext,
+  OutputPayload,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
-import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
+import { formatRelativeTime, formatTimestampInUserTimezone } from "@/lib/timezone";
 
 // Output channel names matching backend
 const CHANNEL_SUCCESS = "success";
@@ -23,61 +23,40 @@ const CHANNEL_TIMEOUT = "timeout";
 const CHANNEL_FAIL = "fail";
 
 /**
- * Output payload type
- */
-interface OutputPayload {
-  type: string;
-  timestamp: string;
-  data: any;
-}
-
-/**
  * Type for merge outputs with channel structure
  */
-type MergeOutputs = {
+type Outputs = {
   success?: OutputPayload[];
   timeout?: OutputPayload[];
   fail?: OutputPayload[];
-  default?: OutputPayload[]; // For backwards compatibility
 };
 
 /**
  * Metadata structure for merge execution (from backend)
  */
-interface MergeExecutionMetadata {
+interface ExecutionMetadata {
   groupKey?: string;
   eventIDs?: string[];
-  sources?: string[];
+  sourceNodes?: SourceNode[];
   stopEarly?: boolean;
 }
 
-/**
- * Additional data passed to merge mapper
- */
-interface MergeAdditionalData {
-  incomingSourcesCount?: number;
+interface SourceNode {
+  nodeId: string;
+  receivedAt?: string;
 }
-
-export const mergeDataBuilder: ComponentAdditionalDataBuilder = {
-  buildAdditionalData(context: AdditionalDataBuilderContext): MergeAdditionalData {
-    return {
-      incomingSourcesCount: context.edges?.filter((edge) => edge.targetId === context.node.id).length || 0,
-    };
-  },
-};
 
 /**
  * Determines which output channel has data, indicating the merge outcome.
  * Returns the channel name or null if no output found.
  */
 function getActiveChannel(execution: ExecutionInfo): string | null {
-  const outputs = execution.outputs as MergeOutputs | undefined;
+  const outputs = execution.outputs as Outputs | undefined;
   if (!outputs) return null;
 
   if (outputs.success && outputs.success.length > 0) return CHANNEL_SUCCESS;
   if (outputs.timeout && outputs.timeout.length > 0) return CHANNEL_TIMEOUT;
   if (outputs.fail && outputs.fail.length > 0) return CHANNEL_FAIL;
-  if (outputs.default && outputs.default.length > 0) return "default";
 
   return null;
 }
@@ -186,23 +165,18 @@ export const mergeMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const metadata = context.execution.metadata as MergeExecutionMetadata | undefined;
+    const details: Record<string, string> = {};
+    const metadata = context.execution.metadata as ExecutionMetadata | undefined;
 
     if (context.execution.createdAt) {
-      details["Started at"] = new Date(context.execution.createdAt).toLocaleString();
+      details["Started at"] = formatTimestampInUserTimezone(context.execution.createdAt);
     }
 
     if (context.execution.state === "STATE_FINISHED" && context.execution.updatedAt) {
-      details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
+      details["Finished at"] = formatTimestampInUserTimezone(context.execution.updatedAt);
     }
 
-    // Build timeline for events received
-    if (metadata?.sources && metadata.sources.length > 0) {
-      details["Events"] = buildMergeTimeline(metadata, context.execution, context.nodes);
-    }
-
-    return details;
+    return withSources(details, metadata, context.nodes);
   },
 };
 
@@ -211,7 +185,7 @@ function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo, addi
 
   // Add the main execution section
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
   const eventSubtitle = getMergeSubtitle(execution, additionalData);
@@ -227,86 +201,70 @@ function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo, addi
   return sections;
 }
 
-function getMergeSubtitle(execution: ExecutionInfo, additionalData?: unknown): string | React.ReactNode {
-  const metadata = execution.metadata as MergeExecutionMetadata | undefined;
-  const mergeData = additionalData as MergeAdditionalData | undefined;
+type SourceSummary = {
+  expected: number;
+  received: number;
+};
 
-  const sourcesReceived = metadata?.sources?.length || 0;
-  const sourcesNeeded = mergeData?.incomingSourcesCount;
+function sourceSummary(metadata: ExecutionMetadata | undefined): SourceSummary {
+  const summary: SourceSummary = {
+    expected: 0,
+    received: 0,
+  };
 
-  // Determine timestamp - use updatedAt for finished, createdAt otherwise
-  const timestamp =
-    execution.state === "STATE_FINISHED" && execution.updatedAt ? execution.updatedAt : execution.createdAt;
+  if (metadata?.sourceNodes) {
+    summary.expected = metadata.sourceNodes.length;
+    summary.received = metadata.sourceNodes.filter((s) => s.receivedAt).length;
+  }
+
+  return summary;
+}
+
+function getMergeSubtitle(execution: ExecutionInfo, _: unknown): string | React.ReactNode {
+  const metadata = execution.metadata as ExecutionMetadata | undefined;
+  const summary = sourceSummary(metadata);
 
   // For waiting state, show progress
   if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    const prefix =
-      sourcesNeeded !== undefined && sourcesNeeded > 0
-        ? `${sourcesReceived}/${sourcesNeeded} received`
-        : `${sourcesReceived} received`;
-    return timestamp ? renderWithTimeAgo(prefix, new Date(timestamp)) : prefix;
+    const prefix = `${summary.received}/${summary.expected} received`;
+    return renderWithTimeAgo(prefix, execution.createdAt!);
   }
 
-  // For completed states, show the final count and time
-  if (execution.state === "STATE_FINISHED") {
-    if (sourcesNeeded !== undefined && sourcesNeeded > 0) {
-      const prefix = `${sourcesReceived}/${sourcesNeeded} received`;
-      return timestamp ? renderWithTimeAgo(prefix, new Date(timestamp)) : prefix;
-    }
-    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
-  }
-
-  return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
+  return renderWithTimeAgo(`${summary.received}/${summary.expected} received`, execution.updatedAt!);
 }
 
-/**
- * Timeline entry type for merge events (matches ApprovalTimelineEntry format)
- */
-interface MergeTimelineEntry {
-  label: string;
-  status: string;
-  timestamp?: string | React.ReactNode;
-  comment?: string;
-}
-
-/**
- * Build a timeline showing received events for the merge component
- */
-function buildMergeTimeline(
-  metadata: MergeExecutionMetadata,
-  execution: ExecutionInfo,
-  nodes?: NodeInfo[],
-): MergeTimelineEntry[] {
-  const timeline: MergeTimelineEntry[] = [];
-
-  // Add an entry for each source that contributed
-  if (metadata.sources) {
-    metadata.sources.forEach((sourceId) => {
-      // Look up the source node to get its label/name
-      const sourceNode = nodes?.find((n) => n.id === sourceId);
-      const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${sourceId.substring(0, 8)}...`;
-
-      // Format timestamp in "ago" style
-      const timestampFormatted = execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : undefined;
-
-      timeline.push({
-        label: sourceLabel,
-        status: "Received",
-        timestamp: timestampFormatted,
-      });
-    });
+function withSources(
+  details: Record<string, string>,
+  metadata: ExecutionMetadata | undefined,
+  nodes: NodeInfo[],
+): Record<string, string> {
+  if (!metadata?.sourceNodes) {
+    return details;
   }
 
-  // If merge stopped early, add that to the timeline
-  if (metadata.stopEarly) {
-    const stoppedAtFormatted = execution.updatedAt ? renderTimeAgo(new Date(execution.updatedAt)) : undefined;
-    timeline.push({
-      label: "Condition met",
-      status: "Stopped",
-      timestamp: stoppedAtFormatted,
-      comment: "Merge completed early",
-    });
+  const received = metadata.sourceNodes
+    .filter((s) => s.receivedAt)
+    .sort((a, b) => new Date(a.receivedAt!).getTime() - new Date(b.receivedAt!).getTime());
+
+  const unreceived = metadata.sourceNodes.filter((s) => !s.receivedAt);
+
+  //
+  // Add the received sources first.
+  //
+  for (const source of received) {
+    const sourceNode = nodes.find((n) => n.id === source.nodeId);
+    const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${source.nodeId.substring(0, 8)}...`;
+    details[sourceLabel] = `Received ${formatRelativeTime(source.receivedAt!, true)}`;
   }
 
-  return timeline;
+  //
+  // Add the unreceived sources last.
+  //
+  for (const source of unreceived) {
+    const sourceNode = nodes?.find((n) => n.id === source.nodeId);
+    const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${source.nodeId.substring(0, 8)}...`;
+    details[sourceLabel] = source.receivedAt ? formatRelativeTime(source.receivedAt, true) : "-";
+  }
+
+  return details;
 }
