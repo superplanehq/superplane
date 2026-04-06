@@ -114,12 +114,11 @@ function renderBlockByType(args: {
   nodeId?: string;
   selected: boolean;
   showHeader?: boolean;
-  onExpand?: BlockProps["onExpand"];
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
 }) {
-  const { data, nodeId, selected, showHeader, onExpand, onAnnotationUpdate, onAnnotationBlur, actionProps } = args;
+  const { data, nodeId, selected, showHeader, onAnnotationUpdate, onAnnotationBlur, actionProps } = args;
 
   switch (data.type) {
     case "trigger":
@@ -143,11 +142,6 @@ function renderBlockByType(args: {
       return (
         <Composite
           {...getSafeCompositeProps(data)}
-          onExpandChildEvents={() => {
-            if (onExpand && nodeId) {
-              onExpand(nodeId, data);
-            }
-          }}
           selected={selected}
           showHeader={showHeader}
           {...actionProps}
@@ -188,7 +182,6 @@ export function BlockContent({
   onDelete,
   showHeader,
   isCompactView,
-  onExpand,
   onAnnotationUpdate,
   onAnnotationBlur,
 }: BlockProps) {
@@ -211,7 +204,6 @@ export function BlockContent({
     nodeId,
     selected,
     showHeader,
-    onExpand,
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
