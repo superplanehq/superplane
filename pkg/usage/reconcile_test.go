@@ -58,3 +58,20 @@ func TestReconcileCanvasCount_SkipsWhenCountsMatch(t *testing.T) {
 
 	assert.Empty(t, published)
 }
+
+func TestReconcileCanvasCount_SkipsWhenOverCounted(t *testing.T) {
+	r := support.Setup(t)
+
+	support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+	var published []string
+	fakePublish := func(canvasID, orgID string) error {
+		published = append(published, canvasID)
+		return nil
+	}
+
+	// usage service reports 5, DB has 1 — over-count, should not re-enqueue
+	reconcileCanvasCount(r.Organization.ID.String(), 5, fakePublish)
+
+	assert.Empty(t, published)
+}

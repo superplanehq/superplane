@@ -1,12 +1,21 @@
 package usage
 
 import (
+	"sync"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+var reconcileInFlight sync.Map
+
 func ReconcileCanvasCount(orgID string, usageServiceCount int32) {
+	if _, loaded := reconcileInFlight.LoadOrStore(orgID, struct{}{}); loaded {
+		return
+	}
+	defer reconcileInFlight.Delete(orgID)
+
 	reconcileCanvasCount(orgID, usageServiceCount, publishCanvasCreated)
 }
 
@@ -17,7 +26,7 @@ func reconcileCanvasCount(orgID string, usageServiceCount int32, publish func(ca
 		return
 	}
 
-	if int64(usageServiceCount) == dbCount {
+	if int64(usageServiceCount) >= dbCount {
 		return
 	}
 
