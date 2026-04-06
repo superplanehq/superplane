@@ -27,20 +27,6 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Users {
-  //
-  // Endpoint for listing all user permissions within a domain
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListUserPermissions(ListUserPermissionsRequest) returns (ListUserPermissionsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/permissions"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List user permissions";
-      description: "Returns all permissions a user has within a specific domain";
-      tags: "Users";
-    };
-  }
 
   //
   // Endpoint for getting user roles within a domain
@@ -71,19 +57,6 @@ service Users {
       tags: "Users";
     };
   }
-}
-
-message ListUserPermissionsRequest {
-  Authorization.DomainType domain_type = 1;
-  string domain_id = 2;
-  string user_id = 3;
-}
-
-message ListUserPermissionsResponse {
-  string user_id = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
-  repeated Authorization.Permission permissions = 4;
 }
 
 message ListUserRolesRequest {
