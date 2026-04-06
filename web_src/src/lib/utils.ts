@@ -1,13 +1,10 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { type LucideIcon } from "lucide-react";
-import { resolveLucideIcon } from "@/lib/iconRegistry";
+export { resolveLucideIcon as resolveIcon } from "@/lib/iconRegistry";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-export const resolveIcon = (slug?: string, fallback?: string): LucideIcon => resolveLucideIcon(slug, fallback);
 
 export const calcRelativeTimeFromDiff = (diff: number) => {
   const seconds = Math.floor(diff / 1000);
