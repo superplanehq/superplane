@@ -60,7 +60,7 @@ message ListUserRolesResponse {
 message ListUsersRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
-  bool include_service_accounts = 3;
+  bool include_role_assignments = 3;
 }
 
 message ListUsersResponse {
@@ -77,10 +77,10 @@ message User {
 
   message Spec {
     string display_name = 1;
-    repeated AccountProvider account_providers = 2;
   }
 
   message Status {
+    repeated AccountProvider account_providers = 1;
     repeated UserRoleAssignment role_assignments = 2;
   }
 

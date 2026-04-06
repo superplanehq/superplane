@@ -1377,10 +1377,10 @@ export type UsersUserRoleAssignment = {
 
 export type UsersUserSpec = {
   displayName?: string;
-  accountProviders?: Array<UsersAccountProvider>;
 };
 
 export type UsersUserStatus = {
+  accountProviders?: Array<UsersAccountProvider>;
   roleAssignments?: Array<UsersUserRoleAssignment>;
 };
 
@@ -4244,7 +4244,7 @@ export type UsersListUsersData = {
   query?: {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
-    includeServiceAccounts?: boolean;
+    includeRoleAssignments?: boolean;
   };
   url: "/api/v1/users";
 };
