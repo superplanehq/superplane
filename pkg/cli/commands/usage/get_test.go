@@ -85,6 +85,92 @@ func TestGetCommandExecuteJSON(t *testing.T) {
 	require.Contains(t, stdout.String(), `"statusMessage": "usage disabled"`)
 }
 
+func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+
+		switch r.URL.Path {
+		case "/api/v1/me":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-123"}}`))
+		case "/api/v1/organizations/org-123/usage":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"enabled": true,
+				"statusMessage": "usage tracking active",
+				"limits": {
+					"maxCanvases": 10,
+					"maxNodesPerCanvas": 200,
+					"maxUsers": 25,
+					"retentionWindowDays": 30,
+					"maxEventsPerMonth": "100000",
+					"maxIntegrations": -1
+				},
+				"usage": {
+					"canvases": 3,
+					"eventBucketLevel": 12,
+					"eventBucketCapacity": 100,
+					"eventBucketLastUpdatedAt": "2026-03-19T15:04:05Z"
+				}
+			}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stdout := newUsageCommandContextForTest(t, server, "json")
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+
+	output := stdout.String()
+
+	// maxEventsPerMonth should be numeric, not a string
+	require.Contains(t, output, `"maxEventsPerMonth": 100000`)
+	require.NotContains(t, output, `"maxEventsPerMonth": "100000"`)
+
+	// other limits remain numeric
+	require.Contains(t, output, `"maxCanvases": 10`)
+	require.Contains(t, output, `"maxIntegrations": -1`)
+}
+
+func TestGetCommandExecuteJSONUnlimitedSentinel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+
+		switch r.URL.Path {
+		case "/api/v1/me":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-123"}}`))
+		case "/api/v1/organizations/org-123/usage":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"enabled": true,
+				"limits": {
+					"maxCanvases": -1,
+					"maxEventsPerMonth": "-1"
+				}
+			}`))
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stdout := newUsageCommandContextForTest(t, server, "json")
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+
+	output := stdout.String()
+
+	// Both sentinel values should be numeric -1
+	require.Contains(t, output, `"maxCanvases": -1`)
+	require.Contains(t, output, `"maxEventsPerMonth": -1`)
+	require.NotContains(t, output, `"maxEventsPerMonth": "-1"`)
+}
+
 func TestGetCommandExecuteRequiresOrganizationID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
