@@ -59,7 +59,6 @@ export type ComponentActionKeys =
   | "runDisabledTooltip"
   | "onTogglePause"
   | "onEdit"
-  | "onConfigure"
   | "onDuplicate"
   | "onDeactivate"
   | "onToggleCollapse"
