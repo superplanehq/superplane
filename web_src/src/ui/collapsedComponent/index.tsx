@@ -27,7 +27,6 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   runDisabledTooltip: _runDisabledTooltip,
   onDuplicate: _onDuplicate,
   onEdit: _onEdit,
-  onConfigure: _onConfigure,
   onDeactivate: _onDeactivate,
   onToggleView: _onToggleView,
   onDelete: _onDelete,

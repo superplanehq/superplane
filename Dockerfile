@@ -64,7 +64,6 @@ CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 FROM dev-base AS builder
 
 ARG BASE_URL=https://app.superplane.com
-ARG VITE_ENABLE_CUSTOM_COMPONENTS=false
 
 WORKDIR /app
 COPY pkg /app/pkg
@@ -83,7 +82,7 @@ RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
-RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_COMPONENTS npm run build
+RUN VITE_BASE_URL=$BASE_URL npm run build
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Runner stage to run the application.
