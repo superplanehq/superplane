@@ -217,7 +217,6 @@ export interface CanvasPageProps {
   runDisabled?: boolean;
   runDisabledTooltip?: string;
 
-  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
@@ -410,7 +409,6 @@ type PendingRunData = {
 };
 
 type CanvasNodeRendererCallbacks = {
-  handleNodeExpand: NonNullable<BlockProps["onExpand"]>;
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
@@ -531,7 +529,6 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
-    onExpand: (expandedNodeId, nodeData) => callbacks.handleNodeExpand(expandedNodeId, nodeData),
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
@@ -2307,14 +2304,6 @@ function CanvasContent({
     restoreActiveNoteFocus();
   }, [state.nodes]);
 
-  const handleNodeExpand = useCallback<NonNullable<BlockProps["onExpand"]>>((nodeId: string, nodeData: BlockData) => {
-    const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
-    const expandedNodeData = (node?.data as BlockData | undefined) ?? nodeData;
-    if (stateRef.current.onNodeExpand) {
-      stateRef.current.onNodeExpand(nodeId, expandedNodeData);
-    }
-  }, []);
-
   const handleNodeClick = useCallback(
     (nodeId: string, e?: React.MouseEvent) => {
       const isMultiSelectClick = e && (e.ctrlKey || e.metaKey);
@@ -2618,7 +2607,6 @@ function CanvasContent({
 
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
-    handleNodeExpand,
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
@@ -2638,7 +2626,6 @@ function CanvasContent({
     hasMultiSelection,
   });
   callbacksRef.current = {
-    handleNodeExpand,
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
