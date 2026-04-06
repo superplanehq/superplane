@@ -4,6 +4,40 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+function getReactDisplayName(childType: string | React.JSXElementConstructor<unknown>): string | undefined {
+  if (typeof childType === "string") {
+    return childType;
+  }
+
+  if ((typeof childType === "function" || typeof childType === "object") && "displayName" in childType) {
+    return typeof childType.displayName === "string" ? childType.displayName : undefined;
+  }
+
+  return undefined;
+}
+
+function hasDialogTitle(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) {
+      return false;
+    }
+
+    const childType = child.type;
+    const displayName = getReactDisplayName(childType);
+
+    if (
+      childType === DialogTitle ||
+      childType === DialogPrimitive.Title ||
+      displayName === "DialogTitle" ||
+      displayName === DialogPrimitive.Title.displayName
+    ) {
+      return true;
+    }
+
+    return hasDialogTitle(child.props.children);
+  });
+}
+
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
@@ -44,6 +78,8 @@ function DialogContent({
   /** "large" removes default max-width so className can set e.g. 80vw/80vh */
   size?: "default" | "large";
 }) {
+  const titlePresent = hasDialogTitle(children);
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -56,6 +92,7 @@ function DialogContent({
         )}
         {...props}
       >
+        {!titlePresent && <DialogTitle className="sr-only">Dialog</DialogTitle>}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -100,6 +137,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
     />
   );
 }
+DialogTitle.displayName = "DialogTitle";
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (

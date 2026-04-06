@@ -55,7 +55,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     [permissionSet],
   );
 
-  const isLoading = !organizationId || meLoading || (!!organizationId && !userId);
+  const isLoading = !organizationId || meLoading || (!!organizationId && !userId && meLoading);
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
