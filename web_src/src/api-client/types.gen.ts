@@ -829,6 +829,10 @@ export type IntegrationsIntegrationDefinition = {
   instructions?: string;
 };
 
+export type MeMeResponse = {
+  user?: SuperplaneMeUser;
+};
+
 export type MeRegenerateTokenResponse = {
   token?: string;
 };
@@ -1308,6 +1312,7 @@ export type SuperplaneMeUser = {
   organizationId?: string;
   createdAt?: string;
   hasToken?: boolean;
+  permissions?: Array<AuthorizationPermission>;
 };
 
 export type SuperplaneOrganizationsListIntegrationsResponse = {
@@ -1348,13 +1353,6 @@ export type UsersAccountProvider = {
   avatarUrl?: string;
   createdAt?: string;
   updatedAt?: string;
-};
-
-export type UsersListUserPermissionsResponse = {
-  userId?: string;
-  domainType?: AuthorizationDomainType;
-  domainId?: string;
-  permissions?: Array<AuthorizationPermission>;
 };
 
 export type UsersListUserRolesResponse = {
@@ -2970,7 +2968,9 @@ export type OrganizationsAcceptInviteLinkResponse =
 export type MeMeData = {
   body?: never;
   path?: never;
-  query?: never;
+  query?: {
+    includePermissions?: boolean;
+  };
   url: "/api/v1/me";
 };
 
@@ -2987,10 +2987,10 @@ export type MeMeResponses = {
   /**
    * A successful response.
    */
-  200: SuperplaneMeUser;
+  200: MeMeResponse;
 };
 
-export type MeMeResponse = MeMeResponses[keyof MeMeResponses];
+export type MeMeResponse2 = MeMeResponses[keyof MeMeResponses];
 
 export type MeRegenerateTokenData = {
   body?: never;
@@ -4273,37 +4273,6 @@ export type UsersListUsersResponses = {
 };
 
 export type UsersListUsersResponse2 = UsersListUsersResponses[keyof UsersListUsersResponses];
-
-export type UsersListUserPermissionsData = {
-  body?: never;
-  path: {
-    userId: string;
-  };
-  query?: {
-    domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
-    domainId?: string;
-  };
-  url: "/api/v1/users/{userId}/permissions";
-};
-
-export type UsersListUserPermissionsErrors = {
-  /**
-   * An unexpected error response.
-   */
-  default: GooglerpcStatus;
-};
-
-export type UsersListUserPermissionsError = UsersListUserPermissionsErrors[keyof UsersListUserPermissionsErrors];
-
-export type UsersListUserPermissionsResponses = {
-  /**
-   * A successful response.
-   */
-  200: UsersListUserPermissionsResponse;
-};
-
-export type UsersListUserPermissionsResponse2 =
-  UsersListUserPermissionsResponses[keyof UsersListUserPermissionsResponses];
 
 export type UsersListUserRolesData = {
   body?: never;
