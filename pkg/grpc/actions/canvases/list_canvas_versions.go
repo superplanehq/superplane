@@ -75,6 +75,12 @@ func ListCanvasVersionsPaginated(
 
 		version, versionErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, draft.VersionID)
 		if versionErr != nil {
+			if errors.Is(versionErr, gorm.ErrRecordNotFound) {
+				return tx.
+					Where("workflow_id = ? AND user_id = ?", canvas.ID, userUUID).
+					Delete(&models.CanvasUserDraft{}).
+					Error
+			}
 			return versionErr
 		}
 		draftVersion = version
