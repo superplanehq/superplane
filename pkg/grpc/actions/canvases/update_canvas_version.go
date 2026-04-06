@@ -208,6 +208,9 @@ func updateLiveCanvasWithoutVersioning(
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		canvasInTx, findCanvasErr := models.FindCanvasInTransaction(tx, organizationUUID, canvasID)
 		if findCanvasErr != nil {
+			if errors.Is(findCanvasErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.NotFound, "canvas not found")
+			}
 			return findCanvasErr
 		}
 		if canvasInTx.IsTemplate {
