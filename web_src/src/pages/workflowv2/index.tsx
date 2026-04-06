@@ -1740,7 +1740,7 @@ export function WorkflowPageV2() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints, availableIntegrations),
+    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
     [triggers, components, blueprints, availableIntegrations],
   );
 
