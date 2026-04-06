@@ -46,7 +46,7 @@ test.setup.db:
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(COMPOSE) up -d --wait-for-healthy
+	$(COMPOSE) up -d --wait
 
 test.down:
 	$(COMPOSE) down --remove-orphans
