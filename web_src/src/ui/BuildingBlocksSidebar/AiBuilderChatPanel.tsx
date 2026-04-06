@@ -1,55 +1,15 @@
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { aiBuilderNodeDisplayName, type AiBuilderMentionNode } from "@/lib/aiBuilderNodeMentions";
-import { Activity, ArrowLeft, ArrowUp, User } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Activity, ArrowLeft, User } from "lucide-react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import type { AiBuilderMentionNode } from "@/lib/aiBuilderNodeMentions";
 import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { AiBuilderChatInput } from "@/ui/BuildingBlocksSidebar/AiBuilderChatInput";
 import { cn } from "../../lib/utils";
-
-/** `@` mention: from @ through cursor; no newlines or second @ in the segment. */
-function getActiveMentionSegment(value: string, cursor: number): { start: number; query: string } | null {
-  const before = value.slice(0, cursor);
-  const at = before.lastIndexOf("@");
-  if (at < 0) {
-    return null;
-  }
-  const afterAt = before.slice(at + 1);
-  if (afterAt.includes("\n") || afterAt.includes("@")) {
-    return null;
-  }
-  if (at > 0 && !/\s/.test(value.charAt(at - 1))) {
-    return null;
-  }
-  return { start: at, query: afterAt };
-}
-
-/** `@Name` is finished (typed fully or picked); stop treating it as an active filter. */
-function isMentionSegmentComplete(query: string, nodes: AiBuilderMentionNode[]): boolean {
-  const names = nodes
-    .map((n) => aiBuilderNodeDisplayName(n).trim())
-    .filter((name) => name.length > 0)
-    .sort((a, b) => b.length - a.length);
-  for (const name of names) {
-    if (query === name || query.startsWith(`${name} `)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function mentionQueryHasAnyMatch(query: string, nodes: AiBuilderMentionNode[]): boolean {
-  const q = query.trim().toLowerCase();
-  return nodes.some((n) => {
-    const name = aiBuilderNodeDisplayName(n).toLowerCase();
-    return !q || name.includes(q);
-  });
-}
 
 type AiBuilderChatPanelProps = {
   chatSessions: AiChatSession[];
@@ -130,7 +90,7 @@ export function AiBuilderChatPanel({
       <div className="h-full rounded-md bg-slate-50/30 flex flex-col">
         {isNewChatView ? (
           <>
-            <InputForm
+            <AiBuilderChatInput
               aiInputRef={aiInputRef}
               aiInput={aiInput}
               onAiInputChange={onAiInputChange}
@@ -183,7 +143,7 @@ export function AiBuilderChatPanel({
               disabled={disabled}
             />
 
-            <InputForm
+            <AiBuilderChatInput
               aiInputRef={aiInputRef}
               aiInput={aiInput}
               onAiInputChange={onAiInputChange}
@@ -503,278 +463,5 @@ function ProposalsList({
 
       {aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
     </div>
-  );
-}
-
-type InputFormProps = {
-  aiInputRef: React.RefObject<HTMLTextAreaElement | null>;
-  aiInput: string;
-  onAiInputChange: (value: string) => void;
-  onSendPrompt: () => void;
-  disabled: boolean;
-  canvasId?: string;
-  canvasNodes?: AiBuilderMentionNode[];
-  isGeneratingResponse: boolean;
-  maxAiInputHeight: number;
-  expanded?: boolean;
-};
-
-const TEXT_AREA_CLASSNAME = cn(
-  "min-h-[20px] flex-1 resize-none border-0",
-  "rounded-sm bg-transparent px-0.5 py-0.5 shadow-none",
-  "focus-visible:ring-0 focus-visible:border-transparent",
-);
-
-const MENTION_LIST_MAX = 20;
-
-function InputForm({
-  aiInputRef,
-  aiInput,
-  onAiInputChange,
-  onSendPrompt,
-  disabled,
-  canvasId,
-  canvasNodes,
-  isGeneratingResponse,
-  maxAiInputHeight,
-  expanded = false,
-}: InputFormProps) {
-  const mentionAnchorRef = useRef<HTMLDivElement>(null);
-  const [mentionMenuPlacement, setMentionMenuPlacement] = useState<{
-    left: number;
-    width: number;
-    bottom: number;
-  } | null>(null);
-
-  const [mentionOpen, setMentionOpen] = useState(false);
-  const [mentionStart, setMentionStart] = useState(0);
-  const [mentionQuery, setMentionQuery] = useState("");
-  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
-
-  const syncMentionUi = useCallback(
-    (value: string, cursor: number) => {
-      if (!canvasNodes?.length) {
-        setMentionOpen(false);
-        return;
-      }
-      const seg = getActiveMentionSegment(value, cursor);
-      if (!seg) {
-        setMentionOpen(false);
-        return;
-      }
-      if (isMentionSegmentComplete(seg.query, canvasNodes)) {
-        setMentionOpen(false);
-        return;
-      }
-      if (!mentionQueryHasAnyMatch(seg.query, canvasNodes)) {
-        setMentionOpen(false);
-        return;
-      }
-      setMentionOpen(true);
-      setMentionStart(seg.start);
-      setMentionQuery(seg.query);
-      setMentionSelectedIndex(0);
-    },
-    [canvasNodes],
-  );
-
-  const filteredMentionNodes = useMemo(() => {
-    if (!canvasNodes?.length) {
-      return [];
-    }
-    const q = mentionQuery.trim().toLowerCase();
-    return canvasNodes
-      .filter((n) => {
-        const name = aiBuilderNodeDisplayName(n).toLowerCase();
-        return !q || name.includes(q);
-      })
-      .slice(0, MENTION_LIST_MAX);
-  }, [canvasNodes, mentionQuery]);
-
-  const applyMention = useCallback(
-    (node: AiBuilderMentionNode) => {
-      const el = aiInputRef.current;
-      if (!el) {
-        return;
-      }
-      const cursor = el.selectionStart ?? aiInput.length;
-      const name = aiBuilderNodeDisplayName(node);
-      const before = aiInput.slice(0, mentionStart);
-      const after = aiInput.slice(cursor);
-      const insert = `@${name} `;
-      const next = before + insert + after;
-      onAiInputChange(next);
-      setMentionOpen(false);
-      const pos = before.length + insert.length;
-      requestAnimationFrame(() => {
-        el.focus();
-        el.setSelectionRange(pos, pos);
-        syncMentionUi(next, pos);
-      });
-    },
-    [aiInput, aiInputRef, mentionStart, onAiInputChange, syncMentionUi],
-  );
-
-  const updateMentionMenuPlacement = useCallback(() => {
-    if (!mentionOpen || filteredMentionNodes.length === 0) {
-      setMentionMenuPlacement(null);
-      return;
-    }
-    const anchor = mentionAnchorRef.current;
-    if (!anchor) {
-      setMentionMenuPlacement(null);
-      return;
-    }
-    const rect = anchor.getBoundingClientRect();
-    setMentionMenuPlacement({
-      left: rect.left,
-      width: rect.width,
-      bottom: window.innerHeight - rect.top + 4,
-    });
-  }, [mentionOpen, filteredMentionNodes.length]);
-
-  useLayoutEffect(() => {
-    updateMentionMenuPlacement();
-  }, [updateMentionMenuPlacement, aiInput, mentionOpen, filteredMentionNodes.length]);
-
-  useEffect(() => {
-    if (!mentionOpen || filteredMentionNodes.length === 0) {
-      return;
-    }
-    const onReposition = () => updateMentionMenuPlacement();
-    window.addEventListener("scroll", onReposition, true);
-    window.addEventListener("resize", onReposition);
-    return () => {
-      window.removeEventListener("scroll", onReposition, true);
-      window.removeEventListener("resize", onReposition);
-    };
-  }, [mentionOpen, filteredMentionNodes.length, updateMentionMenuPlacement]);
-
-  const isDisabled = disabled || isGeneratingResponse || !canvasId || !aiInput.trim();
-
-  const changeHandler = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const v = e.target.value;
-    onAiInputChange(v);
-    const cursor = e.target.selectionStart ?? v.length;
-    requestAnimationFrame(() => syncMentionUi(v, cursor));
-  };
-
-  const keyDownHandler = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (mentionOpen && filteredMentionNodes.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setMentionSelectedIndex((i) => Math.min(i + 1, filteredMentionNodes.length - 1));
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setMentionSelectedIndex((i) => Math.max(i - 1, 0));
-        return;
-      }
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        const pick = filteredMentionNodes[mentionSelectedIndex];
-        if (pick) {
-          applyMention(pick);
-        }
-        return;
-      }
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setMentionOpen(false);
-        return;
-      }
-    }
-
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSendPrompt();
-    }
-  };
-
-  const submitHandler = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    onSendPrompt();
-  };
-
-  return (
-    <div className={cn("m-1.5", expanded && "mb-3")}>
-      <form
-        onSubmit={submitHandler}
-        className={cn("rounded-md border border-slate-300 bg-white p-1.5", expanded && "p-3 shadow-sm")}
-      >
-        <div ref={mentionAnchorRef} className="relative">
-          {mentionOpen &&
-            filteredMentionNodes.length > 0 &&
-            mentionMenuPlacement &&
-            createPortal(
-              <div
-                className="fixed z-[300] max-h-48 overflow-y-auto rounded-md border border-slate-200 bg-popover py-1 shadow-lg"
-                role="listbox"
-                style={{
-                  left: mentionMenuPlacement.left,
-                  width: mentionMenuPlacement.width,
-                  bottom: mentionMenuPlacement.bottom,
-                }}
-              >
-                {filteredMentionNodes.map((node, index) => {
-                  const label = aiBuilderNodeDisplayName(node);
-                  return (
-                    <button
-                      key={node.id}
-                      type="button"
-                      role="option"
-                      aria-selected={index === mentionSelectedIndex}
-                      className={cn(
-                        "block w-full px-2 py-1.5 text-left text-sm text-slate-800",
-                        index === mentionSelectedIndex ? "bg-slate-100" : "hover:bg-slate-50",
-                      )}
-                      onMouseDown={(ev) => ev.preventDefault()}
-                      onMouseEnter={() => setMentionSelectedIndex(index)}
-                      onClick={() => applyMention(node)}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>,
-              document.body,
-            )}
-
-          <Textarea
-            ref={aiInputRef}
-            value={aiInput}
-            onChange={changeHandler}
-            onKeyDown={keyDownHandler}
-            onClick={(e) => syncMentionUi(aiInput, e.currentTarget.selectionStart ?? aiInput.length)}
-            onSelect={(e) => syncMentionUi(aiInput, e.currentTarget.selectionStart ?? aiInput.length)}
-            placeholder="What would you like to build? (@ to mention a step)"
-            disabled={disabled || !canvasId}
-            rows={expanded ? 4 : 1}
-            className={cn(TEXT_AREA_CLASSNAME, expanded && "min-h-[112px] text-[15px] leading-6")}
-            style={{ maxHeight: `${maxAiInputHeight}px` }}
-          />
-        </div>
-
-        <div className="flex items-center justify-end">
-          <SubmitButton disabled={isDisabled} />
-        </div>
-      </form>
-    </div>
-  );
-}
-
-const SUBMIT_BUTTON_CLASSNAME = cn(
-  "p-1 rounded-full bg-slate-600 text-white hover:bg-slate-700",
-  "cursor-pointer",
-  "disabled:opacity-50 disabled:cursor-not-allowed",
-  "flex items-center justify-center",
-);
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  return (
-    <button type="submit" className={SUBMIT_BUTTON_CLASSNAME} disabled={disabled} aria-label="Send prompt">
-      <ArrowUp size={14} />
-    </button>
   );
 }
