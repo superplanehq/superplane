@@ -209,7 +209,12 @@ async def _stream_agent_run(
     else:
         user_prompt_for_run = payload.question
 
-    recorder = PersistedRunRecorder(store, chat.id, user_prompt_for_run)
+    recorder = PersistedRunRecorder(
+        store,
+        chat.id,
+        user_prompt_for_run,
+        initial_message=payload.question,
+    )
 
     _debug_log(
         "starting agent run",
