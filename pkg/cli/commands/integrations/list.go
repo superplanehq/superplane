@@ -17,11 +17,11 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if !me.HasOrganizationId() {
+	if !me.User.HasOrganizationId() {
 		return fmt.Errorf("organization id not found for authenticated user")
 	}
 
-	connectedResponse, _, err := ctx.API.OrganizationAPI.OrganizationsListIntegrations(ctx.Context, me.GetOrganizationId()).Execute()
+	connectedResponse, _, err := ctx.API.OrganizationAPI.OrganizationsListIntegrations(ctx.Context, me.User.GetOrganizationId()).Execute()
 	if err != nil {
 		return err
 	}
