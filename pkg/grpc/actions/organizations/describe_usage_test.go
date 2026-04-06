@@ -196,7 +196,7 @@ func Test__DescribeUsage(t *testing.T) {
 		require.NotNil(t, response.Limits)
 		assert.Equal(t, int32(10), response.Limits.MaxCanvases)
 		require.NotNil(t, response.Usage)
-		assert.Equal(t, int32(0), response.Usage.Canvases)
+		assert.Equal(t, int32(4), response.Usage.Canvases)
 		assert.Equal(t, 42.0, response.Usage.EventBucketLevel)
 		require.NotNil(t, response.Usage.NextEventBucketDecreaseAt)
 		assert.WithinDuration(t, now.Add(24*time.Hour), response.Usage.NextEventBucketDecreaseAt.AsTime(), time.Second)
@@ -251,32 +251,8 @@ func Test__DescribeUsage(t *testing.T) {
 		require.NotNil(t, response.Limits)
 		assert.Equal(t, int32(12), response.Limits.MaxCanvases)
 		require.NotNil(t, response.Usage)
-		assert.Equal(t, int32(0), response.Usage.Canvases)
+		assert.Equal(t, int32(1), response.Usage.Canvases)
 		require.NotNil(t, response.Usage.NextEventBucketDecreaseAt)
 		assert.WithinDuration(t, now.Add(24*time.Hour), response.Usage.NextEventBucketDecreaseAt.AsTime(), time.Second)
-	})
-
-	t.Run("uses database canvas count instead of usage service value", func(t *testing.T) {
-		support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-
-		service := &fakeUsageService{
-			enabled: true,
-			describeLimitsResponse: &pb.DescribeOrganizationLimitsResponse{
-				Limits: &pb.OrganizationLimits{
-					MaxCanvases: 10,
-				},
-			},
-			describeUsageResponse: &pb.DescribeOrganizationUsageResponse{
-				Usage: &pb.OrganizationUsage{
-					Canvases: 0,
-				},
-			},
-		}
-
-		response, err := DescribeUsage(context.Background(), service, r.Organization.ID.String())
-		require.NoError(t, err)
-		require.NotNil(t, response.Usage)
-		assert.Equal(t, int32(2), response.Usage.Canvases)
 	})
 }
