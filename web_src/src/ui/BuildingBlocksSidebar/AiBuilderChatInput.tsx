@@ -1,5 +1,6 @@
 import { Textarea } from "@/components/ui/textarea";
-import { AiBuilderMentionListPortal, useAiBuilderMentionTypeahead } from "@/hooks/useAiBuilderMentionTypeahead";
+import { useAiBuilderMentionTypeahead } from "@/hooks/useAiBuilderMentionTypeahead";
+import { AiBuilderMentionListPortal } from "@/ui/BuildingBlocksSidebar/AiBuilderMentionListPortal";
 import type { AiBuilderMentionNode } from "@/lib/aiBuilderNodeMentions";
 import { cn } from "@/lib/utils";
 import { ArrowUp } from "lucide-react";
