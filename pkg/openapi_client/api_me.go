@@ -23,11 +23,17 @@ import (
 type MeAPIService service
 
 type ApiMeMeRequest struct {
-	ctx        context.Context
-	ApiService *MeAPIService
+	ctx                context.Context
+	ApiService         *MeAPIService
+	includePermissions *bool
 }
 
-func (r ApiMeMeRequest) Execute() (*SuperplaneMeUser, *http.Response, error) {
+func (r ApiMeMeRequest) IncludePermissions(includePermissions bool) ApiMeMeRequest {
+	r.includePermissions = &includePermissions
+	return r
+}
+
+func (r ApiMeMeRequest) Execute() (*MeMeResponse, *http.Response, error) {
 	return r.ApiService.MeMeExecute(r)
 }
 
@@ -48,13 +54,13 @@ func (a *MeAPIService) MeMe(ctx context.Context) ApiMeMeRequest {
 
 // Execute executes the request
 //
-//	@return SuperplaneMeUser
-func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*SuperplaneMeUser, *http.Response, error) {
+//	@return MeMeResponse
+func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*MeMeResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodGet
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *SuperplaneMeUser
+		localVarReturnValue *MeMeResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "MeAPIService.MeMe")
@@ -68,6 +74,9 @@ func (a *MeAPIService) MeMeExecute(r ApiMeMeRequest) (*SuperplaneMeUser, *http.R
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.includePermissions != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includePermissions", r.includePermissions, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

@@ -297,9 +297,6 @@ import type {
   TriggersListTriggersData,
   TriggersListTriggersErrors,
   TriggersListTriggersResponses,
-  UsersListUserPermissionsData,
-  UsersListUserPermissionsErrors,
-  UsersListUserPermissionsResponses,
   UsersListUserRolesData,
   UsersListUserRolesErrors,
   UsersListUserRolesResponses,
@@ -1866,19 +1863,6 @@ export const usersListUsers = <ThrowOnError extends boolean = true>(
 ) =>
   (options?.client ?? client).get<UsersListUsersResponses, UsersListUsersErrors, ThrowOnError>({
     url: "/api/v1/users",
-    ...options,
-  });
-
-/**
- * List user permissions
- *
- * Returns all permissions a user has within a specific domain
- */
-export const usersListUserPermissions = <ThrowOnError extends boolean = true>(
-  options: Options<UsersListUserPermissionsData, ThrowOnError>,
-) =>
-  (options.client ?? client).get<UsersListUserPermissionsResponses, UsersListUserPermissionsErrors, ThrowOnError>({
-    url: "/api/v1/users/{userId}/permissions",
     ...options,
   });
 

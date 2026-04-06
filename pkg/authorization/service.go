@@ -554,6 +554,28 @@ func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
+
+	//
+	// Keep policy cache fresh for role resolution calls that are not preceded by a permission
+	// check (for example, /me when include_permissions=true).
+	//
+	filters := []gormadapter.Filter{
+		{
+			Ptype: []string{"p"},
+			V1:    []string{orgDomain, "/org/*"},
+		},
+		{
+			Ptype: []string{"g"},
+			V2:    []string{orgDomain, "/org/*"},
+		},
+	}
+	if err := a.enforcer.LoadFilteredPolicy(filters); err != nil {
+		return nil, err
+	}
+	if err := a.loadDefaultPolicies(); err != nil {
+		return nil, err
+	}
+
 	prefixedUserID := prefixUserID(userID)
 	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
 	if err != nil {
