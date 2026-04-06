@@ -19,6 +19,7 @@ func ListAgentChats(ctx context.Context, agentURL string, orgID string, userID s
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
 	}
+	defer closeAgentConnection(conn)
 
 	client := internalpb.NewAgentsClient(conn)
 	response, err := client.ListAgentChats(ctx, &internalpb.ListAgentChatsRequest{
