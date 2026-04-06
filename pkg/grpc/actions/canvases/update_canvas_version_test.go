@@ -113,6 +113,32 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		assert.Contains(t, s.Message(), "canvas versioning is disabled")
 	})
 
+	t.Run("deleted canvas returns not found instead of internal error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		require.NoError(
+			t,
+			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
+		)
+
+		require.NoError(t, database.Conn().Delete(&models.Canvas{}, "id = ?", canvas.ID).Error)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			"",
+			testPbCanvas(canvas.Name),
+			nil,
+			"",
+		)
+
+		require.Error(t, err)
+		assert.Equal(t, codes.NotFound, status.Code(err))
+	})
+
 	t.Run("versioning disabled and no version id -> updates live canvas", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 		require.NoError(
