@@ -6,6 +6,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/pkg/usage"
@@ -38,6 +39,12 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		return nil, err
 	}
 
+	canvasCount, err := models.CountCanvasesByOrganization(orgID)
+	if err != nil {
+		log.Warnf("Failed to count canvases for organization %s, falling back to usage service value: %v", orgID, err)
+		canvasCount = int64(orgUsage.GetCanvases())
+	}
+
 	if err := usage.MarkOrganizationSyncedIfUnset(orgID); err != nil {
 		log.Warnf("Failed to persist usage sync state for organization %s: %v", orgID, err)
 	}
@@ -46,7 +53,7 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		Enabled:       true,
 		StatusMessage: "Usage tracking is active.",
 		Limits:        serializeUsageLimits(limits),
-		Usage:         serializeUsage(orgUsage),
+		Usage:         serializeUsage(orgUsage, int32(canvasCount)),
 	}, nil
 }
 
@@ -133,7 +140,7 @@ func serializeUsageLimits(limits *usagepb.OrganizationLimits) *pb.OrganizationLi
 	}
 }
 
-func serializeUsage(orgUsage *usagepb.OrganizationUsage) *pb.OrganizationUsage {
+func serializeUsage(orgUsage *usagepb.OrganizationUsage, canvasCount int32) *pb.OrganizationUsage {
 	if orgUsage == nil {
 		return nil
 	}
@@ -153,7 +160,7 @@ func serializeUsage(orgUsage *usagepb.OrganizationUsage) *pb.OrganizationUsage {
 	}
 
 	return &pb.OrganizationUsage{
-		Canvases:                  orgUsage.Canvases,
+		Canvases:                  canvasCount,
 		EventBucketLevel:          orgUsage.EventBucketLevel,
 		EventBucketCapacity:       orgUsage.EventBucketCapacity,
 		EventBucketLastUpdatedAt:  eventBucketLastUpdatedAt,
