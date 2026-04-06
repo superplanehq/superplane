@@ -344,9 +344,6 @@ func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, kbPollInterval)
 }
 
-// resolveDisplayNames enriches the output map with human-readable names for
-// the embedding model, project, and OpenSearch database. Failures are ignored
-// so a lookup error never blocks the execution result.
 // mergeCreateKBOutputFromFetchedKB updates the Execute-time output map with fields that the create
 // response may omit until async provisioning finishes (e.g. databaseId for a newly created OpenSearch cluster).
 func mergeCreateKBOutputFromFetchedKB(output map[string]any, kb *KnowledgeBase) {
@@ -358,6 +355,9 @@ func mergeCreateKBOutputFromFetchedKB(output map[string]any, kb *KnowledgeBase) 
 	}
 }
 
+// resolveDisplayNames enriches the output map with human-readable names for
+// the embedding model, project, and OpenSearch database. Failures are ignored
+// so a lookup error never blocks the execution result.
 func resolveDisplayNames(client *Client, spec CreateKnowledgeBaseSpec, output map[string]any) {
 	if models, err := client.ListEmbeddingModels(); err == nil {
 		for _, m := range models {
