@@ -40,16 +40,16 @@ def expand_node_mentions_in_prompt(question: str, deps: AgentDeps) -> str:
         deps.canvas_cache[canvas_id] = summary
 
     by_id = {node.id: node for node in summary.nodes}
-    lines = ["### Referenced nodes", ""]
+    bullet_lines: list[str] = []
     for node_id in ids:
         node = by_id.get(node_id)
         if node is None:
-            lines.append(f"- id `{node_id}`: (not found on canvas)")
+            bullet_lines.append(f"- id `{node_id}`: (not found on canvas)")
             continue
         label = node.name or node.id
-        lines.append(
+        bullet_lines.append(
             f"- **{label}** (`{node.id}`): "
             f"type={node.type or 'n/a'}, block={node.block_name or 'n/a'}"
         )
 
-    return f"{question.rstrip()}{REFERENCED_NODES_APPENDIX_MARKER}\n\n" + "\n".join(lines[2:])
+    return f"{question.rstrip()}{REFERENCED_NODES_APPENDIX_MARKER}\n\n" + "\n".join(bullet_lines)
