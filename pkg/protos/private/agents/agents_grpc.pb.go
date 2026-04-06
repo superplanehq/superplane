@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Agents_CreateAgentChat_FullMethodName       = "/Superplane.Internal.Agents.Agents/CreateAgentChat"
-	Agents_ListAgentChats_FullMethodName        = "/Superplane.Internal.Agents.Agents/ListAgentChats"
-	Agents_DescribeAgentChat_FullMethodName     = "/Superplane.Internal.Agents.Agents/DescribeAgentChat"
-	Agents_ListAgentChatMessages_FullMethodName = "/Superplane.Internal.Agents.Agents/ListAgentChatMessages"
+	Agents_CreateAgentChat_FullMethodName                = "/Superplane.Internal.Agents.Agents/CreateAgentChat"
+	Agents_ListAgentChats_FullMethodName                 = "/Superplane.Internal.Agents.Agents/ListAgentChats"
+	Agents_DescribeAgentChat_FullMethodName              = "/Superplane.Internal.Agents.Agents/DescribeAgentChat"
+	Agents_ListAgentChatMessages_FullMethodName          = "/Superplane.Internal.Agents.Agents/ListAgentChatMessages"
+	Agents_DescribeOrganizationAgentUsage_FullMethodName = "/Superplane.Internal.Agents.Agents/DescribeOrganizationAgentUsage"
 )
 
 // AgentsClient is the client API for Agents service.
@@ -37,6 +38,7 @@ type AgentsClient interface {
 	ListAgentChats(ctx context.Context, in *ListAgentChatsRequest, opts ...grpc.CallOption) (*ListAgentChatsResponse, error)
 	DescribeAgentChat(ctx context.Context, in *DescribeAgentChatRequest, opts ...grpc.CallOption) (*DescribeAgentChatResponse, error)
 	ListAgentChatMessages(ctx context.Context, in *ListAgentChatMessagesRequest, opts ...grpc.CallOption) (*ListAgentChatMessagesResponse, error)
+	DescribeOrganizationAgentUsage(ctx context.Context, in *DescribeOrganizationAgentUsageRequest, opts ...grpc.CallOption) (*DescribeOrganizationAgentUsageResponse, error)
 }
 
 type agentsClient struct {
@@ -87,6 +89,16 @@ func (c *agentsClient) ListAgentChatMessages(ctx context.Context, in *ListAgentC
 	return out, nil
 }
 
+func (c *agentsClient) DescribeOrganizationAgentUsage(ctx context.Context, in *DescribeOrganizationAgentUsageRequest, opts ...grpc.CallOption) (*DescribeOrganizationAgentUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeOrganizationAgentUsageResponse)
+	err := c.cc.Invoke(ctx, Agents_DescribeOrganizationAgentUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentsServer is the server API for Agents service.
 // All implementations should embed UnimplementedAgentsServer
 // for forward compatibility.
@@ -99,6 +111,7 @@ type AgentsServer interface {
 	ListAgentChats(context.Context, *ListAgentChatsRequest) (*ListAgentChatsResponse, error)
 	DescribeAgentChat(context.Context, *DescribeAgentChatRequest) (*DescribeAgentChatResponse, error)
 	ListAgentChatMessages(context.Context, *ListAgentChatMessagesRequest) (*ListAgentChatMessagesResponse, error)
+	DescribeOrganizationAgentUsage(context.Context, *DescribeOrganizationAgentUsageRequest) (*DescribeOrganizationAgentUsageResponse, error)
 }
 
 // UnimplementedAgentsServer should be embedded to have
@@ -119,6 +132,9 @@ func (UnimplementedAgentsServer) DescribeAgentChat(context.Context, *DescribeAge
 }
 func (UnimplementedAgentsServer) ListAgentChatMessages(context.Context, *ListAgentChatMessagesRequest) (*ListAgentChatMessagesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListAgentChatMessages not implemented")
+}
+func (UnimplementedAgentsServer) DescribeOrganizationAgentUsage(context.Context, *DescribeOrganizationAgentUsageRequest) (*DescribeOrganizationAgentUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DescribeOrganizationAgentUsage not implemented")
 }
 func (UnimplementedAgentsServer) testEmbeddedByValue() {}
 
@@ -212,6 +228,24 @@ func _Agents_ListAgentChatMessages_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agents_DescribeOrganizationAgentUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeOrganizationAgentUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentsServer).DescribeOrganizationAgentUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agents_DescribeOrganizationAgentUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentsServer).DescribeOrganizationAgentUsage(ctx, req.(*DescribeOrganizationAgentUsageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agents_ServiceDesc is the grpc.ServiceDesc for Agents service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -234,6 +268,10 @@ var Agents_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAgentChatMessages",
 			Handler:    _Agents_ListAgentChatMessages_Handler,
+		},
+		{
+			MethodName: "DescribeOrganizationAgentUsage",
+			Handler:    _Agents_DescribeOrganizationAgentUsage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
