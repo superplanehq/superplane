@@ -40,7 +40,7 @@ export function AiBuilderMentionListPortal({
       style={{
         left: placement.left,
         width: placement.width,
-        top: placement.top,
+        bottom: placement.bottom,
         maxHeight: placement.maxHeight,
       }}
     >

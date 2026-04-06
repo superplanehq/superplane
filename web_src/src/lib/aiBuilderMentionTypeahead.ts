@@ -54,22 +54,24 @@ export function filterMentionNodesByQuery(nodes: AiBuilderMentionNode[], query: 
 export type MentionMenuPlacement = {
   left: number;
   width: number;
-  top: number;
+  /** Distance from viewport bottom to the menu's bottom edge (menu opens upward). */
+  bottom: number;
   maxHeight: number;
 };
 
-/** Fixed menu below the anchor; height capped by viewport and list max (~max-h-48). */
+/** Fixed menu above the anchor (portal + `bottom`); height capped by viewport and list max (~max-h-48). */
 export function computeMentionMenuPlacement(anchorRect: DOMRect): MentionMenuPlacement {
   const margin = 8;
+  const gap = 4;
   const maxListHeightPx = 192;
-  const top = anchorRect.bottom + 4;
-  const availableBelow = window.innerHeight - top - margin;
-  const maxHeight = Math.min(maxListHeightPx, Math.max(0, availableBelow));
+  const bottom = window.innerHeight - anchorRect.top + gap;
+  const availableAbove = anchorRect.top - margin - gap;
+  const maxHeight = Math.min(maxListHeightPx, Math.max(0, availableAbove));
   let left = anchorRect.left;
   const width = anchorRect.width;
   const maxLeft = window.innerWidth - width - margin;
   if (left > maxLeft) {
     left = Math.max(margin, maxLeft);
   }
-  return { left, width, top, maxHeight };
+  return { left, width, bottom, maxHeight };
 }
