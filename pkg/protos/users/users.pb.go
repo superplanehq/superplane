@@ -717,10 +717,8 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x99\x03\n" +
-	"\x05Users\x12\xd8\x01\n" +
-	"\rListUserRoles\x12&.Superplane.Users.ListUserRolesRequest\x1a'.Superplane.Users.ListUserRolesResponse\"v\x92AN\n" +
-	"\x05Users\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/users/{user_id}/roles\x12\xb4\x01\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\xbe\x01\n" +
+	"\x05Users\x12\xb4\x01\n" +
 	"\tListUsers\x12\".Superplane.Users.ListUsersRequest\x1a#.Superplane.Users.ListUsersResponse\"^\x92AF\n" +
 	"\x05Users\x12\n" +
 	"List users\x1a1Returns all users that have roles within a domain\x82\xd3\xe4\x93\x02\x0f\x12\r/api/v1/usersB\xbf\x01\x92A\x86\x01\x12\\\n" +
@@ -772,12 +770,10 @@ var file_users_proto_depIdxs = []int32{
 	12, // 13: Superplane.Users.User.Metadata.updated_at:type_name -> google.protobuf.Timestamp
 	6,  // 14: Superplane.Users.User.Spec.account_providers:type_name -> Superplane.Users.AccountProvider
 	5,  // 15: Superplane.Users.User.Status.role_assignments:type_name -> Superplane.Users.UserRoleAssignment
-	0,  // 16: Superplane.Users.Users.ListUserRoles:input_type -> Superplane.Users.ListUserRolesRequest
-	2,  // 17: Superplane.Users.Users.ListUsers:input_type -> Superplane.Users.ListUsersRequest
-	1,  // 18: Superplane.Users.Users.ListUserRoles:output_type -> Superplane.Users.ListUserRolesResponse
-	3,  // 19: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse
-	18, // [18:20] is the sub-list for method output_type
-	16, // [16:18] is the sub-list for method input_type
+	2,  // 16: Superplane.Users.Users.ListUsers:input_type -> Superplane.Users.ListUsersRequest
+	3,  // 17: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse
+	17, // [17:18] is the sub-list for method output_type
+	16, // [16:17] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
 	16, // [16:16] is the sub-list for extension extendee
 	0,  // [0:16] is the sub-list for field type_name
