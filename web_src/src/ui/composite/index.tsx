@@ -98,7 +98,6 @@ export const Composite: React.FC<CompositeProps> = ({
   runDisabled,
   runDisabledTooltip,
   onEdit,
-  onConfigure,
   onDuplicate,
   onDeactivate,
   onTogglePause,
@@ -219,7 +218,6 @@ export const Composite: React.FC<CompositeProps> = ({
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
-      onConfigure={onConfigure}
       onDuplicate={onDuplicate}
       onDeactivate={onDeactivate}
       onTogglePause={onTogglePause}
