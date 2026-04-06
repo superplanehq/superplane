@@ -42,6 +42,8 @@ func DescribeUsage(ctx context.Context, usageService usage.Service, orgID string
 		log.Warnf("Failed to persist usage sync state for organization %s: %v", orgID, err)
 	}
 
+	go usage.ReconcileCanvasCount(orgID, orgUsage.GetCanvases())
+
 	return &pb.DescribeUsageResponse{
 		Enabled:       true,
 		StatusMessage: "Usage tracking is active.",
