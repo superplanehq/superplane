@@ -2,16 +2,20 @@ package me
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func GetUser(ctx context.Context) (*pb.User, error) {
+func GetUser(ctx context.Context, authService authorization.Authorization, includePermissions bool) (*pb.MeResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -27,11 +31,50 @@ func GetUser(ctx context.Context) (*pb.User, error) {
 		return nil, status.Error(codes.NotFound, "user not found")
 	}
 
-	return &pb.User{
+	userProto := &pb.User{
 		Id:             user.ID.String(),
 		Email:          user.GetEmail(),
 		OrganizationId: orgID,
 		CreatedAt:      timestamppb.New(user.CreatedAt),
 		HasToken:       user.TokenHash != "",
+	}
+
+	if !includePermissions {
+		return &pb.MeResponse{
+			User: userProto,
+		}, nil
+	}
+
+	roles, err := authService.GetUserRolesForOrg(userID, user.OrganizationID.String())
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get user roles")
+	}
+
+	//
+	// TODO: this can be simplified
+	//
+	permissionSet := make(map[string]*pbAuth.Permission)
+	for _, role := range roles {
+		rolePermissions := role.Permissions
+
+		for _, perm := range rolePermissions {
+			key := fmt.Sprintf("%s:%s", perm.Resource, perm.Action)
+			permissionSet[key] = &pbAuth.Permission{
+				Resource:   perm.Resource,
+				Action:     perm.Action,
+				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
+			}
+		}
+	}
+
+	permissions := make([]*pbAuth.Permission, 0, len(permissionSet))
+	for _, perm := range permissionSet {
+		permissions = append(permissions, perm)
+	}
+
+	userProto.Permissions = permissions
+
+	return &pb.MeResponse{
+		User: userProto,
 	}, nil
 }

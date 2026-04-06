@@ -19,7 +19,7 @@ func TestGetCommandExecuteText(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/me":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-123"}`))
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-123"}}`))
 		case "/api/v1/organizations/org-123/usage":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{
@@ -67,7 +67,7 @@ func TestGetCommandExecuteJSON(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/me":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-123"}`))
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-123"}}`))
 		case "/api/v1/organizations/org-123/usage":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"enabled":false,"statusMessage":"usage disabled"}`))
@@ -90,7 +90,7 @@ func TestGetCommandExecuteRequiresOrganizationID(t *testing.T) {
 		require.Equal(t, http.MethodGet, r.Method)
 		require.Equal(t, "/api/v1/me", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"user-1"}`))
+		_, _ = w.Write([]byte(`{"user":{"id":"user-1"}}`))
 	}))
 	t.Cleanup(server.Close)
 

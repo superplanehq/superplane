@@ -1,8 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-
-import { usersListUserPermissions, type AuthorizationPermission } from "@/api-client";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { type AuthorizationPermission } from "@/api-client";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useMe } from "@/hooks/useMe";
 
@@ -35,25 +32,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
   const { data: me, isLoading: meLoading } = useMe();
 
   const userId = me?.id;
-
-  const permissionsQuery = useQuery({
-    queryKey: ["permissions", organizationId, userId],
-    queryFn: async () => {
-      const response = await usersListUserPermissions(
-        withOrganizationHeader({
-          organizationId,
-          path: { userId: userId! },
-          query: { domainType: "DOMAIN_TYPE_ORGANIZATION", domainId: organizationId },
-        }),
-      );
-      return response.data?.permissions || [];
-    },
-    enabled: !!organizationId && !!userId,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const permissions = permissionsQuery.data ?? [];
+  const permissions = me?.permissions ?? [];
 
   const permissionSet = useMemo(() => {
     return new Set(
@@ -76,7 +55,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     [permissionSet],
   );
 
-  const isLoading = !organizationId || meLoading || (!!organizationId && !userId) || permissionsQuery.isLoading;
+  const isLoading = !organizationId || meLoading || (!!organizationId && !userId);
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
