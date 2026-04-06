@@ -2605,7 +2605,6 @@ export function WorkflowPageV2() {
 
         return result;
       } catch (error: any) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         setLastCanvasSaveError(displayMessage);
@@ -4338,7 +4337,6 @@ export function WorkflowPageV2() {
           setInitialWorkflowSnapshot(null);
         }
       } catch (error) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }
