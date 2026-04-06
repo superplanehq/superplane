@@ -32,20 +32,21 @@ lint:
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
-test.setup:
+test.setup.build:
 	@touch agent/.env
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
+
+test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(COMPOSE) up -d
-	sleep 5
+	$(COMPOSE) up -d --wait-for-healthy
 
 test.down:
 	$(COMPOSE) down --remove-orphans

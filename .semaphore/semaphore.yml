@@ -33,7 +33,8 @@ blocks:
           - mkdir -p tmp/go tmp/go-build
           - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
           - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make test.setup
+          - make test.setup.build
+          - make test.setup.db
           - make test.start
       jobs:
         - name: Lint
