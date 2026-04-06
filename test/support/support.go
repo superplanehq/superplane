@@ -105,7 +105,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 	accountProvider := &models.AccountProvider{
 		AccountID:  account.ID,
 		Provider:   "github",
-		ProviderID: "12345",
+		ProviderID: "testuser",
 		Username:   "testuser",
 		Email:      account.Email,
 		Name:       account.Name,
