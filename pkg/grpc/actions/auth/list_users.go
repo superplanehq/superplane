@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"log"
 	"slices"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -45,27 +44,7 @@ func ListUsers(
 		return nil, status.Error(codes.Internal, "failed to fetch account providers")
 	}
 
-	log.Printf("accountProviders: %v", accountProviders)
-	log.Printf("users: %v", users)
-
-	protoUsers := make([]*pb.User, len(users))
-	for i, user := range users {
-		protoUsers[i] = &pb.User{
-			Metadata: &pb.User_Metadata{
-				Id:        user.ID.String(),
-				Email:     user.GetEmail(),
-				CreatedAt: timestamppb.New(user.CreatedAt),
-				UpdatedAt: timestamppb.New(user.UpdatedAt),
-			},
-			Spec: &pb.User_Spec{
-				DisplayName: user.Name,
-			},
-			Status: &pb.User_Status{
-				AccountProviders: accountProvidersForUser(user.ID.String(), accountProviders),
-			},
-		}
-	}
-
+	protoUsers := usersToProto(users, accountProviders)
 	if !includeRoleAssignments {
 		return &pb.ListUsersResponse{
 			Users: protoUsers,
@@ -125,46 +104,4 @@ func ListUsers(
 	return &pb.ListUsersResponse{
 		Users: protoUsers,
 	}, nil
-}
-
-type UserAccountProvider struct {
-	models.AccountProvider
-	UserID string
-}
-
-func getAccountProviders(users []models.User) ([]UserAccountProvider, error) {
-	userIDs := make([]string, len(users))
-	for i, user := range users {
-		userIDs[i] = user.ID.String()
-	}
-
-	var accountProviders []UserAccountProvider
-	err := database.Conn().
-		Table("users").
-		Select("users.id as user_id, account_providers.*").
-		Joins("inner join accounts on accounts.id = users.account_id").
-		Joins("inner join account_providers on account_providers.account_id = accounts.id").
-		Where("users.id IN (?)", userIDs).
-		Find(&accountProviders).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return accountProviders, nil
-}
-
-func accountProvidersForUser(userID string, accountProviders []UserAccountProvider) []*pb.AccountProvider {
-	providers := []*pb.AccountProvider{}
-	for _, accountProvider := range accountProviders {
-		if accountProvider.UserID == userID {
-			providers = append(providers, &pb.AccountProvider{
-				ProviderType: accountProvider.Provider,
-				ProviderId:   accountProvider.ProviderID,
-			})
-		}
-	}
-
-	return providers
 }
