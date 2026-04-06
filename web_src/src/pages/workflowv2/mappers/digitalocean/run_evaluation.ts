@@ -107,7 +107,8 @@ export const runEvaluationMapper: ComponentBaseMapper = {
     details["Test Case"] = String(result.testCaseName || result.testCaseId || "-");
 
     if (result.workspaceId && result.testCaseId && result.evaluationRunId) {
-      details["View Evaluation"] = `https://cloud.digitalocean.com/gen-ai/workspaces/${result.workspaceId}/evaluations/${result.testCaseId}/runs/${result.evaluationRunId}`;
+      details["View Evaluation"] =
+        `https://cloud.digitalocean.com/gen-ai/workspaces/${result.workspaceId}/evaluations/${result.testCaseId}/runs/${result.evaluationRunId}`;
     }
 
     const starMetricLabel = formatStarMetric(result);

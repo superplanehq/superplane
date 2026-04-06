@@ -16,6 +16,36 @@ import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { CreateKnowledgeBaseConfiguration } from "./types";
 
+function getKBResult(context: ExecutionDetailsContext): Record<string, unknown> | undefined {
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  return outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+}
+
+function getKnowledgeBaseDetails(result: Record<string, unknown>): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  details["Knowledge Base"] = String(result.name || "-");
+
+  if (result.uuid) {
+    details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${result.uuid}`;
+  }
+
+  if (result.databaseId) {
+    details["View OpenSearch Database"] = `https://cloud.digitalocean.com/databases/${result.databaseId}`;
+  }
+
+  details["Region"] = String(result.region || "-");
+  details["Embedding Model"] = String(result.embeddingModelName || result.embeddingModelUUID || "-");
+  details["Project"] = String(result.projectName || result.projectId || "-");
+
+  const tags = result.tags as string[] | undefined;
+  if (tags && tags.length > 0) {
+    details["Tags"] = tags.join(", ");
+  }
+
+  return details;
+}
+
 export const createKnowledgeBaseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -40,30 +70,10 @@ export const createKnowledgeBaseMapper: ComponentBaseMapper = {
       details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+    const result = getKBResult(context);
     if (!result) return details;
 
-    details["Knowledge Base"] = String(result.name || "-");
-
-    if (result.uuid) {
-      details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${result.uuid}`;
-    }
-
-    if (result.databaseId) {
-      details["View OpenSearch Database"] = `https://cloud.digitalocean.com/databases/${result.databaseId}`;
-    }
-
-    details["Region"] = String(result.region || "-");
-    details["Embedding Model"] = String(result.embeddingModelName || result.embeddingModelUUID || "-");
-    details["Project"] = String(result.projectName || result.projectId || "-");
-
-    const tags = result.tags as string[] | undefined;
-    if (tags && tags.length > 0) {
-      details["Tags"] = tags.join(", ");
-    }
-
-    return details;
+    return { ...details, ...getKnowledgeBaseDetails(result) };
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
