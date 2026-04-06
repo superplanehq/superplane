@@ -32,6 +32,8 @@ db.migration.create:
 
 db.migrate:
 	rm -f db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://agent/db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c '\
+		migrate -source file://agent/db/migrations -database "postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable" up && \
+		pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME) > agent/db/structure.sql && \
+		pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME) >> agent/db/structure.sql \
+	'
