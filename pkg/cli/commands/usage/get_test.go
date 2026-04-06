@@ -92,7 +92,7 @@ func TestGetCommandExecuteJSONWithLimits(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/me":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-123"}`))
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-123"}}`))
 		case "/api/v1/organizations/org-123/usage":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{
@@ -142,7 +142,7 @@ func TestGetCommandExecuteJSONUnlimitedSentinel(t *testing.T) {
 		switch r.URL.Path {
 		case "/api/v1/me":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"id":"user-1","organizationId":"org-123"}`))
+			_, _ = w.Write([]byte(`{"user":{"id":"user-1","organizationId":"org-123"}}`))
 		case "/api/v1/organizations/org-123/usage":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{
