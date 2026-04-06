@@ -31,7 +31,6 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
   const organizationId = useOrganizationId();
   const { data: me, isLoading: meLoading } = useMe();
 
-  const userId = me?.id;
   const permissions = me?.permissions ?? [];
 
   const permissionSet = useMemo(() => {
@@ -55,7 +54,7 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
     [permissionSet],
   );
 
-  const isLoading = !organizationId || meLoading || (!!organizationId && !userId && meLoading);
+  const isLoading = !organizationId || meLoading || (!!organizationId && meLoading);
 
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>

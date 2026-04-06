@@ -2,41 +2,8 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
+import { hasDialogTitle } from "@/lib/dialogTitle";
 import { cn } from "@/lib/utils";
-
-function getReactDisplayName(childType: string | React.JSXElementConstructor<unknown>): string | undefined {
-  if (typeof childType === "string") {
-    return childType;
-  }
-
-  if ((typeof childType === "function" || typeof childType === "object") && "displayName" in childType) {
-    return typeof childType.displayName === "string" ? childType.displayName : undefined;
-  }
-
-  return undefined;
-}
-
-function hasDialogTitle(children: React.ReactNode): boolean {
-  return React.Children.toArray(children).some((child) => {
-    if (!React.isValidElement<{ children?: React.ReactNode }>(child)) {
-      return false;
-    }
-
-    const childType = child.type;
-    const displayName = getReactDisplayName(childType);
-
-    if (
-      childType === DialogTitle ||
-      childType === DialogPrimitive.Title ||
-      displayName === "DialogTitle" ||
-      displayName === DialogPrimitive.Title.displayName
-    ) {
-      return true;
-    }
-
-    return hasDialogTitle(child.props.children);
-  });
-}
 
 const Dialog = DialogPrimitive.Root;
 
@@ -65,7 +32,7 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => {
-  const titlePresent = hasDialogTitle(children);
+  const titlePresent = hasDialogTitle(children, [DialogTitle, DialogPrimitive.Title]);
 
   return (
     <DialogPortal>
