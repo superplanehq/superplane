@@ -38,6 +38,24 @@ CREATE TABLE public.agent_chat_messages (
 
 
 --
+-- Name: agent_chat_usage_records; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_chat_usage_records (
+    id uuid NOT NULL,
+    chat_id uuid NOT NULL,
+    model text DEFAULT ''::text NOT NULL,
+    input_tokens bigint DEFAULT 0 NOT NULL,
+    output_tokens bigint DEFAULT 0 NOT NULL,
+    cache_read_tokens bigint DEFAULT 0 NOT NULL,
+    cache_write_tokens bigint DEFAULT 0 NOT NULL,
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    estimated_cost_usd double precision,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: agent_chats; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -48,7 +66,11 @@ CREATE TABLE public.agent_chats (
     canvas_id uuid NOT NULL,
     initial_message text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    total_input_tokens bigint DEFAULT 0 NOT NULL,
+    total_output_tokens bigint DEFAULT 0 NOT NULL,
+    total_tokens bigint DEFAULT 0 NOT NULL,
+    total_estimated_cost_usd double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -68,6 +90,14 @@ CREATE TABLE public.schema_migrations (
 
 ALTER TABLE ONLY public.agent_chat_messages
     ADD CONSTRAINT agent_chat_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_chat_usage_records agent_chat_usage_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_usage_records
+    ADD CONSTRAINT agent_chat_usage_records_pkey PRIMARY KEY (id);
 
 
 --
@@ -94,6 +124,13 @@ CREATE UNIQUE INDEX idx_agent_chat_messages_chat_id_message_index ON public.agen
 
 
 --
+-- Name: idx_agent_chat_usage_records_chat_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_chat_usage_records_chat_id ON public.agent_chat_usage_records USING btree (chat_id);
+
+
+--
 -- Name: idx_agent_chats_owner_canvas_created; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -106,6 +143,14 @@ CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING bt
 
 ALTER TABLE ONLY public.agent_chat_messages
     ADD CONSTRAINT agent_chat_messages_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.agent_chats(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agent_chat_usage_records agent_chat_usage_records_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_chat_usage_records
+    ADD CONSTRAINT agent_chat_usage_records_chat_id_fkey FOREIGN KEY (chat_id) REFERENCES public.agent_chats(id) ON DELETE CASCADE;
 
 
 --
@@ -140,7 +185,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260325205949	f
+20260403134227	f
 \.
 
 
