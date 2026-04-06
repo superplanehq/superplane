@@ -11,8 +11,6 @@ import (
 	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -94,79 +92,6 @@ func FindUser(org, id, email string) (*models.User, error) {
 	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
-func GetUsersWithRolesInDomain(domainID, domainType string, includeServiceAccounts bool, authService authorization.Authorization) ([]*pbUsers.User, error) {
-	if domainType != models.DomainTypeOrganization {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
-	}
-
-	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Extract all role names for batch metadata lookup
-	roleNames := make([]string, len(roleDefinitions))
-	for i, roleDef := range roleDefinitions {
-		roleNames[i] = roleDef.Name
-	}
-
-	// Batch fetch role metadata
-	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
-	if err != nil {
-		return nil, status.Error(codes.NotFound, "role not found")
-	}
-
-	userRoleMap := make(map[string][]*pbUsers.UserRoleAssignment)
-
-	for _, roleDef := range roleDefinitions {
-		userIDs, err := authService.GetOrgUsersForRole(roleDef.Name, domainID)
-		if err != nil {
-			continue
-		}
-
-		roleMetadata := roleMetadataMap[roleDef.Name]
-		roleAssignment := &pb.UserRoleAssignment{
-			RoleName:        roleDef.Name,
-			RoleDisplayName: roleMetadata.DisplayName,
-			RoleDescription: roleMetadata.Description,
-			DomainType:      actions.DomainTypeToProto(domainType),
-			DomainId:        domainID,
-			AssignedAt:      timestamppb.Now(),
-		}
-
-		for _, userID := range userIDs {
-			userRoleMap[userID] = append(userRoleMap[userID], roleAssignment)
-		}
-	}
-
-	userIDs := make([]string, 0, len(userRoleMap))
-	for userID := range userRoleMap {
-		userIDs = append(userIDs, userID)
-	}
-
-	var dbUsers []models.User
-	if includeServiceAccounts {
-		dbUsers, err = models.FindUsersByIDs(userIDs)
-	} else {
-		dbUsers, err = models.FindHumanUsersByIDs(userIDs)
-	}
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to fetch users")
-	}
-
-	var users []*pbUsers.User
-	for i := range dbUsers {
-		roleAssignments := userRoleMap[dbUsers[i].ID.String()]
-		user, err := convertUserToProto(&dbUsers[i], roleAssignments)
-		if err != nil {
-			continue
-		}
-		users = append(users, user)
-	}
-
-	return users, nil
-}
-
 func convertUserToProto(dbUser *models.User, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
 	var pbAccountProviders []*pbUsers.AccountProvider
 
@@ -199,11 +124,11 @@ func convertUserToProto(dbUser *models.User, roleAssignments []*pbUsers.UserRole
 			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
 		},
 		Spec: &pb.User_Spec{
-			DisplayName:      dbUser.Name,
-			AccountProviders: pbAccountProviders,
+			DisplayName: dbUser.Name,
 		},
 		Status: &pb.User_Status{
-			RoleAssignments: roleAssignments,
+			AccountProviders: pbAccountProviders,
+			RoleAssignments:  roleAssignments,
 		},
 	}, nil
 }

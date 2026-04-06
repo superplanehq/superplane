@@ -66,10 +66,10 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeServiceAccounts = false) => {
+export const useOrganizationUsers = (organizationId: string, includeRoleAssignments = false) => {
   return useQuery({
-    queryKey: includeServiceAccounts
-      ? [...organizationKeys.users(organizationId), includeServiceAccounts]
+    queryKey: includeRoleAssignments
+      ? [...organizationKeys.users(organizationId), includeRoleAssignments]
       : organizationKeys.users(organizationId),
     queryFn: async () => {
       const response = await usersListUsers(
@@ -77,7 +77,7 @@ export const useOrganizationUsers = (organizationId: string, includeServiceAccou
           query: {
             domainType: "DOMAIN_TYPE_ORGANIZATION",
             domainId: organizationId,
-            includeServiceAccounts,
+            includeRoleAssignments,
           },
         }),
       );
