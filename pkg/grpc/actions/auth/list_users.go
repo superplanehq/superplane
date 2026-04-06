@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/users"
@@ -25,21 +24,12 @@ func ListUsers(
 		return nil, status.Error(codes.InvalidArgument, "domain type must be organization")
 	}
 
-	//
-	// Find organization users
-	//
-	var users []models.User
-	err := database.Conn().
-		Where("organization_id = ?", domainID).
-		Where("type = ?", models.UserTypeHuman).
-		Find(&users).
-		Error
-
+	users, err := models.ListAllActiveUsersInOrganization(domainID)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.Internal, "failed to fetch users")
 	}
 
-	accountProviders, err := getAccountProviders(users)
+	accountProviders, err := models.FindUserAccountProviders(users)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to fetch account providers")
 	}

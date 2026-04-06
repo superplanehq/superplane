@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -92,7 +91,7 @@ func FindUser(org, id, email string) (*models.User, error) {
 	return models.FindActiveUserByEmail(orgID.String(), email)
 }
 
-func usersToProto(users []models.User, accountProviders []UserAccountProvider) []*userpb.User {
+func usersToProto(users []models.User, accountProviders []models.UserAccountProvider) []*userpb.User {
 	protoUsers := make([]*userpb.User, len(users))
 	for i, user := range users {
 		protoUsers[i] = &userpb.User{
@@ -114,35 +113,7 @@ func usersToProto(users []models.User, accountProviders []UserAccountProvider) [
 	return protoUsers
 }
 
-type UserAccountProvider struct {
-	models.AccountProvider
-	UserID string
-}
-
-func getAccountProviders(users []models.User) ([]UserAccountProvider, error) {
-	userIDs := make([]string, len(users))
-	for i, user := range users {
-		userIDs[i] = user.ID.String()
-	}
-
-	var accountProviders []UserAccountProvider
-	err := database.Conn().
-		Table("users").
-		Select("users.id as user_id, account_providers.*").
-		Joins("inner join accounts on accounts.id = users.account_id").
-		Joins("inner join account_providers on account_providers.account_id = accounts.id").
-		Where("users.id IN (?)", userIDs).
-		Find(&accountProviders).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return accountProviders, nil
-}
-
-func accountProvidersForUser(userID string, accountProviders []UserAccountProvider) []*userpb.AccountProvider {
+func accountProvidersForUser(userID string, accountProviders []models.UserAccountProvider) []*userpb.AccountProvider {
 	providers := []*userpb.AccountProvider{}
 	for _, accountProvider := range accountProviders {
 		if accountProvider.UserID == userID {

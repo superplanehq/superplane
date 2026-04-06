@@ -35,7 +35,7 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 		return nil, status.Error(codes.Internal, "failed to fetch group users")
 	}
 
-	accountProviders, err := getAccountProviders(users)
+	accountProviders, err := models.FindUserAccountProviders(users)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to fetch account providers")
 	}
