@@ -5,7 +5,7 @@ describe("monaco bootstrap", () => {
     delete (globalThis as typeof globalThis & { MonacoEnvironment?: unknown }).MonacoEnvironment;
     vi.resetModules();
     vi.doUnmock("@monaco-editor/react");
-    vi.doUnmock("monaco-editor");
+    vi.doUnmock("monaco-editor/esm/vs/editor/editor.api.js");
     vi.doUnmock("monaco-editor/esm/vs/language/css/css.worker?worker");
     vi.doUnmock("monaco-editor/esm/vs/language/html/html.worker?worker");
     vi.doUnmock("monaco-editor/esm/vs/language/json/json.worker?worker");
@@ -36,7 +36,7 @@ describe("monaco bootstrap", () => {
     vi.doMock("@monaco-editor/react", () => ({
       loader: { config: loaderConfig },
     }));
-    vi.doMock("monaco-editor", () => monacoInstance);
+    vi.doMock("monaco-editor/esm/vs/editor/editor.api.js", () => monacoInstance);
     vi.doMock("monaco-editor/esm/vs/language/css/css.worker?worker", () => ({ default: cssWorker }));
     vi.doMock("monaco-editor/esm/vs/language/html/html.worker?worker", () => ({ default: htmlWorker }));
     vi.doMock("monaco-editor/esm/vs/language/json/json.worker?worker", () => ({ default: jsonWorker }));
