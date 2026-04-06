@@ -193,6 +193,12 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.session.Sleep(300)
 }
 
+func (s *CanvasSteps) AddNote() {
+	s.session.Click(q.TestID("add-note-button"))
+	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
+	s.session.Sleep(300)
+}
+
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
 func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	s.OpenBuildingBlocksSidebar()
