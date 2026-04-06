@@ -14,7 +14,7 @@ REFERENCED_NODES_APPENDIX_MARKER = "\n\n### Referenced nodes"
 
 
 def strip_referenced_nodes_appendix_for_display(text: str) -> str:
-    """Remove server-only mention expansion; full text stays in stored model messages for the LLM."""
+    """Strip mention appendix for UI; stored model messages still keep the full text."""
     if not text.strip():
         return text
     idx = text.find(REFERENCED_NODES_APPENDIX_MARKER)
@@ -48,7 +48,8 @@ def expand_node_mentions_in_prompt(question: str, deps: AgentDeps) -> str:
             continue
         label = node.name or node.id
         lines.append(
-            f"- **{label}** (`{node.id}`): type={node.type or 'n/a'}, block={node.block_name or 'n/a'}"
+            f"- **{label}** (`{node.id}`): "
+            f"type={node.type or 'n/a'}, block={node.block_name or 'n/a'}"
         )
 
     return (
