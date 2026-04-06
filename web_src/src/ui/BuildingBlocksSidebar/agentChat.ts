@@ -137,6 +137,16 @@ function normalizePersistedMessage(message: AgentsAgentChatMessage): AiBuilderMe
   };
 }
 
+export function formatTokenCount(tokens: number): string {
+  if (tokens >= 999_950) {
+    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}k tokens`;
+  }
+  return `${tokens} tokens`;
+}
+
 function normalizeChatSession(chat: AgentsAgentChatInfo): AiChatSession | null {
   const id = typeof chat.id === "string" ? chat.id.trim() : "";
   if (!id) {
@@ -146,18 +156,17 @@ function normalizeChatSession(chat: AgentsAgentChatInfo): AiChatSession | null {
   const initialMessage = typeof chat.initialMessage === "string" ? chat.initialMessage.trim() : "";
   const createdAt = typeof chat.createdAt === "string" && chat.createdAt.trim().length > 0 ? chat.createdAt : undefined;
 
-  const totalTokens = chat.usage?.totalTokens ? Number(chat.usage.totalTokens) : undefined;
-  const totalEstimatedCostUsd = chat.usage?.totalEstimatedCostUsd
-    ? Number(chat.usage.totalEstimatedCostUsd)
-    : undefined;
+  const usage = chat.usage;
+  const totalTokens = usage?.totalTokens ? Number(usage.totalTokens) : 0;
+  const totalCost = usage?.totalEstimatedCostUsd ? Number(usage.totalEstimatedCostUsd) : 0;
 
   return {
     id,
     title: initialMessage || UNTITLED_CHAT_SESSION,
     initialMessage: initialMessage || undefined,
     createdAt,
-    totalTokens: totalTokens && totalTokens > 0 ? totalTokens : undefined,
-    totalEstimatedCostUsd: totalEstimatedCostUsd && totalEstimatedCostUsd > 0 ? totalEstimatedCostUsd : undefined,
+    totalTokens: totalTokens > 0 ? totalTokens : undefined,
+    totalEstimatedCostUsd: totalCost > 0 ? totalCost : undefined,
   };
 }
 

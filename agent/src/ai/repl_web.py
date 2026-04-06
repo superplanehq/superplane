@@ -13,7 +13,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.usage import RunUsage
 from pydantic_ai.messages import (
     FinalResultEvent,
     FunctionToolCallEvent,
@@ -27,6 +26,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
+from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
 from ai.config import config

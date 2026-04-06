@@ -7,7 +7,12 @@ import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
+import {
+  formatTokenCount,
+  type AiBuilderMessage,
+  type AiBuilderProposal,
+  type AiChatSession,
+} from "@/ui/BuildingBlocksSidebar/agentChat";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
@@ -310,7 +315,9 @@ function ConversationContent({
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
-      <AiMessages messages={aiMessages} />
+      {aiMessages.map((message) => (
+        <AiMessage key={message.id} message={message} />
+      ))}
 
       {isGeneratingResponse ? (
         <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
@@ -334,16 +341,6 @@ function ConversationContent({
   );
 }
 
-function AiMessages({ messages }: { messages: AiBuilderMessage[] }) {
-  return (
-    <>
-      {messages.map((message) => (
-        <AiMessage key={message.id} message={message} />
-      ))}
-    </>
-  );
-}
-
 function formatSessionDate(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -356,16 +353,6 @@ function formatSessionDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function formatTokenCount(tokens: number): string {
-  if (tokens >= 999_950) {
-    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
-  }
-  if (tokens >= 1_000) {
-    return `${(tokens / 1_000).toFixed(1)}k tokens`;
-  }
-  return `${tokens} tokens`;
 }
 
 function AiMessage({ message }: { message: AiBuilderMessage }) {
