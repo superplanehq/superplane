@@ -1740,8 +1740,8 @@ export function WorkflowPageV2() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints, availableIntegrations),
-    [triggers, components, blueprints, availableIntegrations],
+    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
+    [triggers, components, availableIntegrations],
   );
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
@@ -4069,22 +4069,6 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const handleConfigure = useCallback(
-    (nodeId: string) => {
-      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId && canvas) {
-        // Pass workflow info as URL parameters
-        const params = new URLSearchParams({
-          fromWorkflow: canvasId!,
-          workflowName: canvas.metadata?.name || "Canvas",
-        });
-        navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
-      }
-    },
-    [canvas, organizationId, canvasId, navigate],
-  );
-
   const handleRun = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!canvasId) return;
@@ -5688,7 +5672,6 @@ export function WorkflowPageV2() {
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
-          onConfigure={!isReadOnly ? handleConfigure : undefined}
           buildingBlocks={buildingBlocks}
           showAiBuilderTab={showAiBuilderTab}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}

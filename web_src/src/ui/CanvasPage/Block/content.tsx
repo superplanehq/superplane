@@ -42,7 +42,6 @@ function getActionProps(data: BlockProps["data"], compactView: boolean, props: P
     onToggleView: props.onToggleView,
     onDelete: props.onDelete,
     isCompactView: compactView,
-    onConfigure: data.type === "composite" ? props.onConfigure : undefined,
   };
 }
 
@@ -182,7 +181,6 @@ export function BlockContent({
   runDisabledTooltip,
   onTogglePause,
   onEdit,
-  onConfigure,
   onDuplicate,
   onDeactivate,
   onToggleCollapse,
@@ -201,7 +199,6 @@ export function BlockContent({
     runDisabledTooltip,
     onTogglePause,
     onEdit,
-    onConfigure,
     onDuplicate,
     onDeactivate,
     onToggleCollapse,
