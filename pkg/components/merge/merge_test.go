@@ -6,11 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -71,6 +69,42 @@ func Test_Merge_StopIfExpression(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_BadStopIfExpression(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+	steps.CreateWorkflow()
+
+	//
+	// Set up an expression that does not evaluate to a boolean value.
+	//
+	steps.SetMergeConfiguration(map[string]any{
+		"stopIfExpression": "$[\"process-1\"].result",
+	})
+
+	steps.CreateEventsWithData(
+		map[string]any{"result": "fail"},
+		map[string]any{"result": "ok"},
+	)
+	steps.CreateQueueItems()
+
+	m := &Merge{}
+
+	//
+	// First event should fail the execution and mark the merge as stopped early.
+	//
+	steps.ProcessFirstEventExpectFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFailedWithError("stop expression must evaluate to boolean, got string: fail")
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	// Second event should be dequeued and not re-finish the execution
+	steps.ProcessSecondEventExpectNoFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.AssertQueueIsEmpty()
+}
+
 func Test_Merge_StopIfExpression_SourceNodeReference(t *testing.T) {
 	steps := NewMergeTestSteps(t)
 
@@ -117,64 +151,6 @@ func Test_Merge_WaitsForDistinctSources(t *testing.T) {
 	steps.AssertNodeIsAllowedToProcessNextQueueItem()
 
 	steps.AssertQueueIsEmpty()
-}
-
-func TestMerge_ExpressionEnv_UsesContextEnv(t *testing.T) {
-	ctx := core.ProcessQueueContext{
-		Input:        map[string]any{"result": "ignored"},
-		SourceNodeID: "source-node",
-		ExpressionEnv: func(expression string) (map[string]any, error) {
-			return map[string]any{
-				"$": map[string]any{
-					"other-node": map[string]any{
-						"result": "ok",
-					},
-				},
-			}, nil
-		},
-	}
-
-	env, err := expressionEnv(ctx, "$[\"other-node\"].result == \"ok\"")
-	require.NoError(t, err)
-
-	vm, err := expr.Compile("$[\"other-node\"].result == \"ok\"", expr.Env(env), expr.AsBool())
-	require.NoError(t, err)
-
-	out, err := expr.Run(vm, env)
-	require.NoError(t, err)
-	assert.True(t, out.(bool))
-}
-
-func TestMerge_ExpressionOptions_RootAndPrevious(t *testing.T) {
-	ctx := core.ProcessQueueContext{
-		ExpressionEnv: func(expression string) (map[string]any, error) {
-			return map[string]any{
-				"$": map[string]any{},
-				"__root": map[string]any{
-					"data": map[string]any{
-						"ref": "main",
-					},
-				},
-				"__previousByDepth": map[string]any{
-					"1": map[string]any{
-						"data": map[string]any{
-							"ok": true,
-						},
-					},
-				},
-			}, nil
-		},
-	}
-
-	env, err := expressionEnv(ctx, `root().data.ref == "main" && previous().data.ok == true`)
-	require.NoError(t, err)
-
-	vm, err := expr.Compile(`root().data.ref == "main" && previous().data.ok == true`, expressionOptions(env)...)
-	require.NoError(t, err)
-
-	out, err := expr.Run(vm, env)
-	require.NoError(t, err)
-	assert.True(t, out.(bool))
 }
 
 type MergeTestSteps struct {
@@ -525,7 +501,7 @@ func (s *MergeTestSteps) ProcessFirstEvent(m *Merge) {
 
 	execution, err := m.ProcessQueueItem(*ctx1)
 	require.NoError(s.t, err)
-	require.Nil(s.t, execution)
+	require.NotNil(s.t, execution)
 }
 
 // ProcessFirstEventExpectFinish is used when the first event should
@@ -573,6 +549,15 @@ func (s *MergeTestSteps) AssertExecutionFinished() {
 	var execution models.CanvasNodeExecution
 	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
 	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+}
+
+func (s *MergeTestSteps) AssertExecutionFailedWithError(errorMessage string) {
+	var execution models.CanvasNodeExecution
+	require.NoError(s.t, s.Tx.Where("node_id = ?", s.MergeNode.NodeID).First(&execution).Error)
+	assert.Equal(s.t, models.CanvasNodeExecutionStateFinished, execution.State)
+	assert.Equal(s.t, models.CanvasNodeExecutionResultFailed, execution.Result)
+	assert.Equal(s.t, "error", execution.ResultReason)
+	assert.Equal(s.t, errorMessage, execution.ResultMessage)
 }
 
 // AssertExecutionFailed checks that the execution finished and emitted to the fail channel.

@@ -1175,6 +1175,15 @@ export function WorkflowPageV2() {
         return;
       }
 
+      // Mark the saved version as already applied so the version sync effect
+      // (which replaces canvas spec with loadedCanvasVersion.spec) doesn't
+      // overwrite the merged positions we set below.
+      const versionId = version.metadata?.id;
+      lastAppliedVersionSnapshotRef.current =
+        versionId && versionId === activeCanvasVersionIdRef.current
+          ? `${versionId}:${version.metadata?.updatedAt || ""}`
+          : lastAppliedVersionSnapshotRef.current;
+
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
         if (!current || getWorkflowSaveSignature(current) !== getWorkflowSaveSignature(workflow)) {
           return current;
@@ -2596,7 +2605,6 @@ export function WorkflowPageV2() {
 
         return result;
       } catch (error: any) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         setLastCanvasSaveError(displayMessage);
@@ -4329,7 +4337,6 @@ export function WorkflowPageV2() {
           setInitialWorkflowSnapshot(null);
         }
       } catch (error) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }

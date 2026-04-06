@@ -18,22 +18,18 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.authorization_domain_type import AuthorizationDomainType
-from superplaneapi.models.roles_role import RolesRole
+from superplaneapi.models.superplane_me_user import SuperplaneMeUser
 from typing import Optional, Set
 from typing_extensions import Self
 
-class UsersListUserRolesResponse(BaseModel):
+class MeMeResponse(BaseModel):
     """
-    UsersListUserRolesResponse
+    MeMeResponse
     """ # noqa: E501
-    user_id: Optional[StrictStr] = Field(default=None, alias="userId")
-    domain_type: Optional[AuthorizationDomainType] = Field(default=AuthorizationDomainType.DOMAIN_TYPE_UNSPECIFIED, alias="domainType")
-    domain_id: Optional[StrictStr] = Field(default=None, alias="domainId")
-    roles: Optional[List[RolesRole]] = None
-    __properties: ClassVar[List[str]] = ["userId", "domainType", "domainId", "roles"]
+    user: Optional[SuperplaneMeUser] = None
+    __properties: ClassVar[List[str]] = ["user"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -53,7 +49,7 @@ class UsersListUserRolesResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of UsersListUserRolesResponse from a JSON string"""
+        """Create an instance of MeMeResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -74,18 +70,14 @@ class UsersListUserRolesResponse(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in roles (list)
-        _items = []
-        if self.roles:
-            for _item_roles in self.roles:
-                if _item_roles:
-                    _items.append(_item_roles.to_dict())
-            _dict['roles'] = _items
+        # override the default output from pydantic by calling `to_dict()` of user
+        if self.user:
+            _dict['user'] = self.user.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of UsersListUserRolesResponse from a dict"""
+        """Create an instance of MeMeResponse from a dict"""
         if obj is None:
             return None
 
@@ -93,10 +85,7 @@ class UsersListUserRolesResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "userId": obj.get("userId"),
-            "domainType": obj.get("domainType") if obj.get("domainType") is not None else AuthorizationDomainType.DOMAIN_TYPE_UNSPECIFIED,
-            "domainId": obj.get("domainId"),
-            "roles": [RolesRole.from_dict(_item) for _item in obj["roles"]] if obj.get("roles") is not None else None
+            "user": SuperplaneMeUser.from_dict(obj["user"]) if obj.get("user") is not None else None
         })
         return _obj
 
