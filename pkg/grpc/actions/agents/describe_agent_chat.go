@@ -24,6 +24,7 @@ func DescribeAgentChat(
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
 	}
+	defer conn.Close()
 
 	client := internalpb.NewAgentsClient(conn)
 	response, err := client.DescribeAgentChat(ctx, &internalpb.DescribeAgentChatRequest{
@@ -44,6 +45,7 @@ func DescribeAgentChat(
 	chat := &pb.AgentChatInfo{
 		Id:             response.Chat.Id,
 		InitialMessage: response.Chat.InitialMessage,
+		Usage:          serializeChatUsage(response.Chat.Usage),
 	}
 
 	if response.Chat.CreatedAt != nil {
