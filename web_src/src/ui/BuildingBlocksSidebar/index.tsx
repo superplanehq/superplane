@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatAiBuilderWireMentionsForDisplay } from "@/lib/aiBuilderNodeMentions";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/lib/colors";
@@ -48,6 +49,8 @@ export interface BuildingBlocksSidebarProps {
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
 }
+
+const EMPTY_AI_BUILDER_CANVAS_NODES: NonNullable<BuildingBlocksSidebarProps["canvasNodes"]> = [];
 
 export type AiCanvasOperation =
   | {
@@ -269,6 +272,33 @@ function OpenBuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
+
+  const nodesForMentionDisplay = canvasNodes ?? EMPTY_AI_BUILDER_CANVAS_NODES;
+
+  const chatSessionsForDisplay = useMemo(
+    () =>
+      chatSessions.map((session) => ({
+        ...session,
+        title: formatAiBuilderWireMentionsForDisplay(session.title, nodesForMentionDisplay),
+        initialMessage: session.initialMessage
+          ? formatAiBuilderWireMentionsForDisplay(session.initialMessage, nodesForMentionDisplay)
+          : undefined,
+      })),
+    [chatSessions, nodesForMentionDisplay],
+  );
+
+  const aiMessagesForDisplay = useMemo(
+    () =>
+      aiMessages.map((message) =>
+        message.role === "user"
+          ? {
+              ...message,
+              content: formatAiBuilderWireMentionsForDisplay(message.content, nodesForMentionDisplay),
+            }
+          : message,
+      ),
+    [aiMessages, nodesForMentionDisplay],
+  );
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
@@ -816,11 +846,11 @@ function OpenBuildingBlocksSidebar({
 
         {showAiBuilderTab && (
           <AiBuilderChatPanel
-            chatSessions={chatSessions}
+            chatSessions={chatSessionsForDisplay}
             currentChatId={currentChatId}
             isLoadingChatSessions={isLoadingChatSessions}
             isLoadingChatMessages={isLoadingChatMessages}
-            aiMessages={aiMessages}
+            aiMessages={aiMessagesForDisplay}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
             pendingProposalSummaries={pendingProposalSummaries}
