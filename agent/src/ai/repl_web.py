@@ -32,6 +32,7 @@ from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
 from ai.models import CanvasAnswer
+from ai.node_mentions import expand_node_mentions_in_prompt
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
@@ -47,7 +48,7 @@ class WebServerConfig:
 
 
 class ReplStreamRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=2000)
+    question: str = Field(min_length=1, max_length=6000)
     model: str = Field(
         default=config.ai_model,
         min_length=1,
@@ -196,13 +197,19 @@ async def _stream_agent_run(
         claims, chat = _resolve_agent_context(chat_id, request)
 
     message_history = _load_message_history(store, chat.id)
-    recorder = PersistedRunRecorder(store, chat.id, payload.question)
     resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
         if claims is None:
             raise ValueError("Agent claims are missing.")
         deps = _build_deps(payload, request, claims, resolved_canvas_id)
+
+    if deps is not None:
+        user_prompt_for_run = expand_node_mentions_in_prompt(payload.question, deps)
+    else:
+        user_prompt_for_run = payload.question
+
+    recorder = PersistedRunRecorder(store, chat.id, user_prompt_for_run)
 
     _debug_log(
         "starting agent run",
@@ -219,7 +226,7 @@ async def _stream_agent_run(
         "canvas_id": resolved_canvas_id,
     }
 
-    run_kwargs: dict[str, Any] = {"user_prompt": payload.question}
+    run_kwargs: dict[str, Any] = {"user_prompt": user_prompt_for_run}
     if message_history is not None:
         run_kwargs["message_history"] = message_history
 
