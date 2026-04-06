@@ -140,12 +140,7 @@ function renderBlockByType(args: {
     }
     case "composite":
       return (
-        <Composite
-          {...getSafeCompositeProps(data)}
-          selected={selected}
-          showHeader={showHeader}
-          {...actionProps}
-        />
+        <Composite {...getSafeCompositeProps(data)} selected={selected} showHeader={showHeader} {...actionProps} />
       );
     case "annotation":
       return (
