@@ -1,6 +1,10 @@
 services:
   app:
-    image: ghcr.io/superplanehq/superplane-dev-base:v7
+    build:
+      context: .
+      target: dev-base
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
     command: bash /app/docker-entrypoint.dev.sh
     environment:
@@ -92,7 +96,6 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
-      - otel:otel
 
     depends_on:
       db:
@@ -108,7 +111,12 @@ services:
       - /tmp:/tmp
 
   agent:
-    image: ghcr.io/superplanehq/superplane-dev-base:v7
+    build:
+      context: agent
+      dockerfile: Dockerfile
+      target: dev
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:agent-latest
     working_dir: /app/agent
     env_file:
       - agent/.env
@@ -152,6 +160,7 @@ services:
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
+    profiles: [dev]
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
@@ -174,6 +183,7 @@ services:
 
   pgweb:
     image: sosedoff/pgweb
+    profiles: [dev]
     environment:
       DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
     ports:
