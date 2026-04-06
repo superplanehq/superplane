@@ -115,22 +115,19 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 
 	t.Run("deleted canvas returns not found instead of internal error", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		require.NoError(
-			t,
-			database.Conn().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Update("versioning_enabled", false).Error,
-		)
 
+		// Simulate the race: outer FindCanvas succeeded (we have the canvas object),
+		// but the canvas is deleted before updateLiveCanvasWithoutVersioning's
+		// inner FindCanvasInTransaction runs.
 		require.NoError(t, database.Conn().Delete(&models.Canvas{}, "id = ?", canvas.ID).Error)
 
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := UpdateCanvasVersion(
-			ctx,
+		_, err := updateLiveCanvasWithoutVersioning(
+			context.Background(),
 			r.Encryptor,
 			r.Registry,
-			r.Organization.ID.String(),
-			canvas.ID.String(),
-			"",
-			testPbCanvas(canvas.Name),
+			r.Organization.ID,
+			canvas,
+			nil,
 			nil,
 			"",
 		)
