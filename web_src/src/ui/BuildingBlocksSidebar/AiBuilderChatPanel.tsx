@@ -264,6 +264,11 @@ function ConversationList({
                     <TimeAgo date={session.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
                   ) : null}
                 </div>
+                {session.totalTokens ? (
+                  <div className="mt-0.5 text-[11px] tabular-nums text-slate-400">
+                    {formatTokenCount(session.totalTokens)}
+                  </div>
+                ) : null}
               </button>
             );
           })}
@@ -351,6 +356,16 @@ function formatSessionDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 999_950) {
+    return `${(tokens / 1_000_000).toFixed(1)}M tokens`;
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(1)}k tokens`;
+  }
+  return `${tokens} tokens`;
 }
 
 function AiMessage({ message }: { message: AiBuilderMessage }) {

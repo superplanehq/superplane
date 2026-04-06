@@ -81,6 +81,17 @@ service Agents {
       tags: "Agent";
     };
   }
+
+  rpc DescribeAgentUsage(DescribeAgentUsageRequest) returns (DescribeAgentUsageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/agents/usage"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe agent token usage for the organization";
+      description: "Returns aggregated token usage across all agent chats in the organization";
+      tags: "Agent";
+    };
+  }
 }
 
 message ListAgentChatsRequest {
@@ -141,4 +152,18 @@ message AgentChatInfo {
   string id = 1;
   string initial_message = 2;
   google.protobuf.Timestamp created_at = 3;
+  AgentChatUsage usage = 4;
+}
+
+message AgentChatUsage {
+  int64 total_input_tokens = 1;
+  int64 total_output_tokens = 2;
+  int64 total_tokens = 3;
+  double total_estimated_cost_usd = 4;
+}
+
+message DescribeAgentUsageRequest {}
+
+message DescribeAgentUsageResponse {
+  AgentChatUsage usage = 1;
 }
