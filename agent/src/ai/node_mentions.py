@@ -52,7 +52,4 @@ def expand_node_mentions_in_prompt(question: str, deps: AgentDeps) -> str:
             f"type={node.type or 'n/a'}, block={node.block_name or 'n/a'}"
         )
 
-    return (
-        f"{question.rstrip()}{REFERENCED_NODES_APPENDIX_MARKER}\n\n"
-        + "\n".join(lines[2:])
-    )
+    return f"{question.rstrip()}{REFERENCED_NODES_APPENDIX_MARKER}\n\n" + "\n".join(lines[2:])
