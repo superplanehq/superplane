@@ -115,11 +115,16 @@ func usersToProto(users []models.User, accountProviders []models.UserAccountProv
 
 func accountProvidersForUser(userID string, accountProviders []models.UserAccountProvider) []*userpb.AccountProvider {
 	providers := []*userpb.AccountProvider{}
-	for _, accountProvider := range accountProviders {
-		if accountProvider.UserID == userID {
+	for _, provider := range accountProviders {
+		if provider.UserID == userID {
 			providers = append(providers, &userpb.AccountProvider{
-				ProviderType: accountProvider.Provider,
-				ProviderId:   accountProvider.ProviderID,
+				ProviderType: provider.Provider,
+				ProviderId:   provider.ProviderID,
+				Email:        provider.Email,
+				DisplayName:  provider.Name,
+				AvatarUrl:    provider.AvatarURL,
+				CreatedAt:    timestamppb.New(provider.CreatedAt),
+				UpdatedAt:    timestamppb.New(provider.UpdatedAt),
 			})
 		}
 	}

@@ -55,8 +55,8 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 			UpdatedAt:  timestamppb.New(groupMetadata.UpdatedAt),
 		},
 		Spec: &pb.Group_Spec{
-			Description: groupMetadata.DisplayName,
-			DisplayName: groupMetadata.Description,
+			Description: groupMetadata.Description,
+			DisplayName: groupMetadata.DisplayName,
 			Role:        role,
 		},
 		Status: &pb.Group_Status{
