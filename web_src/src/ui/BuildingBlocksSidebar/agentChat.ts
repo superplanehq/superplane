@@ -43,6 +43,8 @@ export type AiChatSession = {
   title: string;
   initialMessage?: string;
   createdAt?: string;
+  totalTokens?: number;
+  totalEstimatedCostUsd?: number;
 };
 
 const AI_MAX_STORED_MESSAGES = 50;
@@ -144,11 +146,18 @@ function normalizeChatSession(chat: AgentsAgentChatInfo): AiChatSession | null {
   const initialMessage = typeof chat.initialMessage === "string" ? chat.initialMessage.trim() : "";
   const createdAt = typeof chat.createdAt === "string" && chat.createdAt.trim().length > 0 ? chat.createdAt : undefined;
 
+  const totalTokens = chat.usage?.totalTokens ? Number(chat.usage.totalTokens) : undefined;
+  const totalEstimatedCostUsd = chat.usage?.totalEstimatedCostUsd
+    ? Number(chat.usage.totalEstimatedCostUsd)
+    : undefined;
+
   return {
     id,
     title: initialMessage || UNTITLED_CHAT_SESSION,
     initialMessage: initialMessage || undefined,
     createdAt,
+    totalTokens: totalTokens && totalTokens > 0 ? totalTokens : undefined,
+    totalEstimatedCostUsd: totalEstimatedCostUsd && totalEstimatedCostUsd > 0 ? totalEstimatedCostUsd : undefined,
   };
 }
 
@@ -334,6 +343,25 @@ async function fetchChatStreamResponse({
   return response;
 }
 
+function refreshChatSessions({
+  canvasId,
+  organizationId,
+  setChatSessions,
+}: {
+  canvasId: string;
+  organizationId: string;
+  setChatSessions?: Dispatch<SetStateAction<AiChatSession[]>>;
+}) {
+  if (!setChatSessions) {
+    return;
+  }
+
+  loadChatSessions({ canvasId, organizationId }).then(
+    (sessions) => setChatSessions(sessions),
+    () => {},
+  );
+}
+
 export async function sendChatPrompt({
   value,
   aiInput,
@@ -423,6 +451,8 @@ export async function sendChatPrompt({
       testModeHint: TEST_MODE_HINT,
       testModelSentinel: TEST_MODEL_SENTINEL,
     });
+
+    refreshChatSessions({ canvasId, organizationId, setChatSessions });
   } catch (error) {
     applyChatPromptFailure({
       assistantMessageId,

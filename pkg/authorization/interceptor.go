@@ -156,6 +156,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAgents.Agents_ListAgentChats_FullMethodName:        {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_DescribeAgentChat_FullMethodName:     {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbAgents.Agents_DescribeAgentUsage_FullMethodName:    {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Canvases rules
 		pbCanvases.Canvases_ListCanvases_FullMethodName: {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},
