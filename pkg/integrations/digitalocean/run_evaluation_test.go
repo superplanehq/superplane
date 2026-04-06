@@ -214,6 +214,48 @@ func Test__RunEvaluation__Execute(t *testing.T) {
 		assert.Equal(t, "ws-uuid-001", stored.WorkspaceUUID)
 	})
 
+	t.Run("expression testCaseId -> testCaseName falls back to resolved UUID", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		metadata := &contexts.MetadataContext{}
+		requests := &contexts.RequestContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"testCaseId": "tc-uuid-123",
+				"agentId":    "agent-uuid-456",
+				"runName":    "my-eval-run",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader(`{"evaluation_run_uuids": ["run-uuid-789"]}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			ExecutionState: executionState,
+			Metadata:       metadata,
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: map[string]any{
+					"testCaseId":   "{{ $.trigger.data.testCaseId }}",
+					"testCaseName": "{{ $.trigger.data.testCaseId }}",
+					"agentId":      "agent-uuid-456",
+					"agentName":    "staging-bot",
+				},
+			},
+			Requests: requests,
+		})
+
+		require.NoError(t, err)
+		stored, ok := metadata.Metadata.(evalRunMetadata)
+		require.True(t, ok)
+		// Expression was resolved to a UUID at execution time — name must be the UUID, not the expression
+		assert.Equal(t, "tc-uuid-123", stored.TestCaseName)
+	})
+
 	t.Run("expression agentId -> agentName falls back to resolved UUID", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		metadata := &contexts.MetadataContext{}

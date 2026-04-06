@@ -199,9 +199,14 @@ func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
 	var nodeMeta EvalNodeMetadata
 	_ = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMeta)
 
-	// If agentId was configured via an expression, the name stored during Setup
-	// is the raw expression string. Fall back to the resolved UUID instead.
+	// If testCaseId or agentId was configured via an expression, the name stored
+	// during Setup is the raw expression string. Fall back to the resolved ID instead.
 	// Also resolve workspace UUID from the agent if not already set.
+	testCaseName := nodeMeta.TestCaseName
+	if strings.Contains(testCaseName, "{{") {
+		testCaseName = spec.TestCaseID
+	}
+
 	agentName := nodeMeta.AgentName
 	workspaceUUID := nodeMeta.WorkspaceUUID
 	if strings.Contains(agentName, "{{") {
@@ -218,7 +223,7 @@ func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
 	meta := evalRunMetadata{
 		EvalRunUUID:   runUUID,
 		TestCaseID:    spec.TestCaseID,
-		TestCaseName:  nodeMeta.TestCaseName,
+		TestCaseName:  testCaseName,
 		WorkspaceUUID: workspaceUUID,
 		AgentID:       spec.AgentID,
 		AgentName:     agentName,
