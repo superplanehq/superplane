@@ -10,20 +10,24 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
+  <LinkCard title="Attach Knowledge Base" href="#attach-knowledge-base" description="Attach a knowledge base to a DigitalOcean Gradient AI agent" />
   <LinkCard title="Copy Object" href="#copy-object" description="Copy or move an object within DigitalOcean Spaces Object Storage" />
   <LinkCard title="Create Alert Policy" href="#create-alert-policy" description="Create a DigitalOcean monitoring alert policy for droplet metrics" />
   <LinkCard title="Create App" href="#create-app" description="Create a new DigitalOcean App Platform application with services, static sites, workers, or jobs" />
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record for a DigitalOcean domain" />
   <LinkCard title="Create Droplet" href="#create-droplet" description="Create a new DigitalOcean Droplet" />
+  <LinkCard title="Create Knowledge Base" href="#create-knowledge-base" description="Create a DigitalOcean Gradient AI knowledge base with one or more data sources" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a DigitalOcean Load Balancer with forwarding rules and targets" />
   <LinkCard title="Create Snapshot" href="#create-snapshot" description="Create a snapshot of a DigitalOcean Droplet" />
   <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
   <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
+  <LinkCard title="Delete Knowledge Base" href="#delete-knowledge-base" description="Delete a DigitalOcean Gradient AI knowledge base and optionally its OpenSearch database" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
   <LinkCard title="Delete Object" href="#delete-object" description="Delete an object from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Delete Snapshot" href="#delete-snapshot" description="Delete a DigitalOcean snapshot" />
+  <LinkCard title="Detach Knowledge Base" href="#detach-knowledge-base" description="Detach a knowledge base from a DigitalOcean Gradient AI agent" />
   <LinkCard title="Get Alert Policy" href="#get-alert-policy" description="Fetch details of a DigitalOcean monitoring alert policy" />
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
@@ -31,6 +35,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
+  <LinkCard title="Run Evaluation" href="#run-evaluation" description="Run a Gradient AI evaluation test case against an agent and report pass or fail" />
   <LinkCard title="Update Alert Policy" href="#update-alert-policy" description="Update an existing DigitalOcean monitoring alert policy" />
   <LinkCard title="Update App" href="#update-app" description="Update a DigitalOcean App Platform application's configuration, environment, and deployment settings" />
   <LinkCard title="Upsert DNS Record" href="#upsert-dns-record" description="Idempotently create or update a DNS record for a DigitalOcean domain" />
@@ -106,6 +111,42 @@ Returns the action result including:
   },
   "timestamp": "2026-03-13T10:10:08.000000000Z",
   "type": "digitalocean.reservedip.assign"
+}
+```
+
+<a id="attach-knowledge-base"></a>
+
+## Attach Knowledge Base
+
+The Attach Knowledge Base component connects a knowledge base to an existing Gradient AI agent, enabling the agent to use it for retrieval-augmented generation (RAG).
+
+### Use Cases
+
+- **Post-creation wiring**: After creating a new knowledge base, attach it to an agent to make it immediately available
+- **Blue/green KB deployment**: Attach a newly indexed knowledge base to an agent as part of a promotion pipeline
+- **Multi-KB agents**: Add additional knowledge bases to an agent that already has others attached
+
+### Configuration
+
+- **Agent**: The agent to attach the knowledge base to (required)
+- **Knowledge Base**: The knowledge base to attach — only shows knowledge bases not already attached to the selected agent (required)
+
+### Output
+
+Returns confirmation of the attachment including:
+- **agentId**: UUID of the agent
+- **knowledgeBaseId**: UUID of the attached knowledge base
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.attached"
 }
 ```
 
@@ -472,6 +513,71 @@ Returns the created droplet object including:
 }
 ```
 
+<a id="create-knowledge-base"></a>
+
+## Create Knowledge Base
+
+The Create Knowledge Base component creates a new knowledge base on the DigitalOcean Gradient AI Platform, ready for use with AI agents via retrieval-augmented generation (RAG).
+
+### How it works
+
+A knowledge base converts your data sources into vector embeddings using the selected embedding model. Those embeddings are stored in an OpenSearch database — either a newly provisioned one or one you already have. Once created, the knowledge base can be attached to any Gradient AI agent.
+
+### Data Sources
+
+You can add multiple data sources of different types:
+
+- **Spaces Bucket or Folder** — indexes all supported files in a DigitalOcean Spaces bucket or folder
+- **Web or Sitemap URL** — crawls a public website (seed URL) or a list of URLs from a sitemap
+
+Each data source has its own independent chunking strategy.
+
+### Chunking Strategies
+
+- **Section-based** (default) — splits on structural elements like headings and paragraphs; fast and low-cost
+- **Semantic** — groups sentences by meaning; slower but context-aware
+- **Hierarchical** — creates parent (context) and child (retrieval) chunk pairs
+- **Fixed-length** — splits strictly by token count; best for logs and unstructured text
+
+### OpenSearch Database
+
+The knowledge base requires an OpenSearch database to store the vector embeddings:
+- **Create new** — provisions a new database automatically sized to your data
+- **Use existing** — connects to a database you already have by providing its ID
+
+### Output
+
+Returns the created knowledge base including:
+- **uuid**: Knowledge base UUID for use in downstream components
+- **name**: Name of the knowledge base
+- **region**: Datacenter region
+- **embeddingModelUUID**: UUID of the embedding model used
+- **projectId**: Associated project ID
+- **databaseId**: UUID of the OpenSearch database (populated after provisioning completes for new databases)
+- **createdAt**: Creation timestamp
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2025-01-01T00:00:00Z",
+    "databaseId": "abf1055a-745d-4c24-a1db-1959ea819264",
+    "embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+    "name": "my-knowledge-base",
+    "projectId": "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+    "region": "tor1",
+    "tags": [
+      "docs",
+      "production"
+    ],
+    "uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.created"
+}
+```
+
 <a id="create-load-balancer"></a>
 
 ## Create Load Balancer
@@ -754,6 +860,55 @@ Returns information about the deleted droplet:
 }
 ```
 
+<a id="delete-knowledge-base"></a>
+
+## Delete Knowledge Base
+
+The Delete Knowledge Base component removes a knowledge base from the DigitalOcean Gradient AI Platform.
+
+### How it works
+
+Deletes the specified knowledge base. Optionally, you can also delete the associated OpenSearch database that stores the vector embeddings.
+
+### Use Cases
+
+- **Cleanup**: Remove knowledge bases that are no longer needed
+- **Resource management**: Free up resources by deleting unused knowledge bases and their databases
+- **Rotation**: Delete an old knowledge base after a new one has been verified and attached
+
+### Configuration
+
+- **Knowledge Base**: The knowledge base to delete (required)
+- **Delete OpenSearch Database**: Whether to also delete the associated OpenSearch database (optional, defaults to off)
+
+### Output
+
+Returns confirmation of the deletion including:
+- **knowledgeBaseId**: UUID of the deleted knowledge base
+- **databaseDeleted**: Whether the OpenSearch database was also deleted
+- **databaseId**: UUID of the deleted database (included when the database was deleted)
+- **databaseName**: Name of the deleted database (included when the database was deleted)
+
+### Notes
+
+- If the knowledge base is currently attached to any agents, it will automatically be removed from those agents upon deletion. Consider using the Detach Knowledge Base component first if you need more control over the detachment process.
+- Deleting the OpenSearch database is irreversible and will remove all vector embeddings
+
+### Example Output
+
+```json
+{
+  "data": {
+    "databaseDeleted": true,
+    "databaseId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
+    "databaseName": "my-knowledge-base-os",
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.deleted"
+}
+```
+
 <a id="delete-load-balancer"></a>
 
 ## Delete Load Balancer
@@ -871,6 +1026,42 @@ Returns confirmation of the deleted snapshot including:
   },
   "timestamp": "2026-03-13T06:27:06.208635289Z",
   "type": "digitalocean.snapshot.deleted"
+}
+```
+
+<a id="detach-knowledge-base"></a>
+
+## Detach Knowledge Base
+
+The Detach Knowledge Base component removes a knowledge base from an existing Gradient AI agent.
+
+### Use Cases
+
+- **Rollback**: Remove a knowledge base that is causing poor agent responses
+- **Cleanup**: Detach an outdated knowledge base before attaching a freshly indexed one
+- **Rotation**: As part of a blue/green pipeline, detach the old knowledge base after the new one is verified
+
+### Configuration
+
+- **Agent**: The agent to detach the knowledge base from (required)
+- **Knowledge Base**: The knowledge base to detach — only shows knowledge bases currently attached to the selected agent (required)
+
+### Output
+
+Returns confirmation of the detachment including:
+- **agentId**: UUID of the agent
+- **knowledgeBaseId**: UUID of the detached knowledge base
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.detached"
 }
 ```
 
@@ -1440,6 +1631,131 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
   },
   "timestamp": "2026-03-25T09:00:00Z",
   "type": "digitalocean.spaces.object.uploaded"
+}
+```
+
+<a id="run-evaluation"></a>
+
+## Run Evaluation
+
+The Run Evaluation component triggers a Gradient AI evaluation test case against an agent, waits for it to complete, and reports whether the agent passed or failed.
+
+### How it works
+
+Runs a pre-configured evaluation test case against the selected agent. The test case already defines the prompts, metrics, and pass/fail thresholds. The component polls until the evaluation finishes, then fetches the results and routes to the appropriate output channel.
+
+### Use Cases
+
+- **Blue/green deployments**: Evaluate a staging agent before promoting it to production
+- **Regression testing**: Automatically verify agent quality after knowledge base or configuration changes
+- **Continuous validation**: Schedule periodic evaluations to detect quality drift
+
+### Configuration
+
+- **Test Case**: A pre-configured evaluation test case with prompts, metrics, and thresholds (required)
+- **Agent**: The agent to evaluate (required)
+- **Run Name**: A name for this evaluation run, visible in the DigitalOcean console (required, max 64 characters). Supports expressions for dynamic naming.
+
+### Output Channels
+
+- **Passed**: The evaluation completed and the agent met all pass criteria defined in the test case
+- **Failed**: The evaluation completed but the agent did not meet the pass criteria, or the evaluation run itself errored
+
+### Output
+
+Returns the evaluation results including:
+- **evaluationRunId**: UUID of the evaluation run
+- **testCaseId / testCaseName**: The test case that was run
+- **agentId / agentName**: The agent that was evaluated
+- **passed**: Whether the agent passed the evaluation
+- **status**: Final status of the evaluation run
+- **starMetric**: The primary metric result (name, numberValue, stringValue)
+- **runLevelMetrics**: All run-level metric results (name, numberValue, stringValue)
+- **prompts**: Per-prompt results including input, output, ground truth, and per-prompt metric scores
+- **startedAt / finishedAt**: Timing information
+- **errorDescription**: Present on the Failed channel if the run itself errored
+
+### Notes
+
+- The evaluation typically takes 1–5 minutes depending on the number of prompts and complexity
+- The component polls every 30 seconds until completion
+- If the evaluation run itself fails (API error, timeout, etc.), the result is emitted to the Failed channel with the error description
+
+### Example Output
+
+```json
+{
+  "data": {
+    "agentId": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
+    "agentName": "support-agent",
+    "evaluationRunId": "ba42b577-9dab-40a9-a375-315a5be1922e",
+    "finishedAt": "2025-01-01T00:03:44Z",
+    "passed": true,
+    "prompts": [
+      {
+        "groundTruth": "A Droplet is a virtual machine that runs on DigitalOcean's cloud infrastructure.",
+        "input": "What is a Droplet?",
+        "metrics": [
+          {
+            "metricName": "Correctness (general hallucinations)",
+            "numberValue": 100,
+            "stringValue": ""
+          },
+          {
+            "metricName": "Retrieved context relevance",
+            "numberValue": 0,
+            "stringValue": ""
+          }
+        ],
+        "output": "A Droplet is a type of virtual private server (VPS) provided by a cloud platform."
+      },
+      {
+        "groundTruth": "Droplets have flexible pricing based on instance type, region, and options you select.",
+        "input": "What is the pricing for Droplet?",
+        "metrics": [
+          {
+            "metricName": "Correctness (general hallucinations)",
+            "numberValue": 66.67,
+            "stringValue": ""
+          },
+          {
+            "metricName": "Retrieved context relevance",
+            "numberValue": 0,
+            "stringValue": ""
+          }
+        ],
+        "output": "The pricing for Droplet starts at $5/month for a basic plan."
+      }
+    ],
+    "runLevelMetrics": [
+      {
+        "metricName": "Retrieved context relevance",
+        "numberValue": 0,
+        "stringValue": ""
+      },
+      {
+        "metricName": "Response-context completeness",
+        "numberValue": 0,
+        "stringValue": ""
+      },
+      {
+        "metricName": "Correctness (general hallucinations)",
+        "numberValue": 93.33,
+        "stringValue": ""
+      }
+    ],
+    "starMetric": {
+      "metricName": "Correctness (general hallucinations)",
+      "numberValue": 93.33,
+      "stringValue": ""
+    },
+    "startedAt": "2025-01-01T00:00:00Z",
+    "status": "successful",
+    "testCaseId": "c6d75370-2f3e-11f1-b074-4e013e2ddde4",
+    "testCaseName": "Product Knowledge Baseline"
+  },
+  "timestamp": "2025-01-01T00:03:44Z",
+  "type": "digitalocean.evaluation.passed"
 }
 ```
 
