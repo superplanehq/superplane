@@ -1,5 +1,7 @@
 .PHONY: lint test test.coverage test.license.check test.agent.unit test.agent.setup
 
+MAKEFLAGS += --no-print-directory
+
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
@@ -219,10 +221,7 @@ ui.start:
 #
 
 db.create:
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	@$(COMPOSE) --progress quiet run --rm --no-deps -e PGPASSWORD=the-cake-is-a-lie app bash scripts/docker/db-create.sh $(DB_NAME)
 
 db.migration.create:
 	$(COMPOSE) run --rm app mkdir -p db/migrations
@@ -235,13 +234,11 @@ db.data_migration.create:
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
-	rm -f db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
-	# echo dump schema to db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	@rm -f db/structure.sql
+	@$(COMPOSE) --progress quiet run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app \
+		bash scripts/docker/db-migrate.sh $(DB_NAME) db/migrations db/data_migrations
+	@$(COMPOSE) --progress quiet run --rm --no-deps --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app \
+		bash scripts/docker/db-dump.sh $(DB_NAME) data_migrations > db/structure.sql
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
