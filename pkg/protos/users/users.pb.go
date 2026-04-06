@@ -158,7 +158,7 @@ type ListUsersRequest struct {
 	state                  protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType             authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId               string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	IncludeServiceAccounts bool                     `protobuf:"varint,3,opt,name=include_service_accounts,json=includeServiceAccounts,proto3" json:"include_service_accounts,omitempty"`
+	IncludeRoleAssignments bool                     `protobuf:"varint,3,opt,name=include_role_assignments,json=includeRoleAssignments,proto3" json:"include_role_assignments,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -207,9 +207,9 @@ func (x *ListUsersRequest) GetDomainId() string {
 	return ""
 }
 
-func (x *ListUsersRequest) GetIncludeServiceAccounts() bool {
+func (x *ListUsersRequest) GetIncludeRoleAssignments() bool {
 	if x != nil {
-		return x.IncludeServiceAccounts
+		return x.IncludeRoleAssignments
 	}
 	return false
 }
@@ -563,11 +563,10 @@ func (x *User_Metadata) GetUpdatedAt() *timestamp.Timestamp {
 }
 
 type User_Spec struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	DisplayName      string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	AccountProviders []*AccountProvider     `protobuf:"bytes,2,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DisplayName   string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User_Spec) Reset() {
@@ -607,18 +606,12 @@ func (x *User_Spec) GetDisplayName() string {
 	return ""
 }
 
-func (x *User_Spec) GetAccountProviders() []*AccountProvider {
-	if x != nil {
-		return x.AccountProviders
-	}
-	return nil
-}
-
 type User_Status struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RoleAssignments []*UserRoleAssignment  `protobuf:"bytes,2,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	AccountProviders []*AccountProvider     `protobuf:"bytes,1,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
+	RoleAssignments  []*UserRoleAssignment  `protobuf:"bytes,2,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *User_Status) Reset() {
@@ -651,6 +644,13 @@ func (*User_Status) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{4, 2}
 }
 
+func (x *User_Status) GetAccountProviders() []*AccountProvider {
+	if x != nil {
+		return x.AccountProviders
+	}
+	return nil
+}
+
 func (x *User_Status) GetRoleAssignments() []*UserRoleAssignment {
 	if x != nil {
 		return x.RoleAssignments
@@ -678,9 +678,9 @@ const file_users_proto_rawDesc = "" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x128\n" +
-	"\x18include_service_accounts\x18\x03 \x01(\bR\x16includeServiceAccounts\"A\n" +
+	"\x18include_role_assignments\x18\x03 \x01(\bR\x16includeRoleAssignments\"A\n" +
 	"\x11ListUsersResponse\x12,\n" +
-	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xaa\x04\n" +
+	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xab\x04\n" +
 	"\x04User\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Users.User.MetadataR\bmetadata\x12/\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Users.User.SpecR\x04spec\x125\n" +
@@ -691,11 +691,11 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1ay\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a)\n" +
 	"\x04Spec\x12!\n" +
-	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12N\n" +
-	"\x11account_providers\x18\x02 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x1aY\n" +
-	"\x06Status\x12O\n" +
+	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x1a\xa9\x01\n" +
+	"\x06Status\x12N\n" +
+	"\x11account_providers\x18\x01 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x12O\n" +
 	"\x10role_assignments\x18\x02 \x03(\v2$.Superplane.Users.UserRoleAssignmentR\x0froleAssignments\"\xa9\x02\n" +
 	"\x12UserRoleAssignment\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12*\n" +
@@ -768,7 +768,7 @@ var file_users_proto_depIdxs = []int32{
 	12, // 11: Superplane.Users.AccountProvider.updated_at:type_name -> google.protobuf.Timestamp
 	12, // 12: Superplane.Users.User.Metadata.created_at:type_name -> google.protobuf.Timestamp
 	12, // 13: Superplane.Users.User.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	6,  // 14: Superplane.Users.User.Spec.account_providers:type_name -> Superplane.Users.AccountProvider
+	6,  // 14: Superplane.Users.User.Status.account_providers:type_name -> Superplane.Users.AccountProvider
 	5,  // 15: Superplane.Users.User.Status.role_assignments:type_name -> Superplane.Users.UserRoleAssignment
 	2,  // 16: Superplane.Users.Users.ListUsers:input_type -> Superplane.Users.ListUsersRequest
 	3,  // 17: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse

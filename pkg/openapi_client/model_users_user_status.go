@@ -20,7 +20,8 @@ var _ MappedNullable = &UsersUserStatus{}
 
 // UsersUserStatus struct for UsersUserStatus
 type UsersUserStatus struct {
-	RoleAssignments []UsersUserRoleAssignment `json:"roleAssignments,omitempty"`
+	AccountProviders []UsersAccountProvider    `json:"accountProviders,omitempty"`
+	RoleAssignments  []UsersUserRoleAssignment `json:"roleAssignments,omitempty"`
 }
 
 // NewUsersUserStatus instantiates a new UsersUserStatus object
@@ -38,6 +39,38 @@ func NewUsersUserStatus() *UsersUserStatus {
 func NewUsersUserStatusWithDefaults() *UsersUserStatus {
 	this := UsersUserStatus{}
 	return &this
+}
+
+// GetAccountProviders returns the AccountProviders field value if set, zero value otherwise.
+func (o *UsersUserStatus) GetAccountProviders() []UsersAccountProvider {
+	if o == nil || IsNil(o.AccountProviders) {
+		var ret []UsersAccountProvider
+		return ret
+	}
+	return o.AccountProviders
+}
+
+// GetAccountProvidersOk returns a tuple with the AccountProviders field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *UsersUserStatus) GetAccountProvidersOk() ([]UsersAccountProvider, bool) {
+	if o == nil || IsNil(o.AccountProviders) {
+		return nil, false
+	}
+	return o.AccountProviders, true
+}
+
+// HasAccountProviders returns a boolean if a field has been set.
+func (o *UsersUserStatus) HasAccountProviders() bool {
+	if o != nil && !IsNil(o.AccountProviders) {
+		return true
+	}
+
+	return false
+}
+
+// SetAccountProviders gets a reference to the given []UsersAccountProvider and assigns it to the AccountProviders field.
+func (o *UsersUserStatus) SetAccountProviders(v []UsersAccountProvider) {
+	o.AccountProviders = v
 }
 
 // GetRoleAssignments returns the RoleAssignments field value if set, zero value otherwise.
@@ -82,6 +115,9 @@ func (o UsersUserStatus) MarshalJSON() ([]byte, error) {
 
 func (o UsersUserStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.AccountProviders) {
+		toSerialize["accountProviders"] = o.AccountProviders
+	}
 	if !IsNil(o.RoleAssignments) {
 		toSerialize["roleAssignments"] = o.RoleAssignments
 	}

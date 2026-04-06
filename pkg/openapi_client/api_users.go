@@ -27,7 +27,7 @@ type ApiUsersListUsersRequest struct {
 	ApiService             *UsersAPIService
 	domainType             *string
 	domainId               *string
-	includeServiceAccounts *bool
+	includeRoleAssignments *bool
 }
 
 func (r ApiUsersListUsersRequest) DomainType(domainType string) ApiUsersListUsersRequest {
@@ -40,8 +40,8 @@ func (r ApiUsersListUsersRequest) DomainId(domainId string) ApiUsersListUsersReq
 	return r
 }
 
-func (r ApiUsersListUsersRequest) IncludeServiceAccounts(includeServiceAccounts bool) ApiUsersListUsersRequest {
-	r.includeServiceAccounts = &includeServiceAccounts
+func (r ApiUsersListUsersRequest) IncludeRoleAssignments(includeRoleAssignments bool) ApiUsersListUsersRequest {
+	r.includeRoleAssignments = &includeRoleAssignments
 	return r
 }
 
@@ -95,8 +95,8 @@ func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*Us
 	if r.domainId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
 	}
-	if r.includeServiceAccounts != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "includeServiceAccounts", r.includeServiceAccounts, "", "")
+	if r.includeRoleAssignments != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeRoleAssignments", r.includeRoleAssignments, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

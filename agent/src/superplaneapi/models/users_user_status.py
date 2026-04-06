@@ -20,6 +20,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.users_account_provider import UsersAccountProvider
 from superplaneapi.models.users_user_role_assignment import UsersUserRoleAssignment
 from typing import Optional, Set
 from typing_extensions import Self
@@ -28,8 +29,9 @@ class UsersUserStatus(BaseModel):
     """
     UsersUserStatus
     """ # noqa: E501
+    account_providers: Optional[List[UsersAccountProvider]] = Field(default=None, alias="accountProviders")
     role_assignments: Optional[List[UsersUserRoleAssignment]] = Field(default=None, alias="roleAssignments")
-    __properties: ClassVar[List[str]] = ["roleAssignments"]
+    __properties: ClassVar[List[str]] = ["accountProviders", "roleAssignments"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -70,6 +72,13 @@ class UsersUserStatus(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in account_providers (list)
+        _items = []
+        if self.account_providers:
+            for _item_account_providers in self.account_providers:
+                if _item_account_providers:
+                    _items.append(_item_account_providers.to_dict())
+            _dict['accountProviders'] = _items
         # override the default output from pydantic by calling `to_dict()` of each item in role_assignments (list)
         _items = []
         if self.role_assignments:
@@ -89,6 +98,7 @@ class UsersUserStatus(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
+            "accountProviders": [UsersAccountProvider.from_dict(_item) for _item in obj["accountProviders"]] if obj.get("accountProviders") is not None else None,
             "roleAssignments": [UsersUserRoleAssignment.from_dict(_item) for _item in obj["roleAssignments"]] if obj.get("roleAssignments") is not None else None
         })
         return _obj

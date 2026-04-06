@@ -30,7 +30,7 @@ func Test_ListGroupUsers(t *testing.T) {
 		assert.Equal(t, r.User.String(), resp.Users[0].Metadata.Id)
 		assert.NotEmpty(t, resp.Users[0].Spec.DisplayName)
 		assert.NotEmpty(t, resp.Users[0].Metadata.Email)
-		assert.NotEmpty(t, resp.Users[0].Status.RoleAssignments)
+		assert.Empty(t, resp.Users[0].Status.RoleAssignments)
 
 		assert.NotNil(t, resp.Group)
 		assert.Equal(t, "test-group", resp.Group.Metadata.Name)
