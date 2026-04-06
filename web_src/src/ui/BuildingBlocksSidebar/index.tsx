@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatAiBuilderWireMentionsForDisplay } from "@/lib/aiBuilderNodeMentions";
 import { isCustomComponentsEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/lib/colors";
@@ -49,6 +50,8 @@ export interface BuildingBlocksSidebarProps {
   onAddNote?: () => void;
 }
 
+const EMPTY_AI_BUILDER_CANVAS_NODES: NonNullable<BuildingBlocksSidebarProps["canvasNodes"]> = [];
+
 export type AiCanvasOperation =
   | {
       type: "add_node";
@@ -92,6 +95,7 @@ export function BuildingBlocksSidebar({
   showAiBuilderTab = false,
   canvasId,
   organizationId,
+  canvasNodes,
   onApplyAiOperations,
   integrations = [],
   canvasZoom = 1,
@@ -120,6 +124,7 @@ export function BuildingBlocksSidebar({
       showAiBuilderTab={showAiBuilderTab}
       canvasId={canvasId}
       organizationId={organizationId}
+      canvasNodes={canvasNodes}
       onApplyAiOperations={onApplyAiOperations}
       integrations={integrations}
       canvasZoom={canvasZoom}
@@ -206,6 +211,7 @@ interface OpenBuildingBlocksSidebarProps {
   showAiBuilderTab: boolean;
   canvasId?: string;
   organizationId?: string;
+  canvasNodes?: BuildingBlocksSidebarProps["canvasNodes"];
   onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
   integrations: OrganizationsIntegration[];
   canvasZoom: number;
@@ -220,6 +226,7 @@ function OpenBuildingBlocksSidebar({
   showAiBuilderTab,
   canvasId,
   organizationId,
+  canvasNodes,
   onApplyAiOperations,
   integrations,
   canvasZoom,
@@ -265,6 +272,33 @@ function OpenBuildingBlocksSidebar({
     const isMacPlatform = /Mac|iPhone|iPad|iPod/i.test(`${navigator.platform} ${navigator.userAgent}`);
     return isMacPlatform ? "Cmd+Enter" : "Ctrl+Enter";
   }, []);
+
+  const nodesForMentionDisplay = canvasNodes ?? EMPTY_AI_BUILDER_CANVAS_NODES;
+
+  const chatSessionsForDisplay = useMemo(
+    () =>
+      chatSessions.map((session) => ({
+        ...session,
+        title: formatAiBuilderWireMentionsForDisplay(session.title, nodesForMentionDisplay),
+        initialMessage: session.initialMessage
+          ? formatAiBuilderWireMentionsForDisplay(session.initialMessage, nodesForMentionDisplay)
+          : undefined,
+      })),
+    [chatSessions, nodesForMentionDisplay],
+  );
+
+  const aiMessagesForDisplay = useMemo(
+    () =>
+      aiMessages.map((message) =>
+        message.role === "user"
+          ? {
+              ...message,
+              content: formatAiBuilderWireMentionsForDisplay(message.content, nodesForMentionDisplay),
+            }
+          : message,
+      ),
+    [aiMessages, nodesForMentionDisplay],
+  );
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const handleSendPrompt = useCallback(
     async (value?: string) => {
@@ -273,6 +307,7 @@ function OpenBuildingBlocksSidebar({
         aiInput,
         canvasId,
         organizationId,
+        canvasNodes,
         currentChatId,
         isGeneratingResponse,
         setChatSessions,
@@ -285,7 +320,7 @@ function OpenBuildingBlocksSidebar({
         focusInput: () => aiInputRef.current?.focus(),
       });
     },
-    [aiInput, canvasId, currentChatId, isGeneratingResponse, organizationId],
+    [aiInput, canvasId, canvasNodes, currentChatId, isGeneratingResponse, organizationId],
   );
 
   const handleStartNewChatSession = useCallback(() => {
@@ -811,11 +846,11 @@ function OpenBuildingBlocksSidebar({
 
         {showAiBuilderTab && (
           <AiBuilderChatPanel
-            chatSessions={chatSessions}
+            chatSessions={chatSessionsForDisplay}
             currentChatId={currentChatId}
             isLoadingChatSessions={isLoadingChatSessions}
             isLoadingChatMessages={isLoadingChatMessages}
-            aiMessages={aiMessages}
+            aiMessages={aiMessagesForDisplay}
             isGeneratingResponse={isGeneratingResponse}
             pendingProposal={pendingProposal}
             pendingProposalSummaries={pendingProposalSummaries}
@@ -826,6 +861,7 @@ function OpenBuildingBlocksSidebar({
             aiError={aiError}
             disabled={disabled}
             canvasId={canvasId}
+            canvasNodes={canvasNodes}
             aiInput={aiInput}
             onAiInputChange={setAiInput}
             onSelectChat={handleSelectChatSession}

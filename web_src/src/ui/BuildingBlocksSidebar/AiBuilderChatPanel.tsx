@@ -1,13 +1,14 @@
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Activity, ArrowLeft, ArrowUp, User } from "lucide-react";
+import { Activity, ArrowLeft, User } from "lucide-react";
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import type { AiBuilderMentionNode } from "@/lib/aiBuilderNodeMentions";
 import type { AiBuilderMessage, AiBuilderProposal, AiChatSession } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { AiBuilderChatInput } from "@/ui/BuildingBlocksSidebar/AiBuilderChatInput";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
@@ -26,6 +27,7 @@ type AiBuilderChatPanelProps = {
   aiError: string | null;
   disabled: boolean;
   canvasId?: string;
+  canvasNodes?: AiBuilderMentionNode[];
   aiInput: string;
   onAiInputChange: (value: string) => void;
   onSelectChat: (chatId: string) => void;
@@ -50,6 +52,7 @@ export function AiBuilderChatPanel({
   aiError,
   disabled,
   canvasId,
+  canvasNodes,
   aiInput,
   onAiInputChange,
   onSelectChat,
@@ -87,13 +90,14 @@ export function AiBuilderChatPanel({
       <div className="h-full rounded-md bg-slate-50/30 flex flex-col">
         {isNewChatView ? (
           <>
-            <InputForm
+            <AiBuilderChatInput
               aiInputRef={aiInputRef}
               aiInput={aiInput}
               onAiInputChange={onAiInputChange}
               onSendPrompt={onSendPrompt}
               disabled={disabled}
               canvasId={canvasId}
+              canvasNodes={canvasNodes}
               isGeneratingResponse={isGeneratingResponse}
               maxAiInputHeight={maxAiInputHeight}
               expanded
@@ -139,13 +143,14 @@ export function AiBuilderChatPanel({
               disabled={disabled}
             />
 
-            <InputForm
+            <AiBuilderChatInput
               aiInputRef={aiInputRef}
               aiInput={aiInput}
               onAiInputChange={onAiInputChange}
               onSendPrompt={onSendPrompt}
               disabled={disabled}
               canvasId={canvasId}
+              canvasNodes={canvasNodes}
               isGeneratingResponse={isGeneratingResponse}
               maxAiInputHeight={maxAiInputHeight}
             />
@@ -458,89 +463,5 @@ function ProposalsList({
 
       {aiError ? <p className="text-xs text-red-700">{aiError}</p> : null}
     </div>
-  );
-}
-
-type InputFormProps = {
-  aiInputRef: React.RefObject<HTMLTextAreaElement | null>;
-  aiInput: string;
-  onAiInputChange: (value: string) => void;
-  onSendPrompt: () => void;
-  disabled: boolean;
-  canvasId?: string;
-  isGeneratingResponse: boolean;
-  maxAiInputHeight: number;
-  expanded?: boolean;
-};
-
-const TEXT_AREA_CLASSNAME = cn(
-  "min-h-[20px] flex-1 resize-none border-0",
-  "rounded-sm bg-transparent px-0.5 py-0.5 shadow-none",
-  "focus-visible:ring-0 focus-visible:border-transparent",
-);
-
-function InputForm({
-  aiInputRef,
-  aiInput,
-  onAiInputChange,
-  onSendPrompt,
-  disabled,
-  canvasId,
-  isGeneratingResponse,
-  maxAiInputHeight,
-  expanded = false,
-}: InputFormProps) {
-  const isDisabled = disabled || isGeneratingResponse || !canvasId || !aiInput.trim();
-
-  const keyDownHandler = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSendPrompt();
-    }
-  };
-
-  const submitHandler = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    onSendPrompt();
-  };
-
-  return (
-    <div className={cn("m-1.5", expanded && "mb-3")}>
-      <form
-        onSubmit={submitHandler}
-        className={cn("rounded-md border border-slate-300 bg-white p-1.5", expanded && "p-3 shadow-sm")}
-      >
-        <Textarea
-          ref={aiInputRef}
-          value={aiInput}
-          onChange={(e) => onAiInputChange(e.target.value)}
-          onKeyDown={keyDownHandler}
-          placeholder="What would you like to build?"
-          disabled={disabled || !canvasId}
-          rows={expanded ? 4 : 1}
-          className={cn(TEXT_AREA_CLASSNAME, expanded && "min-h-[112px] text-[15px] leading-6")}
-          style={{ maxHeight: `${maxAiInputHeight}px` }}
-        />
-
-        <div className="flex items-center justify-end">
-          <SubmitButton disabled={isDisabled} />
-        </div>
-      </form>
-    </div>
-  );
-}
-
-const SUBMIT_BUTTON_CLASSNAME = cn(
-  "p-1 rounded-full bg-slate-600 text-white hover:bg-slate-700",
-  "cursor-pointer",
-  "disabled:opacity-50 disabled:cursor-not-allowed",
-  "flex items-center justify-center",
-);
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  return (
-    <button type="submit" className={SUBMIT_BUTTON_CLASSNAME} disabled={disabled} aria-label="Send prompt">
-      <ArrowUp size={14} />
-    </button>
   );
 }
