@@ -46,9 +46,11 @@ type connTracker struct {
 	open atomic.Int64
 }
 
-func (c *connTracker) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context { return ctx }
-func (c *connTracker) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context  { return ctx }
-func (c *connTracker) HandleRPC(ctx context.Context, s stats.RPCStats)                     {}
+func (c *connTracker) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context {
+	return ctx
+}
+func (c *connTracker) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context { return ctx }
+func (c *connTracker) HandleRPC(ctx context.Context, s stats.RPCStats)                    {}
 
 func (c *connTracker) HandleConn(ctx context.Context, s stats.ConnStats) {
 	switch s.(type) {
