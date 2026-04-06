@@ -236,7 +236,7 @@ export const useAgentUsage = (organizationId: string, enabled = true) => {
   return useQuery({
     queryKey: organizationKeys.agentUsage(organizationId),
     queryFn: async () => {
-      const response = await agentsDescribeAgentUsage(withOrganizationHeader({}));
+      const response = await agentsDescribeAgentUsage(withOrganizationHeader({ organizationId }));
       return response.data || null;
     },
     staleTime: 30 * 1000,
