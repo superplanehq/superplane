@@ -3919,7 +3919,7 @@
             "type": "string"
           },
           {
-            "name": "includeServiceAccounts",
+            "name": "includeRoleAssignments",
             "in": "query",
             "required": false,
             "type": "boolean"
@@ -7230,19 +7230,19 @@
       "properties": {
         "displayName": {
           "type": "string"
-        },
-        "accountProviders": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/UsersAccountProvider"
-          }
         }
       }
     },
     "UsersUserStatus": {
       "type": "object",
       "properties": {
+        "accountProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersAccountProvider"
+          }
+        },
         "roleAssignments": {
           "type": "array",
           "items": {
