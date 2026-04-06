@@ -283,26 +283,18 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
 	domain := prefixDomain(domainType, domainID)
-	prefixedGroupName := prefixGroupName(group)
 	prefixedUserID := prefixUserID(userID)
 
-	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+	groupExists, err := a.groupExistsInDomain(group, domain)
 	if err != nil {
 		return fmt.Errorf("failed to check group existence: %w", err)
-	}
-
-	groupExists := false
-	for _, g := range groups {
-		if g[2] == domain {
-			groupExists = true
-			break
-		}
 	}
 
 	if !groupExists {
 		return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
 	}
 
+	prefixedGroupName := prefixGroupName(group)
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add user to group: %w", err)
@@ -334,6 +326,14 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 
 func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
+	groupExists, err := a.groupExistsInDomain(group, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check group existence: %w", err)
+	}
+	if !groupExists {
+		return nil, fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
+	}
+
 	prefixedGroupName := prefixGroupName(group)
 
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
@@ -348,6 +348,22 @@ func (a *AuthService) GetGroupUsers(domainID string, domainType string, group st
 	}
 
 	return users, nil
+}
+
+func (a *AuthService) groupExistsInDomain(group, domain string) (bool, error) {
+	prefixedGroupName := prefixGroupName(group)
+	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+	if err != nil {
+		return false, err
+	}
+
+	for _, g := range groups {
+		if len(g) >= 3 && g[2] == domain {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {

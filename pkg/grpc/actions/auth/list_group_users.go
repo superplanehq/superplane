@@ -19,16 +19,16 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
+	role, err := authService.GetGroupRole(domainID, domainType, groupName)
+	if err != nil {
+		log.Errorf("failed to get group role: %v", err)
+		return nil, status.Error(codes.NotFound, "group not found")
+	}
+
 	userIDs, err := authService.GetGroupUsers(domainID, domainType, groupName)
 	if err != nil {
 		log.Errorf("failed to get group users: %v", err)
 		return nil, status.Error(codes.Internal, "failed to get group users")
-	}
-
-	role, err := authService.GetGroupRole(domainID, domainType, groupName)
-	if err != nil {
-		log.Errorf("failed to get group role: %v", err)
-		return nil, status.Error(codes.Internal, "failed to get group role")
 	}
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames([]string{role}, domainType, domainID)
@@ -37,6 +37,9 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 	}
 
 	roleMetadata := roleMetadataMap[role]
+	if roleMetadata == nil {
+		return nil, status.Error(codes.NotFound, "role metadata not found")
+	}
 
 	dbUsers, err := models.FindUsersByIDs(userIDs)
 	if err != nil {
