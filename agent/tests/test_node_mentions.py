@@ -1,6 +1,11 @@
 from ai.agent import AgentDeps
 from ai.models import CanvasNode, CanvasSummary
-from ai.node_mentions import expand_node_mentions_in_prompt, parse_node_mention_ids
+from ai.node_mentions import (
+    REFERENCED_NODES_APPENDIX_MARKER,
+    expand_node_mentions_in_prompt,
+    parse_node_mention_ids,
+    strip_referenced_nodes_appendix_for_display,
+)
 
 
 def test_parse_node_mention_ids_dedupes_and_preserves_order() -> None:
@@ -31,6 +36,15 @@ def test_expand_node_mentions_appends_appendix_and_primes_cache() -> None:
     assert "`n1`" in out
     assert deps.canvas_cache["c1"] is not None
     assert len(deps.canvas_cache["c1"].nodes) == 2
+
+
+def test_strip_referenced_nodes_appendix_for_display() -> None:
+    q = "Hello @[node:n1]"
+    appendix = f"{REFERENCED_NODES_APPENDIX_MARKER}\n\n- **N** (`n1`): type=x, block=y"
+    assert strip_referenced_nodes_appendix_for_display(q + appendix) == q
+    assert strip_referenced_nodes_appendix_for_display(q) == q
+    assert strip_referenced_nodes_appendix_for_display("") == ""
+    assert strip_referenced_nodes_appendix_for_display("   ") == "   "
 
 
 def test_expand_node_mentions_unknown_id() -> None:
