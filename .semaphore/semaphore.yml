@@ -94,6 +94,7 @@ blocks:
             - "[ -f agent/junit-report.xml ] && test-results publish agent/junit-report.xml"
 
   - name: "Frondend Tests"
+    dependencies: []
     task:
       prologue:
         commands:
@@ -126,6 +127,7 @@ blocks:
             - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run lint:knip
+
 after_pipeline:
   task:
     jobs:
