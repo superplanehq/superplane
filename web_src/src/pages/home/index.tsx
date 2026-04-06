@@ -109,16 +109,18 @@ const HomePage = () => {
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="bg-slate-100 w-full flex-grow-1">
           <div className="mx-auto w-full max-w-6xl p-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <Heading level={2} className="!text-2xl mb-1">
-                  Canvases
-                </Heading>
-                <Text className="text-gray-800 dark:text-gray-400">
-                  Overview of all mapped automations across your organization.
-                </Text>
+            {!(canvases.length === 0 && !searchQuery) && (
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <Heading level={2} className="!text-2xl mb-1">
+                    Canvases
+                  </Heading>
+                  <Text className="text-gray-800 dark:text-gray-400">
+                    Overview of all mapped automations across your organization.
+                  </Text>
+                </div>
               </div>
-            </div>
+            )}
 
             {!(canvases.length === 0 && !searchQuery) && (
               <div className="mb-6">
