@@ -4,7 +4,8 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 
 export const meKeys = {
-  me: (organizationId: string, includePermissions: boolean = true) => ["me", organizationId, includePermissions] as const,
+  me: (organizationId: string, includePermissions: boolean = true) =>
+    ["me", organizationId, includePermissions] as const,
 };
 
 export const useMe = (includePermissions: boolean = true) => {
