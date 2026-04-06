@@ -34,7 +34,7 @@ blocks:
       jobs:
         - name: "Build"
           commands:
-            - bash release/superplane-dev-base/build.sh "$REL_VERSION" "amd64"
+            - bash release/superplane-dev-base/build.sh "amd64"
 
   - name: "arm64 Image"
     dependencies: []
@@ -47,21 +47,24 @@ blocks:
       jobs:
         - name: "Build"
           commands:
-            - bash release/superplane-dev-base/build.sh "$REL_VERSION" "arm64"
+            - bash release/superplane-dev-base/build.sh "arm64"
 
-  - name: "Build Multi-Platform Manifest"
+  - name: "Build Multi-Platform Manifests"
     dependencies: ["amd64 Image", "arm64 Image"]
     task:
       jobs:
-        - name: "Create and Push Manifest"
+        - name: "Create and Push Manifests"
           commands:
-            - docker manifest create "$DEV_BASE_IMAGE_REPO:$REL_VERSION" "$DEV_BASE_IMAGE_REPO:$REL_VERSION-amd64" "$DEV_BASE_IMAGE_REPO:$REL_VERSION-arm64"
-            - docker manifest push "$DEV_BASE_IMAGE_REPO:$REL_VERSION"
+            - docker manifest create "$DEV_BASE_IMAGE_REPO:app-latest" "$DEV_BASE_IMAGE_REPO:app-latest-amd64" "$DEV_BASE_IMAGE_REPO:app-latest-arm64"
+            - docker manifest push "$DEV_BASE_IMAGE_REPO:app-latest"
+            - docker manifest create "$DEV_BASE_IMAGE_REPO:agent-latest" "$DEV_BASE_IMAGE_REPO:agent-latest-amd64" "$DEV_BASE_IMAGE_REPO:agent-latest-arm64"
+            - docker manifest push "$DEV_BASE_IMAGE_REPO:agent-latest"
 
-  - name: "Verify Image"
-    dependencies: ["Build Multi-Platform Manifest"]
+  - name: "Verify Images"
+    dependencies: ["Build Multi-Platform Manifests"]
     task:
       jobs:
-        - name: "Verify GHCR Image"
+        - name: "Verify GHCR Images"
           commands:
-            - docker manifest inspect "$DEV_BASE_IMAGE_REPO:$REL_VERSION"
+            - docker manifest inspect "$DEV_BASE_IMAGE_REPO:app-latest"
+            - docker manifest inspect "$DEV_BASE_IMAGE_REPO:agent-latest"
