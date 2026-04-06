@@ -57,6 +57,13 @@ Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spa
 
 - Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
 
+## GradientAI Model Provider Keys (optional)
+
+Only required when creating GradientAI agents using **Anthropic** or **OpenAI** models.
+
+- **OpenAI API Key**: Generate one at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- **Anthropic API Key**: Generate one at [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+
 > **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.`
 }
 
@@ -85,6 +92,22 @@ func (d *DigitalOcean) Configuration() []configuration.Field {
 			Required:    false,
 			Sensitive:   true,
 			Description: "Required for Spaces Object Storage components",
+		},
+		{
+			Name:        "openAIKey",
+			Label:       "OpenAI API Key",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Required when creating GradientAI agents with OpenAI models",
+		},
+		{
+			Name:        "anthropicKey",
+			Label:       "Anthropic API Key",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Sensitive:   true,
+			Description: "Required when creating GradientAI agents with Anthropic models",
 		},
 	}
 }
@@ -116,6 +139,7 @@ func (d *DigitalOcean) Components() []core.Component {
 		&GetApp{},
 		&DeleteApp{},
 		&UpdateApp{},
+		&CreateAgent{},
 	}
 }
 
