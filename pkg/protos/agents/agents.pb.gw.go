@@ -236,6 +236,30 @@ func local_request_Agents_ResumeAgentChat_0(ctx context.Context, marshaler runti
 	return msg, metadata, err
 }
 
+func request_Agents_PrepareConfigAssistantSuggest_0(ctx context.Context, marshaler runtime.Marshaler, client AgentsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq PrepareConfigAssistantSuggestRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.PrepareConfigAssistantSuggest(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Agents_PrepareConfigAssistantSuggest_0(ctx context.Context, marshaler runtime.Marshaler, server AgentsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq PrepareConfigAssistantSuggestRequest
+		metadata runtime.ServerMetadata
+	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.PrepareConfigAssistantSuggest(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 // RegisterAgentsHandlerServer registers the http handlers for service Agents to "mux".
 // UnaryRPC     :call AgentsServer directly.
 // StreamingRPC :currently unsupported pending https://github.com/grpc/grpc-go/issues/906.
@@ -248,7 +272,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -268,7 +292,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -288,7 +312,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats/{chat_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -308,7 +332,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/messages"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats/{chat_id}/messages"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -328,7 +352,7 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/resume"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats/{chat_id}/resume"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -341,6 +365,26 @@ func RegisterAgentsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 			return
 		}
 		forward_Agents_ResumeAgentChat_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
+	mux.Handle(http.MethodPost, pattern_Agents_PrepareConfigAssistantSuggest_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Agents.Agents/PrepareConfigAssistantSuggest", runtime.WithHTTPPathPattern("/api/v1/agents/config/prepare-suggest"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Agents_PrepareConfigAssistantSuggest_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Agents_PrepareConfigAssistantSuggest_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 
 	return nil
@@ -386,7 +430,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChats", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -403,7 +447,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/CreateAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -420,7 +464,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/DescribeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats/{chat_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -437,7 +481,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/messages"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ListAgentChatMessages", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats/{chat_id}/messages"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -454,7 +498,7 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/chats/{chat_id}/resume"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/ResumeAgentChat", runtime.WithHTTPPathPattern("/api/v1/agents/builder/chats/{chat_id}/resume"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -467,21 +511,40 @@ func RegisterAgentsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		}
 		forward_Agents_ResumeAgentChat_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodPost, pattern_Agents_PrepareConfigAssistantSuggest_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Agents.Agents/PrepareConfigAssistantSuggest", runtime.WithHTTPPathPattern("/api/v1/agents/config/prepare-suggest"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Agents_PrepareConfigAssistantSuggest_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Agents_PrepareConfigAssistantSuggest_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	return nil
 }
 
 var (
-	pattern_Agents_ListAgentChats_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "agents", "chats"}, ""))
-	pattern_Agents_CreateAgentChat_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "agents", "chats"}, ""))
-	pattern_Agents_DescribeAgentChat_0     = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "agents", "chats", "chat_id"}, ""))
-	pattern_Agents_ListAgentChatMessages_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "agents", "chats", "chat_id", "messages"}, ""))
-	pattern_Agents_ResumeAgentChat_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "agents", "chats", "chat_id", "resume"}, ""))
+	pattern_Agents_ListAgentChats_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "agents", "builder", "chats"}, ""))
+	pattern_Agents_CreateAgentChat_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "agents", "builder", "chats"}, ""))
+	pattern_Agents_DescribeAgentChat_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "agents", "builder", "chats", "chat_id"}, ""))
+	pattern_Agents_ListAgentChatMessages_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "agents", "builder", "chats", "chat_id", "messages"}, ""))
+	pattern_Agents_ResumeAgentChat_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "agents", "builder", "chats", "chat_id", "resume"}, ""))
+	pattern_Agents_PrepareConfigAssistantSuggest_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "agents", "config", "prepare-suggest"}, ""))
 )
 
 var (
-	forward_Agents_ListAgentChats_0        = runtime.ForwardResponseMessage
-	forward_Agents_CreateAgentChat_0       = runtime.ForwardResponseMessage
-	forward_Agents_DescribeAgentChat_0     = runtime.ForwardResponseMessage
-	forward_Agents_ListAgentChatMessages_0 = runtime.ForwardResponseMessage
-	forward_Agents_ResumeAgentChat_0       = runtime.ForwardResponseMessage
+	forward_Agents_ListAgentChats_0                = runtime.ForwardResponseMessage
+	forward_Agents_CreateAgentChat_0               = runtime.ForwardResponseMessage
+	forward_Agents_DescribeAgentChat_0             = runtime.ForwardResponseMessage
+	forward_Agents_ListAgentChatMessages_0         = runtime.ForwardResponseMessage
+	forward_Agents_ResumeAgentChat_0               = runtime.ForwardResponseMessage
+	forward_Agents_PrepareConfigAssistantSuggest_0 = runtime.ForwardResponseMessage
 )

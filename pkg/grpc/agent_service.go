@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	configassistant "github.com/superplanehq/superplane/pkg/grpc/actions/configassistant"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
@@ -131,4 +132,30 @@ func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListA
 	}
 
 	return agents.ListAgentChatMessages(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+}
+
+func (s *AgentsService) PrepareConfigAssistantSuggest(
+	ctx context.Context,
+	req *pb.PrepareConfigAssistantSuggestRequest,
+) (*pb.PrepareConfigAssistantSuggestResponse, error) {
+	agentHTTPURL := config.AgentHTTPURL()
+	if agentHTTPURL == "" {
+		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return configassistant.PrepareConfigAssistantSuggest(
+		ctx,
+		s.authService,
+		s.jwtSigner,
+		agentHTTPURL,
+		userID,
+		organizationID,
+		req,
+	)
 }
