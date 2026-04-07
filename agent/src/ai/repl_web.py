@@ -26,11 +26,13 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
+from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
+from ai.llm_cost_estimate import estimate_cost_usd_for_model
 from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
@@ -124,6 +126,21 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
+def _record_usage(store: SessionStore, run_id: str, model: str, usage: RunUsage) -> None:
+    try:
+        store.update_run_usage(
+            run_id=run_id,
+            input_tokens=usage.input_tokens or 0,
+            output_tokens=usage.output_tokens or 0,
+            cache_read_tokens=usage.cache_read_tokens or 0,
+            cache_write_tokens=usage.cache_write_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+            estimated_cost_usd=estimate_cost_usd_for_model(model, usage),
+        )
+    except Exception as error:
+        print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
+
+
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
     history = store.load_agent_chat_message_history(chat_id)
     if not history:
@@ -196,7 +213,8 @@ async def _stream_agent_run(
         claims, chat = _resolve_agent_context(chat_id, request)
 
     message_history = _load_message_history(store, chat.id)
-    recorder = PersistedRunRecorder(store, chat.id, payload.question)
+    run_id = store.create_agent_chat_run(chat.id, payload.model)
+    recorder = PersistedRunRecorder(store, chat.id, run_id, payload.question)
     resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
@@ -243,10 +261,12 @@ async def _stream_agent_run(
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
+                usage = result.usage()
+                _record_usage(store, run_id, payload.model, usage)
                 yield {
                     "type": "final_answer",
                     "output": output,
-                    "usage": _to_jsonable(result.usage()),
+                    "usage": _to_jsonable(usage),
                 }
 
         yield {
@@ -406,10 +426,12 @@ async def _stream_agent_run(
                         await asyncio.sleep(0.01)
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
+            usage = result.usage()
+            _record_usage(store, run_id, payload.model, usage)
             yield {
                 "type": "final_answer",
                 "output": output,
-                "usage": _to_jsonable(result.usage()),
+                "usage": _to_jsonable(usage),
             }
 
     yield {
