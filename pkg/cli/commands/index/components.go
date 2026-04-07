@@ -47,7 +47,15 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(components)
+		summary := make([]map[string]string, len(components))
+		for i, component := range components {
+			summary[i] = map[string]string{
+				"name":        component.GetName(),
+				"label":       component.GetLabel(),
+				"description": component.GetDescription(),
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -239,7 +247,7 @@ func (c *componentsCommand) findComponentByName(ctx core.CommandContext, name st
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.ComponentsComponent{}, err
+			return openapi_client.ComponentsComponent{}, fmt.Errorf("component %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationComponent(integration, componentName)
 	}
