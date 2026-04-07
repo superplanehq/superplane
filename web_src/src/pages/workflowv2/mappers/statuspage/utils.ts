@@ -72,9 +72,9 @@ export function getDetailsForIncident(
 
   details["Updates"] = updates
     .map((update) => {
-      const status = update.status || "-";
-      const timestamp = update.created_at ? formatRelativeTime(update.created_at, true) : undefined;
-      const comment = update.body?.trim() || undefined;
+      const status = stringOrDash(update.status);
+      const timestamp = update.created_at ? formatRelativeTime(update.created_at, true) : "-";
+      const comment = stringOrDash(update.body?.trim());
       return `${status} (${timestamp}): ${comment}`;
     })
     .join(" | ");
