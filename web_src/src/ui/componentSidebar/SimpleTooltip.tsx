@@ -4,7 +4,7 @@ import "tippy.js/dist/tippy.css";
 
 interface SimpleTooltipProps {
   children: React.ReactElement;
-  content: string;
+  content: React.ReactNode;
   delay?: number;
   hideOnClick?: boolean;
 }
@@ -12,7 +12,12 @@ interface SimpleTooltipProps {
 export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({ children, content, delay = 200, hideOnClick = true }) => {
   return (
     <Tippy
-      render={() => <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg">{content}</div>}
+      interactive={true}
+      render={() => (
+        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words">
+          {content}
+        </div>
+      )}
       placement="top"
       delay={delay}
       hideOnClick={hideOnClick}
