@@ -47,15 +47,7 @@ func (c *componentsCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		summary := make([]map[string]string, len(components))
-		for i, component := range components {
-			summary[i] = map[string]string{
-				"name":        component.GetName(),
-				"label":       component.GetLabel(),
-				"description": component.GetDescription(),
-			}
-		}
-		return ctx.Renderer.Render(summary)
+		return ctx.Renderer.Render(components)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {

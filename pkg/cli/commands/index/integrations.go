@@ -40,23 +40,14 @@ func (c *integrationsCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	integrations := response.GetIntegrations()
 	if !ctx.Renderer.IsText() {
-		summary := make([]map[string]string, len(integrations))
-		for i, integration := range integrations {
-			summary[i] = map[string]string{
-				"name":        integration.GetName(),
-				"label":       integration.GetLabel(),
-				"description": integration.GetDescription(),
-			}
-		}
-		return ctx.Renderer.Render(summary)
+		return ctx.Renderer.Render(response.GetIntegrations())
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
-		for _, integration := range integrations {
+		for _, integration := range response.GetIntegrations() {
 			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", integration.GetName(), integration.GetLabel(), integration.GetDescription())
 		}
 		return writer.Flush()
