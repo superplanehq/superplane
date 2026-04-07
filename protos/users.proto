@@ -6,7 +6,6 @@ import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "authorization.proto";
-import "roles.proto";
 
 option go_package = "github.com/superplanehq/superplane/pkg/protos/users";
 
@@ -42,19 +41,6 @@ service Users {
       tags: "Users";
     };
   }
-}
-
-message ListUserRolesRequest {
-  string user_id = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
-}
-
-message ListUserRolesResponse {
-  string user_id = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
-  repeated Roles.Role roles = 4;
 }
 
 message ListUsersRequest {
