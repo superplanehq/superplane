@@ -179,6 +179,7 @@ describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
     expect(details["Data Sources"]).toBe("2");
     expect(details["Last Indexing"]).toContain("2/2 sources");
     expect(details["Last Indexed At"]).toBeDefined();
+    expect(details["View Activity"]).toContain("kb-uuid/activity");
   });
 
   it("omits optional fields when absent", () => {
@@ -197,6 +198,7 @@ describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
     expect(details["Data Sources"]).toBeUndefined();
     expect(details["Last Indexing"]).toBeUndefined();
     expect(details["Last Indexed At"]).toBeUndefined();
+    expect(details["View Activity"]).toBeUndefined();
     expect(details["View Knowledge Base"]).toBeUndefined();
   });
 

@@ -91,6 +91,10 @@ export const getKnowledgeBaseMapper: ComponentBaseMapper = {
       if (finishedAt) {
         details["Last Indexed At"] = new Date(finishedAt).toLocaleString();
       }
+
+      if (uuid) {
+        details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${uuid}/activity`;
+      }
     }
 
     return details;
