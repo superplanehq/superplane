@@ -105,26 +105,6 @@ func (t *OnVMStarted) Color() string {
 	return "blue"
 }
 
-func (t *OnVMStarted) ExampleData() map[string]any {
-	return map[string]any{
-		"id":              "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc",
-		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/start",
-		"eventType":       "Microsoft.Resources.ResourceActionSuccess",
-		"eventTime":       "2026-02-11T10:30:00Z",
-		"dataVersion":     "2",
-		"metadataVersion": "1",
-		"data": map[string]any{
-			"operationName":    "Microsoft.Compute/virtualMachines/start/action",
-			"status":           "Succeeded",
-			"resourceProvider": "Microsoft.Compute",
-			"resourceUri":      "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-			"subscriptionId":   "12345678-1234-1234-1234-123456789abc",
-			"tenantId":         "12345678-1234-1234-1234-123456789abc",
-		},
-	}
-}
-
 func (t *OnVMStarted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

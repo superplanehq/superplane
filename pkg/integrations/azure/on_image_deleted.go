@@ -76,44 +76,6 @@ func (t *OnImageDeleted) Color() string {
 	return "blue"
 }
 
-func (t *OnImageDeleted) ExampleData() map[string]any {
-	return map[string]any{
-		"id":              "afc359b4-001e-001b-66ab-eeb76e069631",
-		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry",
-		"subject":         "myregistry.azurecr.io/myrepository@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-		"eventType":       "Microsoft.ContainerRegistry.ImageDeleted",
-		"eventTime":       "2026-03-16T11:00:00Z",
-		"dataVersion":     "1.0",
-		"metadataVersion": "1",
-		"data": map[string]any{
-			"id":        "afc359b4-001e-001b-66ab-eeb76e069631",
-			"timestamp": "2026-03-16T11:00:00Z",
-			"action":    "delete",
-			"target": map[string]any{
-				"mediaType":  "application/vnd.docker.distribution.manifest.v2+json",
-				"digest":     "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-				"repository": "myrepository",
-				"tag":        "",
-				"url":        "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890",
-			},
-			"request": map[string]any{
-				"id":        "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-				"addr":      "203.0.113.0:49926",
-				"host":      "myregistry.azurecr.io",
-				"method":    "DELETE",
-				"useragent": "docker/20.10.7",
-			},
-			"actor": map[string]any{
-				"name": "myuser",
-			},
-			"source": map[string]any{
-				"addr":       "myregistry.azurecr.io",
-				"instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c",
-			},
-		},
-	}
-}
-
 func (t *OnImageDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
