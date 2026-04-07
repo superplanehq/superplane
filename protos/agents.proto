@@ -27,7 +27,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 service Agents {
   rpc ListAgentChats(ListAgentChatsRequest) returns (ListAgentChatsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/agents/chats"
+      get: "/api/v1/agents/builder/chats"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List agent chats for the authenticated user";
@@ -38,7 +38,7 @@ service Agents {
 
   rpc CreateAgentChat(CreateAgentChatRequest) returns (CreateAgentChatResponse) {
     option (google.api.http) = {
-      post: "/api/v1/agents/chats"
+      post: "/api/v1/agents/builder/chats"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -50,7 +50,7 @@ service Agents {
 
   rpc DescribeAgentChat(DescribeAgentChatRequest) returns (DescribeAgentChatResponse) {
     option (google.api.http) = {
-      get: "/api/v1/agents/chats/{chat_id}"
+      get: "/api/v1/agents/builder/chats/{chat_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describes an agent chat for the authenticated user";
@@ -61,7 +61,7 @@ service Agents {
 
   rpc ListAgentChatMessages(ListAgentChatMessagesRequest) returns (ListAgentChatMessagesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/agents/chats/{chat_id}/messages"
+      get: "/api/v1/agents/builder/chats/{chat_id}/messages"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List the messages in an agent chat";
@@ -72,12 +72,24 @@ service Agents {
 
   rpc ResumeAgentChat(ResumeAgentChatRequest) returns (ResumeAgentChatResponse) {
     option (google.api.http) = {
-      post: "/api/v1/agents/chats/{chat_id}/resume"
+      post: "/api/v1/agents/builder/chats/{chat_id}/resume"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Resume an agent chat";
       description: "Resumes an agent chat. The response includes the URL and token for resuming the chat";
+      tags: "Agent";
+    };
+  }
+
+  rpc PrepareConfigAssistantSuggest(PrepareConfigAssistantSuggestRequest) returns (PrepareConfigAssistantSuggestResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/config/prepare-suggest"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Prepare config assistant field suggest";
+      description: "Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.";
       tags: "Agent";
     };
   }
@@ -141,4 +153,14 @@ message AgentChatInfo {
   string id = 1;
   string initial_message = 2;
   google.protobuf.Timestamp created_at = 3;
+}
+
+message PrepareConfigAssistantSuggestRequest {
+  string canvas_id = 1;
+}
+
+message PrepareConfigAssistantSuggestResponse {
+  string token = 1;
+  // Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest).
+  string suggest_url = 2;
 }

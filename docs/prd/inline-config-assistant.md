@@ -104,9 +104,8 @@ Go enforces caps: instruction length (runes) and max `field_context_json` bytes.
 
 ## Public API (Go)
 
-- **HTTP:** `POST /api/v1/agents/suggest-field` (gRPC-Gateway for
-  `ConfigAssistant.SuggestConfigurationField`, or equivalent registration under the agents URL
-  prefix—implementation detail).
+- **HTTP:** `POST /api/v1/agents/config/suggest-field` (gRPC-Gateway for
+  `Agents.SuggestConfigurationField` on the unified agents service).
 - **Auth:** Same session authentication as the rest of the app.
 - **AuthZ:** User must be allowed to **update** the canvas (same bar as editing the workflow);
   plus **org AI enabled** aligned with AI Builder (**403** when AI is disabled for the org).
@@ -117,8 +116,8 @@ Go enforces caps: instruction length (runes) and max `field_context_json` bytes.
 - **Scopes:** Include `canvases:read:<canvas_id>` (and related org/integration read checks as
   implemented) so the agent can validate the JWT without builder-only semantics.
 
-Proto and generated code may live under `protos/config_assistant.proto` and
-`pkg/protos/config_assistant/`; the **documented public URL** is **`/api/v1/agents/suggest-field`**.
+Proto and generated code live under `protos/agents.proto` and `pkg/protos/agents/`; the
+**documented public URL** is **`/api/v1/agents/config/suggest-field`**.
 
 ## Agent service (Python)
 
@@ -154,7 +153,7 @@ Proto and generated code may live under `protos/config_assistant.proto` and
 
 1. User opens a node on a workflow canvas with assistant enabled.
 2. User focuses an **expression** field, opens sparkle, enters “filter to open PRs only”.
-3. UI calls `POST /api/v1/agents/suggest-field` with `field_context_json` (including
+3. UI calls `POST /api/v1/agents/config/suggest-field` with `field_context_json` (including
    autocomplete-style upstream payload) and instruction.
 4. Go authorizes (canvas update + org AI allowed), mints `config-assistant` JWT, POSTs to agent.
 5. Agent runs **one** model call—no tools—using instruction + context JSON + system prompt;

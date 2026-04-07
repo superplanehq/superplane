@@ -48,6 +48,18 @@ export type AgentsListAgentChatsResponse = {
   chats?: Array<AgentsAgentChatInfo>;
 };
 
+export type AgentsPrepareConfigAssistantSuggestRequest = {
+  canvasId?: string;
+};
+
+export type AgentsPrepareConfigAssistantSuggestResponse = {
+  token?: string;
+  /**
+   * Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest).
+   */
+  suggestUrl?: string;
+};
+
 export type AgentsResumeAgentChatBody = {
   canvasId?: string;
 };
@@ -1429,7 +1441,7 @@ export type AgentsListAgentChatsData = {
   query?: {
     canvasId?: string;
   };
-  url: "/api/v1/agents/chats";
+  url: "/api/v1/agents/builder/chats";
 };
 
 export type AgentsListAgentChatsErrors = {
@@ -1454,7 +1466,7 @@ export type AgentsCreateAgentChatData = {
   body: AgentsCreateAgentChatRequest;
   path?: never;
   query?: never;
-  url: "/api/v1/agents/chats";
+  url: "/api/v1/agents/builder/chats";
 };
 
 export type AgentsCreateAgentChatErrors = {
@@ -1483,7 +1495,7 @@ export type AgentsDescribeAgentChatData = {
   query?: {
     canvasId?: string;
   };
-  url: "/api/v1/agents/chats/{chatId}";
+  url: "/api/v1/agents/builder/chats/{chatId}";
 };
 
 export type AgentsDescribeAgentChatErrors = {
@@ -1512,7 +1524,7 @@ export type AgentsListAgentChatMessagesData = {
   query?: {
     canvasId?: string;
   };
-  url: "/api/v1/agents/chats/{chatId}/messages";
+  url: "/api/v1/agents/builder/chats/{chatId}/messages";
 };
 
 export type AgentsListAgentChatMessagesErrors = {
@@ -1541,7 +1553,7 @@ export type AgentsResumeAgentChatData = {
     chatId: string;
   };
   query?: never;
-  url: "/api/v1/agents/chats/{chatId}/resume";
+  url: "/api/v1/agents/builder/chats/{chatId}/resume";
 };
 
 export type AgentsResumeAgentChatErrors = {
@@ -1561,6 +1573,33 @@ export type AgentsResumeAgentChatResponses = {
 };
 
 export type AgentsResumeAgentChatResponse2 = AgentsResumeAgentChatResponses[keyof AgentsResumeAgentChatResponses];
+
+export type AgentsPrepareConfigAssistantSuggestData = {
+  body: AgentsPrepareConfigAssistantSuggestRequest;
+  path?: never;
+  query?: never;
+  url: "/api/v1/agents/config/prepare-suggest";
+};
+
+export type AgentsPrepareConfigAssistantSuggestErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsPrepareConfigAssistantSuggestError =
+  AgentsPrepareConfigAssistantSuggestErrors[keyof AgentsPrepareConfigAssistantSuggestErrors];
+
+export type AgentsPrepareConfigAssistantSuggestResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsPrepareConfigAssistantSuggestResponse;
+};
+
+export type AgentsPrepareConfigAssistantSuggestResponse2 =
+  AgentsPrepareConfigAssistantSuggestResponses[keyof AgentsPrepareConfigAssistantSuggestResponses];
 
 export type BlueprintsListBlueprintsData = {
   body?: never;
