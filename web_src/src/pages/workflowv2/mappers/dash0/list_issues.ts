@@ -122,29 +122,26 @@ export const listIssuesMapper: ComponentBaseMapper = {
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
+    const details: Record<string, string> = {};
 
-    // Add "Checked at" timestamp
     if (context.execution.createdAt) {
       details["Checked at"] = new Date(context.execution.createdAt).toLocaleString();
     }
 
     const payload = getFirstPayload(context.execution);
     if (!payload || !payload.data) {
-      details["Issues"] = [];
       return details;
     }
 
     const responseData = payload.data as PrometheusResponse | undefined;
     if (!responseData || !responseData.data || !responseData.data.result) {
-      details["Issues"] = [];
       return details;
     }
 
     const results = responseData.data.result;
 
     // Parse issues from Prometheus response
-    const issues = results.map((result) => {
+    results.forEach((result) => {
       const metric = result.metric || {};
       const value = result.value;
 
@@ -159,17 +156,8 @@ export const listIssuesMapper: ComponentBaseMapper = {
       const checkName = metric["dash0_check_name"] || "Unknown Check";
       const checkSummary = metric["dash0_check_summary_template"] || "";
       const checkDescription = metric["dash0_check_description_template"] || "";
-
-      return {
-        status,
-        checkName,
-        checkSummary,
-        checkDescription,
-      };
+      details[checkName] = `${status} - ${checkSummary} - ${checkDescription}`;
     });
-
-    // Add issues list with special type for custom rendering
-    details["Issues"] = issues;
 
     return details;
   },
