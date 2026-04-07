@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
 import { OnboardingWelcome } from "./OnboardingWelcome";
-import type { ComponentsEdge, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvas, ComponentsEdge, ComponentsNode } from "@/api-client";
 
 type CanvasViewMode = "grid" | "list";
 
@@ -62,7 +62,7 @@ const HomePage = () => {
     return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
-  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: any) => ({
+  const canvases: CanvasCardData[] = (canvasesData || []).map((canvas: CanvasesCanvas) => ({
     id: canvas.metadata?.id!,
     name: canvas.metadata?.name!,
     description: canvas.metadata?.description,

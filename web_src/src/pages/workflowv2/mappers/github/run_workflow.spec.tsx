@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ComponentBaseContext, NodeInfo } from "../types";
 import { runWorkflowMapper } from "./run_workflow";
+import { QueryClient } from "@tanstack/react-query";
 
 function makeNode(configuration: unknown): NodeInfo {
   return {
@@ -25,6 +26,16 @@ function makeContext(configuration: unknown): ComponentBaseContext {
       color: "purple",
     },
     lastExecutions: [],
+    currentUser: {
+      id: "123",
+      name: "John Doe",
+      email: "john.doe@example.com",
+      roles: ["admin"],
+      groups: ["developers"],
+    },
+    organizationId: "123",
+    canvasId: "123",
+    queryClient: new QueryClient(),
   };
 }
 

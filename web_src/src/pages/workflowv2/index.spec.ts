@@ -65,11 +65,6 @@ describe("canvas node preparation resilience", () => {
   });
 
   it("returns a fallback canvas node when component preparation fails", () => {
-    vi.spyOn(mappers, "getComponentAdditionalDataBuilder").mockReturnValue({
-      buildAdditionalData: () => {
-        throw new Error("builder failed");
-      },
-    });
     vi.spyOn(mappers, "getComponentBaseMapper").mockReturnValue({
       props: () => {
         throw new Error("mapper failed");
