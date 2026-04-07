@@ -2985,7 +2985,9 @@ export function WorkflowPageV2() {
     if (!canAutoSave) {
       return;
     }
-  }, [canAutoSave]);
+
+    debouncedAnnotationAutoSave.flush();
+  }, [canAutoSave, debouncedAnnotationAutoSave]);
 
   const clearPendingAutoSaveWork = useCallback(() => {
     debouncedAutoSave.cancel();
@@ -3013,47 +3015,41 @@ export function WorkflowPageV2() {
       const { x, y, ...configurationUpdates } = updates;
       const hasPositionUpdate = x !== undefined || y !== undefined;
       const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
-      const hasOnlyTextUpdate =
-        !hasPositionUpdate && Object.keys(configurationUpdates).length === 1 && configurationUpdates.text !== undefined;
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+          return node;
+        }
 
-      const shouldUpdateCache = !canAutoSave || !hasOnlyTextUpdate;
-      if (shouldUpdateCache) {
-        const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
-          if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
-            return node;
-          }
+        const updatedNode = { ...node };
 
-          const updatedNode = { ...node };
+        // Update position if provided
+        if (hasPositionUpdate) {
+          updatedNode.position = {
+            x: x !== undefined ? x : node.position?.x || 0,
+            y: y !== undefined ? y : node.position?.y || 0,
+          };
+        }
 
-          // Update position if provided
-          if (hasPositionUpdate) {
-            updatedNode.position = {
-              x: x !== undefined ? x : node.position?.x || 0,
-              y: y !== undefined ? y : node.position?.y || 0,
-            };
-          }
+        // Update configuration if provided
+        if (hasConfigurationUpdate) {
+          updatedNode.configuration = {
+            ...node.configuration,
+            ...configurationUpdates,
+          };
+        }
 
-          // Update configuration if provided
-          if (hasConfigurationUpdate) {
-            updatedNode.configuration = {
-              ...node.configuration,
-              ...configurationUpdates,
-            };
-          }
+        return updatedNode;
+      });
 
-          return updatedNode;
-        });
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
 
-        const updatedWorkflow = {
-          ...latestWorkflow,
-          spec: {
-            ...latestWorkflow.spec,
-            nodes: updatedNodes,
-          },
-        };
-
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (hasConfigurationUpdate) {
         if (canAutoSave) {
@@ -3168,7 +3164,8 @@ export function WorkflowPageV2() {
       const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+      const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
+      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
 
       // Generate a unique node ID
       const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
