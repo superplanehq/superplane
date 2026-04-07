@@ -18,7 +18,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/registry"
-	_ "github.com/superplanehq/superplane/pkg/server"
+	_ "github.com/superplanehq/superplane/pkg/server" // register all components and triggers
 )
 
 type nodeKind string
@@ -923,40 +923,6 @@ func builtinCallSchemas(name string, call *ast.CallExpr, analyzer *packageAnalyz
 	}
 }
 
-func schemaFromRuntimeValue(value any) schema {
-	switch typed := value.(type) {
-	case nil:
-		return schema{Kind: schemaNull}
-	case bool:
-		return schema{Kind: schemaBool}
-	case string:
-		return schema{Kind: schemaString}
-	case float64, float32, int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8:
-		return schema{Kind: schemaNumber}
-	case []any:
-		elem := schema{Kind: schemaUnknown}
-		for _, item := range typed {
-			elem = mergeSchema(elem, schemaFromRuntimeValue(item))
-		}
-		return schema{Kind: schemaArray, Elem: &elem, Exact: true}
-	case map[string]any:
-		fields := map[string]schema{}
-		for key, item := range typed {
-			fields[key] = schemaFromRuntimeValue(item)
-		}
-		return schema{Kind: schemaObject, Fields: fields, Exact: true}
-	default:
-		rv := reflect.ValueOf(value)
-		if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
-			elem := schema{Kind: schemaUnknown}
-			for i := 0; i < rv.Len(); i++ {
-				elem = mergeSchema(elem, schemaFromRuntimeValue(rv.Index(i).Interface()))
-			}
-			return schema{Kind: schemaArray, Elem: &elem, Exact: true}
-		}
-		return schema{Kind: schemaUnknown}
-	}
-}
 
 func (a *packageAnalyzer) schemaFromTypeExpr(expr ast.Expr, seen map[string]bool) schema {
 	switch t := expr.(type) {
@@ -1135,52 +1101,6 @@ func validateExampleAgainstSpecs(example exampleRecord, specs []emitSpec) []Issu
 	return nil
 }
 
-func schemasCompatible(example schema, candidate schema) (bool, string) {
-	if candidate.Kind == schemaUnknown {
-		return true, ""
-	}
-
-	if example.Kind != candidate.Kind {
-		return false, fmt.Sprintf("expected %s data, got %s", candidate.Kind, example.Kind)
-	}
-
-	switch example.Kind {
-	case schemaObject:
-		if candidate.Fields == nil {
-			return true, ""
-		}
-
-		for key, exampleField := range example.Fields {
-			candidateField, ok := candidate.Fields[key]
-			if !ok {
-				return false, fmt.Sprintf("unexpected field %q", key)
-			}
-			if ok, reason := schemasCompatible(exampleField, candidateField); !ok {
-				return false, fmt.Sprintf("field %q: %s", key, reason)
-			}
-		}
-
-		if candidate.Exact {
-			for key := range candidate.Fields {
-				if _, ok := example.Fields[key]; !ok {
-					return false, fmt.Sprintf("missing field %q", key)
-				}
-			}
-		}
-
-		return true, ""
-	case schemaArray:
-		if candidate.Elem == nil || candidate.Elem.Kind == schemaUnknown {
-			return true, ""
-		}
-		if example.Elem == nil {
-			return true, ""
-		}
-		return schemasCompatible(*example.Elem, *candidate.Elem)
-	default:
-		return true, ""
-	}
-}
 
 func mergeSchema(left, right schema) schema {
 	if left.Kind == schemaUnknown {

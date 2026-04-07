@@ -46,11 +46,16 @@ func TestOnVMDeleted_ExampleData(t *testing.T) {
 	example := trigger.ExampleData()
 
 	require.NotNil(t, example)
-	assert.Contains(t, example, "id")
-	assert.Contains(t, example, "eventType")
-	assert.Equal(t, "Microsoft.Resources.ResourceDeleteSuccess", example["eventType"])
-	assert.Contains(t, example, "subject")
+	assert.Contains(t, example, "type")
+	assert.Contains(t, example, "timestamp")
 	assert.Contains(t, example, "data")
+
+	envelope, ok := example["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Contains(t, envelope, "id")
+	assert.Contains(t, envelope, "eventType")
+	assert.Equal(t, "Microsoft.Resources.ResourceDeleteSuccess", envelope["eventType"])
+	assert.Contains(t, envelope, "subject")
 }
 
 // TestOnVMDeleted_Setup verifies the trigger setup method
