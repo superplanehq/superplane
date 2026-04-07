@@ -366,6 +366,24 @@ func (a *AuthService) groupExistsInDomain(group, domain string) (bool, error) {
 	return false, nil
 }
 
+func (a *AuthService) GetUserGroups(domainID string, domainType string, userID string) ([]string, error) {
+	domain := prefixDomain(domainType, domainID)
+	prefixedUserID := prefixUserID(userID)
+	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user groups: %w", err)
+	}
+
+	var userGroups []string
+	for _, group := range groups {
+		if strings.HasPrefix(group[1], "/groups/") {
+			userGroups = append(userGroups, strings.TrimPrefix(group[1], "/groups/"))
+		}
+	}
+
+	return userGroups, nil
+}
+
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)

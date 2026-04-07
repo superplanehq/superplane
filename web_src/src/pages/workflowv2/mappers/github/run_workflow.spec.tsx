@@ -25,6 +25,16 @@ function makeContext(configuration: unknown): ComponentBaseContext {
       color: "purple",
     },
     lastExecutions: [],
+    currentUser: {
+      id: "123",
+      name: "John Doe",
+      email: "john.doe@example.com",
+      roles: ["admin"],
+      groups: ["developers"],
+    },
+    actions: {
+      invokeNodeExecutionAction: async () => {},
+    },
   };
 }
 

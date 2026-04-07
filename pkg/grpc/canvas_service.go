@@ -102,6 +102,7 @@ func (s *CanvasService) UpdateCanvasVersion(ctx context.Context, req *pb.UpdateC
 		req.Canvas,
 		req.AutoLayout,
 		s.webhookBaseURL,
+		s.authService,
 	)
 }
 
