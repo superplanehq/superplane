@@ -244,16 +244,16 @@
         ]
       }
     },
-    "/api/v1/agents/config/suggest-field": {
+    "/api/v1/agents/config/prepare-suggest": {
       "post": {
-        "summary": "Suggest a value for a configuration field",
-        "description": "Uses the AI config assistant to propose a field value from context and a natural-language instruction.",
-        "operationId": "Agents_SuggestConfigurationField",
+        "summary": "Prepare config assistant field suggest",
+        "description": "Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.",
+        "operationId": "Agents_PrepareConfigAssistantSuggest",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AgentsSuggestConfigurationFieldResponse"
+              "$ref": "#/definitions/AgentsPrepareConfigAssistantSuggestResponse"
             }
           },
           "default": {
@@ -269,7 +269,7 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AgentsSuggestConfigurationFieldRequest"
+              "$ref": "#/definitions/AgentsPrepareConfigAssistantSuggestRequest"
             }
           }
         ],
@@ -4124,6 +4124,26 @@
         }
       }
     },
+    "AgentsPrepareConfigAssistantSuggestRequest": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsPrepareConfigAssistantSuggestResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "suggestUrl": {
+          "type": "string",
+          "description": "Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest)."
+        }
+      }
+    },
     "AgentsResumeAgentChatBody": {
       "type": "object",
       "properties": {
@@ -4139,35 +4159,6 @@
           "type": "string"
         },
         "url": {
-          "type": "string"
-        }
-      }
-    },
-    "AgentsSuggestConfigurationFieldRequest": {
-      "type": "object",
-      "properties": {
-        "canvasId": {
-          "type": "string"
-        },
-        "nodeId": {
-          "type": "string"
-        },
-        "instruction": {
-          "type": "string"
-        },
-        "fieldContextJson": {
-          "type": "string",
-          "description": "JSON blob: field metadata, current value, autocompleteExampleObj, etc."
-        }
-      }
-    },
-    "AgentsSuggestConfigurationFieldResponse": {
-      "type": "object",
-      "properties": {
-        "value": {
-          "type": "string"
-        },
-        "explanation": {
           "type": "string"
         }
       }

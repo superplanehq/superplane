@@ -15,12 +15,12 @@ import type {
   AgentsListAgentChatsData,
   AgentsListAgentChatsErrors,
   AgentsListAgentChatsResponses,
+  AgentsPrepareConfigAssistantSuggestData,
+  AgentsPrepareConfigAssistantSuggestErrors,
+  AgentsPrepareConfigAssistantSuggestResponses,
   AgentsResumeAgentChatData,
   AgentsResumeAgentChatErrors,
   AgentsResumeAgentChatResponses,
-  AgentsSuggestConfigurationFieldData,
-  AgentsSuggestConfigurationFieldErrors,
-  AgentsSuggestConfigurationFieldResponses,
   BlueprintsCreateBlueprintData,
   BlueprintsCreateBlueprintErrors,
   BlueprintsCreateBlueprintResponses,
@@ -401,19 +401,19 @@ export const agentsResumeAgentChat = <ThrowOnError extends boolean = true>(
   });
 
 /**
- * Suggest a value for a configuration field
+ * Prepare config assistant field suggest
  *
- * Uses the AI config assistant to propose a field value from context and a natural-language instruction.
+ * Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.
  */
-export const agentsSuggestConfigurationField = <ThrowOnError extends boolean = true>(
-  options: Options<AgentsSuggestConfigurationFieldData, ThrowOnError>,
+export const agentsPrepareConfigAssistantSuggest = <ThrowOnError extends boolean = true>(
+  options: Options<AgentsPrepareConfigAssistantSuggestData, ThrowOnError>,
 ) =>
   (options.client ?? client).post<
-    AgentsSuggestConfigurationFieldResponses,
-    AgentsSuggestConfigurationFieldErrors,
+    AgentsPrepareConfigAssistantSuggestResponses,
+    AgentsPrepareConfigAssistantSuggestErrors,
     ThrowOnError
   >({
-    url: "/api/v1/agents/config/suggest-field",
+    url: "/api/v1/agents/config/prepare-suggest",
     ...options,
     headers: {
       "Content-Type": "application/json",

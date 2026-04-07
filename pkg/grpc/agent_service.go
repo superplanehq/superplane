@@ -134,13 +134,13 @@ func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListA
 	return agents.ListAgentChatMessages(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
 }
 
-func (s *AgentsService) SuggestConfigurationField(
+func (s *AgentsService) PrepareConfigAssistantSuggest(
 	ctx context.Context,
-	req *pb.SuggestConfigurationFieldRequest,
-) (*pb.SuggestConfigurationFieldResponse, error) {
-	configAssistantHTTPURL := config.ConfigAssistantHTTPURL()
-	if configAssistantHTTPURL == "" {
-		return nil, status.Error(codes.Unavailable, "CONFIG_ASSISTANT_HTTP_URL is not set")
+	req *pb.PrepareConfigAssistantSuggestRequest,
+) (*pb.PrepareConfigAssistantSuggestResponse, error) {
+	agentHTTPURL := config.AgentHTTPURL()
+	if agentHTTPURL == "" {
+		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
 	}
 
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
@@ -149,11 +149,11 @@ func (s *AgentsService) SuggestConfigurationField(
 		return nil, err
 	}
 
-	return configassistant.SuggestConfigurationField(
+	return configassistant.PrepareConfigAssistantSuggest(
 		ctx,
 		s.authService,
 		s.jwtSigner,
-		configAssistantHTTPURL,
+		agentHTTPURL,
 		userID,
 		organizationID,
 		req,

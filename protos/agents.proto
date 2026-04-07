@@ -82,14 +82,14 @@ service Agents {
     };
   }
 
-  rpc SuggestConfigurationField(SuggestConfigurationFieldRequest) returns (SuggestConfigurationFieldResponse) {
+  rpc PrepareConfigAssistantSuggest(PrepareConfigAssistantSuggestRequest) returns (PrepareConfigAssistantSuggestResponse) {
     option (google.api.http) = {
-      post: "/api/v1/agents/config/suggest-field"
+      post: "/api/v1/agents/config/prepare-suggest"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Suggest a value for a configuration field";
-      description: "Uses the AI config assistant to propose a field value from context and a natural-language instruction.";
+      summary: "Prepare config assistant field suggest";
+      description: "Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.";
       tags: "Agent";
     };
   }
@@ -155,15 +155,12 @@ message AgentChatInfo {
   google.protobuf.Timestamp created_at = 3;
 }
 
-message SuggestConfigurationFieldRequest {
+message PrepareConfigAssistantSuggestRequest {
   string canvas_id = 1;
-  string node_id = 2;
-  string instruction = 3;
-  // JSON blob: field metadata, current value, autocompleteExampleObj, etc.
-  string field_context_json = 4;
 }
 
-message SuggestConfigurationFieldResponse {
-  string value = 1;
-  string explanation = 2;
+message PrepareConfigAssistantSuggestResponse {
+  string token = 1;
+  // Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest).
+  string suggest_url = 2;
 }

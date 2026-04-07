@@ -501,57 +501,53 @@ func (a *AgentAPIService) AgentsListAgentChatsExecute(r ApiAgentsListAgentChatsR
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAgentsResumeAgentChatRequest struct {
+type ApiAgentsPrepareConfigAssistantSuggestRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	chatId     string
-	body       *AgentsResumeAgentChatBody
+	body       *AgentsPrepareConfigAssistantSuggestRequest
 }
 
-func (r ApiAgentsResumeAgentChatRequest) Body(body AgentsResumeAgentChatBody) ApiAgentsResumeAgentChatRequest {
+func (r ApiAgentsPrepareConfigAssistantSuggestRequest) Body(body AgentsPrepareConfigAssistantSuggestRequest) ApiAgentsPrepareConfigAssistantSuggestRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAgentsResumeAgentChatRequest) Execute() (*AgentsResumeAgentChatResponse, *http.Response, error) {
-	return r.ApiService.AgentsResumeAgentChatExecute(r)
+func (r ApiAgentsPrepareConfigAssistantSuggestRequest) Execute() (*AgentsPrepareConfigAssistantSuggestResponse, *http.Response, error) {
+	return r.ApiService.AgentsPrepareConfigAssistantSuggestExecute(r)
 }
 
 /*
-AgentsResumeAgentChat Resume an agent chat
+AgentsPrepareConfigAssistantSuggest Prepare config assistant field suggest
 
-Resumes an agent chat. The response includes the URL and token for resuming the chat
+Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@param chatId
-	@return ApiAgentsResumeAgentChatRequest
+	@return ApiAgentsPrepareConfigAssistantSuggestRequest
 */
-func (a *AgentAPIService) AgentsResumeAgentChat(ctx context.Context, chatId string) ApiAgentsResumeAgentChatRequest {
-	return ApiAgentsResumeAgentChatRequest{
+func (a *AgentAPIService) AgentsPrepareConfigAssistantSuggest(ctx context.Context) ApiAgentsPrepareConfigAssistantSuggestRequest {
+	return ApiAgentsPrepareConfigAssistantSuggestRequest{
 		ApiService: a,
 		ctx:        ctx,
-		chatId:     chatId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return AgentsResumeAgentChatResponse
-func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentChatRequest) (*AgentsResumeAgentChatResponse, *http.Response, error) {
+//	@return AgentsPrepareConfigAssistantSuggestResponse
+func (a *AgentAPIService) AgentsPrepareConfigAssistantSuggestExecute(r ApiAgentsPrepareConfigAssistantSuggestRequest) (*AgentsPrepareConfigAssistantSuggestResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsResumeAgentChatResponse
+		localVarReturnValue *AgentsPrepareConfigAssistantSuggestResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsResumeAgentChat")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsPrepareConfigAssistantSuggest")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/builder/chats/{chatId}/resume"
-	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
+	localVarPath := localBasePath + "/api/v1/agents/config/prepare-suggest"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -624,53 +620,57 @@ func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentCha
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAgentsSuggestConfigurationFieldRequest struct {
+type ApiAgentsResumeAgentChatRequest struct {
 	ctx        context.Context
 	ApiService *AgentAPIService
-	body       *AgentsSuggestConfigurationFieldRequest
+	chatId     string
+	body       *AgentsResumeAgentChatBody
 }
 
-func (r ApiAgentsSuggestConfigurationFieldRequest) Body(body AgentsSuggestConfigurationFieldRequest) ApiAgentsSuggestConfigurationFieldRequest {
+func (r ApiAgentsResumeAgentChatRequest) Body(body AgentsResumeAgentChatBody) ApiAgentsResumeAgentChatRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAgentsSuggestConfigurationFieldRequest) Execute() (*AgentsSuggestConfigurationFieldResponse, *http.Response, error) {
-	return r.ApiService.AgentsSuggestConfigurationFieldExecute(r)
+func (r ApiAgentsResumeAgentChatRequest) Execute() (*AgentsResumeAgentChatResponse, *http.Response, error) {
+	return r.ApiService.AgentsResumeAgentChatExecute(r)
 }
 
 /*
-AgentsSuggestConfigurationField Suggest a value for a configuration field
+AgentsResumeAgentChat Resume an agent chat
 
-Uses the AI config assistant to propose a field value from context and a natural-language instruction.
+Resumes an agent chat. The response includes the URL and token for resuming the chat
 
 	@param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
-	@return ApiAgentsSuggestConfigurationFieldRequest
+	@param chatId
+	@return ApiAgentsResumeAgentChatRequest
 */
-func (a *AgentAPIService) AgentsSuggestConfigurationField(ctx context.Context) ApiAgentsSuggestConfigurationFieldRequest {
-	return ApiAgentsSuggestConfigurationFieldRequest{
+func (a *AgentAPIService) AgentsResumeAgentChat(ctx context.Context, chatId string) ApiAgentsResumeAgentChatRequest {
+	return ApiAgentsResumeAgentChatRequest{
 		ApiService: a,
 		ctx:        ctx,
+		chatId:     chatId,
 	}
 }
 
 // Execute executes the request
 //
-//	@return AgentsSuggestConfigurationFieldResponse
-func (a *AgentAPIService) AgentsSuggestConfigurationFieldExecute(r ApiAgentsSuggestConfigurationFieldRequest) (*AgentsSuggestConfigurationFieldResponse, *http.Response, error) {
+//	@return AgentsResumeAgentChatResponse
+func (a *AgentAPIService) AgentsResumeAgentChatExecute(r ApiAgentsResumeAgentChatRequest) (*AgentsResumeAgentChatResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod  = http.MethodPost
 		localVarPostBody    interface{}
 		formFiles           []formFile
-		localVarReturnValue *AgentsSuggestConfigurationFieldResponse
+		localVarReturnValue *AgentsResumeAgentChatResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsSuggestConfigurationField")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AgentAPIService.AgentsResumeAgentChat")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/agents/config/suggest-field"
+	localVarPath := localBasePath + "/api/v1/agents/builder/chats/{chatId}/resume"
+	localVarPath = strings.Replace(localVarPath, "{"+"chatId"+"}", url.PathEscape(parameterValueToString(r.chatId, "chatId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

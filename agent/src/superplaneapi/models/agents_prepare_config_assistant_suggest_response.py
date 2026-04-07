@@ -23,15 +23,13 @@ from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsSuggestConfigurationFieldRequest(BaseModel):
+class AgentsPrepareConfigAssistantSuggestResponse(BaseModel):
     """
-    AgentsSuggestConfigurationFieldRequest
+    AgentsPrepareConfigAssistantSuggestResponse
     """ # noqa: E501
-    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
-    node_id: Optional[StrictStr] = Field(default=None, alias="nodeId")
-    instruction: Optional[StrictStr] = None
-    field_context_json: Optional[StrictStr] = Field(default=None, description="JSON blob: field metadata, current value, autocompleteExampleObj, etc.", alias="fieldContextJson")
-    __properties: ClassVar[List[str]] = ["canvasId", "nodeId", "instruction", "fieldContextJson"]
+    token: Optional[StrictStr] = None
+    suggest_url: Optional[StrictStr] = Field(default=None, description="Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest).", alias="suggestUrl")
+    __properties: ClassVar[List[str]] = ["token", "suggestUrl"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -51,7 +49,7 @@ class AgentsSuggestConfigurationFieldRequest(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsSuggestConfigurationFieldRequest from a JSON string"""
+        """Create an instance of AgentsPrepareConfigAssistantSuggestResponse from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -76,7 +74,7 @@ class AgentsSuggestConfigurationFieldRequest(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsSuggestConfigurationFieldRequest from a dict"""
+        """Create an instance of AgentsPrepareConfigAssistantSuggestResponse from a dict"""
         if obj is None:
             return None
 
@@ -84,10 +82,8 @@ class AgentsSuggestConfigurationFieldRequest(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "canvasId": obj.get("canvasId"),
-            "nodeId": obj.get("nodeId"),
-            "instruction": obj.get("instruction"),
-            "fieldContextJson": obj.get("fieldContextJson")
+            "token": obj.get("token"),
+            "suggestUrl": obj.get("suggestUrl")
         })
         return _obj
 

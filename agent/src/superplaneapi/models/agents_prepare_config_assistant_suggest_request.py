@@ -18,18 +18,17 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class AgentsSuggestConfigurationFieldResponse(BaseModel):
+class AgentsPrepareConfigAssistantSuggestRequest(BaseModel):
     """
-    AgentsSuggestConfigurationFieldResponse
+    AgentsPrepareConfigAssistantSuggestRequest
     """ # noqa: E501
-    value: Optional[StrictStr] = None
-    explanation: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["value", "explanation"]
+    canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
+    __properties: ClassVar[List[str]] = ["canvasId"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -49,7 +48,7 @@ class AgentsSuggestConfigurationFieldResponse(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of AgentsSuggestConfigurationFieldResponse from a JSON string"""
+        """Create an instance of AgentsPrepareConfigAssistantSuggestRequest from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -74,7 +73,7 @@ class AgentsSuggestConfigurationFieldResponse(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of AgentsSuggestConfigurationFieldResponse from a dict"""
+        """Create an instance of AgentsPrepareConfigAssistantSuggestRequest from a dict"""
         if obj is None:
             return None
 
@@ -82,8 +81,7 @@ class AgentsSuggestConfigurationFieldResponse(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "value": obj.get("value"),
-            "explanation": obj.get("explanation")
+            "canvasId": obj.get("canvasId")
         })
         return _obj
 

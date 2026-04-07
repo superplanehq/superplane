@@ -156,7 +156,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAgents.Agents_DescribeAgentChat_FullMethodName:     {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 
-		pbAgents.Agents_SuggestConfigurationField_FullMethodName: {
+		pbAgents.Agents_PrepareConfigAssistantSuggest_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,
