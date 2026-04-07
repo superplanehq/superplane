@@ -496,7 +496,7 @@ describe("safe mapper recovers from substring on non-string config values", () =
     };
     const safe = createSafeComponentMapper(underlying, "broken-substring");
     const ctx = makeSubtitleContext();
-    (ctx.node as Record<string, unknown>).configuration = { query: 12345 };
+    (ctx.node as unknown as Record<string, unknown>).configuration = { query: 12345 };
 
     expect(safe.subtitle(ctx)).toBe("");
     expect(consoleSpy).toHaveBeenCalledWith(
@@ -518,7 +518,7 @@ describe("safe mapper recovers from substring on non-string config values", () =
     };
     const safe = createSafeComponentMapper(underlying, "broken-substring");
     const ctx = makeExecutionDetailsContext();
-    (ctx.node as Record<string, unknown>).configuration = { body: { nested: true } };
+    (ctx.node as unknown as Record<string, unknown>).configuration = { body: { nested: true } };
 
     expect(safe.getExecutionDetails(ctx)).toEqual({});
     consoleSpy.mockRestore();
