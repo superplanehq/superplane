@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -106,6 +107,7 @@ func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeA
 func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
 	url := config.AgentGRPCURL()
 	if url == "" {
+		log.WithField("canvas_id", req.CanvasId).Warn("agent GRPC URL not configured")
 		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
 	}
 
