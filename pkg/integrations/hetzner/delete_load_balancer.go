@@ -56,12 +56,6 @@ func (c *DeleteLoadBalancer) OutputChannels(configuration any) []core.OutputChan
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
-	return map[string]any{
-		"loadBalancerId": "12345",
-	}
-}
-
 func (c *DeleteLoadBalancer) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
