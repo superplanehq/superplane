@@ -108,26 +108,6 @@ func (t *OnVMDeallocated) Color() string {
 	return "blue"
 }
 
-func (t *OnVMDeallocated) ExampleData() map[string]any {
-	return map[string]any{
-		"id":              "c3d4e5f6-a7b8-9012-cdef-123456789012",
-		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc",
-		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/deallocate",
-		"eventType":       "Microsoft.Resources.ResourceActionSuccess",
-		"eventTime":       "2026-02-11T10:30:00Z",
-		"dataVersion":     "2",
-		"metadataVersion": "1",
-		"data": map[string]any{
-			"operationName":    "Microsoft.Compute/virtualMachines/deallocate/action",
-			"status":           "Succeeded",
-			"resourceProvider": "Microsoft.Compute",
-			"resourceUri":      "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-			"subscriptionId":   "12345678-1234-1234-1234-123456789abc",
-			"tenantId":         "12345678-1234-1234-1234-123456789abc",
-		},
-	}
-}
-
 func (t *OnVMDeallocated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
