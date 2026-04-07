@@ -573,6 +573,11 @@ class SessionStore:
             if row is None:
                 return
 
+            chat_id = row["chat_id"]
+            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
+            if cur.fetchone() is None:
+                return
+
             cur.execute(
                 """
                 UPDATE agent_chats
@@ -591,7 +596,7 @@ class SessionStore:
                 ) sub
                 WHERE id = %s
                 """,
-                (now, row["chat_id"], row["chat_id"]),
+                (now, chat_id, chat_id),
             )
 
     def get_org_usage(self, org_id: str) -> StoredAgentChatUsage:
