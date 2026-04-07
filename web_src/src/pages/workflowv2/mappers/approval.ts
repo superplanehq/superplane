@@ -468,11 +468,7 @@ function getApprovalDecisionLabel(record: ApprovalRecord): string {
   return "Any user";
 }
 
-function canCurrentUserActOnApproval(
-  organizationId: string,
-  record: ApprovalRecord,
-  currentUser?: User,
-): boolean {
+function canCurrentUserActOnApproval(organizationId: string, record: ApprovalRecord, currentUser?: User): boolean {
   if (!currentUser || !organizationId) {
     return false;
   }

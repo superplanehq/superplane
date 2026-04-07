@@ -3,6 +3,7 @@ package approval
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -114,7 +115,22 @@ func (m *Metadata) UpdateResult() {
 	m.Result = StateApproved
 }
 
+func (m *Metadata) hasGivenInputInAnyRecord(user *core.User) bool {
+	if user == nil {
+		return false
+	}
+
+	return slices.ContainsFunc(m.Records, func(record Record) bool {
+		return record.State != StatePending && record.User != nil && record.User.ID == user.ID
+	})
+}
+
 func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) error {
+	user := ctx.Auth.AuthenticatedUser()
+	if m.hasGivenInputInAnyRecord(user) {
+		return fmt.Errorf("user has already approved/rejected another requirement")
+	}
+
 	err := m.validateAction(record, ctx)
 	if err != nil {
 		return err
@@ -122,7 +138,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 
 	record.State = StateApproved
 	record.Approval = &ApprovalInfo{ApprovedAt: time.Now().Format(time.RFC3339)}
-	record.User = ctx.Auth.AuthenticatedUser()
+	record.User = user
 	comment, ok := ctx.Parameters["comment"].(string)
 	if ok {
 		record.Approval.Comment = comment
@@ -133,6 +149,11 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 }
 
 func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) error {
+	user := ctx.Auth.AuthenticatedUser()
+	if m.hasGivenInputInAnyRecord(user) {
+		return fmt.Errorf("user has already approved/rejected another requirement")
+	}
+
 	err := m.validateAction(record, ctx)
 	if err != nil {
 		return err
@@ -149,7 +170,7 @@ func (m *Metadata) Reject(record *Record, index int, ctx core.ActionContext) err
 	}
 
 	record.State = StateRejected
-	record.User = ctx.Auth.AuthenticatedUser()
+	record.User = user
 	record.Rejection = &RejectionInfo{
 		RejectedAt: time.Now().Format(time.RFC3339),
 		Reason:     reasonStr,
@@ -447,11 +468,31 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to parse node metadata: %w", err)
 	}
 
-	executionMetadata := &Metadata{Records: nodeMetadata.Records}
-	executionMetadata.UpdateResult()
-	err = ctx.Metadata.Set(executionMetadata)
-	if err != nil {
-		return fmt.Errorf("error setting metadata: %v", err)
+	//
+	// Set execution metadata.
+	// If node metadata is set, we use it.
+	// Otherwise, we create a new metadata with the configured items.
+	//
+	var executionMetadata *Metadata
+	if len(nodeMetadata.Records) > 0 {
+		executionMetadata = &Metadata{Records: nodeMetadata.Records}
+		executionMetadata.UpdateResult()
+		err = ctx.Metadata.Set(executionMetadata)
+		if err != nil {
+			return fmt.Errorf("error setting metadata: %v", err)
+		}
+	} else {
+		nodeMetadata, err := a.newNodeMetadata(ctx.Auth, config.Items)
+		if err != nil {
+			return fmt.Errorf("error creating new metadata: %v", err)
+		}
+
+		executionMetadata = &Metadata{Records: nodeMetadata.Records}
+		executionMetadata.UpdateResult()
+		err = ctx.Metadata.Set(executionMetadata)
+		if err != nil {
+			return fmt.Errorf("error setting metadata: %v", err)
+		}
 	}
 
 	//

@@ -30,11 +30,7 @@ import type {
   OrganizationsIntegration,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import {
-  useOrganization,
-  useOrganizationRoles,
-  useOrganizationUsers,
-} from "@/hooks/useOrganizationData";
+import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -1728,7 +1724,15 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       organizationId!,
-      me ? { id: me.id || "", name: me.name || "", email: me.email || "", roles: me.roles || [], groups: me.groups || [] } : undefined,
+      me
+        ? {
+            id: me.id || "",
+            name: me.name || "",
+            email: me.email || "",
+            roles: me.roles || [],
+            groups: me.groups || [],
+          }
+        : undefined,
     );
   }, [
     canvas,

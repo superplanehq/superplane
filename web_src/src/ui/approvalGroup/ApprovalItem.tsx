@@ -234,7 +234,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 <Input
                   id="approval-comment"
                   placeholder="Enter comment..."
-                  value={approvalComment}
+                  value={approvalCommentInput}
                   onChange={(e) => setApprovalCommentInput(e.target.value)}
                   className="w-full outline-none  focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
