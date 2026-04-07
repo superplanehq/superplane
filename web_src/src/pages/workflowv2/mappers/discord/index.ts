@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { GET_LAST_MENTION_STATE_REGISTRY, getLastMentionMapper } from "./get_last_mention";
 import { sendTextMessageMapper } from "./send_text_message";
 

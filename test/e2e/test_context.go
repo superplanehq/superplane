@@ -30,6 +30,7 @@ func NewTestContext(t *testing.M) *TestContext {
 
 func (s *TestContext) Start() {
 	os.Setenv("DB_NAME", "superplane_test")
+	os.Setenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/superplane_test")
 	os.Setenv("START_PUBLIC_API", "yes")
 	os.Setenv("START_INTERNAL_API", "yes")
 	os.Setenv("INTERNAL_API_PORT", "50052")

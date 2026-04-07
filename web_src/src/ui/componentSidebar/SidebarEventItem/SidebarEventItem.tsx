@@ -2,13 +2,13 @@
 import { resolveIcon, isUrl } from "@/lib/utils";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isCancelledError } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
-import { SidebarEvent } from "../types";
+import type { SidebarEvent } from "../types";
 import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
-import { DEFAULT_EVENT_STATE_MAP, EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export interface ExecutionChainItem extends EventStateStyle {
   name: string;
@@ -83,7 +83,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const [activeTab, setActiveTab] = useState<"current" | "root" | "payload" | "executionChain">(getDefaultActiveTab());
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
-  const [copiedExecutions, setCopiedExecutions] = useState<Set<string>>(new Set());
   const [payloadCopied, setPayloadCopied] = useState(false);
   const [executionChainData, setExecutionChainData] = useState<ExecutionChainItem[] | null>(null);
   const [executionChainLoading, setExecutionChainLoading] = useState(false);
@@ -200,8 +199,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
     [loadExecutionChain, tabData, event.nodeId],
   );
 
-  const navigate = useNavigate();
-
   // Use ref to track current values without causing re-renders
   const pollingRef = useRef<{
     activeTab: string;
@@ -249,62 +246,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
       setTimeout(() => setPayloadCopied(false), 2000);
     },
     [copyToClipboard],
-  );
-
-  const copyExecutionLink = useCallback(
-    (execution: ExecutionChainItem) => {
-      const pathParts = window.location.pathname.split("/");
-      const orgId = pathParts[1];
-      const workflowId = pathParts[3];
-
-      if ((execution.children?.length || 0) > 0) {
-        const nodeId = execution.nodeId;
-        const executionId = execution.executionId;
-
-        const link = `${window.location.origin}/${orgId}/canvases/${workflowId}/nodes/${nodeId}/${executionId}`;
-        copyToClipboard(link);
-      } else {
-        const link = `${window.location.origin}/${orgId}/canvases/${workflowId}?sidebar=1&node=${execution.nodeId}`;
-        copyToClipboard(link);
-      }
-
-      const executionKey = `${execution.nodeId}-${execution.executionId}`;
-      setCopiedExecutions((prev) => new Set(prev).add(executionKey));
-      setTimeout(() => {
-        setCopiedExecutions((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(executionKey);
-          return newSet;
-        });
-      }, 2000);
-    },
-    [copyToClipboard],
-  );
-
-  const handleExpandCustomComponentExecution = useCallback(
-    (execution: ExecutionChainItem) => {
-      const pathParts = window.location.pathname.split("/");
-      const orgId = pathParts[1];
-      const workflowId = pathParts[3];
-
-      const nodeId = execution.nodeId;
-      const executionId = execution.executionId;
-
-      const path = `/${orgId}/canvases/${workflowId}/nodes/${nodeId}/${executionId}`;
-      navigate(path, { replace: false });
-    },
-    [navigate],
-  );
-
-  const showExecutionPayload = useCallback(
-    (execution: ExecutionChainItem) => {
-      const payload = execution.payload || tabData?.payload;
-      if (payload) {
-        setModalPayload(payload);
-        setIsPayloadModalOpen(true);
-      }
-    },
-    [tabData?.payload],
   );
 
   // Update active tab when tabData changes to ensure we always have a valid active tab
@@ -616,76 +557,7 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
                           <span>{execution.state}</span>
                         </div>
                         <span className="text-sm text-gray-800 truncate flex-1">{execution.name}</span>
-                        {/* Hover Icons */}
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {/* See Group (Expand/Collapse) */}
-                          {execution.children && execution.children.length > 0 && (
-                            <SimpleTooltip content="See Group">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleExpandCustomComponentExecution(execution);
-                                }}
-                                className="p-1 rounded text-gray-500"
-                              >
-                                {React.createElement(resolveIcon("expand"), { size: 14 })}
-                              </button>
-                            </SimpleTooltip>
-                          )}
-                          {/* Copy Link */}
-                          <SimpleTooltip
-                            content={
-                              copiedExecutions.has(`${execution.nodeId}-${execution.executionId}`)
-                                ? "Copied!"
-                                : "Copy Link"
-                            }
-                            hideOnClick={false}
-                          >
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                copyExecutionLink(execution);
-                              }}
-                              className="p-1 rounded text-gray-500"
-                            >
-                              {React.createElement(resolveIcon("link"), { size: 14 })}
-                            </button>
-                          </SimpleTooltip>
-                          {/* Payload */}
-                          <SimpleTooltip content="Payload">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                showExecutionPayload(execution);
-                              }}
-                              className="p-1 rounded text-gray-500"
-                            >
-                              {React.createElement(resolveIcon("code"), { size: 14 })}
-                            </button>
-                          </SimpleTooltip>
-                        </div>
                       </div>
-                      {/* Children executions */}
-                      {execution.children &&
-                        execution.children.map((child, childIndex) => (
-                          <div
-                            key={`${index}-${childIndex}`}
-                            className="flex items-center gap-2 px-2 py-1 rounded-md w-full min-w-0"
-                          >
-                            <div className="flex-shrink-0">
-                              {React.createElement(resolveIcon("corner-down-right"), {
-                                size: 16,
-                                className: "text-gray-400",
-                              })}
-                            </div>
-                            <div
-                              className={`uppercase text-xs py-[1px] px-[3px] font-semibold rounded flex items-center justify-center text-white flex-shrink-0 ${child.badgeColor}`}
-                            >
-                              <span>{child.state}</span>
-                            </div>
-                            <span className="text-sm text-gray-700 truncate flex-1">{child.name}</span>
-                          </div>
-                        ))}
                     </div>
                   ))}
                 </>

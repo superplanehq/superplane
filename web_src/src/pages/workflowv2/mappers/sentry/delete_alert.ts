@@ -3,10 +3,10 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { formatTimeAgo } from "@/lib/date";
 import { getState, getStateMap, getTriggerRenderer } from "..";
+import type { AlertRuleNodeMetadata } from "./utils";
 import {
   addFormattedTimestamp,
   addOrderedDetails,
-  AlertRuleNodeMetadata,
   buildEventSections,
   getAlertRuleProjectLabel,
   getAlertRuleSelectionLabel,

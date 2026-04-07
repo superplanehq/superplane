@@ -3,6 +3,7 @@ import type {
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionState,
   ComponentsEdge,
+  OrganizationsIntegration,
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
@@ -80,9 +81,6 @@ export type ExecutionInfo = {
   metadata: any;
   configuration: any;
   rootEvent: EventInfo;
-  input?: {
-    [key: string]: unknown;
-  };
   outputs?: {
     [key: string]: unknown;
   };
@@ -159,8 +157,9 @@ export type AdditionalDataBuilderContext = {
 };
 
 export type User = {
-  id?: string;
-  email?: string;
+  id: string;
+  email: string;
+  roles: string[];
 };
 
 /**
@@ -184,7 +183,7 @@ export interface EventStateRegistry {
 export interface CustomFieldRendererContext {
   onRun?: (initialData?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
-  integration?: import("@/api-client").OrganizationsIntegration;
+  integration?: OrganizationsIntegration;
 }
 
 export interface CustomFieldRenderer {

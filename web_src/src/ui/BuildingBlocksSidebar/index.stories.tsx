@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 
-import { BuildingBlocksSidebar, BuildingBlock, BuildingBlockCategory } from "./index";
+import type { BuildingBlock, BuildingBlockCategory } from "./index";
+import { BuildingBlocksSidebar } from "./index";
 import React from "react";
 
 const sampleTriggers: BuildingBlock[] = [
@@ -73,45 +74,10 @@ const sampleComponents: BuildingBlock[] = [
   },
 ];
 
-const sampleBlueprints: BuildingBlock[] = [
-  {
-    id: "bp-1",
-    name: "deploy-to-k8s",
-    label: "Deploy to Kubernetes",
-    description: "Deploy an application to a Kubernetes cluster",
-    type: "blueprint",
-    icon: "component",
-    color: "gray",
-    outputChannels: [{ name: "success" }, { name: "failure" }],
-    configuration: [
-      { name: "namespace", type: "string" },
-      { name: "deployment", type: "string" },
-    ],
-  },
-  {
-    id: "bp-2",
-    name: "send-notification",
-    label: "Send Notification",
-    description: "Send a notification to multiple channels",
-    type: "blueprint",
-    icon: "component",
-    color: "gray",
-    outputChannels: [{ name: "default" }],
-    configuration: [
-      { name: "message", type: "string" },
-      { name: "channels", type: "array" },
-    ],
-  },
-];
-
 const sampleBlocks: BuildingBlockCategory[] = [
   {
     name: "Core",
     blocks: [...sampleTriggers, ...sampleComponents],
-  },
-  {
-    name: "Bundles",
-    blocks: sampleBlueprints,
   },
 ];
 

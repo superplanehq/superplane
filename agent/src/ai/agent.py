@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -6,6 +5,7 @@ from typing import Any, Literal
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
 
+from ai.config import config
 from ai.models import CanvasAnswer, CanvasQuestionRequest, CanvasSummary
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
@@ -42,7 +42,9 @@ class AgentDeps:
     client: SuperplaneClient
     canvas_id: str
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
-    catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(default_factory=dict)
+    catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(
+        default_factory=dict
+    )
 
 
 def _get_cached_catalog_list(
@@ -91,7 +93,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     )
 
     def _tool_debug(message: str) -> None:
-        if os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if config.debug:
             print(f"[web][agent] {message}", flush=True)
 
     def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
@@ -135,9 +137,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return [_tool_error_entry("search_decision_patterns", error)]
 
     @agent.tool
-    def get_decision_pattern(
-        _ctx: RunContext[AgentDeps], pattern_id: str
-    ) -> dict[str, Any]:
+    def get_decision_pattern(_ctx: RunContext[AgentDeps], pattern_id: str) -> dict[str, Any]:
         """Fetch full markdown content for one decision pattern by id."""
         try:
             pattern = get_markdown_pattern(pattern_id=pattern_id)
@@ -154,10 +154,13 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List components (compact catalog rows: name, label, description, provider, output_channel_names).
+        """List components (compact catalog rows).
 
-        For configuration fields and types needed in proposals, call describe_component on the chosen name.
-        Prefer a single list call per request with provider/query; reuse prior results when possible.
+        Returns name, label, description, provider, output_channel_names.
+        For configuration fields and types needed in proposals,
+        call describe_component on the chosen name.
+        Prefer a single list call per request with provider/query;
+        reuse prior results when possible.
         """
         try:
             cached = _get_cached_catalog_list(ctx.deps, "components", provider, query)
@@ -185,10 +188,13 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List triggers (compact catalog rows: name, label, description, provider).
+        """List triggers (compact catalog rows).
 
-        For configuration fields and types needed in proposals, call describe_trigger on the chosen name.
-        Prefer a single list call per request with provider/query; reuse prior results when possible.
+        Returns name, label, description, provider.
+        For configuration fields and types needed in proposals,
+        call describe_trigger on the chosen name.
+        Prefer a single list call per request with provider/query;
+        reuse prior results when possible.
         """
         try:
             cached = _get_cached_catalog_list(ctx.deps, "triggers", provider, query)
@@ -237,14 +243,18 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     ) -> list[dict[str, Any]]:
         """List selectable resources for an org integration resource type.
 
-        Returns [] without calling the API when integration_id or type is missing or blank. For results, both must be set: use describe_component / describe_trigger to
-        read integration-resource field metadata for the correct type string.
+        Returns [] without calling the API when integration_id or type
+        is missing or blank. For results, both must be set: use
+        describe_component / describe_trigger to read
+        integration-resource field metadata for the correct type string.
         """
         if not isinstance(integration_id, str) or not integration_id.strip():
             _tool_debug("list_integration_resources skipped: empty integration_id")
             return []
         if not isinstance(type, str) or not type.strip():
-            _tool_debug("list_integration_resources skipped: empty type (resource type is required by API)")
+            _tool_debug(
+                "list_integration_resources skipped: empty type (resource type is required by API)"
+            )
             return []
         try:
             return ctx.deps.client.list_integration_resources(

@@ -6,14 +6,19 @@ from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorCont
 from ai.models import CanvasAnswer
 from evals.evaluators.workflow_utils import process_operations
 
+
 @dataclass
 class CanvasHasTrigger(Evaluator):
-  trigger: str
+    trigger: str
 
-  def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
-    wf = process_operations(ctx.output.proposal.operations)
-    
-    if self.trigger in wf.nodes:
-      return EvaluationReason(value=True, reason=f"Trigger {self.trigger} found in workflow")
-    else:
-      return EvaluationReason(value=False, reason=f"Trigger {self.trigger} not found in workflow")
+    def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
+        if ctx.output.proposal is None:
+            return EvaluationReason(value=False, reason="No proposal in output")
+        wf = process_operations(ctx.output.proposal.operations)
+
+        if self.trigger in wf.nodes:
+            return EvaluationReason(value=True, reason=f"Trigger {self.trigger} found in workflow")
+        else:
+            return EvaluationReason(
+                value=False, reason=f"Trigger {self.trigger} not found in workflow"
+            )

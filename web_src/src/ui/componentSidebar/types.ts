@@ -1,5 +1,5 @@
-import { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
-import { ChildEventsState } from "../composite";
+import type { CanvasesCanvasEvent, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { ChildEventsState } from "../composite";
 
 export interface SidebarEvent {
   // Unique UI identifier for the item (remains stable across types)

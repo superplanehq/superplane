@@ -1,4 +1,4 @@
-import { CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { useMemo } from "react";
 import { Diff, Hunk, parseDiff } from "react-diff-view";
 import * as yaml from "js-yaml";

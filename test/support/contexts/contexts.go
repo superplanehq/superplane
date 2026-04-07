@@ -370,3 +370,12 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 
 	return value, nil
 }
+
+type ExpressionContext struct {
+	Output any
+	Error  error
+}
+
+func (c *ExpressionContext) Run(expression string) (any, error) {
+	return c.Output, c.Error
+}

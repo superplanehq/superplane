@@ -1,14 +1,19 @@
-import os
 import threading
-import uuid
-
 from concurrent import futures
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
-import grpc
+import grpc  # type: ignore[import-untyped]
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat, StoredAgentChatMessage
+from ai.config import config
+from ai.session_store import (
+    AgentChatNotFoundError,
+    SessionStore,
+    StoredAgentChat,
+    StoredAgentChatMessage,
+)
 from private import agents_pb2
 
 
@@ -18,22 +23,22 @@ class AgentServiceConfig:
     port: int = 50061
 
 
-def _timestamp(value) -> Timestamp:
+def _timestamp(value: datetime) -> Timestamp:
     result = Timestamp()
     result.FromDatetime(value)
     return result
 
 
-def _serialize_chat(chat: StoredAgentChat) -> agents_pb2.ChatInfo:
-    return agents_pb2.ChatInfo(
+def _serialize_chat(chat: StoredAgentChat) -> Any:
+    return agents_pb2.ChatInfo(  # type: ignore[attr-defined]
         id=chat.id,
         initial_message=chat.initial_message or "",
         created_at=_timestamp(chat.created_at),
     )
 
 
-def _serialize_message(message: StoredAgentChatMessage) -> agents_pb2.AgentChatMessage:
-    return agents_pb2.AgentChatMessage(
+def _serialize_message(message: StoredAgentChatMessage) -> Any:
+    return agents_pb2.AgentChatMessage(  # type: ignore[attr-defined]
         id=message.id,
         role=message.role,
         content=message.content,
@@ -47,23 +52,23 @@ class AgentsServicer:
     def __init__(self, store: SessionStore) -> None:
         self._store = store
 
-    def CreateAgentChat(self, request, context):  # noqa: N802
+    def CreateAgentChat(self, request: Any, context: Any) -> Any:  # noqa: N802
         chat = self._store.create_agent_chat(
             org_id=request.org_id,
             user_id=request.user_id,
             canvas_id=request.canvas_id,
         )
-        return agents_pb2.CreateAgentChatResponse(chat=_serialize_chat(chat))
+        return agents_pb2.CreateAgentChatResponse(chat=_serialize_chat(chat))  # type: ignore[attr-defined]
 
-    def ListAgentChats(self, request, context):  # noqa: N802
+    def ListAgentChats(self, request: Any, context: Any) -> Any:  # noqa: N802
         chats = self._store.list_agent_chats(
             org_id=request.org_id,
             user_id=request.user_id,
             canvas_id=request.canvas_id,
         )
-        return agents_pb2.ListAgentChatsResponse(chats=[_serialize_chat(chat) for chat in chats])
+        return agents_pb2.ListAgentChatsResponse(chats=[_serialize_chat(chat) for chat in chats])  # type: ignore[attr-defined]
 
-    def DescribeAgentChat(self, request, context):  # noqa: N802
+    def DescribeAgentChat(self, request: Any, context: Any) -> Any:  # noqa: N802
         try:
             chat = self._store.describe_agent_chat(
                 org_id=request.org_id,
@@ -75,9 +80,9 @@ class AgentsServicer:
             context.abort(grpc.StatusCode.NOT_FOUND, "chat not found")
             raise error
 
-        return agents_pb2.DescribeAgentChatResponse(chat=_serialize_chat(chat))
+        return agents_pb2.DescribeAgentChatResponse(chat=_serialize_chat(chat))  # type: ignore[attr-defined]
 
-    def ListAgentChatMessages(self, request, context):  # noqa: N802
+    def ListAgentChatMessages(self, request: Any, context: Any) -> Any:  # noqa: N802
         try:
             messages = self._store.list_agent_chat_messages(
                 org_id=request.org_id,
@@ -89,29 +94,32 @@ class AgentsServicer:
             context.abort(grpc.StatusCode.NOT_FOUND, "chat not found")
             raise error
 
-        return agents_pb2.ListAgentChatMessagesResponse(messages=[_serialize_message(message) for message in messages])
+        return agents_pb2.ListAgentChatMessagesResponse(  # type: ignore[attr-defined]
+            messages=[_serialize_message(message) for message in messages]
+        )
+
 
 def add_agents_servicer_to_server(servicer: AgentsServicer, server: grpc.Server) -> None:
     rpc_method_handlers = {
         "CreateAgentChat": grpc.unary_unary_rpc_method_handler(
             servicer.CreateAgentChat,
-            request_deserializer=agents_pb2.CreateAgentChatRequest.FromString,
-            response_serializer=agents_pb2.CreateAgentChatResponse.SerializeToString,
+            request_deserializer=agents_pb2.CreateAgentChatRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.CreateAgentChatResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
         "ListAgentChats": grpc.unary_unary_rpc_method_handler(
             servicer.ListAgentChats,
-            request_deserializer=agents_pb2.ListAgentChatsRequest.FromString,
-            response_serializer=agents_pb2.ListAgentChatsResponse.SerializeToString,
+            request_deserializer=agents_pb2.ListAgentChatsRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.ListAgentChatsResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
         "DescribeAgentChat": grpc.unary_unary_rpc_method_handler(
             servicer.DescribeAgentChat,
-            request_deserializer=agents_pb2.DescribeAgentChatRequest.FromString,
-            response_serializer=agents_pb2.DescribeAgentChatResponse.SerializeToString,
+            request_deserializer=agents_pb2.DescribeAgentChatRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.DescribeAgentChatResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
         "ListAgentChatMessages": grpc.unary_unary_rpc_method_handler(
             servicer.ListAgentChatMessages,
-            request_deserializer=agents_pb2.ListAgentChatMessagesRequest.FromString,
-            response_serializer=agents_pb2.ListAgentChatMessagesResponse.SerializeToString,
+            request_deserializer=agents_pb2.ListAgentChatMessagesRequest.FromString,  # type: ignore[attr-defined]
+            response_serializer=agents_pb2.ListAgentChatMessagesResponse.SerializeToString,  # type: ignore[attr-defined]
         ),
     }
 
@@ -133,9 +141,7 @@ class InternalAgentServer:
 
     @classmethod
     def from_env(cls, store: SessionStore) -> "InternalAgentServer":
-        host = os.getenv("INTERNAL_GRPC_HOST", "0.0.0.0").strip() or "0.0.0.0"
-        port = int(os.getenv("INTERNAL_GRPC_PORT", "50061"))
-        return cls(AgentServiceConfig(host=host, port=port), store)
+        return cls(AgentServiceConfig(host=config.grpc_host, port=config.grpc_port), store)
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():

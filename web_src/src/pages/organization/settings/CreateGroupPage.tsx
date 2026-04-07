@@ -93,8 +93,14 @@ export function CreateGroupPage() {
             <div className="space-y-6">
               {/* Group Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">Group Name *</label>
+                <label
+                  htmlFor="group-name-input"
+                  className="block text-sm font-medium text-gray-800 dark:text-white mb-2"
+                >
+                  Group Name *
+                </label>
                 <Input
+                  id="group-name-input"
                   type="text"
                   placeholder="Enter group name"
                   value={groupName}
@@ -106,7 +112,12 @@ export function CreateGroupPage() {
 
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 dark:text-white mb-2">Role *</label>
+                <label
+                  htmlFor="group-role-select"
+                  className="block text-sm font-medium text-gray-800 dark:text-white mb-2"
+                >
+                  Role *
+                </label>
                 {loadingRoles ? (
                   <div className="flex justify-center items-center h-12">
                     <p className="text-gray-500 dark:text-gray-400">Loading roles...</p>
@@ -133,7 +144,7 @@ export function CreateGroupPage() {
                 ) : (
                   <>
                     <Select value={selectedRole} onValueChange={setSelectedRole}>
-                      <SelectTrigger className="w-auto min-w-56">
+                      <SelectTrigger id="group-role-select" className="w-auto min-w-56">
                         <SelectValue placeholder="Select Role" />
                       </SelectTrigger>
                       <SelectContent>

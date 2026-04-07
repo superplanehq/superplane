@@ -278,7 +278,9 @@ export function CanvasSettingsView({
   const versioningContent = (
     <div className="flex items-start justify-between gap-6">
       <div>
-        <Label className="mb-1 block text-sm font-medium text-gray-700">Canvas Versioning</Label>
+        <Label htmlFor="canvas-versioning-switch" className="mb-1 block text-sm font-medium text-gray-700">
+          Canvas Versioning
+        </Label>
         <p className="text-[13px] text-gray-500">
           Manage canvas edits with drafts and publish flow. When disabled, users edit the live canvas directly.
           {isVersioningEnforcedByOrganization
@@ -291,6 +293,7 @@ export function CanvasSettingsView({
           {isVersioningEnforcedByOrganization ? "Enabled" : versioningEnabled ? "Enabled" : "Disabled"}
         </span>
         <Switch
+          id="canvas-versioning-switch"
           checked={isVersioningEnforcedByOrganization ? true : versioningEnabled}
           onCheckedChange={setVersioningEnabled}
           disabled={isVersioningToggleDisabled}
@@ -305,8 +308,11 @@ export function CanvasSettingsView({
       <div className="mx-auto w-full max-w-3xl space-y-6">
         <Fieldset className="space-y-6 rounded-lg border border-slate-950/15 bg-white p-6">
           <Field className="space-y-3">
-            <Label className="block text-sm font-medium text-gray-700">Canvas Name</Label>
+            <Label htmlFor="canvas-settings-name-input" className="block text-sm font-medium text-gray-700">
+              Canvas Name
+            </Label>
             <Input
+              id="canvas-settings-name-input"
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -315,8 +321,11 @@ export function CanvasSettingsView({
           </Field>
 
           <Field className="space-y-3">
-            <Label className="block text-sm font-medium text-gray-700">Description</Label>
+            <Label htmlFor="canvas-settings-description-input" className="block text-sm font-medium text-gray-700">
+              Description
+            </Label>
             <Textarea
+              id="canvas-settings-description-input"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               disabled={!canUpdateCanvas}
@@ -340,7 +349,7 @@ export function CanvasSettingsView({
           {effectiveCanvasVersioningEnabled ? (
             <div className="mt-6 border-t border-slate-950/10 pt-6 space-y-4">
               <div>
-                <Label className="mb-1 block text-sm font-medium text-gray-700">Who can approve changes</Label>
+                <p className="mb-1 block text-sm font-medium text-gray-700">Who can approve changes</p>
                 <p className="text-[13px] text-gray-500">
                   Define who can approve or reject change requests for this canvas.
                 </p>

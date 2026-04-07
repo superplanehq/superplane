@@ -283,26 +283,18 @@ func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName 
 
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
 	domain := prefixDomain(domainType, domainID)
-	prefixedGroupName := prefixGroupName(group)
 	prefixedUserID := prefixUserID(userID)
 
-	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+	groupExists, err := a.groupExistsInDomain(group, domain)
 	if err != nil {
 		return fmt.Errorf("failed to check group existence: %w", err)
-	}
-
-	groupExists := false
-	for _, g := range groups {
-		if g[2] == domain {
-			groupExists = true
-			break
-		}
 	}
 
 	if !groupExists {
 		return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
 	}
 
+	prefixedGroupName := prefixGroupName(group)
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add user to group: %w", err)
@@ -334,6 +326,14 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 
 func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
 	domain := prefixDomain(domainType, domainID)
+	groupExists, err := a.groupExistsInDomain(group, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check group existence: %w", err)
+	}
+	if !groupExists {
+		return nil, fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
+	}
+
 	prefixedGroupName := prefixGroupName(group)
 
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
@@ -348,6 +348,22 @@ func (a *AuthService) GetGroupUsers(domainID string, domainType string, group st
 	}
 
 	return users, nil
+}
+
+func (a *AuthService) groupExistsInDomain(group, domain string) (bool, error) {
+	prefixedGroupName := prefixGroupName(group)
+	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+	if err != nil {
+		return false, err
+	}
+
+	for _, g := range groups {
+		if len(g) >= 3 && g[2] == domain {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
@@ -554,6 +570,28 @@ func (a *AuthService) DestroyOrganization(tx *gorm.DB, orgID string) error {
 
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := prefixDomain(models.DomainTypeOrganization, orgID)
+
+	//
+	// Keep policy cache fresh for role resolution calls that are not preceded by a permission
+	// check (for example, /me when include_permissions=true).
+	//
+	filters := []gormadapter.Filter{
+		{
+			Ptype: []string{"p"},
+			V1:    []string{orgDomain, "/org/*"},
+		},
+		{
+			Ptype: []string{"g"},
+			V2:    []string{orgDomain, "/org/*"},
+		},
+	}
+	if err := a.enforcer.LoadFilteredPolicy(filters); err != nil {
+		return nil, err
+	}
+	if err := a.loadDefaultPolicies(); err != nil {
+		return nil, err
+	}
+
 	prefixedUserID := prefixUserID(userID)
 	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
 	if err != nil {

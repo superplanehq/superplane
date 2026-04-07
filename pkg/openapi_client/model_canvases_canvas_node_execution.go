@@ -30,7 +30,6 @@ type CanvasesCanvasNodeExecution struct {
 	Result              *CanvasNodeExecutionResult        `json:"result,omitempty"`
 	ResultReason        *CanvasNodeExecutionResultReason  `json:"resultReason,omitempty"`
 	ResultMessage       *string                           `json:"resultMessage,omitempty"`
-	Input               map[string]interface{}            `json:"input,omitempty"`
 	Outputs             map[string]interface{}            `json:"outputs,omitempty"`
 	CreatedAt           *time.Time                        `json:"createdAt,omitempty"`
 	UpdatedAt           *time.Time                        `json:"updatedAt,omitempty"`
@@ -358,38 +357,6 @@ func (o *CanvasesCanvasNodeExecution) SetResultMessage(v string) {
 	o.ResultMessage = &v
 }
 
-// GetInput returns the Input field value if set, zero value otherwise.
-func (o *CanvasesCanvasNodeExecution) GetInput() map[string]interface{} {
-	if o == nil || IsNil(o.Input) {
-		var ret map[string]interface{}
-		return ret
-	}
-	return o.Input
-}
-
-// GetInputOk returns a tuple with the Input field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *CanvasesCanvasNodeExecution) GetInputOk() (map[string]interface{}, bool) {
-	if o == nil || IsNil(o.Input) {
-		return map[string]interface{}{}, false
-	}
-	return o.Input, true
-}
-
-// HasInput returns a boolean if a field has been set.
-func (o *CanvasesCanvasNodeExecution) HasInput() bool {
-	if o != nil && !IsNil(o.Input) {
-		return true
-	}
-
-	return false
-}
-
-// SetInput gets a reference to the given map[string]interface{} and assigns it to the Input field.
-func (o *CanvasesCanvasNodeExecution) SetInput(v map[string]interface{}) {
-	o.Input = v
-}
-
 // GetOutputs returns the Outputs field value if set, zero value otherwise.
 func (o *CanvasesCanvasNodeExecution) GetOutputs() map[string]interface{} {
 	if o == nil || IsNil(o.Outputs) {
@@ -682,9 +649,6 @@ func (o CanvasesCanvasNodeExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ResultMessage) {
 		toSerialize["resultMessage"] = o.ResultMessage
-	}
-	if !IsNil(o.Input) {
-		toSerialize["input"] = o.Input
 	}
 	if !IsNil(o.Outputs) {
 		toSerialize["outputs"] = o.Outputs

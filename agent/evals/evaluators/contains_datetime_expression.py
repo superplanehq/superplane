@@ -30,7 +30,10 @@ def _date_open_paren_index(s: str, date_keyword_start: int) -> int | None:
 
 
 def _matching_close_paren(s: str, open_paren: int) -> int | None:
-    """Index of ')' that closes the '(' at open_paren, using paren depth (strings not special-cased)."""
+    """Index of ')' that closes the '(' at open_paren.
+
+    Uses paren depth (strings not special-cased).
+    """
     depth = 0
     i = open_paren
     n = len(s)
@@ -47,9 +50,11 @@ def _matching_close_paren(s: str, open_paren: int) -> int | None:
 
 
 def _has_infix_between_first_two_date_calls(s: str) -> bool:
-    """True if `-`, `<`, `>`, `==`, etc. appears after the first date(...) closes and before the second date(.
+    """True if an infix op appears between the first two date() calls.
 
-    Ignores content inside the first call (e.g. hyphens in ISO strings inside the first literal).
+    Checks for `-`, `<`, `>`, `==`, etc. after the first date(...) closes
+    and before the second date(. Ignores content inside the first call
+    (e.g. hyphens in ISO strings inside the first literal).
     """
     positions = _date_call_positions(s)
     if len(positions) < 2:
@@ -71,7 +76,10 @@ def _has_duration_method(s: str) -> bool:
 
 @dataclass
 class ContainsDatetimeExpression(Evaluator):
-    """Proposal configuration should include expr-lang datetime usage (date, duration, now, or duration methods)."""
+    """Proposal config should include expr-lang datetime usage.
+
+    Checks for date, duration, now, or duration methods.
+    """
 
     def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
         if ctx.output.proposal is None:
@@ -79,21 +87,26 @@ class ContainsDatetimeExpression(Evaluator):
 
         texts = list(iter_config_strings_from_operations(ctx.output.proposal.operations))
         if not texts:
-            return EvaluationReason(value=False, reason="No configuration strings in proposal operations")
+            return EvaluationReason(
+                value=False, reason="No configuration strings in proposal operations"
+            )
 
         combined = "\n".join(texts)
 
         if _THREE_ARG_HINT in combined:
             return EvaluationReason(
                 value=False,
-                reason="Three-argument date(str, format, ...) style is not supported in SuperPlane expressions",
+                reason=(
+                    "Three-argument date(str, format, ...) style "
+                    "is not supported in SuperPlane expressions"
+                ),
             )
 
         date_count = len(_DATE_CALL_RE.findall(combined))
-        has_date_and_duration = "duration(" in combined and _DATE_CALL_RE.search(combined) is not None
-        has_now_and_duration = (
-            _NOW_CALL_RE.search(combined) is not None and "duration(" in combined
+        has_date_and_duration = (
+            "duration(" in combined and _DATE_CALL_RE.search(combined) is not None
         )
+        has_now_and_duration = _NOW_CALL_RE.search(combined) is not None and "duration(" in combined
         has_two_date_infix = date_count >= 2 and any(
             _has_infix_between_first_two_date_calls(t) for t in texts
         )
@@ -115,7 +128,8 @@ class ContainsDatetimeExpression(Evaluator):
         return EvaluationReason(
             value=False,
             reason=(
-                "Expected datetime expression patterns: two date() with - or comparison between them, "
-                "or date()+duration(), or now()+duration(), or date() with .Hours/.Minutes/.Seconds"
+                "Expected datetime expression patterns: two date() with "
+                "- or comparison between them, or date()+duration(), "
+                "or now()+duration(), or date() with .Hours/.Minutes/.Seconds"
             ),
         )
