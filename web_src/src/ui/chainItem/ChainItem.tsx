@@ -178,7 +178,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
 
   const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
   const showConnectingLine = totalItems && index < totalItems - 1;
-  const isError = item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && item.originalExecution?.resultMessage;
+  const isError =
+    item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && item.originalExecution?.resultMessage;
 
   return (
     <div className="relative">
