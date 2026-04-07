@@ -58,6 +58,9 @@ blocks:
         - name: "Check: Go Format"
           commands:
             - make format.go.check
+        - name: "Check: Example Payloads"
+          commands:
+            - go run ./scripts/check_example_payloads.go
       epilogue:
         always:
           commands:
