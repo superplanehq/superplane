@@ -18,7 +18,9 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "List canvases",
 		Args:  cobra.NoArgs,
 	}
-	core.Bind(listCmd, &listCommand{}, options)
+	var listFull bool
+	listCmd.Flags().BoolVar(&listFull, "full", false, "show full output including all fields")
+	core.Bind(listCmd, &listCommand{full: &listFull}, options)
 
 	getCmd := &cobra.Command{
 		Use:   "get <name-or-id>",

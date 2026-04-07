@@ -76,8 +76,8 @@ export type ExecutionInfo = {
   result: CanvasNodeExecutionResult;
   resultReason: CanvasNodeExecutionResultReason;
   resultMessage: string;
-  metadata: any;
-  configuration: any;
+  metadata: unknown;
+  configuration: unknown;
   rootEvent: EventInfo;
   outputs?: {
     [key: string]: unknown;
