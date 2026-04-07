@@ -87,16 +87,5 @@ export function buildFireHydrantExecutionDetails(execution: ExecutionInfo): Reco
     Object.assign(details, getDetailsForIncident(incident));
   }
 
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
-    details["Error"] = {
-      __type: "error",
-      message: execution.resultMessage,
-    };
-  }
-
   return details;
 }

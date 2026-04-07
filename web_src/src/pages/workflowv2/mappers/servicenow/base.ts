@@ -53,16 +53,6 @@ export function buildIncidentExecutionDetails(
     if (incident.impact) details["Impact"] = IMPACT_LABELS[incident.impact] || incident.impact;
     if (incident.sys_created_on) details["Created On"] = incident.sys_created_on;
   }
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
-    details["Error"] = {
-      __type: "error",
-      message: execution.resultMessage,
-    };
-  }
   return details;
 }
 
