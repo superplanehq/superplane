@@ -545,7 +545,6 @@ class SessionStore:
         estimated_cost_usd: float | None,
     ) -> None:
         now = _utcnow()
-        cost = estimated_cost_usd if estimated_cost_usd is not None else 0.0
 
         with self._cursor(transactional=True) as cur:
             cur.execute(
@@ -577,14 +576,22 @@ class SessionStore:
             cur.execute(
                 """
                 UPDATE agent_chats
-                SET total_input_tokens = total_input_tokens + %s,
-                    total_output_tokens = total_output_tokens + %s,
-                    total_tokens = total_tokens + %s,
-                    total_estimated_cost_usd = total_estimated_cost_usd + %s,
+                SET total_input_tokens = sub.input_tokens,
+                    total_output_tokens = sub.output_tokens,
+                    total_tokens = sub.total_tokens,
+                    total_estimated_cost_usd = sub.estimated_cost_usd,
                     updated_at = %s
+                FROM (
+                    SELECT COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
+                           COALESCE(SUM(r.output_tokens), 0) AS output_tokens,
+                           COALESCE(SUM(r.total_tokens), 0) AS total_tokens,
+                           COALESCE(SUM(r.estimated_cost_usd), 0) AS estimated_cost_usd
+                    FROM agent_chat_runs r
+                    WHERE r.chat_id = %s
+                ) sub
                 WHERE id = %s
                 """,
-                (input_tokens, output_tokens, total_tokens, cost, now, row["chat_id"]),
+                (now, row["chat_id"], row["chat_id"]),
             )
 
     def get_org_usage(self, org_id: str) -> StoredAgentChatUsage:
