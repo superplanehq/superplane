@@ -59,6 +59,9 @@ export const getDashboardMapper: ComponentBaseMapper = {
     if (dashboard.title) {
       details.Title = dashboard.title;
     }
+    if (dashboard.url) {
+      details["Dashboard URL"] = dashboard.url;
+    }
     if (dashboard.folderTitle) {
       details.Folder = dashboard.folderTitle;
     }

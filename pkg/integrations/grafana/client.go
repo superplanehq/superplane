@@ -217,6 +217,20 @@ func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.BaseURL, "/"), strings.TrimPrefix(path, "/"))
 }
 
+func (c *Client) resolveURL(value string) string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(raw)
+	if err == nil && parsed.IsAbs() {
+		return raw
+	}
+
+	return c.buildURL(raw)
+}
+
 func (c *Client) execRequest(method, path string, body io.Reader, contentType string) ([]byte, int, error) {
 	return c.execRequestWithHeaders(method, path, body, contentType, nil)
 }
@@ -726,7 +740,7 @@ func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
 		UID:         strings.TrimSpace(response.Dashboard.UID),
 		Title:       strings.TrimSpace(response.Dashboard.Title),
 		Slug:        strings.TrimSpace(response.Meta.Slug),
-		URL:         strings.TrimSpace(response.Meta.URL),
+		URL:         c.resolveURL(response.Meta.URL),
 		FolderTitle: strings.TrimSpace(response.Meta.FolderTitle),
 		FolderUID:   strings.TrimSpace(response.Meta.FolderUID),
 		Tags:        response.Dashboard.Tags,
