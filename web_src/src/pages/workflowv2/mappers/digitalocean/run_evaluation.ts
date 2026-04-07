@@ -121,6 +121,10 @@ export const runEvaluationMapper: ComponentBaseMapper = {
       details["Prompts Evaluated"] = String(prompts.length);
     }
 
+    if (result.errorDescription) {
+      details["Evaluation Error"] = String(result.errorDescription);
+    }
+
     return details;
   },
 
