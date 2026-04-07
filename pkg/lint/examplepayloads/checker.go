@@ -923,7 +923,6 @@ func builtinCallSchemas(name string, call *ast.CallExpr, analyzer *packageAnalyz
 	}
 }
 
-
 func (a *packageAnalyzer) schemaFromTypeExpr(expr ast.Expr, seen map[string]bool) schema {
 	switch t := expr.(type) {
 	case nil:
@@ -1100,7 +1099,6 @@ func validateExampleAgainstSpecs(example exampleRecord, specs []emitSpec) []Issu
 
 	return nil
 }
-
 
 func mergeSchema(left, right schema) schema {
 	if left.Kind == schemaUnknown {
