@@ -8,6 +8,7 @@ import {
   createSafeTriggerRenderer,
   normalizeComponentBaseProps,
   normalizeTriggerProps,
+  truncate,
 } from "./safeMappers";
 import type {
   AdditionalDataBuilderContext,
@@ -436,5 +437,90 @@ describe("additional data and custom field safety", () => {
     );
 
     expect(safe.render(DEFAULT_NODE)).toBeNull();
+  });
+});
+
+describe("truncate", () => {
+  it("returns the string unchanged when within the limit", () => {
+    expect(truncate("hello", 10)).toBe("hello");
+  });
+
+  it("truncates a long string and appends ellipsis", () => {
+    expect(truncate("hello world", 5)).toBe("hello...");
+  });
+
+  it("supports a custom ellipsis character", () => {
+    expect(truncate("hello world", 5, "\u2026")).toBe("hello\u2026");
+  });
+
+  it("handles undefined without throwing", () => {
+    expect(truncate(undefined, 10)).toBe("");
+  });
+
+  it("handles null without throwing", () => {
+    expect(truncate(null, 10)).toBe("");
+  });
+
+  it("handles a number by coercing to string", () => {
+    expect(truncate(12345, 3)).toBe("123...");
+  });
+
+  it("handles a boolean by coercing to string", () => {
+    expect(truncate(true, 10)).toBe("true");
+  });
+
+  it("handles an object by coercing to string", () => {
+    expect(truncate({ key: "value" }, 5)).toBe("[obje...");
+  });
+
+  it("handles an array by coercing to string", () => {
+    expect(truncate([1, 2, 3], 3)).toBe("1,2...");
+  });
+
+  it("returns empty string for empty string input", () => {
+    expect(truncate("", 10)).toBe("");
+  });
+});
+
+describe("safe mapper recovers from substring on non-string config values", () => {
+  it("recovers when subtitle calls substring on a number config value", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const underlying: ComponentBaseMapper = {
+      props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
+      subtitle: (ctx) => {
+        const config = ctx.node.configuration as Record<string, unknown>;
+        // Simulates the old bug: calling .substring() on a non-string
+        return (config.query as string).substring(0, 50);
+      },
+      getExecutionDetails: () => ({}),
+    };
+    const safe = createSafeComponentMapper(underlying, "broken-substring");
+    const ctx = makeSubtitleContext();
+    (ctx.node as Record<string, unknown>).configuration = { query: 12345 };
+
+    expect(safe.subtitle(ctx)).toBe("");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Component mapper "broken-substring" threw in subtitle()'),
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("recovers when getExecutionDetails calls substring on an object config value", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const underlying: ComponentBaseMapper = {
+      props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
+      subtitle: () => "",
+      getExecutionDetails: (ctx) => {
+        const config = ctx.node.configuration as Record<string, unknown>;
+        return { Preview: (config.body as string).substring(0, 50) };
+      },
+    };
+    const safe = createSafeComponentMapper(underlying, "broken-substring");
+    const ctx = makeExecutionDetailsContext();
+    (ctx.node as Record<string, unknown>).configuration = { body: { nested: true } };
+
+    expect(safe.getExecutionDetails(ctx)).toEqual({});
+    consoleSpy.mockRestore();
   });
 });
