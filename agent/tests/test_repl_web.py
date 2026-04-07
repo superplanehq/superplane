@@ -44,10 +44,9 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_store.count_chat_model_messages.return_value = 0
     fake_store.load_agent_chat_message_history.return_value = []
     fake_store.set_initial_chat_message_if_missing.return_value = None
-    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message: (
-        SimpleNamespace(
-            id="message-123",
-        )
+    fake_store.create_agent_chat_run.side_effect = lambda chat_id, model: "run-123"
+    fake_store.create_agent_chat_model_message.side_effect = (
+        lambda chat_id, message, run_id=None: SimpleNamespace(id="message-123")
     )
     fake_store.update_agent_chat_model_message.return_value = None
     fake_store.replace_agent_chat_messages_after.return_value = None
@@ -170,7 +169,7 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
     store.set_initial_chat_message_if_missing.return_value = None
 
     def fake_create_agent_chat_model_message(
-        chat_id: str, message: ModelRequest
+        chat_id: str, message: ModelRequest, run_id: str | None = None
     ) -> SimpleNamespace:
         persisted_messages.append(message)
         return SimpleNamespace(id=f"message-{len(persisted_messages)}")
@@ -180,6 +179,7 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
         if False:
             yield None
 
+    store.create_agent_chat_run.side_effect = lambda chat_id, model: "run-456"
     store.create_agent_chat_model_message.side_effect = fake_create_agent_chat_model_message
     monkeypatch.setattr(repl_web, "_run_stream_events", fake_run_stream_events)
 
@@ -221,7 +221,7 @@ def test_persisted_run_recorder_does_not_duplicate_final_assistant_message() -> 
         SimpleNamespace(id="tool-message-1"),
     ]
 
-    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "Current question")  # type: ignore[attr-defined]
+    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "run-789", "Current question")  # type: ignore[attr-defined]
     recorder.tool_finished(
         SimpleNamespace(  # type: ignore[arg-type]
             result=ToolReturnPart(
