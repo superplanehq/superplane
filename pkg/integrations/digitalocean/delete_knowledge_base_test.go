@@ -217,6 +217,60 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 		assert.Equal(t, "digitalocean.knowledge_base.deleted", executionState.Type)
 	})
 
+	t.Run("database already gone (404) -> databaseDeleted stays false", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"knowledgeBase":            "kb-uuid-123",
+				"deleteOpenSearchDatabase": true,
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						// GetKnowledgeBase
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"knowledge_base": {"uuid": "kb-uuid-123", "name": "my-kb", "database_id": "db-uuid-456"}
+						}`)),
+					},
+					{
+						// DeleteKnowledgeBase
+						StatusCode: http.StatusNoContent,
+						Body:       io.NopCloser(strings.NewReader("")),
+					},
+					{
+						// ListDatabasesByEngine
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"databases": [{"id": "db-uuid-456", "name": "my-kb-os", "engine": "opensearch"}]
+						}`)),
+					},
+					{
+						// DeleteDatabase returns 404 — already gone
+						StatusCode: http.StatusNotFound,
+						Body:       io.NopCloser(strings.NewReader(`{"message": "not found"}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionState.Passed)
+		assert.Equal(t, "digitalocean.knowledge_base.deleted", executionState.Type)
+		require.Len(t, executionState.Payloads, 1)
+
+		wrapped := executionState.Payloads[0].(map[string]any)
+		payload := wrapped["data"].(map[string]any)
+		assert.Equal(t, false, payload["databaseDeleted"])
+		assert.Nil(t, payload["databaseId"])
+		assert.Nil(t, payload["databaseName"])
+	})
+
 	t.Run("API error (not 404) -> returns error", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 

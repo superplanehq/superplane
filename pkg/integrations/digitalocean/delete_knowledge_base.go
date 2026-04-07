@@ -163,11 +163,12 @@ func (d *DeleteKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 
 	// Delete the OpenSearch database if requested and a database ID was found
 	if spec.DeleteOpenSearchDatabase && databaseID != "" {
-		// Resolve database name for display before deleting
+		// Resolve database name before deleting so we can include it in the output
+		var databaseName string
 		if databases, err := client.ListDatabasesByEngine("opensearch"); err == nil {
 			for _, db := range databases {
 				if db.ID == databaseID {
-					output["databaseName"] = db.Name
+					databaseName = db.Name
 					break
 				}
 			}
@@ -175,13 +176,17 @@ func (d *DeleteKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 
 		if err := client.DeleteDatabase(databaseID); err != nil {
 			if doErr, ok := err.(*DOAPIError); ok && doErr.StatusCode == http.StatusNotFound {
-				// Database already gone
+				// Database already absent — don't claim we deleted it
 			} else {
 				return fmt.Errorf("knowledge base deleted, but failed to delete OpenSearch database %s: %v", databaseID, err)
 			}
+		} else {
+			output["databaseDeleted"] = true
+			output["databaseId"] = databaseID
+			if databaseName != "" {
+				output["databaseName"] = databaseName
+			}
 		}
-		output["databaseDeleted"] = true
-		output["databaseId"] = databaseID
 	}
 
 	return ctx.ExecutionState.Emit(
