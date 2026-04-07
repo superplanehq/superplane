@@ -46,7 +46,15 @@ func (c *triggersCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(triggers)
+		summary := make([]map[string]string, len(triggers))
+		for i, trigger := range triggers {
+			summary[i] = map[string]string{
+				"name":        trigger.GetName(),
+				"label":       trigger.GetLabel(),
+				"description": trigger.GetDescription(),
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -137,7 +145,7 @@ func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.TriggersTrigger{}, err
+			return openapi_client.TriggersTrigger{}, fmt.Errorf("trigger %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationTrigger(integration, triggerName)
 	}
