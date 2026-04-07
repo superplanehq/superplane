@@ -50,8 +50,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
   PYTHONPATH=/app/agent/src \
   PATH=/app/agent/.venv/bin:$PATH
 
+# postgresql-client provides createdb; golang-migrate version must stay in sync with
+# scripts/docker/install-gomigrate.sh.
+ARG MIGRATE_VERSION=4.18.2
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bash ca-certificates \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl postgresql-client \
+  && ARCH="$(dpkg --print-architecture)" \
+  && case "$ARCH" in \
+       amd64) MIGRATE_ARCH=amd64 ;; \
+       arm64) MIGRATE_ARCH=arm64 ;; \
+       *) echo "unsupported architecture: ${ARCH}" >&2 && exit 1 ;; \
+     esac \
+  && curl -fsSL "https://github.com/golang-migrate/migrate/releases/download/v${MIGRATE_VERSION}/migrate.linux-${MIGRATE_ARCH}.tar.gz" \
+    | tar -xzC /tmp \
+  && mv /tmp/migrate /usr/local/bin/migrate \
+  && chmod +x /usr/local/bin/migrate \
+  && rm -f /tmp/LICENSE /tmp/README.md \
   && rm -rf /var/lib/apt/lists/*
 
 # We don't need Docker health checks, since these containers
@@ -62,10 +76,12 @@ WORKDIR /app/agent
 RUN chown nobody /app/agent
 
 COPY --from=builder --chown=nobody:root /app/agent /app/agent
+COPY --chown=nobody:root docker-entrypoint.sh /app/agent/docker-entrypoint.sh
+RUN chmod +x /app/agent/docker-entrypoint.sh
 
 USER nobody
 
 EXPOSE 8090
 EXPOSE 50061
 
-CMD ["bash", "-c", "exec uvicorn ai.web:create_app --factory --host 0.0.0.0 --port ${APP_PORT:-8090} --timeout-graceful-shutdown ${UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT:-310}"]
+CMD ["/app/agent/docker-entrypoint.sh"]
