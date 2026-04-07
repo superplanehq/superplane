@@ -12,6 +12,7 @@ import type {
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getTriggerRenderer } from ".";
+import { truncate } from "./safeMappers";
 import type React from "react";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { renderWithTimeAgo } from "@/components/TimeAgo";
@@ -251,7 +252,7 @@ function withSources(
   //
   for (const source of received) {
     const sourceNode = nodes.find((n) => n.id === source.nodeId);
-    const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${source.nodeId.substring(0, 8)}...`;
+    const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${truncate(source.nodeId, 8)}`;
     details[sourceLabel] = `Received ${formatRelativeTime(source.receivedAt!, true)}`;
   }
 
@@ -260,7 +261,7 @@ function withSources(
   //
   for (const source of unreceived) {
     const sourceNode = nodes?.find((n) => n.id === source.nodeId);
-    const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${source.nodeId.substring(0, 8)}...`;
+    const sourceLabel = sourceNode?.name || sourceNode?.componentName || `Node ${truncate(source.nodeId, 8)}`;
     details[sourceLabel] = source.receivedAt ? formatRelativeTime(source.receivedAt, true) : "-";
   }
 

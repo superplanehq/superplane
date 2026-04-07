@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { buildIncidentExecutionDetails } from "./base";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const annotateIncidentMapper: ComponentBaseMapper = {
@@ -54,9 +55,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (configuration.content) {
-    const truncatedContent =
-      configuration.content.length > 50 ? configuration.content.substring(0, 50) + "..." : configuration.content;
-    metadata.push({ icon: "message-square", label: `Note: ${truncatedContent}` });
+    metadata.push({ icon: "message-square", label: `Note: ${truncate(configuration.content, 50)}` });
   }
 
   return metadata;
