@@ -7,14 +7,19 @@ interface SimpleTooltipProps {
   content: React.ReactNode;
   delay?: number;
   hideOnClick?: boolean;
+  interactive?: boolean;
 }
 
 export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({ children, content, delay = 200, hideOnClick = true }) => {
+  const isInteractive = false;
   return (
     <Tippy
-      interactive={true}
-      render={() => (
-        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words">
+      interactive={isInteractive}
+      render={(attrs) => (
+        <div
+          {...attrs}
+          className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words"
+        >
           {content}
         </div>
       )}
