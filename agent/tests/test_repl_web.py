@@ -45,8 +45,8 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_store.load_agent_chat_message_history.return_value = []
     fake_store.set_initial_chat_message_if_missing.return_value = None
     fake_store.create_agent_chat_run.side_effect = lambda chat_id, model: "run-123"
-    fake_store.create_agent_chat_model_message.side_effect = (
-        lambda chat_id, message, run_id=None: SimpleNamespace(id="message-123")
+    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message, run_id=None: (
+        SimpleNamespace(id="message-123")
     )
     fake_store.update_agent_chat_model_message.return_value = None
     fake_store.replace_agent_chat_messages_after.return_value = None
