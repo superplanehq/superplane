@@ -648,6 +648,103 @@ func (x *AgentChatInfo) GetCreatedAt() *timestamp.Timestamp {
 	return nil
 }
 
+type PrepareConfigAssistantSuggestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrepareConfigAssistantSuggestRequest) Reset() {
+	*x = PrepareConfigAssistantSuggestRequest{}
+	mi := &file_agents_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrepareConfigAssistantSuggestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrepareConfigAssistantSuggestRequest) ProtoMessage() {}
+
+func (x *PrepareConfigAssistantSuggestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrepareConfigAssistantSuggestRequest.ProtoReflect.Descriptor instead.
+func (*PrepareConfigAssistantSuggestRequest) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *PrepareConfigAssistantSuggestRequest) GetCanvasId() string {
+	if x != nil {
+		return x.CanvasId
+	}
+	return ""
+}
+
+type PrepareConfigAssistantSuggestResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Token string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	// Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest).
+	SuggestUrl    string `protobuf:"bytes,2,opt,name=suggest_url,json=suggestUrl,proto3" json:"suggest_url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PrepareConfigAssistantSuggestResponse) Reset() {
+	*x = PrepareConfigAssistantSuggestResponse{}
+	mi := &file_agents_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PrepareConfigAssistantSuggestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PrepareConfigAssistantSuggestResponse) ProtoMessage() {}
+
+func (x *PrepareConfigAssistantSuggestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PrepareConfigAssistantSuggestResponse.ProtoReflect.Descriptor instead.
+func (*PrepareConfigAssistantSuggestResponse) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *PrepareConfigAssistantSuggestResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *PrepareConfigAssistantSuggestResponse) GetSuggestUrl() string {
+	if x != nil {
+		return x.SuggestUrl
+	}
+	return ""
+}
+
 var File_agents_proto protoreflect.FileDescriptor
 
 const file_agents_proto_rawDesc = "" +
@@ -692,19 +789,26 @@ const file_agents_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt2\xb4\n" +
-	"\n" +
-	"\x06Agents\x12\xf5\x01\n" +
-	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x8d\x01\x92An\n" +
-	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/agents/chats\x12\x90\x02\n" +
-	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\xa5\x01\x92A\x82\x01\n" +
-	"\x05Agent\x12\x18Creates a new agent chat\x1a_Create a new agent chat. The response includes the URL and token for initiating the chat stream\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/agents/chats\x12\x89\x02\n" +
-	"\x11DescribeAgentChat\x12+.Superplane.Agents.DescribeAgentChatRequest\x1a,.Superplane.Agents.DescribeAgentChatResponse\"\x98\x01\x92Ao\n" +
-	"\x05Agent\x122Describes an agent chat for the authenticated user\x1a2Describes an agent chat for the authenticated user\x82\xd3\xe4\x93\x02 \x12\x1e/api/v1/agents/chats/{chat_id}\x12\xfe\x01\n" +
-	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x81\x01\x92AO\n" +
-	"\x05Agent\x12\"List the messages in an agent chat\x1a\"List the messages in an agent chat\x82\xd3\xe4\x93\x02)\x12'/api/v1/agents/chats/{chat_id}/messages\x12\x91\x02\n" +
-	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xa6\x01\x92As\n" +
-	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/chats/{chat_id}/resumeB\xca\x01\x92A\x90\x01\x12f\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"C\n" +
+	"$PrepareConfigAssistantSuggestRequest\x12\x1b\n" +
+	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"^\n" +
+	"%PrepareConfigAssistantSuggestResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x1f\n" +
+	"\vsuggest_url\x18\x02 \x01(\tR\n" +
+	"suggestUrl2\xf8\r\n" +
+	"\x06Agents\x12\xfd\x01\n" +
+	"\x0eListAgentChats\x12(.Superplane.Agents.ListAgentChatsRequest\x1a).Superplane.Agents.ListAgentChatsResponse\"\x95\x01\x92An\n" +
+	"\x05Agent\x12+List agent chats for the authenticated user\x1a8Returns a list of agent chats for the authenticated user\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/agents/builder/chats\x12\x98\x02\n" +
+	"\x0fCreateAgentChat\x12).Superplane.Agents.CreateAgentChatRequest\x1a*.Superplane.Agents.CreateAgentChatResponse\"\xad\x01\x92A\x82\x01\n" +
+	"\x05Agent\x12\x18Creates a new agent chat\x1a_Create a new agent chat. The response includes the URL and token for initiating the chat stream\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/api/v1/agents/builder/chats\x12\x91\x02\n" +
+	"\x11DescribeAgentChat\x12+.Superplane.Agents.DescribeAgentChatRequest\x1a,.Superplane.Agents.DescribeAgentChatResponse\"\xa0\x01\x92Ao\n" +
+	"\x05Agent\x122Describes an agent chat for the authenticated user\x1a2Describes an agent chat for the authenticated user\x82\xd3\xe4\x93\x02(\x12&/api/v1/agents/builder/chats/{chat_id}\x12\x86\x02\n" +
+	"\x15ListAgentChatMessages\x12/.Superplane.Agents.ListAgentChatMessagesRequest\x1a0.Superplane.Agents.ListAgentChatMessagesResponse\"\x89\x01\x92AO\n" +
+	"\x05Agent\x12\"List the messages in an agent chat\x1a\"List the messages in an agent chat\x82\xd3\xe4\x93\x021\x12//api/v1/agents/builder/chats/{chat_id}/messages\x12\x99\x02\n" +
+	"\x0fResumeAgentChat\x12).Superplane.Agents.ResumeAgentChatRequest\x1a*.Superplane.Agents.ResumeAgentChatResponse\"\xae\x01\x92As\n" +
+	"\x05Agent\x12\x14Resume an agent chat\x1aTResumes an agent chat. The response includes the URL and token for resuming the chat\x82\xd3\xe4\x93\x022:\x01*\"-/api/v1/agents/builder/chats/{chat_id}/resume\x12\x99\x03\n" +
+	"\x1dPrepareConfigAssistantSuggest\x127.Superplane.Agents.PrepareConfigAssistantSuggestRequest\x1a8.Superplane.Agents.PrepareConfigAssistantSuggestResponse\"\x84\x02\x92A\xd0\x01\n" +
+	"\x05Agent\x12&Prepare config assistant field suggest\x1a\x9e\x01Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.\x82\xd3\xe4\x93\x02*:\x01*\"%/api/v1/agents/config/prepare-suggestB\xca\x01\x92A\x90\x01\x12f\n" +
 	"\x15SuperPlane Agents API\x12!API for SuperPlane agent sessions\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x02\x012\x10application/json:\x10application/jsonZ4github.com/superplanehq/superplane/pkg/protos/agentsb\x06proto3"
 
@@ -720,40 +824,44 @@ func file_agents_proto_rawDescGZIP() []byte {
 	return file_agents_proto_rawDescData
 }
 
-var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_agents_proto_goTypes = []any{
-	(*ListAgentChatsRequest)(nil),         // 0: Superplane.Agents.ListAgentChatsRequest
-	(*ListAgentChatsResponse)(nil),        // 1: Superplane.Agents.ListAgentChatsResponse
-	(*DescribeAgentChatRequest)(nil),      // 2: Superplane.Agents.DescribeAgentChatRequest
-	(*DescribeAgentChatResponse)(nil),     // 3: Superplane.Agents.DescribeAgentChatResponse
-	(*ListAgentChatMessagesRequest)(nil),  // 4: Superplane.Agents.ListAgentChatMessagesRequest
-	(*ListAgentChatMessagesResponse)(nil), // 5: Superplane.Agents.ListAgentChatMessagesResponse
-	(*AgentChatMessage)(nil),              // 6: Superplane.Agents.AgentChatMessage
-	(*CreateAgentChatRequest)(nil),        // 7: Superplane.Agents.CreateAgentChatRequest
-	(*CreateAgentChatResponse)(nil),       // 8: Superplane.Agents.CreateAgentChatResponse
-	(*ResumeAgentChatRequest)(nil),        // 9: Superplane.Agents.ResumeAgentChatRequest
-	(*ResumeAgentChatResponse)(nil),       // 10: Superplane.Agents.ResumeAgentChatResponse
-	(*AgentChatInfo)(nil),                 // 11: Superplane.Agents.AgentChatInfo
-	(*timestamp.Timestamp)(nil),           // 12: google.protobuf.Timestamp
+	(*ListAgentChatsRequest)(nil),                 // 0: Superplane.Agents.ListAgentChatsRequest
+	(*ListAgentChatsResponse)(nil),                // 1: Superplane.Agents.ListAgentChatsResponse
+	(*DescribeAgentChatRequest)(nil),              // 2: Superplane.Agents.DescribeAgentChatRequest
+	(*DescribeAgentChatResponse)(nil),             // 3: Superplane.Agents.DescribeAgentChatResponse
+	(*ListAgentChatMessagesRequest)(nil),          // 4: Superplane.Agents.ListAgentChatMessagesRequest
+	(*ListAgentChatMessagesResponse)(nil),         // 5: Superplane.Agents.ListAgentChatMessagesResponse
+	(*AgentChatMessage)(nil),                      // 6: Superplane.Agents.AgentChatMessage
+	(*CreateAgentChatRequest)(nil),                // 7: Superplane.Agents.CreateAgentChatRequest
+	(*CreateAgentChatResponse)(nil),               // 8: Superplane.Agents.CreateAgentChatResponse
+	(*ResumeAgentChatRequest)(nil),                // 9: Superplane.Agents.ResumeAgentChatRequest
+	(*ResumeAgentChatResponse)(nil),               // 10: Superplane.Agents.ResumeAgentChatResponse
+	(*AgentChatInfo)(nil),                         // 11: Superplane.Agents.AgentChatInfo
+	(*PrepareConfigAssistantSuggestRequest)(nil),  // 12: Superplane.Agents.PrepareConfigAssistantSuggestRequest
+	(*PrepareConfigAssistantSuggestResponse)(nil), // 13: Superplane.Agents.PrepareConfigAssistantSuggestResponse
+	(*timestamp.Timestamp)(nil),                   // 14: google.protobuf.Timestamp
 }
 var file_agents_proto_depIdxs = []int32{
 	11, // 0: Superplane.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Agents.AgentChatInfo
 	11, // 1: Superplane.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Agents.AgentChatInfo
 	6,  // 2: Superplane.Agents.ListAgentChatMessagesResponse.messages:type_name -> Superplane.Agents.AgentChatMessage
-	12, // 3: Superplane.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
-	12, // 4: Superplane.Agents.AgentChatInfo.created_at:type_name -> google.protobuf.Timestamp
+	14, // 3: Superplane.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	14, // 4: Superplane.Agents.AgentChatInfo.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 5: Superplane.Agents.Agents.ListAgentChats:input_type -> Superplane.Agents.ListAgentChatsRequest
 	7,  // 6: Superplane.Agents.Agents.CreateAgentChat:input_type -> Superplane.Agents.CreateAgentChatRequest
 	2,  // 7: Superplane.Agents.Agents.DescribeAgentChat:input_type -> Superplane.Agents.DescribeAgentChatRequest
 	4,  // 8: Superplane.Agents.Agents.ListAgentChatMessages:input_type -> Superplane.Agents.ListAgentChatMessagesRequest
 	9,  // 9: Superplane.Agents.Agents.ResumeAgentChat:input_type -> Superplane.Agents.ResumeAgentChatRequest
-	1,  // 10: Superplane.Agents.Agents.ListAgentChats:output_type -> Superplane.Agents.ListAgentChatsResponse
-	8,  // 11: Superplane.Agents.Agents.CreateAgentChat:output_type -> Superplane.Agents.CreateAgentChatResponse
-	3,  // 12: Superplane.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Agents.DescribeAgentChatResponse
-	5,  // 13: Superplane.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Agents.ListAgentChatMessagesResponse
-	10, // 14: Superplane.Agents.Agents.ResumeAgentChat:output_type -> Superplane.Agents.ResumeAgentChatResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
+	12, // 10: Superplane.Agents.Agents.PrepareConfigAssistantSuggest:input_type -> Superplane.Agents.PrepareConfigAssistantSuggestRequest
+	1,  // 11: Superplane.Agents.Agents.ListAgentChats:output_type -> Superplane.Agents.ListAgentChatsResponse
+	8,  // 12: Superplane.Agents.Agents.CreateAgentChat:output_type -> Superplane.Agents.CreateAgentChatResponse
+	3,  // 13: Superplane.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Agents.DescribeAgentChatResponse
+	5,  // 14: Superplane.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Agents.ListAgentChatMessagesResponse
+	10, // 15: Superplane.Agents.Agents.ResumeAgentChat:output_type -> Superplane.Agents.ResumeAgentChatResponse
+	13, // 16: Superplane.Agents.Agents.PrepareConfigAssistantSuggest:output_type -> Superplane.Agents.PrepareConfigAssistantSuggestResponse
+	11, // [11:17] is the sub-list for method output_type
+	5,  // [5:11] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -770,7 +878,7 @@ func file_agents_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_agents_proto_rawDesc), len(file_agents_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

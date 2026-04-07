@@ -312,6 +312,7 @@ openapi.client.gen:
 		-g go \
 		-o /local/pkg/openapi_client \
 		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
+	docker run --rm -v ${PWD}:/local alpine chown -R $$(id -u):$$(id -g) /local/pkg/openapi_client
 	rm -rf pkg/openapi_client/test
 	rm -rf pkg/openapi_client/docs
 	rm -rf pkg/openapi_client/api
@@ -322,6 +323,7 @@ openapi.client.gen:
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
 	$(COMPOSE) run --rm --no-deps app bash -c "cd web_src && npm run generate:api"
+	docker run --rm -v ${PWD}:/local alpine chown -R $$(id -u):$$(id -g) /local/web_src/src/api-client
 
 openapi.python.client.gen:
 	rm -rf agent/src/superplaneapi
@@ -332,6 +334,7 @@ openapi.python.client.gen:
 		-o /local/agent/src/superplaneapi \
 		--package-name superplaneapi \
 		--additional-properties=packageName=superplaneapi,projectName=superplaneapi,generateSourceCodeOnly=true
+	docker run --rm -v ${PWD}:/local alpine chown -R $$(id -u):$$(id -g) /local/agent/src/superplaneapi
 	cp -R agent/src/superplaneapi/superplaneapi/. agent/src/superplaneapi/
 	rm -rf agent/src/superplaneapi/superplaneapi
 	rm -rf agent/src/superplaneapi/docs
