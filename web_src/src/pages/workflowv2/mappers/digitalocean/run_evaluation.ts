@@ -104,11 +104,11 @@ export const runEvaluationMapper: ComponentBaseMapper = {
       details["Finished At"] = new Date(String(result.finishedAt)).toLocaleString();
     }
 
-    details["Test Case"] = String(result.testCaseName || result.testCaseId || "-");
+    details["Test Case"] = String(result.testCaseName || result.testCaseUUID || "-");
 
-    if (result.workspaceId && result.testCaseId && result.evaluationRunId) {
+    if (result.workspaceUUID && result.testCaseUUID && result.evaluationRunUUID) {
       details["View Evaluation"] =
-        `https://cloud.digitalocean.com/gen-ai/workspaces/${result.workspaceId}/evaluations/${result.testCaseId}/runs/${result.evaluationRunId}`;
+        `https://cloud.digitalocean.com/gen-ai/workspaces/${result.workspaceUUID}/evaluations/${result.testCaseUUID}/runs/${result.evaluationRunUUID}`;
     }
 
     const starMetricLabel = formatStarMetric(result);
@@ -141,14 +141,14 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (nodeMetadata?.testCaseName) {
     metadata.push({ icon: "flask-conical", label: nodeMetadata.testCaseName });
-  } else if (configuration?.testCaseId) {
-    metadata.push({ icon: "flask-conical", label: `Test: ${configuration.testCaseId}` });
+  } else if (configuration?.testCase) {
+    metadata.push({ icon: "flask-conical", label: `Test: ${configuration.testCase}` });
   }
 
   if (nodeMetadata?.agentName) {
     metadata.push({ icon: "bot", label: nodeMetadata.agentName });
-  } else if (configuration?.agentId) {
-    metadata.push({ icon: "bot", label: `Agent: ${configuration.agentId}` });
+  } else if (configuration?.agent) {
+    metadata.push({ icon: "bot", label: `Agent: ${configuration.agent}` });
   }
 
   return metadata;

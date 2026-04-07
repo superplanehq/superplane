@@ -15,20 +15,20 @@ import (
 func Test__DeleteKnowledgeBase__Setup(t *testing.T) {
 	component := &DeleteKnowledgeBase{}
 
-	t.Run("missing knowledgeBaseId returns error", func(t *testing.T) {
+	t.Run("missing knowledgeBase returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
 			Metadata:      &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "knowledgeBaseId is required")
+		require.ErrorContains(t, err, "knowledgeBase is required")
 	})
 
-	t.Run("expression knowledgeBaseId is accepted at setup time", func(t *testing.T) {
+	t.Run("expression knowledgeBase is accepted at setup time", func(t *testing.T) {
 		metaCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId": "{{ $.trigger.data.kbId }}",
+				"knowledgeBase": "{{ $.trigger.data.kbId }}",
 			},
 			Metadata: metaCtx,
 		})
@@ -43,7 +43,7 @@ func Test__DeleteKnowledgeBase__Setup(t *testing.T) {
 	t.Run("valid knowledgeBaseId -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId": "kb-uuid-123",
+				"knowledgeBase": "kb-uuid-123",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -73,7 +73,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId":          "kb-uuid-123",
+				"knowledgeBase":            "kb-uuid-123",
 				"deleteOpenSearchDatabase": false,
 			},
 			HTTP: &contexts.HTTPContext{
@@ -99,7 +99,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		wrapped := executionState.Payloads[0].(map[string]any)
 		payload := wrapped["data"].(map[string]any)
-		assert.Equal(t, "kb-uuid-123", payload["knowledgeBaseId"])
+		assert.Equal(t, "kb-uuid-123", payload["knowledgeBaseUUID"])
 		assert.Equal(t, false, payload["databaseDeleted"])
 	})
 
@@ -108,7 +108,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId":          "kb-uuid-123",
+				"knowledgeBase":            "kb-uuid-123",
 				"deleteOpenSearchDatabase": true,
 			},
 			HTTP: &contexts.HTTPContext{
@@ -156,7 +156,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		wrapped := executionState.Payloads[0].(map[string]any)
 		payload := wrapped["data"].(map[string]any)
-		assert.Equal(t, "kb-uuid-123", payload["knowledgeBaseId"])
+		assert.Equal(t, "kb-uuid-123", payload["knowledgeBaseUUID"])
 		assert.Equal(t, true, payload["databaseDeleted"])
 		assert.Equal(t, "db-uuid-456", payload["databaseId"])
 		assert.Equal(t, "my-kb-os", payload["databaseName"])
@@ -167,7 +167,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId":          "kb-uuid-123",
+				"knowledgeBase":            "kb-uuid-123",
 				"deleteOpenSearchDatabase": false,
 			},
 			HTTP: &contexts.HTTPContext{
@@ -194,7 +194,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId":          "kb-uuid-123",
+				"knowledgeBase":            "kb-uuid-123",
 				"deleteOpenSearchDatabase": true,
 			},
 			HTTP: &contexts.HTTPContext{
@@ -222,7 +222,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId":          "kb-uuid-123",
+				"knowledgeBase":            "kb-uuid-123",
 				"deleteOpenSearchDatabase": false,
 			},
 			HTTP: &contexts.HTTPContext{
@@ -248,7 +248,7 @@ func Test__DeleteKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"knowledgeBaseId":          "kb-uuid-123",
+				"knowledgeBase":            "kb-uuid-123",
 				"deleteOpenSearchDatabase": true,
 			},
 			HTTP: &contexts.HTTPContext{

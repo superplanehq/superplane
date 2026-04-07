@@ -500,7 +500,7 @@ func listAgents(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 }
 
 func listAgentKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	agentID := ctx.Parameters["agentId"]
+	agentID := ctx.Parameters["agent"]
 	if agentID == "" {
 		return []core.IntegrationResource{}, nil
 	}
@@ -528,7 +528,7 @@ func listAgentKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationR
 }
 
 func listAgentAvailableKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	agentID := ctx.Parameters["agentId"]
+	agentID := ctx.Parameters["agent"]
 	if agentID == "" {
 		return []core.IntegrationResource{}, nil
 	}

@@ -52,11 +52,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("missing name returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources":        []any{validSpacesSource},
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
@@ -68,23 +68,23 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 			Configuration: map[string]any{
 				"name":           "my-kb",
 				"region":         "tor1",
-				"projectId":      "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
 				"databaseOption": "new",
 				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
-		require.ErrorContains(t, err, "embeddingModelUUID is required")
+		require.ErrorContains(t, err, "embeddingModel is required")
 	})
 
 	t.Run("missing region with new database returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources":        []any{validSpacesSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
@@ -94,12 +94,12 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("missing region with existing database -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "existing",
-				"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
-				"dataSources":        []any{validSpacesSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "existing",
+				"database":       "abf1055a-745d-4c24-a1db-1959ea819264",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
@@ -109,41 +109,41 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("missing projectId returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"databaseOption":     "new",
-				"dataSources":        []any{validSpacesSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"databaseOption": "new",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
-		require.ErrorContains(t, err, "projectId is required")
+		require.ErrorContains(t, err, "project is required")
 	})
 
 	t.Run("existing database without databaseId returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "existing",
-				"dataSources":        []any{validSpacesSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "existing",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
-		require.ErrorContains(t, err, "databaseId is required when using an existing database")
+		require.ErrorContains(t, err, "database is required when using an existing database")
 	})
 
 	t.Run("empty dataSources returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources":        []any{},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
+				"dataSources":    []any{},
 			},
 		})
 
@@ -153,11 +153,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("missing dataSources field returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 			},
 		})
 
@@ -169,11 +169,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("data source with missing type returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{"spacesBucket": "my-bucket"},
 				},
@@ -186,11 +186,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("data source with unknown type returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{"type": "dropbox"},
 				},
@@ -205,11 +205,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("spaces source without spacesBucket returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{"type": "spaces"},
 				},
@@ -222,11 +222,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("spaces source with invalid bucket ID format returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":         "spaces",
@@ -244,11 +244,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("web source without webURL returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":           "web",
@@ -265,11 +265,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("web source without crawlType returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":   "web",
@@ -285,11 +285,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("web source with invalid crawlType returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":      "web",
@@ -306,11 +306,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("seed URL without crawlingOption returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":      "web",
@@ -329,11 +329,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("invalid chunking algorithm returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":              "spaces",
@@ -350,11 +350,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("hierarchical chunking without parentChunkSize returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":              "spaces",
@@ -372,11 +372,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("hierarchical chunking without childChunkSize returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":              "spaces",
@@ -394,11 +394,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("hierarchical chunking with childChunkSize >= parentChunkSize returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":              "spaces",
@@ -420,12 +420,12 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("valid spaces source with new database -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources":        []any{validSpacesSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
@@ -435,12 +435,12 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("valid spaces source with existing database -> no error (no region needed)", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "existing",
-				"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
-				"dataSources":        []any{validSpacesSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "existing",
+				"database":       "abf1055a-745d-4c24-a1db-1959ea819264",
+				"dataSources":    []any{validSpacesSource},
 			},
 		})
 
@@ -450,12 +450,12 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("valid web seed source -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
-				"dataSources":        []any{validSeedSource},
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
+				"dataSources":    []any{validSeedSource},
 			},
 		})
 
@@ -465,11 +465,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("valid web sitemap source -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":      "web",
@@ -486,11 +486,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("multiple data sources of mixed types -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					validSpacesSource,
 					validSeedSource,
@@ -509,11 +509,11 @@ func Test__CreateKnowledgeBase__Setup(t *testing.T) {
 	t.Run("hierarchical chunking with valid sizes -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"name":               "my-kb",
-				"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-				"region":             "tor1",
-				"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-				"databaseOption":     "new",
+				"name":           "my-kb",
+				"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+				"region":         "tor1",
+				"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+				"databaseOption": "new",
 				"dataSources": []any{
 					map[string]any{
 						"type":              "spaces",
@@ -599,11 +599,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 	}
 
 	baseConfig := map[string]any{
-		"name":               "my-kb",
-		"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-		"region":             "tor1",
-		"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-		"databaseOption":     "new",
+		"name":           "my-kb",
+		"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+		"region":         "tor1",
+		"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+		"databaseOption": "new",
 		"dataSources": []any{
 			map[string]any{
 				"type":         "spaces",
@@ -640,11 +640,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		_, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "existing",
-			"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "existing",
+			"database":       "abf1055a-745d-4c24-a1db-1959ea819264",
 			"dataSources": []any{
 				map[string]any{"type": "spaces", "spacesBucket": "tor1/my-bucket"},
 			},
@@ -680,11 +680,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		_, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "new",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":         "tor1",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "new",
 			"dataSources": []any{
 				map[string]any{"type": "spaces", "spacesBucket": "tor1/my-bucket"},
 				map[string]any{"type": "web", "crawlType": "seed", "webURL": "https://docs.example.com", "crawlingOption": "SCOPED"},
@@ -707,11 +707,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		_, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "new",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":         "tor1",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "new",
 			"dataSources": []any{
 				map[string]any{
 					"type":              "spaces",
@@ -743,11 +743,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		_, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "new",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":         "tor1",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "new",
 			"dataSources": []any{
 				map[string]any{"type": "web", "crawlType": "seed", "webURL": "https://docs.example.com", "crawlingOption": "SCOPED", "webIncludeNavLinks": false},
 			},
@@ -772,11 +772,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		_, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "new",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":         "tor1",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "new",
 			"dataSources": []any{
 				map[string]any{"type": "web", "crawlType": "seed", "webURL": "https://docs.example.com", "crawlingOption": "SCOPED", "webIncludeNavLinks": true},
 			},
@@ -802,11 +802,11 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		_, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "new",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":         "tor1",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "new",
 			"dataSources": []any{
 				map[string]any{"type": "web", "crawlType": "sitemap", "webURL": "https://example.com/sitemap.xml"},
 			},
@@ -828,12 +828,12 @@ func Test__CreateKnowledgeBase__Execute(t *testing.T) {
 		}
 
 		meta, _, err := executeKB(t, httpContext, map[string]any{
-			"name":               "my-kb",
-			"embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
-			"region":             "tor1",
-			"projectId":          "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
-			"databaseOption":     "existing",
-			"databaseId":         "abf1055a-745d-4c24-a1db-1959ea819264",
+			"name":           "my-kb",
+			"embeddingModel": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+			"region":         "tor1",
+			"project":        "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+			"databaseOption": "existing",
+			"database":       "abf1055a-745d-4c24-a1db-1959ea819264",
 			"dataSources": []any{
 				map[string]any{"type": "spaces", "spacesBucket": "tor1/my-bucket"},
 			},
@@ -1112,7 +1112,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 	}
 
 	t.Run("has all top-level required fields", func(t *testing.T) {
-		for _, name := range []string{"name", "embeddingModelUUID", "projectId"} {
+		for _, name := range []string{"name", "embeddingModel", "project"} {
 			field := findField(name)
 			require.NotNil(t, field, "%s field must exist", name)
 			assert.True(t, field.Required, "%s must be required", name)
@@ -1142,7 +1142,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 			switch f.Name {
 			case "region":
 				regionIdx = i
-			case "databaseId":
+			case "database":
 				databaseIdIdx = i
 			}
 		}
@@ -1152,7 +1152,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 	})
 
 	t.Run("embeddingModelUUID is an integration resource field", func(t *testing.T) {
-		field := findField("embeddingModelUUID")
+		field := findField("embeddingModel")
 		require.NotNil(t, field)
 		assert.Equal(t, "integration-resource", field.Type)
 		assert.True(t, field.Required)
@@ -1162,7 +1162,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 	})
 
 	t.Run("projectId is an integration resource field", func(t *testing.T) {
-		field := findField("projectId")
+		field := findField("project")
 		require.NotNil(t, field)
 		assert.Equal(t, "integration-resource", field.Type)
 		assert.True(t, field.Required)
@@ -1172,7 +1172,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 	})
 
 	t.Run("databaseId is an integration resource field with visibility condition", func(t *testing.T) {
-		field := findField("databaseId")
+		field := findField("database")
 		require.NotNil(t, field)
 		assert.Equal(t, "integration-resource", field.Type)
 		require.NotNil(t, field.TypeOptions)
@@ -1212,7 +1212,7 @@ func Test__CreateKnowledgeBase__Configuration(t *testing.T) {
 	})
 
 	t.Run("databaseId is hidden unless databaseOption is 'existing'", func(t *testing.T) {
-		field := findField("databaseId")
+		field := findField("database")
 		require.NotNil(t, field)
 		require.Len(t, field.VisibilityConditions, 1)
 		assert.Equal(t, "databaseOption", field.VisibilityConditions[0].Field)

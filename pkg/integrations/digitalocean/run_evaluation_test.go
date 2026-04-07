@@ -15,34 +15,34 @@ import (
 func Test__RunEvaluation__Setup(t *testing.T) {
 	component := &RunEvaluation{}
 
-	t.Run("missing testCaseId returns error", func(t *testing.T) {
+	t.Run("missing testCase returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"agentId": "agent-123",
+				"agent": "agent-123",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "testCaseId is required")
+		require.ErrorContains(t, err, "testCase is required")
 	})
 
-	t.Run("missing agentId returns error", func(t *testing.T) {
+	t.Run("missing agent returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-123",
-				"runName":    "my-run",
+				"testCase": "tc-123",
+				"runName":  "my-run",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "agentId is required")
+		require.ErrorContains(t, err, "agent is required")
 	})
 
 	t.Run("missing runName returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-123",
-				"agentId":    "agent-123",
+				"testCase": "tc-123",
+				"agent":    "agent-123",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -53,9 +53,9 @@ func Test__RunEvaluation__Setup(t *testing.T) {
 	t.Run("runName over 64 chars returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-123",
-				"agentId":    "agent-123",
-				"runName":    strings.Repeat("a", 65),
+				"testCase": "tc-123",
+				"agent":    "agent-123",
+				"runName":  strings.Repeat("a", 65),
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -66,9 +66,9 @@ func Test__RunEvaluation__Setup(t *testing.T) {
 	t.Run("expression values are accepted at setup time", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"testCaseId": "{{ $.trigger.data.testCaseId }}",
-				"agentId":    "{{ $.trigger.data.agentId }}",
-				"runName":    "{{ $.trigger.data.runName }}",
+				"testCase": "{{ $.trigger.data.testCaseId }}",
+				"agent":    "{{ $.trigger.data.agentId }}",
+				"runName":  "{{ $.trigger.data.runName }}",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
@@ -79,9 +79,9 @@ func Test__RunEvaluation__Setup(t *testing.T) {
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-uuid-123",
-				"agentId":    "agent-uuid-456",
-				"runName":    "my-eval-run",
+				"testCase": "tc-uuid-123",
+				"agent":    "agent-uuid-456",
+				"runName":  "my-eval-run",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -121,9 +121,9 @@ func Test__RunEvaluation__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-uuid-123",
-				"agentId":    "agent-uuid-456",
-				"runName":    "my-eval-run",
+				"testCase": "tc-uuid-123",
+				"agent":    "agent-uuid-456",
+				"runName":  "my-eval-run",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -164,16 +164,16 @@ func Test__RunEvaluation__Execute(t *testing.T) {
 		assert.Equal(t, "ws-uuid-001", stored.WorkspaceUUID)
 	})
 
-	t.Run("expression agentId -> agentName is resolved UUID and workspace resolved from API", func(t *testing.T) {
+	t.Run("expression agent -> agentName is resolved UUID and workspace resolved from API", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-uuid-123",
-				"agentId":    "agent-uuid-456",
-				"runName":    "my-eval-run",
+				"testCase": "tc-uuid-123",
+				"agent":    "agent-uuid-456",
+				"runName":  "my-eval-run",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -214,16 +214,16 @@ func Test__RunEvaluation__Execute(t *testing.T) {
 		assert.Equal(t, "ws-uuid-001", stored.WorkspaceUUID)
 	})
 
-	t.Run("expression testCaseId -> testCaseName falls back to resolved UUID", func(t *testing.T) {
+	t.Run("expression testCase -> testCaseName falls back to resolved UUID", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-uuid-123",
-				"agentId":    "agent-uuid-456",
-				"runName":    "my-eval-run",
+				"testCase": "tc-uuid-123",
+				"agent":    "agent-uuid-456",
+				"runName":  "my-eval-run",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -256,16 +256,16 @@ func Test__RunEvaluation__Execute(t *testing.T) {
 		assert.Equal(t, "tc-uuid-123", stored.TestCaseName)
 	})
 
-	t.Run("expression agentId -> agentName falls back to resolved UUID", func(t *testing.T) {
+	t.Run("expression agent -> agentName falls back to resolved UUID", func(t *testing.T) {
 		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"testCaseId": "tc-uuid-123",
-				"agentId":    "agent-uuid-456",
-				"runName":    "my-eval-run",
+				"testCase": "tc-uuid-123",
+				"agent":    "agent-uuid-456",
+				"runName":  "my-eval-run",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{

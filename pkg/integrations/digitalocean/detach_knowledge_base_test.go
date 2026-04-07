@@ -15,31 +15,31 @@ import (
 func Test__DetachKnowledgeBase__Setup(t *testing.T) {
 	component := &DetachKnowledgeBase{}
 
-	t.Run("missing agentId returns error", func(t *testing.T) {
+	t.Run("missing agent returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
 			Metadata:      &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "agentId is required")
+		require.ErrorContains(t, err, "agent is required")
 	})
 
-	t.Run("missing knowledgeBaseId returns error", func(t *testing.T) {
+	t.Run("missing knowledgeBase returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"agentId": "agent-uuid",
+				"agent": "agent-uuid",
 			},
 			Metadata: &contexts.MetadataContext{},
 		})
 
-		require.ErrorContains(t, err, "knowledgeBaseId is required")
+		require.ErrorContains(t, err, "knowledgeBase is required")
 	})
 
-	t.Run("expression agentId is accepted at setup time", func(t *testing.T) {
+	t.Run("expression agent is accepted at setup time", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"agentId":         "{{ $.trigger.data.agentId }}",
-				"knowledgeBaseId": "kb-uuid",
+				"agent":         "{{ $.trigger.data.agentId }}",
+				"knowledgeBase": "kb-uuid",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -61,11 +61,11 @@ func Test__DetachKnowledgeBase__Setup(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("expression knowledgeBaseId is accepted at setup time", func(t *testing.T) {
+	t.Run("expression knowledgeBase is accepted at setup time", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"agentId":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-				"knowledgeBaseId": "{{ $.steps.create_kb.id }}",
+				"agent":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"knowledgeBase": "{{ $.steps.create_kb.id }}",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -90,8 +90,8 @@ func Test__DetachKnowledgeBase__Setup(t *testing.T) {
 	t.Run("valid configuration -> no error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
-				"agentId":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-				"knowledgeBaseId": "kb-uuid",
+				"agent":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"knowledgeBase": "kb-uuid",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -131,8 +131,8 @@ func Test__DetachKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"agentId":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-				"knowledgeBaseId": "kb-uuid",
+				"agent":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"knowledgeBase": "kb-uuid",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{
@@ -158,8 +158,8 @@ func Test__DetachKnowledgeBase__Execute(t *testing.T) {
 
 		wrapped := executionState.Payloads[0].(map[string]any)
 		payload := wrapped["data"].(map[string]any)
-		assert.Equal(t, "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", payload["agentId"])
-		assert.Equal(t, "kb-uuid", payload["knowledgeBaseId"])
+		assert.Equal(t, "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", payload["agentUUID"])
+		assert.Equal(t, "kb-uuid", payload["knowledgeBaseUUID"])
 	})
 
 	t.Run("detach API error -> returns error", func(t *testing.T) {
@@ -169,8 +169,8 @@ func Test__DetachKnowledgeBase__Execute(t *testing.T) {
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"agentId":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-				"knowledgeBaseId": "kb-uuid",
+				"agent":         "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+				"knowledgeBase": "kb-uuid",
 			},
 			HTTP: &contexts.HTTPContext{
 				Responses: []*http.Response{

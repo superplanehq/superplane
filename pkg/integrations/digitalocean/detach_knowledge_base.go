@@ -14,8 +14,8 @@ import (
 type DetachKnowledgeBase struct{}
 
 type DetachKnowledgeBaseSpec struct {
-	AgentID         string `json:"agentId" mapstructure:"agentId"`
-	KnowledgeBaseID string `json:"knowledgeBaseId" mapstructure:"knowledgeBaseId"`
+	Agent         string `json:"agent" mapstructure:"agent"`
+	KnowledgeBase string `json:"knowledgeBase" mapstructure:"knowledgeBase"`
 }
 
 func (d *DetachKnowledgeBase) Name() string {
@@ -47,8 +47,8 @@ func (d *DetachKnowledgeBase) Documentation() string {
 ## Output
 
 Returns confirmation of the detachment including:
-- **agentId**: UUID of the agent
-- **knowledgeBaseId**: UUID of the detached knowledge base`
+- **agentUUID**: UUID of the agent
+- **knowledgeBaseUUID**: UUID of the detached knowledge base`
 }
 
 func (d *DetachKnowledgeBase) Icon() string {
@@ -66,12 +66,12 @@ func (d *DetachKnowledgeBase) OutputChannels(configuration any) []core.OutputCha
 func (d *DetachKnowledgeBase) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "agentId",
-			Label:       "Agent UUID",
+			Name:        "agent",
+			Label:       "Agent",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select an agent",
-			Description: "The agent to detach the knowledge base from",
+			Description: "The agent to detach the knowledge base from. When using an expression, provide the agent UUID.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "agent",
@@ -79,19 +79,19 @@ func (d *DetachKnowledgeBase) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "knowledgeBaseId",
-			Label:       "Knowledge Base UUID",
+			Name:        "knowledgeBase",
+			Label:       "Knowledge Base",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select a knowledge base to detach",
-			Description: "The knowledge base to detach. Only knowledge bases currently attached to the selected agent are shown.",
+			Description: "The knowledge base to detach. Only knowledge bases currently attached to the selected agent are shown. When using an expression, provide the knowledge base UUID.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "agent_knowledge_base",
 					Parameters: []configuration.ParameterRef{
 						{
-							Name:      "agentId",
-							ValueFrom: &configuration.ParameterValueFrom{Field: "agentId"},
+							Name:      "agent",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "agent"},
 						},
 					},
 				},
@@ -106,15 +106,15 @@ func (d *DetachKnowledgeBase) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.AgentID == "" {
-		return errors.New("agentId is required")
+	if spec.Agent == "" {
+		return errors.New("agent is required")
 	}
 
-	if spec.KnowledgeBaseID == "" {
-		return errors.New("knowledgeBaseId is required")
+	if spec.KnowledgeBase == "" {
+		return errors.New("knowledgeBase is required")
 	}
 
-	if err := resolveKBNodeMetadata(ctx, spec.AgentID, spec.KnowledgeBaseID); err != nil {
+	if err := resolveKBNodeMetadata(ctx, spec.Agent, spec.KnowledgeBase); err != nil {
 		return fmt.Errorf("error resolving metadata: %v", err)
 	}
 
@@ -132,7 +132,7 @@ func (d *DetachKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	if err := client.DetachKnowledgeBase(spec.AgentID, spec.KnowledgeBaseID); err != nil {
+	if err := client.DetachKnowledgeBase(spec.Agent, spec.KnowledgeBase); err != nil {
 		return fmt.Errorf("failed to detach knowledge base: %v", err)
 	}
 
@@ -140,8 +140,8 @@ func (d *DetachKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 		core.DefaultOutputChannel.Name,
 		"digitalocean.knowledge_base.detached",
 		[]any{map[string]any{
-			"agentId":         spec.AgentID,
-			"knowledgeBaseId": spec.KnowledgeBaseID,
+			"agentUUID":         spec.Agent,
+			"knowledgeBaseUUID": spec.KnowledgeBase,
 		}},
 	)
 }

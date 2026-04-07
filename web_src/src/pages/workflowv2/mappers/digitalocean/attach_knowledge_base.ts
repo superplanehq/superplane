@@ -46,8 +46,8 @@ export const attachKnowledgeBaseMapper: ComponentBaseMapper = {
 
     const nodeMetadata = context.node.metadata as KBNodeMetadata | undefined;
 
-    details["Agent"] = nodeMetadata?.agentName || String(result.agentId || "-");
-    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseId || "-");
+    details["Agent"] = nodeMetadata?.agentName || String(result.agentUUID || "-");
+    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseUUID || "-");
 
     return details;
   },

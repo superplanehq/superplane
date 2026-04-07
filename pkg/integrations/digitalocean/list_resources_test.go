@@ -746,7 +746,7 @@ func Test__ListResources__AgentAvailableKnowledgeBases(t *testing.T) {
 		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
 			HTTP:        httpContext,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
-			Parameters:  map[string]string{"agentId": "agent-uuid"},
+			Parameters:  map[string]string{"agent": "agent-uuid"},
 		})
 
 		require.NoError(t, err)
@@ -787,7 +787,7 @@ func Test__ListResources__AgentAvailableKnowledgeBases(t *testing.T) {
 		resources, err := integration.ListResources("agent_available_knowledge_base", core.ListResourcesContext{
 			HTTP:        httpContext,
 			Integration: &contexts.IntegrationContext{Configuration: map[string]any{"apiToken": "test-token"}},
-			Parameters:  map[string]string{"agentId": "agent-uuid"},
+			Parameters:  map[string]string{"agent": "agent-uuid"},
 		})
 
 		require.NoError(t, err)

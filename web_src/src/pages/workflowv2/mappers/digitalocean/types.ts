@@ -239,12 +239,12 @@ export interface KBNodeMetadata {
 
 export interface CreateKnowledgeBaseConfiguration {
   name: string;
-  embeddingModelUUID: string;
+  embeddingModel: string;
   region: string;
-  projectId: string;
+  project: string;
   tags?: string[];
   databaseOption?: string;
-  databaseId?: string;
+  database?: string;
   dataSources?: KnowledgeBaseDataSource[];
 }
 
@@ -254,7 +254,7 @@ export interface DeleteKBNodeMetadata {
 }
 
 export interface DeleteKnowledgeBaseConfiguration {
-  knowledgeBaseId: string;
+  knowledgeBase: string;
   deleteOpenSearchDatabase?: boolean;
 }
 
@@ -266,8 +266,8 @@ export interface EvalNodeMetadata {
 }
 
 export interface RunEvaluationConfiguration {
-  testCaseId: string;
-  agentId: string;
+  testCase: string;
+  agent: string;
   runName: string;
 }
 

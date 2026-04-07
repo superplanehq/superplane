@@ -23,9 +23,9 @@ const (
 type RunEvaluation struct{}
 
 type RunEvaluationSpec struct {
-	TestCaseID string `json:"testCaseId" mapstructure:"testCaseId"`
-	AgentID    string `json:"agentId" mapstructure:"agentId"`
-	RunName    string `json:"runName" mapstructure:"runName"`
+	TestCase string `json:"testCase" mapstructure:"testCase"`
+	Agent    string `json:"agent" mapstructure:"agent"`
+	RunName  string `json:"runName" mapstructure:"runName"`
 }
 
 func (r *RunEvaluation) Name() string {
@@ -67,9 +67,9 @@ Runs a pre-configured evaluation test case against the selected agent. The test 
 ## Output
 
 Returns the evaluation results including:
-- **evaluationRunId**: UUID of the evaluation run
-- **testCaseId / testCaseName**: The test case that was run
-- **agentId / agentName**: The agent that was evaluated
+- **evaluationRunUUID**: UUID of the evaluation run
+- **testCaseUUID / testCaseName**: The test case that was run
+- **agentUUID / agentName**: The agent that was evaluated
 - **passed**: Whether the agent passed the evaluation
 - **status**: Final status of the evaluation run
 - **starMetric**: The primary metric result (name, numberValue, stringValue)
@@ -111,12 +111,12 @@ func (r *RunEvaluation) Configuration() []configuration.Field {
 			Description: "A name for this evaluation run, visible in the DigitalOcean console. Maximum 64 characters.",
 		},
 		{
-			Name:        "testCaseId",
+			Name:        "testCase",
 			Label:       "Evaluation Test Case",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select a test case",
-			Description: "The pre-configured evaluation test case to run, including prompts, metrics, and pass/fail thresholds",
+			Description: "The pre-configured evaluation test case to run, including prompts, metrics, and pass/fail thresholds. When using an expression, provide the test case UUID.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "evaluation_test_case",
@@ -124,12 +124,12 @@ func (r *RunEvaluation) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "agentId",
-			Label:       "Agent UUID",
+			Name:        "agent",
+			Label:       "Agent",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select an agent",
-			Description: "The agent to evaluate",
+			Description: "The agent to evaluate. When using an expression, provide the agent UUID.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "agent",
@@ -145,12 +145,12 @@ func (r *RunEvaluation) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.TestCaseID == "" {
-		return errors.New("testCaseId is required")
+	if spec.TestCase == "" {
+		return errors.New("testCase is required")
 	}
 
-	if spec.AgentID == "" {
-		return errors.New("agentId is required")
+	if spec.Agent == "" {
+		return errors.New("agent is required")
 	}
 
 	if spec.RunName == "" {
@@ -190,7 +190,7 @@ func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// POST only returns the run UUID, not the full object
-	runUUID, err := client.RunEvaluation(spec.TestCaseID, []string{spec.AgentID}, spec.RunName)
+	runUUID, err := client.RunEvaluation(spec.TestCase, []string{spec.Agent}, spec.RunName)
 	if err != nil {
 		return fmt.Errorf("failed to start evaluation run: %v", err)
 	}
@@ -204,15 +204,15 @@ func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
 	// Also resolve workspace UUID from the agent if not already set.
 	testCaseName := nodeMeta.TestCaseName
 	if strings.Contains(testCaseName, "{{") {
-		testCaseName = spec.TestCaseID
+		testCaseName = spec.TestCase
 	}
 
 	agentName := nodeMeta.AgentName
 	workspaceUUID := nodeMeta.WorkspaceUUID
 	if strings.Contains(agentName, "{{") {
-		agentName = spec.AgentID
+		agentName = spec.Agent
 		if workspaceUUID == "" {
-			if agent, agentErr := client.GetAgent(spec.AgentID); agentErr == nil {
+			if agent, agentErr := client.GetAgent(spec.Agent); agentErr == nil {
 				if agent.Workspace != nil {
 					workspaceUUID = agent.Workspace.UUID
 				}
@@ -222,10 +222,10 @@ func (r *RunEvaluation) Execute(ctx core.ExecutionContext) error {
 
 	meta := evalRunMetadata{
 		EvalRunUUID:   runUUID,
-		TestCaseID:    spec.TestCaseID,
+		TestCaseID:    spec.TestCase,
 		TestCaseName:  testCaseName,
 		WorkspaceUUID: workspaceUUID,
-		AgentID:       spec.AgentID,
+		AgentID:       spec.Agent,
 		AgentName:     agentName,
 	}
 
@@ -333,16 +333,16 @@ func (r *RunEvaluation) emitFailed(ctx core.ActionContext, meta evalRunMetadata,
 
 func buildEvalOutput(meta evalRunMetadata, run *EvaluationRun, prompts []EvaluationPrompt) map[string]any {
 	output := map[string]any{
-		"evaluationRunId": meta.EvalRunUUID,
-		"testCaseId":      meta.TestCaseID,
-		"testCaseName":    meta.TestCaseName,
-		"workspaceId":     meta.WorkspaceUUID,
-		"agentId":         meta.AgentID,
-		"agentName":       meta.AgentName,
-		"passed":          run.PassStatus,
-		"status":          evalRunState(run.Status),
-		"startedAt":       run.StartedAt,
-		"finishedAt":      run.FinishedAt,
+		"evaluationRunUUID": meta.EvalRunUUID,
+		"testCaseUUID":      meta.TestCaseID,
+		"testCaseName":      meta.TestCaseName,
+		"workspaceUUID":     meta.WorkspaceUUID,
+		"agentUUID":         meta.AgentID,
+		"agentName":         meta.AgentName,
+		"passed":            run.PassStatus,
+		"status":            evalRunState(run.Status),
+		"startedAt":         run.StartedAt,
+		"finishedAt":        run.FinishedAt,
 	}
 
 	if run.StarMetricResult != nil {
@@ -422,26 +422,26 @@ type EvalNodeMetadata struct {
 // resolveEvalMetadata fetches the test case and agent names from the API
 func resolveEvalMetadata(ctx core.SetupContext, spec RunEvaluationSpec) error {
 	meta := EvalNodeMetadata{
-		TestCaseID: spec.TestCaseID,
-		AgentID:    spec.AgentID,
+		TestCaseID: spec.TestCase,
+		AgentID:    spec.Agent,
 	}
 
-	isTestCaseExpr := strings.Contains(spec.TestCaseID, "{{")
-	isAgentExpr := strings.Contains(spec.AgentID, "{{")
+	isTestCaseExpr := strings.Contains(spec.TestCase, "{{")
+	isAgentExpr := strings.Contains(spec.Agent, "{{")
 
 	if isTestCaseExpr {
-		meta.TestCaseName = spec.TestCaseID
+		meta.TestCaseName = spec.TestCase
 	}
 	if isAgentExpr {
-		meta.AgentName = spec.AgentID
+		meta.AgentName = spec.Agent
 	}
 
 	// Check if already cached
 	var existing EvalNodeMetadata
 	err := mapstructure.Decode(ctx.Metadata.Get(), &existing)
 	if err == nil &&
-		existing.TestCaseID == spec.TestCaseID && existing.TestCaseName != "" &&
-		existing.AgentID == spec.AgentID && existing.AgentName != "" {
+		existing.TestCaseID == spec.TestCase && existing.TestCaseName != "" &&
+		existing.AgentID == spec.Agent && existing.AgentName != "" {
 		return nil
 	}
 
@@ -460,21 +460,21 @@ func resolveEvalMetadata(ctx core.SetupContext, spec RunEvaluationSpec) error {
 			return fmt.Errorf("failed to list evaluation test cases: %w", err)
 		}
 		for _, tc := range testCases {
-			if tc.UUID == spec.TestCaseID {
+			if tc.UUID == spec.TestCase {
 				meta.TestCaseName = tc.Name
 				meta.WorkspaceUUID = tc.WorkspaceUUID
 				break
 			}
 		}
 		if meta.TestCaseName == "" {
-			meta.TestCaseName = spec.TestCaseID
+			meta.TestCaseName = spec.TestCase
 		}
 	}
 
 	if !isAgentExpr {
-		agent, err := client.GetAgent(spec.AgentID)
+		agent, err := client.GetAgent(spec.Agent)
 		if err != nil {
-			return fmt.Errorf("failed to fetch agent %q: %w", spec.AgentID, err)
+			return fmt.Errorf("failed to fetch agent %q: %w", spec.Agent, err)
 		}
 		meta.AgentName = agent.Name
 		if agent.Workspace != nil && meta.WorkspaceUUID == "" {

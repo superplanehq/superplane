@@ -134,16 +134,16 @@ The Attach Knowledge Base component connects a knowledge base to an existing Gra
 ### Output
 
 Returns confirmation of the attachment including:
-- **agentId**: UUID of the agent
-- **knowledgeBaseId**: UUID of the attached knowledge base
+- **agentUUID**: UUID of the agent
+- **knowledgeBaseUUID**: UUID of the attached knowledge base
 
 ### Example Output
 
 ```json
 {
   "data": {
-    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+    "agentUUID": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseUUID": "a1b2c3d4-0000-0000-0000-000000000001"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "digitalocean.knowledge_base.attached"
@@ -884,7 +884,7 @@ Deletes the specified knowledge base. Optionally, you can also delete the associ
 ### Output
 
 Returns confirmation of the deletion including:
-- **knowledgeBaseId**: UUID of the deleted knowledge base
+- **knowledgeBaseUUID**: UUID of the deleted knowledge base
 - **databaseDeleted**: Whether the OpenSearch database was also deleted
 - **databaseId**: UUID of the deleted database (included when the database was deleted)
 - **databaseName**: Name of the deleted database (included when the database was deleted)
@@ -902,7 +902,7 @@ Returns confirmation of the deletion including:
     "databaseDeleted": true,
     "databaseId": "9cc10173-e9ea-4176-9dbc-a4cee4c4ff30",
     "databaseName": "my-knowledge-base-os",
-    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+    "knowledgeBaseUUID": "a1b2c3d4-0000-0000-0000-000000000001"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "digitalocean.knowledge_base.deleted"
@@ -1049,16 +1049,16 @@ The Detach Knowledge Base component removes a knowledge base from an existing Gr
 ### Output
 
 Returns confirmation of the detachment including:
-- **agentId**: UUID of the agent
-- **knowledgeBaseId**: UUID of the detached knowledge base
+- **agentUUID**: UUID of the agent
+- **knowledgeBaseUUID**: UUID of the detached knowledge base
 
 ### Example Output
 
 ```json
 {
   "data": {
-    "agentId": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-    "knowledgeBaseId": "a1b2c3d4-0000-0000-0000-000000000001"
+    "agentUUID": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseUUID": "a1b2c3d4-0000-0000-0000-000000000001"
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "digitalocean.knowledge_base.detached"
@@ -1664,9 +1664,9 @@ Runs a pre-configured evaluation test case against the selected agent. The test 
 ### Output
 
 Returns the evaluation results including:
-- **evaluationRunId**: UUID of the evaluation run
-- **testCaseId / testCaseName**: The test case that was run
-- **agentId / agentName**: The agent that was evaluated
+- **evaluationRunUUID**: UUID of the evaluation run
+- **testCaseUUID / testCaseName**: The test case that was run
+- **agentUUID / agentName**: The agent that was evaluated
 - **passed**: Whether the agent passed the evaluation
 - **status**: Final status of the evaluation run
 - **starMetric**: The primary metric result (name, numberValue, stringValue)
@@ -1686,9 +1686,9 @@ Returns the evaluation results including:
 ```json
 {
   "data": {
-    "agentId": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
     "agentName": "support-agent",
-    "evaluationRunId": "ba42b577-9dab-40a9-a375-315a5be1922e",
+    "agentUUID": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
+    "evaluationRunUUID": "ba42b577-9dab-40a9-a375-315a5be1922e",
     "finishedAt": "2025-01-01T00:03:44Z",
     "passed": true,
     "prompts": [
@@ -1751,8 +1751,8 @@ Returns the evaluation results including:
     },
     "startedAt": "2025-01-01T00:00:00Z",
     "status": "successful",
-    "testCaseId": "c6d75370-2f3e-11f1-b074-4e013e2ddde4",
-    "testCaseName": "Product Knowledge Baseline"
+    "testCaseName": "Product Knowledge Baseline",
+    "testCaseUUID": "c6d75370-2f3e-11f1-b074-4e013e2ddde4"
   },
   "timestamp": "2025-01-01T00:03:44Z",
   "type": "digitalocean.evaluation.passed"

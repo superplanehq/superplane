@@ -46,7 +46,7 @@ export const deleteKnowledgeBaseMapper: ComponentBaseMapper = {
 
     const nodeMetadata = context.node.metadata as DeleteKBNodeMetadata | undefined;
 
-    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseId || "-");
+    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseUUID || "-");
 
     if (result.databaseDeleted) {
       const dbName = String(result.databaseName || result.databaseId || "");
@@ -71,8 +71,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (nodeMetadata?.knowledgeBaseName) {
     metadata.push({ icon: "brain", label: nodeMetadata.knowledgeBaseName });
-  } else if (configuration?.knowledgeBaseId) {
-    metadata.push({ icon: "brain", label: `KB: ${configuration.knowledgeBaseId}` });
+  } else if (configuration?.knowledgeBase) {
+    metadata.push({ icon: "brain", label: `KB: ${configuration.knowledgeBase}` });
   }
 
   return metadata;

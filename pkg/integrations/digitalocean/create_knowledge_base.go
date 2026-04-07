@@ -42,14 +42,14 @@ type DataSourceSpec struct {
 
 // CreateKnowledgeBaseSpec is the decoded configuration for the CreateKnowledgeBase component
 type CreateKnowledgeBaseSpec struct {
-	Name               string           `json:"name" mapstructure:"name"`
-	EmbeddingModelUUID string           `json:"embeddingModelUUID" mapstructure:"embeddingModelUUID"`
-	Region             string           `json:"region" mapstructure:"region"`
-	ProjectID          string           `json:"projectId" mapstructure:"projectId"`
-	Tags               []string         `json:"tags" mapstructure:"tags"`
-	DatabaseOption     string           `json:"databaseOption" mapstructure:"databaseOption"` // "new" | "existing"
-	DatabaseID         string           `json:"databaseId" mapstructure:"databaseId"`
-	DataSources        []DataSourceSpec `json:"dataSources" mapstructure:"dataSources"`
+	Name           string           `json:"name" mapstructure:"name"`
+	EmbeddingModel string           `json:"embeddingModel" mapstructure:"embeddingModel"`
+	Region         string           `json:"region" mapstructure:"region"`
+	Project        string           `json:"project" mapstructure:"project"`
+	Tags           []string         `json:"tags" mapstructure:"tags"`
+	DatabaseOption string           `json:"databaseOption" mapstructure:"databaseOption"` // "new" | "existing"
+	Database       string           `json:"database" mapstructure:"database"`
+	DataSources    []DataSourceSpec `json:"dataSources" mapstructure:"dataSources"`
 }
 
 func (c *CreateKnowledgeBase) Name() string {
@@ -128,11 +128,11 @@ func (c *CreateKnowledgeBase) Configuration() []configuration.Field {
 			Placeholder: "my-knowledge-base",
 		},
 		{
-			Name:        "embeddingModelUUID",
+			Name:        "embeddingModel",
 			Label:       "Embedding Model",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The embedding model used to convert your data into vector embeddings. This cannot be changed after the knowledge base is created.",
+			Description: "The embedding model used to convert your data into vector embeddings. This cannot be changed after the knowledge base is created. When using an expression, provide the embedding model UUID.",
 			Placeholder: "Select an embedding model",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -141,11 +141,11 @@ func (c *CreateKnowledgeBase) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "projectId",
+			Name:        "project",
 			Label:       "Project",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "DigitalOcean project to associate with the knowledge base",
+			Description: "DigitalOcean project to associate with the knowledge base. When using an expression, provide the project UUID.",
 			Placeholder: "Select a project",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -188,11 +188,11 @@ func (c *CreateKnowledgeBase) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "databaseId",
+			Name:        "database",
 			Label:       "OpenSearch Database",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "The existing OpenSearch database cluster to connect to",
+			Description: "The existing OpenSearch database cluster to connect to. When using an expression, provide the database UUID.",
 			Placeholder: "Select an OpenSearch database",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "databaseOption", Values: []string{"existing"}},
@@ -254,20 +254,20 @@ func (c *CreateKnowledgeBase) Setup(ctx core.SetupContext) error {
 		return errors.New("name is required")
 	}
 
-	if spec.EmbeddingModelUUID == "" {
-		return errors.New("embeddingModelUUID is required")
+	if spec.EmbeddingModel == "" {
+		return errors.New("embeddingModel is required")
 	}
 
-	if spec.ProjectID == "" {
-		return errors.New("projectId is required")
+	if spec.Project == "" {
+		return errors.New("project is required")
 	}
 
 	if spec.DatabaseOption == "new" && spec.Region == "" {
 		return errors.New("region is required when creating a new database")
 	}
 
-	if spec.DatabaseOption == "existing" && spec.DatabaseID == "" {
-		return errors.New("databaseId is required when using an existing database")
+	if spec.DatabaseOption == "existing" && spec.Database == "" {
+		return errors.New("database is required when using an existing database")
 	}
 
 	if len(spec.DataSources) == 0 {
@@ -302,8 +302,8 @@ func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 
 	req := CreateKnowledgeBaseRequest{
 		Name:               spec.Name,
-		EmbeddingModelUUID: spec.EmbeddingModelUUID,
-		ProjectID:          spec.ProjectID,
+		EmbeddingModelUUID: spec.EmbeddingModel,
+		ProjectID:          spec.Project,
 		Tags:               spec.Tags,
 		DataSources:        buildKBDataSources(spec.DataSources),
 	}
@@ -313,7 +313,7 @@ func (c *CreateKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.DatabaseOption == "existing" {
-		req.DatabaseID = spec.DatabaseID
+		req.DatabaseID = spec.Database
 	}
 
 	kb, err := client.CreateKnowledgeBase(req)
@@ -361,7 +361,7 @@ func mergeCreateKBOutputFromFetchedKB(output map[string]any, kb *KnowledgeBase) 
 func resolveDisplayNames(client *Client, spec CreateKnowledgeBaseSpec, output map[string]any) {
 	if models, err := client.ListEmbeddingModels(); err == nil {
 		for _, m := range models {
-			if m.UUID == spec.EmbeddingModelUUID {
+			if m.UUID == spec.EmbeddingModel {
 				output["embeddingModelName"] = m.Name
 				break
 			}
@@ -370,17 +370,17 @@ func resolveDisplayNames(client *Client, spec CreateKnowledgeBaseSpec, output ma
 
 	if projects, err := client.ListProjects(); err == nil {
 		for _, p := range projects {
-			if p.ID == spec.ProjectID {
+			if p.ID == spec.Project {
 				output["projectName"] = p.Name
 				break
 			}
 		}
 	}
 
-	if spec.DatabaseOption == "existing" && spec.DatabaseID != "" {
+	if spec.DatabaseOption == "existing" && spec.Database != "" {
 		if databases, err := client.ListDatabasesByEngine("opensearch"); err == nil {
 			for _, db := range databases {
-				if db.ID == spec.DatabaseID {
+				if db.ID == spec.Database {
 					output["databaseName"] = db.Name
 					output["databaseStatus"] = db.Status
 					break

@@ -15,7 +15,7 @@ import (
 type DeleteKnowledgeBase struct{}
 
 type DeleteKnowledgeBaseSpec struct {
-	KnowledgeBaseID          string `json:"knowledgeBaseId" mapstructure:"knowledgeBaseId"`
+	KnowledgeBase            string `json:"knowledgeBase" mapstructure:"knowledgeBase"`
 	DeleteOpenSearchDatabase bool   `json:"deleteOpenSearchDatabase" mapstructure:"deleteOpenSearchDatabase"`
 }
 
@@ -52,7 +52,7 @@ Deletes the specified knowledge base. Optionally, you can also delete the associ
 ## Output
 
 Returns confirmation of the deletion including:
-- **knowledgeBaseId**: UUID of the deleted knowledge base
+- **knowledgeBaseUUID**: UUID of the deleted knowledge base
 - **databaseDeleted**: Whether the OpenSearch database was also deleted
 - **databaseId**: UUID of the deleted database (included when the database was deleted)
 - **databaseName**: Name of the deleted database (included when the database was deleted)
@@ -78,12 +78,12 @@ func (d *DeleteKnowledgeBase) OutputChannels(configuration any) []core.OutputCha
 func (d *DeleteKnowledgeBase) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "knowledgeBaseId",
-			Label:       "Knowledge Base UUID",
+			Name:        "knowledgeBase",
+			Label:       "Knowledge Base",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select a knowledge base",
-			Description: "The knowledge base to delete",
+			Description: "The knowledge base to delete. When using an expression, provide the knowledge base UUID.",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "knowledge_base",
@@ -107,11 +107,11 @@ func (d *DeleteKnowledgeBase) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if spec.KnowledgeBaseID == "" {
-		return errors.New("knowledgeBaseId is required")
+	if spec.KnowledgeBase == "" {
+		return errors.New("knowledgeBase is required")
 	}
 
-	if err := resolveDeleteKBMetadata(ctx, spec.KnowledgeBaseID); err != nil {
+	if err := resolveDeleteKBMetadata(ctx, spec.KnowledgeBase); err != nil {
 		return fmt.Errorf("error resolving metadata: %v", err)
 	}
 
@@ -130,14 +130,14 @@ func (d *DeleteKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 	}
 
 	output := map[string]any{
-		"knowledgeBaseId": spec.KnowledgeBaseID,
-		"databaseDeleted": false,
+		"knowledgeBaseUUID": spec.KnowledgeBase,
+		"databaseDeleted":   false,
 	}
 
 	// If deleting the database, fetch the KB first to get the database ID
 	var databaseID string
 	if spec.DeleteOpenSearchDatabase {
-		kb, err := client.GetKnowledgeBase(spec.KnowledgeBaseID)
+		kb, err := client.GetKnowledgeBase(spec.KnowledgeBase)
 		if err != nil {
 			if doErr, ok := err.(*DOAPIError); ok && doErr.StatusCode == http.StatusNotFound {
 				// KB already gone — nothing to do
@@ -153,7 +153,7 @@ func (d *DeleteKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Delete the knowledge base
-	if err := client.DeleteKnowledgeBase(spec.KnowledgeBaseID); err != nil {
+	if err := client.DeleteKnowledgeBase(spec.KnowledgeBase); err != nil {
 		if doErr, ok := err.(*DOAPIError); ok && doErr.StatusCode == http.StatusNotFound {
 			// Idempotent — already deleted
 		} else {

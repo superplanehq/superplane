@@ -1,9 +1,9 @@
 {
   "data": {
-    "evaluationRunId": "ba42b577-9dab-40a9-a375-315a5be1922e",
-    "testCaseId": "c6d75370-2f3e-11f1-b074-4e013e2ddde4",
+    "evaluationRunUUID": "ba42b577-9dab-40a9-a375-315a5be1922e",
+    "testCaseUUID": "c6d75370-2f3e-11f1-b074-4e013e2ddde4",
     "testCaseName": "Product Knowledge Baseline",
-    "agentId": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
+    "agentUUID": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
     "agentName": "support-agent",
     "passed": true,
     "status": "successful",
