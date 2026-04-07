@@ -3165,7 +3165,8 @@ export function WorkflowPageV2() {
       const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+      const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
+      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
 
       // Generate a unique node ID
       const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);

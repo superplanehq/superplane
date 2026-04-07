@@ -194,6 +194,14 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 }
 
 func (s *CanvasSteps) AddNote() {
+	// The "Add Note" button only appears in the closed building blocks sidebar.
+	// If the sidebar is currently open, close it first by clicking on empty canvas area.
+	sidebar := q.TestID("building-blocks-sidebar").Run(s.session)
+	if isVisible, _ := sidebar.IsVisible(); isVisible {
+		s.ClickOnEmptyCanvasArea()
+		s.session.Sleep(300)
+	}
+
 	s.session.Click(q.TestID("add-note-button"))
 	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)

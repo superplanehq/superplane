@@ -165,9 +165,20 @@ func (s *canvasAutoSaveSteps) assertNotePreview(text string) {
 
 func (s *canvasAutoSaveSteps) assertNoteTextInDB(expected string) {
 	require.Eventually(s.t, func() bool {
-		node := s.canvas.GetNodeFromDB("Note")
-		text, _ := node.Configuration.Data()["text"].(string)
-		return text == expected
+		versions, err := models.ListCanvasVersions(s.canvas.WorkflowID)
+		if err != nil || len(versions) == 0 {
+			return false
+		}
+
+		// Find the "Note" node in the latest version's nodes
+		for _, node := range versions[0].Nodes {
+			if node.Name == "Note" {
+				text, _ := node.Configuration["text"].(string)
+				return text == expected
+			}
+		}
+
+		return false
 	}, 10*time.Second, 200*time.Millisecond)
 }
 
