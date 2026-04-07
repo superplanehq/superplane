@@ -26,11 +26,13 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
+from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
+from ai.llm_cost_estimate import estimate_cost_usd_for_model
 from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
@@ -122,6 +124,22 @@ def _to_jsonable(value: Any) -> Any:
     if callable(model_dump):
         return model_dump(mode="json", by_alias=True)
     return str(value)
+
+
+def _record_usage(store: SessionStore, chat_id: str, model: str, usage: RunUsage) -> None:
+    try:
+        store.record_run_usage(
+            chat_id=chat_id,
+            model=model,
+            input_tokens=usage.input_tokens or 0,
+            output_tokens=usage.output_tokens or 0,
+            cache_read_tokens=usage.cache_read_tokens or 0,
+            cache_write_tokens=usage.cache_write_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+            estimated_cost_usd=estimate_cost_usd_for_model(model, usage),
+        )
+    except Exception as error:
+        print(f"[web] failed to record usage for chat {chat_id}: {error}", flush=True)
 
 
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
@@ -406,11 +424,13 @@ async def _stream_agent_run(
                         await asyncio.sleep(0.01)
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
+            usage = result.usage()
             yield {
                 "type": "final_answer",
                 "output": output,
-                "usage": _to_jsonable(result.usage()),
+                "usage": _to_jsonable(usage),
             }
+            _record_usage(store, chat.id, payload.model, usage)
 
     yield {
         "type": "run_completed",
