@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
+import { getKnowledgeBaseMapper } from "./get_knowledge_base";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
 import { runEvaluationMapper, RUN_EVALUATION_STATE_REGISTRY } from "./run_evaluation";
@@ -120,6 +121,91 @@ describe("createKnowledgeBaseMapper.getExecutionDetails", () => {
       execution: { outputs: { default: [buildOutput({ name: "kb", tags: [] })] } },
     });
     expect(createKnowledgeBaseMapper.getExecutionDetails(ctx)["Tags"]).toBeUndefined();
+  });
+});
+
+// ── getKnowledgeBaseMapper ───────────────────────────────────────────
+
+describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
+  it("does not throw when outputs is undefined", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
+    expect(() => getKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("does not throw when default array is empty", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
+    expect(() => getKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("does not throw when output data fields are all missing", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [buildOutput({})] } } });
+    expect(() => getKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("extracts knowledge base details from output", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              uuid: "kb-uuid",
+              name: "my-kb",
+              databaseStatus: "ONLINE",
+              region: "tor1",
+              embeddingModelName: "GTE Large EN v1.5",
+              projectName: "AI Agents",
+              database: { id: "db-1", name: "my-kb-os" },
+              dataSources: [{ uuid: "ds-1", type: "spaces" }, { uuid: "ds-2", type: "web" }],
+              lastIndexingJob: {
+                status: "INDEX_JOB_STATUS_COMPLETED",
+                completedDataSources: 2,
+                totalDataSources: 2,
+                finishedAt: "2025-06-01T00:05:32Z",
+              },
+            }),
+          ],
+        },
+      },
+    });
+    const details = getKnowledgeBaseMapper.getExecutionDetails(ctx);
+    expect(details["Knowledge Base"]).toBe("my-kb");
+    expect(details["View Knowledge Base"]).toContain("kb-uuid");
+    expect(details["Database Status"]).toBe("ONLINE");
+    expect(details["Database"]).toBe("my-kb-os");
+    expect(details["View Database"]).toContain("db-1");
+    expect(details["Region"]).toBe("tor1");
+    expect(details["Embedding Model"]).toBe("GTE Large EN v1.5");
+    expect(details["Project"]).toBe("AI Agents");
+    expect(details["Data Sources"]).toBe("2");
+    expect(details["Last Indexing"]).toContain("2/2 sources");
+    expect(details["Last Indexed At"]).toBeDefined();
+  });
+
+  it("omits optional fields when absent", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: { default: [buildOutput({ name: "kb" })] },
+      },
+    });
+    const details = getKnowledgeBaseMapper.getExecutionDetails(ctx);
+    expect(details["Knowledge Base"]).toBe("kb");
+    expect(details["Database Status"]).toBeUndefined();
+    expect(details["Embedding Model"]).toBeUndefined();
+    expect(details["Project"]).toBeUndefined();
+    expect(details["Database"]).toBeUndefined();
+    expect(details["View Database"]).toBeUndefined();
+    expect(details["Data Sources"]).toBeUndefined();
+    expect(details["Last Indexing"]).toBeUndefined();
+    expect(details["Last Indexed At"]).toBeUndefined();
+    expect(details["View Knowledge Base"]).toBeUndefined();
+  });
+
+  it("does not throw when node metadata and configuration are undefined", () => {
+    const ctx = buildDetailsCtx({
+      node: { metadata: undefined, configuration: undefined },
+      execution: { outputs: { default: [buildOutput({ name: "kb" })] } },
+    });
+    expect(() => getKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 });
 

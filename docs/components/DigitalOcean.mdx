@@ -32,6 +32,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get App" href="#get-app" description="Fetch details of a DigitalOcean App Platform application by ID" />
   <LinkCard title="Get Droplet" href="#get-droplet" description="Fetch details of a DigitalOcean Droplet by ID" />
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
+  <LinkCard title="Get Knowledge Base" href="#get-knowledge-base" description="Retrieve detailed information about a DigitalOcean Gradient AI knowledge base" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
@@ -1444,6 +1445,96 @@ All metric values are rounded to two decimal places.
   },
   "timestamp": "2026-03-19T08:36:37.115389929Z",
   "type": "digitalocean.droplet.metrics"
+}
+```
+
+<a id="get-knowledge-base"></a>
+
+## Get Knowledge Base
+
+The Get Knowledge Base component retrieves comprehensive information about an existing knowledge base on the DigitalOcean Gradient AI Platform.
+
+### How it works
+
+Fetches the knowledge base details including its OpenSearch database, all attached data sources, and the latest indexing job status.
+
+### Use Cases
+
+- **Pre-flight checks**: Inspect a knowledge base before attaching it to an agent or running evaluations
+- **Health monitoring**: Check indexing status and data source count on a schedule
+- **Teardown workflows**: Fetch the database ID before deleting the knowledge base
+- **Auditing**: Verify region, embedding model, and data source configuration
+
+### Output
+
+Returns the full knowledge base object including:
+- **uuid**, **name**, **status**, **region**, **tags** — core properties
+- **embeddingModelUUID**, **embeddingModelName** — embedding model details
+- **projectId**, **projectName** — associated project
+- **database** — OpenSearch database object with id, name, and status
+- **dataSources** — array of all attached data sources with type and source details
+- **lastIndexingJob** — full indexing job details: status, phase, tokens, data source progress, timing, and report availability
+- **createdAt**, **updatedAt** — timestamps
+
+### Example Output
+
+```json
+{
+  "data": {
+    "createdAt": "2025-01-01T00:00:00Z",
+    "dataSources": [
+      {
+        "chunkingAlgorithm": "CHUNKING_ALGORITHM_SECTION_BASED",
+        "createdAt": "2025-01-01T00:00:00Z",
+        "spacesBucket": "tor1/product-data",
+        "type": "spaces",
+        "updatedAt": "2025-06-01T00:00:00Z",
+        "uuid": "a1b2c3d4-0000-0000-0000-000000000001"
+      },
+      {
+        "chunkingAlgorithm": "CHUNKING_ALGORITHM_SEMANTIC",
+        "crawlingOption": "SCOPED",
+        "createdAt": "2025-02-01T00:00:00Z",
+        "type": "web",
+        "updatedAt": "2025-06-01T00:00:00Z",
+        "uuid": "a1b2c3d4-0000-0000-0000-000000000002",
+        "webURL": "https://docs.example.com"
+      }
+    ],
+    "database": {
+      "id": "abf1055a-745d-4c24-a1db-1959ea819264",
+      "name": "product-catalog-os",
+      "status": "online"
+    },
+    "databaseStatus": "ONLINE",
+    "embeddingModelName": "GTE Large EN v1.5",
+    "embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+    "lastIndexingJob": {
+      "completedDataSources": 2,
+      "createdAt": "2025-06-01T00:00:00Z",
+      "finishedAt": "2025-06-01T00:05:32Z",
+      "isReportAvailable": true,
+      "phase": "BATCH_JOB_PHASE_COMPLETE",
+      "startedAt": "2025-06-01T00:00:00Z",
+      "status": "INDEX_JOB_STATUS_COMPLETED",
+      "tokens": 123,
+      "totalDataSources": 2,
+      "totalTokens": "12345",
+      "uuid": "b2c3d4e5-0000-0000-0000-000000000001"
+    },
+    "name": "product-catalog-v2",
+    "projectId": "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+    "projectName": "AI Agents",
+    "region": "tor1",
+    "tags": [
+      "production",
+      "docs"
+    ],
+    "updatedAt": "2025-06-01T00:00:00Z",
+    "uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4"
+  },
+  "timestamp": "2025-06-01T00:05:32Z",
+  "type": "digitalocean.knowledge_base.fetched"
 }
 ```
 

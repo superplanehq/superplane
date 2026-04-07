@@ -257,6 +257,16 @@ func (u *UpdateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
 }
 
+//go:embed example_output_get_knowledge_base.json
+var exampleOutputGetKnowledgeBaseBytes []byte
+
+var exampleOutputGetKnowledgeBaseOnce sync.Once
+var exampleOutputGetKnowledgeBase map[string]any
+
+func (g *GetKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetKnowledgeBaseOnce, exampleOutputGetKnowledgeBaseBytes, &exampleOutputGetKnowledgeBase)
+}
+
 //go:embed example_output_create_knowledge_base.json
 var exampleOutputCreateKnowledgeBaseBytes []byte
 

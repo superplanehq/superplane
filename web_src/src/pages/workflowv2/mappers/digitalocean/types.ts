@@ -230,6 +230,15 @@ export interface UpdateAppConfiguration {
   gitHubBranch?: string;
 }
 
+export interface GetKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface GetKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
 export interface KBNodeMetadata {
   agentId?: string;
   agentName?: string;

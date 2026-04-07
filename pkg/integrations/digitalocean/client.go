@@ -2387,6 +2387,10 @@ type KnowledgeBase struct {
 	LastIndexingJob    *IndexJob `json:"last_indexing_job"`
 	CreatedAt          string    `json:"created_at"`
 	UpdatedAt          string    `json:"updated_at"`
+
+	// DatabaseStatus is a sibling field in the API response (not inside knowledge_base).
+	// It is populated by GetKnowledgeBase after parsing the response.
+	DatabaseStatus string `json:"-"`
 }
 
 // GetKnowledgeBase retrieves a knowledge base by its UUID
@@ -2398,13 +2402,15 @@ func (c *Client) GetKnowledgeBase(kbUUID string) (*KnowledgeBase, error) {
 	}
 
 	var response struct {
-		KnowledgeBase KnowledgeBase `json:"knowledge_base"`
+		KnowledgeBase  KnowledgeBase `json:"knowledge_base"`
+		DatabaseStatus string        `json:"database_status"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
+	response.KnowledgeBase.DatabaseStatus = response.DatabaseStatus
 	return &response.KnowledgeBase, nil
 }
 
@@ -2476,8 +2482,19 @@ func (c *Client) CreateKnowledgeBase(req CreateKnowledgeBaseRequest) (*Knowledge
 
 // IndexJob represents a DigitalOcean Gradient AI knowledge base indexing job
 type IndexJob struct {
-	UUID   string `json:"uuid"`
-	Status string `json:"status"`
+	UUID                 string `json:"uuid"`
+	Status               string `json:"status"`
+	Phase                string `json:"phase"`
+	Tokens               int    `json:"tokens"`
+	TotalTokens          string `json:"total_tokens"`
+	CompletedDataSources int    `json:"completed_datasources"`
+	TotalDataSources     int    `json:"total_datasources"`
+	StartedAt            string `json:"started_at"`
+	FinishedAt           string `json:"finished_at"`
+	CreatedAt            string `json:"created_at"`
+	UpdatedAt            string `json:"updated_at"`
+	IsReportAvailable    bool   `json:"is_report_available"`
+	KnowledgeBaseUUID    string `json:"knowledge_base_uuid"`
 }
 
 // StartIndexingJob triggers a new indexing job for a knowledge base
@@ -2503,6 +2520,39 @@ func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
 	}
 
 	return &response.IndexJob, nil
+}
+
+// KBDataSourceInfo represents a data source returned by the list data sources endpoint.
+// Spaces sources use flat fields (bucket_name, region, item_path).
+// Web sources use a nested web_crawler_data_source object.
+type KBDataSourceInfo struct {
+	UUID                 string                  `json:"uuid"`
+	BucketName           string                  `json:"bucket_name,omitempty"`
+	Region               string                  `json:"region,omitempty"`
+	ItemPath             string                  `json:"item_path,omitempty"`
+	WebCrawlerDataSource *KBWebCrawlerDataSource `json:"web_crawler_data_source,omitempty"`
+	ChunkingAlgorithm    string                  `json:"chunking_algorithm,omitempty"`
+	CreatedAt            string                  `json:"created_at,omitempty"`
+	UpdatedAt            string                  `json:"updated_at,omitempty"`
+}
+
+// ListKBDataSources retrieves all data sources for a knowledge base
+func (c *Client) ListKBDataSources(kbUUID string) ([]KBDataSourceInfo, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s/data_sources?per_page=200", c.BaseURL, kbUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DataSources []KBDataSourceInfo `json:"knowledge_base_data_sources"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.DataSources, nil
 }
 
 // AgentKnowledgeBase represents a knowledge base attached to a GradientAI agent
