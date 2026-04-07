@@ -1,7 +1,8 @@
-FROM python:3.13-slim AS base
+# Must match agent/pyproject.toml requires-python (currently >=3.12,<3.13).
+FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-  PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1
 
 COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
 
@@ -21,6 +22,11 @@ CMD ["bash", "-lc", "sleep infinity"]
 
 FROM base AS builder
 
+# Use the image's system Python for .venv so symlinks stay valid in the runner
+# (managed Python under /root/.local/share/uv is not copied and is not usable as nobody).
+ENV UV_PYTHON_DOWNLOADS=0 \
+    UV_LINK_MODE=copy
+
 COPY pyproject.toml pyproject.toml
 COPY uv.lock uv.lock
 COPY README.md README.md
@@ -30,7 +36,7 @@ COPY evals evals
 
 RUN uv sync --frozen --no-dev
 
-FROM python:3.13-slim AS runner
+FROM python:3.12-slim AS runner
 
 LABEL org.opencontainers.image.title="superplane-agent" \
   org.opencontainers.image.description="SuperPlane agent service" \
