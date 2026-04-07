@@ -112,6 +112,10 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if resourceType != resourceTypeSilence && resourceType != resourceTypeDataSource {
+		return []core.IntegrationResource{}, nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %w", err)
@@ -143,10 +147,6 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		}
 
 		return resources, nil
-	}
-
-	if resourceType != resourceTypeDataSource {
-		return []core.IntegrationResource{}, nil
 	}
 
 	dataSources, err := client.ListDataSources()
