@@ -158,7 +158,7 @@ type ListUsersRequest struct {
 	state                  protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType             authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId               string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	IncludeServiceAccounts bool                     `protobuf:"varint,3,opt,name=include_service_accounts,json=includeServiceAccounts,proto3" json:"include_service_accounts,omitempty"`
+	IncludeRoleAssignments bool                     `protobuf:"varint,3,opt,name=include_role_assignments,json=includeRoleAssignments,proto3" json:"include_role_assignments,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -207,9 +207,9 @@ func (x *ListUsersRequest) GetDomainId() string {
 	return ""
 }
 
-func (x *ListUsersRequest) GetIncludeServiceAccounts() bool {
+func (x *ListUsersRequest) GetIncludeRoleAssignments() bool {
 	if x != nil {
-		return x.IncludeServiceAccounts
+		return x.IncludeRoleAssignments
 	}
 	return false
 }
@@ -318,7 +318,7 @@ func (x *User) GetStatus() *User_Status {
 	return nil
 }
 
-type UserRoleAssignment struct {
+type RoleAssignment struct {
 	state           protoimpl.MessageState   `protogen:"open.v1"`
 	RoleName        string                   `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
 	RoleDisplayName string                   `protobuf:"bytes,2,opt,name=role_display_name,json=roleDisplayName,proto3" json:"role_display_name,omitempty"`
@@ -330,20 +330,20 @@ type UserRoleAssignment struct {
 	sizeCache       protoimpl.SizeCache
 }
 
-func (x *UserRoleAssignment) Reset() {
-	*x = UserRoleAssignment{}
+func (x *RoleAssignment) Reset() {
+	*x = RoleAssignment{}
 	mi := &file_users_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *UserRoleAssignment) String() string {
+func (x *RoleAssignment) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*UserRoleAssignment) ProtoMessage() {}
+func (*RoleAssignment) ProtoMessage() {}
 
-func (x *UserRoleAssignment) ProtoReflect() protoreflect.Message {
+func (x *RoleAssignment) ProtoReflect() protoreflect.Message {
 	mi := &file_users_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -355,47 +355,47 @@ func (x *UserRoleAssignment) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use UserRoleAssignment.ProtoReflect.Descriptor instead.
-func (*UserRoleAssignment) Descriptor() ([]byte, []int) {
+// Deprecated: Use RoleAssignment.ProtoReflect.Descriptor instead.
+func (*RoleAssignment) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *UserRoleAssignment) GetRoleName() string {
+func (x *RoleAssignment) GetRoleName() string {
 	if x != nil {
 		return x.RoleName
 	}
 	return ""
 }
 
-func (x *UserRoleAssignment) GetRoleDisplayName() string {
+func (x *RoleAssignment) GetRoleDisplayName() string {
 	if x != nil {
 		return x.RoleDisplayName
 	}
 	return ""
 }
 
-func (x *UserRoleAssignment) GetRoleDescription() string {
+func (x *RoleAssignment) GetRoleDescription() string {
 	if x != nil {
 		return x.RoleDescription
 	}
 	return ""
 }
 
-func (x *UserRoleAssignment) GetDomainType() authorization.DomainType {
+func (x *RoleAssignment) GetDomainType() authorization.DomainType {
 	if x != nil {
 		return x.DomainType
 	}
 	return authorization.DomainType(0)
 }
 
-func (x *UserRoleAssignment) GetDomainId() string {
+func (x *RoleAssignment) GetDomainId() string {
 	if x != nil {
 		return x.DomainId
 	}
 	return ""
 }
 
-func (x *UserRoleAssignment) GetAssignedAt() *timestamp.Timestamp {
+func (x *RoleAssignment) GetAssignedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.AssignedAt
 	}
@@ -563,11 +563,10 @@ func (x *User_Metadata) GetUpdatedAt() *timestamp.Timestamp {
 }
 
 type User_Spec struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	DisplayName      string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	AccountProviders []*AccountProvider     `protobuf:"bytes,2,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DisplayName   string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *User_Spec) Reset() {
@@ -607,18 +606,12 @@ func (x *User_Spec) GetDisplayName() string {
 	return ""
 }
 
-func (x *User_Spec) GetAccountProviders() []*AccountProvider {
-	if x != nil {
-		return x.AccountProviders
-	}
-	return nil
-}
-
 type User_Status struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RoleAssignments []*UserRoleAssignment  `protobuf:"bytes,2,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	AccountProviders []*AccountProvider     `protobuf:"bytes,1,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
+	Roles            []*RoleAssignment      `protobuf:"bytes,2,rep,name=roles,proto3" json:"roles,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *User_Status) Reset() {
@@ -651,9 +644,16 @@ func (*User_Status) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{4, 2}
 }
 
-func (x *User_Status) GetRoleAssignments() []*UserRoleAssignment {
+func (x *User_Status) GetAccountProviders() []*AccountProvider {
 	if x != nil {
-		return x.RoleAssignments
+		return x.AccountProviders
+	}
+	return nil
+}
+
+func (x *User_Status) GetRoles() []*RoleAssignment {
+	if x != nil {
+		return x.Roles
 	}
 	return nil
 }
@@ -678,9 +678,9 @@ const file_users_proto_rawDesc = "" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x128\n" +
-	"\x18include_service_accounts\x18\x03 \x01(\bR\x16includeServiceAccounts\"A\n" +
+	"\x18include_role_assignments\x18\x03 \x01(\bR\x16includeRoleAssignments\"A\n" +
 	"\x11ListUsersResponse\x12,\n" +
-	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xaa\x04\n" +
+	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\x92\x04\n" +
 	"\x04User\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Users.User.MetadataR\bmetadata\x12/\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Users.User.SpecR\x04spec\x125\n" +
@@ -691,13 +691,13 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1ay\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a)\n" +
 	"\x04Spec\x12!\n" +
-	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12N\n" +
-	"\x11account_providers\x18\x02 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x1aY\n" +
-	"\x06Status\x12O\n" +
-	"\x10role_assignments\x18\x02 \x03(\v2$.Superplane.Users.UserRoleAssignmentR\x0froleAssignments\"\xa9\x02\n" +
-	"\x12UserRoleAssignment\x12\x1b\n" +
+	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x1a\x90\x01\n" +
+	"\x06Status\x12N\n" +
+	"\x11account_providers\x18\x01 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x126\n" +
+	"\x05roles\x18\x02 \x03(\v2 .Superplane.Users.RoleAssignmentR\x05roles\"\xa5\x02\n" +
+	"\x0eRoleAssignment\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12*\n" +
 	"\x11role_display_name\x18\x02 \x01(\tR\x0froleDisplayName\x12)\n" +
 	"\x10role_description\x18\x03 \x01(\tR\x0froleDescription\x12E\n" +
@@ -744,7 +744,7 @@ var file_users_proto_goTypes = []any{
 	(*ListUsersRequest)(nil),      // 2: Superplane.Users.ListUsersRequest
 	(*ListUsersResponse)(nil),     // 3: Superplane.Users.ListUsersResponse
 	(*User)(nil),                  // 4: Superplane.Users.User
-	(*UserRoleAssignment)(nil),    // 5: Superplane.Users.UserRoleAssignment
+	(*RoleAssignment)(nil),        // 5: Superplane.Users.RoleAssignment
 	(*AccountProvider)(nil),       // 6: Superplane.Users.AccountProvider
 	(*User_Metadata)(nil),         // 7: Superplane.Users.User.Metadata
 	(*User_Spec)(nil),             // 8: Superplane.Users.User.Spec
@@ -762,14 +762,14 @@ var file_users_proto_depIdxs = []int32{
 	7,  // 5: Superplane.Users.User.metadata:type_name -> Superplane.Users.User.Metadata
 	8,  // 6: Superplane.Users.User.spec:type_name -> Superplane.Users.User.Spec
 	9,  // 7: Superplane.Users.User.status:type_name -> Superplane.Users.User.Status
-	10, // 8: Superplane.Users.UserRoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
-	12, // 9: Superplane.Users.UserRoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
+	10, // 8: Superplane.Users.RoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 9: Superplane.Users.RoleAssignment.assigned_at:type_name -> google.protobuf.Timestamp
 	12, // 10: Superplane.Users.AccountProvider.created_at:type_name -> google.protobuf.Timestamp
 	12, // 11: Superplane.Users.AccountProvider.updated_at:type_name -> google.protobuf.Timestamp
 	12, // 12: Superplane.Users.User.Metadata.created_at:type_name -> google.protobuf.Timestamp
 	12, // 13: Superplane.Users.User.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	6,  // 14: Superplane.Users.User.Spec.account_providers:type_name -> Superplane.Users.AccountProvider
-	5,  // 15: Superplane.Users.User.Status.role_assignments:type_name -> Superplane.Users.UserRoleAssignment
+	6,  // 14: Superplane.Users.User.Status.account_providers:type_name -> Superplane.Users.AccountProvider
+	5,  // 15: Superplane.Users.User.Status.roles:type_name -> Superplane.Users.RoleAssignment
 	2,  // 16: Superplane.Users.Users.ListUsers:input_type -> Superplane.Users.ListUsersRequest
 	3,  // 17: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse
 	17, // [17:18] is the sub-list for method output_type

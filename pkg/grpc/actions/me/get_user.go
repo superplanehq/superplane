@@ -37,6 +37,8 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		OrganizationId: orgID,
 		CreatedAt:      timestamppb.New(user.CreatedAt),
 		HasToken:       user.TokenHash != "",
+		Permissions:    []*pbAuth.Permission{},
+		Roles:          []string{},
 	}
 
 	if !includePermissions {
@@ -51,17 +53,17 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	}
 
 	//
-	// TODO: this can be simplified
+	// NOTE: authService.GetUserRolesForOrg returns implicit roles,
+	// so when serializing, we need to make sure permissions are only added once.
 	//
 	permissionSet := make(map[string]*pbAuth.Permission)
 	for _, role := range roles {
-		rolePermissions := role.Permissions
-
-		for _, perm := range rolePermissions {
-			key := fmt.Sprintf("%s:%s", perm.Resource, perm.Action)
+		userProto.Roles = append(userProto.Roles, role.Name)
+		for _, permission := range role.Permissions {
+			key := fmt.Sprintf("%s:%s", permission.Resource, permission.Action)
 			permissionSet[key] = &pbAuth.Permission{
-				Resource:   perm.Resource,
-				Action:     perm.Action,
+				Resource:   permission.Resource,
+				Action:     permission.Action,
 				DomainType: actions.DomainTypeToProto(models.DomainTypeOrganization),
 			}
 		}
