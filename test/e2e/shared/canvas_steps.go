@@ -41,7 +41,8 @@ func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 	}
 
 	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := time.Now().Add(2 * time.Second)
+
 	initialStateCaptured := false
 	initialState := ""
 	initialSavedLabel := ""
@@ -49,10 +50,11 @@ func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 	seenSaving := false
 	initialSavedStateStableUntil := time.Time{}
 	lastState := ""
+
 	for time.Now().Before(deadline) {
 		isVisible, _ := status.IsVisible()
 		if !isVisible {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 
@@ -99,7 +101,7 @@ func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 			return
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	s.t.Fatalf("timed out waiting for canvas save status saved, last state=%q", lastState)
 }
