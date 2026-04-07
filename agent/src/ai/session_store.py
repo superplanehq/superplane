@@ -130,6 +130,18 @@ class StoredAgentChat:
     initial_message: str | None
     created_at: datetime
     updated_at: datetime
+    total_input_tokens: int = 0
+    total_output_tokens: int = 0
+    total_tokens: int = 0
+    total_estimated_cost_usd: float = 0.0
+
+
+@dataclass(frozen=True)
+class StoredAgentChatUsage:
+    total_input_tokens: int
+    total_output_tokens: int
+    total_tokens: int
+    total_estimated_cost_usd: float
 
 
 @dataclass(frozen=True)
@@ -257,6 +269,10 @@ class SessionStore:
             initial_message=None,
             created_at=now,
             updated_at=now,
+            total_input_tokens=0,
+            total_output_tokens=0,
+            total_tokens=0,
+            total_estimated_cost_usd=0.0,
         )
 
         with self._cursor() as cur:
@@ -378,7 +394,7 @@ class SessionStore:
         return history
 
     def create_agent_chat_model_message(
-        self, chat_id: str, message: ModelMessage
+        self, chat_id: str, message: ModelMessage, run_id: str | None = None
     ) -> StoredAgentChatMessageRecord:
         now = _utcnow()
         serialized_message = _serialize_model_message(message)
@@ -394,12 +410,13 @@ class SessionStore:
             cur.execute(
                 """
                 INSERT INTO agent_chat_messages (
-                    id, chat_id, message_index, message, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s)
+                    id, chat_id, run_id, message_index, message, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     message_id,
                     chat_id,
+                    run_id,
                     message_index,
                     Jsonb(serialized_message),
                     created_at,
@@ -444,6 +461,7 @@ class SessionStore:
         chat_id: str,
         preserved_message_count: int,
         messages: list[ModelMessage],
+        run_id: str | None = None,
     ) -> None:
         now = _utcnow()
         with self._cursor(transactional=True) as cur:
@@ -466,12 +484,13 @@ class SessionStore:
                 cur.execute(
                     """
                     INSERT INTO agent_chat_messages (
-                        id, chat_id, message_index, message, created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s)
+                        id, chat_id, run_id, message_index, message, created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         str(uuid.uuid4()),
                         chat_id,
+                        run_id,
                         preserved_message_count + offset,
                         Jsonb(serialized_message),
                         created_at,
@@ -495,6 +514,121 @@ class SessionStore:
                 """,
                 (initial_message.strip(), now, chat_id),
             )
+
+    def create_agent_chat_run(self, chat_id: str, model: str) -> str:
+        run_id = str(uuid.uuid4())
+        now = _utcnow()
+
+        with self._cursor(transactional=True) as cur:
+            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
+            if cur.fetchone() is None:
+                raise AgentChatNotFoundError(chat_id)
+
+            cur.execute(
+                """
+                INSERT INTO agent_chat_runs (id, chat_id, model, created_at)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (run_id, chat_id, model, now),
+            )
+
+        return run_id
+
+    def update_run_usage(
+        self,
+        run_id: str,
+        input_tokens: int,
+        output_tokens: int,
+        cache_read_tokens: int,
+        cache_write_tokens: int,
+        total_tokens: int,
+        estimated_cost_usd: float | None,
+    ) -> None:
+        now = _utcnow()
+
+        with self._cursor(transactional=True) as cur:
+            cur.execute(
+                """
+                UPDATE agent_chat_runs
+                SET input_tokens = %s,
+                    output_tokens = %s,
+                    cache_read_tokens = %s,
+                    cache_write_tokens = %s,
+                    total_tokens = %s,
+                    estimated_cost_usd = %s
+                WHERE id = %s
+                RETURNING chat_id
+                """,
+                (
+                    input_tokens,
+                    output_tokens,
+                    cache_read_tokens,
+                    cache_write_tokens,
+                    total_tokens,
+                    estimated_cost_usd,
+                    run_id,
+                ),
+            )
+            row = cur.fetchone()
+            if row is None:
+                return
+
+            chat_id = row["chat_id"]
+            cur.execute("SELECT id FROM agent_chats WHERE id = %s FOR UPDATE", (chat_id,))
+            if cur.fetchone() is None:
+                return
+
+            cur.execute(
+                """
+                UPDATE agent_chats
+                SET total_input_tokens = sub.input_tokens,
+                    total_output_tokens = sub.output_tokens,
+                    total_tokens = sub.total_tokens,
+                    total_estimated_cost_usd = sub.estimated_cost_usd,
+                    updated_at = %s
+                FROM (
+                    SELECT COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
+                           COALESCE(SUM(r.output_tokens), 0) AS output_tokens,
+                           COALESCE(SUM(r.total_tokens), 0) AS total_tokens,
+                           COALESCE(SUM(r.estimated_cost_usd), 0) AS estimated_cost_usd
+                    FROM agent_chat_runs r
+                    WHERE r.chat_id = %s
+                ) sub
+                WHERE id = %s
+                """,
+                (now, chat_id, chat_id),
+            )
+
+    def get_org_usage(self, org_id: str) -> StoredAgentChatUsage:
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(total_input_tokens), 0) AS total_input_tokens,
+                    COALESCE(SUM(total_output_tokens), 0) AS total_output_tokens,
+                    COALESCE(SUM(total_tokens), 0) AS total_tokens,
+                    COALESCE(SUM(total_estimated_cost_usd), 0) AS total_estimated_cost_usd
+                FROM agent_chats
+                WHERE org_id = %s
+                """,
+                (org_id,),
+            )
+            row = cur.fetchone()
+
+        if row is None:
+            return StoredAgentChatUsage(
+                total_input_tokens=0,
+                total_output_tokens=0,
+                total_tokens=0,
+                total_estimated_cost_usd=0.0,
+            )
+
+        return StoredAgentChatUsage(
+            total_input_tokens=int(row["total_input_tokens"]),
+            total_output_tokens=int(row["total_output_tokens"]),
+            total_tokens=int(row["total_tokens"]),
+            total_estimated_cost_usd=float(row["total_estimated_cost_usd"]),
+        )
 
     def _flatten_message_record(
         self, record: StoredAgentChatMessageRecord
@@ -589,6 +723,10 @@ class SessionStore:
             else None,
             created_at=_from_db_time(row["created_at"]),
             updated_at=_from_db_time(row["updated_at"]),
+            total_input_tokens=int(row.get("total_input_tokens") or 0),
+            total_output_tokens=int(row.get("total_output_tokens") or 0),
+            total_tokens=int(row.get("total_tokens") or 0),
+            total_estimated_cost_usd=float(row.get("total_estimated_cost_usd") or 0.0),
         )
 
     def _row_to_message_record(self, row: dict[str, Any]) -> StoredAgentChatMessageRecord:

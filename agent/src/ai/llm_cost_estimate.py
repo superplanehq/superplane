@@ -82,8 +82,8 @@ def estimate_claude_cost_usd(usage: RunUsage, rates: ClaudeUsdPerMillion) -> flo
     """Estimate USD for one run using base input/output and Anthropic cache multipliers."""
     m = 1_000_000.0
     # Base input and output (standard tiers from pricing table).
-    cost = usage.input_tokens * rates.input_base / m
-    cost += usage.output_tokens * rates.output / m
+    cost = (usage.input_tokens or 0) * rates.input_base / m
+    cost += (usage.output_tokens or 0) * rates.output / m
     # Prompt caching: cache read ≈ 0.1× base input; 5m cache write ≈ 1.25× base input per MTok.
     if usage.cache_read_tokens:
         cost += usage.cache_read_tokens * (0.1 * rates.input_base) / m
