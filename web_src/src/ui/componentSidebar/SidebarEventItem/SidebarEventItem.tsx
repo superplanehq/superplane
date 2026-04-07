@@ -38,8 +38,6 @@ interface SidebarEventItemProps {
   tabData?: TabData;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  onPushThrough?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
@@ -64,8 +62,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   tabData,
   onCancelQueueItem,
   onCancelExecution,
-  onPushThrough,
-  supportsPushThrough,
   onReEmit,
   loadExecutionChain,
   getExecutionState,
@@ -272,10 +268,9 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const isQueued = event.state === "queued";
   const isRunning = event.state === "running";
 
-  const showPushThrough = supportsPushThrough && !!event.executionId && (isRunning || isWaiting);
   const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
   const showReEmit = event.kind === "trigger";
-  const showActionsMenu = showPushThrough || showCancel || showReEmit;
+  const showActionsMenu = showCancel || showReEmit;
 
   return (
     <div
@@ -336,8 +331,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
               executionId={event.executionId}
               onCancelQueueItem={onCancelQueueItem}
               onCancelExecution={onCancelExecution}
-              onPushThrough={onPushThrough}
-              supportsPushThrough={supportsPushThrough}
               eventState={event.state}
               kind={event.kind || "execution"}
               onReEmit={() => {
