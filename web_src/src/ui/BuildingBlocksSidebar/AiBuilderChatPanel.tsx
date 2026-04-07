@@ -525,7 +525,9 @@ function InputForm({
         />
 
         <div className="flex items-center justify-end">
-          <SubmitButton disabled={isDisabled} />
+          <button type="submit" className={SUBMIT_BUTTON_CLASSNAME} disabled={isDisabled} aria-label="Send prompt">
+            <ArrowUp size={14} />
+          </button>
         </div>
       </form>
     </div>
@@ -538,11 +540,3 @@ const SUBMIT_BUTTON_CLASSNAME = cn(
   "disabled:opacity-50 disabled:cursor-not-allowed",
   "flex items-center justify-center",
 );
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  return (
-    <button type="submit" className={SUBMIT_BUTTON_CLASSNAME} disabled={disabled} aria-label="Send prompt">
-      <ArrowUp size={14} />
-    </button>
-  );
-}
