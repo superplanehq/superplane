@@ -35,7 +35,6 @@ export interface ChainItemData {
   originalEvent?: CanvasesCanvasEvent; // Add event data for trigger events
   childExecutions?: ChildExecution[]; // Add child executions for composite components
   workflowNode?: ComponentsNode; // Add workflow node for subtitle generation
-  additionalData?: unknown; // Add additional data for subtitle generation
   tabData?: {
     current?: Record<string, any>;
     payload?: any;
@@ -51,13 +50,6 @@ type DetailValue = {
 type ErrorValue = {
   __type: "error";
   message: string;
-};
-
-type ApprovalTimelineEntry = {
-  label: string;
-  status: string;
-  timestamp?: React.ReactNode;
-  comment?: string;
 };
 
 type IssueListEntry = {
@@ -182,7 +174,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     const subtitle = mapper.subtitle?.({
       node: buildNodeInfo(item.workflowNode),
       execution: buildExecutionInfo(item.originalExecution),
-      additionalData: { skipIssueCounts: true },
     });
 
     return getComponentSubtitlePrefix(subtitle);
@@ -223,18 +214,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     if (!value || typeof value !== "object") return false;
     return "__type" in value && (value as ErrorValue).__type === "error";
   };
-  const isApprovalTimeline = (value: unknown): value is ApprovalTimelineEntry[] => {
-    if (!Array.isArray(value)) return false;
-    return value.every(
-      (entry) =>
-        entry &&
-        typeof entry === "object" &&
-        "label" in entry &&
-        "status" in entry &&
-        typeof (entry as ApprovalTimelineEntry).label === "string" &&
-        typeof (entry as ApprovalTimelineEntry).status === "string",
-    );
-  };
   const isIssuesList = (value: unknown): value is IssueListEntry[] => {
     if (!Array.isArray(value)) return false;
     return value.every(
@@ -268,14 +247,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const getUrgencyDotColor = (urgency: string) => {
     if (urgency === "high") return "bg-red-500";
     return "bg-yellow-500";
-  };
-  const getApprovalStatusColor = (status: string) => {
-    const normalized = status.toLowerCase();
-    if (normalized === "approved") return "bg-emerald-500";
-    if (normalized === "rejected") return "bg-red-500";
-    if (normalized === "critical") return "bg-red-500";
-    if (normalized === "degraded") return "bg-yellow-500";
-    return "bg-gray-400";
   };
 
   return (
@@ -438,77 +409,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {activeTab === "current" && item.tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
                 {Object.entries(item.tabData.current).map(([key, value]) => {
-                  if (isApprovalTimeline(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
-                          <div className="flex flex-col gap-3">
-                            {value.map((entry, entryIndex) => {
-                              const timestampText = getReactNodeText(entry.timestamp).trim();
-
-                              return (
-                                <div key={`${entry.label}-${entryIndex}`} className="relative pl-4">
-                                  <div
-                                    className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getApprovalStatusColor(
-                                      entry.status,
-                                    )}`}
-                                  />
-                                  {entryIndex < value.length - 1 && (
-                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
-                                  )}
-                                  {entry.label.includes(" · ") ? (
-                                    // Handle combined label with status (e.g., "Check Name · STATUS")
-                                    // Status is in label, so we don't show the separate status line
-                                    <div className="text-[13px] text-gray-800 font-medium truncate" title={entry.label}>
-                                      {entry.label.split(" · ").map((part, idx) => (
-                                        <span key={idx}>
-                                          {idx === 0 ? (
-                                            <span>{part}</span>
-                                          ) : (
-                                            <span>
-                                              {" · "}
-                                              <span className="text-[12px] text-gray-600 font-normal">{part}</span>
-                                            </span>
-                                          )}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div
-                                        className="text-[13px] text-gray-800 font-medium truncate"
-                                        title={entry.label}
-                                      >
-                                        {entry.label}
-                                      </div>
-                                      {entry.status && (
-                                        <div
-                                          className="text-[12px] text-gray-600 truncate"
-                                          title={`${entry.status}${timestampText ? ` ${timestampText}` : ""}`}
-                                        >
-                                          {entry.status}
-                                          {entry.timestamp && <> {entry.timestamp}</>}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                  {entry.comment && (
-                                    <div className="text-[12px] text-gray-500 italic break-words">
-                                      "{entry.comment}"
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
                   if (isIssuesList(value)) {
                     return (
                       <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
