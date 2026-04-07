@@ -1,21 +1,21 @@
 FROM python:3.13-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+  PYTHONUNBUFFERED=1
 
 COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
 
 WORKDIR /app/agent
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends bash ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS dev
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends make \
-    && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends make \
+  && rm -rf /var/lib/apt/lists/*
 
 CMD ["bash", "-lc", "sleep infinity"]
 
@@ -40,13 +40,13 @@ LABEL org.opencontainers.image.title="superplane-agent" \
   org.opencontainers.image.documentation="https://docs.superplane.com"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/agent/src \
-    PATH=/app/agent/.venv/bin:$PATH
+  PYTHONUNBUFFERED=1 \
+  PYTHONPATH=/app/agent/src \
+  PATH=/app/agent/.venv/bin:$PATH
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends bash ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 
 # We don't need Docker health checks, since these containers
 # are intended to run in Kubernetes pods, which have probes.
@@ -62,4 +62,4 @@ USER nobody
 EXPOSE 8090
 EXPOSE 50061
 
-CMD ["bash", "-lc", "uvicorn ai.web:create_app --factory --host 0.0.0.0 --port ${APP_PORT:-8090} --timeout-graceful-shutdown ${UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT:-310}"]
+CMD ["bash", "-c", "exec uvicorn ai.web:create_app --factory --host 0.0.0.0 --port ${APP_PORT:-8090} --timeout-graceful-shutdown ${UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT:-310}"]
