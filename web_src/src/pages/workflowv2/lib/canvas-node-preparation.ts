@@ -12,6 +12,8 @@ import {
   type TriggersTrigger,
 } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type { CompositeProps, LastRunState } from "@/ui/composite";
@@ -405,21 +407,25 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
 function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): ActionContext {
   return {
     invokeNodeExecutionAction: async (executionId: string, actionName: string, parameters: unknown) => {
-      await canvasesInvokeNodeExecutionAction(
-        withOrganizationHeader({
-          path: {
-            canvasId,
-            executionId,
-            actionName,
-          },
-          body: {
-            parameters,
-          },
-        }),
-      );
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.nodeExecution(canvasId, nodeId),
-      });
+      try {
+        await canvasesInvokeNodeExecutionAction(
+          withOrganizationHeader({
+            path: {
+              canvasId,
+              executionId,
+              actionName,
+            },
+            body: {
+              parameters,
+            },
+          }),
+        );
+        queryClient.invalidateQueries({
+          queryKey: canvasKeys.nodeExecution(canvasId, nodeId),
+        });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "failed to invoke action"));
+      }
     },
   };
 }

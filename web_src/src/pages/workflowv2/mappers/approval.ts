@@ -221,10 +221,7 @@ function getRejectionDetail(detail: RejectionDetail, record: ApprovalRecord): st
   return `Rejected ${formatRelativeTime(detail.rejectedAt, true)}` + getRecordTypeLabel(record);
 }
 
-function withApprovals(
-  details: Record<string, string>,
-  metadata: ExecutionMetadata,
-): Record<string, string> {
+function withApprovals(details: Record<string, string>, metadata: ExecutionMetadata): Record<string, string> {
   details["State"] = metadata.result.charAt(0).toUpperCase() + metadata.result.slice(1);
 
   //
@@ -266,7 +263,9 @@ function withApprovals(
 function sortedApprovalRecords(records: ApprovalRecord[]): ApprovalRecord[] {
   return records
     .filter((record) => record.state === "approved")
-    .sort((a, b) => new Date(a.approval?.approvedAt || "").getTime() - new Date(b.approval?.approvedAt || "").getTime());
+    .sort(
+      (a, b) => new Date(a.approval?.approvedAt || "").getTime() - new Date(b.approval?.approvedAt || "").getTime(),
+    );
 }
 
 function getApprovalCustomField(context: ComponentBaseContext): React.ReactNode | undefined {
