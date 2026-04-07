@@ -1,8 +1,6 @@
-import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import {
-  createSafeAdditionalDataBuilder,
   createSafeComponentMapper,
   createSafeCustomFieldRenderer,
   createSafeTriggerRenderer,
@@ -10,7 +8,6 @@ import {
   normalizeTriggerProps,
 } from "./safeMappers";
 import type {
-  AdditionalDataBuilderContext,
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
@@ -46,7 +43,23 @@ function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
 }
 
 function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return { nodes: [], node: DEFAULT_NODE, componentDefinition: DEFAULT_DEFINITION, lastExecutions: [], ...overrides };
+  return {
+    nodes: [],
+    node: DEFAULT_NODE,
+    componentDefinition: DEFAULT_DEFINITION,
+    lastExecutions: [],
+    ...overrides,
+    currentUser: {
+      id: "user-1",
+      name: "John Doe",
+      email: "john.doe@example.com",
+      roles: ["admin"],
+      groups: ["developers"],
+    },
+    actions: {
+      invokeNodeExecutionAction: async () => {},
+    },
+  };
 }
 
 function makeSubtitleContext(): SubtitleContext {
@@ -67,18 +80,6 @@ function makeTriggerRendererContext(): TriggerRendererContext {
 
 function makeTriggerEventContext(): TriggerEventContext {
   return { event: { id: "ev1", createdAt: new Date().toISOString(), data: {}, nodeId: "n1", type: "test" } };
-}
-
-function makeAdditionalDataContext(): AdditionalDataBuilderContext {
-  return {
-    nodes: [DEFAULT_NODE],
-    node: DEFAULT_NODE,
-    componentDefinition: DEFAULT_DEFINITION,
-    lastExecutions: [],
-    canvasId: "canvas-1",
-    queryClient: new QueryClient(),
-    organizationId: "org-1",
-  };
 }
 
 function throwingMapper(method: "props" | "subtitle" | "getExecutionDetails"): ComponentBaseMapper {
@@ -388,26 +389,7 @@ describe("safe mapper canvas resilience", () => {
   });
 });
 
-describe("additional data and custom field safety", () => {
-  it("returns undefined when an additional data builder throws", () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const safe = createSafeAdditionalDataBuilder(
-      {
-        buildAdditionalData: () => {
-          throw new Error("builder failed");
-        },
-      },
-      "approval",
-    );
-
-    expect(safe.buildAdditionalData(makeAdditionalDataContext())).toBeUndefined();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Additional data builder "approval" threw in buildAdditionalData()'),
-      expect.any(Error),
-    );
-    consoleSpy.mockRestore();
-  });
-
+describe("custom field safety", () => {
   it("returns null when a custom field renderer throws", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const safe = createSafeCustomFieldRenderer(

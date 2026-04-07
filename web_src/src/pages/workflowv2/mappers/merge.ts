@@ -152,16 +152,14 @@ export const mergeMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("white"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Merge",
-      eventSections: lastExecution
-        ? getMergeEventSections(context.nodes, lastExecution, context.additionalData)
-        : undefined,
+      eventSections: lastExecution ? getMergeEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: MERGE_STATE_MAP,
     };
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    return getMergeSubtitle(context.execution, context.additionalData);
+    return getMergeSubtitle(context.execution);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
@@ -180,7 +178,7 @@ export const mergeMapper: ComponentBaseMapper = {
   },
 };
 
-function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo, additionalData?: unknown): EventSection[] {
+function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const sections: EventSection[] = [];
 
   // Add the main execution section
@@ -188,7 +186,7 @@ function getMergeEventSections(nodes: NodeInfo[], execution: ExecutionInfo, addi
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
 
-  const eventSubtitle = getMergeSubtitle(execution, additionalData);
+  const eventSubtitle = getMergeSubtitle(execution);
 
   sections.push({
     receivedAt: new Date(execution.createdAt!),
@@ -220,7 +218,7 @@ function sourceSummary(metadata: ExecutionMetadata | undefined): SourceSummary {
   return summary;
 }
 
-function getMergeSubtitle(execution: ExecutionInfo, _: unknown): string | React.ReactNode {
+function getMergeSubtitle(execution: ExecutionInfo): string | React.ReactNode {
   const metadata = execution.metadata as ExecutionMetadata | undefined;
   const summary = sourceSummary(metadata);
 

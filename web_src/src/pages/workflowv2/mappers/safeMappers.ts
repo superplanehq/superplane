@@ -2,7 +2,6 @@ import React from "react";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
-  ComponentAdditionalDataBuilder,
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
@@ -397,22 +396,6 @@ export function createSafeTriggerRenderer(renderer: TriggerRenderer, rendererNam
           }
         }
       : undefined,
-  };
-}
-
-export function createSafeAdditionalDataBuilder(
-  builder: ComponentAdditionalDataBuilder,
-  builderName: string,
-): ComponentAdditionalDataBuilder {
-  return {
-    buildAdditionalData(context) {
-      try {
-        return builder.buildAdditionalData(context);
-      } catch (error) {
-        console.error(`[SafeMapper] Additional data builder "${builderName}" threw in buildAdditionalData():`, error);
-        return undefined;
-      }
-    },
   };
 }
 
