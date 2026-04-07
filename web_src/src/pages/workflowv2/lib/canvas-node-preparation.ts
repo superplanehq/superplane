@@ -1,21 +1,22 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { Puzzle } from "lucide-react";
-import type {
-  BlueprintsBlueprint,
-  CanvasesCanvasEvent,
-  CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
-  ComponentsComponent,
-  ComponentsEdge,
-  ComponentsNode,
-  TriggersTrigger,
+import {
+  canvasesInvokeNodeExecutionAction,
+  type BlueprintsBlueprint,
+  type CanvasesCanvasEvent,
+  type CanvasesCanvasNodeExecution,
+  type CanvasesCanvasNodeQueueItem,
+  type ComponentsComponent,
+  type ComponentsEdge,
+  type ComponentsNode,
+  type TriggersTrigger,
 } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type { CompositeProps, LastRunState } from "@/ui/composite";
-import type { ComponentBaseMapper, User } from "../mappers/types";
-import { getComponentAdditionalDataBuilder, getComponentBaseMapper, getTriggerRenderer } from "../mappers";
+import type { ActionContext, ComponentBaseMapper, User } from "../mappers/types";
+import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
 export const CANVAS_BUNDLE_ICON_SLUG = "component";
@@ -26,8 +27,11 @@ import {
   buildExecutionInfo,
   buildNodeInfo,
   buildQueueItemInfo,
+  buildUserInfo,
   getNextInQueueInfo,
 } from "../utils";
+import { canvasKeys } from "@/hooks/useCanvasData";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 type PrepareComponentNodeArgs = {
   nodes: ComponentsNode[];
@@ -50,7 +54,6 @@ type PrepareComponentBaseNodeArgs = {
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   canvasId: string;
   queryClient: QueryClient;
-  organizationId: string;
   currentUser?: User;
   edges?: ComponentsEdge[];
 };
@@ -248,36 +251,6 @@ function buildPlaceholderComponentNode(node: ComponentsNode): CanvasNode {
   };
 }
 
-function buildComponentAdditionalData(args: {
-  componentDef?: ComponentsComponent;
-  node: ComponentsNode;
-  nodes: ComponentsNode[];
-  executions: CanvasesCanvasNodeExecution[];
-  canvasId: string;
-  queryClient: QueryClient;
-  organizationId: string;
-  currentUser?: User;
-  edges?: ComponentsEdge[];
-}) {
-  const { componentDef, node, nodes, executions, canvasId, queryClient, organizationId, currentUser, edges } = args;
-
-  if (!componentDef) {
-    return undefined;
-  }
-
-  return getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
-    componentDefinition: buildComponentDefinition(componentDef),
-    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-    edges,
-    canvasId: canvasId,
-    queryClient,
-    organizationId,
-    currentUser,
-  });
-}
-
 function resolveComponentEmptyStateProps(
   componentBaseProps: ReturnType<ComponentBaseMapper["props"]>,
   node: ComponentsNode,
@@ -353,18 +326,8 @@ export function prepareCompositeNode(
 }
 
 export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode {
-  const {
-    nodes,
-    node,
-    components,
-    nodeExecutionsMap,
-    nodeQueueItemsMap,
-    canvasId,
-    queryClient,
-    organizationId,
-    currentUser,
-    edges,
-  } = args;
+  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser, edges } =
+    args;
   const isPlaceholder = !node.component?.name && node.name === "New Component";
 
   if (isPlaceholder) {
@@ -379,25 +342,13 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     nodeQueueItemsMap,
     canvasId,
     queryClient,
-    organizationId: organizationId || "",
     currentUser,
     edges,
   });
 }
 
 export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): CanvasNode {
-  const {
-    nodes,
-    node,
-    components,
-    nodeExecutionsMap,
-    nodeQueueItemsMap,
-    canvasId,
-    queryClient,
-    organizationId,
-    currentUser,
-    edges,
-  } = args;
+  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser } = args;
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
   const displayLabel = node.name || metadata?.label || node.component?.name || "Component";
@@ -409,25 +360,14 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   try {
-    const additionalData = buildComponentAdditionalData({
-      componentDef,
-      node,
-      nodes,
-      executions,
-      canvasId,
-      queryClient,
-      organizationId,
-      currentUser,
-      edges,
-    });
-
     const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
       nodes: nodes.map((n) => buildNodeInfo(n)),
       node: buildNodeInfo(node),
       componentDefinition: buildComponentDefinition(fallbackComponentDef),
       lastExecutions: executions.map((e) => buildExecutionInfo(e)),
       nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
-      additionalData,
+      currentUser: buildUserInfo(currentUser),
+      actions: buildActionContext(queryClient, canvasId, node.id!),
     });
 
     if (!componentBaseProps.iconSrc) {
@@ -460,4 +400,26 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     console.error(`[CanvasPage] Failed to prepare component node "${node.id}":`, error);
     return buildComponentFallbackCanvasNode({ node, displayLabel, metadata });
   }
+}
+
+function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): ActionContext {
+  return {
+    invokeNodeExecutionAction: async (executionId: string, actionName: string, parameters: unknown) => {
+      await canvasesInvokeNodeExecutionAction(
+        withOrganizationHeader({
+          path: {
+            canvasId,
+            executionId,
+            actionName,
+          },
+          body: {
+            parameters,
+          },
+        }),
+      );
+      queryClient.invalidateQueries({
+        queryKey: canvasKeys.nodeExecution(canvasId, nodeId),
+      });
+    },
+  };
 }
