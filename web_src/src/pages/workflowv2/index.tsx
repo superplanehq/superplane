@@ -2127,9 +2127,6 @@ export function WorkflowPageV2() {
     nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
     allNodes: canvas?.spec?.nodes || [],
     enabled: !!currentHistoryNode && !!canvasId && isViewingLiveVersion,
-    components,
-    organizationId: organizationId || "",
-    queryClient,
   });
 
   const queueHistoryQuery = useQueueHistory({

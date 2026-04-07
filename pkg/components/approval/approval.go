@@ -195,6 +195,10 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeRole:
+		if record.RoleRef == nil {
+			return fmt.Errorf("role reference is required")
+		}
+
 		hasRole, err := ctx.Auth.HasRole(record.RoleRef.Name)
 		if err != nil {
 			return fmt.Errorf("error checking role %s: %v", record.RoleRef.Name, err)
@@ -207,6 +211,10 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeGroup:
+		if record.GroupRef == nil {
+			return fmt.Errorf("group reference is required")
+		}
+
 		inGroup, err := ctx.Auth.InGroup(record.GroupRef.Name)
 		if err != nil {
 			return fmt.Errorf("error checking group %s: %v", record.GroupRef.Name, err)

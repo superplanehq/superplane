@@ -1,39 +1,18 @@
 import { useCallback, useMemo } from "react";
 import { useInfiniteNodeEvents, useInfiniteNodeExecutions } from "./useCanvasData";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import type {
-  ComponentsComponent,
-  ComponentsNode,
-  CanvasesListNodeEventsResponse,
-  CanvasesListNodeExecutionsResponse,
-} from "@/api-client";
+import type { ComponentsNode, CanvasesListNodeEventsResponse, CanvasesListNodeExecutionsResponse } from "@/api-client";
 import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
-import type { QueryClient } from "@tanstack/react-query";
-import { useMe } from "./useMe";
 
 interface UseNodeHistoryProps {
   canvasId: string;
-  organizationId: string;
-  components: ComponentsComponent[];
   nodeId: string;
   nodeType: string;
   allNodes: ComponentsNode[];
   enabled: boolean;
-  queryClient: QueryClient;
 }
 
-export const useNodeHistory = ({
-  canvasId,
-  nodeId,
-  nodeType,
-  allNodes,
-  enabled,
-  organizationId,
-  queryClient,
-  components,
-}: UseNodeHistoryProps) => {
-  const { data: me } = useMe();
-
+export const useNodeHistory = ({ canvasId, nodeId, nodeType, allNodes, enabled }: UseNodeHistoryProps) => {
   // For trigger nodes, use events; for other nodes, use executions
   const isTriggerNode = nodeType === "TYPE_TRIGGER";
 
@@ -41,10 +20,6 @@ export const useNodeHistory = ({
   const executionsQuery = useInfiniteNodeExecutions(canvasId, nodeId, enabled && !isTriggerNode);
 
   const node = useMemo(() => allNodes.find((n) => n.id === nodeId), [allNodes, nodeId]);
-  const componentDef = useMemo(
-    () => components.find((c) => c.name === node?.component?.name),
-    [components, node?.component?.name],
-  );
   const allExecutions = useMemo(() => {
     if (!enabled || isTriggerNode) return [];
     return (
@@ -65,19 +40,7 @@ export const useNodeHistory = ({
     } else {
       return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined);
     }
-  }, [
-    enabled,
-    node,
-    allNodes,
-    isTriggerNode,
-    eventsQuery.data,
-    allExecutions,
-    componentDef,
-    organizationId,
-    queryClient,
-    canvasId,
-    me,
-  ]);
+  }, [enabled, node, allNodes, isTriggerNode, eventsQuery.data, allExecutions]);
 
   const handleLoadMore = useCallback(() => {
     if (isTriggerNode) {
