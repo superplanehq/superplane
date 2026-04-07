@@ -161,10 +161,6 @@ function getExecutionDetails(context: ExecutionDetailsContext): Record<string, s
     details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
   }
 
-  if (context.execution.resultMessage) {
-    details["Error"] = context.execution.resultMessage;
-  }
-
   return details;
 }
 

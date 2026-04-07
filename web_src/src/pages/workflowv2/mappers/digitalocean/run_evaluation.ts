@@ -122,7 +122,7 @@ export const runEvaluationMapper: ComponentBaseMapper = {
     }
 
     if (result.errorDescription) {
-      details["Error"] = String(result.errorDescription);
+      details["Evaluation Error"] = String(result.errorDescription);
     }
 
     return details;

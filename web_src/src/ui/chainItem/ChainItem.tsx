@@ -42,16 +42,6 @@ export interface ChainItemData {
   };
 }
 
-type DetailValue = {
-  text: string;
-  comment?: string;
-};
-
-type ErrorValue = {
-  __type: "error";
-  message: string;
-};
-
 interface ChainItemProps {
   item: ChainItemData;
   index: number;
@@ -185,17 +175,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     () => (item.tabData?.configuration ? escapeStringValuesForJsonView(item.tabData.configuration) : undefined),
     [item.tabData],
   );
-  const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
 
+  const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
   const showConnectingLine = totalItems && index < totalItems - 1;
-  const isDetailValue = (value: unknown): value is DetailValue => {
-    if (!value || typeof value !== "object") return false;
-    return "text" in value && typeof (value as DetailValue).text === "string";
-  };
-  const isErrorValue = (value: unknown): value is ErrorValue => {
-    if (!value || typeof value !== "object") return false;
-    return "__type" in value && (value as ErrorValue).__type === "error";
-  };
+  const isError =
+    item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && item.originalExecution?.resultMessage;
 
   return (
     <div className="relative">
@@ -357,44 +341,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {activeTab === "current" && item.tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
                 {Object.entries(item.tabData.current).map(([key, value]) => {
-                  if (isErrorValue(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span
-                          className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600"
-                          title={key}
-                        >
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-red-600 min-w-0">
-                          <div className="break-words whitespace-normal" title={value.message}>
-                            {value.message}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (isDetailValue(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
-                          <div className="truncate" title={value.text}>
-                            {value.text}
-                          </div>
-                          {value.comment && (
-                            <div className="text-[12px] text-gray-500 italic truncate" title={value.comment}>
-                              "{value.comment}"
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
 
@@ -426,6 +372,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     </div>
                   );
                 })}
+                {isError && (
+                  <div className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                    <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600" title="Error">
+                      Error:
+                    </span>
+                    <span
+                      className="text-[13px] flex-1 truncate text-left w-[70%] text-red-600 truncate"
+                      title={item.originalExecution?.resultMessage}
+                    >
+                      {item.originalExecution?.resultMessage}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 
