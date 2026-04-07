@@ -1,4 +1,4 @@
-import { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

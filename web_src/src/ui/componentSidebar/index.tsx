@@ -21,14 +21,13 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
-import { ChildEventsState } from "../composite";
-import { TabData } from "./SidebarEventItem/SidebarEventItem";
-import { SidebarEvent } from "./types";
+import type { TabData } from "./SidebarEventItem/SidebarEventItem";
+import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
-import {
+import type {
   AuthorizationDomainType,
   ConfigurationField,
   CanvasesCanvasNodeExecution,
@@ -39,8 +38,8 @@ import {
   OrganizationsIntegration,
   ComponentsIntegrationRef,
 } from "@/api-client";
-import { EventState, EventStateMap } from "../componentBase";
-import { ReactNode } from "react";
+import type { EventState, EventStateMap } from "../componentBase";
+import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
@@ -56,14 +55,12 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
 
 interface ComponentSidebarProps {
   isOpen?: boolean;
-  setIsOpen?: (isOpen: boolean) => void;
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
   nodeId?: string;
   iconSrc?: string;
   iconSlug?: string;
-  iconColor?: string;
   totalInQueueCount: number;
   totalInHistoryCount: number;
   hideQueueEvents?: boolean;
@@ -73,19 +70,7 @@ interface ComponentSidebarProps {
   onSeeFullHistory?: () => void;
   onSeeQueue?: () => void;
 
-  // Action handlers
-  onRun?: () => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
-  onDuplicate?: () => void;
-  onDocs?: () => void;
-  onEdit?: () => void;
-  onConfigure?: () => void;
-  onDeactivate?: () => void;
-  onToggleView?: () => void;
-  onDelete?: () => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  isCompactView?: boolean;
 
   // Tab data function to get tab data for each event
   getTabData?: (event: SidebarEvent) => TabData | undefined;
@@ -192,18 +177,7 @@ export const ComponentSidebar = ({
   hideQueueEvents = false,
   onSeeQueue,
   onSeeFullHistory,
-  onRun: _onRun,
-  runDisabled: _runDisabled,
-  runDisabledTooltip: _runDisabledTooltip,
-  onDuplicate: _onDuplicate,
-  onDocs: _onDocs,
-  onEdit: _onEdit,
-  onConfigure: _onConfigure,
-  onDeactivate: _onDeactivate,
-  onToggleView: _onToggleView,
-  onDelete: _onDelete,
   onReEmit,
-  isCompactView: _isCompactView = false,
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
@@ -275,8 +249,6 @@ export const ComponentSidebar = ({
   const [activeExecutionChainTriggerEvent, setActiveExecutionChainTriggerEvent] = useState<SidebarEvent | null>(null);
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const activeTab = currentTab || "latest";
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<ChildEventsState | "all">("all");
   const [justCopied, setJustCopied] = useState(false);
   const [isCreateIntegrationDialogOpen, setIsCreateIntegrationDialogOpen] = useState(false);
   const [configureIntegrationId, setConfigureIntegrationId] = useState<string | null>(null);
@@ -493,8 +465,6 @@ export const ComponentSidebar = ({
     } else {
       setPage("overview");
     }
-    setSearchQuery("");
-    setStatusFilter("all");
     setActiveExecutionChainEventId(null);
     setActiveExecutionChainTriggerEvent(null);
     setSelectedExecutionId(null);
@@ -600,27 +570,6 @@ export const ComponentSidebar = ({
         return 0;
     }
   }, [allEvents, totalInHistoryCount, totalInQueueCount, listPage]);
-
-  const filteredHistoryEvents = React.useMemo(() => {
-    if (!allEvents) return [];
-    let events = allEvents;
-
-    if (statusFilter !== "all") {
-      events = events.filter((event) => event.state === statusFilter);
-    }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      events = events.filter(
-        (event) =>
-          event.title.toLowerCase().includes(query) ||
-          (typeof event.subtitle === "string" && event.subtitle?.toLowerCase().includes(query)) ||
-          Object.values(event.values || {}).some((value) => String(value).toLowerCase().includes(query)),
-      );
-    }
-
-    return events;
-  }, [allEvents, statusFilter, searchQuery]);
 
   // Clear highlights when sidebar closes or when leaving execution chain page
   useEffect(() => {
@@ -852,7 +801,7 @@ export const ComponentSidebar = ({
                     previousPage === "queue") && (
                     <HistoryQueuePage
                       page={(page === "execution-chain" ? previousPage : page) as "history" | "queue"}
-                      filteredEvents={filteredHistoryEvents}
+                      events={allEvents}
                       openEventIds={openEventIds}
                       onToggleOpen={handleToggleOpen}
                       onEventClick={onEventClick}
@@ -887,8 +836,6 @@ export const ComponentSidebar = ({
                       loadingMoreItems={loadingMoreItems}
                       showMoreCount={showMoreCount}
                       onLoadMoreItems={handleLoadMoreItems}
-                      searchQuery={searchQuery}
-                      statusFilter={statusFilter}
                     />
                   )}
                 </div>

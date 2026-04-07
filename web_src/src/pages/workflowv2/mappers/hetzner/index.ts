@@ -1,4 +1,4 @@
-import { ComponentBaseMapper } from "../types";
+import type { ComponentBaseMapper } from "../types";
 import { hetznerBaseMapper } from "./base";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {

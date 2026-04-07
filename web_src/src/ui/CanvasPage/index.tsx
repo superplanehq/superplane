@@ -47,7 +47,7 @@ import {
   type SyntheticEvent,
 } from "react";
 
-import {
+import type {
   ConfigurationField,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
@@ -63,25 +63,21 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import {
-  AiCanvasOperation,
-  BuildingBlock,
-  BuildingBlockCategory,
-  BuildingBlocksSidebar,
-} from "../BuildingBlocksSidebar";
+import type { AiCanvasOperation, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
-import { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
+import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import { EmitEventModal } from "../EmitEventModal";
-import { EventState, EventStateMap } from "../componentBase";
+import type { EventState, EventStateMap } from "../componentBase";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import { GroupNode } from "../groupNode";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
-import { Simulation } from "./storybooks/useSimulation";
-import { CanvasPageState, useCanvasState } from "./useCanvasState";
-import { SidebarEvent } from "../componentSidebar/types";
+import type { CanvasPageState } from "./useCanvasState";
+import { useCanvasState } from "./useCanvasState";
+import type { SidebarEvent } from "../componentSidebar/types";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
@@ -102,9 +98,10 @@ export interface SidebarData {
   isComposite?: boolean;
 }
 
-export interface CanvasNode extends ReactFlowNode {
-  __simulation?: Simulation;
-}
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type --
+   Having a specific type allows us to extend it with additional properties without breaking consumers.
+ */
+export interface CanvasNode extends ReactFlowNode {}
 
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
@@ -220,7 +217,6 @@ export interface CanvasPageProps {
   runDisabled?: boolean;
   runDisabledTooltip?: string;
 
-  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
@@ -284,7 +280,6 @@ export interface CanvasPageProps {
   onDuplicate?: (nodeId: string) => void;
   onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
@@ -414,13 +409,11 @@ type PendingRunData = {
 };
 
 type CanvasNodeRendererCallbacks = {
-  handleNodeExpand: NonNullable<BlockProps["onExpand"]>;
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
-  onConfigure: React.MutableRefObject<CanvasPageProps["onConfigure"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
@@ -536,13 +529,11 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
-    onExpand: (expandedNodeId, nodeData) => callbacks.handleNodeExpand(expandedNodeId, nodeData),
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
     onRun: getNodeAction(callbacks.onRun, nodeId),
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
-    onConfigure: getNodeAction(callbacks.onConfigure, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
@@ -1347,7 +1338,6 @@ function CanvasPage(props: CanvasPageProps) {
                 onToggleCollapse={props.onToggleCollapse}
                 onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
-                onConfigure={props.onConfigure}
                 onDeactivate={props.onDeactivate}
                 onAnnotationUpdate={props.onAnnotationUpdate}
                 onAnnotationBlur={props.onAnnotationBlur}
@@ -1434,15 +1424,6 @@ function CanvasPage(props: CanvasPageProps) {
               onPushThrough={handlePushThrough}
               onCancelExecution={handleCancelExecution}
               supportsPushThrough={props.supportsPushThrough}
-              onRun={handleNodeRun}
-              onDuplicate={props.onDuplicate}
-              onDocs={props.onDocs}
-              onConfigure={props.onConfigure}
-              onDeactivate={props.onDeactivate}
-              onToggleView={handleToggleView}
-              onDelete={handleNodeDelete}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
               getAllHistoryEvents={props.getAllHistoryEvents}
               onLoadMoreHistory={props.onLoadMoreHistory}
               getHasMoreHistory={props.getHasMoreHistory}
@@ -1458,7 +1439,6 @@ function CanvasPage(props: CanvasPageProps) {
               editingNodeData={editingNodeData}
               onSaveConfiguration={handleSaveConfiguration}
               configurationSaveMode={props.configurationSaveMode}
-              onEdit={handleNodeEdit}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
               organizationId={props.organizationId}
@@ -1510,16 +1490,7 @@ function Sidebar({
   onPushThrough,
   onCancelExecution,
   supportsPushThrough,
-  onRun,
-  onDuplicate,
-  onDocs,
-  onConfigure,
-  onDeactivate,
-  onToggleView,
-  onDelete,
   onReEmit,
-  runDisabled,
-  runDisabledTooltip,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1534,7 +1505,6 @@ function Sidebar({
   editingNodeData,
   onSaveConfiguration,
   configurationSaveMode = "manual",
-  onEdit,
   currentTab,
   onTabChange,
   organizationId,
@@ -1561,16 +1531,7 @@ function Sidebar({
   onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
   supportsPushThrough?: (nodeId: string) => boolean;
-  onRun?: (nodeId: string) => void;
-  onDuplicate?: (nodeId: string) => void;
-  onDocs?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
-  onDeactivate?: (nodeId: string) => void;
-  onToggleView?: (nodeId: string) => void;
-  onDelete?: (nodeId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1592,7 +1553,6 @@ function Sidebar({
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
-  onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   organizationId?: string;
@@ -1723,7 +1683,6 @@ function Sidebar({
       nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
       iconSlug={isAnnotationNode ? "sticky-note" : sidebarData.iconSlug}
-      iconColor={isAnnotationNode ? "text-yellow-600" : sidebarData.iconColor}
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
@@ -1734,17 +1693,6 @@ function Sidebar({
       onPushThrough={onPushThrough}
       onCancelExecution={onCancelExecution}
       supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
-      onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
-      onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
-      onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
-      onConfigure={
-        onConfigure && sidebarData?.isComposite ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined
-      }
-      onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
-      onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
-      onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
       getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
       onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
       getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
@@ -1766,7 +1714,6 @@ function Sidebar({
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       configurationSaveMode={configurationSaveMode}
-      onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
@@ -1991,7 +1938,6 @@ function CanvasContent({
   hideHeader,
   onRun,
   onDuplicate,
-  onConfigure,
   onDeactivate,
   onTogglePause,
   onToggleView,
@@ -2080,7 +2026,6 @@ function CanvasContent({
   hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
@@ -2322,14 +2267,6 @@ function CanvasContent({
     restoreActiveNoteFocus();
   }, [state.nodes]);
 
-  const handleNodeExpand = useCallback<NonNullable<BlockProps["onExpand"]>>((nodeId: string, nodeData: BlockData) => {
-    const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
-    const expandedNodeData = (node?.data as BlockData | undefined) ?? nodeData;
-    if (stateRef.current.onNodeExpand) {
-      stateRef.current.onNodeExpand(nodeId, expandedNodeData);
-    }
-  }, []);
-
   const handleNodeClick = useCallback(
     (nodeId: string, e?: React.MouseEvent) => {
       const isMultiSelectClick = e && (e.ctrlKey || e.metaKey);
@@ -2420,9 +2357,6 @@ function CanvasContent({
 
   const onDuplicateRef = useRef(onDuplicate);
   onDuplicateRef.current = onDuplicate;
-
-  const onConfigureRef = useRef(onConfigure);
-  onConfigureRef.current = onConfigure;
 
   const onDeactivateRef = useRef(onDeactivate);
   onDeactivateRef.current = onDeactivate;
@@ -2636,13 +2570,11 @@ function CanvasContent({
 
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
-    handleNodeExpand,
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
     onDuplicate: onDuplicateRef,
-    onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
@@ -2657,13 +2589,11 @@ function CanvasContent({
     hasMultiSelection,
   });
   callbacksRef.current = {
-    handleNodeExpand,
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
     onDuplicate: onDuplicateRef,
-    onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,

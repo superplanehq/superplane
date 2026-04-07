@@ -10,7 +10,7 @@ auto_cancel:
   queued:
     when: branch != 'main'
 blocks:
-  - name: "\U0001F4DC License Check"
+  - name: "License Check"
     dependencies: []
     task:
       prologue:
@@ -20,7 +20,8 @@ blocks:
         - name: Licence Check
           commands:
             - make test.license.check
-  - name: "\U0001F9EA QA"
+
+  - name: "Backend Tests"
     dependencies: []
     task:
       env_vars:
@@ -32,7 +33,8 @@ blocks:
           - mkdir -p tmp/go tmp/go-build
           - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
           - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make test.setup
+          - make test.setup.build
+          - make test.setup.db
           - make test.start
       jobs:
         - name: Lint
@@ -44,9 +46,6 @@ blocks:
         - name: E2E Tests
           parallelism: 10
           commands:
-            - mkdir -p tmp/ms-playwright
-            - "cache restore pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile),pw-browsers-$SEMAPHORE_GIT_BRANCH,pw-browsers"
-            - make setup.playwright
             - make test.e2e.autoparallel INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
         - name: "Check: DB structure"
           commands:
@@ -66,8 +65,8 @@ blocks:
             - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
-            - "cache store pw-browsers-$SEMAPHORE_GIT_BRANCH-$(checksum Makefile) tmp/ms-playwright"
-  - name: "\U0001F9EA Agent Tests"
+
+  - name: "Agent Tests"
     dependencies: []
     task:
       env_vars:
@@ -94,56 +93,42 @@ blocks:
         always:
           commands:
             - "[ -f agent/junit-report.xml ] && test-results publish agent/junit-report.xml"
-  - name: "\U0001F528 Frontend Build"
+
+  - name: "Frondend Tests"
     dependencies: []
     task:
       prologue:
         commands:
           - checkout
           - sem-version node 20
-      jobs:
-        - name: Build Frontend
+          - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
+          - cd web_src
+          - npm ci
+      epilogue:
+        always:
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
             - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+      jobs:
+        - name: Check Build
+          commands:
             - npm run build
-  - name: "\U0001F9EA Frontend Tests"
-    dependencies:
-      - "\U0001F528 Frontend Build"
-    task:
-      prologue:
-        commands:
-          - checkout
-          - sem-version node 20
-      jobs:
-        - name: UI Tests
+
+        - name: Unit Tests
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
-            - "npm run test:coverage"
+            - npm run test:coverage
+
         - name: Format Check
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src && npm ci && cd ..
-            - make format.js.check
+            - cd .. && make format.js.check
+
         - name: EsLint
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run lint:budget
-        - name: Knip
+
+        - name: Knip (dead files check)
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run lint:knip
+
 after_pipeline:
   task:
     jobs:

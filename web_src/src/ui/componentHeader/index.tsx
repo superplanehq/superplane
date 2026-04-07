@@ -1,7 +1,7 @@
 import { resolveIcon } from "@/lib/utils";
 import React from "react";
 import { toTestId } from "../../lib/testID";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 
 export interface ComponentHeaderProps extends ComponentActionsProps {
   iconSrc?: string;

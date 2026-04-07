@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { runFunctionMapper } from "./lambda/run_function";
 import { onImagePushTriggerRenderer } from "./ecr/on_image_push";
 import { onImageScanTriggerRenderer } from "./ecr/on_image_scan";

@@ -21,11 +21,13 @@ var _ MappedNullable = &SuperplaneMeUser{}
 
 // SuperplaneMeUser struct for SuperplaneMeUser
 type SuperplaneMeUser struct {
-	Id             *string    `json:"id,omitempty"`
-	Email          *string    `json:"email,omitempty"`
-	OrganizationId *string    `json:"organizationId,omitempty"`
-	CreatedAt      *time.Time `json:"createdAt,omitempty"`
-	HasToken       *bool      `json:"hasToken,omitempty"`
+	Id             *string                   `json:"id,omitempty"`
+	Email          *string                   `json:"email,omitempty"`
+	OrganizationId *string                   `json:"organizationId,omitempty"`
+	CreatedAt      *time.Time                `json:"createdAt,omitempty"`
+	HasToken       *bool                     `json:"hasToken,omitempty"`
+	Permissions    []AuthorizationPermission `json:"permissions,omitempty"`
+	Roles          []string                  `json:"roles,omitempty"`
 }
 
 // NewSuperplaneMeUser instantiates a new SuperplaneMeUser object
@@ -205,6 +207,70 @@ func (o *SuperplaneMeUser) SetHasToken(v bool) {
 	o.HasToken = &v
 }
 
+// GetPermissions returns the Permissions field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetPermissions() []AuthorizationPermission {
+	if o == nil || IsNil(o.Permissions) {
+		var ret []AuthorizationPermission
+		return ret
+	}
+	return o.Permissions
+}
+
+// GetPermissionsOk returns a tuple with the Permissions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetPermissionsOk() ([]AuthorizationPermission, bool) {
+	if o == nil || IsNil(o.Permissions) {
+		return nil, false
+	}
+	return o.Permissions, true
+}
+
+// HasPermissions returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasPermissions() bool {
+	if o != nil && !IsNil(o.Permissions) {
+		return true
+	}
+
+	return false
+}
+
+// SetPermissions gets a reference to the given []AuthorizationPermission and assigns it to the Permissions field.
+func (o *SuperplaneMeUser) SetPermissions(v []AuthorizationPermission) {
+	o.Permissions = v
+}
+
+// GetRoles returns the Roles field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetRoles() []string {
+	if o == nil || IsNil(o.Roles) {
+		var ret []string
+		return ret
+	}
+	return o.Roles
+}
+
+// GetRolesOk returns a tuple with the Roles field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetRolesOk() ([]string, bool) {
+	if o == nil || IsNil(o.Roles) {
+		return nil, false
+	}
+	return o.Roles, true
+}
+
+// HasRoles returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasRoles() bool {
+	if o != nil && !IsNil(o.Roles) {
+		return true
+	}
+
+	return false
+}
+
+// SetRoles gets a reference to the given []string and assigns it to the Roles field.
+func (o *SuperplaneMeUser) SetRoles(v []string) {
+	o.Roles = v
+}
+
 func (o SuperplaneMeUser) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -229,6 +295,12 @@ func (o SuperplaneMeUser) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.HasToken) {
 		toSerialize["hasToken"] = o.HasToken
+	}
+	if !IsNil(o.Permissions) {
+		toSerialize["permissions"] = o.Permissions
+	}
+	if !IsNil(o.Roles) {
+		toSerialize["roles"] = o.Roles
 	}
 	return toSerialize, nil
 }

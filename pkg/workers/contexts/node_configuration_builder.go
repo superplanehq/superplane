@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +18,6 @@ import (
 )
 
 var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
-var previousDepthRegex = regexp.MustCompile(`\bprevious\s*\(([^)]*)\)`)
 
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
@@ -169,7 +167,7 @@ func (b *NodeConfigurationBuilder) resolveListItems(list []any, itemDef *configu
 func (b *NodeConfigurationBuilder) resolveValue(value any) (any, error) {
 	switch v := value.(type) {
 	case string:
-		return b.ResolveExpression(v)
+		return b.ResolveTemplateExpressions(v)
 
 	case map[string]any:
 		return b.resolve(v)
@@ -212,7 +210,7 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
-func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
+func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil
 	}
@@ -225,7 +223,7 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			return match
 		}
 
-		value, e := b.resolveExpression(matches[1])
+		value, e := b.ResolveExpression(matches[1])
 		if e != nil {
 			err = e
 			return ""
@@ -241,54 +239,7 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 	return result, nil
 }
 
-func (b *NodeConfigurationBuilder) BuildMessageChainForExpression(expression string) (map[string]any, error) {
-	referencedNodes, err := parseReferencedNodes(expression)
-	if err != nil {
-		return nil, err
-	}
-
-	return b.buildMessageChain(referencedNodes)
-}
-
-func (b *NodeConfigurationBuilder) BuildExpressionEnv(expression string) (map[string]any, error) {
-	messageChain, err := b.BuildMessageChainForExpression(expression)
-	if err != nil {
-		return nil, err
-	}
-
-	env := map[string]any{
-		"$":      messageChain,
-		"memory": b.buildMemoryExpressionNamespace(),
-	}
-
-	if strings.Contains(expression, "root(") {
-		rootPayload, err := b.resolveRootPayload()
-		if err != nil {
-			return nil, err
-		}
-		env["__root"] = rootPayload
-	}
-
-	depths, err := parsePreviousDepths(expression)
-	if err != nil {
-		return nil, err
-	}
-	if len(depths) > 0 {
-		previousByDepth := make(map[string]any, len(depths))
-		for _, depth := range depths {
-			payload, err := b.resolvePreviousPayload(depth)
-			if err != nil {
-				return nil, err
-			}
-			previousByDepth[strconv.Itoa(depth)] = payload
-		}
-		env["__previousByDepth"] = previousByDepth
-	}
-
-	return env, nil
-}
-
-func (b *NodeConfigurationBuilder) resolveExpression(expression string) (any, error) {
+func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
 	referencedNodes, err := parseReferencedNodes(expression)
 	if err != nil {
 		return "", err
@@ -666,38 +617,6 @@ func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUI
 	}
 
 	return latestByExecution
-}
-
-func parsePreviousDepths(expression string) ([]int, error) {
-	matches := previousDepthRegex.FindAllStringSubmatch(expression, -1)
-	if len(matches) == 0 {
-		return nil, nil
-	}
-
-	seen := map[int]struct{}{}
-	for _, match := range matches {
-		raw := strings.TrimSpace(match[1])
-		if raw == "" {
-			seen[1] = struct{}{}
-			continue
-		}
-
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			return nil, fmt.Errorf("depth must be an integer")
-		}
-		if parsed < 1 {
-			return nil, fmt.Errorf("depth must be >= 1")
-		}
-		seen[parsed] = struct{}{}
-	}
-
-	depths := make([]int, 0, len(seen))
-	for depth := range seen {
-		depths = append(depths, depth)
-	}
-	sort.Ints(depths)
-	return depths, nil
 }
 
 func parseDepth(param any) (int, error) {

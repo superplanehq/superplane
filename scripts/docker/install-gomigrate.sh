@@ -13,5 +13,6 @@ else
   curl --retry 5 --retry-delay 1 --retry-max-time 60 --retry-connrefused -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz;
 fi
 
-mv /tmp/migrate /usr/bin/migrate
+mv ./migrate /usr/bin/migrate
 chmod +x /usr/bin/migrate
+rm -f ./LICENSE ./README.md

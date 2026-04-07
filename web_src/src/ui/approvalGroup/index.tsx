@@ -1,5 +1,6 @@
 import React from "react";
-import { ApprovalItem, ApprovalItemProps } from "../approvalItem";
+import type { ApprovalItemProps } from "../approvalItem";
+import { ApprovalItem } from "../approvalItem";
 import { ItemGroup } from "../item";
 
 export interface ApprovalGroupProps {

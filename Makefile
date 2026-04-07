@@ -32,20 +32,21 @@ lint:
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
-test.setup:
+test.setup.build:
 	@touch agent/.env
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
-	$(COMPOSE) build
+	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
+
+test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(COMPOSE) up -d
-	sleep 5
+	$(COMPOSE) up -d --wait
 
 test.down:
 	$(COMPOSE) down --remove-orphans
@@ -92,10 +93,6 @@ test.agent.unit:
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
-
-setup.playwright:
-	$(COMPOSE) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
-	$(COMPOSE) exec app bash -c "if [ -d /app/tmp/ms-playwright ] && [ \"$(ls -A /app/tmp/ms-playwright 2>/dev/null)\" ]; then echo \"Playwright browsers cache present, skipping install\"; else bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps; fi"
 
 #
 # Code formatting

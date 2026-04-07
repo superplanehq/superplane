@@ -94,7 +94,7 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
 		WithNodeID(s.node.NodeID).
 		WithInput(map[string]any{s.node.NodeID: payload})
-	resolved, err := builder.ResolveExpression(template)
+	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
 	}

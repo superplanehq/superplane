@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { createIncidentMapper } from "./create_incident";
 import { getIncidentMapper } from "./get_incident";
 import { buildActionStateRegistry } from "../utils";

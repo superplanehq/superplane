@@ -12,7 +12,7 @@ func TestNodeConfigurationBuilder_ResolveExpression_DateWithTimezoneOption(t *te
 	// and using date(...) in server-side expression resolution.
 	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
 
-	out, err := b.ResolveExpression(`{{ date("2026-03-17T01:02:03Z").Add(duration("1ns")).Format("2006-01-02T15:04:05.999999999Z07:00") }}`)
+	out, err := b.ResolveTemplateExpressions(`{{ date("2026-03-17T01:02:03Z").Add(duration("1ns")).Format("2006-01-02T15:04:05.999999999Z07:00") }}`)
 	require.NoError(t, err)
 	require.Equal(t, "2026-03-17T01:02:03.000000001Z", out)
 }

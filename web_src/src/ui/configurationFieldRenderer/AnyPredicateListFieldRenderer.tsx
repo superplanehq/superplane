@@ -3,7 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "../button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FieldRendererProps } from "./types";
+import type { FieldRendererProps } from "./types";
 import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 
 interface Predicate {

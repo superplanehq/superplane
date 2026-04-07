@@ -41,7 +41,8 @@ func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 	}
 
 	status := q.Locator(`[data-testid="canvas-save-status"]`).Run(s.session)
-	deadline := time.Now().Add(20 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
+
 	initialStateCaptured := false
 	initialState := ""
 	initialSavedLabel := ""
@@ -49,10 +50,11 @@ func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 	seenSaving := false
 	initialSavedStateStableUntil := time.Time{}
 	lastState := ""
+
 	for time.Now().Before(deadline) {
 		isVisible, _ := status.IsVisible()
 		if !isVisible {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 			continue
 		}
 
@@ -99,7 +101,7 @@ func (s *CanvasSteps) WaitForCanvasSaveStatusSaved() {
 			return
 		}
 
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	s.t.Fatalf("timed out waiting for canvas save status saved, last state=%q", lastState)
 }
@@ -190,6 +192,20 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.WaitForCanvasSaveStatusSaved()
+	s.session.Sleep(300)
+}
+
+func (s *CanvasSteps) AddNote() {
+	// The "Add Note" button only appears in the closed building blocks sidebar.
+	// If the sidebar is currently open, close it first by clicking on empty canvas area.
+	sidebar := q.TestID("building-blocks-sidebar").Run(s.session)
+	if isVisible, _ := sidebar.IsVisible(); isVisible {
+		s.ClickOnEmptyCanvasArea()
+		s.session.Sleep(300)
+	}
+
+	s.session.Click(q.TestID("add-note-button"))
+	s.session.AssertVisible(q.Text("Double click to add and edit notes..."))
 	s.session.Sleep(300)
 }
 
