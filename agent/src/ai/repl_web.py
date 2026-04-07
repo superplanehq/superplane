@@ -213,14 +213,15 @@ async def _stream_agent_run(
         claims, chat = _resolve_agent_context(chat_id, request)
 
     message_history = _load_message_history(store, chat.id)
-    run_id = store.create_agent_chat_run(chat.id, payload.model)
-    recorder = PersistedRunRecorder(store, chat.id, run_id, payload.question)
     resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
         if claims is None:
             raise ValueError("Agent claims are missing.")
         deps = _build_deps(payload, request, claims, resolved_canvas_id)
+
+    run_id = store.create_agent_chat_run(chat.id, payload.model)
+    recorder = PersistedRunRecorder(store, chat.id, run_id, payload.question)
 
     _debug_log(
         "starting agent run",
