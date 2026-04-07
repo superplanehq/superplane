@@ -14,6 +14,7 @@ type ListEventsCommand struct {
 	NodeID   *string
 	Limit    *int64
 	Before   *string
+	Full     *bool
 }
 
 func (c *ListEventsCommand) Execute(ctx core.CommandContext) error {
@@ -52,7 +53,20 @@ func (c *ListEventsCommand) listNodeEvents(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(response)
+		if c.Full != nil && *c.Full {
+			return ctx.Renderer.Render(response)
+		}
+
+		events := response.GetEvents()
+		summary := make([]map[string]string, len(events))
+		for i, event := range events {
+			summary[i] = map[string]string{
+				"id":        event.GetId(),
+				"channel":   event.GetChannel(),
+				"createdAt": event.GetCreatedAt().Format(time.RFC3339),
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
@@ -106,7 +120,22 @@ func (c *ListEventsCommand) listCanvasEvents(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(response)
+		if c.Full != nil && *c.Full {
+			return ctx.Renderer.Render(response)
+		}
+
+		events := response.GetEvents()
+		summary := make([]map[string]any, len(events))
+		for i, event := range events {
+			summary[i] = map[string]any{
+				"id":         event.GetId(),
+				"nodeId":     event.GetNodeId(),
+				"channel":    event.GetChannel(),
+				"executions": len(event.GetExecutions()),
+				"createdAt":  event.GetCreatedAt().Format(time.RFC3339),
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
