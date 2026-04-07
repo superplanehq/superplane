@@ -58,6 +58,7 @@ function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): Co
       name: "John Doe",
       email: "john.doe@example.com",
       roles: ["admin"],
+      groups: ["developers"],
     },
   };
 }

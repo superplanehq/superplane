@@ -32,7 +32,6 @@ import type {
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import {
   useOrganization,
-  useOrganizationGroups,
   useOrganizationRoles,
   useOrganizationUsers,
 } from "@/hooks/useOrganizationData";
@@ -567,7 +566,6 @@ export function WorkflowPageV2() {
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
   const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
-  const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -1730,7 +1728,7 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       organizationId!,
-      me ? { id: me.id || "", name: me.name || "", email: me.email || "", roles: me.roles || [] } : undefined,
+      me ? { id: me.id || "", name: me.name || "", email: me.email || "", roles: me.roles || [], groups: me.groups || [] } : undefined,
     );
   }, [
     canvas,
@@ -5232,8 +5230,7 @@ export function WorkflowPageV2() {
       componentsLoading ||
       widgetsLoading ||
       usersLoading ||
-      rolesLoading ||
-      groupsLoading);
+      rolesLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.

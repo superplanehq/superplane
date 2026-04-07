@@ -67,17 +67,12 @@ func (c *AuthContext) GetRole(name string) (*core.RoleRef, error) {
 }
 
 func (c *AuthContext) GetGroup(name string) (*core.GroupRef, error) {
-	role, err := c.authService.GetGroupRole(c.orgID.String(), models.DomainTypeOrganization, name)
-	if err != nil {
-		return nil, fmt.Errorf("error getting group role: %v", err)
-	}
-
 	groupMetadata, err := models.FindGroupMetadata(name, models.DomainTypeOrganization, c.orgID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error getting group metadata: %v", err)
 	}
 
-	return &core.GroupRef{Name: role, DisplayName: groupMetadata.DisplayName}, nil
+	return &core.GroupRef{Name: groupMetadata.GroupName, DisplayName: groupMetadata.DisplayName}, nil
 }
 
 func (c *AuthContext) HasRole(role string) (bool, error) {

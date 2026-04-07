@@ -73,6 +73,7 @@ message User {
   bool has_token = 6;
   repeated Authorization.Permission permissions = 7;
   repeated string roles = 8;
+  repeated string groups = 9;
 }
 
 message RegenerateTokenResponse {

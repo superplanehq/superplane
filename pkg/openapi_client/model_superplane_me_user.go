@@ -29,6 +29,7 @@ type SuperplaneMeUser struct {
 	HasToken       *bool                     `json:"hasToken,omitempty"`
 	Permissions    []AuthorizationPermission `json:"permissions,omitempty"`
 	Roles          []string                  `json:"roles,omitempty"`
+	Groups         []string                  `json:"groups,omitempty"`
 }
 
 // NewSuperplaneMeUser instantiates a new SuperplaneMeUser object
@@ -304,6 +305,38 @@ func (o *SuperplaneMeUser) SetRoles(v []string) {
 	o.Roles = v
 }
 
+// GetGroups returns the Groups field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetGroups() []string {
+	if o == nil || IsNil(o.Groups) {
+		var ret []string
+		return ret
+	}
+	return o.Groups
+}
+
+// GetGroupsOk returns a tuple with the Groups field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetGroupsOk() ([]string, bool) {
+	if o == nil || IsNil(o.Groups) {
+		return nil, false
+	}
+	return o.Groups, true
+}
+
+// HasGroups returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasGroups() bool {
+	if o != nil && !IsNil(o.Groups) {
+		return true
+	}
+
+	return false
+}
+
+// SetGroups gets a reference to the given []string and assigns it to the Groups field.
+func (o *SuperplaneMeUser) SetGroups(v []string) {
+	o.Groups = v
+}
+
 func (o SuperplaneMeUser) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -337,6 +370,9 @@ func (o SuperplaneMeUser) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Roles) {
 		toSerialize["roles"] = o.Roles
+	}
+	if !IsNil(o.Groups) {
+		toSerialize["groups"] = o.Groups
 	}
 	return toSerialize, nil
 }

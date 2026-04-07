@@ -40,6 +40,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 		HasToken:       user.TokenHash != "",
 		Permissions:    []*pbAuth.Permission{},
 		Roles:          []string{},
+		Groups:         []string{},
 	}
 
 	if !includePermissions {
@@ -76,6 +77,16 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 	}
 
 	userProto.Permissions = permissions
+
+	//
+	// Add information about the groups the user is a member of.
+	//
+	groups, err := authService.GetUserGroups(user.OrganizationID.String(), models.DomainTypeOrganization, userID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get user groups")
+	}
+
+	userProto.Groups = groups
 
 	return &pb.MeResponse{
 		User: userProto,

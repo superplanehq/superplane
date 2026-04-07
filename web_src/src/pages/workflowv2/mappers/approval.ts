@@ -1,4 +1,4 @@
-import type { SuperplaneUsersUser, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { canvasesInvokeNodeExecutionAction } from "@/api-client";
 import type {
   ComponentBaseContext,
@@ -25,8 +25,6 @@ import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
-import type { QueryClient } from "@tanstack/react-query";
-import { organizationKeys } from "@/hooks/useOrganizationData";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
@@ -289,7 +287,7 @@ function approvalItemPropsForRecord(
   const canAct =
     record.state === "pending" &&
     isAwaitingApproval &&
-    canCurrentUserActOnApproval(context.queryClient, context.organizationId, record, context.currentUser);
+    canCurrentUserActOnApproval(context.organizationId, record, context.currentUser);
 
   const title = getApprovalDecisionLabel(record);
 
@@ -471,7 +469,6 @@ function getApprovalDecisionLabel(record: ApprovalRecord): string {
 }
 
 function canCurrentUserActOnApproval(
-  queryClient: QueryClient,
   organizationId: string,
   record: ApprovalRecord,
   currentUser?: User,
@@ -495,14 +492,7 @@ function canCurrentUserActOnApproval(
         return false;
       }
 
-      const groupUsers = queryClient.getQueryData<SuperplaneUsersUser[]>(
-        organizationKeys.groupUsers(organizationId, record.groupRef.name),
-      );
-
-      if (!Array.isArray(groupUsers)) return false;
-      return groupUsers.some(
-        (user) => user.metadata?.id === currentUser.id || user.metadata?.email === currentUser.email,
-      );
+      return currentUser.groups.includes(record.groupRef.name);
     }
   }
 

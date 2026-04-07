@@ -1315,6 +1315,7 @@ export type SuperplaneMeUser = {
   hasToken?: boolean;
   permissions?: Array<AuthorizationPermission>;
   roles?: Array<string>;
+  groups?: Array<string>;
 };
 
 export type SuperplaneOrganizationsListIntegrationsResponse = {

@@ -37,7 +37,8 @@ class SuperplaneMeUser(BaseModel):
     has_token: Optional[StrictBool] = Field(default=None, alias="hasToken")
     permissions: Optional[List[AuthorizationPermission]] = None
     roles: Optional[List[StrictStr]] = None
-    __properties: ClassVar[List[str]] = ["id", "name", "email", "organizationId", "createdAt", "hasToken", "permissions", "roles"]
+    groups: Optional[List[StrictStr]] = None
+    __properties: ClassVar[List[str]] = ["id", "name", "email", "organizationId", "createdAt", "hasToken", "permissions", "roles", "groups"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -104,7 +105,8 @@ class SuperplaneMeUser(BaseModel):
             "createdAt": obj.get("createdAt"),
             "hasToken": obj.get("hasToken"),
             "permissions": [AuthorizationPermission.from_dict(_item) for _item in obj["permissions"]] if obj.get("permissions") is not None else None,
-            "roles": obj.get("roles")
+            "roles": obj.get("roles"),
+            "groups": obj.get("groups")
         })
         return _obj
 

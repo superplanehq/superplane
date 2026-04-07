@@ -31,6 +31,7 @@ function makeContext(configuration: unknown): ComponentBaseContext {
       name: "John Doe",
       email: "john.doe@example.com",
       roles: ["admin"],
+      groups: ["developers"],
     },
     organizationId: "123",
     canvasId: "123",
