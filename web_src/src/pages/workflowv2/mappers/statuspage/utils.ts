@@ -1,9 +1,9 @@
-import type React from "react";
 import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
 import type { ExecutionInfo, NodeInfo } from "../types";
-import type { StatuspageIncident, StatuspageIncidentUpdate } from "./types";
+import type { StatuspageIncident } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatRelativeTime } from "@/lib/timezone";
 
 export function stringOrDash(value?: string | null): string {
   if (value === undefined || value === null || value === "") {
@@ -17,73 +17,6 @@ export function truncateForDisplay(value: unknown, maxLen = 40): string {
   const str = typeof value === "string" ? value : value == null ? "" : String(value);
   if (!str || str.length <= maxLen) return str;
   return str.substring(0, maxLen) + "...";
-}
-
-/** Timeline entry format for ChainItem's isApprovalTimeline renderer. */
-export type IncidentTimelineEntry = {
-  label: string;
-  status: string;
-  timestamp?: string | React.ReactNode;
-  comment?: string;
-};
-
-/** Human-readable status labels for incident_updates. */
-const STATUS_LABELS: Record<string, string> = {
-  investigating: "Investigating",
-  identified: "Identified",
-  monitoring: "Monitoring",
-  resolved: "Resolved",
-  scheduled: "Scheduled",
-  in_progress: "In Progress",
-  verifying: "Verifying",
-  completed: "Completed",
-};
-
-/**
- * Maps incident status to a value that ChainItem's getApprovalStatusColor recognizes,
- * so we get colored timeline dots without modifying core UI.
- * approved=green, degraded=yellow, rejected=red, critical=red, default=gray
- */
-const STATUS_TO_COLOR: Record<string, string> = {
-  resolved: "Approved",
-  completed: "Approved",
-  investigating: "Degraded",
-  identified: "Degraded",
-  monitoring: "Degraded",
-  in_progress: "Degraded",
-  verifying: "Degraded",
-  scheduled: "Scheduled", // no match → gray
-};
-
-function humanizeStatus(status?: string): string {
-  if (!status) return "Update";
-  return STATUS_LABELS[status] ?? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ");
-}
-
-/**
- * Builds a timeline from incident_updates for the Details tab.
- * API returns incident_updates in chronological order; first is creation.
- * Uses status values that map to ChainItem's existing colors (Approved=green, Degraded=yellow).
- */
-export function buildIncidentTimeline(updates: StatuspageIncidentUpdate[]): IncidentTimelineEntry[] {
-  const timeline: IncidentTimelineEntry[] = [];
-
-  for (const update of updates) {
-    const rawStatus = update.status ?? "";
-    const label = humanizeStatus(rawStatus);
-    const statusForColor = STATUS_TO_COLOR[rawStatus] ?? label;
-    const timestamp = update.created_at ? renderTimeAgo(new Date(update.created_at)) : undefined;
-    const comment = update.body?.trim() || undefined;
-
-    timeline.push({
-      label,
-      status: statusForColor,
-      timestamp,
-      comment,
-    });
-  }
-
-  return timeline;
 }
 
 export type GetDetailsForIncidentOptions = {
@@ -100,8 +33,8 @@ export type GetDetailsForIncidentOptions = {
 export function getDetailsForIncident(
   incident: StatuspageIncident,
   options?: GetDetailsForIncidentOptions,
-): Record<string, string | IncidentTimelineEntry[]> {
-  const details: Record<string, string | IncidentTimelineEntry[]> = {};
+): Record<string, string> {
+  const details: Record<string, string> = {};
   const componentName = options?.componentName;
   const execution = options?.execution;
 
@@ -127,14 +60,24 @@ export function getDetailsForIncident(
   details["Incident URL"] = stringOrDash(incident?.shortlink);
 
   // Timeline only for get and update, omit completely for create
-  if (componentName !== "statuspage.createIncident") {
-    const updates = incident?.incident_updates;
-    if (updates && updates.length > 0) {
-      details["Timeline"] = buildIncidentTimeline(updates);
-    } else {
-      details["Updates"] = "No updates recorded";
-    }
+  if (componentName === "statuspage.createIncident") {
+    return details;
   }
+
+  const updates = incident?.incident_updates;
+  if (!updates || updates.length === 0) {
+    details["Updates"] = "No updates recorded";
+    return details;
+  }
+
+  details["Updates"] = updates
+    .map((update) => {
+      const status = update.status || "-";
+      const timestamp = update.created_at ? formatRelativeTime(update.created_at, true) : undefined;
+      const comment = update.body?.trim() || undefined;
+      return `${status} (${timestamp}): ${comment}`;
+    })
+    .join(" | ");
 
   return details;
 }
