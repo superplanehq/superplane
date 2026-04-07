@@ -3,6 +3,7 @@ import { getState, getTriggerRenderer } from "..";
 import type { ExecutionInfo, NodeInfo } from "../types";
 import type { StatuspageIncident } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { formatRelativeTime } from "@/lib/timezone";
 
 export function stringOrDash(value?: string | null): string {
   if (value === undefined || value === null || value === "") {
@@ -72,7 +73,7 @@ export function getDetailsForIncident(
   details["Updates"] = updates
     .map((update) => {
       const status = update.status || "-";
-      const timestamp = update.created_at ? renderTimeAgo(new Date(update.created_at)) : undefined;
+      const timestamp = update.created_at ? formatRelativeTime(update.created_at, true) : undefined;
       const comment = update.body?.trim() || undefined;
       return `${status} (${timestamp}): ${comment}`;
     })
