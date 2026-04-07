@@ -244,6 +244,30 @@
         ]
       }
     },
+    "/api/v1/agents/usage": {
+      "get": {
+        "summary": "Describe agent token usage for the organization",
+        "description": "Returns aggregated token usage across all agent chats in the organization",
+        "operationId": "Agents_DescribeAgentUsage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsDescribeAgentUsageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
     "/api/v1/blueprints": {
       "get": {
         "summary": "List blueprints",
@@ -4012,6 +4036,9 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "usage": {
+          "$ref": "#/definitions/AgentsAgentChatUsage"
         }
       }
     },
@@ -4039,6 +4066,27 @@
         }
       }
     },
+    "AgentsAgentChatUsage": {
+      "type": "object",
+      "properties": {
+        "totalInputTokens": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalOutputTokens": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalTokens": {
+          "type": "string",
+          "format": "int64"
+        },
+        "totalEstimatedCostUsd": {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    },
     "AgentsCreateAgentChatRequest": {
       "type": "object",
       "properties": {
@@ -4063,6 +4111,14 @@
       "properties": {
         "chat": {
           "$ref": "#/definitions/AgentsAgentChatInfo"
+        }
+      }
+    },
+    "AgentsDescribeAgentUsageResponse": {
+      "type": "object",
+      "properties": {
+        "usage": {
+          "$ref": "#/definitions/AgentsAgentChatUsage"
         }
       }
     },
