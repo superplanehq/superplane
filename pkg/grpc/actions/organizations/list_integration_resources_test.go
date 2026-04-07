@@ -56,7 +56,7 @@ func Test__ListIntegrationResources(t *testing.T) {
 		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	})
 
-	t.Run("non-ready integration returns empty resources", func(t *testing.T) {
+	t.Run("pending integration returns empty resources", func(t *testing.T) {
 		integration, err := models.CreateIntegration(
 			uuid.New(),
 			r.Organization.ID,
@@ -77,6 +77,29 @@ func Test__ListIntegrationResources(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Empty(t, resp.Resources)
+	})
+
+	t.Run("error integration returns failed precondition", func(t *testing.T) {
+		integration, err := models.CreateIntegration(
+			uuid.New(),
+			r.Organization.ID,
+			"missing-app",
+			support.RandomName("integration"),
+			map[string]any{},
+		)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(integration).Update("state", models.IntegrationStateError).Error)
+
+		_, err = ListIntegrationResources(
+			context.Background(),
+			r.Registry,
+			r.Organization.ID.String(),
+			integration.ID.String(),
+			map[string]string{"type": "repository"},
+		)
+
+		require.Error(t, err)
+		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	})
 
 	t.Run("integration list failure returns failed precondition", func(t *testing.T) {

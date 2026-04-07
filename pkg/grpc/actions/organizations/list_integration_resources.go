@@ -42,6 +42,14 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		return nil, status.Error(codes.Internal, "failed to load integration")
 	}
 
+	if instance.State == models.IntegrationStateError {
+		log.WithFields(log.Fields{
+			"integration_id":   instance.ID,
+			"integration_name": instance.AppName,
+		}).Warn("integration is in error state")
+		return nil, status.Error(codes.FailedPrecondition, "integration is in error state")
+	}
+
 	if instance.State != models.IntegrationStateReady {
 		return &pb.ListIntegrationResourcesResponse{
 			Resources: []*pb.IntegrationResourceRef{},
