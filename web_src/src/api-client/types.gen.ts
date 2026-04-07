@@ -1325,6 +1325,7 @@ export type SuperplaneMeUser = {
   createdAt?: string;
   hasToken?: boolean;
   permissions?: Array<AuthorizationPermission>;
+  roles?: Array<string>;
 };
 
 export type SuperplaneOrganizationsListIntegrationsResponse = {
@@ -1371,14 +1372,7 @@ export type UsersListUsersResponse = {
   users?: Array<SuperplaneUsersUser>;
 };
 
-export type UsersUserMetadata = {
-  id?: string;
-  email?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type UsersUserRoleAssignment = {
+export type UsersRoleAssignment = {
   roleName?: string;
   roleDisplayName?: string;
   roleDescription?: string;
@@ -1387,13 +1381,20 @@ export type UsersUserRoleAssignment = {
   assignedAt?: string;
 };
 
+export type UsersUserMetadata = {
+  id?: string;
+  email?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type UsersUserSpec = {
   displayName?: string;
-  accountProviders?: Array<UsersAccountProvider>;
 };
 
 export type UsersUserStatus = {
-  roleAssignments?: Array<UsersUserRoleAssignment>;
+  accountProviders?: Array<UsersAccountProvider>;
+  roles?: Array<UsersRoleAssignment>;
 };
 
 export type WidgetsDescribeWidgetResponse = {
@@ -4282,7 +4283,7 @@ export type UsersListUsersData = {
   query?: {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
-    includeServiceAccounts?: boolean;
+    includeRoles?: boolean;
   };
   url: "/api/v1/users";
 };

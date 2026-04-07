@@ -53,7 +53,7 @@ func ResumeAgentChat(
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
 	}
-	defer conn.Close()
+	defer closeAgentConnection(conn)
 
 	client := internalpb.NewAgentsClient(conn)
 	response, err := client.DescribeAgentChat(ctx, &internalpb.DescribeAgentChatRequest{

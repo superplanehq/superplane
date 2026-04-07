@@ -263,8 +263,8 @@ docs/TriggersTrigger.md
 docs/UsersAPI.md
 docs/UsersAccountProvider.md
 docs/UsersListUsersResponse.md
+docs/UsersRoleAssignment.md
 docs/UsersUserMetadata.md
-docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
 docs/UsersUserStatus.md
 docs/WidgetAPI.md
@@ -493,8 +493,8 @@ model_triggers_list_triggers_response.go
 model_triggers_trigger.go
 model_users_account_provider.go
 model_users_list_users_response.go
+model_users_role_assignment.go
 model_users_user_metadata.go
-model_users_user_role_assignment.go
 model_users_user_spec.go
 model_users_user_status.go
 model_widgets_describe_widget_response.go

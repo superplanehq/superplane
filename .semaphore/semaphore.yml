@@ -101,32 +101,32 @@ blocks:
         commands:
           - checkout
           - sem-version node 20
+          - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
+          - cd web_src
+          - npm ci
+      epilogue:
+        always:
+          commands:
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
       jobs:
+        - name: Check Build
+          commands:
+            - npm run build
+
         - name: Unit Tests
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
-            - "npm run test:coverage"
+            - npm run test:coverage
+
         - name: Format Check
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src && npm ci && cd ..
-            - make format.js.check
+            - cd .. && make format.js.check
+
         - name: EsLint
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run lint:budget
+
         - name: Knip (dead files check)
           commands:
-            - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-            - cd web_src
-            - npm ci
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
             - npm run lint:knip
 
 after_pipeline:

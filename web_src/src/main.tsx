@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
-import "./lib/monaco.ts";
+import "@xyflow/react/dist/style.css";
 import App from "./App.tsx";
 import { setupApiInterceptor } from "./lib/api-interceptor.ts";
 import { Sentry } from "./sentry.ts";

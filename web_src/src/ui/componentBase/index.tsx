@@ -2,7 +2,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import { AlertTriangle } from "lucide-react";
 import React from "react";
-import { ChildEvents, type ChildEventsInfo } from "../childEvents";
 import { ComponentHeader } from "../componentHeader";
 import { EmptyState } from "../emptyState";
 import type { MetadataItem } from "../metadataList";
@@ -94,14 +93,6 @@ const EventSectionDisplay: React.FC<EventSectionDisplayProps> = ({
           {section.eventTitle}
         </span>
       </div>
-      {section.childEventsInfo && (
-        <ChildEvents
-          childEventsInfo={section.childEventsInfo}
-          onExpandChildEvents={section.onExpandChildEvents}
-          onReRunChildEvents={section.onReRunChildEvents}
-          showItems={false}
-        />
-      )}
     </div>
   );
 };
@@ -203,9 +194,6 @@ export interface EventSection {
   eventTitle?: string;
   eventSubtitle?: string | React.ReactNode;
   handleComponent?: React.ReactNode;
-  childEventsInfo?: ChildEventsInfo;
-  onExpandChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
-  onReRunChildEvents?: (childEventsInfo: ChildEventsInfo) => void;
 }
 
 export interface ComponentBaseProps extends ComponentActionsProps {
@@ -255,7 +243,6 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   runDisabledTooltip: _runDisabledTooltip,
   onTogglePause,
   onEdit: _onEdit,
-  onConfigure: _onConfigure,
   onDuplicate,
   onDeactivate: _onDeactivate,
   onToggleView,
