@@ -11,16 +11,13 @@ import { AccountProvider } from "./contexts/AccountContext";
 import { useAccount } from "./contexts/AccountContext";
 import { PermissionsProvider } from "./contexts/PermissionsContext";
 import { RequirePermission } from "./components/PermissionGate";
-import { isCustomComponentsEnabled } from "./lib/env";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
-import { CustomComponent } from "./pages/custom-component";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import HomePage from "./pages/home";
-import NodeRunPage from "./pages/node-run";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
@@ -98,19 +95,9 @@ function AppRouter() {
           <Route path=":organizationId" element={<OrganizationScope />}>
             <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
             <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
-            {isCustomComponentsEnabled() && (
-              <Route
-                path="custom-components/:blueprintId"
-                element={withAuthAndPermission(CustomComponent, "blueprints", "read")}
-              />
-            )}
             <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
             <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
             <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
-            <Route
-              path="canvases/:canvasId/nodes/:nodeId/:executionId"
-              element={withAuthAndPermission(NodeRunPage, "canvases", "read")}
-            />
             <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
           </Route>
 

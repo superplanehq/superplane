@@ -1,91 +1,88 @@
-ARG GO_VERSION=1.25.3
 ARG UBUNTU_VERSION=22.04
-ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+ARG GO_VERSION=1.25.3
+ARG PLAYWRIGHT_GO_VERSION=v0.5200.1
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
-
-# ----------------------------------------------------------------------------------------------------------------------
-# Base stage with common dependencies.
-# Based on this, the dev and builder stages are created.
-# ----------------------------------------------------------------------------------------------------------------------
-
-FROM ${BUILDER_IMAGE} AS base
-
-WORKDIR /tmp
-
-COPY scripts/docker scripts
-
-ENV GO_VERSION=1.25.3
-ENV PATH="/usr/local/go/bin:${PATH}"
-ENV GOPATH="/go"
-ENV GOBIN="/go/bin"
-ENV PATH="${GOBIN}:${PATH}"
-ENV GOPROXY="https://proxy.golang.org,direct"
-
-RUN bash scripts/install-go.sh ${GO_VERSION}
-RUN bash scripts/install-nodejs.sh
-RUN bash scripts/install-postgresql-client.sh
-RUN bash scripts/install-gomigrate.sh
-RUN bash scripts/install-protoc.sh
-
-WORKDIR /app
-
-COPY pkg pkg
-COPY cmd cmd
-COPY go.mod go.mod
-COPY go.sum go.sum
-COPY db/migrations /app/db/migrations
-COPY db/data_migrations /app/db/data_migrations
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-COPY web_src web_src
-COPY protos protos
-COPY api/swagger api/swagger
-COPY rbac rbac
-COPY templates templates
-
-WORKDIR /app
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Development stage with tools installed.
 # Used for local development and testing.
 # ----------------------------------------------------------------------------------------------------------------------
 
-FROM base AS dev
+FROM ubuntu:${UBUNTU_VERSION} AS dev-base
+
+ARG GO_VERSION
+ARG PLAYWRIGHT_GO_VERSION
+
+WORKDIR /opt/install
+COPY scripts/docker /opt/install-scripts
+COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
+
+ENV GO_VERSION=${GO_VERSION}
+ENV PATH="/usr/local/go/bin:${PATH}"
+ENV GOPATH="/go"
+ENV GOBIN="/go/bin"
+ENV PATH="${GOBIN}:${PATH}"
+ENV GOPROXY="https://proxy.golang.org,direct"
+ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
+
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends bash ca-certificates make unzip && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+RUN bash /opt/install-scripts/install-go.sh "${GO_VERSION}"
+RUN bash /opt/install-scripts/install-nodejs.sh
+RUN bash /opt/install-scripts/install-postgresql-client.sh
+RUN bash /opt/install-scripts/install-gomigrate.sh
+RUN bash /opt/install-scripts/install-protoc.sh
+
+RUN export GOMODCACHE=/tmp/go-mod GOCACHE=/tmp/go-build && \
+  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6 && \
+  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0 && \
+  go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.26.3 && \
+  go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.26.3 && \
+  go install github.com/air-verse/air@latest && \
+  go install github.com/mgechev/revive@v1.8.0 && \
+  go install gotest.tools/gotestsum@v1.12.3 && \
+  go install github.com/playwright-community/playwright-go/cmd/playwright@"${PLAYWRIGHT_GO_VERSION}" && \
+  rm -rf /tmp/go-mod /tmp/go-build /go/pkg/* /root/.cache/* /root/.config/go/telemetry
 
 WORKDIR /app
 
-# Install dev tools with retries to mitigate intermittent network flakes
-# Pin protoc plugin versions to ensure consistent proto generation
-RUN bash /tmp/scripts/retry.sh 6 2s go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
-RUN bash /tmp/scripts/retry.sh 6 2s go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0
-RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.26.3
-RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.26.3
-RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/air-verse/air@latest
-RUN bash /tmp/scripts/retry.sh 6 2s go install github.com/mgechev/revive@v1.8.0
-RUN bash /tmp/scripts/retry.sh 6 2s go install gotest.tools/gotestsum@v1.12.3
+RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
+RUN playwright install chromium-headless-shell --with-deps
+RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
-# Inject test files and dev entrypoint
-COPY test test
-COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
-
-CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
+WORKDIR /app
+CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Builder stage to create production artifacts.
 # Used to build the final runner image.
 # ----------------------------------------------------------------------------------------------------------------------
 
-FROM base AS builder
+FROM dev-base AS builder
 
 ARG BASE_URL=https://app.superplane.com
-ARG VITE_ENABLE_CUSTOM_COMPONENTS=false
-
 
 WORKDIR /app
+COPY pkg /app/pkg
+COPY cmd /app/cmd
+COPY go.mod /app/go.mod
+COPY go.sum /app/go.sum
+COPY db/migrations /app/db/migrations
+COPY db/data_migrations /app/db/data_migrations
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY web_src /app/web_src
+COPY protos /app/protos
+COPY api/swagger /app/api/swagger
+COPY rbac /app/rbac
+COPY templates /app/templates
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
-RUN VITE_BASE_URL=$BASE_URL VITE_ENABLE_CUSTOM_COMPONENTS=$VITE_ENABLE_CUSTOM_COMPONENTS npm run build
+RUN VITE_BASE_URL=$BASE_URL npm run build
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Runner stage to run the application.

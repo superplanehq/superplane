@@ -2,6 +2,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 
+import { hasDialogTitle } from "@/lib/dialogTitle";
 import { cn } from "@/lib/utils";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -44,6 +45,8 @@ function DialogContent({
   /** "large" removes default max-width so className can set e.g. 80vw/80vh */
   size?: "default" | "large";
 }) {
+  const titlePresent = hasDialogTitle(children, [DialogTitle, DialogPrimitive.Title]);
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -56,6 +59,7 @@ function DialogContent({
         )}
         {...props}
       >
+        {!titlePresent && <DialogTitle className="sr-only">Dialog</DialogTitle>}
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
@@ -100,6 +104,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
     />
   );
 }
+DialogTitle.displayName = "DialogTitle";
 
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (

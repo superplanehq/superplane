@@ -27,35 +27,6 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Users {
-  //
-  // Endpoint for listing all user permissions within a domain
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListUserPermissions(ListUserPermissionsRequest) returns (ListUserPermissionsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/permissions"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List user permissions";
-      description: "Returns all permissions a user has within a specific domain";
-      tags: "Users";
-    };
-  }
-
-  //
-  // Endpoint for getting user roles within a domain
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/users/{user_id}/roles"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get user roles";
-      description: "Returns the roles a user has within a specific domain";
-      tags: "Users";
-    };
-  }
 
   //
   // Endpoint for getting all users in a domain
@@ -71,19 +42,6 @@ service Users {
       tags: "Users";
     };
   }
-}
-
-message ListUserPermissionsRequest {
-  Authorization.DomainType domain_type = 1;
-  string domain_id = 2;
-  string user_id = 3;
-}
-
-message ListUserPermissionsResponse {
-  string user_id = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
-  repeated Authorization.Permission permissions = 4;
 }
 
 message ListUserRolesRequest {
@@ -102,7 +60,7 @@ message ListUserRolesResponse {
 message ListUsersRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
-  bool include_service_accounts = 3;
+  bool include_roles = 3;
 }
 
 message ListUsersResponse {
@@ -119,11 +77,11 @@ message User {
 
   message Spec {
     string display_name = 1;
-    repeated AccountProvider account_providers = 2;
   }
 
   message Status {
-    repeated UserRoleAssignment role_assignments = 2;
+    repeated AccountProvider account_providers = 1;
+    repeated RoleAssignment roles = 2;
   }
 
   Metadata metadata = 1;
@@ -131,7 +89,7 @@ message User {
   Status status = 3;
 }
 
-message UserRoleAssignment {
+message RoleAssignment {
   string role_name = 1;
   string role_display_name = 2;
   string role_description = 3;

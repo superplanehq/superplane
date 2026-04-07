@@ -21,6 +21,7 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.authorization_permission import AuthorizationPermission
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -33,7 +34,9 @@ class SuperplaneMeUser(BaseModel):
     organization_id: Optional[StrictStr] = Field(default=None, alias="organizationId")
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     has_token: Optional[StrictBool] = Field(default=None, alias="hasToken")
-    __properties: ClassVar[List[str]] = ["id", "email", "organizationId", "createdAt", "hasToken"]
+    permissions: Optional[List[AuthorizationPermission]] = None
+    roles: Optional[List[StrictStr]] = None
+    __properties: ClassVar[List[str]] = ["id", "email", "organizationId", "createdAt", "hasToken", "permissions", "roles"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -74,6 +77,13 @@ class SuperplaneMeUser(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of each item in permissions (list)
+        _items = []
+        if self.permissions:
+            for _item_permissions in self.permissions:
+                if _item_permissions:
+                    _items.append(_item_permissions.to_dict())
+            _dict['permissions'] = _items
         return _dict
 
     @classmethod
@@ -90,7 +100,9 @@ class SuperplaneMeUser(BaseModel):
             "email": obj.get("email"),
             "organizationId": obj.get("organizationId"),
             "createdAt": obj.get("createdAt"),
-            "hasToken": obj.get("hasToken")
+            "hasToken": obj.get("hasToken"),
+            "permissions": [AuthorizationPermission.from_dict(_item) for _item in obj["permissions"]] if obj.get("permissions") is not None else None,
+            "roles": obj.get("roles")
         })
         return _obj
 
