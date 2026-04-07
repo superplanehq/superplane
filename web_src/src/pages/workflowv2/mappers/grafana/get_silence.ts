@@ -19,12 +19,12 @@ export const getSilenceMapper: ComponentBaseMapper = {
     }
 
     const payload = outputs.default[0];
-    const payloadTimestamp = formatTimestamp(payload?.timestamp);
+    const payloadTimestamp = formatTimestamp(payload.timestamp);
     if (payloadTimestamp !== "-") {
       details["Fetched At"] = payloadTimestamp;
     }
 
-    const silence = payload?.data as Silence | undefined;
+    const silence = payload.data as Silence | undefined;
 
     if (silence?.status?.state) {
       details.State = silence.status.state;
