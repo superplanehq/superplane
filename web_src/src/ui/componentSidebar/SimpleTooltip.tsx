@@ -13,7 +13,7 @@ export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({ children, content,
   return (
     <Tippy
       render={() => (
-        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg w-[90vw] max-w-[520px] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words">
+        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words">
           {content}
         </div>
       )}
