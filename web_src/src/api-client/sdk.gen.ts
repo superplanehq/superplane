@@ -9,6 +9,9 @@ import type {
   AgentsDescribeAgentChatData,
   AgentsDescribeAgentChatErrors,
   AgentsDescribeAgentChatResponses,
+  AgentsDescribeAgentUsageData,
+  AgentsDescribeAgentUsageErrors,
+  AgentsDescribeAgentUsageResponses,
   AgentsListAgentChatMessagesData,
   AgentsListAgentChatMessagesErrors,
   AgentsListAgentChatMessagesResponses,
@@ -395,6 +398,19 @@ export const agentsResumeAgentChat = <ThrowOnError extends boolean = true>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Describe agent token usage for the organization
+ *
+ * Returns aggregated token usage across all agent chats in the organization
+ */
+export const agentsDescribeAgentUsage = <ThrowOnError extends boolean = true>(
+  options?: Options<AgentsDescribeAgentUsageData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<AgentsDescribeAgentUsageResponses, AgentsDescribeAgentUsageErrors, ThrowOnError>({
+    url: "/api/v1/agents/usage",
+    ...options,
   });
 
 /**
