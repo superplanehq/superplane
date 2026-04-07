@@ -306,6 +306,7 @@ func createDraftVersion(ctx context.Context, t *testing.T, r *support.ResourceRe
 		},
 		nil,
 		testWebhookBaseURL,
+		r.AuthService,
 	)
 	require.NoError(t, err)
 	return versionID

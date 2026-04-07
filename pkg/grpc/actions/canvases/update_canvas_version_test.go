@@ -42,6 +42,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
@@ -73,6 +74,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
@@ -104,6 +106,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
@@ -130,6 +133,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			nil,
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
@@ -158,6 +162,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.NoError(t, err)
@@ -190,6 +195,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.NoError(t, err)
@@ -232,6 +238,7 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 			testPbCanvas(canvas.Name),
 			nil,
 			"",
+			r.AuthService,
 		)
 
 		require.Error(t, err)
