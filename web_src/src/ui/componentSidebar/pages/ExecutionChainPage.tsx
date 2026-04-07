@@ -43,19 +43,6 @@ function buildExecutionTabData(
     };
   }
 
-  // Only add error if it's not already in custom details
-  // Custom details (like from filter mapper) handle error positioning themselves
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
-    !("Error" in currentData)
-  ) {
-    currentData["Error"] = {
-      __type: "error",
-      message: execution.resultMessage,
-    };
-  }
-
   if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in currentData)) {
     const cancelledBy = execution.cancelledBy;
     currentData["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
