@@ -12,6 +12,7 @@ interface SimpleTooltipProps {
 export const SimpleTooltip: React.FC<SimpleTooltipProps> = ({ children, content, delay = 200, hideOnClick = true }) => {
   return (
     <Tippy
+      interactive={true}
       render={() => (
         <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg max-w-[min(520px,90vw)] max-h-[40vh] overflow-auto whitespace-pre-wrap break-words">
           {content}
