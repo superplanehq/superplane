@@ -81,7 +81,6 @@ describe("canvas node preparation resilience", () => {
       nodeQueueItemsMap: {},
       canvasId: "canvas-1",
       queryClient: new QueryClient(),
-      organizationId: "org-1",
     });
 
     const fallbackData = result.data as unknown as FallbackComponentData;

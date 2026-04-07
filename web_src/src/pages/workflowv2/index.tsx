@@ -28,6 +28,7 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   OrganizationsIntegration,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -102,6 +103,7 @@ import {
   summarizeWorkflowChanges,
   buildExecutionInfo,
   buildChildToGroupMap,
+  buildUserInfo,
 } from "./utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -1723,16 +1725,7 @@ export function WorkflowPageV2() {
       visibleNodeQueueItemsMap,
       canvasId!,
       queryClient,
-      organizationId!,
-      me
-        ? {
-            id: me.id || "",
-            name: me.name || "",
-            email: me.email || "",
-            roles: me.roles || [],
-            groups: me.groups || [],
-          }
-        : undefined,
+      me,
     );
   }, [
     canvas,
@@ -5929,12 +5922,12 @@ function prepareData(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
-  organizationId: string,
-  currentUser?: User,
+  user?: SuperplaneMeUser | null,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
+  const currentUser = buildUserInfo(user);
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
   const workflowEdges = workflow?.spec?.edges || [];
   const workflowNodes = workflow?.spec?.nodes || [];
@@ -5952,7 +5945,6 @@ function prepareData(
           nodeQueueItemsMap,
           workflowId,
           queryClient,
-          organizationId,
           currentUser,
           workflowEdges,
         );
@@ -5977,7 +5969,6 @@ function prepareNode(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
-  organizationId: string,
   currentUser?: User,
   edges?: ComponentsEdge[],
 ): CanvasNode {
@@ -6016,7 +6007,6 @@ function prepareNode(
         nodeQueueItemsMap,
         canvasId: workflowId,
         queryClient,
-        organizationId,
         currentUser,
         edges,
       });

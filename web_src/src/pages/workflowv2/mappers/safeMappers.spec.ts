@@ -1,4 +1,3 @@
-import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import {
@@ -50,15 +49,15 @@ function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): Co
     componentDefinition: DEFAULT_DEFINITION,
     lastExecutions: [],
     ...overrides,
-    organizationId: "org-1",
-    canvasId: "canvas-1",
-    queryClient: new QueryClient(),
     currentUser: {
       id: "user-1",
       name: "John Doe",
       email: "john.doe@example.com",
       roles: ["admin"],
       groups: ["developers"],
+    },
+    actions: {
+      invokeNodeExecutionAction: async () => {},
     },
   };
 }

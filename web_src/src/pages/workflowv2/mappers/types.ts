@@ -6,7 +6,6 @@ import type {
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
-import type { QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 /**
@@ -120,10 +119,12 @@ export type ComponentBaseContext = {
   componentDefinition: ComponentDefinition;
   lastExecutions: ExecutionInfo[];
   nodeQueueItems?: QueueItemInfo[];
-  currentUser: User;
-  organizationId: string;
-  canvasId: string;
-  queryClient: QueryClient;
+  currentUser: User | undefined;
+  actions: ActionContext;
+};
+
+export type ActionContext = {
+  invokeNodeExecutionAction: (executionId: string, action: string, parameters: unknown) => Promise<void>;
 };
 
 export type SubtitleContext = {

@@ -46,7 +46,7 @@ func TestApprovals(t *testing.T) {
 		steps.givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop()
 		steps.runManualTrigger()
 		steps.approveAnyoneRequirement()
-		steps.waitForApprovalMetadata("Approval", 1, 1, "user")
+		steps.waitForApprovalMetadata("Approval", 1, 1, "anyone")
 		steps.assertNoApproveButtons()
 	})
 

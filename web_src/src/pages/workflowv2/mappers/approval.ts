@@ -1,5 +1,4 @@
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import { canvasesInvokeNodeExecutionAction } from "@/api-client";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -25,10 +24,7 @@ import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { canvasKeys } from "@/hooks/useCanvasData";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { showErrorToast } from "@/lib/toast";
 import { formatRelativeTime } from "@/lib/timezone";
 import type { ApprovalItemProps } from "@/ui/approvalGroup/ApprovalItem";
 
@@ -262,7 +258,7 @@ function getApprovalCustomField(context: ComponentBaseContext): React.ReactNode 
   }
 
   const metadata = lastExecution.metadata as ExecutionMetadata | undefined;
-  if (!metadata) {
+  if (!metadata || !metadata.records) {
     return;
   }
 
@@ -273,7 +269,7 @@ function getApprovalCustomField(context: ComponentBaseContext): React.ReactNode 
   return React.createElement(ApprovalGroup, {
     awaitingApproval: isAwaitingApproval,
     approvals: metadata.records.map((record: ApprovalRecord) => {
-      return approvalItemPropsForRecord(context, lastExecution, record, isAwaitingApproval);
+      return approvalItemPropsForRecord(context, lastExecution, metadata.records, record, isAwaitingApproval);
     }),
   });
 }
@@ -281,13 +277,15 @@ function getApprovalCustomField(context: ComponentBaseContext): React.ReactNode 
 function approvalItemPropsForRecord(
   context: ComponentBaseContext,
   lastExecution: ExecutionInfo,
+  records: ApprovalRecord[],
   record: ApprovalRecord,
   isAwaitingApproval: boolean,
 ): ApprovalItemProps {
   const canAct =
     record.state === "pending" &&
     isAwaitingApproval &&
-    canCurrentUserActOnApproval(context.organizationId, record, context.currentUser);
+    canCurrentUserActOnRecord(record, context.currentUser) &&
+    !hasUserGivenInputInAnyRecord(records, context.currentUser);
 
   const title = getApprovalDecisionLabel(record);
 
@@ -303,56 +301,18 @@ function approvalItemPropsForRecord(
     onApprove: async (comment?: string) => {
       if (!lastExecution?.id) return;
 
-      try {
-        await canvasesInvokeNodeExecutionAction(
-          withOrganizationHeader({
-            path: {
-              canvasId: context.canvasId,
-              executionId: lastExecution.id,
-              actionName: "approve",
-            },
-            body: {
-              parameters: {
-                index: record.index,
-                comment: comment,
-              },
-            },
-          }),
-        );
-
-        context.queryClient.invalidateQueries({
-          queryKey: canvasKeys.nodeExecution(context.canvasId, context.node.id!),
-        });
-      } catch {
-        showErrorToast("Failed to approve");
-      }
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "approve", {
+        index: record.index,
+        comment: comment,
+      });
     },
     onReject: async (reason: string) => {
       if (!lastExecution?.id) return;
 
-      try {
-        await canvasesInvokeNodeExecutionAction(
-          withOrganizationHeader({
-            path: {
-              canvasId: context.canvasId,
-              executionId: lastExecution.id,
-              actionName: "reject",
-            },
-            body: {
-              parameters: {
-                index: record.index,
-                reason: reason,
-              },
-            },
-          }),
-        );
-
-        context.queryClient.invalidateQueries({
-          queryKey: canvasKeys.nodeExecution(context.canvasId, context.node.id!),
-        });
-      } catch {
-        showErrorToast("Failed to reject");
-      }
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "reject", {
+        index: record.index,
+        reason: reason,
+      });
     },
   };
 }
@@ -468,8 +428,16 @@ function getApprovalDecisionLabel(record: ApprovalRecord): string {
   return "Any user";
 }
 
-function canCurrentUserActOnApproval(organizationId: string, record: ApprovalRecord, currentUser?: User): boolean {
-  if (!currentUser || !organizationId) {
+function hasUserGivenInputInAnyRecord(records: ApprovalRecord[], user?: User): boolean {
+  if (!user) {
+    return false;
+  }
+
+  return records.some((record) => record.state !== "pending" && record.user?.id === user.id);
+}
+
+function canCurrentUserActOnRecord(record: ApprovalRecord, currentUser?: User): boolean {
+  if (!currentUser) {
     return false;
   }
 
