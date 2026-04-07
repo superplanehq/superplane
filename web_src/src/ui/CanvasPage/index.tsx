@@ -1120,12 +1120,6 @@ function CanvasPage(props: CanvasPageProps) {
     [state.toggleNodeCollapse, props.onToggleView],
   );
 
-  const handlePushThrough = (executionId: string) => {
-    if (state.componentSidebar.selectedNodeId && props.onPushThrough) {
-      props.onPushThrough(state.componentSidebar.selectedNodeId, executionId);
-    }
-  };
-
   const handleCancelQueueItem = (queueId: string) => {
     if (state.componentSidebar.selectedNodeId && props.onCancelQueueItem) {
       props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, queueId);
@@ -1421,9 +1415,7 @@ function CanvasPage(props: CanvasPageProps) {
               getTabData={props.getTabData}
               getAutocompleteExampleObj={props.getAutocompleteExampleObj}
               onCancelQueueItem={handleCancelQueueItem}
-              onPushThrough={handlePushThrough}
               onCancelExecution={handleCancelExecution}
-              supportsPushThrough={props.supportsPushThrough}
               getAllHistoryEvents={props.getAllHistoryEvents}
               onLoadMoreHistory={props.onLoadMoreHistory}
               getHasMoreHistory={props.getHasMoreHistory}
@@ -1487,9 +1479,7 @@ function Sidebar({
   getTabData,
   getAutocompleteExampleObj,
   onCancelQueueItem,
-  onPushThrough,
   onCancelExecution,
-  supportsPushThrough,
   onReEmit,
   getAllHistoryEvents,
   onLoadMoreHistory,
@@ -1528,9 +1518,7 @@ function Sidebar({
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onCancelQueueItem?: (id: string) => void;
-  onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  supportsPushThrough?: (nodeId: string) => boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
@@ -1690,9 +1678,7 @@ function Sidebar({
         getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(event.nodeId!, event) : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
-      onPushThrough={onPushThrough}
       onCancelExecution={onCancelExecution}
-      supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
       getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
       onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
       getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}

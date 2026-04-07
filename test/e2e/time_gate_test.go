@@ -48,8 +48,7 @@ func TestTimeGateComponent(t *testing.T) {
 		activeDay := dayString(tomorrow.Weekday())
 		steps.givenACanvasWithManualTriggerTimeGateAndOutput([]string{activeDay}, "00:00-23:59", "0")
 		steps.runManualTrigger()
-		steps.openSidebarForNode("timeGate")
-		steps.pushThroughFirstItemFromSidebar()
+		steps.pushThroughFromNode("timeGate")
 		steps.assertTimeGateExecutionFinishedAndOutputNodeProcessed()
 	})
 }
@@ -175,20 +174,13 @@ func (s *TimeGateSteps) runManualTrigger() {
 	)
 }
 
-func (s *TimeGateSteps) openSidebarForNode(node string) {
-	header := q.TestID("node", node, "header")
-	s.session.AssertVisible(header)
-	s.session.Click(header)
-}
-
-func (s *TimeGateSteps) pushThroughFirstItemFromSidebar() {
-	// TimeGate maps pending/started executions to UI state "waiting" (see timegate mapper).
-	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"]`)
-	s.session.HoverOver(eventItem)
-	s.session.Sleep(300)
-	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="waiting"] button[aria-label="Open actions"]`))
-	s.session.Sleep(300)
-	s.session.Click(q.TestID("push-through-item"))
+func (s *TimeGateSteps) pushThroughFromNode(node string) {
+	s.canvas.StartEditingNode(node)
+	pushThroughButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + strings.ToLower(node) + `-header"]) button:has-text("Push through")`,
+	)
+	s.session.AssertVisible(pushThroughButton)
+	s.session.Click(pushThroughButton)
 	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 
