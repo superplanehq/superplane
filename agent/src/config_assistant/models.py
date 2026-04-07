@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FieldSuggestOutput(BaseModel):
@@ -15,9 +15,11 @@ class FieldSuggestOutput(BaseModel):
 
 
 class SuggestHTTPRequest(BaseModel):
+    """Suggest request body. LLM model comes from server env only, not from the client."""
+
+    model_config = ConfigDict(extra="forbid")
+
     canvas_id: str = Field(min_length=1)
     node_id: str = Field(min_length=1)
     instruction: str = Field(min_length=1, max_length=2000)
     field_context_json: str = Field(default="", max_length=100 * 1024)
-    # When omitted, the handler uses CONFIG_ASSISTANT_AI_MODEL / AI_MODEL from the environment.
-    model: str | None = Field(default=None, max_length=200)

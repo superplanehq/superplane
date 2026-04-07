@@ -31,6 +31,24 @@ def test_build_config_assistant_agent_test_model() -> None:
     assert agent is not None
 
 
+def test_config_assistant_suggest_rejects_client_model_field() -> None:
+    """Model must not be client-controlled (no TestModel bypass or arbitrary provider strings)."""
+    app = FastAPI()
+    app.include_router(build_config_assistant_router())
+    client = TestClient(app)
+    response = client.post(
+        "/config-assistant/suggest",
+        json={
+            "canvas_id": "550e8400-e29b-41d4-a716-446655440000",
+            "node_id": "node-1",
+            "instruction": "hello",
+            "field_context_json": "{}",
+            "model": "test",
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_config_assistant_suggest_missing_authorization_returns_401() -> None:
     app = FastAPI()
     app.include_router(build_config_assistant_router())

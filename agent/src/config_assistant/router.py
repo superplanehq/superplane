@@ -29,15 +29,11 @@ def build_config_assistant_router() -> APIRouter:
             raise HTTPException(status_code=401, detail=str(exc)) from exc
 
         try:
-            canvas_id = validator.validate_canvas(payload.canvas_id, claims)
+            validator.validate_canvas(payload.canvas_id, claims)
         except ValueError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
 
-        if canvas_id != payload.canvas_id.strip():
-            raise HTTPException(status_code=400, detail="canvas_id mismatch.")
-
-        raw_model = (payload.model or "").strip()
-        model_name = raw_model if raw_model else default_config_assistant_model()
+        model_name = default_config_assistant_model()
 
         user_prompt = build_user_prompt(
             instruction=payload.instruction,
