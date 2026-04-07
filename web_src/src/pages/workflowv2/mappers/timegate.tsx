@@ -21,6 +21,7 @@ import { getColorClass } from "@/lib/colors";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
 
 interface Configuration {
   days?: string[];
@@ -53,6 +54,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       includeEmptyState: !context.lastExecutions[0],
       specs: getTimeGateSpecs(context.node),
       eventStateMap: getStateMap(componentName),
+      customField: getTimeGateCustomField(context),
     };
   },
   subtitle(context: SubtitleContext): React.ReactNode {
@@ -89,6 +91,24 @@ export const timeGateMapper: ComponentBaseMapper = {
     return details;
   },
 };
+
+function getTimeGateCustomField(context: ComponentBaseContext): React.ReactNode {
+  const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+  if (!lastExecution) {
+    return null;
+  }
+
+  if (lastExecution.state === "STATE_FINISHED") {
+    return null;
+  }
+
+  return React.createElement(PushThroughHandler, {
+    onPushThrough: async () => {
+      if (!lastExecution?.id) return;
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "pushThrough", null);
+    },
+  });
+}
 
 export const TIME_GATE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
