@@ -136,7 +136,6 @@ export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],
   limit?: number,
-  additionalData?: unknown,
 ): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
 
@@ -152,7 +151,6 @@ export function mapExecutionsToSidebarEvents(
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
       execution: buildExecutionInfo(execution),
-      additionalData,
     });
 
     const { title, subtitle } = execution.rootEvent

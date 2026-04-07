@@ -7,16 +7,8 @@ import type {
   CanvasesListNodeEventsResponse,
   CanvasesListNodeExecutionsResponse,
 } from "@/api-client";
-import {
-  mapTriggerEventsToSidebarEvents,
-  mapExecutionsToSidebarEvents,
-  buildComponentDefinition,
-  buildExecutionInfo,
-  buildNodeInfo,
-} from "@/pages/workflowv2/utils";
+import { mapTriggerEventsToSidebarEvents, mapExecutionsToSidebarEvents } from "@/pages/workflowv2/utils";
 import type { QueryClient } from "@tanstack/react-query";
-import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
-import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import { useMe } from "./useMe";
 
 interface UseNodeHistoryProps {
@@ -60,30 +52,6 @@ export const useNodeHistory = ({
       []
     );
   }, [enabled, isTriggerNode, executionsQuery.data]);
-  const approvalGroupNames = useMemo(() => {
-    if (!enabled || isTriggerNode || componentDef?.name !== "approval") return [];
-
-    const groupNames = new Set<string>();
-    allExecutions.forEach((execution) => {
-      const metadata = execution.metadata as { records?: Array<{ type?: string; group?: string }> } | undefined;
-      const records = metadata?.records;
-      if (!Array.isArray(records)) return;
-
-      records.forEach((record) => {
-        if (record.type === "group" && record.group) {
-          groupNames.add(record.group);
-        }
-      });
-    });
-
-    return Array.from(groupNames);
-  }, [enabled, isTriggerNode, componentDef?.name, allExecutions]);
-
-  useApprovalGroupUsersPrefetch({
-    organizationId,
-    groupNames: approvalGroupNames,
-    enabled: enabled && !isTriggerNode && componentDef?.name === "approval",
-  });
 
   const getAllHistoryEvents = useCallback((): SidebarEvent[] => {
     if (!enabled) return [];
@@ -95,18 +63,7 @@ export const useNodeHistory = ({
         eventsQuery.data?.pages.flatMap((page) => (page as CanvasesListNodeEventsResponse)?.events || []) || [];
       return mapTriggerEventsToSidebarEvents(allEvents, node);
     } else {
-      const additionalData = getComponentAdditionalDataBuilder(componentDef?.name || "")?.buildAdditionalData({
-        nodes: allNodes.map((n) => buildNodeInfo(n)),
-        node: buildNodeInfo(node),
-        componentDefinition: buildComponentDefinition(componentDef!),
-        lastExecutions: allExecutions.map((e) => buildExecutionInfo(e)),
-        canvasId: canvasId || "",
-        queryClient,
-        organizationId: organizationId || "",
-        currentUser: me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
-      });
-
-      return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
+      return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined);
     }
   }, [
     enabled,

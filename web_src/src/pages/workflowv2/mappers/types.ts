@@ -2,7 +2,6 @@ import type {
   CanvasNodeExecutionResult,
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionState,
-  ComponentsEdge,
   OrganizationsIntegration,
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
@@ -121,13 +120,15 @@ export type ComponentBaseContext = {
   componentDefinition: ComponentDefinition;
   lastExecutions: ExecutionInfo[];
   nodeQueueItems?: QueueItemInfo[];
-  additionalData?: unknown;
+  currentUser: User;
+  organizationId: string;
+  canvasId: string;
+  queryClient: QueryClient;
 };
 
 export type SubtitleContext = {
   node: NodeInfo;
   execution: ExecutionInfo;
-  additionalData?: unknown;
 };
 
 export type ExecutionDetailsContext = {
@@ -136,30 +137,22 @@ export type ExecutionDetailsContext = {
   execution: ExecutionInfo;
 };
 
-/**
- * A component additional data builder creates component-specific data
- * that cannot be derived from the standard parameters alone.
- */
-export interface ComponentAdditionalDataBuilder {
-  buildAdditionalData(context: AdditionalDataBuilderContext): unknown;
-}
-
-export type AdditionalDataBuilderContext = {
-  nodes: NodeInfo[];
-  node: NodeInfo;
-  edges?: ComponentsEdge[];
-  componentDefinition: ComponentDefinition;
-  lastExecutions: ExecutionInfo[];
-  canvasId: string;
-  queryClient: QueryClient;
-  organizationId?: string;
-  currentUser?: User;
-};
-
 export type User = {
   id: string;
+  name: string;
   email: string;
   roles: string[];
+  groups: string[];
+};
+
+export type RoleRef = {
+  name: string;
+  displayName: string;
+};
+
+export type GroupRef = {
+  name: string;
+  displayName: string;
 };
 
 /**
