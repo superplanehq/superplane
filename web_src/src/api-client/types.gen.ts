@@ -4245,7 +4245,7 @@ export type UsersListUsersData = {
   query?: {
     domainType?: "DOMAIN_TYPE_UNSPECIFIED" | "DOMAIN_TYPE_ORGANIZATION";
     domainId?: string;
-    includeRoleAssignments?: boolean;
+    includeRoles?: boolean;
   };
   url: "/api/v1/users";
 };

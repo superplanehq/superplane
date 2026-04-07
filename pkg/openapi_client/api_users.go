@@ -23,11 +23,11 @@ import (
 type UsersAPIService service
 
 type ApiUsersListUsersRequest struct {
-	ctx                    context.Context
-	ApiService             *UsersAPIService
-	domainType             *string
-	domainId               *string
-	includeRoleAssignments *bool
+	ctx          context.Context
+	ApiService   *UsersAPIService
+	domainType   *string
+	domainId     *string
+	includeRoles *bool
 }
 
 func (r ApiUsersListUsersRequest) DomainType(domainType string) ApiUsersListUsersRequest {
@@ -40,8 +40,8 @@ func (r ApiUsersListUsersRequest) DomainId(domainId string) ApiUsersListUsersReq
 	return r
 }
 
-func (r ApiUsersListUsersRequest) IncludeRoleAssignments(includeRoleAssignments bool) ApiUsersListUsersRequest {
-	r.includeRoleAssignments = &includeRoleAssignments
+func (r ApiUsersListUsersRequest) IncludeRoles(includeRoles bool) ApiUsersListUsersRequest {
+	r.includeRoles = &includeRoles
 	return r
 }
 
@@ -95,8 +95,8 @@ func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*Us
 	if r.domainId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
 	}
-	if r.includeRoleAssignments != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "includeRoleAssignments", r.includeRoleAssignments, "", "")
+	if r.includeRoles != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeRoles", r.includeRoles, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

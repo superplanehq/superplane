@@ -199,7 +199,6 @@ function getApprovalCustomField(
 function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): ComponentBaseSpec[] {
   if (items.length === 0) return [];
 
-  const usersById = (additionalData as { usersById?: Record<string, any> })?.usersById || {};
   const rolesByName = (additionalData as { rolesByName?: Record<string, any> })?.rolesByName || {};
 
   return [
@@ -223,9 +222,6 @@ function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): Comp
           const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
 
           // Pretty-print values
-          if (type === "user" && value && usersById[value]) {
-            value = usersById[value].email || usersById[value].name || value;
-          }
           if (type === "role" && value) {
             value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
             // Fallback to simple suffix mapping when not found
@@ -434,7 +430,6 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
     const { node, lastExecutions, canvasId, queryClient, organizationId, currentUser } = context;
     const execution = lastExecutions.length > 0 ? lastExecutions[0] : null;
     const executionMetadata = execution?.metadata as Record<string, unknown> | undefined;
-    const usersById: Record<string, { email?: string; name?: string }> = {};
     const rolesByName: Record<string, string> = {};
     const groupsByName: Record<string, string> = {};
 
@@ -603,7 +598,6 @@ export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
 
     return {
       approvals,
-      usersById,
       rolesByName,
       groupsByName,
     };
@@ -616,32 +610,32 @@ function canCurrentUserActOnApproval(
   record: ApprovalRecord,
   currentUser?: User,
 ): boolean {
-  if (!currentUser) return false;
+  if (!currentUser || !organizationId) {
+    return false;
+  }
 
   switch (record.type) {
     case "anyone":
-      return !!(currentUser.id || currentUser.email);
+      return true;
 
     case "user":
-      return (
-        (!!currentUser.id && record.user?.id === currentUser.id) ||
-        (!!currentUser.email && record.user?.email === currentUser.email)
-      );
+      return record.user?.id === currentUser.id || record.user?.email === currentUser.email;
 
     case "role":
-      const role = currentUser.roles || [];
-      return !!record.role && role.includes(record.role);
+      return !!record.role && currentUser.roles.includes(record.role);
 
     case "group": {
-      if (!record.group || !organizationId) return false;
+      if (!record.group) {
+        return false;
+      }
+
       const groupUsers = queryClient.getQueryData<SuperplaneUsersUser[]>(
         organizationKeys.groupUsers(organizationId, record.group),
       );
+
       if (!Array.isArray(groupUsers)) return false;
       return groupUsers.some(
-        (user) =>
-          (!!currentUser.id && user.metadata?.id === currentUser.id) ||
-          (!!currentUser.email && user.metadata?.email === currentUser.email),
+        (user) => user.metadata?.id === currentUser.id || user.metadata?.email === currentUser.email,
       );
     }
   }
@@ -678,7 +672,12 @@ function getPendingUserApprovalIndex(records: ApprovalRecord[], currentUser?: Us
   return match?.index;
 }
 
-function getInteractiveApprovalIndex(organizationId: string, queryClient: QueryClient, records: ApprovalRecord[], currentUser?: User): number | undefined {
+function getInteractiveApprovalIndex(
+  organizationId: string,
+  queryClient: QueryClient,
+  records: ApprovalRecord[],
+  currentUser?: User,
+): number | undefined {
   if (!currentUser) return undefined;
 
   const pendingUserIndex = getPendingUserApprovalIndex(records, currentUser);
@@ -695,8 +694,7 @@ function getInteractiveApprovalIndex(organizationId: string, queryClient: QueryC
 
   const fallback = records.find(
     (record) =>
-      record.state === "pending" &&
-      canCurrentUserActOnApproval(queryClient, organizationId, record, currentUser)
+      record.state === "pending" && canCurrentUserActOnApproval(queryClient, organizationId, record, currentUser),
   );
 
   return fallback?.index;

@@ -3919,7 +3919,7 @@
             "type": "string"
           },
           {
-            "name": "includeRoleAssignments",
+            "name": "includeRoles",
             "in": "query",
             "required": false,
             "type": "boolean"

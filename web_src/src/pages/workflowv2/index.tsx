@@ -91,7 +91,6 @@ import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
-import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
@@ -135,7 +134,7 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
-import { User } from "./mappers/types";
+import type { User } from "./mappers/types";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -188,7 +187,6 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { account } = useAccount();
   const { data: me } = useMe();
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -1761,7 +1759,7 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       organizationId!,
-      me ? { id: me.id, email: me.email, roles: me.roles } : undefined,
+      me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
     );
   }, [
     canvas,
@@ -1780,7 +1778,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     integrationsLoading,
     organizationId,
-    account,
+    me,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -1824,7 +1822,7 @@ export function WorkflowPageV2() {
         canvasId,
         queryClient,
         organizationId,
-        me ? { id: me.id, email: me.email, roles: me.roles } : undefined,
+        me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -1844,7 +1842,7 @@ export function WorkflowPageV2() {
       getNodeData,
       queryClient,
       organizationId,
-      account,
+      me,
     ],
   );
 

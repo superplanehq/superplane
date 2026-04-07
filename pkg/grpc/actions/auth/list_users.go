@@ -17,7 +17,7 @@ func ListUsers(
 	ctx context.Context,
 	domainType string,
 	domainID string,
-	includeRoleAssignments bool,
+	includeRoles bool,
 	authService authorization.Authorization,
 ) (*pb.ListUsersResponse, error) {
 	if domainType != models.DomainTypeOrganization {
@@ -35,7 +35,7 @@ func ListUsers(
 	}
 
 	protoUsers := usersToProto(users, accountProviders)
-	if !includeRoleAssignments {
+	if !includeRoles {
 		return &pb.ListUsersResponse{
 			Users: protoUsers,
 		}, nil

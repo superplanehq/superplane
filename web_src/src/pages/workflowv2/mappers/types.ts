@@ -157,9 +157,9 @@ export type AdditionalDataBuilderContext = {
 };
 
 export type User = {
-  id?: string;
-  email?: string;
-  roles?: string[];
+  id: string;
+  email: string;
+  roles: string[];
 };
 
 /**

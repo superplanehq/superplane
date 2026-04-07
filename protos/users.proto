@@ -60,7 +60,7 @@ message ListUserRolesResponse {
 message ListUsersRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
-  bool include_role_assignments = 3;
+  bool include_roles = 3;
 }
 
 message ListUsersResponse {

@@ -103,7 +103,7 @@ export const useNodeHistory = ({
         canvasId: canvasId || "",
         queryClient,
         organizationId: organizationId || "",
-        currentUser: me ? { id: me.id, email: me.email, roles: me.roles } : undefined,
+        currentUser: me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
       });
 
       return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
