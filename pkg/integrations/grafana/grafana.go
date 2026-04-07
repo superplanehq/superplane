@@ -10,6 +10,7 @@ import (
 )
 
 const resourceTypeDataSource = "data-source"
+const resourceTypeSilence = "silence"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -111,13 +112,41 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeDataSource {
-		return []core.IntegrationResource{}, nil
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err != nil {
 		return nil, fmt.Errorf("error creating client: %w", err)
+	}
+
+	if resourceType == resourceTypeSilence {
+		silences, err := client.ListSilences("")
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(silences))
+		for _, silence := range silences {
+			id := strings.TrimSpace(silence.ID)
+			if id == "" {
+				continue
+			}
+
+			label := formatSilenceResourceLabel(silence)
+			if label == "" {
+				label = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeSilence,
+				Name: label,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+	}
+
+	if resourceType != resourceTypeDataSource {
+		return []core.IntegrationResource{}, nil
 	}
 
 	dataSources, err := client.ListDataSources()
@@ -145,4 +174,26 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 	}
 
 	return resources, nil
+}
+
+func formatSilenceResourceLabel(s Silence) string {
+	comment := strings.TrimSpace(s.Comment)
+	state := strings.TrimSpace(s.Status.State)
+
+	id := strings.TrimSpace(s.ID)
+	idShort := id
+	if len(idShort) > 8 {
+		idShort = idShort[:8]
+	}
+
+	if comment == "" && state == "" {
+		return id
+	}
+	if comment == "" {
+		return fmt.Sprintf("%s (%s)", idShort, state)
+	}
+	if state == "" {
+		return fmt.Sprintf("%s (%s)", comment, idShort)
+	}
+	return fmt.Sprintf("%s [%s] (%s)", comment, state, idShort)
 }

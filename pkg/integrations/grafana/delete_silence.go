@@ -45,7 +45,7 @@ func (d *DeleteSilence) Documentation() string {
 
 ## Configuration
 
-- **Silence ID**: The unique ID of the silence to expire (required)
+- **Silence**: The silence to expire (required)
 
 ## Output
 
@@ -69,10 +69,15 @@ func (d *DeleteSilence) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "silenceId",
-			Label:       "Silence ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Silence",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the silence to expire",
+			Description: "The silence to expire",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeSilence,
+				},
+			},
 		},
 	}
 }

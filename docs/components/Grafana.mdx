@@ -103,11 +103,11 @@ The Create Silence component creates a new Alertmanager silence in Grafana, supp
 
 ### Configuration
 
-- **Matchers**: One or more label matchers that identify which alerts to silence (required)
+- **Matchers**: One or more label matchers that identify which alerts to silence (required). Each matcher uses an operator: equal (=), not equal (!=), regex match (=~), or regex does not match (!~), matching Grafana Alertmanager semantics.
 - **Starts At**: The start of the silence window (required)
 - **Ends At**: The end of the silence window (required)
 - **Comment**: A description of why the silence is being created (required)
-- **Created By**: The author name recorded on the silence (optional, defaults to "superplane")
+  - The createdBy field sent to Grafana is set automatically to SuperPlane-&lt;org_name&gt; and is not configurable
 
 ### Output
 
@@ -138,7 +138,7 @@ The Delete Silence component expires an existing silence in Grafana Alertmanager
 
 ### Configuration
 
-- **Silence ID**: The unique ID of the silence to expire (required)
+- **Silence**: The silence to expire (required)
 
 ### Output
 
@@ -170,7 +170,7 @@ The Get Silence component fetches the details of a single silence from Grafana A
 
 ### Configuration
 
-- **Silence ID**: The unique ID of the silence to retrieve (required)
+- **Silence**: The silence to retrieve (required)
 
 ### Output
 

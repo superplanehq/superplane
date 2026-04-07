@@ -63,6 +63,10 @@ export const getSilenceMapper: ComponentBaseMapper = {
       details["Ends At"] = formatTimestamp(silence.endsAt);
     }
 
+    if (silence?.url) {
+      details["Silence URL"] = silence.url;
+    }
+
     return details;
   },
 

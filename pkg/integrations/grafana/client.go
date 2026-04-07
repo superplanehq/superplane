@@ -43,6 +43,7 @@ type Silence struct {
 	EndsAt    string           `json:"endsAt"`
 	UpdatedAt string           `json:"updatedAt"`
 	Matchers  []SilenceMatcher `json:"matchers"`
+	URL       string           `json:"url,omitempty"`
 }
 
 type SilenceStatus struct {

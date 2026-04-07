@@ -40,7 +40,7 @@ func (g *GetSilence) Documentation() string {
 
 ## Configuration
 
-- **Silence ID**: The unique ID of the silence to retrieve (required)
+- **Silence**: The silence to retrieve (required)
 
 ## Output
 
@@ -64,10 +64,15 @@ func (g *GetSilence) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "silenceId",
-			Label:       "Silence ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Silence",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the silence to retrieve",
+			Description: "The silence to retrieve",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeSilence,
+				},
+			},
 		},
 	}
 }
@@ -97,6 +102,12 @@ func (g *GetSilence) Execute(ctx core.ExecutionContext) error {
 	silence, err := client.GetSilence(strings.TrimSpace(spec.SilenceID))
 	if err != nil {
 		return fmt.Errorf("error getting silence: %w", err)
+	}
+
+	if silence != nil && strings.TrimSpace(silence.ID) != "" {
+		if silenceURL, err := buildSilenceWebURL(ctx.Integration, silence.ID); err == nil {
+			silence.URL = silenceURL
+		}
 	}
 
 	return ctx.ExecutionState.Emit(
