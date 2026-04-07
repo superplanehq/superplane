@@ -16,8 +16,8 @@ import {
 } from "@/pages/workflowv2/utils";
 import type { QueryClient } from "@tanstack/react-query";
 import { getComponentAdditionalDataBuilder } from "@/pages/workflowv2/mappers";
-import { useAccount } from "@/contexts/AccountContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
+import { useMe } from "./useMe";
 
 interface UseNodeHistoryProps {
   canvasId: string;
@@ -40,7 +40,8 @@ export const useNodeHistory = ({
   queryClient,
   components,
 }: UseNodeHistoryProps) => {
-  const { account } = useAccount();
+  const { data: me } = useMe();
+
   // For trigger nodes, use events; for other nodes, use executions
   const isTriggerNode = nodeType === "TYPE_TRIGGER";
 
@@ -102,7 +103,7 @@ export const useNodeHistory = ({
         canvasId: canvasId || "",
         queryClient,
         organizationId: organizationId || "",
-        currentUser: account ? { id: account.id, email: account.email } : undefined,
+        currentUser: me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
       });
 
       return mapExecutionsToSidebarEvents(allExecutions, allNodes, undefined, additionalData);
@@ -118,7 +119,7 @@ export const useNodeHistory = ({
     organizationId,
     queryClient,
     canvasId,
-    account,
+    me,
   ]);
 
   const handleLoadMore = useCallback(() => {
