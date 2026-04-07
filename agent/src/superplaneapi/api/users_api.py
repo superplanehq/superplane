@@ -44,7 +44,7 @@ class UsersApi:
         self,
         domain_type: Optional[StrictStr] = None,
         domain_id: Optional[StrictStr] = None,
-        include_service_accounts: Optional[StrictBool] = None,
+        include_roles: Optional[StrictBool] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -66,8 +66,8 @@ class UsersApi:
         :type domain_type: str
         :param domain_id:
         :type domain_id: str
-        :param include_service_accounts:
-        :type include_service_accounts: bool
+        :param include_roles:
+        :type include_roles: bool
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -93,7 +93,7 @@ class UsersApi:
         _param = self._users_list_users_serialize(
             domain_type=domain_type,
             domain_id=domain_id,
-            include_service_accounts=include_service_accounts,
+            include_roles=include_roles,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -119,7 +119,7 @@ class UsersApi:
         self,
         domain_type: Optional[StrictStr] = None,
         domain_id: Optional[StrictStr] = None,
-        include_service_accounts: Optional[StrictBool] = None,
+        include_roles: Optional[StrictBool] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -141,8 +141,8 @@ class UsersApi:
         :type domain_type: str
         :param domain_id:
         :type domain_id: str
-        :param include_service_accounts:
-        :type include_service_accounts: bool
+        :param include_roles:
+        :type include_roles: bool
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -168,7 +168,7 @@ class UsersApi:
         _param = self._users_list_users_serialize(
             domain_type=domain_type,
             domain_id=domain_id,
-            include_service_accounts=include_service_accounts,
+            include_roles=include_roles,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -194,7 +194,7 @@ class UsersApi:
         self,
         domain_type: Optional[StrictStr] = None,
         domain_id: Optional[StrictStr] = None,
-        include_service_accounts: Optional[StrictBool] = None,
+        include_roles: Optional[StrictBool] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -216,8 +216,8 @@ class UsersApi:
         :type domain_type: str
         :param domain_id:
         :type domain_id: str
-        :param include_service_accounts:
-        :type include_service_accounts: bool
+        :param include_roles:
+        :type include_roles: bool
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -243,7 +243,7 @@ class UsersApi:
         _param = self._users_list_users_serialize(
             domain_type=domain_type,
             domain_id=domain_id,
-            include_service_accounts=include_service_accounts,
+            include_roles=include_roles,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -264,7 +264,7 @@ class UsersApi:
         self,
         domain_type,
         domain_id,
-        include_service_accounts,
+        include_roles,
         _request_auth,
         _content_type,
         _headers,
@@ -295,9 +295,9 @@ class UsersApi:
             
             _query_params.append(('domainId', domain_id))
             
-        if include_service_accounts is not None:
+        if include_roles is not None:
             
-            _query_params.append(('includeServiceAccounts', include_service_accounts))
+            _query_params.append(('includeRoles', include_roles))
             
         # process the header parameters
         # process the form parameters

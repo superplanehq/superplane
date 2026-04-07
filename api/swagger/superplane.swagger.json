@@ -3919,7 +3919,7 @@
             "type": "string"
           },
           {
-            "name": "includeServiceAccounts",
+            "name": "includeRoles",
             "in": "query",
             "required": false,
             "type": "boolean"
@@ -7063,6 +7063,12 @@
             "type": "object",
             "$ref": "#/definitions/AuthorizationPermission"
           }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -7182,26 +7188,7 @@
         }
       }
     },
-    "UsersUserMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "UsersUserRoleAssignment": {
+    "UsersRoleAssignment": {
       "type": "object",
       "properties": {
         "roleName": {
@@ -7225,29 +7212,48 @@
         }
       }
     },
+    "UsersUserMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "UsersUserSpec": {
       "type": "object",
       "properties": {
         "displayName": {
           "type": "string"
-        },
-        "accountProviders": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/UsersAccountProvider"
-          }
         }
       }
     },
     "UsersUserStatus": {
       "type": "object",
       "properties": {
-        "roleAssignments": {
+        "accountProviders": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/UsersUserRoleAssignment"
+            "$ref": "#/definitions/UsersAccountProvider"
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersRoleAssignment"
           }
         }
       }
