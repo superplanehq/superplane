@@ -3,6 +3,7 @@ package merge
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +27,58 @@ const (
 
 func init() {
 	registry.RegisterComponent("merge", &Merge{})
+}
+
+/*
+ * The execution metadata associated with a merge component
+ * holds information about the grouping of events.
+ */
+type ExecutionMetadata struct {
+	// GroupKey is a logical key used to correlate queue items into a single execution
+	GroupKey string `json:"groupKey,omitempty" mapstructure:"groupKey"`
+
+	// EventIDs collects upstream event ids that reached this merge
+	EventIDs []string `json:"eventIDs,omitempty" mapstructure:"eventIDs"`
+
+	// Sources collects distinct upstream source nodes that reached this merge
+	SourceNodes []SourceNode `json:"sourceNodes,omitempty" mapstructure:"sourceNodes"`
+
+	// StopEarly indicates the merge was short-circuited based on a stop condition
+	StopEarly bool `json:"stopEarly,omitempty" mapstructure:"stopEarly"`
+}
+
+func (m *ExecutionMetadata) HasReceivedAll() bool {
+	for _, s := range m.SourceNodes {
+		if s.ReceivedAt == nil {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (m *ExecutionMetadata) UpdateSource(nodeID string) {
+	if m.SourceNodes == nil {
+		m.SourceNodes = []SourceNode{
+			{NodeID: nodeID},
+		}
+	}
+
+	i := slices.IndexFunc(m.SourceNodes, func(s SourceNode) bool {
+		return s.NodeID == nodeID
+	})
+
+	if i == -1 {
+		return
+	}
+
+	now := time.Now().Format(time.RFC3339)
+	m.SourceNodes[i].ReceivedAt = &now
+}
+
+type SourceNode struct {
+	NodeID     string  `json:"nodeId,omitempty" mapstructure:"nodeId"`
+	ReceivedAt *string `json:"receivedAt,omitempty" mapstructure:"receivedAt"`
 }
 
 type Merge struct{}
@@ -189,7 +242,12 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		return nil, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	executionCtx, err := m.findOrCreateExecution(ctx, ctx.RootEventID)
+	incomingSources, err := ctx.DistinctIncomingSources()
+	if err != nil {
+		return nil, fmt.Errorf("error counting distinct incoming sources: %v", err)
+	}
+
+	executionCtx, err := m.findOrCreateExecution(ctx, ctx.RootEventID, incomingSources)
 	if err != nil {
 		return nil, fmt.Errorf("error finding or creating execution: %v", err)
 	}
@@ -209,11 +267,6 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 
 	if err := ctx.UpdateNodeState(models.CanvasNodeStateReady); err != nil {
 		return nil, fmt.Errorf("error updating node state: %v", err)
-	}
-
-	incoming, err := ctx.CountDistinctIncomingSources()
-	if err != nil {
-		return nil, fmt.Errorf("error counting distinct incoming sources: %v", err)
 	}
 
 	md, err := m.addEventToMetadata(ctx, executionCtx)
@@ -280,7 +333,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 		}
 	}
 
-	if len(md.Sources) >= incoming {
+	if md.HasReceivedAll() {
 		return &executionCtx.ID, executionCtx.ExecutionState.Emit(
 			ChannelNameSuccess,
 			"merge.finished",
@@ -291,7 +344,7 @@ func (m *Merge) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, erro
 	return &executionCtx.ID, nil
 }
 
-func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string) (*core.ExecutionContext, error) {
+func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup string, incomingSources []core.Node) (*core.ExecutionContext, error) {
 	executionCtx, err := ctx.FindExecutionByKV("merge_group", mergeGroup)
 	if err != nil {
 		return nil, err
@@ -317,10 +370,18 @@ func (m *Merge) findOrCreateExecution(ctx core.ProcessQueueContext, mergeGroup s
 		return nil, err
 	}
 
+	sourceNodes := []SourceNode{}
+	for _, source := range incomingSources {
+		sourceNodes = append(sourceNodes, SourceNode{
+			NodeID:     source.ID,
+			ReceivedAt: nil,
+		})
+	}
+
 	md := &ExecutionMetadata{
-		GroupKey: mergeGroup,
-		EventIDs: []string{},
-		Sources:  []string{},
+		GroupKey:    mergeGroup,
+		EventIDs:    []string{},
+		SourceNodes: sourceNodes,
 	}
 
 	err = executionCtx.Metadata.Set(md)
@@ -344,16 +405,7 @@ func (m *Merge) addEventToMetadata(ctx core.ProcessQueueContext, executionCtx *c
 	// Track distinct source nodes that reached this merge
 	//
 	if ctx.SourceNodeID != "" {
-		exists := false
-		for _, s := range md.Sources {
-			if s == ctx.SourceNodeID {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			md.Sources = append(md.Sources, ctx.SourceNodeID)
-		}
+		md.UpdateSource(ctx.SourceNodeID)
 	}
 
 	err = executionCtx.Metadata.Set(md)

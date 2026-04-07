@@ -1,8 +1,7 @@
 import * as React from "react";
 import type { LucideProps } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 
 import { Badge, type BadgeProps } from "../badge";
 import { Item, ItemActions, ItemContent, ItemMedia, ItemTitle } from "../item";
@@ -50,45 +49,9 @@ export interface EventItemProps {
   className?: string;
 }
 
-const FALLBACK_ICON = "bell";
-
-function resolveIcon(slug?: string, fallback: string = FALLBACK_ICON): IconComponent {
-  const source = slug ?? fallback;
-
-  const pascal = source
-    .split("-")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join("");
-
-  const candidate = (LucideIcons as Record<string, unknown>)[pascal];
-
-  if (
-    typeof candidate === "function" ||
-    (typeof candidate === "object" && candidate && "render" in (candidate as object))
-  ) {
-    return candidate as IconComponent;
-  }
-
-  const fallbackPascal = fallback
-    .split("-")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join("");
-
-  const fallbackCandidate = (LucideIcons as Record<string, unknown>)[fallbackPascal];
-
-  if (
-    typeof fallbackCandidate === "function" ||
-    (typeof fallbackCandidate === "object" && fallbackCandidate && "render" in (fallbackCandidate as object))
-  ) {
-    return fallbackCandidate as IconComponent;
-  }
-
-  return LucideIcons.Circle;
-}
-
 const EventItem: React.FC<EventItemProps> = ({ status, title, badges, href, timestamp, statusIcon, className }) => {
   const statusConfig = STATUS_STYLES[status];
-  const StatusIcon = resolveIcon(statusIcon, statusConfig.icon);
+  const StatusIcon = resolveIcon(statusIcon, statusConfig.icon) as IconComponent;
 
   const baseClassName = cn("w-full rounded-full transition-colors", statusConfig.background, className);
 
@@ -107,7 +70,7 @@ const EventItem: React.FC<EventItemProps> = ({ status, title, badges, href, time
           {badges?.length ? (
             <span className="flex shrink-0 gap-1">
               {badges.map(({ label, icon, variant, className: badgeClassName, ...badgeProps }) => {
-                const BadgeIcon = icon ? resolveIcon(icon) : null;
+                const BadgeIcon = icon ? (resolveIcon(icon, "bell") as IconComponent) : null;
 
                 return (
                   <Badge

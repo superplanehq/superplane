@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -174,20 +175,20 @@ func BuildProcessQueueContext(
 		return &executionCtx.ID, nil
 	}
 
-	ctx.CountDistinctIncomingSources = func() (int, error) {
+	ctx.DistinctIncomingSources = func() ([]core.Node, error) {
 		// Similar blueprint-aware logic as CountIncomingEdges, but count
 		// distinct source nodes rather than edge count.
 		if node.ParentNodeID != nil && *node.ParentNodeID != "" {
 			parent, err := models.FindCanvasNode(tx, node.WorkflowID, *node.ParentNodeID)
 			if err != nil {
-				return 0, err
+				return nil, err
 			}
 
 			blueprintID := parent.Ref.Data().Blueprint.ID
 			if blueprintID != "" {
 				bp, err := models.FindUnscopedBlueprintInTransaction(tx, blueprintID)
 				if err != nil {
-					return 0, err
+					return nil, err
 				}
 
 				prefix := parent.NodeID + ":"
@@ -196,32 +197,36 @@ func BuildProcessQueueContext(
 					childID = childID[len(prefix):]
 				}
 
-				uniq := map[string]struct{}{}
+				sources := []core.Node{}
 				for _, e := range bp.Edges {
 					if e.TargetID == childID {
-						uniq[e.SourceID] = struct{}{}
+						sources = append(sources, core.Node{
+							ID: fmt.Sprintf("%s:%s", parent.NodeID, e.SourceID),
+						})
 					}
 				}
-				return len(uniq), nil
+				return uniqueSourceNodes(sources), nil
 			}
 		}
 
 		wf, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 		_, liveEdges, err := models.FindLiveCanvasSpecInTransaction(tx, wf.ID)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 
-		uniq := map[string]struct{}{}
+		sources := []core.Node{}
 		for _, edge := range liveEdges {
 			if edge.TargetID == node.NodeID {
-				uniq[edge.SourceID] = struct{}{}
+				sources = append(sources, core.Node{
+					ID: edge.SourceID,
+				})
 			}
 		}
-		return len(uniq), nil
+		return uniqueSourceNodes(sources), nil
 	}
 
 	ctx.FindExecutionByKV = func(key string, value string) (*core.ExecutionContext, error) {
@@ -263,4 +268,14 @@ func BuildProcessQueueContext(
 	}
 
 	return ctx, nil
+}
+
+func uniqueSourceNodes(nodes []core.Node) []core.Node {
+	unique := []core.Node{}
+	for _, node := range nodes {
+		if !slices.ContainsFunc(unique, func(a core.Node) bool { return a.ID == node.ID }) {
+			unique = append(unique, node)
+		}
+	}
+	return unique
 }

@@ -27,8 +27,6 @@ export interface CanvasPageState {
     close: () => void;
     open: (nodeId: string) => void;
   };
-
-  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
 }
 
 export function useCanvasState(props: CanvasPageProps): CanvasPageState {
@@ -272,7 +270,6 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     setEdges,
     onNodesChange,
     onEdgesChange,
-    onNodeExpand: props.onNodeExpand,
     isCollapsed,
     toggleCollapse,
     toggleNodeCollapse,

@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { isCustomComponentsEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
@@ -596,17 +595,9 @@ function OpenBuildingBlocksSidebar({
     const categoryOrder: Record<string, number> = {
       Core: 0,
       Memory: 1,
-      Bundles: 2,
     };
 
-    const filteredCategories = (blocks || []).filter((category) => {
-      if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
-        return false;
-      }
-      return true;
-    });
-
-    return [...filteredCategories].sort((a, b) => {
+    return [...blocks].sort((a, b) => {
       const aOrder = categoryOrder[a.name] ?? Infinity;
       const bOrder = categoryOrder[b.name] ?? Infinity;
 
