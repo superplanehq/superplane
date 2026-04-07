@@ -14,7 +14,7 @@ import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type { CompositeProps, LastRunState } from "@/ui/composite";
-import type { ComponentBaseMapper } from "../mappers/types";
+import type { ComponentBaseMapper, User } from "../mappers/types";
 import { getComponentAdditionalDataBuilder, getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
@@ -38,7 +38,7 @@ type PrepareComponentNodeArgs = {
   canvasId: string;
   queryClient: QueryClient;
   organizationId?: string;
-  currentUser?: { id?: string; email?: string };
+  currentUser?: User;
   edges?: ComponentsEdge[];
 };
 
@@ -51,7 +51,7 @@ type PrepareComponentBaseNodeArgs = {
   canvasId: string;
   queryClient: QueryClient;
   organizationId: string;
-  currentUser?: { id?: string; email?: string };
+  currentUser?: User;
   edges?: ComponentsEdge[];
 };
 
@@ -256,7 +256,7 @@ function buildComponentAdditionalData(args: {
   canvasId: string;
   queryClient: QueryClient;
   organizationId: string;
-  currentUser?: { id?: string; email?: string };
+  currentUser?: User;
   edges?: ComponentsEdge[];
 }) {
   const { componentDef, node, nodes, executions, canvasId, queryClient, organizationId, currentUser, edges } = args;

@@ -20,8 +20,7 @@ var _ MappedNullable = &UsersUserSpec{}
 
 // UsersUserSpec struct for UsersUserSpec
 type UsersUserSpec struct {
-	DisplayName      *string                `json:"displayName,omitempty"`
-	AccountProviders []UsersAccountProvider `json:"accountProviders,omitempty"`
+	DisplayName *string `json:"displayName,omitempty"`
 }
 
 // NewUsersUserSpec instantiates a new UsersUserSpec object
@@ -73,38 +72,6 @@ func (o *UsersUserSpec) SetDisplayName(v string) {
 	o.DisplayName = &v
 }
 
-// GetAccountProviders returns the AccountProviders field value if set, zero value otherwise.
-func (o *UsersUserSpec) GetAccountProviders() []UsersAccountProvider {
-	if o == nil || IsNil(o.AccountProviders) {
-		var ret []UsersAccountProvider
-		return ret
-	}
-	return o.AccountProviders
-}
-
-// GetAccountProvidersOk returns a tuple with the AccountProviders field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *UsersUserSpec) GetAccountProvidersOk() ([]UsersAccountProvider, bool) {
-	if o == nil || IsNil(o.AccountProviders) {
-		return nil, false
-	}
-	return o.AccountProviders, true
-}
-
-// HasAccountProviders returns a boolean if a field has been set.
-func (o *UsersUserSpec) HasAccountProviders() bool {
-	if o != nil && !IsNil(o.AccountProviders) {
-		return true
-	}
-
-	return false
-}
-
-// SetAccountProviders gets a reference to the given []UsersAccountProvider and assigns it to the AccountProviders field.
-func (o *UsersUserSpec) SetAccountProviders(v []UsersAccountProvider) {
-	o.AccountProviders = v
-}
-
 func (o UsersUserSpec) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -117,9 +84,6 @@ func (o UsersUserSpec) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.DisplayName) {
 		toSerialize["displayName"] = o.DisplayName
-	}
-	if !IsNil(o.AccountProviders) {
-		toSerialize["accountProviders"] = o.AccountProviders
 	}
 	return toSerialize, nil
 }
