@@ -760,7 +760,8 @@ function OpenBuildingBlocksSidebar({
             </div>
             <div
               onClick={() => onToggle(false)}
-              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              data-testid="close-sidebar-button"
+              className="absolute top-4 right-4 z-40 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
             >
               <X size={16} />
             </div>
@@ -792,7 +793,8 @@ function OpenBuildingBlocksSidebar({
             </TabsList>
             <div
               onClick={() => onToggle(false)}
-              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              data-testid="close-sidebar-button"
+              className="absolute top-4 right-4 z-40 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
             >
               <X size={16} />
             </div>

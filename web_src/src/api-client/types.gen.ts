@@ -1320,12 +1320,14 @@ export type SuperplaneIntegrationsListIntegrationsResponse = {
 
 export type SuperplaneMeUser = {
   id?: string;
+  name?: string;
   email?: string;
   organizationId?: string;
   createdAt?: string;
   hasToken?: boolean;
   permissions?: Array<AuthorizationPermission>;
   roles?: Array<string>;
+  groups?: Array<string>;
 };
 
 export type SuperplaneOrganizationsListIntegrationsResponse = {
