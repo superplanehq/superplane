@@ -17,7 +17,7 @@ func DescribeAgentUsage(ctx context.Context, agentURL string, orgID string) (*pb
 	if err != nil {
 		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
 	}
-	defer conn.Close()
+	defer closeAgentConnection(conn)
 
 	client := internalpb.NewAgentsClient(conn)
 	response, err := client.DescribeOrganizationAgentUsage(ctx, &internalpb.DescribeOrganizationAgentUsageRequest{
