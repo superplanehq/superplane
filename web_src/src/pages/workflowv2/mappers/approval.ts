@@ -181,7 +181,11 @@ export const approvalMapper: ComponentBaseMapper = {
       details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
 
-    return withApprovals(details, metadata);
+    if (!metadata) {
+      return details;
+    }
+
+    return withApprovals(details, metadata!);
   },
 };
 
@@ -214,36 +218,55 @@ function getRejectionDetail(detail: RejectionDetail, record: ApprovalRecord): st
     return "-";
   }
 
-  let label = `Rejected ${formatRelativeTime(detail.rejectedAt, true)}` + getRecordTypeLabel(record);
-  if (detail.reason) {
-    label += ` - ${detail.reason}`;
-  }
-  return label;
+  return `Rejected ${formatRelativeTime(detail.rejectedAt, true)}` + getRecordTypeLabel(record);
 }
 
 function withApprovals(
   details: Record<string, string>,
-  metadata: ExecutionMetadata | undefined,
+  metadata: ExecutionMetadata,
 ): Record<string, string> {
-  if (!metadata) return details;
+  details["State"] = metadata.result.charAt(0).toUpperCase() + metadata.result.slice(1);
 
-  details["Result"] = metadata.result;
-
-  for (const record of metadata.records) {
+  //
+  // Show approval information first
+  //
+  const approvedRecords = sortedApprovalRecords(metadata.records);
+  for (const record of approvedRecords) {
     if (record.approval) {
       const userLabel = record.user?.name || record.user?.email || "User";
       details[userLabel] = getApprovalDetail(record.approval, record);
       continue;
     }
+  }
 
-    if (record.rejection) {
-      const userLabel = record.user?.name || record.user?.email || "User";
-      details[userLabel] = getRejectionDetail(record.rejection, record);
-      continue;
+  const rejectedRecord = metadata.records.find((record) => record.state === "rejected");
+  if (rejectedRecord) {
+    if (rejectedRecord.rejection) {
+      const userLabel = rejectedRecord.user?.name || rejectedRecord.user?.email || "User";
+      details[userLabel] = getRejectionDetail(rejectedRecord.rejection, rejectedRecord);
+      details["Rejection Reason"] = rejectedRecord.rejection.reason || "-";
     }
   }
 
+  if (rejectedRecord) {
+    return details;
+  }
+
+  //
+  // Add pending information last, only if no rejected records exist
+  //
+  const pendingRecordLabels = metadata.records
+    .filter((record) => record.state === "pending")
+    .map((record) => getApprovalItemLabel(record));
+
+  details["Pending"] = pendingRecordLabels.join(", ");
   return details;
+}
+
+function sortedApprovalRecords(records: ApprovalRecord[]): ApprovalRecord[] {
+  return records
+    .filter((record) => record.state === "approved")
+    .sort((a, b) => new Date(a.approval?.approvedAt || "").getTime() - new Date(b.approval?.approvedAt || "").getTime());
 }
 
 function getApprovalCustomField(context: ComponentBaseContext): React.ReactNode | undefined {
@@ -287,7 +310,7 @@ function approvalItemPropsForRecord(
     canCurrentUserActOnRecord(record, context.currentUser) &&
     !hasUserGivenInputInAnyRecord(records, context.currentUser);
 
-  const title = getApprovalDecisionLabel(record);
+  const title = getApprovalItemLabel(record);
 
   return {
     id: `${record.index}`,
@@ -412,7 +435,7 @@ function getComponentSubtitle(execution: ExecutionInfo): string | React.ReactNod
   return "";
 }
 
-function getApprovalDecisionLabel(record: ApprovalRecord): string {
+function getApprovalItemLabel(record: ApprovalRecord): string {
   if (record.type === "user") {
     return record.user?.name || "User";
   }
