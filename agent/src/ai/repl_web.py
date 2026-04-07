@@ -425,12 +425,12 @@ async def _stream_agent_run(
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
             usage = result.usage()
+            _record_usage(store, run_id, payload.model, usage)
             yield {
                 "type": "final_answer",
                 "output": output,
                 "usage": _to_jsonable(usage),
             }
-            _record_usage(store, run_id, payload.model, usage)
 
     yield {
         "type": "run_completed",
