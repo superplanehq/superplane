@@ -1,12 +1,11 @@
 import type { EventSection } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "..";
 import type { ExecutionInfo, NodeInfo, OutputPayload } from "../types";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { IncidentRecord } from "./types";
 import { STATE_LABELS, URGENCY_LABELS, IMPACT_LABELS } from "./types";
 
-export function getIncidentFromExecution(execution: CanvasesCanvasNodeExecution): IncidentRecord | null {
+export function getIncidentFromExecution(execution: ExecutionInfo): IncidentRecord | null {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   if (!outputs || !outputs.default || outputs.default.length === 0) {
     return null;
@@ -29,10 +28,7 @@ export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, c
   ];
 }
 
-export function buildIncidentExecutionDetails(
-  execution: CanvasesCanvasNodeExecution,
-  instanceUrl?: string,
-): Record<string, any> {
+export function buildIncidentExecutionDetails(execution: ExecutionInfo, instanceUrl?: string): Record<string, any> {
   const details: Record<string, any> = {};
   if (execution.createdAt) {
     details["Executed at"] = new Date(execution.createdAt).toLocaleString();
