@@ -84,7 +84,7 @@ class JwtValidator:
         )
 
     def decode_agent_builder_token(self, token: str) -> JwtClaims:
-        """Decode a scoped JWT and require purpose agent-builder (AI Builder stream, tools, etc.)."""
+        """Decode scoped JWT; purpose must be agent-builder (AI Builder)."""
         claims = self.decode(token)
         if claims.purpose != AGENT_BUILDER_PURPOSE:
             raise WrongScopedPurposeError("Scoped token purpose is not valid for AI Builder.")

@@ -1,7 +1,11 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from config_assistant.agent import build_config_assistant_agent, build_user_prompt, load_system_prompt
+from config_assistant.agent import (
+    build_config_assistant_agent,
+    build_user_prompt,
+    load_system_prompt,
+)
 from config_assistant.router import build_config_assistant_router
 
 
