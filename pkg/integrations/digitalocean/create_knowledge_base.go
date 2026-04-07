@@ -394,24 +394,12 @@ func resolveDisplayNames(client *Client, spec CreateKnowledgeBaseSpec, output ma
 func validateDataSource(index int, ds DataSourceSpec) error {
 	switch ds.Type {
 	case "spaces":
-		if ds.SpacesBucket == "" {
-			return fmt.Errorf("data source %d: spacesBucket is required", index)
-		}
-		if _, _, err := parseSpacesBucketID(ds.SpacesBucket); err != nil {
-			return fmt.Errorf("data source %d: %w", index, err)
+		if err := validateSpacesDataSource(index, ds); err != nil {
+			return err
 		}
 	case "web":
-		if ds.WebURL == "" {
-			return fmt.Errorf("data source %d: webURL is required", index)
-		}
-		if ds.CrawlType == "" {
-			return fmt.Errorf("data source %d: crawlType is required", index)
-		}
-		if ds.CrawlType != "seed" && ds.CrawlType != "sitemap" {
-			return fmt.Errorf("data source %d: crawlType must be 'seed' or 'sitemap', got %q", index, ds.CrawlType)
-		}
-		if ds.CrawlType == "seed" && ds.CrawlingOption == "" {
-			return fmt.Errorf("data source %d: crawlingOption is required for seed URLs", index)
+		if err := validateWebDataSource(index, ds); err != nil {
+			return err
 		}
 	case "":
 		return fmt.Errorf("data source %d: type is required", index)
@@ -420,6 +408,38 @@ func validateDataSource(index int, ds DataSourceSpec) error {
 	}
 
 	return validateChunking(index, ds)
+}
+
+func validateSpacesDataSource(index int, ds DataSourceSpec) error {
+	if ds.SpacesBucket == "" {
+		return fmt.Errorf("data source %d: spacesBucket is required", index)
+	}
+
+	if _, _, err := parseSpacesBucketID(ds.SpacesBucket); err != nil {
+		return fmt.Errorf("data source %d: %w", index, err)
+	}
+
+	return nil
+}
+
+func validateWebDataSource(index int, ds DataSourceSpec) error {
+	if ds.WebURL == "" {
+		return fmt.Errorf("data source %d: webURL is required", index)
+	}
+
+	if ds.CrawlType == "" {
+		return fmt.Errorf("data source %d: crawlType is required", index)
+	}
+
+	if ds.CrawlType != "seed" && ds.CrawlType != "sitemap" {
+		return fmt.Errorf("data source %d: crawlType must be 'seed' or 'sitemap', got %q", index, ds.CrawlType)
+	}
+
+	if ds.CrawlType == "seed" && ds.CrawlingOption == "" {
+		return fmt.Errorf("data source %d: crawlingOption is required for seed URLs", index)
+	}
+
+	return nil
 }
 
 // validateChunking validates the chunking configuration for a data source
@@ -475,27 +495,9 @@ func buildKBDataSource(ds DataSourceSpec) KBDataSource {
 
 	switch ds.Type {
 	case "spaces":
-		region, bucketName, _ := parseSpacesBucketID(ds.SpacesBucket) // already validated in Setup
-		kbDS.SpacesDataSource = &KBSpacesDataSource{
-			BucketName: bucketName,
-			Region:     region,
-		}
+		kbDS.SpacesDataSource = buildSpacesDataSource(ds)
 	case "web":
-		crawlingOption := ds.CrawlingOption
-		if ds.CrawlType == "sitemap" {
-			// sitemap URLs use a fixed crawling option
-			crawlingOption = "SITEMAP"
-		}
-		excludeTags := defaultWebExcludeTags
-		if ds.WebIncludeNavLinks {
-			excludeTags = webExcludeTagsWithNav
-		}
-		kbDS.WebCrawlerDataSource = &KBWebCrawlerDataSource{
-			BaseURL:        ds.WebURL,
-			CrawlingOption: crawlingOption,
-			EmbedMedia:     ds.WebEmbedMedia,
-			ExcludeTags:    excludeTags,
-		}
+		kbDS.WebCrawlerDataSource = buildWebDataSource(ds)
 	}
 
 	algorithm := ds.ChunkingAlgorithm
@@ -509,6 +511,33 @@ func buildKBDataSource(ds DataSourceSpec) KBDataSource {
 	}
 
 	return kbDS
+}
+
+func buildSpacesDataSource(ds DataSourceSpec) *KBSpacesDataSource {
+	region, bucketName, _ := parseSpacesBucketID(ds.SpacesBucket) // already validated in Setup
+	return &KBSpacesDataSource{
+		BucketName: bucketName,
+		Region:     region,
+	}
+}
+
+func buildWebDataSource(ds DataSourceSpec) *KBWebCrawlerDataSource {
+	crawlingOption := ds.CrawlingOption
+	if ds.CrawlType == "sitemap" {
+		crawlingOption = "SITEMAP"
+	}
+
+	excludeTags := defaultWebExcludeTags
+	if ds.WebIncludeNavLinks {
+		excludeTags = webExcludeTagsWithNav
+	}
+
+	return &KBWebCrawlerDataSource{
+		BaseURL:        ds.WebURL,
+		CrawlingOption: crawlingOption,
+		EmbedMedia:     ds.WebEmbedMedia,
+		ExcludeTags:    excludeTags,
+	}
 }
 
 func buildChunkingOptions(ds DataSourceSpec) *KBChunkingOptions {

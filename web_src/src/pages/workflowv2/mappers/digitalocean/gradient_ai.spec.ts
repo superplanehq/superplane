@@ -2,10 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
-import { detachKnowledgeBaseMapper } from "./detach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
 import { runEvaluationMapper, RUN_EVALUATION_STATE_REGISTRY } from "./run_evaluation";
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "../types";
+import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -51,10 +50,6 @@ function buildDetailsCtx(overrides?: {
 }): ExecutionDetailsContext {
   const node = buildNode(overrides?.node);
   return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
-
-function buildSubtitleCtx(overrides?: Partial<ExecutionInfo>): SubtitleContext {
-  return { node: buildNode(), execution: buildExecution(overrides) };
 }
 
 // ── createKnowledgeBaseMapper ────────────────────────────────────────
@@ -128,16 +123,6 @@ describe("createKnowledgeBaseMapper.getExecutionDetails", () => {
   });
 });
 
-describe("createKnowledgeBaseMapper.subtitle", () => {
-  it("returns empty string when createdAt is falsy", () => {
-    expect(createKnowledgeBaseMapper.subtitle(buildSubtitleCtx({ createdAt: "" }))).toBe("");
-  });
-
-  it("does not throw with valid createdAt", () => {
-    expect(() => createKnowledgeBaseMapper.subtitle(buildSubtitleCtx())).not.toThrow();
-  });
-});
-
 // ── attachKnowledgeBaseMapper ────────────────────────────────────────
 
 describe("attachKnowledgeBaseMapper.getExecutionDetails", () => {
@@ -154,7 +139,7 @@ describe("attachKnowledgeBaseMapper.getExecutionDetails", () => {
   it("prefers node metadata names over output IDs", () => {
     const ctx = buildDetailsCtx({
       node: { metadata: { agentName: "My Agent", knowledgeBaseName: "My KB" } },
-      execution: { outputs: { default: [buildOutput({ agentId: "a1", knowledgeBaseId: "kb1" })] } },
+      execution: { outputs: { default: [buildOutput({ agentUUID: "a1", knowledgeBaseUUID: "kb1" })] } },
     });
     const details = attachKnowledgeBaseMapper.getExecutionDetails(ctx);
     expect(details["Agent"]).toBe("My Agent");
@@ -163,7 +148,7 @@ describe("attachKnowledgeBaseMapper.getExecutionDetails", () => {
 
   it("falls back to output IDs when metadata is absent", () => {
     const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({ agentId: "agent-1", knowledgeBaseId: "kb-2" })] } },
+      execution: { outputs: { default: [buildOutput({ agentUUID: "agent-1", knowledgeBaseUUID: "kb-2" })] } },
     });
     const details = attachKnowledgeBaseMapper.getExecutionDetails(ctx);
     expect(details["Agent"]).toBe("agent-1");
@@ -182,79 +167,9 @@ describe("attachKnowledgeBaseMapper.getExecutionDetails", () => {
   it("does not throw when node metadata is undefined", () => {
     const ctx = buildDetailsCtx({
       node: { metadata: undefined },
-      execution: { outputs: { default: [buildOutput({ agentId: "a1" })] } },
+      execution: { outputs: { default: [buildOutput({ agentUUID: "a1" })] } },
     });
     expect(() => attachKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-});
-
-describe("attachKnowledgeBaseMapper.subtitle", () => {
-  it("returns empty string when createdAt is falsy", () => {
-    expect(attachKnowledgeBaseMapper.subtitle(buildSubtitleCtx({ createdAt: "" }))).toBe("");
-  });
-
-  it("does not throw with valid createdAt", () => {
-    expect(() => attachKnowledgeBaseMapper.subtitle(buildSubtitleCtx())).not.toThrow();
-  });
-});
-
-// ── detachKnowledgeBaseMapper ────────────────────────────────────────
-
-describe("detachKnowledgeBaseMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => detachKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => detachKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("prefers node metadata names over output IDs", () => {
-    const ctx = buildDetailsCtx({
-      node: { metadata: { agentName: "Agent X", knowledgeBaseName: "KB Y" } },
-      execution: { outputs: { default: [buildOutput({ agentId: "a1", knowledgeBaseId: "kb1" })] } },
-    });
-    const details = detachKnowledgeBaseMapper.getExecutionDetails(ctx);
-    expect(details["Agent"]).toBe("Agent X");
-    expect(details["Knowledge Base"]).toBe("KB Y");
-  });
-
-  it("falls back to output IDs when metadata is absent", () => {
-    const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({ agentId: "agent-9", knowledgeBaseId: "kb-7" })] } },
-    });
-    const details = detachKnowledgeBaseMapper.getExecutionDetails(ctx);
-    expect(details["Agent"]).toBe("agent-9");
-    expect(details["Knowledge Base"]).toBe("kb-7");
-  });
-
-  it("shows dash when both metadata and output IDs are missing", () => {
-    const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({})] } },
-    });
-    const details = detachKnowledgeBaseMapper.getExecutionDetails(ctx);
-    expect(details["Agent"]).toBe("-");
-    expect(details["Knowledge Base"]).toBe("-");
-  });
-
-  it("does not throw when node metadata is undefined", () => {
-    const ctx = buildDetailsCtx({
-      node: { metadata: undefined },
-      execution: { outputs: { default: [buildOutput({ agentId: "a1" })] } },
-    });
-    expect(() => detachKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-});
-
-describe("detachKnowledgeBaseMapper.subtitle", () => {
-  it("returns empty string when createdAt is falsy", () => {
-    expect(detachKnowledgeBaseMapper.subtitle(buildSubtitleCtx({ createdAt: "" }))).toBe("");
-  });
-
-  it("does not throw with valid createdAt", () => {
-    expect(() => detachKnowledgeBaseMapper.subtitle(buildSubtitleCtx())).not.toThrow();
   });
 });
 
@@ -275,7 +190,7 @@ describe("deleteKnowledgeBaseMapper.getExecutionDetails", () => {
     const ctx = buildDetailsCtx({
       node: { metadata: { knowledgeBaseName: "My KB" } },
       execution: {
-        outputs: { default: [buildOutput({ knowledgeBaseId: "kb-1", databaseDeleted: true, databaseName: "db-1" })] },
+        outputs: { default: [buildOutput({ knowledgeBaseUUID: "kb-1", databaseDeleted: true, databaseName: "db-1" })] },
       },
     });
     const details = deleteKnowledgeBaseMapper.getExecutionDetails(ctx);
@@ -285,7 +200,7 @@ describe("deleteKnowledgeBaseMapper.getExecutionDetails", () => {
   it("falls back to output knowledgeBaseId when metadata is absent", () => {
     const ctx = buildDetailsCtx({
       execution: {
-        outputs: { default: [buildOutput({ knowledgeBaseId: "kb-99", databaseDeleted: false })] },
+        outputs: { default: [buildOutput({ knowledgeBaseUUID: "kb-99", databaseDeleted: false })] },
       },
     });
     expect(deleteKnowledgeBaseMapper.getExecutionDetails(ctx)["Knowledge Base"]).toBe("kb-99");
@@ -294,7 +209,7 @@ describe("deleteKnowledgeBaseMapper.getExecutionDetails", () => {
   it("shows database deleted status with name", () => {
     const ctx = buildDetailsCtx({
       execution: {
-        outputs: { default: [buildOutput({ knowledgeBaseId: "kb-1", databaseDeleted: true, databaseName: "db-1" })] },
+        outputs: { default: [buildOutput({ knowledgeBaseUUID: "kb-1", databaseDeleted: true, databaseName: "db-1" })] },
       },
     });
     expect(deleteKnowledgeBaseMapper.getExecutionDetails(ctx)["OpenSearch Database"]).toContain("Deleted");
@@ -303,7 +218,7 @@ describe("deleteKnowledgeBaseMapper.getExecutionDetails", () => {
 
   it("shows database kept when not deleted", () => {
     const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({ knowledgeBaseId: "kb-1", databaseDeleted: false })] } },
+      execution: { outputs: { default: [buildOutput({ knowledgeBaseUUID: "kb-1", databaseDeleted: false })] } },
     });
     expect(deleteKnowledgeBaseMapper.getExecutionDetails(ctx)["OpenSearch Database"]).toBe("Kept");
   });
@@ -311,19 +226,9 @@ describe("deleteKnowledgeBaseMapper.getExecutionDetails", () => {
   it("does not throw when node metadata and configuration are undefined", () => {
     const ctx = buildDetailsCtx({
       node: { metadata: undefined, configuration: undefined },
-      execution: { outputs: { default: [buildOutput({ knowledgeBaseId: "kb-1", databaseDeleted: false })] } },
+      execution: { outputs: { default: [buildOutput({ knowledgeBaseUUID: "kb-1", databaseDeleted: false })] } },
     });
     expect(() => deleteKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-});
-
-describe("deleteKnowledgeBaseMapper.subtitle", () => {
-  it("returns empty string when createdAt is falsy", () => {
-    expect(deleteKnowledgeBaseMapper.subtitle(buildSubtitleCtx({ createdAt: "" }))).toBe("");
-  });
-
-  it("does not throw with valid createdAt", () => {
-    expect(() => deleteKnowledgeBaseMapper.subtitle(buildSubtitleCtx())).not.toThrow();
   });
 });
 
@@ -361,9 +266,9 @@ describe("runEvaluationMapper.getExecutionDetails", () => {
             buildOutput({
               testCaseName: "My Test",
               finishedAt: new Date().toISOString(),
-              workspaceId: "ws-1",
-              testCaseId: "tc-1",
-              evaluationRunId: "run-1",
+              workspaceUUID: "ws-1",
+              testCaseUUID: "tc-1",
+              evaluationRunUUID: "run-1",
               starMetric: { metricName: "Accuracy", numberValue: 92.567 },
               prompts: [{}, {}],
             }),
@@ -414,20 +319,10 @@ describe("runEvaluationMapper.getExecutionDetails", () => {
   it("omits view evaluation link when any required ID is missing", () => {
     const ctx = buildDetailsCtx({
       execution: {
-        outputs: { passed: [buildOutput({ testCaseName: "T", workspaceId: "ws-1" })] },
+        outputs: { passed: [buildOutput({ testCaseName: "T", workspaceUUID: "ws-1" })] },
       },
     });
     expect(runEvaluationMapper.getExecutionDetails(ctx)["View Evaluation"]).toBeUndefined();
-  });
-});
-
-describe("runEvaluationMapper.subtitle", () => {
-  it("returns empty string when createdAt is falsy", () => {
-    expect(runEvaluationMapper.subtitle(buildSubtitleCtx({ createdAt: "" }))).toBe("");
-  });
-
-  it("does not throw with valid createdAt", () => {
-    expect(() => runEvaluationMapper.subtitle(buildSubtitleCtx())).not.toThrow();
   });
 });
 
