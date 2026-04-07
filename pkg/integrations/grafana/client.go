@@ -34,6 +34,29 @@ type DataSource struct {
 	Name string `json:"name"`
 }
 
+type Silence struct {
+	ID        string           `json:"id"`
+	Status    SilenceStatus    `json:"status"`
+	Comment   string           `json:"comment"`
+	CreatedBy string           `json:"createdBy"`
+	StartsAt  string           `json:"startsAt"`
+	EndsAt    string           `json:"endsAt"`
+	UpdatedAt string           `json:"updatedAt"`
+	Matchers  []SilenceMatcher `json:"matchers"`
+	URL       string           `json:"url,omitempty"`
+}
+
+type SilenceStatus struct {
+	State string `json:"state"`
+}
+
+type SilenceMatcher struct {
+	Name    string `json:"name"`
+	Value   string `json:"value"`
+	IsRegex bool   `json:"isRegex"`
+	IsEqual bool   `json:"isEqual"`
+}
+
 type apiStatusError struct {
 	Operation    string
 	StatusCode   int
@@ -544,6 +567,128 @@ func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
 		return err
 	}
 	return c.putNotificationPolicies(root)
+}
+
+func (c *Client) ListSilences(filter string) ([]Silence, error) {
+	path := "/api/alertmanager/grafana/api/v2/silences"
+	if f := strings.TrimSpace(filter); f != "" {
+		q := url.Values{}
+		q.Set("filter", f)
+		path = path + "?" + q.Encode()
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing silences: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana silence list", status, responseBody)
+	}
+
+	var silences []Silence
+	if err := json.Unmarshal(responseBody, &silences); err != nil {
+		return nil, fmt.Errorf("error parsing silences response: %v", err)
+	}
+
+	return silences, nil
+}
+
+func (c *Client) GetSilence(id string) (*Silence, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/alertmanager/grafana/api/v2/silence/%s", url.PathEscape(id)),
+		nil, "",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting silence: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana silence get", status, responseBody)
+	}
+
+	var silence Silence
+	if err := json.Unmarshal(responseBody, &silence); err != nil {
+		return nil, fmt.Errorf("error parsing silence response: %v", err)
+	}
+
+	return &silence, nil
+}
+
+func (c *Client) CreateSilence(matchers []SilenceMatcher, startsAt, endsAt, comment, createdBy string) (string, error) {
+	if strings.TrimSpace(createdBy) == "" {
+		createdBy = "superplane"
+	}
+
+	payload := map[string]any{
+		"matchers":  matchers,
+		"startsAt":  startsAt,
+		"endsAt":    endsAt,
+		"comment":   comment,
+		"createdBy": createdBy,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling silence payload: %v", err)
+	}
+
+	responseBody, status, err := c.execRequest(
+		http.MethodPost,
+		"/api/alertmanager/grafana/api/v2/silences",
+		bytes.NewReader(body),
+		"application/json",
+	)
+	if err != nil {
+		return "", fmt.Errorf("error creating silence: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return "", newAPIStatusError("grafana silence create", status, responseBody)
+	}
+
+	id, err := parseCreateSilenceResponseBody(responseBody)
+	if err != nil {
+		return "", err
+	}
+
+	return id, nil
+}
+
+func parseCreateSilenceResponseBody(responseBody []byte) (string, error) {
+	var result struct {
+		SilenceID string `json:"silenceID"`
+		SilenceId string `json:"silenceId"`
+	}
+	if err := json.Unmarshal(responseBody, &result); err != nil {
+		return "", fmt.Errorf("error parsing create silence response: %v", err)
+	}
+	if id := strings.TrimSpace(result.SilenceID); id != "" {
+		return id, nil
+	}
+	if id := strings.TrimSpace(result.SilenceId); id != "" {
+		return id, nil
+	}
+
+	return "", fmt.Errorf("create silence response missing silence id")
+}
+
+func (c *Client) DeleteSilence(id string) error {
+	responseBody, status, err := c.execRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/alertmanager/grafana/api/v2/silence/%s", url.PathEscape(id)),
+		nil, "",
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting silence: %v", err)
+	}
+
+	if status == http.StatusNotFound || status == http.StatusNoContent || (status >= 200 && status < 300) {
+		return nil
+	}
+
+	return newAPIStatusError("grafana silence delete", status, responseBody)
 }
 
 func (c *Client) ListDataSources() ([]DataSource, error) {
