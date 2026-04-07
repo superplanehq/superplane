@@ -79,7 +79,7 @@ func Test__ListIntegrationResources(t *testing.T) {
 		assert.Empty(t, resp.Resources)
 	})
 
-	t.Run("integration list failure returns unavailable", func(t *testing.T) {
+	t.Run("integration list failure returns failed precondition", func(t *testing.T) {
 		r.Registry.Integrations["dummy"] = support.NewDummyIntegration(support.DummyIntegrationOptions{
 			ListResources: func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 				return nil, errors.New("boom")
@@ -105,6 +105,6 @@ func Test__ListIntegrationResources(t *testing.T) {
 		)
 
 		require.Error(t, err)
-		assert.Equal(t, codes.Unavailable, status.Code(err))
+		assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	})
 }
