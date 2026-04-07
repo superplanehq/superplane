@@ -22,12 +22,12 @@ func Test__ListUsers(t *testing.T) {
 
 		for _, user := range resp.Users {
 			assert.NotEmpty(t, user.Metadata.Id)
-			assert.NotEmpty(t, user.Status.RoleAssignments)
+			assert.NotEmpty(t, user.Status.Roles)
 			assert.NotEmpty(t, user.Status.AccountProviders)
-			for _, roleAssignment := range user.Status.RoleAssignments {
-				assert.NotEmpty(t, roleAssignment.RoleName)
-				assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, roleAssignment.DomainType)
-				assert.Equal(t, r.Organization.ID.String(), roleAssignment.DomainId)
+			for _, role := range user.Status.Roles {
+				assert.NotEmpty(t, role)
+				assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, role.DomainType)
+				assert.Equal(t, r.Organization.ID.String(), role.DomainId)
 			}
 		}
 	})
@@ -37,6 +37,6 @@ func Test__ListUsers(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Len(t, resp.Users, 1)
-		assert.Empty(t, resp.Users[0].Status.RoleAssignments)
+		assert.Empty(t, resp.Users[0].Status.Roles)
 	})
 }

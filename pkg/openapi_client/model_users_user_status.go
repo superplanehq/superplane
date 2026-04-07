@@ -20,8 +20,8 @@ var _ MappedNullable = &UsersUserStatus{}
 
 // UsersUserStatus struct for UsersUserStatus
 type UsersUserStatus struct {
-	AccountProviders []UsersAccountProvider    `json:"accountProviders,omitempty"`
-	RoleAssignments  []UsersUserRoleAssignment `json:"roleAssignments,omitempty"`
+	AccountProviders []UsersAccountProvider `json:"accountProviders,omitempty"`
+	Roles            []UsersRoleAssignment  `json:"roles,omitempty"`
 }
 
 // NewUsersUserStatus instantiates a new UsersUserStatus object
@@ -73,36 +73,36 @@ func (o *UsersUserStatus) SetAccountProviders(v []UsersAccountProvider) {
 	o.AccountProviders = v
 }
 
-// GetRoleAssignments returns the RoleAssignments field value if set, zero value otherwise.
-func (o *UsersUserStatus) GetRoleAssignments() []UsersUserRoleAssignment {
-	if o == nil || IsNil(o.RoleAssignments) {
-		var ret []UsersUserRoleAssignment
+// GetRoles returns the Roles field value if set, zero value otherwise.
+func (o *UsersUserStatus) GetRoles() []UsersRoleAssignment {
+	if o == nil || IsNil(o.Roles) {
+		var ret []UsersRoleAssignment
 		return ret
 	}
-	return o.RoleAssignments
+	return o.Roles
 }
 
-// GetRoleAssignmentsOk returns a tuple with the RoleAssignments field value if set, nil otherwise
+// GetRolesOk returns a tuple with the Roles field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserStatus) GetRoleAssignmentsOk() ([]UsersUserRoleAssignment, bool) {
-	if o == nil || IsNil(o.RoleAssignments) {
+func (o *UsersUserStatus) GetRolesOk() ([]UsersRoleAssignment, bool) {
+	if o == nil || IsNil(o.Roles) {
 		return nil, false
 	}
-	return o.RoleAssignments, true
+	return o.Roles, true
 }
 
-// HasRoleAssignments returns a boolean if a field has been set.
-func (o *UsersUserStatus) HasRoleAssignments() bool {
-	if o != nil && !IsNil(o.RoleAssignments) {
+// HasRoles returns a boolean if a field has been set.
+func (o *UsersUserStatus) HasRoles() bool {
+	if o != nil && !IsNil(o.Roles) {
 		return true
 	}
 
 	return false
 }
 
-// SetRoleAssignments gets a reference to the given []UsersUserRoleAssignment and assigns it to the RoleAssignments field.
-func (o *UsersUserStatus) SetRoleAssignments(v []UsersUserRoleAssignment) {
-	o.RoleAssignments = v
+// SetRoles gets a reference to the given []UsersRoleAssignment and assigns it to the Roles field.
+func (o *UsersUserStatus) SetRoles(v []UsersRoleAssignment) {
+	o.Roles = v
 }
 
 func (o UsersUserStatus) MarshalJSON() ([]byte, error) {
@@ -118,8 +118,8 @@ func (o UsersUserStatus) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.AccountProviders) {
 		toSerialize["accountProviders"] = o.AccountProviders
 	}
-	if !IsNil(o.RoleAssignments) {
-		toSerialize["roleAssignments"] = o.RoleAssignments
+	if !IsNil(o.Roles) {
+		toSerialize["roles"] = o.Roles
 	}
 	return toSerialize, nil
 }

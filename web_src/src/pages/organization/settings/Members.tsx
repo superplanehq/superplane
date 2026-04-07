@@ -75,7 +75,7 @@ export function Members({ organizationId }: MembersProps) {
   const error = usersError || rolesError;
   const ownerIds = useMemo(() => {
     const ids = users
-      .filter((user) => user.status?.roleAssignments?.some((role) => role.roleName === "org_owner"))
+      .filter((user) => user.status?.roles?.some((role) => role.roleName === "org_owner"))
       .map((user) => user.metadata?.id)
       .filter((id): id is string => Boolean(id));
 
@@ -109,8 +109,8 @@ export function Members({ organizationId }: MembersProps) {
         .slice(0, 2);
 
       // Get primary role name and display name from role assignments
-      const primaryRoleName = user.status?.roleAssignments?.[0]?.roleName || "Member";
-      const primaryRoleDisplayName = user.status?.roleAssignments?.[0]?.roleDisplayName || primaryRoleName;
+      const primaryRoleName = user.status?.roles?.[0]?.roleName || "Member";
+      const primaryRoleDisplayName = user.status?.roles?.[0]?.roleDisplayName || primaryRoleName;
 
       return {
         id: user.metadata?.id || "",

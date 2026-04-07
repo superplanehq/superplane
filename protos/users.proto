@@ -81,7 +81,7 @@ message User {
 
   message Status {
     repeated AccountProvider account_providers = 1;
-    repeated UserRoleAssignment role_assignments = 2;
+    repeated RoleAssignment roles = 2;
   }
 
   Metadata metadata = 1;
@@ -89,7 +89,7 @@ message User {
   Status status = 3;
 }
 
-message UserRoleAssignment {
+message RoleAssignment {
   string role_name = 1;
   string role_display_name = 2;
   string role_description = 3;

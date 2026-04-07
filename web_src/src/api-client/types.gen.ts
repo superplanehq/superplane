@@ -1313,6 +1313,7 @@ export type SuperplaneMeUser = {
   createdAt?: string;
   hasToken?: boolean;
   permissions?: Array<AuthorizationPermission>;
+  roles?: Array<string>;
 };
 
 export type SuperplaneOrganizationsListIntegrationsResponse = {
@@ -1359,14 +1360,7 @@ export type UsersListUsersResponse = {
   users?: Array<SuperplaneUsersUser>;
 };
 
-export type UsersUserMetadata = {
-  id?: string;
-  email?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type UsersUserRoleAssignment = {
+export type UsersRoleAssignment = {
   roleName?: string;
   roleDisplayName?: string;
   roleDescription?: string;
@@ -1375,13 +1369,20 @@ export type UsersUserRoleAssignment = {
   assignedAt?: string;
 };
 
+export type UsersUserMetadata = {
+  id?: string;
+  email?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type UsersUserSpec = {
   displayName?: string;
 };
 
 export type UsersUserStatus = {
   accountProviders?: Array<UsersAccountProvider>;
-  roleAssignments?: Array<UsersUserRoleAssignment>;
+  roles?: Array<UsersRoleAssignment>;
 };
 
 export type WidgetsDescribeWidgetResponse = {

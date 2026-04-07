@@ -69,7 +69,7 @@ func ListUsers(
 		}
 
 		roleMetadata := roleMetadataMap[roleDef.Name]
-		roleAssignment := &pb.UserRoleAssignment{
+		roleAssignment := &pb.RoleAssignment{
 			RoleName:        roleDef.Name,
 			RoleDisplayName: roleMetadata.DisplayName,
 			RoleDescription: roleMetadata.Description,
@@ -87,7 +87,7 @@ func ListUsers(
 				continue
 			}
 
-			protoUsers[i].Status.RoleAssignments = append(protoUsers[i].Status.RoleAssignments, roleAssignment)
+			protoUsers[i].Status.Roles = append(protoUsers[i].Status.Roles, roleAssignment)
 		}
 	}
 

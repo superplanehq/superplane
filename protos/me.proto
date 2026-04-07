@@ -71,6 +71,7 @@ message User {
   google.protobuf.Timestamp created_at = 4;
   bool has_token = 5;
   repeated Authorization.Permission permissions = 6;
+  repeated string roles = 7;
 }
 
 message RegenerateTokenResponse {
