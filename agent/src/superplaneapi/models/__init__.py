@@ -234,8 +234,8 @@ from superplaneapi.models.triggers_list_triggers_response import TriggersListTri
 from superplaneapi.models.triggers_trigger import TriggersTrigger
 from superplaneapi.models.users_account_provider import UsersAccountProvider
 from superplaneapi.models.users_list_users_response import UsersListUsersResponse
+from superplaneapi.models.users_role_assignment import UsersRoleAssignment
 from superplaneapi.models.users_user_metadata import UsersUserMetadata
-from superplaneapi.models.users_user_role_assignment import UsersUserRoleAssignment
 from superplaneapi.models.users_user_spec import UsersUserSpec
 from superplaneapi.models.users_user_status import UsersUserStatus
 from superplaneapi.models.widgets_describe_widget_response import WidgetsDescribeWidgetResponse
