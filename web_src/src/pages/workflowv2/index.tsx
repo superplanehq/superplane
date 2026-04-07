@@ -83,7 +83,6 @@ import { useCanvasYaml } from "./useCanvasYaml";
 import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
@@ -4965,13 +4964,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, createWorkflowMutation, navigate, queryClient, canvasId],
   );
 
-  // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
-  const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
-    canvasId: canvasId!,
-    organizationId,
-    canvas,
-  });
-
   const { onCancelExecution } = useCancelExecutionHandler({
     canvasId: canvasId!,
     canvas,
@@ -5651,8 +5643,6 @@ export function WorkflowPageV2() {
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
-          onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
-          supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}
           onCancelExecution={isViewingLiveVersion ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}
           onLoadMoreHistory={handleLoadMoreHistory}
