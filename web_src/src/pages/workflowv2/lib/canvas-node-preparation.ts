@@ -15,7 +15,7 @@ import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type { CompositeProps, LastRunState } from "@/ui/composite";
 import type { ComponentBaseMapper, User } from "../mappers/types";
-import { getComponentAdditionalDataBuilder, getComponentBaseMapper, getTriggerRenderer } from "../mappers";
+import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
 export const CANVAS_BUNDLE_ICON_SLUG = "component";
@@ -248,36 +248,6 @@ function buildPlaceholderComponentNode(node: ComponentsNode): CanvasNode {
   };
 }
 
-function buildComponentAdditionalData(args: {
-  componentDef?: ComponentsComponent;
-  node: ComponentsNode;
-  nodes: ComponentsNode[];
-  executions: CanvasesCanvasNodeExecution[];
-  canvasId: string;
-  queryClient: QueryClient;
-  organizationId: string;
-  currentUser?: User;
-  edges?: ComponentsEdge[];
-}) {
-  const { componentDef, node, nodes, executions, canvasId, queryClient, organizationId, currentUser, edges } = args;
-
-  if (!componentDef) {
-    return undefined;
-  }
-
-  return getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
-    componentDefinition: buildComponentDefinition(componentDef),
-    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-    edges,
-    canvasId: canvasId,
-    queryClient,
-    organizationId,
-    currentUser,
-  });
-}
-
 function resolveComponentEmptyStateProps(
   componentBaseProps: ReturnType<ComponentBaseMapper["props"]>,
   node: ComponentsNode,
@@ -396,7 +366,6 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     queryClient,
     organizationId,
     currentUser,
-    edges,
   } = args;
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component?.name);
@@ -409,25 +378,16 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
   const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
 
   try {
-    const additionalData = buildComponentAdditionalData({
-      componentDef,
-      node,
-      nodes,
-      executions,
-      canvasId,
-      queryClient,
-      organizationId,
-      currentUser,
-      edges,
-    });
-
     const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
       nodes: nodes.map((n) => buildNodeInfo(n)),
       node: buildNodeInfo(node),
       componentDefinition: buildComponentDefinition(fallbackComponentDef),
       lastExecutions: executions.map((e) => buildExecutionInfo(e)),
       nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
-      additionalData,
+      organizationId,
+      canvasId,
+      queryClient,
+      currentUser: currentUser!,
     });
 
     if (!componentBaseProps.iconSrc) {

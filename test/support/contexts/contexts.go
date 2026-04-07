@@ -284,8 +284,8 @@ func (c *ExecutionStateContext) SetKV(key, value string) error {
 type AuthContext struct {
 	User   *core.User
 	Users  map[string]*core.User
-	Roles  map[string]struct{}
-	Groups map[string]struct{}
+	Roles  map[string]*core.RoleRef
+	Groups map[string]*core.GroupRef
 }
 
 func (c *AuthContext) AuthenticatedUser() *core.User {
@@ -300,6 +300,24 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 	}
 
 	return nil, fmt.Errorf("user not found: %s", id.String())
+}
+
+func (c *AuthContext) GetRole(name string) (*core.RoleRef, error) {
+	if c.Roles != nil {
+		if role, ok := c.Roles[name]; ok {
+			return role, nil
+		}
+	}
+	return nil, fmt.Errorf("role not found: %s", name)
+}
+
+func (c *AuthContext) GetGroup(name string) (*core.GroupRef, error) {
+	if c.Groups != nil {
+		if group, ok := c.Groups[name]; ok {
+			return group, nil
+		}
+	}
+	return nil, fmt.Errorf("group not found: %s", name)
 }
 
 func (c *AuthContext) HasRole(role string) (bool, error) {

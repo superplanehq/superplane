@@ -21,7 +21,7 @@ import type {
 } from "../types";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { ListIssuesConfiguration, PrometheusResponse } from "./types";
-import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import { renderWithTimeAgo } from "@/components/TimeAgo";
 
 // Output channel names matching the backend constants
 const CHANNEL_CLEAR = "clear";
@@ -103,15 +103,6 @@ export const listIssuesMapper: ComponentBaseMapper = {
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     const date = new Date(context.execution.createdAt!);
-
-    // If additionalData is explicitly a marker object indicating ChainItem context, skip counts
-    if (
-      context.additionalData &&
-      typeof context.additionalData === "object" &&
-      "skipIssueCounts" in context.additionalData
-    ) {
-      return renderTimeAgo(date);
-    }
 
     const { critical, degraded } = getIssueCounts(context.execution);
 
