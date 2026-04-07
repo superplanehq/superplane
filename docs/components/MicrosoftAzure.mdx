@@ -95,23 +95,27 @@ Each blob created event includes:
 ```json
 {
   "data": {
-    "api": "PutBlob",
-    "blobType": "BlockBlob",
-    "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-    "contentLength": 524288,
-    "contentType": "text/csv",
-    "eTag": "0x8D4BCC2E4835CD0",
-    "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
-    "sequencer": "00000000000004420000000000028963",
-    "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+    "data": {
+      "api": "PutBlob",
+      "blobType": "BlockBlob",
+      "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+      "contentLength": 524288,
+      "contentType": "text/csv",
+      "eTag": "0x8D4BCC2E4835CD0",
+      "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
+      "sequencer": "00000000000004420000000000028963",
+      "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+    },
+    "dataVersion": "",
+    "eventTime": "2026-03-16T10:00:00Z",
+    "eventType": "Microsoft.Storage.BlobCreated",
+    "id": "831e1650-001e-001b-66ab-eeb76e069631",
+    "metadataVersion": "1",
+    "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
   },
-  "dataVersion": "",
-  "eventTime": "2026-03-16T10:00:00Z",
-  "eventType": "Microsoft.Storage.BlobCreated",
-  "id": "831e1650-001e-001b-66ab-eeb76e069631",
-  "metadataVersion": "1",
-  "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.blob.created"
 }
 ```
 
@@ -153,23 +157,27 @@ Each blob deleted event includes:
 ```json
 {
   "data": {
-    "api": "DeleteBlob",
-    "blobType": "BlockBlob",
-    "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-    "contentLength": 0,
-    "contentType": "text/csv",
-    "eTag": "0x8D4BCC2E4835CD0",
-    "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
-    "sequencer": "00000000000004420000000000028964",
-    "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+    "data": {
+      "api": "DeleteBlob",
+      "blobType": "BlockBlob",
+      "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+      "contentLength": 0,
+      "contentType": "text/csv",
+      "eTag": "0x8D4BCC2E4835CD0",
+      "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
+      "sequencer": "00000000000004420000000000028964",
+      "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+    },
+    "dataVersion": "",
+    "eventTime": "2026-03-16T11:00:00Z",
+    "eventType": "Microsoft.Storage.BlobDeleted",
+    "id": "afc359b4-001e-001b-66ab-eeb76e069631",
+    "metadataVersion": "1",
+    "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
   },
-  "dataVersion": "",
-  "eventTime": "2026-03-16T11:00:00Z",
-  "eventType": "Microsoft.Storage.BlobDeleted",
-  "id": "afc359b4-001e-001b-66ab-eeb76e069631",
-  "metadataVersion": "1",
-  "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+  "timestamp": "2026-03-16T11:00:00Z",
+  "type": "azure.blob.deleted"
 }
 ```
 
@@ -212,38 +220,42 @@ Each delete event includes:
 ```json
 {
   "data": {
-    "action": "delete",
-    "actor": {
-      "name": "myuser"
+    "data": {
+      "action": "delete",
+      "actor": {
+        "name": "myuser"
+      },
+      "id": "afc359b4-001e-001b-66ab-eeb76e069631",
+      "request": {
+        "addr": "203.0.113.0:49926",
+        "host": "myregistry.azurecr.io",
+        "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+        "method": "DELETE",
+        "useragent": "docker/20.10.7"
+      },
+      "source": {
+        "addr": "myregistry.azurecr.io",
+        "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
+      },
+      "target": {
+        "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "repository": "myrepository",
+        "tag": "",
+        "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+      },
+      "timestamp": "2026-03-16T11:00:00Z"
     },
+    "dataVersion": "1.0",
+    "eventTime": "2026-03-16T11:00:00Z",
+    "eventType": "Microsoft.ContainerRegistry.ImageDeleted",
     "id": "afc359b4-001e-001b-66ab-eeb76e069631",
-    "request": {
-      "addr": "203.0.113.0:49926",
-      "host": "myregistry.azurecr.io",
-      "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-      "method": "DELETE",
-      "useragent": "docker/20.10.7"
-    },
-    "source": {
-      "addr": "myregistry.azurecr.io",
-      "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
-    },
-    "target": {
-      "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-      "repository": "myrepository",
-      "tag": "",
-      "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
-    },
-    "timestamp": "2026-03-16T11:00:00Z"
+    "metadataVersion": "1",
+    "subject": "myregistry.azurecr.io/myrepository@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
   },
-  "dataVersion": "1.0",
-  "eventTime": "2026-03-16T11:00:00Z",
-  "eventType": "Microsoft.ContainerRegistry.ImageDeleted",
-  "id": "afc359b4-001e-001b-66ab-eeb76e069631",
-  "metadataVersion": "1",
-  "subject": "myregistry.azurecr.io/myrepository@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
+  "timestamp": "2026-03-16T11:00:00Z",
+  "type": "azure.image.deleted"
 }
 ```
 
@@ -287,40 +299,44 @@ Each push event includes:
 ```json
 {
   "data": {
-    "action": "push",
-    "actor": {
-      "name": "myuser"
+    "data": {
+      "action": "push",
+      "actor": {
+        "name": "myuser"
+      },
+      "id": "831e1650-001e-001b-66ab-eeb76e069631",
+      "request": {
+        "addr": "203.0.113.0:49926",
+        "host": "myregistry.azurecr.io",
+        "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+        "method": "PUT",
+        "useragent": "docker/20.10.7"
+      },
+      "source": {
+        "addr": "myregistry.azurecr.io",
+        "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
+      },
+      "target": {
+        "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+        "length": 1234567,
+        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+        "repository": "myrepository",
+        "size": 1234567,
+        "tag": "v1.2.3",
+        "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+      },
+      "timestamp": "2026-03-16T10:00:00Z"
     },
+    "dataVersion": "1.0",
+    "eventTime": "2026-03-16T10:00:00Z",
+    "eventType": "Microsoft.ContainerRegistry.ImagePushed",
     "id": "831e1650-001e-001b-66ab-eeb76e069631",
-    "request": {
-      "addr": "203.0.113.0:49926",
-      "host": "myregistry.azurecr.io",
-      "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-      "method": "PUT",
-      "useragent": "docker/20.10.7"
-    },
-    "source": {
-      "addr": "myregistry.azurecr.io",
-      "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
-    },
-    "target": {
-      "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-      "length": 1234567,
-      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-      "repository": "myrepository",
-      "size": 1234567,
-      "tag": "v1.2.3",
-      "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
-    },
-    "timestamp": "2026-03-16T10:00:00Z"
+    "metadataVersion": "1",
+    "subject": "myregistry.azurecr.io/myrepository:v1.2.3",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
   },
-  "dataVersion": "1.0",
-  "eventTime": "2026-03-16T10:00:00Z",
-  "eventType": "Microsoft.ContainerRegistry.ImagePushed",
-  "id": "831e1650-001e-001b-66ab-eeb76e069631",
-  "metadataVersion": "1",
-  "subject": "myregistry.azurecr.io/myrepository:v1.2.3",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.image.pushed"
 }
 ```
 
@@ -395,20 +411,24 @@ No manual setup is required.
 ```json
 {
   "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
-    "resourceProvider": "Microsoft.Compute",
-    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-    "status": "Succeeded",
-    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-    "tenantId": "12345678-1234-1234-1234-123456789abc"
+    "data": {
+      "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
+      "resourceProvider": "Microsoft.Compute",
+      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "status": "Succeeded",
+      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+      "tenantId": "12345678-1234-1234-1234-123456789abc"
+    },
+    "dataVersion": "2",
+    "eventTime": "2026-02-11T10:30:00Z",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "metadataVersion": "1",
+    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/deallocate",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
   },
-  "dataVersion": "2",
-  "eventTime": "2026-02-11T10:30:00Z",
-  "eventType": "Microsoft.Resources.ResourceActionSuccess",
-  "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
-  "metadataVersion": "1",
-  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/deallocate",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+  "timestamp": "2026-02-11T10:30:00Z",
+  "type": "azure.vm.deallocated"
 }
 ```
 
@@ -477,20 +497,24 @@ No manual setup is required.
 ```json
 {
   "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/delete",
-    "resourceProvider": "Microsoft.Compute",
-    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-    "status": "Succeeded",
-    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-    "tenantId": "12345678-1234-1234-1234-123456789abc"
+    "data": {
+      "operationName": "Microsoft.Compute/virtualMachines/delete",
+      "resourceProvider": "Microsoft.Compute",
+      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "status": "Succeeded",
+      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+      "tenantId": "12345678-1234-1234-1234-123456789abc"
+    },
+    "dataVersion": "2",
+    "eventTime": "2026-02-11T10:30:00Z",
+    "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
+    "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
+    "metadataVersion": "1",
+    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
   },
-  "dataVersion": "2",
-  "eventTime": "2026-02-11T10:30:00Z",
-  "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
-  "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
-  "metadataVersion": "1",
-  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+  "timestamp": "2026-02-11T10:30:00Z",
+  "type": "azure.vm.deleted"
 }
 ```
 
@@ -566,20 +590,24 @@ No manual setup is required.
 ```json
 {
   "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/restart/action",
-    "resourceProvider": "Microsoft.Compute",
-    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-    "status": "Succeeded",
-    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-    "tenantId": "12345678-1234-1234-1234-123456789abc"
+    "data": {
+      "operationName": "Microsoft.Compute/virtualMachines/restart/action",
+      "resourceProvider": "Microsoft.Compute",
+      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "status": "Succeeded",
+      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+      "tenantId": "12345678-1234-1234-1234-123456789abc"
+    },
+    "dataVersion": "2",
+    "eventTime": "2026-02-11T10:30:00Z",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+    "metadataVersion": "1",
+    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/restart",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
   },
-  "dataVersion": "2",
-  "eventTime": "2026-02-11T10:30:00Z",
-  "eventType": "Microsoft.Resources.ResourceActionSuccess",
-  "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
-  "metadataVersion": "1",
-  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/restart",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+  "timestamp": "2026-02-11T10:30:00Z",
+  "type": "azure.vm.restarted"
 }
 ```
 
@@ -651,20 +679,24 @@ No manual setup is required.
 ```json
 {
   "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/start/action",
-    "resourceProvider": "Microsoft.Compute",
-    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-    "status": "Succeeded",
-    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-    "tenantId": "12345678-1234-1234-1234-123456789abc"
+    "data": {
+      "operationName": "Microsoft.Compute/virtualMachines/start/action",
+      "resourceProvider": "Microsoft.Compute",
+      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "status": "Succeeded",
+      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+      "tenantId": "12345678-1234-1234-1234-123456789abc"
+    },
+    "dataVersion": "2",
+    "eventTime": "2026-02-11T10:30:00Z",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "metadataVersion": "1",
+    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/start",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
   },
-  "dataVersion": "2",
-  "eventTime": "2026-02-11T10:30:00Z",
-  "eventType": "Microsoft.Resources.ResourceActionSuccess",
-  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "metadataVersion": "1",
-  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/start",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+  "timestamp": "2026-02-11T10:30:00Z",
+  "type": "azure.vm.started"
 }
 ```
 
@@ -738,20 +770,24 @@ No manual setup is required.
 ```json
 {
   "data": {
-    "operationName": "Microsoft.Compute/virtualMachines/powerOff/action",
-    "resourceProvider": "Microsoft.Compute",
-    "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-    "status": "Succeeded",
-    "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-    "tenantId": "12345678-1234-1234-1234-123456789abc"
+    "data": {
+      "operationName": "Microsoft.Compute/virtualMachines/powerOff/action",
+      "resourceProvider": "Microsoft.Compute",
+      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "status": "Succeeded",
+      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
+      "tenantId": "12345678-1234-1234-1234-123456789abc"
+    },
+    "dataVersion": "2",
+    "eventTime": "2026-02-11T10:30:00Z",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "metadataVersion": "1",
+    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/powerOff",
+    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
   },
-  "dataVersion": "2",
-  "eventTime": "2026-02-11T10:30:00Z",
-  "eventType": "Microsoft.Resources.ResourceActionSuccess",
-  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-  "metadataVersion": "1",
-  "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/powerOff",
-  "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+  "timestamp": "2026-02-11T10:30:00Z",
+  "type": "azure.vm.stopped"
 }
 ```
 
@@ -807,11 +843,15 @@ Returns the created VM information including:
 
 ```json
 {
-  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-  "location": "eastus",
-  "name": "my-vm",
-  "provisioningState": "Succeeded",
-  "size": "Standard_B1s"
+  "data": {
+    "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+    "location": "eastus",
+    "name": "my-vm",
+    "provisioningState": "Succeeded",
+    "size": "Standard_B1s"
+  },
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.vm"
 }
 ```
 
@@ -861,9 +901,13 @@ Returns the deallocated VM information including:
 
 ```json
 {
-  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-  "name": "my-vm",
-  "resourceGroup": "my-rg"
+  "data": {
+    "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+    "name": "my-vm",
+    "resourceGroup": "my-rg"
+  },
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.vm"
 }
 ```
 
@@ -917,7 +961,7 @@ Returns the deleted VM information including:
     "name": "my-vm",
     "resourceGroup": "my-rg"
   },
-  "timestamp": "2026-02-12T12:10:00Z",
+  "timestamp": "2026-03-16T10:00:00Z",
   "type": "azure.vm"
 }
 ```
@@ -965,9 +1009,13 @@ Returns the restarted VM information including:
 
 ```json
 {
-  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-  "name": "my-vm",
-  "resourceGroup": "my-rg"
+  "data": {
+    "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+    "name": "my-vm",
+    "resourceGroup": "my-rg"
+  },
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.vm"
 }
 ```
 
@@ -1014,9 +1062,13 @@ Returns the started VM information including:
 
 ```json
 {
-  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-  "name": "my-vm",
-  "resourceGroup": "my-rg"
+  "data": {
+    "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+    "name": "my-vm",
+    "resourceGroup": "my-rg"
+  },
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.vm"
 }
 ```
 
@@ -1062,9 +1114,13 @@ Returns the stopped VM information including:
 
 ```json
 {
-  "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-  "name": "my-vm",
-  "resourceGroup": "my-rg"
+  "data": {
+    "id": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+    "name": "my-vm",
+    "resourceGroup": "my-rg"
+  },
+  "timestamp": "2026-03-16T10:00:00Z",
+  "type": "azure.vm"
 }
 ```
 
