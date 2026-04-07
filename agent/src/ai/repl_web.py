@@ -126,11 +126,10 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _record_usage(store: SessionStore, chat_id: str, model: str, usage: RunUsage) -> None:
+def _record_usage(store: SessionStore, run_id: str, model: str, usage: RunUsage) -> None:
     try:
-        store.record_run_usage(
-            chat_id=chat_id,
-            model=model,
+        store.update_run_usage(
+            run_id=run_id,
             input_tokens=usage.input_tokens or 0,
             output_tokens=usage.output_tokens or 0,
             cache_read_tokens=usage.cache_read_tokens or 0,
@@ -139,7 +138,7 @@ def _record_usage(store: SessionStore, chat_id: str, model: str, usage: RunUsage
             estimated_cost_usd=estimate_cost_usd_for_model(model, usage),
         )
     except Exception as error:
-        print(f"[web] failed to record usage for chat {chat_id}: {error}", flush=True)
+        print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
 
 
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
@@ -214,7 +213,8 @@ async def _stream_agent_run(
         claims, chat = _resolve_agent_context(chat_id, request)
 
     message_history = _load_message_history(store, chat.id)
-    recorder = PersistedRunRecorder(store, chat.id, payload.question)
+    run_id = store.create_agent_chat_run(chat.id, payload.model)
+    recorder = PersistedRunRecorder(store, chat.id, run_id, payload.question)
     resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
@@ -430,7 +430,7 @@ async def _stream_agent_run(
                 "output": output,
                 "usage": _to_jsonable(usage),
             }
-            _record_usage(store, chat.id, payload.model, usage)
+            _record_usage(store, run_id, payload.model, usage)
 
     yield {
         "type": "run_completed",

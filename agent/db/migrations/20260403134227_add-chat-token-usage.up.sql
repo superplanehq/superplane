@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE agent_chat_usage_records (
+CREATE TABLE agent_chat_runs (
     id uuid PRIMARY KEY,
     chat_id uuid NOT NULL REFERENCES agent_chats(id) ON DELETE CASCADE,
     model text NOT NULL DEFAULT '',
@@ -13,7 +13,10 @@ CREATE TABLE agent_chat_usage_records (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_agent_chat_usage_records_chat_id ON agent_chat_usage_records (chat_id);
+CREATE INDEX idx_agent_chat_runs_chat_id ON agent_chat_runs (chat_id);
+
+ALTER TABLE agent_chat_messages
+    ADD COLUMN run_id uuid REFERENCES agent_chat_runs(id) ON DELETE SET NULL;
 
 ALTER TABLE agent_chats
     ADD COLUMN total_input_tokens bigint NOT NULL DEFAULT 0,
