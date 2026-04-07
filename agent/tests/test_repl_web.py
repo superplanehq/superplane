@@ -14,12 +14,13 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
+from starlette.testclient import TestClient
 
 import ai.repl_web as repl_web
 import repl.main as repl_main
 from ai.models import CanvasQuestionRequest
 from ai.session_store import AgentChatNotFoundError
-from ai.web import WebServer, WebServerConfig
+from ai.web import WebServer, WebServerConfig, create_app
 from repl.main import _parse_stream_event, _resolve_stream_url, _stream_repl_answer
 
 
@@ -60,6 +61,13 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
         "from_env",
         MagicMock(return_value=fake_grpc_server),
     )
+
+
+def test_health_returns_200_with_empty_body() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.content == b""
 
 
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
