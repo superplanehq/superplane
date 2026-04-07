@@ -16,11 +16,11 @@ import (
 	"time"
 )
 
-// checks if the UsersUserRoleAssignment type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &UsersUserRoleAssignment{}
+// checks if the UsersRoleAssignment type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &UsersRoleAssignment{}
 
-// UsersUserRoleAssignment struct for UsersUserRoleAssignment
-type UsersUserRoleAssignment struct {
+// UsersRoleAssignment struct for UsersRoleAssignment
+type UsersRoleAssignment struct {
 	RoleName        *string                  `json:"roleName,omitempty"`
 	RoleDisplayName *string                  `json:"roleDisplayName,omitempty"`
 	RoleDescription *string                  `json:"roleDescription,omitempty"`
@@ -29,29 +29,29 @@ type UsersUserRoleAssignment struct {
 	AssignedAt      *time.Time               `json:"assignedAt,omitempty"`
 }
 
-// NewUsersUserRoleAssignment instantiates a new UsersUserRoleAssignment object
+// NewUsersRoleAssignment instantiates a new UsersRoleAssignment object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewUsersUserRoleAssignment() *UsersUserRoleAssignment {
-	this := UsersUserRoleAssignment{}
+func NewUsersRoleAssignment() *UsersRoleAssignment {
+	this := UsersRoleAssignment{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// NewUsersUserRoleAssignmentWithDefaults instantiates a new UsersUserRoleAssignment object
+// NewUsersRoleAssignmentWithDefaults instantiates a new UsersRoleAssignment object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewUsersUserRoleAssignmentWithDefaults() *UsersUserRoleAssignment {
-	this := UsersUserRoleAssignment{}
+func NewUsersRoleAssignmentWithDefaults() *UsersRoleAssignment {
+	this := UsersRoleAssignment{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
 // GetRoleName returns the RoleName field value if set, zero value otherwise.
-func (o *UsersUserRoleAssignment) GetRoleName() string {
+func (o *UsersRoleAssignment) GetRoleName() string {
 	if o == nil || IsNil(o.RoleName) {
 		var ret string
 		return ret
@@ -61,7 +61,7 @@ func (o *UsersUserRoleAssignment) GetRoleName() string {
 
 // GetRoleNameOk returns a tuple with the RoleName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserRoleAssignment) GetRoleNameOk() (*string, bool) {
+func (o *UsersRoleAssignment) GetRoleNameOk() (*string, bool) {
 	if o == nil || IsNil(o.RoleName) {
 		return nil, false
 	}
@@ -69,7 +69,7 @@ func (o *UsersUserRoleAssignment) GetRoleNameOk() (*string, bool) {
 }
 
 // HasRoleName returns a boolean if a field has been set.
-func (o *UsersUserRoleAssignment) HasRoleName() bool {
+func (o *UsersRoleAssignment) HasRoleName() bool {
 	if o != nil && !IsNil(o.RoleName) {
 		return true
 	}
@@ -78,12 +78,12 @@ func (o *UsersUserRoleAssignment) HasRoleName() bool {
 }
 
 // SetRoleName gets a reference to the given string and assigns it to the RoleName field.
-func (o *UsersUserRoleAssignment) SetRoleName(v string) {
+func (o *UsersRoleAssignment) SetRoleName(v string) {
 	o.RoleName = &v
 }
 
 // GetRoleDisplayName returns the RoleDisplayName field value if set, zero value otherwise.
-func (o *UsersUserRoleAssignment) GetRoleDisplayName() string {
+func (o *UsersRoleAssignment) GetRoleDisplayName() string {
 	if o == nil || IsNil(o.RoleDisplayName) {
 		var ret string
 		return ret
@@ -93,7 +93,7 @@ func (o *UsersUserRoleAssignment) GetRoleDisplayName() string {
 
 // GetRoleDisplayNameOk returns a tuple with the RoleDisplayName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserRoleAssignment) GetRoleDisplayNameOk() (*string, bool) {
+func (o *UsersRoleAssignment) GetRoleDisplayNameOk() (*string, bool) {
 	if o == nil || IsNil(o.RoleDisplayName) {
 		return nil, false
 	}
@@ -101,7 +101,7 @@ func (o *UsersUserRoleAssignment) GetRoleDisplayNameOk() (*string, bool) {
 }
 
 // HasRoleDisplayName returns a boolean if a field has been set.
-func (o *UsersUserRoleAssignment) HasRoleDisplayName() bool {
+func (o *UsersRoleAssignment) HasRoleDisplayName() bool {
 	if o != nil && !IsNil(o.RoleDisplayName) {
 		return true
 	}
@@ -110,12 +110,12 @@ func (o *UsersUserRoleAssignment) HasRoleDisplayName() bool {
 }
 
 // SetRoleDisplayName gets a reference to the given string and assigns it to the RoleDisplayName field.
-func (o *UsersUserRoleAssignment) SetRoleDisplayName(v string) {
+func (o *UsersRoleAssignment) SetRoleDisplayName(v string) {
 	o.RoleDisplayName = &v
 }
 
 // GetRoleDescription returns the RoleDescription field value if set, zero value otherwise.
-func (o *UsersUserRoleAssignment) GetRoleDescription() string {
+func (o *UsersRoleAssignment) GetRoleDescription() string {
 	if o == nil || IsNil(o.RoleDescription) {
 		var ret string
 		return ret
@@ -125,7 +125,7 @@ func (o *UsersUserRoleAssignment) GetRoleDescription() string {
 
 // GetRoleDescriptionOk returns a tuple with the RoleDescription field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserRoleAssignment) GetRoleDescriptionOk() (*string, bool) {
+func (o *UsersRoleAssignment) GetRoleDescriptionOk() (*string, bool) {
 	if o == nil || IsNil(o.RoleDescription) {
 		return nil, false
 	}
@@ -133,7 +133,7 @@ func (o *UsersUserRoleAssignment) GetRoleDescriptionOk() (*string, bool) {
 }
 
 // HasRoleDescription returns a boolean if a field has been set.
-func (o *UsersUserRoleAssignment) HasRoleDescription() bool {
+func (o *UsersRoleAssignment) HasRoleDescription() bool {
 	if o != nil && !IsNil(o.RoleDescription) {
 		return true
 	}
@@ -142,12 +142,12 @@ func (o *UsersUserRoleAssignment) HasRoleDescription() bool {
 }
 
 // SetRoleDescription gets a reference to the given string and assigns it to the RoleDescription field.
-func (o *UsersUserRoleAssignment) SetRoleDescription(v string) {
+func (o *UsersRoleAssignment) SetRoleDescription(v string) {
 	o.RoleDescription = &v
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *UsersUserRoleAssignment) GetDomainType() AuthorizationDomainType {
+func (o *UsersRoleAssignment) GetDomainType() AuthorizationDomainType {
 	if o == nil || IsNil(o.DomainType) {
 		var ret AuthorizationDomainType
 		return ret
@@ -157,7 +157,7 @@ func (o *UsersUserRoleAssignment) GetDomainType() AuthorizationDomainType {
 
 // GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserRoleAssignment) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+func (o *UsersRoleAssignment) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
 	if o == nil || IsNil(o.DomainType) {
 		return nil, false
 	}
@@ -165,7 +165,7 @@ func (o *UsersUserRoleAssignment) GetDomainTypeOk() (*AuthorizationDomainType, b
 }
 
 // HasDomainType returns a boolean if a field has been set.
-func (o *UsersUserRoleAssignment) HasDomainType() bool {
+func (o *UsersRoleAssignment) HasDomainType() bool {
 	if o != nil && !IsNil(o.DomainType) {
 		return true
 	}
@@ -174,12 +174,12 @@ func (o *UsersUserRoleAssignment) HasDomainType() bool {
 }
 
 // SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *UsersUserRoleAssignment) SetDomainType(v AuthorizationDomainType) {
+func (o *UsersRoleAssignment) SetDomainType(v AuthorizationDomainType) {
 	o.DomainType = &v
 }
 
 // GetDomainId returns the DomainId field value if set, zero value otherwise.
-func (o *UsersUserRoleAssignment) GetDomainId() string {
+func (o *UsersRoleAssignment) GetDomainId() string {
 	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
@@ -189,7 +189,7 @@ func (o *UsersUserRoleAssignment) GetDomainId() string {
 
 // GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserRoleAssignment) GetDomainIdOk() (*string, bool) {
+func (o *UsersRoleAssignment) GetDomainIdOk() (*string, bool) {
 	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
@@ -197,7 +197,7 @@ func (o *UsersUserRoleAssignment) GetDomainIdOk() (*string, bool) {
 }
 
 // HasDomainId returns a boolean if a field has been set.
-func (o *UsersUserRoleAssignment) HasDomainId() bool {
+func (o *UsersRoleAssignment) HasDomainId() bool {
 	if o != nil && !IsNil(o.DomainId) {
 		return true
 	}
@@ -206,12 +206,12 @@ func (o *UsersUserRoleAssignment) HasDomainId() bool {
 }
 
 // SetDomainId gets a reference to the given string and assigns it to the DomainId field.
-func (o *UsersUserRoleAssignment) SetDomainId(v string) {
+func (o *UsersRoleAssignment) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
 // GetAssignedAt returns the AssignedAt field value if set, zero value otherwise.
-func (o *UsersUserRoleAssignment) GetAssignedAt() time.Time {
+func (o *UsersRoleAssignment) GetAssignedAt() time.Time {
 	if o == nil || IsNil(o.AssignedAt) {
 		var ret time.Time
 		return ret
@@ -221,7 +221,7 @@ func (o *UsersUserRoleAssignment) GetAssignedAt() time.Time {
 
 // GetAssignedAtOk returns a tuple with the AssignedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersUserRoleAssignment) GetAssignedAtOk() (*time.Time, bool) {
+func (o *UsersRoleAssignment) GetAssignedAtOk() (*time.Time, bool) {
 	if o == nil || IsNil(o.AssignedAt) {
 		return nil, false
 	}
@@ -229,7 +229,7 @@ func (o *UsersUserRoleAssignment) GetAssignedAtOk() (*time.Time, bool) {
 }
 
 // HasAssignedAt returns a boolean if a field has been set.
-func (o *UsersUserRoleAssignment) HasAssignedAt() bool {
+func (o *UsersRoleAssignment) HasAssignedAt() bool {
 	if o != nil && !IsNil(o.AssignedAt) {
 		return true
 	}
@@ -238,11 +238,11 @@ func (o *UsersUserRoleAssignment) HasAssignedAt() bool {
 }
 
 // SetAssignedAt gets a reference to the given time.Time and assigns it to the AssignedAt field.
-func (o *UsersUserRoleAssignment) SetAssignedAt(v time.Time) {
+func (o *UsersRoleAssignment) SetAssignedAt(v time.Time) {
 	o.AssignedAt = &v
 }
 
-func (o UsersUserRoleAssignment) MarshalJSON() ([]byte, error) {
+func (o UsersRoleAssignment) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -250,7 +250,7 @@ func (o UsersUserRoleAssignment) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o UsersUserRoleAssignment) ToMap() (map[string]interface{}, error) {
+func (o UsersRoleAssignment) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.RoleName) {
 		toSerialize["roleName"] = o.RoleName
@@ -273,38 +273,38 @@ func (o UsersUserRoleAssignment) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableUsersUserRoleAssignment struct {
-	value *UsersUserRoleAssignment
+type NullableUsersRoleAssignment struct {
+	value *UsersRoleAssignment
 	isSet bool
 }
 
-func (v NullableUsersUserRoleAssignment) Get() *UsersUserRoleAssignment {
+func (v NullableUsersRoleAssignment) Get() *UsersRoleAssignment {
 	return v.value
 }
 
-func (v *NullableUsersUserRoleAssignment) Set(val *UsersUserRoleAssignment) {
+func (v *NullableUsersRoleAssignment) Set(val *UsersRoleAssignment) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableUsersUserRoleAssignment) IsSet() bool {
+func (v NullableUsersRoleAssignment) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableUsersUserRoleAssignment) Unset() {
+func (v *NullableUsersRoleAssignment) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableUsersUserRoleAssignment(val *UsersUserRoleAssignment) *NullableUsersUserRoleAssignment {
-	return &NullableUsersUserRoleAssignment{value: val, isSet: true}
+func NewNullableUsersRoleAssignment(val *UsersRoleAssignment) *NullableUsersRoleAssignment {
+	return &NullableUsersRoleAssignment{value: val, isSet: true}
 }
 
-func (v NullableUsersUserRoleAssignment) MarshalJSON() ([]byte, error) {
+func (v NullableUsersRoleAssignment) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableUsersUserRoleAssignment) UnmarshalJSON(src []byte) error {
+func (v *NullableUsersRoleAssignment) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

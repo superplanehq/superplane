@@ -91,7 +91,6 @@ import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
-import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
@@ -135,6 +134,7 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
+import type { User } from "./mappers/types";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -187,7 +187,6 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { account } = useAccount();
   const { data: me } = useMe();
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -357,7 +356,7 @@ export function WorkflowPageV2() {
 
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
-        avatarUrl: user.spec?.accountProviders?.[0]?.avatarUrl || undefined,
+        avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
       });
     });
     return profilesByID;
@@ -1760,7 +1759,7 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       organizationId!,
-      account ? { id: account.id, email: account.email } : undefined,
+      me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
     );
   }, [
     canvas,
@@ -1779,7 +1778,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     integrationsLoading,
     organizationId,
-    account,
+    me,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -1823,7 +1822,7 @@ export function WorkflowPageV2() {
         canvasId,
         queryClient,
         organizationId,
-        account ? { id: account.id, email: account.email } : undefined,
+        me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -1843,7 +1842,7 @@ export function WorkflowPageV2() {
       getNodeData,
       queryClient,
       organizationId,
-      account,
+      me,
     ],
   );
 
@@ -2986,7 +2985,9 @@ export function WorkflowPageV2() {
     if (!canAutoSave) {
       return;
     }
-  }, [canAutoSave]);
+
+    debouncedAnnotationAutoSave.flush();
+  }, [canAutoSave, debouncedAnnotationAutoSave]);
 
   const clearPendingAutoSaveWork = useCallback(() => {
     debouncedAutoSave.cancel();
@@ -3014,47 +3015,41 @@ export function WorkflowPageV2() {
       const { x, y, ...configurationUpdates } = updates;
       const hasPositionUpdate = x !== undefined || y !== undefined;
       const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
-      const hasOnlyTextUpdate =
-        !hasPositionUpdate && Object.keys(configurationUpdates).length === 1 && configurationUpdates.text !== undefined;
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+          return node;
+        }
 
-      const shouldUpdateCache = !canAutoSave || !hasOnlyTextUpdate;
-      if (shouldUpdateCache) {
-        const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
-          if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
-            return node;
-          }
+        const updatedNode = { ...node };
 
-          const updatedNode = { ...node };
+        // Update position if provided
+        if (hasPositionUpdate) {
+          updatedNode.position = {
+            x: x !== undefined ? x : node.position?.x || 0,
+            y: y !== undefined ? y : node.position?.y || 0,
+          };
+        }
 
-          // Update position if provided
-          if (hasPositionUpdate) {
-            updatedNode.position = {
-              x: x !== undefined ? x : node.position?.x || 0,
-              y: y !== undefined ? y : node.position?.y || 0,
-            };
-          }
+        // Update configuration if provided
+        if (hasConfigurationUpdate) {
+          updatedNode.configuration = {
+            ...node.configuration,
+            ...configurationUpdates,
+          };
+        }
 
-          // Update configuration if provided
-          if (hasConfigurationUpdate) {
-            updatedNode.configuration = {
-              ...node.configuration,
-              ...configurationUpdates,
-            };
-          }
+        return updatedNode;
+      });
 
-          return updatedNode;
-        });
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
 
-        const updatedWorkflow = {
-          ...latestWorkflow,
-          spec: {
-            ...latestWorkflow.spec,
-            nodes: updatedNodes,
-          },
-        };
-
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (hasConfigurationUpdate) {
         if (canAutoSave) {
@@ -3169,7 +3164,8 @@ export function WorkflowPageV2() {
       const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+      const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
+      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
 
       // Generate a unique node ID
       const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
@@ -5982,7 +5978,7 @@ function prepareData(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -6030,7 +6026,7 @@ function prepareNode(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
   edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
@@ -6100,7 +6096,7 @@ function prepareSidebarData(
   workflowId?: string,
   queryClient?: QueryClient,
   organizationId?: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];

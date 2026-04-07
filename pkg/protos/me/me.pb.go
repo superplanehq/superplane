@@ -122,6 +122,7 @@ type User struct {
 	CreatedAt      *timestamp.Timestamp        `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	HasToken       bool                        `protobuf:"varint,5,opt,name=has_token,json=hasToken,proto3" json:"has_token,omitempty"`
 	Permissions    []*authorization.Permission `protobuf:"bytes,6,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Roles          []string                    `protobuf:"bytes,7,rep,name=roles,proto3" json:"roles,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -198,6 +199,13 @@ func (x *User) GetPermissions() []*authorization.Permission {
 	return nil
 }
 
+func (x *User) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
 type RegenerateTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
@@ -251,7 +259,7 @@ const file_me_proto_rawDesc = "" +
 	"\x13include_permissions\x18\x01 \x01(\bR\x12includePermissions\"5\n" +
 	"\n" +
 	"MeResponse\x12'\n" +
-	"\x04user\x18\x01 \x01(\v2\x13.Superplane.Me.UserR\x04user\"\xf5\x01\n" +
+	"\x04user\x18\x01 \x01(\v2\x13.Superplane.Me.UserR\x04user\"\x8b\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\x12'\n" +
@@ -259,7 +267,8 @@ const file_me_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1b\n" +
 	"\thas_token\x18\x05 \x01(\bR\bhasToken\x12F\n" +
-	"\vpermissions\x18\x06 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\"/\n" +
+	"\vpermissions\x18\x06 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12\x14\n" +
+	"\x05roles\x18\a \x03(\tR\x05roles\"/\n" +
 	"\x17RegenerateTokenResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token2\xda\x02\n" +
 	"\x02Me\x12\x90\x01\n" +
