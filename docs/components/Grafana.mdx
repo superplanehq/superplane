@@ -15,6 +15,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Silence" href="#create-silence" description="Create a new silence in the Grafana Alertmanager to suppress alert notifications" />
+  <LinkCard title="Delete Silence" href="#delete-silence" description="Expire (delete) an existing Grafana Alertmanager silence by ID" />
+  <LinkCard title="Get Silence" href="#get-silence" description="Retrieve a single Grafana Alertmanager silence by ID" />
+  <LinkCard title="List Silences" href="#list-silences" description="List active and pending silences from the Grafana Alertmanager" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
 </CardGrid>
 
@@ -82,6 +86,173 @@ The trigger emits the full Grafana webhook payload, including:
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.alert.firing"
+}
+```
+
+<a id="create-silence"></a>
+
+## Create Silence
+
+The Create Silence component creates a new Alertmanager silence in Grafana, suppressing alert notifications that match the configured matchers during the specified time window.
+
+### Use Cases
+
+- **Deploy window**: Suppress noisy alerts during a planned maintenance or deployment window
+- **Incident management**: Prevent alert storms from flooding on-call channels while an incident is being worked on
+- **Testing**: Silence alerts during load tests or chaos experiments
+
+### Configuration
+
+- **Matchers**: One or more label matchers that identify which alerts to silence (required). Each matcher uses an operator: equal (=), not equal (!=), regex match (=~), or regex does not match (!~), matching Grafana Alertmanager semantics.
+- **Starts At**: The start of the silence window (required)
+- **Ends At**: The end of the silence window (required)
+- **Comment**: A description of why the silence is being created (required)
+  - The createdBy field sent to Grafana is set automatically to SuperPlane-&lt;org_name&gt; and is not configurable
+
+### Output
+
+Returns the ID of the newly created silence.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence.created"
+}
+```
+
+<a id="delete-silence"></a>
+
+## Delete Silence
+
+The Delete Silence component expires an existing silence in Grafana Alertmanager.
+
+### Use Cases
+
+- **End a maintenance window early**: Remove a silence once deployment or maintenance completes ahead of schedule
+- **Automated cleanup**: Expire silences created by automation after the condition they covered has resolved
+
+### Configuration
+
+- **Silence**: The silence to expire (required)
+
+### Output
+
+Returns the silence ID and a confirmation that the silence was deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "silenceId": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence.deleted"
+}
+```
+
+<a id="get-silence"></a>
+
+## Get Silence
+
+The Get Silence component fetches the details of a single silence from Grafana Alertmanager using its ID.
+
+### Use Cases
+
+- **Inspect a silence**: Retrieve full details of a silence including state, comment, matchers, and times
+- **Verify a silence**: Confirm a silence is still active before taking action in a workflow
+
+### Configuration
+
+- **Silence**: The silence to retrieve (required)
+
+### Output
+
+Returns the silence object including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "comment": "Deploy window for v2.1.0",
+    "createdBy": "devops-bot",
+    "endsAt": "2026-03-31T11:00:00.000Z",
+    "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+    "matchers": [
+      {
+        "isEqual": true,
+        "isRegex": false,
+        "name": "env",
+        "value": "production"
+      }
+    ],
+    "startsAt": "2026-03-31T10:00:00.000Z",
+    "status": {
+      "state": "active"
+    },
+    "updatedAt": "2026-03-31T10:00:00.000Z"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silence"
+}
+```
+
+<a id="list-silences"></a>
+
+## List Silences
+
+The List Silences component retrieves silences from Grafana Alertmanager.
+
+### Use Cases
+
+- **Audit**: Review all currently active or pending silences in your Grafana instance
+- **Detect if already muted**: Check whether a specific alert or label set is already silenced before creating a duplicate
+- **Workflow logic**: Branch on silence state — e.g. skip escalation if an alert is already silenced
+
+### Configuration
+
+- **Filter**: Optional label matcher string to filter silences (e.g. `alertname=~"High.*"`)
+
+### Output
+
+Returns a list of silence objects, each including ID, state, comment, matchers, start/end times, and the author.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "silences": [
+      {
+        "comment": "Deploy window for v2.1.0",
+        "createdBy": "devops-bot",
+        "endsAt": "2026-03-31T11:00:00.000Z",
+        "id": "a3e5c2d1-8b4f-4e1a-9c7d-2f0e6b3a1d5c",
+        "matchers": [
+          {
+            "isEqual": true,
+            "isRegex": false,
+            "name": "env",
+            "value": "production"
+          }
+        ],
+        "startsAt": "2026-03-31T10:00:00.000Z",
+        "status": {
+          "state": "active"
+        },
+        "updatedAt": "2026-03-31T10:00:00.000Z"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.silences"
 }
 ```
 
