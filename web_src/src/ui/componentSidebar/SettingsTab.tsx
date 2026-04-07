@@ -11,6 +11,8 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { CopyButton } from "@/ui/CopyButton";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
@@ -107,6 +109,7 @@ export function SettingsTab({
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
   const [isSaving, setIsSaving] = useState(false);
+  const [isIntegrationErrorOpen, setIsIntegrationErrorOpen] = useState(false);
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
@@ -252,6 +255,7 @@ export function SettingsTab({
     setSelectedIntegration(integrationRef);
     setValidationErrors(new Set());
     setShowValidation(false);
+    setIsIntegrationErrorOpen(false);
   }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
 
   // Auto-select the first installation if none is selected or selection is invalid
@@ -282,6 +286,7 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
+    setIsIntegrationErrorOpen(false);
   }, [integrationsOfType, selectedIntegration, nodeConfiguration, currentNodeName]);
 
   const shouldShowConfiguration = true;
@@ -577,9 +582,11 @@ export function SettingsTab({
                   <>
                     <p className="py-2 text-xs text-gray-500">Connection</p>
                     {(() => {
+                      const integrationErrorDescription = (
+                        selectedIntegrationFull.status?.stateDescription ?? ""
+                      ).trim();
                       const hasIntegrationError =
-                        selectedIntegrationFull.status?.state === "error" &&
-                        !!selectedIntegrationFull.status?.stateDescription;
+                        selectedIntegrationFull.status?.state === "error" && integrationErrorDescription.length > 0;
 
                       const integrationStatusCard = (
                         <div
@@ -638,9 +645,43 @@ export function SettingsTab({
 
                       if (hasIntegrationError) {
                         return (
-                          <SimpleTooltip content={selectedIntegrationFull.status?.stateDescription || ""}>
-                            {integrationStatusCard}
-                          </SimpleTooltip>
+                          <div className="flex flex-col gap-2">
+                            <SimpleTooltip content="Connection error">{integrationStatusCard}</SimpleTooltip>
+                            <Collapsible
+                              key={`${selectedIntegrationFull.metadata?.id ?? "unknown"}:${integrationErrorDescription}`}
+                              open={isIntegrationErrorOpen}
+                              onOpenChange={setIsIntegrationErrorOpen}
+                            >
+                              <div className="border border-red-950/15 rounded-md bg-red-100 dark:bg-red-950/30 px-3 py-2 text-xs text-red-800 dark:text-red-200">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-semibold">Connection error</div>
+                                    <div className="mt-1 text-[11px] text-red-800/80 dark:text-red-200/80 break-words line-clamp-2">
+                                      {integrationErrorDescription}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 flex-shrink-0">
+                                    <CopyButton text={integrationErrorDescription} />
+                                    <CollapsibleTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="link"
+                                        size="sm"
+                                        className="h-auto p-0 text-[11px] text-red-800 dark:text-red-200"
+                                      >
+                                        {isIntegrationErrorOpen ? "Hide details" : "Show details"}
+                                      </Button>
+                                    </CollapsibleTrigger>
+                                  </div>
+                                </div>
+                                <CollapsibleContent>
+                                  <div className="mt-2 rounded bg-white/60 dark:bg-black/20 p-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-red-900 dark:text-red-100">
+                                    {integrationErrorDescription}
+                                  </div>
+                                </CollapsibleContent>
+                              </div>
+                            </Collapsible>
+                          </div>
                         );
                       }
 
