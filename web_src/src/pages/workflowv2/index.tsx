@@ -91,7 +91,6 @@ import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
-import { useAccount } from "@/contexts/AccountContext";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
@@ -135,6 +134,7 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
+import type { User } from "./mappers/types";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -187,7 +187,6 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { account } = useAccount();
   const { data: me } = useMe();
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -357,7 +356,7 @@ export function WorkflowPageV2() {
 
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
-        avatarUrl: user.spec?.accountProviders?.[0]?.avatarUrl || undefined,
+        avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
       });
     });
     return profilesByID;
@@ -1760,7 +1759,7 @@ export function WorkflowPageV2() {
       canvasId!,
       queryClient,
       organizationId!,
-      account ? { id: account.id, email: account.email } : undefined,
+      me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
     );
   }, [
     canvas,
@@ -1779,7 +1778,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     integrationsLoading,
     organizationId,
-    account,
+    me,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -1823,7 +1822,7 @@ export function WorkflowPageV2() {
         canvasId,
         queryClient,
         organizationId,
-        account ? { id: account.id, email: account.email } : undefined,
+        me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -1843,7 +1842,7 @@ export function WorkflowPageV2() {
       getNodeData,
       queryClient,
       organizationId,
-      account,
+      me,
     ],
   );
 
@@ -5979,7 +5978,7 @@ function prepareData(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -6027,7 +6026,7 @@ function prepareNode(
   workflowId: string,
   queryClient: QueryClient,
   organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
   edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
@@ -6097,7 +6096,7 @@ function prepareSidebarData(
   workflowId?: string,
   queryClient?: QueryClient,
   organizationId?: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];

@@ -25,9 +25,9 @@ from superplaneapi.models.authorization_domain_type import AuthorizationDomainTy
 from typing import Optional, Set
 from typing_extensions import Self
 
-class UsersUserRoleAssignment(BaseModel):
+class UsersRoleAssignment(BaseModel):
     """
-    UsersUserRoleAssignment
+    UsersRoleAssignment
     """ # noqa: E501
     role_name: Optional[StrictStr] = Field(default=None, alias="roleName")
     role_display_name: Optional[StrictStr] = Field(default=None, alias="roleDisplayName")
@@ -55,7 +55,7 @@ class UsersUserRoleAssignment(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of UsersUserRoleAssignment from a JSON string"""
+        """Create an instance of UsersRoleAssignment from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -80,7 +80,7 @@ class UsersUserRoleAssignment(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of UsersUserRoleAssignment from a dict"""
+        """Create an instance of UsersRoleAssignment from a dict"""
         if obj is None:
             return None
 

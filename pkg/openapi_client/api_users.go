@@ -23,11 +23,11 @@ import (
 type UsersAPIService service
 
 type ApiUsersListUsersRequest struct {
-	ctx                    context.Context
-	ApiService             *UsersAPIService
-	domainType             *string
-	domainId               *string
-	includeServiceAccounts *bool
+	ctx          context.Context
+	ApiService   *UsersAPIService
+	domainType   *string
+	domainId     *string
+	includeRoles *bool
 }
 
 func (r ApiUsersListUsersRequest) DomainType(domainType string) ApiUsersListUsersRequest {
@@ -40,8 +40,8 @@ func (r ApiUsersListUsersRequest) DomainId(domainId string) ApiUsersListUsersReq
 	return r
 }
 
-func (r ApiUsersListUsersRequest) IncludeServiceAccounts(includeServiceAccounts bool) ApiUsersListUsersRequest {
-	r.includeServiceAccounts = &includeServiceAccounts
+func (r ApiUsersListUsersRequest) IncludeRoles(includeRoles bool) ApiUsersListUsersRequest {
+	r.includeRoles = &includeRoles
 	return r
 }
 
@@ -95,8 +95,8 @@ func (a *UsersAPIService) UsersListUsersExecute(r ApiUsersListUsersRequest) (*Us
 	if r.domainId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
 	}
-	if r.includeServiceAccounts != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "includeServiceAccounts", r.includeServiceAccounts, "", "")
+	if r.includeRoles != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "includeRoles", r.includeRoles, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
