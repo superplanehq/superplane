@@ -82,17 +82,5 @@ export function buildIncidentExecutionDetails(execution: ExecutionInfo): Record<
     Object.assign(details, getDetailsForIncident(incident));
   }
 
-  // Add error in the proper format (if present) - placed at the end
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
-    details["Error"] = {
-      __type: "error",
-      message: execution.resultMessage,
-    };
-  }
-
   return details;
 }
