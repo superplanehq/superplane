@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,7 +158,9 @@ func (s *WaitSteps) runManualTrigger() {
 
 func (s *WaitSteps) pushThroughFromNode(node string) {
 	s.canvas.StartEditingNode(node)
-	pushThroughButton := q.Locator(`.react-flow__node:has([data-testid="node-wait-header"]) button:has-text("Push through")`)
+	pushThroughButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + strings.ToLower(node) + `-header"]) button:has-text("Push through")`,
+	)
 	s.session.AssertVisible(pushThroughButton)
 	s.session.Click(pushThroughButton)
 	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
