@@ -152,7 +152,7 @@ func (c *triggersCommand) findTriggerByName(ctx core.CommandContext, name string
 	if scoped {
 		integration, err := core.FindIntegrationDefinition(ctx, integrationName)
 		if err != nil {
-			return openapi_client.TriggersTrigger{}, err
+			return openapi_client.TriggersTrigger{}, fmt.Errorf("trigger %q not found: no integration named %q", name, integrationName)
 		}
 		return findIntegrationTrigger(integration, triggerName)
 	}
