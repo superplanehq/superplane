@@ -322,6 +322,8 @@ type ProcessQueueContext struct {
 type AuthContext interface {
 	AuthenticatedUser() *User
 	GetUser(id uuid.UUID) (*User, error)
+	GetRole(name string) (*RoleRef, error)
+	GetGroup(name string) (*GroupRef, error)
 	HasRole(role string) (bool, error)
 	InGroup(group string) (bool, error)
 }
@@ -345,6 +347,16 @@ type User struct {
 	ID    string `mapstructure:"id" json:"id"`
 	Name  string `mapstructure:"name" json:"name"`
 	Email string `mapstructure:"email" json:"email"`
+}
+
+type RoleRef struct {
+	Name        string `mapstructure:"name" json:"name"`
+	DisplayName string `mapstructure:"displayName" json:"displayName"`
+}
+
+type GroupRef struct {
+	Name        string `mapstructure:"name" json:"name"`
+	DisplayName string `mapstructure:"displayName" json:"displayName"`
 }
 
 type Node struct {

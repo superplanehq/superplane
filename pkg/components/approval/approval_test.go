@@ -49,18 +49,18 @@ func TestApproval_HandleAction_Approved_UsesCorrectChannel(t *testing.T) {
 		},
 		{
 			name:   "role",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, RoleRef: &core.RoleRef{Name: role}},
 			auth: &contexts.AuthContext{
 				User:  &core.User{ID: "test-user"},
-				Roles: map[string]struct{}{role: {}},
+				Roles: map[string]*core.RoleRef{role: {Name: role}},
 			},
 		},
 		{
 			name:   "group",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, GroupRef: &core.GroupRef{Name: group}},
 			auth: &contexts.AuthContext{
 				User:   &core.User{ID: "test-user"},
-				Groups: map[string]struct{}{group: {}},
+				Groups: map[string]*core.GroupRef{group: {Name: group}},
 			},
 		},
 	}
@@ -115,18 +115,18 @@ func TestApproval_HandleAction_Rejected_UsesCorrectChannel(t *testing.T) {
 		},
 		{
 			name:   "role",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, RoleRef: &core.RoleRef{Name: role}},
 			auth: &contexts.AuthContext{
 				User:  &core.User{ID: "test-user"},
-				Roles: map[string]struct{}{role: {}},
+				Roles: map[string]*core.RoleRef{role: {Name: role}},
 			},
 		},
 		{
 			name:   "group",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, GroupRef: &core.GroupRef{Name: group}},
 			auth: &contexts.AuthContext{
 				User:   &core.User{ID: "test-user"},
-				Groups: map[string]struct{}{group: {}},
+				Groups: map[string]*core.GroupRef{group: {Name: group}},
 			},
 		},
 	}
@@ -224,18 +224,18 @@ func TestApproval_HandleAction_StillPending_DoesNotCallPass(t *testing.T) {
 		},
 		{
 			name:   "role",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, Role: &role},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeRole, RoleRef: &core.RoleRef{Name: role}},
 			auth: &contexts.AuthContext{
 				User:  &core.User{ID: "test-user-1"},
-				Roles: map[string]struct{}{role: {}},
+				Roles: map[string]*core.RoleRef{role: {Name: role}},
 			},
 		},
 		{
 			name:   "group",
-			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, Group: &group},
+			record: Record{Index: 0, State: StatePending, Type: ItemTypeGroup, GroupRef: &core.GroupRef{Name: group}},
 			auth: &contexts.AuthContext{
 				User:   &core.User{ID: "test-user-1"},
-				Groups: map[string]struct{}{group: {}},
+				Groups: map[string]*core.GroupRef{group: {Name: group}},
 			},
 		},
 	}
@@ -617,9 +617,9 @@ func TestApproval_Execute(t *testing.T) {
 		stored := metadataCtx.Metadata.(*Metadata)
 		require.Len(t, stored.Records, 2)
 		assert.Equal(t, ItemTypeRole, stored.Records[0].Type)
-		assert.Equal(t, role, *stored.Records[0].Role)
+		assert.Equal(t, role, stored.Records[0].RoleRef.Name)
 		assert.Equal(t, ItemTypeGroup, stored.Records[1].Type)
-		assert.Equal(t, group, *stored.Records[1].Group)
+		assert.Equal(t, group, stored.Records[1].GroupRef.Name)
 	})
 }
 

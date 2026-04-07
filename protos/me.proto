@@ -66,12 +66,13 @@ message MeResponse {
 
 message User {
   string id = 1;
-  string email = 2;
-  string organization_id = 3;
-  google.protobuf.Timestamp created_at = 4;
-  bool has_token = 5;
-  repeated Authorization.Permission permissions = 6;
-  repeated string roles = 7;
+  string name = 2;
+  string email = 3;
+  string organization_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  bool has_token = 6;
+  repeated Authorization.Permission permissions = 7;
+  repeated string roles = 8;
 }
 
 message RegenerateTokenResponse {

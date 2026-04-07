@@ -52,6 +52,34 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 	}, nil
 }
 
+func (c *AuthContext) GetRole(name string) (*core.RoleRef, error) {
+	roleDefinition, err := c.authService.GetRoleDefinition(name, models.DomainTypeOrganization, c.orgID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error getting role definition: %v", err)
+	}
+
+	roleMetadata, err := models.FindRoleMetadata(name, models.DomainTypeOrganization, c.orgID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error getting role metadata: %v", err)
+	}
+
+	return &core.RoleRef{Name: roleDefinition.Name, DisplayName: roleMetadata.DisplayName}, nil
+}
+
+func (c *AuthContext) GetGroup(name string) (*core.GroupRef, error) {
+	role, err := c.authService.GetGroupRole(c.orgID.String(), models.DomainTypeOrganization, name)
+	if err != nil {
+		return nil, fmt.Errorf("error getting group role: %v", err)
+	}
+
+	groupMetadata, err := models.FindGroupMetadata(name, models.DomainTypeOrganization, c.orgID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error getting group metadata: %v", err)
+	}
+
+	return &core.GroupRef{Name: role, DisplayName: groupMetadata.DisplayName}, nil
+}
+
 func (c *AuthContext) HasRole(role string) (bool, error) {
 	if c.authenticatedUser == nil {
 		return false, fmt.Errorf("user not authenticated")

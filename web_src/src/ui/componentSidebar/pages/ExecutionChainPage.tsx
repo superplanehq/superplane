@@ -344,7 +344,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       loadInFlightRef.current = false;
       setLoading(false);
     }
-  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
+  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints, getExecutionState]);
 
   // Load execution chain data
   useEffect(() => {

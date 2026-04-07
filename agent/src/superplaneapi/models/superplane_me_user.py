@@ -30,13 +30,14 @@ class SuperplaneMeUser(BaseModel):
     SuperplaneMeUser
     """ # noqa: E501
     id: Optional[StrictStr] = None
+    name: Optional[StrictStr] = None
     email: Optional[StrictStr] = None
     organization_id: Optional[StrictStr] = Field(default=None, alias="organizationId")
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     has_token: Optional[StrictBool] = Field(default=None, alias="hasToken")
     permissions: Optional[List[AuthorizationPermission]] = None
     roles: Optional[List[StrictStr]] = None
-    __properties: ClassVar[List[str]] = ["id", "email", "organizationId", "createdAt", "hasToken", "permissions", "roles"]
+    __properties: ClassVar[List[str]] = ["id", "name", "email", "organizationId", "createdAt", "hasToken", "permissions", "roles"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -97,6 +98,7 @@ class SuperplaneMeUser(BaseModel):
 
         _obj = cls.model_validate({
             "id": obj.get("id"),
+            "name": obj.get("name"),
             "email": obj.get("email"),
             "organizationId": obj.get("organizationId"),
             "createdAt": obj.get("createdAt"),

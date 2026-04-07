@@ -3,7 +3,6 @@ package approval
 import (
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"time"
 
@@ -48,8 +47,12 @@ type Item struct {
 	Group string `mapstructure:"group" json:"group,omitempty"`
 }
 
+type NodeMetadata struct {
+	Records []Record `mapstructure:"records" json:"records"`
+}
+
 /*
- * Metadata for the component.
+ * Metadata for the component execution.
  */
 type Metadata struct {
 	Result  string   `mapstructure:"result" json:"result"`
@@ -61,8 +64,8 @@ type Record struct {
 	Type      string         `mapstructure:"type" json:"type"`
 	State     string         `mapstructure:"state" json:"state"`
 	User      *core.User     `mapstructure:"user" json:"user,omitempty"`
-	Role      *string        `mapstructure:"role" json:"role,omitempty"`
-	Group     *string        `mapstructure:"group" json:"group,omitempty"`
+	RoleRef   *core.RoleRef  `mapstructure:"roleRef" json:"roleRef,omitempty"`
+	GroupRef  *core.GroupRef `mapstructure:"groupRef" json:"groupRef,omitempty"`
 	Approval  *ApprovalInfo  `mapstructure:"approval" json:"approval,omitempty"`
 	Rejection *RejectionInfo `mapstructure:"rejection" json:"rejection,omitempty"`
 }
@@ -111,26 +114,7 @@ func (m *Metadata) UpdateResult() {
 	m.Result = StateApproved
 }
 
-func (m *Metadata) hasApprovedAnyRecord(userID string) bool {
-	if userID == "" {
-		return false
-	}
-
-	return slices.ContainsFunc(m.Records, func(record Record) bool {
-		if record.State != StateApproved || record.User == nil {
-			return false
-		}
-
-		return record.User.ID == userID
-	})
-}
-
 func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) error {
-	authenticatedUser := ctx.Auth.AuthenticatedUser()
-	if authenticatedUser != nil && m.hasApprovedAnyRecord(authenticatedUser.ID) {
-		return fmt.Errorf("user has already approved another requirement")
-	}
-
 	err := m.validateAction(record, ctx)
 	if err != nil {
 		return err
@@ -138,7 +122,7 @@ func (m *Metadata) Approve(record *Record, index int, ctx core.ActionContext) er
 
 	record.State = StateApproved
 	record.Approval = &ApprovalInfo{ApprovedAt: time.Now().Format(time.RFC3339)}
-	record.User = authenticatedUser
+	record.User = ctx.Auth.AuthenticatedUser()
 	comment, ok := ctx.Parameters["comment"].(string)
 	if ok {
 		record.Approval.Comment = comment
@@ -190,25 +174,25 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 		return nil
 
 	case ItemTypeRole:
-		hasRole, err := ctx.Auth.HasRole(*record.Role)
+		hasRole, err := ctx.Auth.HasRole(record.RoleRef.Name)
 		if err != nil {
-			return fmt.Errorf("error checking role %s: %v", *record.Role, err)
+			return fmt.Errorf("error checking role %s: %v", record.RoleRef.Name, err)
 		}
 
 		if !hasRole {
-			return fmt.Errorf("item must be approved by %s", *record.Role)
+			return fmt.Errorf("item must be approved by %s", record.RoleRef.Name)
 		}
 
 		return nil
 
 	case ItemTypeGroup:
-		inGroup, err := ctx.Auth.InGroup(*record.Group)
+		inGroup, err := ctx.Auth.InGroup(record.GroupRef.Name)
 		if err != nil {
-			return fmt.Errorf("error checking group %s: %v", *record.Group, err)
+			return fmt.Errorf("error checking group %s: %v", record.GroupRef.Name, err)
 		}
 
 		if !inGroup {
-			return fmt.Errorf("item must be approved by %s", *record.Group)
+			return fmt.Errorf("item must be approved by %s", record.GroupRef.Name)
 		}
 
 		return nil
@@ -217,11 +201,11 @@ func (m *Metadata) validateAction(record *Record, ctx core.ActionContext) error 
 	return fmt.Errorf("unknown record type: %s", record.Type)
 }
 
-func NewMetadata(ctx core.ExecutionContext, items []Item) (*Metadata, error) {
+func (a *Approval) newNodeMetadata(auth core.AuthContext, items []Item) (*NodeMetadata, error) {
 	records := []Record{}
 
 	for i, item := range items {
-		record, err := approvalItemToRecord(ctx, item, i)
+		record, err := approvalItemToRecord(auth, item, i)
 		if err != nil {
 			return nil, err
 		}
@@ -229,20 +213,18 @@ func NewMetadata(ctx core.ExecutionContext, items []Item) (*Metadata, error) {
 		records = append(records, *record)
 	}
 
-	return &Metadata{
-		Result:  StatePending,
+	return &NodeMetadata{
 		Records: records,
 	}, nil
 }
 
-func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Record, error) {
+func approvalItemToRecord(auth core.AuthContext, item Item, index int) (*Record, error) {
 	switch item.Type {
 	case ItemTypeAnyone:
 		return &Record{
 			Type:  item.Type,
 			Index: index,
 			State: StatePending,
-			User:  nil, // No specific user - anyone can approve
 		}, nil
 
 	case ItemTypeUser:
@@ -251,7 +233,7 @@ func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Rec
 			return nil, err
 		}
 
-		user, err := ctx.Auth.GetUser(userID)
+		user, err := auth.GetUser(userID)
 		if err != nil {
 			return nil, err
 		}
@@ -264,19 +246,29 @@ func approvalItemToRecord(ctx core.ExecutionContext, item Item, index int) (*Rec
 		}, nil
 
 	case ItemTypeRole:
+		role, err := auth.GetRole(item.Role)
+		if err != nil {
+			return nil, err
+		}
+
 		return &Record{
-			Type:  item.Type,
-			Index: index,
-			Role:  &item.Role,
-			State: StatePending,
+			Type:    item.Type,
+			Index:   index,
+			RoleRef: role,
+			State:   StatePending,
 		}, nil
 
 	case ItemTypeGroup:
+		group, err := auth.GetGroup(item.Group)
+		if err != nil {
+			return nil, err
+		}
+
 		return &Record{
-			Type:  item.Type,
-			Index: index,
-			Group: &item.Group,
-			State: StatePending,
+			Type:     item.Type,
+			Index:    index,
+			GroupRef: group,
+			State:    StatePending,
 		}, nil
 	}
 
@@ -423,9 +415,19 @@ func (a *Approval) Configuration() []configuration.Field {
 	}
 }
 
-// TODO: no validation here?
 func (a *Approval) Setup(ctx core.SetupContext) error {
-	return nil
+	config := Config{}
+	err := mapstructure.Decode(ctx.Configuration, &config)
+	if err != nil {
+		return err
+	}
+
+	metadata, err := a.newNodeMetadata(ctx.Auth, config.Items)
+	if err != nil {
+		return err
+	}
+
+	return ctx.Metadata.Set(metadata)
 }
 
 func (a *Approval) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -439,13 +441,15 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	metadata, err := NewMetadata(ctx, config.Items)
+	nodeMetadata := NodeMetadata{}
+	err = mapstructure.Decode(ctx.NodeMetadata.Get(), &nodeMetadata)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse node metadata: %w", err)
 	}
 
-	metadata.UpdateResult()
-	err = ctx.Metadata.Set(metadata)
+	executionMetadata := &Metadata{Records: nodeMetadata.Records}
+	executionMetadata.UpdateResult()
+	err = ctx.Metadata.Set(executionMetadata)
 	if err != nil {
 		return fmt.Errorf("error setting metadata: %v", err)
 	}
@@ -453,16 +457,16 @@ func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	//
 	// If no items are specified, just finish the execution.
 	//
-	if metadata.Completed() {
+	if executionMetadata.Completed() {
 		return ctx.ExecutionState.Emit(
 			ChannelApproved,
 			"approval.finished",
-			[]any{metadata},
+			[]any{executionMetadata},
 		)
 	}
 
 	if ctx.Notifications != nil {
-		if err := a.notifyApprovers(ctx, metadata); err != nil {
+		if err := a.notifyApprovers(ctx, executionMetadata); err != nil {
 			if ctx.Logger != nil {
 				ctx.Logger.Warnf("failed to send approval notification: %v", err)
 			}
@@ -589,7 +593,7 @@ func (a *Approval) handleApprove(ctx core.ActionContext) (*Metadata, error) {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 
-	record, err := a.resolveApproveRecord(metadata, ctx)
+	record, err := a.findPendingRecord(metadata, ctx.Parameters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find requirement: %w", err)
 	}
@@ -616,37 +620,6 @@ func (a *Approval) findPendingRecord(metadata Metadata, parameters map[string]an
 	return &record, nil
 }
 
-func (a *Approval) resolveApproveRecord(metadata Metadata, ctx core.ActionContext) (*Record, error) {
-	index, err := getActionIndex(ctx.Parameters, len(metadata.Records))
-	if err != nil {
-		return nil, err
-	}
-
-	requestedRecord := metadata.Records[index]
-	authenticatedUser := ctx.Auth.AuthenticatedUser()
-	if requestedRecord.Type == ItemTypeAnyone && authenticatedUser != nil {
-		userRecord := findPendingUserRecord(metadata, authenticatedUser.ID)
-		if userRecord != nil {
-			return userRecord, nil
-		}
-	}
-
-	if requestedRecord.State == StatePending {
-		if err := metadata.validateAction(&requestedRecord, ctx); err != nil {
-			return nil, err
-		}
-
-		return &requestedRecord, nil
-	}
-
-	fallback := findPendingEligibleRecord(metadata, ctx)
-	if fallback != nil {
-		return fallback, nil
-	}
-
-	return nil, fmt.Errorf("record at index %d is not pending", index)
-}
-
 func getActionIndex(parameters map[string]any, max int) (int, error) {
 	i, ok := parameters["index"].(float64)
 	if !ok {
@@ -659,50 +632,6 @@ func getActionIndex(parameters map[string]any, max int) (int, error) {
 	}
 
 	return index, nil
-}
-
-func findPendingUserRecord(metadata Metadata, userID string) *Record {
-	for i, record := range metadata.Records {
-		if record.State != StatePending || record.Type != ItemTypeUser || record.User == nil {
-			continue
-		}
-
-		if record.User.ID == userID {
-			record.Index = i
-			return &record
-		}
-	}
-
-	return nil
-}
-
-func findPendingEligibleRecord(metadata Metadata, ctx core.ActionContext) *Record {
-	for i, record := range metadata.Records {
-		if record.State != StatePending {
-			continue
-		}
-
-		if record.Type == ItemTypeUser && record.User == nil {
-			continue
-		}
-
-		if record.Type == ItemTypeRole && record.Role == nil {
-			continue
-		}
-
-		if record.Type == ItemTypeGroup && record.Group == nil {
-			continue
-		}
-
-		if err := metadata.validateAction(&record, ctx); err != nil {
-			continue
-		}
-
-		record.Index = i
-		return &record
-	}
-
-	return nil
 }
 
 func (a *Approval) handleReject(ctx core.ActionContext) (*Metadata, error) {
@@ -734,32 +663,19 @@ func (a *Approval) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Web
 }
 
 func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata) error {
-	url := ""
-	if ctx.BaseURL != "" && ctx.OrganizationID != "" && ctx.WorkflowID != "" && ctx.NodeID != "" {
-		url = fmt.Sprintf(
-			"%s/%s/canvases/%s?sidebar=1&node=%s",
-			strings.TrimRight(ctx.BaseURL, "/"),
-			ctx.OrganizationID,
-			ctx.WorkflowID,
-			ctx.NodeID,
-		)
-	}
+	url := fmt.Sprintf(
+		"%s/%s/canvases/%s?sidebar=1&node=%s",
+		strings.TrimRight(ctx.BaseURL, "/"),
+		ctx.OrganizationID,
+		ctx.WorkflowID,
+		ctx.NodeID,
+	)
 
-	canvasName := ctx.CanvasName
-	if canvasName == "" {
-		canvasName = "Canvas"
-	}
-
-	approvalName := ctx.NodeName
-	if approvalName == "" {
-		approvalName = "Approval"
-	}
-
-	title := fmt.Sprintf("Approval required: %s — %s", canvasName, approvalName)
+	title := fmt.Sprintf("Approval required: %s — %s", ctx.CanvasName, ctx.NodeName)
 	body := fmt.Sprintf(
 		"An approval is waiting for you.\n\nCanvas: %s\nApproval: %s",
-		canvasName,
-		approvalName,
+		ctx.CanvasName,
+		ctx.NodeName,
 	)
 
 	receivers := core.NotificationReceivers{}
@@ -784,13 +700,13 @@ func (a *Approval) notifyApprovers(ctx core.ExecutionContext, metadata *Metadata
 			}
 
 		case ItemTypeRole:
-			if record.Role != nil && *record.Role != "" {
-				roleSet[*record.Role] = struct{}{}
+			if record.RoleRef != nil && record.RoleRef.Name != "" {
+				roleSet[record.RoleRef.Name] = struct{}{}
 			}
 
 		case ItemTypeGroup:
-			if record.Group != nil && *record.Group != "" {
-				groupSet[*record.Group] = struct{}{}
+			if record.GroupRef != nil && record.GroupRef.Name != "" {
+				groupSet[record.GroupRef.Name] = struct{}{}
 			}
 		}
 	}

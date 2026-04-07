@@ -33,6 +33,7 @@ func GetUser(ctx context.Context, authService authorization.Authorization, inclu
 
 	userProto := &pb.User{
 		Id:             user.ID.String(),
+		Name:           user.Name,
 		Email:          user.GetEmail(),
 		OrganizationId: orgID,
 		CreatedAt:      timestamppb.New(user.CreatedAt),

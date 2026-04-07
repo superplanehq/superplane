@@ -1308,6 +1308,7 @@ export type SuperplaneIntegrationsListIntegrationsResponse = {
 
 export type SuperplaneMeUser = {
   id?: string;
+  name?: string;
   email?: string;
   organizationId?: string;
   createdAt?: string;
