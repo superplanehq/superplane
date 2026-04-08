@@ -205,6 +205,15 @@ export interface CanvasPageProps {
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
+  canvasMode?: "editor" | "live" | "runs";
+  onCanvasModeChange?: (mode: "editor" | "live" | "runs") => void;
+  showEditorTab?: boolean;
+  runsNotificationCount?: number;
+  runsSidebar?: React.ReactNode;
+  runViewOverlay?: React.ReactNode;
+  runDetailPanel?: React.ReactNode;
+  onRunViewNodeDoubleClick?: (nodeId: string) => void;
+  onOpenInRunView?: (eventId: string) => void;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -685,6 +694,52 @@ const nodeTypes = {
   default: DefaultNodeRenderer,
   group: GroupNodeRenderer,
 };
+
+type CanvasModeType = "editor" | "live" | "runs";
+
+function CanvasModeStripe({
+  mode,
+  onChange,
+  showEditorTab = true,
+  runsNotificationCount,
+}: {
+  mode: CanvasModeType;
+  onChange: (mode: CanvasModeType) => void;
+  showEditorTab?: boolean;
+  runsNotificationCount?: number;
+}) {
+  const allTabs: { id: CanvasModeType; label: string }[] = [
+    { id: "editor", label: "Editor" },
+    { id: "live", label: "Live Canvas" },
+    { id: "runs", label: "Runs" },
+  ];
+  const tabs = showEditorTab ? allTabs : allTabs.filter((t) => t.id !== "editor");
+
+  return (
+    <div className="flex items-center gap-1 border-b border-slate-950/10 bg-white px-4 py-1.5">
+      <div className="flex items-center rounded-md border border-slate-950/15 p-0.5 text-[13px] font-medium">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            className={cn(
+              "relative rounded-sm px-2.5 py-0.5 transition-colors",
+              mode === tab.id ? "bg-slate-900 text-white" : "text-gray-700 hover:bg-gray-100",
+            )}
+          >
+            {tab.label}
+            {tab.id === "runs" && runsNotificationCount && runsNotificationCount > 0 && mode !== "runs" ? (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white">
+                {runsNotificationCount > 99 ? "99+" : runsNotificationCount}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function CanvasPage(props: CanvasPageProps) {
   const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
@@ -1213,6 +1268,14 @@ function CanvasPage(props: CanvasPageProps) {
           onExportYamlDownload={props.onExportYamlDownload}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
+        {props.canvasMode && props.onCanvasModeChange && (!props.topViewMode || props.topViewMode === "canvas") ? (
+          <CanvasModeStripe
+            mode={props.canvasMode}
+            onChange={props.onCanvasModeChange}
+            showEditorTab={props.showEditorTab}
+            runsNotificationCount={props.runsNotificationCount}
+          />
+        ) : null}
       </div>
 
       {canvasStateMode === "editing" ? (
@@ -1258,7 +1321,9 @@ function CanvasPage(props: CanvasPageProps) {
       ) : (
         <div className="flex-1 flex relative overflow-hidden">
           {props.versionControlSidebar}
-          {props.hideAddControls ? null : (
+          {props.canvasMode === "runs" && props.runsSidebar ? (
+            props.runsSidebar
+          ) : props.hideAddControls ? null : (
             <BuildingBlocksSidebar
               isOpen={isBuildingBlocksSidebarOpen}
               onToggle={handleSidebarToggle}
@@ -1411,8 +1476,13 @@ function CanvasPage(props: CanvasPageProps) {
                 missingIntegrations={props.missingIntegrations}
                 onConnectIntegration={props.onConnectIntegration}
                 canCreateIntegrations={props.canCreateIntegrations}
+                onNodeDoubleClick={props.onRunViewNodeDoubleClick}
+                onOpenInRunView={props.onOpenInRunView}
               />
             </ReactFlowProvider>
+
+            {props.runViewOverlay}
+            {props.runDetailPanel}
 
             <Sidebar
               state={state}
@@ -2014,6 +2084,8 @@ function CanvasContent({
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
+  onNodeDoubleClick,
+  onOpenInRunView,
 }: {
   state: CanvasPageState;
   onSave?: (nodes: CanvasNode[]) => void;
@@ -2118,6 +2190,8 @@ function CanvasContent({
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
+  onNodeDoubleClick?: (nodeId: string) => void;
+  onOpenInRunView?: (eventId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
@@ -2300,7 +2374,9 @@ function CanvasContent({
         return;
       }
 
-      if (isPendingConnection && onPendingConnectionNodeClick) {
+      if (onNodeDoubleClick) {
+        // In run view, single click only selects the node visually.
+      } else if (isPendingConnection && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
@@ -2342,6 +2418,7 @@ function CanvasContent({
       onBuildingBlocksSidebarToggle,
       onPendingConnectionNodeClick,
       onTemplateNodeClick,
+      onNodeDoubleClick,
       setCurrentTab,
     ],
   );
@@ -2876,6 +2953,7 @@ function CanvasContent({
             onMove={handleMove}
             onInit={handleInit}
             deleteKeyCode={null}
+            onNodeDoubleClick={onNodeDoubleClick ? (_event, node) => onNodeDoubleClick(node.id) : undefined}
             onPaneClick={handlePaneClick}
             onSelectionStart={() => {
               setIsSelecting(true);
@@ -3246,6 +3324,7 @@ function CanvasContent({
           onRunNodeSelect={onRunNodeSelect}
           onRunExecutionSelect={onRunExecutionSelect}
           onAcknowledgeErrors={onAcknowledgeErrors}
+          onOpenInRunView={onOpenInRunView}
         />
       ) : null}
     </div>

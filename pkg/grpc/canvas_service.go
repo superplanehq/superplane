@@ -307,6 +307,10 @@ func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEve
 	return canvases.ListEventExecutions(ctx, s.registry, req.CanvasId, req.EventId)
 }
 
+func (s *CanvasService) DescribeRun(ctx context.Context, req *pb.DescribeRunRequest) (*pb.DescribeRunResponse, error) {
+	return canvases.DescribeRun(ctx, s.registry, req.CanvasId, req.EventId)
+}
+
 func (s *CanvasService) ListChildExecutions(ctx context.Context, req *pb.ListChildExecutionsRequest) (*pb.ListChildExecutionsResponse, error) {
 	canvasID, err := uuid.Parse(req.CanvasId)
 	if err != nil {

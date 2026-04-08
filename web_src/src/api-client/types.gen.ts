@@ -393,6 +393,12 @@ export type CanvasesDescribeCanvasVersionResponse = {
   version?: CanvasesCanvasVersion;
 };
 
+export type CanvasesDescribeRunResponse = {
+  run?: CanvasesCanvasEventWithExecutions;
+  snapshotVersion?: CanvasesCanvasVersion;
+  executions?: Array<CanvasesCanvasNodeExecution>;
+};
+
 export type CanvasesEmitNodeEventBody = {
   channel?: string;
   data?: {
@@ -2324,6 +2330,34 @@ export type CanvasesDeleteNodeQueueItemResponses = {
 
 export type CanvasesDeleteNodeQueueItemResponse2 =
   CanvasesDeleteNodeQueueItemResponses[keyof CanvasesDeleteNodeQueueItemResponses];
+
+export type CanvasesDescribeRunData = {
+  body?: never;
+  path: {
+    canvasId: string;
+    eventId: string;
+  };
+  query?: never;
+  url: "/api/v1/canvases/{canvasId}/runs/{eventId}";
+};
+
+export type CanvasesDescribeRunErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type CanvasesDescribeRunError = CanvasesDescribeRunErrors[keyof CanvasesDescribeRunErrors];
+
+export type CanvasesDescribeRunResponses = {
+  /**
+   * A successful response.
+   */
+  200: CanvasesDescribeRunResponse;
+};
+
+export type CanvasesDescribeRunResponse2 = CanvasesDescribeRunResponses[keyof CanvasesDescribeRunResponses];
 
 export type CanvasesInvokeNodeTriggerActionData = {
   body: CanvasesInvokeNodeTriggerActionBody;

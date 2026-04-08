@@ -66,6 +66,9 @@ import type {
   CanvasesDescribeCanvasVersionData,
   CanvasesDescribeCanvasVersionErrors,
   CanvasesDescribeCanvasVersionResponses,
+  CanvasesDescribeRunData,
+  CanvasesDescribeRunErrors,
+  CanvasesDescribeRunResponses,
   CanvasesEmitNodeEventData,
   CanvasesEmitNodeEventErrors,
   CanvasesEmitNodeEventResponses,
@@ -808,6 +811,19 @@ export const canvasesDeleteNodeQueueItem = <ThrowOnError extends boolean = true>
     CanvasesDeleteNodeQueueItemErrors,
     ThrowOnError
   >({ url: "/api/v1/canvases/{canvasId}/nodes/{nodeId}/queue/{itemId}", ...options });
+
+/**
+ * Describe run
+ *
+ * Returns run details including the canvas version snapshot and all node executions
+ */
+export const canvasesDescribeRun = <ThrowOnError extends boolean = true>(
+  options: Options<CanvasesDescribeRunData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<CanvasesDescribeRunResponses, CanvasesDescribeRunErrors, ThrowOnError>({
+    url: "/api/v1/canvases/{canvasId}/runs/{eventId}",
+    ...options,
+  });
 
 /**
  * Invoke trigger action

@@ -364,6 +364,17 @@ service Canvases {
     };
   }
 
+  rpc DescribeRun(DescribeRunRequest) returns (DescribeRunResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/runs/{event_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe run";
+      description: "Returns run details including the canvas version snapshot and all node executions";
+      tags: "CanvasEvent";
+    };
+  }
+
 }
 
 message ListCanvasesRequest {
@@ -883,6 +894,17 @@ message ListEventExecutionsRequest {
 
 message ListEventExecutionsResponse {
   repeated CanvasNodeExecution executions = 1;
+}
+
+message DescribeRunRequest {
+  string canvas_id = 1;
+  string event_id = 2;
+}
+
+message DescribeRunResponse {
+  CanvasEventWithExecutions run = 1;
+  CanvasVersion snapshot_version = 2;
+  repeated CanvasNodeExecution executions = 3;
 }
 
 message CancelExecutionRequest {

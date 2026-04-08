@@ -88,6 +88,7 @@ docs/CanvasesCreateCanvasVersionResponse.md
 docs/CanvasesDescribeCanvasChangeRequestResponse.md
 docs/CanvasesDescribeCanvasResponse.md
 docs/CanvasesDescribeCanvasVersionResponse.md
+docs/CanvasesDescribeRunResponse.md
 docs/CanvasesEmitNodeEventBody.md
 docs/CanvasesEmitNodeEventResponse.md
 docs/CanvasesInvokeNodeExecutionActionBody.md
@@ -326,6 +327,7 @@ model_canvases_create_canvas_version_response.go
 model_canvases_describe_canvas_change_request_response.go
 model_canvases_describe_canvas_response.go
 model_canvases_describe_canvas_version_response.go
+model_canvases_describe_run_response.go
 model_canvases_emit_node_event_body.go
 model_canvases_emit_node_event_response.go
 model_canvases_invoke_node_execution_action_body.go

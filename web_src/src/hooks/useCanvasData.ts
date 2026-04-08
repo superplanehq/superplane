@@ -27,6 +27,7 @@ import {
   triggersDescribeTrigger,
   widgetsListWidgets,
   widgetsDescribeWidget,
+  canvasesDescribeRun,
 } from "../api-client/sdk.gen";
 import type {
   CanvasesCanvas,
@@ -100,6 +101,7 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
+  run: (canvasId: string, eventId: string) => [...canvasKeys.all, "run", canvasId, eventId] as const,
 };
 
 export const triggerKeys = {
@@ -1109,6 +1111,23 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
     },
     initialPageParam: undefined as string | undefined,
     enabled: enabled && !!canvasId && !!nodeId,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useDescribeRun = (canvasId: string, eventId: string | null, enabled = true) => {
+  return useQuery({
+    queryKey: canvasKeys.run(canvasId, eventId || ""),
+    queryFn: async () => {
+      if (!eventId) return null;
+      const response = await canvasesDescribeRun(
+        withOrganizationHeader({
+          path: { canvasId, eventId },
+        }),
+      );
+      return response.data;
+    },
+    enabled: enabled && !!canvasId && !!eventId,
     refetchOnWindowFocus: false,
   });
 };

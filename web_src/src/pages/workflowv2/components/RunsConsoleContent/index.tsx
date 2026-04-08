@@ -57,6 +57,7 @@ export function RunsConsoleContent({
   nodeQueueItemsMap = {},
   onNodeSelect,
   onExecutionSelect,
+  onOpenInRunView,
 }: {
   events: CanvasesCanvasEventWithExecutions[];
   totalCount?: number;
@@ -74,6 +75,7 @@ export function RunsConsoleContent({
     executionId: string;
     triggerEvent?: SidebarEvent;
   }) => void;
+  onOpenInRunView?: (eventId: string) => void;
 }) {
   const [statusFilter, setStatusFilter] = useState<RunsStatusFilter>("all");
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
@@ -137,6 +139,7 @@ export function RunsConsoleContent({
                 onToggle={() => toggleRun(event.id || "")}
                 onNodeSelect={onNodeSelect}
                 onExecutionSelect={onExecutionSelect}
+                onOpenInRunView={onOpenInRunView}
               />
             ))}
             {hasNextPage && statusFilter === "all" && !searchQuery.trim() && (

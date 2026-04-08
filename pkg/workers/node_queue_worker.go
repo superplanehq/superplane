@@ -356,6 +356,10 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		UpdatedAt:           &now,
 	}
 
+	if canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, configErr.QueueItem.WorkflowID); err == nil && canvas.LiveVersionID != nil {
+		execution.CanvasVersionID = canvas.LiveVersionID
+	}
+
 	err = tx.Create(&execution).Error
 	if err != nil {
 		return nil, err

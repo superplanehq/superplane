@@ -106,6 +106,10 @@ func BuildProcessQueueContext(
 			UpdatedAt:           &now,
 		}
 
+		if canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, queueItem.WorkflowID); err == nil && canvas.LiveVersionID != nil {
+			execution.CanvasVersionID = canvas.LiveVersionID
+		}
+
 		// If this queue item originated from an internal (blueprint) execution chain,
 		// propagate the parent execution id from the previous execution so that
 		// child executions are linked to the top-level blueprint execution.

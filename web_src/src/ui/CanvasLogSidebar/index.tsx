@@ -72,6 +72,7 @@ export interface CanvasLogSidebarProps {
     triggerEvent?: SidebarEvent;
   }) => void;
   onAcknowledgeErrors?: (executionIds: string[]) => void;
+  onOpenInRunView?: (eventId: string) => void;
 }
 
 function formatLogTimestamp(value: string) {
@@ -118,6 +119,7 @@ export function CanvasLogSidebar({
   onRunNodeSelect,
   onRunExecutionSelect,
   onAcknowledgeErrors,
+  onOpenInRunView,
 }: CanvasLogSidebarProps) {
   const [internalTab, setInternalTab] = useState<ConsoleTab>("runs");
   const activeTab = controlledTab ?? internalTab;
@@ -392,6 +394,7 @@ export function CanvasLogSidebar({
             nodeQueueItemsMap={runsNodeQueueItemsMap}
             onNodeSelect={onRunNodeSelect}
             onExecutionSelect={onRunExecutionSelect}
+            onOpenInRunView={onOpenInRunView}
           />
         ) : activeTab === "errors" ? (
           <ErrorsConsoleContent

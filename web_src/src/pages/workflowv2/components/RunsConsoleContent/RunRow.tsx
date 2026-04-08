@@ -12,8 +12,9 @@ import { useQuery } from "@tanstack/react-query";
 import { eventExecutionsQueryOptions } from "@/hooks/useCanvasData";
 import { RunRowHeader } from "./RunRowHeader";
 import { ExecutionRow } from "./ExecutionRow";
-import { Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { QueueItemRow } from "./QueueItemRow";
+import { Button } from "@/components/ui/button";
 
 export function RunRow({
   event,
@@ -24,6 +25,7 @@ export function RunRow({
   onToggle,
   onNodeSelect,
   onExecutionSelect,
+  onOpenInRunView,
 }: {
   event: CanvasesCanvasEventWithExecutions;
   nodes: ComponentsNode[];
@@ -38,6 +40,7 @@ export function RunRow({
     executionId: string;
     triggerEvent?: SidebarEvent;
   }) => void;
+  onOpenInRunView?: (eventId: string) => void;
 }) {
   const canvasId = event.canvasId || "";
   const eventId = event.id || "";
@@ -88,6 +91,19 @@ export function RunRow({
       />
       {isExpanded && (executionRefs.length > 0 || queueItems.length > 0) && (
         <div className="bg-gray-50">
+          {onOpenInRunView && event.id ? (
+            <div className="flex items-center border-t border-gray-200 px-4 py-1.5 pl-11">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 gap-1 text-xs text-blue-600 hover:text-blue-700"
+                onClick={() => onOpenInRunView(event.id!)}
+              >
+                <ExternalLink className="h-3 w-3" />
+                Open in Run View
+              </Button>
+            </div>
+          ) : null}
           {executionDetailsQuery.isPending && executionRefs.length > 0 && (
             <div className="flex items-center gap-2 px-4 py-2 pl-11 text-xs text-gray-500 border-t border-gray-200">
               <Loader2 className="h-3 w-3 animate-spin" />

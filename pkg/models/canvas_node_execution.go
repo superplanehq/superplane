@@ -84,6 +84,10 @@ type CanvasNodeExecution struct {
 	// Only new executions will use the new node configuration.
 	//
 	Configuration datatypes.JSONType[map[string]any]
+
+	// Reference to the canvas version that was live when this execution was created.
+	// Used to reconstruct the graph snapshot for run view.
+	CanvasVersionID *uuid.UUID
 }
 
 func (e *CanvasNodeExecution) TableName() string {
@@ -117,6 +121,7 @@ func CreatePendingChildExecution(tx *gorm.DB, parent *CanvasNodeExecution, child
 		NodeID:              fmt.Sprintf("%s:%s", parent.NodeID, childNodeID),
 		State:               CanvasNodeExecutionStatePending,
 		Configuration:       datatypes.NewJSONType(config),
+		CanvasVersionID:     parent.CanvasVersionID,
 		CreatedAt:           &now,
 		UpdatedAt:           &now,
 	}

@@ -1356,6 +1356,44 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasId}/runs/{eventId}": {
+      "get": {
+        "summary": "Describe run",
+        "description": "Returns run details including the canvas version snapshot and all node executions",
+        "operationId": "Canvases_DescribeRun",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/CanvasesDescribeRunResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "CanvasEvent"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasId}/triggers/{nodeId}/actions/{actionName}": {
       "post": {
         "summary": "Invoke trigger action",
@@ -4901,6 +4939,24 @@
       "properties": {
         "version": {
           "$ref": "#/definitions/CanvasesCanvasVersion"
+        }
+      }
+    },
+    "CanvasesDescribeRunResponse": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/CanvasesCanvasEventWithExecutions"
+        },
+        "snapshotVersion": {
+          "$ref": "#/definitions/CanvasesCanvasVersion"
+        },
+        "executions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/CanvasesCanvasNodeExecution"
+          }
         }
       }
     },
