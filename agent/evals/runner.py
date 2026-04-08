@@ -74,6 +74,7 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
             model=env["model"],
             run_usages=run_usages,
             evaluate_wall_seconds=evaluate_wall_seconds,
+            case_names=case_names,
             interaction_log_paths_by_case_name=case_logger.display_paths_by_case_name,
         ).render()
     finally:
