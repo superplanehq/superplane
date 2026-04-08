@@ -52,7 +52,7 @@ Returns the full knowledge base object including:
 - **projectId**, **projectName** — associated project
 - **database** — OpenSearch database object with id, name, and status
 - **dataSources** — array of all attached data sources with type and source details
-- **lastIndexingJob** — full indexing job details: status, phase, tokens, data source progress, timing, and report availability
+- **lastIndexingJob** — full indexing job details: status, phase, totalTokens, data source progress, timing, and report availability
 - **createdAt**, **updatedAt** — timestamps`
 }
 
@@ -157,7 +157,6 @@ func buildGetKBOutput(kb *KnowledgeBase) map[string]any {
 			"uuid":                 kb.LastIndexingJob.UUID,
 			"status":               kb.LastIndexingJob.Status,
 			"phase":                kb.LastIndexingJob.Phase,
-			"tokens":               kb.LastIndexingJob.Tokens,
 			"totalTokens":          kb.LastIndexingJob.TotalTokens,
 			"completedDataSources": kb.LastIndexingJob.CompletedDataSources,
 			"totalDataSources":     kb.LastIndexingJob.TotalDataSources,

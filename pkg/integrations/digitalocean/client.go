@@ -2499,7 +2499,7 @@ type IndexJob struct {
 
 // StartIndexingJob triggers a new indexing job for a knowledge base
 func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
-	url := fmt.Sprintf("%s/gen-ai/index_jobs", c.BaseURL)
+	url := fmt.Sprintf("%s/gen-ai/indexing_jobs", c.BaseURL)
 
 	body, err := json.Marshal(map[string]string{"knowledge_base_uuid": kbUUID})
 	if err != nil {
@@ -2512,14 +2512,14 @@ func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
 	}
 
 	var response struct {
-		IndexJob IndexJob `json:"index_job"`
+		Job IndexJob `json:"job"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
-	return &response.IndexJob, nil
+	return &response.Job, nil
 }
 
 // KBDataSourceInfo represents a data source returned by the list data sources endpoint.

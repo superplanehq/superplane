@@ -201,7 +201,6 @@ func Test__GetKnowledgeBase__Execute(t *testing.T) {
 		job := data["lastIndexingJob"].(map[string]any)
 		assert.Equal(t, "INDEX_JOB_STATUS_COMPLETED", job["status"])
 		assert.Equal(t, "BATCH_JOB_PHASE_COMPLETE", job["phase"])
-		assert.Equal(t, 123, job["tokens"])
 		assert.Equal(t, "12345", job["totalTokens"])
 		assert.Equal(t, 2, job["completedDataSources"])
 		assert.Equal(t, 2, job["totalDataSources"])

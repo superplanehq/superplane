@@ -26,6 +26,7 @@ import { deleteAppMapper } from "./delete_app";
 import { updateAppMapper } from "./update_app";
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { getKnowledgeBaseMapper } from "./get_knowledge_base";
+import { indexKnowledgeBaseMapper } from "./index_knowledge_base";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
 import { detachKnowledgeBaseMapper } from "./detach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
@@ -60,6 +61,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateApp: updateAppMapper,
   createKnowledgeBase: createKnowledgeBaseMapper,
   getKnowledgeBase: getKnowledgeBaseMapper,
+  indexKnowledgeBase: indexKnowledgeBaseMapper,
   attachKnowledgeBase: attachKnowledgeBaseMapper,
   detachKnowledgeBase: detachKnowledgeBaseMapper,
   deleteKnowledgeBase: deleteKnowledgeBaseMapper,
@@ -96,6 +98,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateApp: buildActionStateRegistry("updated"),
   createKnowledgeBase: buildActionStateRegistry("created"),
   getKnowledgeBase: buildActionStateRegistry("fetched"),
+  indexKnowledgeBase: buildActionStateRegistry("indexed"),
   attachKnowledgeBase: buildActionStateRegistry("attached"),
   detachKnowledgeBase: buildActionStateRegistry("detached"),
   deleteKnowledgeBase: buildActionStateRegistry("deleted"),

@@ -239,6 +239,15 @@ export interface GetKnowledgeBaseConfiguration {
   knowledgeBase: string;
 }
 
+export interface IndexKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface IndexKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
 export interface KBNodeMetadata {
   agentId?: string;
   agentName?: string;

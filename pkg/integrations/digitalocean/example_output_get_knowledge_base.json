@@ -37,7 +37,6 @@
       "uuid": "b2c3d4e5-0000-0000-0000-000000000001",
       "status": "INDEX_JOB_STATUS_COMPLETED",
       "phase": "BATCH_JOB_PHASE_COMPLETE",
-      "tokens": 123,
       "totalTokens": "12345",
       "completedDataSources": 2,
       "totalDataSources": 2,
