@@ -5,7 +5,6 @@ import type { CanvasPageProps } from ".";
 import type { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
-  title: string;
   breadcrumbs: BreadcrumbItem[];
 
   nodes: Node[];
@@ -261,7 +260,6 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const componentSidebar = useComponentSidebarState(props.initialSidebar, props.onSidebarChange);
 
   return {
-    title: props.title || "Untitled Workflow",
     breadcrumbs: props.breadcrumbs || [{ label: "Workflows" }, { label: props.title || "Untitled Workflow" }],
     nodes,
     componentSidebar,
