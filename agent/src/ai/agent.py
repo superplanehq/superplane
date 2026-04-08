@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
@@ -352,11 +352,12 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         or when only events matter. Keep limit modest (default 10).
         """
         try:
-            return ctx.deps.client.list_node_events(
+            events = ctx.deps.client.list_node_events(
                 ctx.deps.canvas_id,
                 node_id,
                 limit=limit,
             )
+            return cast(list[NodeEvent | dict[str, Any]], events)
         except Exception as error:
             _tool_debug(f"list_node_events failed for {node_id}: {error}")
             return [_tool_failure("list_node_events", str(error), node_id=node_id)]
@@ -374,12 +375,13 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         API enum values such as RESULT_FAILED. Default limit is 10.
         """
         try:
-            return ctx.deps.client.list_node_executions(
+            executions = ctx.deps.client.list_node_executions(
                 ctx.deps.canvas_id,
                 node_id,
                 limit=limit,
                 results=results,
             )
+            return cast(list[NodeExecution | dict[str, Any]], executions)
         except Exception as error:
             _tool_debug(f"list_node_executions failed for {node_id}: {error}")
             return [_tool_failure("list_node_executions", str(error), node_id=node_id)]
