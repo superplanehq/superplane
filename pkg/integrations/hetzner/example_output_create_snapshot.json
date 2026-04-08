@@ -1,0 +1,11 @@
+{
+  "type": "hetzner.snapshot.created",
+  "data": {
+    "actionId": "12345",
+    "imageId": 67890,
+    "imageType": "snapshot",
+    "serverId": "42",
+    "snapshotName": "workflow-snapshot"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
