@@ -3,17 +3,79 @@ package canvases
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-func newInitCommandContext(t *testing.T, outputFormat string) (core.CommandContext, *bytes.Buffer) {
+const templatesListResponse = `{
+	"canvases": [
+		{
+			"metadata": {
+				"id": "tpl-001",
+				"name": "Health Check Monitor",
+				"description": "Monitor any endpoint and get notified when it goes down.",
+				"isTemplate": true
+			},
+			"spec": {
+				"nodes": [
+					{"id": "trigger-001", "name": "Check every 10 minutes", "type": "TYPE_TRIGGER"},
+					{"id": "http-001", "name": "Health check request", "type": "TYPE_COMPONENT"}
+				],
+				"edges": [
+					{"sourceId": "trigger-001", "targetId": "http-001", "channel": "default"}
+				]
+			}
+		},
+		{
+			"metadata": {
+				"id": "tpl-002",
+				"name": "Staged Release",
+				"description": "Gradually roll out releases through stages.",
+				"isTemplate": true
+			},
+			"spec": {
+				"nodes": [
+					{"id": "trigger-002", "name": "On release", "type": "TYPE_TRIGGER"}
+				],
+				"edges": []
+			}
+		},
+		{
+			"metadata": {
+				"id": "canvas-001",
+				"name": "My Canvas",
+				"description": "A regular canvas",
+				"isTemplate": false
+			},
+			"spec": {
+				"nodes": [],
+				"edges": []
+			}
+		}
+	]
+}`
+
+func newTemplatesServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/v1/canvases", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(templatesListResponse))
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func newInitCommandContext(t *testing.T, server *httptest.Server, outputFormat string) (core.CommandContext, *bytes.Buffer) {
 	t.Helper()
 
 	stdout := bytes.NewBuffer(nil)
@@ -23,15 +85,25 @@ func newInitCommandContext(t *testing.T, outputFormat string) (core.CommandConte
 	cobraCmd := &cobra.Command{}
 	cobraCmd.SetOut(stdout)
 
-	return core.CommandContext{
+	ctx := core.CommandContext{
 		Context:  context.Background(),
 		Cmd:      cobraCmd,
 		Renderer: renderer,
-	}, stdout
+	}
+
+	if server != nil {
+		config := openapi_client.NewConfiguration()
+		config.Servers = openapi_client.ServerConfigurations{
+			{URL: server.URL},
+		}
+		ctx.API = openapi_client.NewAPIClient(config)
+	}
+
+	return ctx, stdout
 }
 
 func TestInitBlankCanvasOutputsValidYAML(t *testing.T) {
-	ctx, stdout := newInitCommandContext(t, "text")
+	ctx, stdout := newInitCommandContext(t, nil, "text")
 	template := ""
 	listTemplates := false
 	outputFile := ""
@@ -53,8 +125,9 @@ func TestInitBlankCanvasOutputsValidYAML(t *testing.T) {
 }
 
 func TestInitWithTemplateOutputsTemplateContent(t *testing.T) {
-	ctx, stdout := newInitCommandContext(t, "text")
-	template := "health-check-monitor"
+	server := newTemplatesServer(t)
+	ctx, stdout := newInitCommandContext(t, server, "text")
+	template := "Health Check Monitor"
 	listTemplates := false
 	outputFile := ""
 
@@ -67,15 +140,14 @@ func TestInitWithTemplateOutputsTemplateContent(t *testing.T) {
 	require.NoError(t, err)
 
 	output := stdout.String()
-	require.Contains(t, output, "apiVersion: v1")
-	require.Contains(t, output, "kind: Canvas")
-	require.Contains(t, output, `name: "Health Check Monitor"`)
-	require.Contains(t, output, "TYPE_TRIGGER")
-	require.Contains(t, output, "TYPE_COMPONENT")
+	require.Contains(t, output, "Health Check Monitor")
+	require.Contains(t, output, "trigger-001")
+	require.Contains(t, output, "http-001")
 }
 
 func TestInitWithInvalidTemplateReturnsError(t *testing.T) {
-	ctx, _ := newInitCommandContext(t, "text")
+	server := newTemplatesServer(t)
+	ctx, _ := newInitCommandContext(t, server, "text")
 	template := "nonexistent"
 	listTemplates := false
 	outputFile := ""
@@ -88,11 +160,12 @@ func TestInitWithInvalidTemplateReturnsError(t *testing.T) {
 
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `template "nonexistent" not found`)
-	require.Contains(t, err.Error(), "health-check-monitor")
+	require.Contains(t, err.Error(), "Health Check Monitor")
 }
 
-func TestInitListTemplatesShowsAllTemplates(t *testing.T) {
-	ctx, stdout := newInitCommandContext(t, "text")
+func TestInitListTemplatesShowsOnlyTemplates(t *testing.T) {
+	server := newTemplatesServer(t)
+	ctx, stdout := newInitCommandContext(t, server, "text")
 	template := ""
 	listTemplates := true
 	outputFile := ""
@@ -106,17 +179,14 @@ func TestInitListTemplatesShowsAllTemplates(t *testing.T) {
 	require.NoError(t, err)
 
 	output := stdout.String()
-	require.Contains(t, output, "health-check-monitor")
-	require.Contains(t, output, "automated-rollback")
-	require.Contains(t, output, "staged-release")
-	require.Contains(t, output, "incident-router")
-	require.Contains(t, output, "incident-data-collection")
-	require.Contains(t, output, "policy-gated-deployment")
-	require.Contains(t, output, "multi-repo-ci-and-release")
+	require.Contains(t, output, "Health Check Monitor")
+	require.Contains(t, output, "Staged Release")
+	require.NotContains(t, output, "My Canvas")
 }
 
 func TestInitListTemplatesJSON(t *testing.T) {
-	ctx, stdout := newInitCommandContext(t, "json")
+	server := newTemplatesServer(t)
+	ctx, stdout := newInitCommandContext(t, server, "json")
 	template := ""
 	listTemplates := true
 	outputFile := ""
@@ -130,12 +200,13 @@ func TestInitListTemplatesJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	output := stdout.String()
-	require.Contains(t, output, `"name": "health-check-monitor"`)
-	require.Contains(t, output, `"title": "Health Check Monitor"`)
+	require.Contains(t, output, `"name": "Health Check Monitor"`)
+	require.Contains(t, output, `"name": "Staged Release"`)
+	require.NotContains(t, output, "My Canvas")
 }
 
 func TestInitWritesToFileWithOutputFlag(t *testing.T) {
-	ctx, _ := newInitCommandContext(t, "text")
+	ctx, _ := newInitCommandContext(t, nil, "text")
 	template := ""
 	listTemplates := false
 	outputPath := filepath.Join(t.TempDir(), "canvas.yaml")
@@ -158,7 +229,7 @@ func TestInitWritesToFileWithOutputFlag(t *testing.T) {
 }
 
 func TestInitErrorsWhenOutputFileExists(t *testing.T) {
-	ctx, _ := newInitCommandContext(t, "text")
+	ctx, _ := newInitCommandContext(t, nil, "text")
 	template := ""
 	listTemplates := false
 	outputPath := filepath.Join(t.TempDir(), "canvas.yaml")
@@ -181,8 +252,9 @@ func TestInitErrorsWhenOutputFileExists(t *testing.T) {
 }
 
 func TestInitTemplateToFile(t *testing.T) {
-	ctx, _ := newInitCommandContext(t, "text")
-	template := "health-check-monitor"
+	server := newTemplatesServer(t)
+	ctx, _ := newInitCommandContext(t, server, "text")
+	template := "Health Check Monitor"
 	listTemplates := false
 	outputPath := filepath.Join(t.TempDir(), "hc.yaml")
 
@@ -198,31 +270,6 @@ func TestInitTemplateToFile(t *testing.T) {
 	require.NoError(t, err)
 
 	content := string(data)
-	require.Contains(t, content, "apiVersion: v1")
-	require.Contains(t, content, `name: "Health Check Monitor"`)
-}
-
-func TestLoadTemplateEntries(t *testing.T) {
-	entries, err := loadTemplateEntries()
-	require.NoError(t, err)
-	require.NotEmpty(t, entries)
-
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		names = append(names, e.key)
-		require.NotEmpty(t, e.name, "template %s should have a name", e.key)
-		require.NotEmpty(t, e.description, "template %s should have a description", e.key)
-	}
-
-	require.True(t, contains(names, "health-check-monitor"))
-	require.True(t, contains(names, "automated-rollback"))
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if strings.EqualFold(s, item) {
-			return true
-		}
-	}
-	return false
+	require.Contains(t, content, "Health Check Monitor")
+	require.Contains(t, content, "trigger-001")
 }

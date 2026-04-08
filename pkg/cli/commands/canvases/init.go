@@ -3,14 +3,14 @@ package canvases
 import (
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/ghodss/yaml"
+	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	canvastemplates "github.com/superplanehq/superplane/templates/canvases"
-	"gopkg.in/yaml.v3"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 const blankCanvasYAML = `apiVersion: v1
@@ -45,21 +45,37 @@ func (c *initCommand) executeBlank(ctx core.CommandContext) error {
 }
 
 func (c *initCommand) executeTemplate(ctx core.CommandContext, name string) error {
-	filename := name + ".yaml"
-	data, err := canvastemplates.FS.ReadFile(filename)
+	templates, err := fetchTemplates(ctx)
 	if err != nil {
-		available, listErr := listTemplateNames()
-		if listErr != nil {
-			return fmt.Errorf("template %q not found", name)
+		return err
+	}
+
+	var match *openapi_client.CanvasesCanvas
+	var available []string
+	for i, t := range templates {
+		metadata := t.GetMetadata()
+		templateName := metadata.GetName()
+		available = append(available, templateName)
+		if strings.EqualFold(templateName, name) {
+			match = &templates[i]
 		}
+	}
+
+	if match == nil {
 		return fmt.Errorf("template %q not found; available templates: %s", name, strings.Join(available, ", "))
+	}
+
+	resource := models.CanvasResourceFromCanvas(*match)
+	data, err := yaml.Marshal(resource)
+	if err != nil {
+		return fmt.Errorf("failed to marshal template: %w", err)
 	}
 
 	return c.output(ctx, data)
 }
 
 func (c *initCommand) executeListTemplates(ctx core.CommandContext) error {
-	templates, err := loadTemplateEntries()
+	templates, err := fetchTemplates(ctx)
 	if err != nil {
 		return err
 	}
@@ -67,10 +83,10 @@ func (c *initCommand) executeListTemplates(ctx core.CommandContext) error {
 	if !ctx.Renderer.IsText() {
 		summaries := make([]map[string]string, 0, len(templates))
 		for _, t := range templates {
+			metadata := t.GetMetadata()
 			summaries = append(summaries, map[string]string{
-				"name":        t.key,
-				"title":       t.name,
-				"description": t.description,
+				"name":        metadata.GetName(),
+				"description": metadata.GetDescription(),
 			})
 		}
 		return ctx.Renderer.Render(summaries)
@@ -85,7 +101,8 @@ func (c *initCommand) executeListTemplates(ctx core.CommandContext) error {
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "NAME\tDESCRIPTION")
 		for _, t := range templates {
-			_, _ = fmt.Fprintf(writer, "%s\t%s\n", t.key, t.description)
+			metadata := t.GetMetadata()
+			_, _ = fmt.Fprintf(writer, "%s\t%s\n", metadata.GetName(), metadata.GetDescription())
 		}
 		return writer.Flush()
 	})
@@ -114,73 +131,21 @@ func (c *initCommand) writeToFile(path string, data []byte) error {
 	return nil
 }
 
-type templateEntry struct {
-	key         string
-	name        string
-	description string
-}
-
-func listTemplateNames() ([]string, error) {
-	entries, err := loadTemplateEntries()
+func fetchTemplates(ctx core.CommandContext) ([]openapi_client.CanvasesCanvas, error) {
+	response, _, err := ctx.API.CanvasAPI.
+		CanvasesListCanvases(ctx.Context).
+		IncludeTemplates(true).
+		Execute()
 	if err != nil {
 		return nil, err
 	}
 
-	names := make([]string, 0, len(entries))
-	for _, e := range entries {
-		names = append(names, e.key)
-	}
-	return names, nil
-}
-
-func loadTemplateEntries() ([]templateEntry, error) {
-	entries, err := fs.ReadDir(canvastemplates.FS, ".")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read embedded templates: %w", err)
-	}
-
-	var templates []templateEntry
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".yaml") {
-			continue
+	var templates []openapi_client.CanvasesCanvas
+	for _, canvas := range response.GetCanvases() {
+		if canvas.Metadata != nil && canvas.Metadata.GetIsTemplate() {
+			templates = append(templates, canvas)
 		}
-
-		data, err := canvastemplates.FS.ReadFile(entry.Name())
-		if err != nil {
-			continue
-		}
-
-		meta := parseTemplateMetadata(data)
-		key := strings.TrimSuffix(entry.Name(), ".yaml")
-		templates = append(templates, templateEntry{
-			key:         key,
-			name:        meta.name,
-			description: meta.description,
-		})
 	}
 
 	return templates, nil
-}
-
-type templateMetadata struct {
-	name        string
-	description string
-}
-
-func parseTemplateMetadata(data []byte) templateMetadata {
-	var raw struct {
-		Metadata struct {
-			Name        string `yaml:"name"`
-			Description string `yaml:"description"`
-		} `yaml:"metadata"`
-	}
-
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return templateMetadata{}
-	}
-
-	return templateMetadata{
-		name:        raw.Metadata.Name,
-		description: raw.Metadata.Description,
-	}
 }
