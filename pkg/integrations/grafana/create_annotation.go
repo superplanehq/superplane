@@ -59,8 +59,8 @@ func (c *CreateAnnotation) Documentation() string {
 - **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
 - **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
 - **Panel ID**: Optional panel ID within the dashboard to attach the annotation to
-- **Time**: Optional start time (defaults to now if omitted). Supports absolute values like ` + "`2026-04-08T15:30`" + ` or relative Grafana values like ` + "`now+2h`" + `
-- **Time End**: Optional end time — providing this creates a region annotation spanning the window. Supports absolute or relative Grafana values
+	- **Time**: Optional start time (defaults to now if omitted). Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` or relative Grafana values like ` + "`now+2h`" + `
+	- **Time End**: Optional end time — providing this creates a region annotation spanning the window. Supports absolute values with an explicit timezone or relative Grafana values
 
 ## Output
 
@@ -130,7 +130,7 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Annotation start time (defaults to now if omitted)",
-			Placeholder: "now, now+2h, or 2026-04-08T15:30",
+			Placeholder: "now, now+2h, or 2026-04-08T15:30Z",
 		},
 		{
 			Name:        "timeEnd",
@@ -138,7 +138,7 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Annotation end time — providing this creates a region annotation",
-			Placeholder: "now+2h or 2026-04-08T17:30",
+			Placeholder: "now+2h or 2026-04-08T17:30Z",
 		},
 	}
 }
@@ -279,7 +279,7 @@ func validateAnnotationTimeRangeMS(timeMS, timeEndMS int64) error {
 }
 
 // parseAnnotationTime accepts Unix milliseconds, RFC3339, RFC3339Nano,
-// local wall time "2006-01-02T15:04", or relative Grafana values like "now+2h".
+// or relative Grafana values like "now+2h".
 func parseAnnotationTime(s string) (time.Time, error) {
 	trimmed := strings.TrimSpace(s)
 	if trimmed == "" {
@@ -296,13 +296,13 @@ func parseAnnotationTime(s string) (time.Time, error) {
 		return time.UnixMilli(ms).UTC(), nil
 	}
 
-	if t, err := time.Parse(time.RFC3339, trimmed); err == nil {
+	if t, ok, err := parseGrafanaQueryTime(trimmed, nil); err != nil {
+		return time.Time{}, err
+	} else if ok {
 		return t, nil
 	}
-	if t, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
-		return t, nil
-	}
-	return time.ParseInLocation(grafanaDateTimeFormat, trimmed, time.Local)
+
+	return time.Time{}, fmt.Errorf("unsupported time value %q", trimmed)
 }
 
 func parseRelativeAnnotationTime(value string, now time.Time) (time.Time, bool, error) {

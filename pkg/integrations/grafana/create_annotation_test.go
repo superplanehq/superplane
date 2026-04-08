@@ -76,6 +76,17 @@ func Test__parseRelativeAnnotationTime__invalidUnit(t *testing.T) {
 	require.True(t, ok)
 }
 
+func Test__parseAnnotationTime__requiresExplicitTimezoneForLocalDateTime(t *testing.T) {
+	_, err := parseAnnotationTime("2026-04-08T15:30")
+	require.ErrorContains(t, err, "timezone is required for datetime-local values")
+}
+
+func Test__parseAnnotationTime__acceptsRFC3339(t *testing.T) {
+	parsed, err := parseAnnotationTime("2026-04-08T15:30:00Z")
+	require.NoError(t, err)
+	require.Equal(t, time.Date(2026, time.April, 8, 15, 30, 0, 0, time.UTC), parsed.UTC())
+}
+
 func Test__buildAnnotationURL(t *testing.T) {
 	panelID := int64(7)
 	url := buildAnnotationURL(

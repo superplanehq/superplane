@@ -51,7 +51,7 @@ func (l *ListAnnotations) Documentation() string {
 
 - **Tags**: Filter to annotations matching all of the specified tags (optional)
 - **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
-- **From / To**: Time range filter as datetime values (optional)
+	- **From / To**: Time range filter as relative Grafana values like ` + "`now-1h`" + ` or absolute values with an explicit timezone like ` + "`2026-04-08T15:30Z`" + ` (optional)
 - **Limit**: Maximum number of annotations to return (optional)
 
 ## Output
@@ -104,26 +104,18 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 		{
 			Name:        "from",
 			Label:       "From",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Return annotations at or after this time",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Placeholder: "now-1h or 2026-04-08T15:30Z",
 		},
 		{
 			Name:        "to",
 			Label:       "To",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Return annotations at or before this time",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Placeholder: "now or 2026-04-08T17:30Z",
 		},
 		{
 			Name:        "limit",
