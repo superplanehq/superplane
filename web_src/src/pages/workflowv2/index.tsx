@@ -73,6 +73,7 @@ import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } f
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { NodeDetailPanel } from "@/ui/NodeDetailPanel";
+import { RunSummary } from "@/ui/RunSummary";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { getColorClass } from "@/lib/colors";
@@ -535,7 +536,7 @@ export function WorkflowPageV2() {
   const initialRunId = searchParams.get("run");
   const [isRunViewActive, setIsRunViewActive] = useState(!!initialRunId);
   const [selectedRunEventId, setSelectedRunEventId] = useState<string | null>(initialRunId);
-  const [showFullRunCanvas, setShowFullRunCanvas] = useState(false);
+  const [runSubView, setRunSubView] = useState<"summary" | "canvas">("summary");
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runsSeenCount, setRunsSeenCount] = useState(0);
   const describeRunQuery = useDescribeRun(canvasId || "", selectedRunEventId, isRunViewActive);
@@ -1851,20 +1852,10 @@ export function WorkflowPageV2() {
       me ? { id: me.id || "", email: me.email || "", roles: me.roles || [] } : undefined,
     );
 
-    if (!showFullRunCanvas) {
-      const filteredNodes = prepared.nodes.filter((n) => runExecutionNodeIds.has(n.id));
-      const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
-      const filteredEdges = prepared.edges.filter(
-        (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target),
-      );
-      return { nodes: filteredNodes, edges: filteredEdges, executionNodeIds: runExecutionNodeIds };
-    }
-
-    const dimmedNodes = prepared.nodes.map((n) => ({
-      ...n,
-      className: runExecutionNodeIds.has(n.id) ? n.className : `${n.className || ""} opacity-30`,
-    }));
-    return { nodes: dimmedNodes, edges: prepared.edges, executionNodeIds: runExecutionNodeIds };
+    const filteredNodes = prepared.nodes.filter((n) => runExecutionNodeIds.has(n.id));
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredEdges = prepared.edges.filter((e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target));
+    return { nodes: filteredNodes, edges: filteredEdges, executionNodeIds: runExecutionNodeIds };
   }, [
     isRunViewActive,
     describeRunQuery.data,
@@ -1880,7 +1871,6 @@ export function WorkflowPageV2() {
     queryClient,
     organizationId,
     me,
-    showFullRunCanvas,
   ]);
 
   const nodes = isRunViewActive && runViewData ? runViewData.nodes : nodesWithIntegrationStatus;
@@ -5773,30 +5763,54 @@ export function WorkflowPageV2() {
                 isFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
                 onLoadMore={() => infiniteEventsQuery.fetchNextPage()}
                 isLoading={infiniteEventsQuery.isLoading}
+                workflowNodes={canvas?.spec?.nodes || []}
+                componentIconMap={componentIconMap}
+                totalCount={runsEventsData.totalCount}
               />
             ) : undefined
           }
           runViewOverlay={
             isRunViewActive ? (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 shadow-md text-xs">
-                  <span className="text-gray-600 font-medium">
-                    {showFullRunCanvas ? "Full canvas" : "Run path only"}
-                  </span>
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
+                <div className="inline-flex rounded-lg border border-slate-200 bg-white shadow-md text-xs overflow-hidden">
                   <button
                     type="button"
-                    onClick={() => setShowFullRunCanvas((v) => !v)}
-                    className="rounded border border-slate-200 px-2 py-0.5 text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setRunSubView("summary")}
+                    className={`px-3 py-1.5 font-medium transition-colors ${
+                      runSubView === "summary" ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-50"
+                    }`}
                   >
-                    {showFullRunCanvas ? "Show run path only" : "Show full canvas"}
+                    Summary
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRunSubView("canvas")}
+                    className={`px-3 py-1.5 font-medium transition-colors ${
+                      runSubView === "canvas" ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-50"
+                    }`}
+                  >
+                    Canvas
                   </button>
                 </div>
               </div>
             ) : undefined
           }
-          onRunViewNodeDoubleClick={isRunViewActive ? (nodeId: string) => setRunDetailNodeId(nodeId) : undefined}
+          runSummaryContent={
+            isRunViewActive && runSubView === "summary" && describeRunQuery.data ? (
+              <RunSummary
+                runData={describeRunQuery.data}
+                workflowNodes={describeRunQuery.data.snapshotVersion?.spec?.nodes}
+                componentIconMap={componentIconMap}
+              />
+            ) : undefined
+          }
+          onRunViewNodeClick={
+            isRunViewActive && runSubView === "canvas" ? (nodeId: string) => setRunDetailNodeId(nodeId) : undefined
+          }
+          runViewSelectedNodeId={isRunViewActive && runSubView === "canvas" ? runDetailNodeId : null}
+          fitViewKey={isRunViewActive && runSubView === "canvas" ? selectedRunEventId : null}
           runDetailPanel={
-            isRunViewActive && runDetailNodeId && describeRunQuery.data ? (
+            isRunViewActive && runSubView === "canvas" && runDetailNodeId && describeRunQuery.data ? (
               <NodeDetailPanel
                 nodeId={runDetailNodeId}
                 runData={describeRunQuery.data}

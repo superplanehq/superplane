@@ -1,9 +1,11 @@
+import React, { useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasNodeExecution, CanvasesDescribeRunResponse, ComponentsNode } from "@/api-client";
-import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
-import { cn, flattenObject } from "@/lib/utils";
+import { cn, resolveIcon, flattenObject } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useMemo } from "react";
+import { TimeAgo } from "@/components/TimeAgo";
+import { getExecutionDetails } from "@/pages/workflowv2/mappers";
+import JsonView from "@uiw/react-json-view";
 
 interface NodeDetailPanelProps {
   nodeId: string;
@@ -11,9 +13,10 @@ interface NodeDetailPanelProps {
   workflowNodes?: ComponentsNode[];
   onClose: () => void;
   onNavigateNode?: (nodeId: string) => void;
-  onOpenInRunView?: (eventId: string) => void;
   isRunView?: boolean;
 }
+
+type TabKey = "current" | "payload" | "configuration";
 
 function ExecutionStatusBadge({ execution }: { execution: CanvasesCanvasNodeExecution }) {
   const state = execution.state;
@@ -49,25 +52,107 @@ function ExecutionStatusBadge({ execution }: { execution: CanvasesCanvasNodeExec
   );
 }
 
-function DataSection({ title, data }: { title: string; data: Record<string, unknown> }) {
-  const entries = Object.entries(data);
-  if (entries.length === 0) return null;
-
+function TriggerStatusBadge() {
   return (
-    <div className="border-t border-slate-100 px-4 py-3">
-      <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400">{title}</h4>
-      <dl className="space-y-1.5">
-        {entries.map(([key, value]) => (
-          <div key={key} className="flex gap-2">
-            <dt className="shrink-0 text-xs text-gray-500">{key}:</dt>
-            <dd className="min-w-0 break-all text-xs text-gray-800">
-              {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
+    <span
+      className={cn(
+        "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold uppercase",
+        "bg-indigo-100 text-indigo-700",
+      )}
+    >
+      Triggered
+    </span>
   );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildExecutionTabData(
+  execution: CanvasesCanvasNodeExecution,
+  workflowNode: ComponentsNode | undefined,
+  workflowNodes: ComponentsNode[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): { current?: Record<string, any>; payload?: any; configuration?: any } {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tabData: { current?: Record<string, any>; payload?: any; configuration?: any } = {};
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let currentData: Record<string, any> = {};
+
+  if (workflowNode?.component?.name) {
+    const customDetails = getExecutionDetails(workflowNode.component.name, execution, workflowNode, workflowNodes);
+    if (customDetails && Object.keys(customDetails).length > 0) {
+      currentData = { ...customDetails };
+    }
+  }
+
+  if (Object.keys(currentData).length === 0) {
+    const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+    const dataSource = hasOutputs ? execution.outputs : execution.metadata || {};
+    currentData = { ...flattenObject(dataSource) };
+  }
+
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
+    !("Error" in currentData)
+  ) {
+    currentData["Error"] = {
+      __type: "error",
+      message: execution.resultMessage,
+    };
+  }
+
+  if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in currentData)) {
+    const cancelledBy = execution.cancelledBy;
+    currentData["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
+  }
+
+  tabData.current = Object.fromEntries(
+    Object.entries(currentData).filter(([_, value]) => value !== undefined && value !== "" && value !== null),
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let payload: Record<string, unknown> = {};
+  if (execution.outputs) {
+    const outputData: unknown[] = Object.values(execution.outputs)?.find((output) => {
+      return Array.isArray(output) && output?.length > 0;
+    }) as unknown[];
+    if (outputData?.length > 0) {
+      payload = outputData?.[0] as Record<string, unknown>;
+    }
+  }
+  tabData.payload = payload;
+
+  if (execution.configuration && Object.keys(execution.configuration).length > 0) {
+    tabData.configuration = execution.configuration;
+  }
+
+  return tabData;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildTriggerTabData(
+  runEvent: CanvasesDescribeRunResponse["run"],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): { current?: Record<string, any>; payload?: any; configuration?: any } {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tabData: { current?: Record<string, any>; payload?: any; configuration?: any } = {};
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentData: Record<string, any> = {};
+  if (runEvent?.channel) currentData["Channel"] = runEvent.channel;
+  if (runEvent?.customName) currentData["Name"] = runEvent.customName;
+  if (runEvent?.createdAt) currentData["Triggered at"] = runEvent.createdAt;
+
+  tabData.current = Object.keys(currentData).length > 0 ? currentData : undefined;
+  tabData.payload = runEvent?.data && Object.keys(runEvent.data).length > 0 ? runEvent.data : undefined;
+
+  return tabData;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isErrorValue(value: any): value is { __type: "error"; message: string } {
+  return value && typeof value === "object" && value.__type === "error";
 }
 
 export function NodeDetailPanel({
@@ -78,13 +163,22 @@ export function NodeDetailPanel({
   onNavigateNode,
   isRunView,
 }: NodeDetailPanelProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>("current");
   const executions = runData.executions || [];
+  const triggerNodeId = runData.run?.nodeId;
 
   const nodeExecution = useMemo(() => executions.find((e) => e.nodeId === nodeId), [executions, nodeId]);
+  const isTriggerNode = nodeId === triggerNodeId;
 
   const executionChain = useMemo(() => {
     const chain: string[] = [];
     const visited = new Set<string>();
+
+    if (triggerNodeId) {
+      chain.push(triggerNodeId);
+      visited.add(triggerNodeId);
+    }
+
     for (const exec of executions) {
       if (exec.nodeId && !visited.has(exec.nodeId)) {
         visited.add(exec.nodeId);
@@ -92,7 +186,7 @@ export function NodeDetailPanel({
       }
     }
     return chain;
-  }, [executions]);
+  }, [executions, triggerNodeId]);
 
   const currentIndex = executionChain.indexOf(nodeId);
   const prevNodeId = currentIndex > 0 ? executionChain[currentIndex - 1] : null;
@@ -103,94 +197,166 @@ export function NodeDetailPanel({
     return node?.name || nodeId;
   }, [workflowNodes, nodeId]);
 
-  const configData = useMemo(() => {
-    if (!nodeExecution?.configuration) return {};
-    return flattenObject(nodeExecution.configuration);
-  }, [nodeExecution?.configuration]);
+  const workflowNode = useMemo(() => workflowNodes?.find((n) => n.id === nodeId), [workflowNodes, nodeId]);
 
-  const outputData = useMemo(() => {
-    if (!nodeExecution?.outputs) return {};
-    return flattenObject(nodeExecution.outputs);
-  }, [nodeExecution?.outputs]);
+  const tabData = useMemo(() => {
+    if (isTriggerNode) {
+      return buildTriggerTabData(runData.run);
+    }
+    if (!nodeExecution) return null;
+    return buildExecutionTabData(nodeExecution, workflowNode, workflowNodes || []);
+  }, [isTriggerNode, runData.run, nodeExecution, workflowNode, workflowNodes]);
 
-  const metadataEntries = useMemo(() => {
-    if (!nodeExecution?.metadata) return {};
-    return flattenObject(nodeExecution.metadata);
-  }, [nodeExecution?.metadata]);
+  useEffect(() => {
+    setActiveTab("current");
+  }, [nodeId]);
+
+  const hasDetails = tabData?.current && Object.keys(tabData.current).length > 0;
+  const hasPayload = tabData?.payload && Object.keys(tabData.payload).length > 0;
+  const hasConfig = tabData?.configuration && Object.keys(tabData.configuration).length > 0;
+  const hasAnyTab = hasDetails || hasPayload || hasConfig;
+
+  const createdAt = isTriggerNode ? runData.run?.createdAt : nodeExecution?.createdAt;
 
   return (
-    <div className="absolute right-0 top-0 z-30 flex h-full w-80 flex-col border-l border-slate-200 bg-white shadow-lg">
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-2.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className="truncate text-sm font-semibold text-gray-900">{nodeName}</h3>
-          {nodeExecution ? <ExecutionStatusBadge execution={nodeExecution} /> : null}
+    <div className="absolute inset-x-0 bottom-0 z-30 flex max-h-[45%] flex-col border-t border-slate-200 bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
+      {/* Header bar */}
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-1.5">
+        <div className="flex items-center gap-3 min-w-0">
+          {isRunView && onNavigateNode ? (
+            <div className="flex items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => prevNodeId && onNavigateNode(prevNodeId)}
+                disabled={!prevNodeId}
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+              <span className="text-[11px] text-gray-400 tabular-nums">
+                {currentIndex >= 0 ? `${currentIndex + 1}/${executionChain.length}` : ""}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => nextNodeId && onNavigateNode(nextNodeId)}
+                disabled={!nextNodeId}
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : null}
+          <h3 className="truncate text-sm font-medium text-gray-900">{nodeName}</h3>
+          {isTriggerNode ? (
+            <TriggerStatusBadge />
+          ) : nodeExecution ? (
+            <ExecutionStatusBadge execution={nodeExecution} />
+          ) : null}
+          {createdAt ? (
+            <span className="text-xs text-gray-400">
+              <TimeAgo date={createdAt} />
+            </span>
+          ) : null}
         </div>
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {nodeExecution ? (
-          <>
-            <div className="px-4 py-3">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span>Execution #{nodeExecution.id?.slice(0, 8)}</span>
-                {nodeExecution.createdAt ? (
-                  <>
-                    <span className="text-gray-300">·</span>
-                    <TimeAgo date={nodeExecution.createdAt} />
-                  </>
-                ) : null}
-              </div>
-            </div>
+      {hasAnyTab ? (
+        <>
+          {/* Tabs */}
+          <div className="flex shrink-0 items-center h-8 border-b border-slate-200 px-2">
+            {hasDetails ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab("current")}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
+                  activeTab === "current"
+                    ? "text-gray-800 border-gray-800"
+                    : "text-gray-500 hover:text-gray-800 border-transparent",
+                )}
+              >
+                {React.createElement(resolveIcon("Croissant"), { size: 14 })}
+                Details
+              </button>
+            ) : null}
+            {hasPayload ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab("payload")}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
+                  activeTab === "payload"
+                    ? "text-gray-800 border-gray-800"
+                    : "text-gray-500 hover:text-gray-800 border-transparent",
+                )}
+              >
+                {React.createElement(resolveIcon("code"), { size: 14 })}
+                Payload
+              </button>
+            ) : null}
+            {hasConfig ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab("configuration")}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1.5 text-[13px] font-medium border-b",
+                  activeTab === "configuration"
+                    ? "text-gray-800 border-gray-800"
+                    : "text-gray-500 hover:text-gray-800 border-transparent",
+                )}
+              >
+                {React.createElement(resolveIcon("settings"), { size: 14 })}
+                Config
+              </button>
+            ) : null}
+          </div>
 
-            {nodeExecution.resultMessage &&
-            (nodeExecution.resultReason === "RESULT_REASON_ERROR" || nodeExecution.result === "RESULT_FAILED") ? (
-              <div className="border-t border-red-100 bg-red-50 px-4 py-3">
-                <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-red-500">Error</h4>
-                <p className="text-xs text-red-700 break-all">{nodeExecution.resultMessage}</p>
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {activeTab === "current" && tabData?.current ? (
+              <div className="flex flex-col gap-1.5">
+                {Object.entries(tabData.current).map(([key, value]) => {
+                  if (isErrorValue(value)) {
+                    return (
+                      <div key={key} className="flex items-start gap-2">
+                        <span className="shrink-0 text-xs text-gray-500 w-[120px] text-right truncate" title={key}>
+                          {key}:
+                        </span>
+                        <span className="min-w-0 break-all text-xs text-red-600 font-medium">{value.message}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={key} className="flex items-start gap-2">
+                      <span className="shrink-0 text-xs text-gray-500 w-[120px] text-right truncate" title={key}>
+                        {key}:
+                      </span>
+                      <span className="min-w-0 break-all text-xs text-gray-800">
+                        {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
 
-            <DataSection title="Output" data={outputData} />
-            <DataSection title="Configuration" data={configData} />
-            <DataSection title="Metadata" data={metadataEntries} />
-          </>
-        ) : (
-          <div className="px-4 py-8 text-center text-xs text-gray-400">
-            No execution data for this node in this run.
-          </div>
-        )}
-      </div>
+            {activeTab === "payload" && tabData?.payload ? (
+              <JsonView value={tabData.payload} collapsed={2} style={{ fontSize: 12 }} />
+            ) : null}
 
-      {isRunView && onNavigateNode ? (
-        <div className="flex shrink-0 items-center justify-between border-t border-slate-200 px-4 py-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs"
-            onClick={() => prevNodeId && onNavigateNode(prevNodeId)}
-            disabled={!prevNodeId}
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Previous
-          </Button>
-          <span className="text-xs text-gray-400">
-            {currentIndex >= 0 ? `${currentIndex + 1} / ${executionChain.length}` : ""}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs"
-            onClick={() => nextNodeId && onNavigateNode(nextNodeId)}
-            disabled={!nextNodeId}
-          >
-            Next
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ) : null}
+            {activeTab === "configuration" && tabData?.configuration ? (
+              <JsonView value={tabData.configuration} collapsed={2} style={{ fontSize: 12 }} />
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <div className="px-4 py-6 text-center text-xs text-gray-400">No execution data for this node in this run.</div>
+      )}
     </div>
   );
 }

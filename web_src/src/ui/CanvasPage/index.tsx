@@ -212,7 +212,10 @@ export interface CanvasPageProps {
   runsSidebar?: React.ReactNode;
   runViewOverlay?: React.ReactNode;
   runDetailPanel?: React.ReactNode;
-  onRunViewNodeDoubleClick?: (nodeId: string) => void;
+  runSummaryContent?: React.ReactNode;
+  onRunViewNodeClick?: (nodeId: string) => void;
+  runViewSelectedNodeId?: string | null;
+  fitViewKey?: string | null;
   onOpenInRunView?: (eventId: string) => void;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -1388,98 +1391,104 @@ function CanvasPage(props: CanvasPageProps) {
                 </div>
               </div>
             ) : null}
-            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-              <CanvasContent
-                state={state}
-                onSave={props.onSave}
-                onNodeEdit={handleNodeEdit}
-                onNodeDelete={handleNodeDelete}
-                onNodesDelete={props.onNodesDelete}
-                onDuplicateNodes={props.onDuplicateNodes}
-                onAutoLayoutNodes={props.onAutoLayoutNodes}
-                onEdgeCreate={props.onEdgeCreate}
-                hideHeader={true}
-                onToggleView={handleToggleView}
-                onToggleCollapse={props.onToggleCollapse}
-                onRun={(nodeId) => handleNodeRun(nodeId)}
-                onDuplicate={props.onDuplicate}
-                onDeactivate={props.onDeactivate}
-                onAnnotationUpdate={props.onAnnotationUpdate}
-                onAnnotationBlur={props.onAnnotationBlur}
-                onGroupUpdate={props.onGroupUpdate}
-                onGroupNodes={props.onGroupNodes}
-                onUngroupNodes={props.onUngroupNodes}
-                onTogglePause={props.onTogglePause}
-                runDisabled={props.runDisabled}
-                runDisabledTooltip={props.runDisabledTooltip}
-                onBuildingBlockDrop={handleBuildingBlockDrop}
-                onBuildingBlocksSidebarToggle={handleSidebarToggle}
-                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-                onZoomChange={setCanvasZoom}
-                hasFitToViewRef={hasFitToViewRef}
-                viewportRefProp={props.viewportRef}
-                highlightedNodeIds={highlightedNodeIds}
-                workflowNodes={props.workflowNodes}
-                setCurrentTab={setCurrentTab}
-                onUndo={props.onUndo}
-                canUndo={props.canUndo}
-                organizationId={props.organizationId}
-                unsavedMessage={props.unsavedMessage}
-                saveIsPrimary={props.saveIsPrimary}
-                saveButtonHidden={props.saveButtonHidden}
-                saveDisabled={props.saveDisabled}
-                saveDisabledTooltip={props.saveDisabledTooltip}
-                versionLabel={props.versionLabel}
-                onCreateVersion={props.onCreateVersion}
-                onPublishVersion={props.onPublishVersion}
-                onDiscardVersion={props.onDiscardVersion}
-                createVersionDisabled={props.createVersionDisabled}
-                createVersionDisabledTooltip={props.createVersionDisabledTooltip}
-                publishVersionDisabled={props.publishVersionDisabled}
-                publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-                discardVersionDisabled={props.discardVersionDisabled}
-                discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-                headerMode={props.headerMode}
-                saveState={props.saveState}
-                lastSavedAt={props.lastSavedAt}
-                saveErrorMessage={props.saveErrorMessage}
-                onEnterEditMode={props.onEnterEditMode}
-                enterEditModeDisabled={props.enterEditModeDisabled}
-                enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-                unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
-                isVersionControlOpen={props.isVersionControlOpen}
-                onOpenVersionControl={props.onOpenVersionControl}
-                versionControlButtonTooltip={props.versionControlButtonTooltip}
-                versionControlNotificationCount={props.versionControlNotificationCount}
-                showBottomStatusControls={props.showBottomStatusControls}
-                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-                readOnly={props.readOnly}
-                logEntries={props.logEntries}
-                focusRequest={props.focusRequest}
-                onExecutionChainHandled={props.onExecutionChainHandled}
-                initialFocusNodeId={props.initialFocusNodeId}
-                runsEvents={props.runsEvents}
-                runsTotalCount={props.runsTotalCount}
-                runsHasNextPage={props.runsHasNextPage}
-                runsIsFetchingNextPage={props.runsIsFetchingNextPage}
-                onRunsLoadMore={props.onRunsLoadMore}
-                runsNodes={props.runsNodes}
-                runsComponentIconMap={props.runsComponentIconMap}
-                runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
-                onRunNodeSelect={props.onRunNodeSelect}
-                onRunExecutionSelect={props.onRunExecutionSelect}
-                onAcknowledgeErrors={props.onAcknowledgeErrors}
-                missingIntegrations={props.missingIntegrations}
-                onConnectIntegration={props.onConnectIntegration}
-                canCreateIntegrations={props.canCreateIntegrations}
-                onNodeDoubleClick={props.onRunViewNodeDoubleClick}
-                onOpenInRunView={props.onOpenInRunView}
-              />
-            </ReactFlowProvider>
+            {props.runSummaryContent ? (
+              props.runSummaryContent
+            ) : (
+              <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+                <CanvasContent
+                  state={state}
+                  onSave={props.onSave}
+                  onNodeEdit={handleNodeEdit}
+                  onNodeDelete={handleNodeDelete}
+                  onNodesDelete={props.onNodesDelete}
+                  onDuplicateNodes={props.onDuplicateNodes}
+                  onAutoLayoutNodes={props.onAutoLayoutNodes}
+                  onEdgeCreate={props.onEdgeCreate}
+                  hideHeader={true}
+                  onToggleView={handleToggleView}
+                  onToggleCollapse={props.onToggleCollapse}
+                  onRun={(nodeId) => handleNodeRun(nodeId)}
+                  onDuplicate={props.onDuplicate}
+                  onDeactivate={props.onDeactivate}
+                  onAnnotationUpdate={props.onAnnotationUpdate}
+                  onAnnotationBlur={props.onAnnotationBlur}
+                  onGroupUpdate={props.onGroupUpdate}
+                  onGroupNodes={props.onGroupNodes}
+                  onUngroupNodes={props.onUngroupNodes}
+                  onTogglePause={props.onTogglePause}
+                  runDisabled={props.runDisabled}
+                  runDisabledTooltip={props.runDisabledTooltip}
+                  onBuildingBlockDrop={handleBuildingBlockDrop}
+                  onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                  onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                  onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                  onZoomChange={setCanvasZoom}
+                  hasFitToViewRef={hasFitToViewRef}
+                  viewportRefProp={props.viewportRef}
+                  highlightedNodeIds={highlightedNodeIds}
+                  workflowNodes={props.workflowNodes}
+                  setCurrentTab={setCurrentTab}
+                  onUndo={props.onUndo}
+                  canUndo={props.canUndo}
+                  organizationId={props.organizationId}
+                  unsavedMessage={props.unsavedMessage}
+                  saveIsPrimary={props.saveIsPrimary}
+                  saveButtonHidden={props.saveButtonHidden}
+                  saveDisabled={props.saveDisabled}
+                  saveDisabledTooltip={props.saveDisabledTooltip}
+                  versionLabel={props.versionLabel}
+                  onCreateVersion={props.onCreateVersion}
+                  onPublishVersion={props.onPublishVersion}
+                  onDiscardVersion={props.onDiscardVersion}
+                  createVersionDisabled={props.createVersionDisabled}
+                  createVersionDisabledTooltip={props.createVersionDisabledTooltip}
+                  publishVersionDisabled={props.publishVersionDisabled}
+                  publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+                  discardVersionDisabled={props.discardVersionDisabled}
+                  discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+                  headerMode={props.headerMode}
+                  saveState={props.saveState}
+                  lastSavedAt={props.lastSavedAt}
+                  saveErrorMessage={props.saveErrorMessage}
+                  onEnterEditMode={props.onEnterEditMode}
+                  enterEditModeDisabled={props.enterEditModeDisabled}
+                  enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+                  unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
+                  isVersionControlOpen={props.isVersionControlOpen}
+                  onOpenVersionControl={props.onOpenVersionControl}
+                  versionControlButtonTooltip={props.versionControlButtonTooltip}
+                  versionControlNotificationCount={props.versionControlNotificationCount}
+                  showBottomStatusControls={props.showBottomStatusControls}
+                  isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                  onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                  autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                  autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                  readOnly={props.readOnly}
+                  logEntries={props.logEntries}
+                  focusRequest={props.focusRequest}
+                  onExecutionChainHandled={props.onExecutionChainHandled}
+                  initialFocusNodeId={props.initialFocusNodeId}
+                  runsEvents={props.runsEvents}
+                  runsTotalCount={props.runsTotalCount}
+                  runsHasNextPage={props.runsHasNextPage}
+                  runsIsFetchingNextPage={props.runsIsFetchingNextPage}
+                  onRunsLoadMore={props.onRunsLoadMore}
+                  runsNodes={props.runsNodes}
+                  runsComponentIconMap={props.runsComponentIconMap}
+                  runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
+                  onRunNodeSelect={props.onRunNodeSelect}
+                  onRunExecutionSelect={props.onRunExecutionSelect}
+                  onAcknowledgeErrors={props.onAcknowledgeErrors}
+                  missingIntegrations={props.missingIntegrations}
+                  onConnectIntegration={props.onConnectIntegration}
+                  canCreateIntegrations={props.canCreateIntegrations}
+                  onNodeDoubleClick={props.onRunViewNodeClick}
+                  runViewSelectedNodeId={props.runViewSelectedNodeId}
+                  fitViewKey={props.fitViewKey}
+                  onOpenInRunView={props.onOpenInRunView}
+                />
+              </ReactFlowProvider>
+            )}
 
             {props.runViewOverlay}
             {props.runDetailPanel}
@@ -2085,6 +2094,8 @@ function CanvasContent({
   onConnectIntegration,
   canCreateIntegrations,
   onNodeDoubleClick,
+  runViewSelectedNodeId,
+  fitViewKey,
   onOpenInRunView,
 }: {
   state: CanvasPageState;
@@ -2191,6 +2202,8 @@ function CanvasContent({
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
   onNodeDoubleClick?: (nodeId: string) => void;
+  runViewSelectedNodeId?: string | null;
+  fitViewKey?: string | null;
   onOpenInRunView?: (eventId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
@@ -2229,6 +2242,21 @@ function CanvasContent({
   // Use refs to avoid recreating callbacks when state changes
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  useEffect(() => {
+    if (runViewSelectedNodeId != null) {
+      state.setNodes((nds) => nds.map((n) => ({ ...n, selected: n.id === runViewSelectedNodeId })));
+    }
+  }, [runViewSelectedNodeId, state.setNodes]);
+
+  const prevFitViewKeyRef = useRef(fitViewKey);
+  useEffect(() => {
+    if (fitViewKey && fitViewKey !== prevFitViewKeyRef.current) {
+      setTimeout(() => fitView({ maxZoom: 1.0, padding: 0.15, duration: 300 }), 50);
+    }
+    prevFitViewKeyRef.current = fitViewKey;
+  }, [fitViewKey, fitView]);
+
   const localViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
 
   // Use viewport ref from props if provided, otherwise create local one
@@ -2375,7 +2403,7 @@ function CanvasContent({
       }
 
       if (onNodeDoubleClick) {
-        // In run view, single click only selects the node visually.
+        onNodeDoubleClick(nodeId);
       } else if (isPendingConnection && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
@@ -2953,7 +2981,6 @@ function CanvasContent({
             onMove={handleMove}
             onInit={handleInit}
             deleteKeyCode={null}
-            onNodeDoubleClick={onNodeDoubleClick ? (_event, node) => onNodeDoubleClick(node.id) : undefined}
             onPaneClick={handlePaneClick}
             onSelectionStart={() => {
               setIsSelecting(true);
