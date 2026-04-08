@@ -107,8 +107,8 @@ The Create Annotation component writes an annotation into Grafana, marking opera
 - **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
 - **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
 - **Panel ID**: Optional panel ID within the dashboard to attach the annotation to
-- **Time**: Optional start time (defaults to now if omitted)
-- **Time End**: Optional end time — providing this creates a region annotation spanning the window
+- **Time**: Optional start time (defaults to now if omitted). Supports absolute values like `2026-04-08T15:30` or relative Grafana values like `now+2h`
+- **Time End**: Optional end time — providing this creates a region annotation spanning the window. Supports absolute or relative Grafana values
 
 ### Output
 
@@ -119,7 +119,8 @@ Returns the ID of the newly created annotation.
 ```json
 {
   "data": {
-    "id": 42
+    "id": 42,
+    "url": "https://grafana.example.com/d/production-overview/production-overview?from=1739376783362\u0026to=1739377383362"
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.annotation.created"
