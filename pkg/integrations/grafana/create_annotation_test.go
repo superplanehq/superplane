@@ -87,6 +87,28 @@ func Test__parseAnnotationTime__acceptsRFC3339(t *testing.T) {
 	require.Equal(t, time.Date(2026, time.April, 8, 15, 30, 0, 0, time.UTC), parsed.UTC())
 }
 
+func Test__parseAnnotationTime__acceptsGoTimeStringOutput(t *testing.T) {
+	parsed, err := parseAnnotationTime("2026-04-08 11:53:05.86655651 +0000 UTC")
+	require.NoError(t, err)
+	require.Equal(t, time.Date(2026, time.April, 8, 11, 53, 5, 866556510, time.UTC), parsed.UTC())
+}
+
+func Test__resolveAnnotationPanelID(t *testing.T) {
+	panelID, err := resolveAnnotationPanelID("7", nil)
+	require.NoError(t, err)
+	require.NotNil(t, panelID)
+	require.Equal(t, int64(7), *panelID)
+
+	legacyPanelID := int64(9)
+	panelID, err = resolveAnnotationPanelID("", &legacyPanelID)
+	require.NoError(t, err)
+	require.NotNil(t, panelID)
+	require.Equal(t, int64(9), *panelID)
+
+	_, err = resolveAnnotationPanelID("abc", nil)
+	require.ErrorContains(t, err, "panel must be a valid panel resource")
+}
+
 func Test__buildAnnotationURL(t *testing.T) {
 	panelID := int64(7)
 	url := buildAnnotationURL(

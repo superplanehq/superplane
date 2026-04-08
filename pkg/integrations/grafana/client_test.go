@@ -311,6 +311,49 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, "dash1", resources[0].ID)
 		require.Equal(t, resourceTypeDashboard, resources[0].Type)
 	})
+
+	t.Run("panel returns dashboard panels scoped by dashboard uid", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"dashboard": {
+							"panels": [
+								{"id": 3, "title": "Latency"},
+								{"type": "row", "panels": [
+									{"id": 7, "title": "Errors"},
+									{"id": 9, "title": ""}
+								]}
+							]
+						}
+					}`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypePanel, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+			Parameters: map[string]string{
+				"dashboardUID": "dash-1",
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 3)
+		require.Equal(t, "Latency", resources[0].Name)
+		require.Equal(t, "3", resources[0].ID)
+		require.Equal(t, "Errors", resources[1].Name)
+		require.Equal(t, "7", resources[1].ID)
+		require.Equal(t, "Panel 9", resources[2].Name)
+		require.Equal(t, resourceTypePanel, resources[2].Type)
+		require.Contains(t, httpContext.Requests[0].URL.Path, "/api/dashboards/uid/dash-1")
+	})
 }
 
 func Test__Client__SearchDashboards__ParsesResponse(t *testing.T) {
@@ -337,6 +380,41 @@ func Test__Client__SearchDashboards__ParsesResponse(t *testing.T) {
 	require.Equal(t, "b", hits[1].UID)
 	require.Equal(t, "", hits[1].Title)
 	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/search")
+}
+
+func Test__Client__ListDashboardPanels(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"dashboard": {
+						"panels": [
+							{"id": 2, "title": "CPU"},
+							{"collapsed": false, "panels": [
+								{"id": 4, "title": "Memory"},
+								{"id": 6, "title": ""}
+							]}
+						]
+					}
+				}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	panels, err := client.ListDashboardPanels("dash-1")
+	require.NoError(t, err)
+	require.Len(t, panels, 3)
+	require.Equal(t, DashboardPanel{ID: 2, Title: "CPU"}, panels[0])
+	require.Equal(t, DashboardPanel{ID: 4, Title: "Memory"}, panels[1])
+	require.Equal(t, DashboardPanel{ID: 6, Title: ""}, panels[2])
+	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/dashboards/uid/dash-1")
 }
 
 func Test__Grafana__ListResources__Annotations(t *testing.T) {

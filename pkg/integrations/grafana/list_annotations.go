@@ -15,8 +15,11 @@ import (
 type ListAnnotations struct{}
 
 type ListAnnotationsSpec struct {
-	Tags         []string `json:"tags" mapstructure:"tags"`
 	DashboardUID string   `json:"dashboardUID" mapstructure:"dashboardUID"`
+	Panel        string   `json:"panel,omitempty" mapstructure:"panel"`
+	PanelID      *int64   `json:"panelId,omitempty" mapstructure:"panelId"`
+	Text         string   `json:"text" mapstructure:"text"`
+	Tags         []string `json:"tags" mapstructure:"tags"`
 	From         string   `json:"from" mapstructure:"from"`
 	To           string   `json:"to" mapstructure:"to"`
 	Limit        int64    `json:"limit" mapstructure:"limit"`
@@ -49,10 +52,12 @@ func (l *ListAnnotations) Documentation() string {
 
 ## Configuration
 
-- **Tags**: Filter to annotations matching all of the specified tags (optional)
-- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
-	- **From / To**: Time range filter as relative Grafana values like ` + "`now-1h`" + ` or absolute values with an explicit timezone like ` + "`2026-04-08T15:30Z`" + ` (optional)
-- **Limit**: Maximum number of annotations to return (optional)
+	- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
+	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
+	- **Text**: Optional — filter annotations whose text contains this value
+	- **Tags**: Filter to annotations matching all of the specified tags (optional)
+	- **From / To**: Time range filter expressions (optional). Examples: ` + "`{{ now() + duration(\"-1h\") }}`" + ` and ` + "`{{ now() }}`" + `
+	- **Limit**: Maximum number of annotations to return (optional)
 
 ## Output
 
@@ -75,6 +80,46 @@ func (l *ListAnnotations) OutputChannels(_ any) []core.OutputChannel {
 func (l *ListAnnotations) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "dashboardUID",
+			Label:       "Dashboard",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Filter annotations to a specific dashboard",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypeDashboard,
+				},
+			},
+		},
+		{
+			Name:        "panel",
+			Label:       "Panel",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Filter annotations to a specific panel",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypePanel,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name: "dashboardUID",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "dashboardUID",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "text",
+			Label:       "Text",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Filter annotation text",
+			Placeholder: "deploy",
+		},
+		{
 			Name:        "tags",
 			Label:       "Tags",
 			Type:        configuration.FieldTypeList,
@@ -90,32 +135,20 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "dashboardUID",
-			Label:       "Dashboard",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
-			Description: "Filter annotations to a specific dashboard",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: resourceTypeDashboard,
-				},
-			},
-		},
-		{
 			Name:        "from",
 			Label:       "From",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Return annotations at or after this time",
-			Placeholder: "now-1h or 2026-04-08T15:30Z",
+			Placeholder: `{{ now() + duration("-1h") }}`,
 		},
 		{
 			Name:        "to",
 			Label:       "To",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Return annotations at or before this time",
-			Placeholder: "now or 2026-04-08T17:30Z",
+			Placeholder: `{{ now() }}`,
 		},
 		{
 			Name:        "limit",
@@ -144,6 +177,10 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var fromMS, toMS int64
+	panelID, err := resolveAnnotationPanelID(spec.Panel, spec.PanelID)
+	if err != nil {
+		return err
+	}
 
 	if strings.TrimSpace(spec.From) != "" {
 		t, err := parseAnnotationTime(strings.TrimSpace(spec.From))
@@ -170,15 +207,28 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
+	fetchLimit := spec.Limit
+	if fetchLimit <= 0 && (panelID != nil || strings.TrimSpace(spec.Text) != "") {
+		fetchLimit = 5000
+	}
+	if fetchLimit > 0 && fetchLimit < 5000 && (panelID != nil || strings.TrimSpace(spec.Text) != "") {
+		fetchLimit = 5000
+	}
+
 	annotations, err := client.ListAnnotations(
 		spec.Tags,
 		strings.TrimSpace(spec.DashboardUID),
 		fromMS,
 		toMS,
-		spec.Limit,
+		fetchLimit,
 	)
 	if err != nil {
 		return fmt.Errorf("error listing annotations: %w", err)
+	}
+
+	annotations = filterAnnotations(annotations, panelID, strings.TrimSpace(spec.Text))
+	if spec.Limit > 0 && int64(len(annotations)) > spec.Limit {
+		annotations = annotations[:spec.Limit]
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -233,4 +283,25 @@ func decodeListAnnotationsSpec(config any) (ListAnnotationsSpec, error) {
 		return ListAnnotationsSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 	return spec, nil
+}
+
+func filterAnnotations(annotations []Annotation, panelID *int64, text string) []Annotation {
+	if panelID == nil && text == "" {
+		return annotations
+	}
+
+	filtered := make([]Annotation, 0, len(annotations))
+	textFilter := strings.ToLower(strings.TrimSpace(text))
+
+	for _, annotation := range annotations {
+		if panelID != nil && annotation.PanelID != *panelID {
+			continue
+		}
+		if textFilter != "" && !strings.Contains(strings.ToLower(annotation.Text), textFilter) {
+			continue
+		}
+		filtered = append(filtered, annotation)
+	}
+
+	return filtered
 }

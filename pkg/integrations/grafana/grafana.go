@@ -13,6 +13,7 @@ import (
 const (
 	resourceTypeDataSource = "data-source"
 	resourceTypeDashboard  = "dashboard"
+	resourceTypePanel      = "panel"
 	resourceTypeAnnotation = "annotation"
 )
 
@@ -175,6 +176,42 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 				Type: resourceTypeDashboard,
 				Name: name,
 				ID:   id,
+			})
+		}
+
+		return resources, nil
+
+	case resourceTypePanel:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboardUID"])
+		if dashboardUID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		panels, err := client.ListDashboardPanels(dashboardUID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(panels))
+		for _, panel := range panels {
+			if panel.ID <= 0 {
+				continue
+			}
+
+			name := strings.TrimSpace(panel.Title)
+			if name == "" {
+				name = fmt.Sprintf("Panel %d", panel.ID)
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypePanel,
+				Name: name,
+				ID:   strconv.FormatInt(panel.ID, 10),
 			})
 		}
 

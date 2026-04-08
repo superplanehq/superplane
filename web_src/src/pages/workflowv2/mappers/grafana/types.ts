@@ -47,10 +47,10 @@ export interface Annotation {
 }
 
 export interface CreateAnnotationConfiguration {
+  dashboardUID?: string;
+  panel?: string;
   text: string;
   tags?: string[];
-  dashboardUID?: string;
-  panelId?: number;
   time?: string;
   timeEnd?: string;
 }
@@ -61,8 +61,10 @@ export interface CreateAnnotationOutput {
 }
 
 export interface ListAnnotationsConfiguration {
-  tags?: string[];
   dashboardUID?: string;
+  panel?: string;
+  text?: string;
+  tags?: string[];
   from?: string;
   to?: string;
   limit?: number;

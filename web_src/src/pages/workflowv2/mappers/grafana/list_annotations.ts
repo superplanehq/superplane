@@ -42,6 +42,16 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
     if (configuration?.tags && configuration.tags.length > 0) {
       details["Tags Filter"] = configuration.tags.join(", ");
     }
+    if (configuration?.text) {
+      details["Text Filter"] =
+        configuration.text.length > 80 ? configuration.text.substring(0, 80) + "..." : configuration.text;
+    }
+    if (configuration?.from) {
+      details["From"] = configuration.from;
+    }
+    if (configuration?.to) {
+      details["To"] = configuration.to;
+    }
 
     if (!outputs || !outputs.default || outputs.default.length === 0) {
       details["Count"] = "0";
@@ -80,6 +90,11 @@ function metadataList(context: ComponentBaseContext): MetadataItem[] {
 
   if (configuration?.tags && configuration.tags.length > 0) {
     metadata.push({ icon: "tag", label: `Tags: ${configuration.tags.join(", ")}` });
+  }
+
+  if (configuration?.text) {
+    const preview = configuration.text.length > 50 ? configuration.text.substring(0, 50) + "..." : configuration.text;
+    metadata.push({ icon: "search", label: `Text: ${preview}` });
   }
 
   const dashboardTitle = nodeMetadata?.dashboardTitle || configuration?.dashboardUID;

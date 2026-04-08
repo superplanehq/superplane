@@ -679,6 +679,11 @@ type DashboardSearchHit struct {
 	Title string `json:"title"`
 }
 
+type DashboardPanel struct {
+	ID    int64
+	Title string
+}
+
 // SearchDashboards lists dashboards via the folder/dashboard search API (dashboard UID + title).
 func (c *Client) SearchDashboards() ([]DashboardSearchHit, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/search?type=dash-db&limit=5000", nil, "")
@@ -696,4 +701,74 @@ func (c *Client) SearchDashboards() ([]DashboardSearchHit, error) {
 	}
 
 	return hits, nil
+}
+
+func (c *Client) ListDashboardPanels(uid string) ([]DashboardPanel, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(strings.TrimSpace(uid))),
+		nil,
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting dashboard: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response struct {
+		Dashboard map[string]any `json:"dashboard"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	return extractDashboardPanels(response.Dashboard), nil
+}
+
+func extractDashboardPanels(dashboard map[string]any) []DashboardPanel {
+	var panels []DashboardPanel
+	if dashboard == nil {
+		return panels
+	}
+
+	rootPanels, _ := dashboard["panels"].([]any)
+	collectDashboardPanels(rootPanels, &panels)
+	return panels
+}
+
+func collectDashboardPanels(values []any, destination *[]DashboardPanel) {
+	for _, value := range values {
+		panel, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if nestedPanels, ok := panel["panels"].([]any); ok {
+			collectDashboardPanels(nestedPanels, destination)
+		}
+
+		idValue, ok := panel["id"]
+		if !ok {
+			continue
+		}
+
+		idFloat, ok := idValue.(float64)
+		if !ok {
+			continue
+		}
+
+		id := int64(idFloat)
+		if id <= 0 {
+			continue
+		}
+
+		title, _ := panel["title"].(string)
+		*destination = append(*destination, DashboardPanel{
+			ID:    id,
+			Title: title,
+		})
+	}
 }
