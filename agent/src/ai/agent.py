@@ -303,7 +303,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return [_tool_error_entry("list_integration_resources", error)]
 
     @agent.tool
-    def get_canvas_shape(ctx: RunContext[AgentDeps]) -> CanvasShape:
+    def get_canvas_shape(ctx: RunContext[AgentDeps]) -> CanvasShape | dict[str, Any]:
         """Compact canvas topology using node display names (no edge channels).
 
         Use for explaining graph shape in human-readable form. For edits and
@@ -311,7 +311,11 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         most one of get_canvas or get_canvas_shape per answer unless the user
         asks to refresh.
         """
-        return ctx.deps.client.get_canvas_shape(ctx.deps.canvas_id)
+        try:
+            return ctx.deps.client.get_canvas_shape(ctx.deps.canvas_id)
+        except Exception as error:
+            _tool_debug(f"get_canvas_shape failed: {error}")
+            return _tool_failure("get_canvas_shape", str(error))
 
     @agent.tool
     def get_node_details(
