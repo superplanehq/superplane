@@ -267,6 +267,16 @@ func (g *GetKnowledgeBase) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetKnowledgeBaseOnce, exampleOutputGetKnowledgeBaseBytes, &exampleOutputGetKnowledgeBase)
 }
 
+//go:embed example_output_add_data_source.json
+var exampleOutputAddDataSourceBytes []byte
+
+var exampleOutputAddDataSourceOnce sync.Once
+var exampleOutputAddDataSource map[string]any
+
+func (a *AddDataSource) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddDataSourceOnce, exampleOutputAddDataSourceBytes, &exampleOutputAddDataSource)
+}
+
 //go:embed example_output_index_knowledge_base.json
 var exampleOutputIndexKnowledgeBaseBytes []byte
 

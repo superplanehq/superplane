@@ -248,6 +248,17 @@ export interface IndexKnowledgeBaseConfiguration {
   knowledgeBase: string;
 }
 
+export interface AddDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface AddDataSourceConfiguration {
+  knowledgeBase: string;
+  type?: string;
+  indexAfterAdding?: boolean;
+}
+
 export interface KBNodeMetadata {
   agentId?: string;
   agentName?: string;

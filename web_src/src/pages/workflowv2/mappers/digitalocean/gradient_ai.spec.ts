@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { getKnowledgeBaseMapper } from "./get_knowledge_base";
 import { indexKnowledgeBaseMapper } from "./index_knowledge_base";
+import { addDataSourceMapper } from "./add_data_source";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
 import { runEvaluationMapper, RUN_EVALUATION_STATE_REGISTRY } from "./run_evaluation";
@@ -285,6 +286,85 @@ describe("indexKnowledgeBaseMapper.getExecutionDetails", () => {
       execution: { outputs: { default: [buildOutput({ knowledgeBaseName: "kb" })] } },
     });
     expect(() => indexKnowledgeBaseMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+});
+
+// ── addDataSourceMapper ───────────────────────────────────────────
+
+describe("addDataSourceMapper.getExecutionDetails", () => {
+  it("does not throw when outputs is undefined", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
+    expect(() => addDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("does not throw when default array is empty", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
+    expect(() => addDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("does not throw when output data fields are all missing", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [buildOutput({})] } } });
+    expect(() => addDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("extracts details with indexing job", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              dataSourceUUID: "ds-1",
+              knowledgeBaseUUID: "kb-uuid",
+              knowledgeBaseName: "my-kb",
+              indexingJob: {
+                status: "INDEX_JOB_STATUS_COMPLETED",
+                totalTokens: "1500",
+                completedDataSources: 2,
+                totalDataSources: 2,
+                finishedAt: "2025-06-01T00:05:32Z",
+              },
+            }),
+          ],
+        },
+      },
+    });
+    const details = addDataSourceMapper.getExecutionDetails(ctx);
+    expect(details["Knowledge Base"]).toBe("my-kb");
+    expect(details["View Knowledge Base"]).toContain("kb-uuid");
+    expect(details["Data Source"]).toBe("ds-1");
+    expect(details["Indexing Status"]).toBe("INDEX_JOB_STATUS_COMPLETED");
+    expect(details["Total Tokens"]).toBe("1500");
+    expect(details["Finished At"]).toBeDefined();
+    expect(details["View Activity"]).toContain("kb-uuid/activity");
+  });
+
+  it("extracts details without indexing job", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              dataSourceUUID: "ds-1",
+              knowledgeBaseUUID: "kb-uuid",
+              knowledgeBaseName: "my-kb",
+            }),
+          ],
+        },
+      },
+    });
+    const details = addDataSourceMapper.getExecutionDetails(ctx);
+    expect(details["Knowledge Base"]).toBe("my-kb");
+    expect(details["Data Source"]).toBe("ds-1");
+    expect(details["Indexing Status"]).toBeUndefined();
+    expect(details["View Activity"]).toBeUndefined();
+  });
+
+  it("does not throw when node metadata and configuration are undefined", () => {
+    const ctx = buildDetailsCtx({
+      node: { metadata: undefined, configuration: undefined },
+      execution: { outputs: { default: [buildOutput({ knowledgeBaseName: "kb" })] } },
+    });
+    expect(() => addDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 });
 

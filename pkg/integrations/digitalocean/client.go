@@ -2522,6 +2522,31 @@ func (c *Client) StartIndexingJob(kbUUID string) (*IndexJob, error) {
 	return &response.Job, nil
 }
 
+// AddKBDataSource adds a data source to an existing knowledge base
+func (c *Client) AddKBDataSource(kbUUID string, ds KBDataSource) (*KBDataSourceInfo, error) {
+	url := fmt.Sprintf("%s/gen-ai/knowledge_bases/%s/data_sources", c.BaseURL, kbUUID)
+
+	body, err := json.Marshal(ds)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		DataSource KBDataSourceInfo `json:"knowledge_base_data_source"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.DataSource, nil
+}
+
 // KBDataSourceInfo represents a data source returned by the list data sources endpoint.
 // Spaces sources use flat fields (bucket_name, region, item_path).
 // Web sources use a nested web_crawler_data_source object.

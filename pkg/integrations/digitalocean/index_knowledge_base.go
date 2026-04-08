@@ -205,8 +205,8 @@ func (i *IndexKnowledgeBase) HandleAction(ctx core.ActionContext) error {
 		)
 	case "running", "pending":
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, indexPollInterval)
-	case "failed", "cancelled":
-		return fmt.Errorf("indexing job %s for knowledge base %s: %s", job.UUID, meta.KBUUID, job.Status)
+	case "failed", "cancelled", "partial":
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("indexing job %s for knowledge base %s: %s", job.UUID, meta.KBUUID, job.Status))
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, indexPollInterval)
 	}
@@ -217,7 +217,7 @@ func (i *IndexKnowledgeBase) HandleAction(ctx core.ActionContext) error {
 // where data sources haven't changed.
 func indexingJobState(status string) string {
 	lower := strings.ToLower(status)
-	for _, state := range []string{"completed", "successful", "no_changes", "running", "pending", "failed", "cancelled"} {
+	for _, state := range []string{"completed", "successful", "no_changes", "partial", "running", "pending", "failed", "cancelled"} {
 		if strings.HasSuffix(lower, state) {
 			return state
 		}
