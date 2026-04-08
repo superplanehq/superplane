@@ -78,7 +78,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.agent.evals:
-	$(COMPOSE) exec agent uv run python -m evals.runner
+	$(COMPOSE) exec $(if $(EVAL_CASES),-e EVAL_CASES=$(EVAL_CASES),) agent uv run python -m evals.runner $(AGENT_EVAL_RUNNER_ARGS)
 
 test.agent.setup:
 	@touch agent/.env
