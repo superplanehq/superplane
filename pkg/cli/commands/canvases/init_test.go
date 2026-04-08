@@ -149,6 +149,24 @@ func TestInitWithTemplateOutputsTemplateContent(t *testing.T) {
 	require.NotContains(t, output, "isTemplate")
 }
 
+func TestInitWithTemplateMatchesKebabCase(t *testing.T) {
+	server := newTemplatesServer(t)
+	ctx, stdout := newInitCommandContext(t, server, "text")
+	template := "health-check-monitor"
+	listTemplates := false
+	outputFile := ""
+
+	err := (&initCommand{
+		template:      &template,
+		listTemplates: &listTemplates,
+		outputFile:    &outputFile,
+	}).Execute(ctx)
+
+	require.NoError(t, err)
+
+	output := stdout.String()
+	require.Contains(t, output, "Health Check Monitor")
+	require.Contains(t, output, "trigger-001")
 }
 
 func TestInitWithInvalidTemplateReturnsError(t *testing.T) {

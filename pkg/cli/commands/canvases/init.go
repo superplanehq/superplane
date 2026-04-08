@@ -52,11 +52,12 @@ func (c *initCommand) executeTemplate(ctx core.CommandContext, name string) erro
 
 	var match *openapi_client.CanvasesCanvas
 	var available []string
+	normalizedInput := normalizeTemplateName(name)
 	for i, t := range templates {
 		metadata := t.GetMetadata()
 		templateName := metadata.GetName()
 		available = append(available, templateName)
-		if strings.EqualFold(templateName, name) {
+		if strings.EqualFold(normalizeTemplateName(templateName), normalizedInput) {
 			match = &templates[i]
 		}
 	}
