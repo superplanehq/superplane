@@ -20,25 +20,26 @@ export function buildGrafanaEventSections(
   execution: ExecutionInfo,
   componentName: string,
 ): EventSection[] {
-  if (!execution.rootEvent?.id || !execution.createdAt) {
-    return [];
-  }
-
   const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
-  if (!rootTriggerNode?.componentName) {
-    return [];
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  const triggerName = rootTriggerNode?.componentName ?? "";
+  const rootTriggerRenderer = getTriggerRenderer(triggerName);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+
+  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+
+  const receivedAtRaw = execution.createdAt || execution.updatedAt;
+  const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : undefined;
+
+  const eventId = execution.rootEvent?.id ?? execution.id;
 
   return [
     {
-      receivedAt: new Date(execution.createdAt),
+      receivedAt,
       eventTitle: title || "Trigger event",
-      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
+      eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent.id,
+      eventId,
     },
   ];
 }

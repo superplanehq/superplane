@@ -1,5 +1,5 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
-import type React from "react";
+import { createElement, type ReactNode } from "react";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import { getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -37,7 +37,13 @@ export const searchDashboardsMapper: ComponentBaseMapper = {
       "Listed At": formatTimestamp(context.execution.createdAt),
     };
 
-    const response = outputs?.default?.[0]?.data as SearchDashboardsOutput | undefined;
+    const payload = outputs?.default?.[0];
+    const response = payload?.data as SearchDashboardsOutput | undefined;
+    const payloadTimestamp = formatTimestamp(payload?.timestamp);
+    if (payloadTimestamp !== "-") {
+      details["Listed At"] = payloadTimestamp;
+    }
+
     if (!response) {
       details.Response = "No data returned";
       return details;
@@ -56,14 +62,19 @@ export const searchDashboardsMapper: ComponentBaseMapper = {
     return details;
   },
 
-  subtitle(context: SubtitleContext): string | React.ReactNode {
+  subtitle(context: SubtitleContext): string | ReactNode {
     if (!context.execution.createdAt) return "-";
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const response = outputs?.default?.[0]?.data as SearchDashboardsOutput | undefined;
     const count = response?.dashboards?.length ?? 0;
-    return [`${count} dashboard${count === 1 ? "" : "s"}`, renderTimeAgo(new Date(context.execution.createdAt))]
-      .filter(Boolean)
-      .join(" · ");
+    const label = `${count} dashboard${count === 1 ? "" : "s"}`;
+    return createElement(
+      "span",
+      { className: "inline-flex items-center gap-1 min-w-0" },
+      createElement("span", null, label),
+      createElement("span", { className: "text-gray-950/50" }, "·"),
+      renderTimeAgo(new Date(context.execution.createdAt)),
+    );
   },
 };
