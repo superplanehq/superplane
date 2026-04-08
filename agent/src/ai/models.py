@@ -61,7 +61,21 @@ class NodeDetails(BaseModel):
     canvas_id: str
     node: CanvasNode
     configuration: dict[str, object] = Field(default_factory=dict)
+    error_message: str | None = None
+    warning_message: str | None = None
+    paused: bool | None = None
+    integration: dict[str, str | None] | None = None
     recent_events: list[NodeEvent] = Field(default_factory=list)
+
+
+class NodeExecution(BaseModel):
+    id: str | None = None
+    state: str | None = None
+    result: str | None = None
+    result_reason: str | None = None
+    result_message: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
 
 class AnswerCitation(BaseModel):
