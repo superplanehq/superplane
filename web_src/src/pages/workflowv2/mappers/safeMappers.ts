@@ -2,7 +2,6 @@ import React from "react";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
 import type {
-  ComponentAdditionalDataBuilder,
   ComponentBaseContext,
   ComponentBaseMapper,
   CustomFieldRenderer,
@@ -36,6 +35,16 @@ function getTriggerTitle(context: TriggerRendererContext): string {
 
 function sanitizeString(value: unknown, fallback: string = ""): string {
   return typeof value === "string" ? value : fallback;
+}
+
+/**
+ * Safely coerces a value to a string and truncates it to the given length.
+ * Handles non-string values (numbers, objects, undefined, null) without throwing.
+ */
+export function truncate(value: unknown, maxLen: number, ellipsis: string = "..."): string {
+  const str = typeof value === "string" ? value : value == null ? "" : String(value);
+  if (str.length <= maxLen) return str;
+  return str.substring(0, maxLen) + ellipsis;
 }
 
 function sanitizeNonEmptyString(value: unknown, fallback: string = ""): string {
@@ -397,22 +406,6 @@ export function createSafeTriggerRenderer(renderer: TriggerRenderer, rendererNam
           }
         }
       : undefined,
-  };
-}
-
-export function createSafeAdditionalDataBuilder(
-  builder: ComponentAdditionalDataBuilder,
-  builderName: string,
-): ComponentAdditionalDataBuilder {
-  return {
-    buildAdditionalData(context) {
-      try {
-        return builder.buildAdditionalData(context);
-      } catch (error) {
-        console.error(`[SafeMapper] Additional data builder "${builderName}" threw in buildAdditionalData():`, error);
-        return undefined;
-      }
-    },
   };
 }
 

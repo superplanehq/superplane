@@ -1,10 +1,5 @@
-import { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import {
-  TriggersTrigger,
-  ComponentsComponent,
-  BlueprintsBlueprint,
-  IntegrationsIntegrationDefinition,
-} from "@/api-client";
+import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
+import type { TriggersTrigger, ComponentsComponent, IntegrationsIntegrationDefinition } from "@/api-client";
 
 // Flow control components that control workflow execution flow
 const FLOW_COMPONENT_NAMES = new Set(["if", "filter", "approval", "wait", "timeGate"]);
@@ -38,7 +33,6 @@ export function getComponentSubtype(block: BuildingBlock): "trigger" | "action" 
 export function buildBuildingBlockCategories(
   triggers: TriggersTrigger[],
   components: ComponentsComponent[],
-  blueprints: BlueprintsBlueprint[],
   availableIntegrations: IntegrationsIntegrationDefinition[],
 ): BuildingBlockCategory[] {
   const deprecatedTriggerNames = new Set(["github", "semaphore"]);
@@ -83,23 +77,6 @@ export function buildBuildingBlockCategories(
     {
       name: "Core",
       blocks: coreBlocks,
-    },
-    {
-      name: "Bundles",
-      blocks: blueprints.map((b): BuildingBlock => {
-        const block: BuildingBlock = {
-          id: b.id,
-          name: b.name!,
-          description: b.description,
-          type: "blueprint",
-          outputChannels: b.outputChannels,
-          configuration: b.configuration,
-          icon: "component",
-          color: "gray",
-        };
-        block.componentSubtype = getComponentSubtype(block);
-        return block;
-      }),
     },
   ];
 

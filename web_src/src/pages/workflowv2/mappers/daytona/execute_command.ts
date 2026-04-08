@@ -1,5 +1,6 @@
-import { EventStateRegistry, OutputPayload, StateFunction } from "../types";
-import { DEFAULT_EVENT_STATE_MAP, EventStateMap } from "@/ui/componentBase";
+import type { EventStateRegistry, OutputPayload, StateFunction } from "../types";
+import type { EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { defaultStateFunction } from "../stateRegistry";
 
 interface ExecuteCommandOutput {

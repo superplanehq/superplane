@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onMentionTriggerRenderer } from "./on_mention";
 import { onMessageTriggerRenderer } from "./on_message";
 import { sendTextMessageMapper } from "./send_text_message";

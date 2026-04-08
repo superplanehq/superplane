@@ -1,7 +1,7 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { AuthorizationPermission, RolesRole } from "../../../api-client/types.gen";
+import type { RolesRole } from "../../../api-client/types.gen";
 import { Icon } from "../../../components/Icon";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../../components/Table/table";
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
@@ -10,7 +10,6 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { showErrorToast } from "@/lib/toast";
-import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface RolesProps {
   organizationId: string;
@@ -20,10 +19,8 @@ export function Roles({ organizationId }: RolesProps) {
   usePageTitle(["Roles"]);
   const navigate = useNavigate();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  // Use React Query hooks for data fetching
   const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId);
 
-  // Mutation for role deletion
   const deleteRoleMutation = useDeleteRole(organizationId);
   const canCreateRoles = canAct("roles", "create");
   const canUpdateRoles = canAct("roles", "update");
@@ -103,15 +100,6 @@ export function Roles({ organizationId }: RolesProps) {
     return getSortedData(roles);
   }, [roles]);
 
-  const filterCustomComponetsPermissions = useCallback(
-    (permissions: AuthorizationPermission[]) => {
-      return permissions.filter((permission) =>
-        permission.resource === "blueprints" ? isCustomComponentsEnabled() : true,
-      );
-    },
-    [isCustomComponentsEnabled],
-  );
-
   return (
     <div className="space-y-6 pt-6">
       {error && (
@@ -159,9 +147,7 @@ export function Roles({ organizationId }: RolesProps) {
                     return (
                       <TableRow key={role.metadata?.name || index} className="last:[&>td]:border-b-0">
                         <TableCell className="font-semibold">{role.spec?.displayName || role.metadata?.name}</TableCell>
-                        <TableCell>
-                          {filterCustomComponetsPermissions(role.spec?.permissions || []).length || 0}
-                        </TableCell>
+                        <TableCell>{(role.spec?.permissions || []).length || 0}</TableCell>
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (

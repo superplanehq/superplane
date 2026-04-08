@@ -284,8 +284,8 @@ func (c *ExecutionStateContext) SetKV(key, value string) error {
 type AuthContext struct {
 	User   *core.User
 	Users  map[string]*core.User
-	Roles  map[string]struct{}
-	Groups map[string]struct{}
+	Roles  map[string]*core.RoleRef
+	Groups map[string]*core.GroupRef
 }
 
 func (c *AuthContext) AuthenticatedUser() *core.User {
@@ -300,6 +300,24 @@ func (c *AuthContext) GetUser(id uuid.UUID) (*core.User, error) {
 	}
 
 	return nil, fmt.Errorf("user not found: %s", id.String())
+}
+
+func (c *AuthContext) GetRole(name string) (*core.RoleRef, error) {
+	if c.Roles != nil {
+		if role, ok := c.Roles[name]; ok {
+			return role, nil
+		}
+	}
+	return nil, fmt.Errorf("role not found: %s", name)
+}
+
+func (c *AuthContext) GetGroup(name string) (*core.GroupRef, error) {
+	if c.Groups != nil {
+		if group, ok := c.Groups[name]; ok {
+			return group, nil
+		}
+	}
+	return nil, fmt.Errorf("group not found: %s", name)
 }
 
 func (c *AuthContext) HasRole(role string) (bool, error) {
@@ -369,4 +387,34 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 	}
 
 	return value, nil
+}
+
+type ExpressionContext struct {
+	Output any
+	Error  error
+}
+
+func (c *ExpressionContext) Run(expression string) (any, error) {
+	return c.Output, c.Error
+}
+
+type Notification struct {
+	Title     string
+	Body      string
+	URL       string
+	URLLabel  string
+	Receivers core.NotificationReceivers
+}
+
+type NotificationContext struct {
+	Messages []Notification
+}
+
+func (c *NotificationContext) IsAvailable() bool {
+	return true
+}
+
+func (c *NotificationContext) Send(title, body, url, urlLabel string, receivers core.NotificationReceivers) error {
+	c.Messages = append(c.Messages, Notification{Title: title, Body: body, URL: url, URLLabel: urlLabel, Receivers: receivers})
+	return nil
 }

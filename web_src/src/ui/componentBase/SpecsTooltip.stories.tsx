@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { SpecsTooltip } from "./SpecsTooltip";
-import { ComponentBaseSpecValue } from "./index";
+import type { ComponentBaseSpecValue } from "./index";
 import { ListFilter } from "lucide-react";
 
 const mockSpecValuesSingle: ComponentBaseSpecValue[] = [

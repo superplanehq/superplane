@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onIncidentTriggerRenderer } from "./on_incident";
 import { onEventTriggerRenderer } from "./on_incident_timeline_event";
 import { createIncidentMapper } from "./create_incident";

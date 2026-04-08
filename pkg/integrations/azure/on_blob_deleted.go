@@ -77,29 +77,6 @@ func (t *OnBlobDeleted) Color() string {
 	return "blue"
 }
 
-func (t *OnBlobDeleted) ExampleData() map[string]any {
-	return map[string]any{
-		"id":              "afc359b4-001e-001b-66ab-eeb76e069631",
-		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount",
-		"subject":         "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
-		"eventType":       "Microsoft.Storage.BlobDeleted",
-		"eventTime":       "2026-03-16T11:00:00Z",
-		"dataVersion":     "",
-		"metadataVersion": "1",
-		"data": map[string]any{
-			"api":             "DeleteBlob",
-			"clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-			"requestId":       "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
-			"eTag":            "0x8D4BCC2E4835CD0",
-			"contentType":     "text/csv",
-			"contentLength":   0,
-			"blobType":        "BlockBlob",
-			"url":             "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv",
-			"sequencer":       "00000000000004420000000000028964",
-		},
-	}
-}
-
 func (t *OnBlobDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

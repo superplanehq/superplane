@@ -1,4 +1,4 @@
-import {
+import type {
   CanvasesCanvasChangeRequest,
   CanvasesCanvasChangeRequestApprovalConfig,
   CanvasesCanvasVersion,
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { formatTimestamp, summarizeNodeDiff, VersionNodeDiffAccordion } from "./VersionNodeDiff";
+import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 import { getChangeRequestReviewActionFlags, getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 
 export type CanvasVersionNodeDiffContext = {
@@ -217,6 +218,12 @@ export function CanvasVersionNodeDiffDialog({
             </DialogDescription>
           ) : null}
         </DialogHeader>
+
+        {effectiveChangeRequest?.metadata?.description?.trim() ? (
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+            <WorkflowMarkdownPreview content={effectiveChangeRequest.metadata.description} />
+          </div>
+        ) : null}
 
         {showReviewActionsSection ? (
           <div

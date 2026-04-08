@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { CheckRuleNodeMetadata, GetCheckRuleConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const getCheckRuleMapper: ComponentBaseMapper = {
@@ -93,8 +94,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (nodeMetadata?.checkRuleName) {
     metadata.push({ icon: "bell", label: nodeMetadata.checkRuleName });
   } else if (configuration?.checkRule) {
-    const idPreview =
-      configuration.checkRule.length > 30 ? configuration.checkRule.substring(0, 30) + "…" : configuration.checkRule;
+    const idPreview = truncate(configuration.checkRule, 30, "…");
     metadata.push({ icon: "bell", label: idPreview });
   }
 

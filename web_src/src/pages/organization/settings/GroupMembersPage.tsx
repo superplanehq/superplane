@@ -20,7 +20,8 @@ import {
 } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { AddMembersSection, AddMembersSectionRef } from "./AddMembersSection";
+import type { AddMembersSectionRef } from "./AddMembersSection";
+import { AddMembersSection } from "./AddMembersSection";
 import { showErrorToast } from "@/lib/toast";
 
 export function GroupMembersPage() {
@@ -247,7 +248,7 @@ export function GroupMembersPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={member.spec?.accountProviders?.[0]?.avatarUrl}
+                          src={member.status?.accountProviders?.[0]?.avatarUrl}
                           initials={member.spec?.displayName?.charAt(0) || "U"}
                           className="size-8"
                         />
