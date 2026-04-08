@@ -16,6 +16,7 @@ export type AgentsAgentChatInfo = {
   id?: string;
   initialMessage?: string;
   createdAt?: string;
+  usage?: AgentsAgentChatUsage;
 };
 
 export type AgentsAgentChatMessage = {
@@ -25,6 +26,13 @@ export type AgentsAgentChatMessage = {
   toolCallId?: string;
   toolStatus?: string;
   createdAt?: string;
+};
+
+export type AgentsAgentChatUsage = {
+  totalInputTokens?: string;
+  totalOutputTokens?: string;
+  totalTokens?: string;
+  totalEstimatedCostUsd?: number;
 };
 
 export type AgentsCreateAgentChatRequest = {
@@ -38,6 +46,10 @@ export type AgentsCreateAgentChatResponse = {
 
 export type AgentsDescribeAgentChatResponse = {
   chat?: AgentsAgentChatInfo;
+};
+
+export type AgentsDescribeAgentUsageResponse = {
+  usage?: AgentsAgentChatUsage;
 };
 
 export type AgentsListAgentChatMessagesResponse = {
@@ -1563,6 +1575,32 @@ export type AgentsResumeAgentChatResponses = {
 };
 
 export type AgentsResumeAgentChatResponse2 = AgentsResumeAgentChatResponses[keyof AgentsResumeAgentChatResponses];
+
+export type AgentsDescribeAgentUsageData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/api/v1/agents/usage";
+};
+
+export type AgentsDescribeAgentUsageErrors = {
+  /**
+   * An unexpected error response.
+   */
+  default: GooglerpcStatus;
+};
+
+export type AgentsDescribeAgentUsageError = AgentsDescribeAgentUsageErrors[keyof AgentsDescribeAgentUsageErrors];
+
+export type AgentsDescribeAgentUsageResponses = {
+  /**
+   * A successful response.
+   */
+  200: AgentsDescribeAgentUsageResponse;
+};
+
+export type AgentsDescribeAgentUsageResponse2 =
+  AgentsDescribeAgentUsageResponses[keyof AgentsDescribeAgentUsageResponses];
 
 export type BlueprintsListBlueprintsData = {
   body?: never;
