@@ -16,6 +16,7 @@ import type { QueryDataSourceConfiguration } from "./types";
 import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
+import { asRecord, getFrameRowCount } from "./queryResponse";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -198,29 +199,4 @@ function collectFieldNames(frame: Record<string, unknown>, fieldNames: Set<strin
       fieldNames.add(field.name);
     }
   }
-}
-
-function getFrameRowCount(frame: Record<string, unknown>): number {
-  const data = asRecord(frame.data);
-  const values = data?.values;
-  if (!Array.isArray(values)) {
-    return 0;
-  }
-
-  let maxLength = 0;
-  for (const column of values) {
-    if (Array.isArray(column) && column.length > maxLength) {
-      maxLength = column.length;
-    }
-  }
-
-  return maxLength;
-}
-
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  return value as Record<string, unknown>;
 }

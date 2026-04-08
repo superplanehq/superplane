@@ -48,11 +48,10 @@ func (q *QueryLogs) Documentation() string {
 
 ## Configuration
 
-- **Data Source**: The Loki data source to query (required)
-- **Query**: A LogQL query expression (required), e.g. ` + "`{app=\"myservice\"} |= \"error\"`" + `
-- **Time From / Time To**: Optional datetime range for the log query window
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
-- **Limit**: Maximum number of log lines to return (optional)
+	- **Data Source**: The Loki data source to query (required)
+	- **Query**: A LogQL query expression (required), e.g. ` + "`{app=\"myservice\"} |= \"error\"`" + `
+	- **Time From / Time To**: Optional log query range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `
+	- **Limit**: Maximum number of log lines to return (optional)
 
 ## Output
 
@@ -97,34 +96,18 @@ func (q *QueryLogs) Configuration() []configuration.Field {
 		{
 			Name:        "timeFrom",
 			Label:       "Time From",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional start of the query time range",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Placeholder: "now-15m or 2026-04-08T15:30",
 		},
 		{
 			Name:        "timeTo",
 			Label:       "Time To",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional end of the query time range",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
-		},
-		{
-			Name:        "timezone",
-			Label:       "Timezone",
-			Type:        configuration.FieldTypeTimezone,
-			Required:    false,
-			Default:     "current",
-			Description: "Timezone offset used for Time From / Time To picker values",
+			Placeholder: "now or now+2h",
 		},
 		{
 			Name:        "limit",

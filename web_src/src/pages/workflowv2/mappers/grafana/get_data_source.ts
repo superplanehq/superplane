@@ -63,6 +63,10 @@ export const getDataSourceMapper: ComponentBaseMapper = {
       details["UID"] = source.uid;
     }
 
+    if (source?.url) {
+      details["URL"] = source.url;
+    }
+
     if (source?.isDefault !== undefined) {
       details["Default"] = source.isDefault ? "Yes" : "No";
     }

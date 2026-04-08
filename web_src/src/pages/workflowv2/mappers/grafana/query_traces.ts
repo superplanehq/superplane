@@ -15,6 +15,7 @@ import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { QueryTracesConfiguration } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
+import { countGrafanaQueryResponseRows } from "./queryResponse";
 
 export const queryTracesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -62,8 +63,7 @@ export const queryTracesMapper: ComponentBaseMapper = {
 
     const responseData = payload?.data as Record<string, unknown> | undefined;
     if (responseData) {
-      const traceCount = countTraces(responseData);
-      details["Traces"] = String(traceCount);
+      details["Traces"] = String(countGrafanaQueryResponseRows(responseData));
     }
 
     return details;
@@ -107,34 +107,4 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventId: execution.rootEvent?.id || "",
     },
   ];
-}
-
-function countTraces(responseData: Record<string, unknown>): number {
-  const results = responseData.results;
-  if (!results || typeof results !== "object" || Array.isArray(results)) {
-    return 0;
-  }
-
-  let total = 0;
-  for (const refId of Object.keys(results)) {
-    const result = (results as Record<string, unknown>)[refId];
-    if (!result || typeof result !== "object" || Array.isArray(result)) continue;
-
-    const frames = (result as Record<string, unknown>).frames;
-    if (!Array.isArray(frames)) continue;
-
-    for (const frame of frames) {
-      if (!frame || typeof frame !== "object" || Array.isArray(frame)) continue;
-      const data = (frame as Record<string, unknown>).data;
-      if (!data || typeof data !== "object" || Array.isArray(data)) continue;
-      const values = (data as Record<string, unknown>).values;
-      if (!Array.isArray(values) || values.length === 0) continue;
-      const firstCol = values[0];
-      if (Array.isArray(firstCol)) {
-        total += firstCol.length;
-      }
-    }
-  }
-
-  return total;
 }

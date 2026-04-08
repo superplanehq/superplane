@@ -47,10 +47,9 @@ func (q *QueryTraces) Documentation() string {
 
 ## Configuration
 
-- **Data Source**: The Tempo data source to query (required)
-- **Query**: A TraceQL query expression (required), e.g. ` + "`{ .http.status_code = 500 }`" + `
-- **Time From / Time To**: Optional datetime range for the trace search window
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+	- **Data Source**: The Tempo data source to query (required)
+	- **Query**: A TraceQL query expression (required), e.g. ` + "`{ .http.status_code = 500 }`" + `
+	- **Time From / Time To**: Optional trace search range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `
 
 ## Output
 
@@ -95,34 +94,18 @@ func (q *QueryTraces) Configuration() []configuration.Field {
 		{
 			Name:        "timeFrom",
 			Label:       "Time From",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional start of the trace search time range",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Placeholder: "now-15m or 2026-04-08T15:30",
 		},
 		{
 			Name:        "timeTo",
 			Label:       "Time To",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional end of the trace search time range",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
-		},
-		{
-			Name:        "timezone",
-			Label:       "Timezone",
-			Type:        configuration.FieldTypeTimezone,
-			Required:    false,
-			Default:     "current",
-			Description: "Timezone offset used for Time From / Time To picker values",
+			Placeholder: "now or now+2h",
 		},
 	}
 }
