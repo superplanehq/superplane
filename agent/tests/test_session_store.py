@@ -253,12 +253,18 @@ def test_delete_expired_chats_loops_until_batch_underflows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = _build_store()
-    batch_results = iter([500, 500, 200])
+    batch_rowcounts = iter([500, 500, 200])
     mock_cursor = MagicMock()
     mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
     mock_cursor.__exit__ = MagicMock(return_value=False)
 
-    type(mock_cursor).rowcount = property(lambda self: next(batch_results))
+    original_execute = mock_cursor.execute
+
+    def execute_with_rowcount(*args: Any, **kwargs: Any) -> None:
+        original_execute(*args, **kwargs)
+        mock_cursor.rowcount = next(batch_rowcounts)
+
+    mock_cursor.execute = MagicMock(side_effect=execute_with_rowcount)
 
     mock_conn = MagicMock()
     mock_conn.closed = False
