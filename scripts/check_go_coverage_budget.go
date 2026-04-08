@@ -28,7 +28,7 @@ var defaultIgnoredPackagePrefixes = []string{
 	"pkg/components",
 	"pkg/integrations",
 	"pkg/openapi_client",
-	"pkg/protos/",
+	"pkg/protos",
 	"pkg/triggers",
 	"pkg/web/assets",
 }
@@ -232,7 +232,7 @@ func toPackagePath(filePath string) string {
 
 func shouldIgnorePackage(packagePath string, ignoredPackagePrefixes []string) bool {
 	for _, prefix := range ignoredPackagePrefixes {
-		if strings.HasPrefix(packagePath, prefix) {
+		if packagePath == prefix || strings.HasPrefix(packagePath, prefix+"/") {
 			return true
 		}
 	}
