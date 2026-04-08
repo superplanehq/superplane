@@ -22,6 +22,20 @@ const setHmrPortFromPortPlugin = {
   },
 };
 
+// index.html uses Go template syntax for boolean literals; replace it during `vite dev`
+// so the inline script stays valid JavaScript (matches AGENT_ENABLED=yes like the app server).
+const injectAgentEnabledForViteDev = {
+  name: "inject-agent-enabled-for-vite-dev",
+  apply: "serve" as const,
+  transformIndexHtml(html: string) {
+    const enabled = process.env.AGENT_ENABLED === "yes";
+    return html.replace(
+      /window\.SUPERPLANE_AGENT_ENABLED = \{\{if \.AgentEnabled\}\}true\{\{else\}\}false\{\{end\}\};/,
+      `window.SUPERPLANE_AGENT_ENABLED = ${enabled};`,
+    );
+  },
+};
+
 // https://vite.dev/config/
 export default defineConfig(({ command }: { command: string }) => {
   const isDev = command !== "build";
@@ -29,7 +43,7 @@ export default defineConfig(({ command }: { command: string }) => {
   const devPort = Number.parseInt(process.env.VITE_DEV_PORT || "5173", 10);
 
   return {
-    plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
+    plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin, injectAgentEnabledForViteDev],
     base: "/",
     server: {
       port: devPort,
