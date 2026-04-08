@@ -15,13 +15,10 @@ from pydantic_evals import Dataset
 from ai.agent import AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from evals.case_logger import CaseLogger
+from evals.case_names import eval_case_name
 from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.cases import dataset
 from evals.report import ReportBuilder
-
-
-def _case_name(case: Any, index: int) -> str:
-    return getattr(case, "name", f"case_{index}")
 
 
 def split_case_names(value: str | None) -> list[str] | None:
@@ -36,7 +33,7 @@ def select_cases(all_cases: Sequence[Any], selected: Collection[str] | None) -> 
     if not selected:
         return list(all_cases)
     wanted = frozenset(selected)
-    known = {_case_name(c, i) for i, c in enumerate(all_cases)}
+    known = {eval_case_name(c, i) for i, c in enumerate(all_cases)}
     unknown = sorted(wanted - known)
     if unknown:
         available = "\n  ".join(sorted(known))
@@ -44,7 +41,7 @@ def select_cases(all_cases: Sequence[Any], selected: Collection[str] | None) -> 
             f"Unknown eval case name(s): {', '.join(unknown)}\nValid names:\n  {available}\n"
         )
         raise SystemExit(2)
-    return [c for i, c in enumerate(all_cases) if _case_name(c, i) in wanted]
+    return [c for i, c in enumerate(all_cases) if eval_case_name(c, i) in wanted]
 
 
 def load_env() -> dict[str, str]:
@@ -59,7 +56,8 @@ def load_env() -> dict[str, str]:
 
 async def runner(*, selected_case_names: list[str] | None) -> None:
     env = load_env()
-    cases = select_cases(list(dataset.cases), selected_case_names)
+    full_cases = list(dataset.cases)
+    cases = select_cases(full_cases, selected_case_names)
     eval_dataset = Dataset(cases=cases)
 
     deps = AgentDeps(
@@ -77,7 +75,7 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
     # Duplicate prompts across cases are not supported (detected under a lock).
     run_usages: dict[str, RunUsage] = {}
     usage_lock = asyncio.Lock()
-    question_to_case_name, case_names = build_case_name_index(cases)
+    question_to_case_name, case_names = build_case_name_index(cases, full_cases)
 
     case_logger = CaseLogger(
         run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%S_%fZ"),
@@ -128,7 +126,7 @@ def main(argv: list[str] | None = None) -> None:
     args = _parse_args(argv)
     if args.list_cases:
         for index, case in enumerate(dataset.cases):
-            print(_case_name(case, index))
+            print(eval_case_name(case, index))
         return
     selected = split_case_names(args.cases)
     if selected is None:
