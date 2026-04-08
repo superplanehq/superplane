@@ -7,13 +7,15 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/components"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func DescribeComponent(ctx context.Context, registry *registry.Registry, name string) (*pb.DescribeComponentResponse, error) {
 	component, err := registry.GetComponent(name)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.NotFound, "component %s not found", name)
 	}
 
 	outputChannels := component.OutputChannels(nil)
