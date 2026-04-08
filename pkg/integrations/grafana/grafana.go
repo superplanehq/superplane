@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -9,7 +10,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const resourceTypeDataSource = "data-source"
+const (
+	resourceTypeDataSource = "data-source"
+	resourceTypeDashboard  = "dashboard"
+	resourceTypePanel      = "panel"
+	resourceTypeAnnotation = "annotation"
+)
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -80,6 +86,9 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
 		&QueryDataSource{},
+		&CreateAnnotation{},
+		&ListAnnotations{},
+		&DeleteAnnotation{},
 	}
 }
 
@@ -107,38 +116,147 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeDataSource {
+	switch resourceType {
+	case resourceTypeDataSource:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		dataSources, err := client.ListDataSources()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(dataSources))
+		for _, source := range dataSources {
+			id := strings.TrimSpace(source.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(source.Name)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeDataSource,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+
+	case resourceTypeDashboard:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		dashboards, err := client.SearchDashboards()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(dashboards))
+		for _, d := range dashboards {
+			id := strings.TrimSpace(d.UID)
+			if id == "" {
+				continue
+			}
+
+			name := strings.TrimSpace(d.Title)
+			if name == "" {
+				name = id
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeDashboard,
+				Name: name,
+				ID:   id,
+			})
+		}
+
+		return resources, nil
+
+	case resourceTypePanel:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboardUID"])
+		if dashboardUID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		panels, err := client.ListDashboardPanels(dashboardUID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(panels))
+		for _, panel := range panels {
+			if panel.ID <= 0 {
+				continue
+			}
+
+			name := strings.TrimSpace(panel.Title)
+			if name == "" {
+				name = fmt.Sprintf("Panel %d", panel.ID)
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypePanel,
+				Name: name,
+				ID:   strconv.FormatInt(panel.ID, 10),
+			})
+		}
+
+		return resources, nil
+
+	case resourceTypeAnnotation:
+		client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+		if err != nil {
+			return nil, fmt.Errorf("error creating client: %w", err)
+		}
+
+		annotations, err := client.ListAnnotations(nil, "", 0, 0, 5000)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(annotations))
+		for _, a := range annotations {
+			idStr := strconv.FormatInt(a.ID, 10)
+			name := formatAnnotationResourceName(a)
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeAnnotation,
+				Name: name,
+				ID:   idStr,
+			})
+		}
+
+		return resources, nil
+
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %w", err)
-	}
-
-	dataSources, err := client.ListDataSources()
-	if err != nil {
-		return nil, err
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(dataSources))
-	for _, source := range dataSources {
-		id := strings.TrimSpace(source.UID)
-		if id == "" {
-			continue
+func formatAnnotationResourceName(a Annotation) string {
+	text := strings.TrimSpace(a.Text)
+	const maxRunes = 72
+	if text != "" {
+		r := []rune(text)
+		if len(r) > maxRunes {
+			text = string(r[:maxRunes]) + "…"
 		}
-
-		name := strings.TrimSpace(source.Name)
-		if name == "" {
-			name = id
-		}
-
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceTypeDataSource,
-			Name: name,
-			ID:   id,
-		})
 	}
-
-	return resources, nil
+	if text == "" {
+		return fmt.Sprintf("#%d", a.ID)
+	}
+	return fmt.Sprintf("#%d · %s", a.ID, text)
 }
