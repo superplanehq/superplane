@@ -12,6 +12,7 @@
     <script>
       window.SUPERPLANE_SENTRY_DSN = "{{ .SentryDSN }}";
       window.SUPERPLANE_SENTRY_ENVIRONMENT = "{{ .SentryEnvironment }}";
+      window.SUPERPLANE_AGENT_ENABLED = {{ .AgentEnabled }}; // boolean literal
     </script>
 
     <title>SuperPlane</title>
