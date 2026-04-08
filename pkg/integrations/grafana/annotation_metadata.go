@@ -28,23 +28,41 @@ func setDashboardNodeMetadata(ctx core.SetupContext, dashboardUID string) error 
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err == nil {
-		dashboards, searchErr := client.SearchDashboards()
-		if searchErr == nil {
-			for _, dashboard := range dashboards {
-				if strings.TrimSpace(dashboard.UID) != dashboardUID {
-					continue
-				}
-
-				title := strings.TrimSpace(dashboard.Title)
-				if title != "" {
-					metadata.DashboardTitle = title
-				}
-				break
+		if title, getErr := client.GetDashboardTitle(dashboardUID); getErr == nil && strings.TrimSpace(title) != "" {
+			metadata.DashboardTitle = title
+		} else if shouldFallbackDashboardTitleLookup(getErr) {
+			if title := searchDashboardTitle(client, dashboardUID); title != "" {
+				metadata.DashboardTitle = title
 			}
 		}
 	}
 
 	return ctx.Metadata.Set(metadata)
+}
+
+func shouldFallbackDashboardTitleLookup(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return strings.Contains(err.Error(), "response too large")
+}
+
+func searchDashboardTitle(client *Client, dashboardUID string) string {
+	dashboards, err := client.SearchDashboards()
+	if err != nil {
+		return ""
+	}
+
+	for _, dashboard := range dashboards {
+		if strings.TrimSpace(dashboard.UID) != dashboardUID {
+			continue
+		}
+
+		return strings.TrimSpace(dashboard.Title)
+	}
+
+	return ""
 }
 
 func setAnnotationNodeMetadata(ctx core.SetupContext, annotationID string) error {
@@ -63,15 +81,9 @@ func setAnnotationNodeMetadata(ctx core.SetupContext, annotationID string) error
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
 	if err == nil {
-		annotations, listErr := client.ListAnnotations(nil, "", 0, 0, 5000)
-		if listErr == nil {
-			for _, annotation := range annotations {
-				if strconv.FormatInt(annotation.ID, 10) != annotationID {
-					continue
-				}
-
+		if id, parseErr := strconv.ParseInt(annotationID, 10, 64); parseErr == nil {
+			if annotation, getErr := client.GetAnnotation(id); getErr == nil {
 				metadata.AnnotationLabel = formatAnnotationResourceName(annotation)
-				break
 			}
 		}
 	}

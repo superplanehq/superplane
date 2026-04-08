@@ -83,9 +83,9 @@ func Test__DeleteAnnotation__Setup__StoresAnnotationLabelMetadata(t *testing.T) 
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`[
-					{"id":42,"text":"Deploy finished","time":0}
-				]`)),
+				Body: io.NopCloser(strings.NewReader(
+					`{"id":42,"text":"Deploy finished","time":0}`,
+				)),
 			},
 		},
 	}

@@ -103,12 +103,12 @@ The Create Annotation component writes an annotation into Grafana, marking opera
 
 ### Configuration
 
-- **Text**: The annotation message (required)
-- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
-- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
-- **Panel ID**: Optional panel ID within the dashboard to attach the annotation to
-- **Time**: Optional start time (defaults to now if omitted). Supports absolute values like `2026-04-08T15:30` or relative Grafana values like `now+2h`
-- **Time End**: Optional end time — providing this creates a region annotation spanning the window. Supports absolute or relative Grafana values
+	- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
+	- **Panel**: Optional panel within the selected dashboard to attach the annotation to
+	- **Text**: The annotation message (required)
+	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
+	- **Time**: Optional start time expression. Example: `{{ now() }}`
+	- **Time End**: Optional end time expression for a region annotation. Example: `{{ now() + duration("24h") }}`
 
 ### Output
 
@@ -174,10 +174,12 @@ The List Annotations component retrieves annotations from Grafana, optionally fi
 
 ### Configuration
 
-- **Tags**: Filter to annotations matching all of the specified tags (optional)
-- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
-- **From / To**: Time range filter as datetime values (optional)
-- **Limit**: Maximum number of annotations to return (optional)
+	- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
+	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
+	- **Text**: Optional — filter annotations whose text contains this value
+	- **Tags**: Filter to annotations matching all of the specified tags (optional)
+	- **From / To**: Time range filter expressions (optional). Examples: `{{ now() + duration("-1h") }}` and `{{ now() }}`
+	- **Limit**: Maximum number of annotations to return (optional)
 
 ### Output
 

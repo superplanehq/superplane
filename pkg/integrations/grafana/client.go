@@ -640,6 +640,27 @@ func (c *Client) ListAnnotations(tags []string, dashboardUID string, from, to, l
 	return annotations, nil
 }
 
+func (c *Client) GetAnnotation(id int64) (Annotation, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/annotations/%d", id),
+		nil,
+		"",
+	)
+	if err != nil {
+		return Annotation{}, fmt.Errorf("error getting annotation: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return Annotation{}, newAPIStatusError("grafana annotation get", status, responseBody)
+	}
+
+	var annotation Annotation
+	if err := json.Unmarshal(responseBody, &annotation); err != nil {
+		return Annotation{}, fmt.Errorf("error parsing annotation response: %v", err)
+	}
+	return annotation, nil
+}
+
 func (c *Client) DeleteAnnotation(id int64) error {
 	responseBody, status, err := c.execRequest(
 		http.MethodDelete,
@@ -701,6 +722,32 @@ func (c *Client) SearchDashboards() ([]DashboardSearchHit, error) {
 	}
 
 	return hits, nil
+}
+
+// GetDashboardTitle loads a dashboard by UID and returns its title (GET /api/dashboards/uid/:uid).
+func (c *Client) GetDashboardTitle(uid string) (string, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(strings.TrimSpace(uid))),
+		nil,
+		"",
+	)
+	if err != nil {
+		return "", fmt.Errorf("error getting dashboard: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response struct {
+		Dashboard struct {
+			Title string `json:"title"`
+		} `json:"dashboard"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return "", fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+	return strings.TrimSpace(response.Dashboard.Title), nil
 }
 
 func (c *Client) ListDashboardPanels(uid string) ([]DashboardPanel, error) {

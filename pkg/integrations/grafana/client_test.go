@@ -417,6 +417,55 @@ func Test__Client__ListDashboardPanels(t *testing.T) {
 	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/dashboards/uid/dash-1")
 }
 
+func Test__Client__GetDashboardTitle(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"dashboard": {"title": "Production Overview", "uid": "abc"}
+				}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	title, err := client.GetDashboardTitle("abc")
+	require.NoError(t, err)
+	require.Equal(t, "Production Overview", title)
+	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/dashboards/uid/abc")
+}
+
+func Test__Client__GetAnnotation(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(
+					`{"id":42,"text":"deploy","tags":["prod"],"time":1,"timeEnd":2,"dashboardUID":"d1","panelId":3}`,
+				)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	annotation, err := client.GetAnnotation(42)
+	require.NoError(t, err)
+	require.Equal(t, int64(42), annotation.ID)
+	require.Equal(t, "deploy", annotation.Text)
+	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/annotations/42")
+}
+
 func Test__Grafana__ListResources__Annotations(t *testing.T) {
 	g := &Grafana{}
 	httpContext := &contexts.HTTPContext{

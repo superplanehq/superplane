@@ -1,6 +1,7 @@
 package grafana
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
@@ -31,6 +32,41 @@ func Test__ListAnnotations__Setup__StoresDashboardTitleMetadata(t *testing.T) {
 		Responses: []*http.Response{
 			{
 				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"dashboard": {"title": "Operations", "uid": "dash-1"}
+				}`)),
+			},
+		},
+	}
+
+	err := component.Setup(core.SetupContext{
+		Configuration: map[string]any{
+			"dashboardUID": "dash-1",
+		},
+		Metadata: metadata,
+		HTTP:     httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseURL":  "https://grafana.example.com",
+				"apiToken": "token",
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, AnnotationNodeMetadata{DashboardTitle: "Operations"}, metadata.Metadata)
+}
+
+func Test__ListAnnotations__Setup__FallsBackToSearchWhenDashboardResponseIsTooLarge(t *testing.T) {
+	component := &ListAnnotations{}
+	metadata := &contexts.MetadataContext{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(bytes.NewReader(bytes.Repeat([]byte("a"), maxResponseSize+1))),
+			},
+			{
+				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`[
 					{"uid":"dash-1","title":"Operations","type":"dash-db"}
 				]`)),
@@ -53,6 +89,9 @@ func Test__ListAnnotations__Setup__StoresDashboardTitleMetadata(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, AnnotationNodeMetadata{DashboardTitle: "Operations"}, metadata.Metadata)
+	require.Len(t, httpContext.Requests, 2)
+	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/dashboards/uid/dash-1")
+	require.Contains(t, httpContext.Requests[1].URL.Path, "/api/search")
 }
 
 func Test__filterAnnotations(t *testing.T) {
