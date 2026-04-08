@@ -143,6 +143,12 @@ func TestInitWithTemplateOutputsTemplateContent(t *testing.T) {
 	require.Contains(t, output, "Health Check Monitor")
 	require.Contains(t, output, "trigger-001")
 	require.Contains(t, output, "http-001")
+
+	// Should not contain server-only fields
+	require.NotContains(t, output, "tpl-001")
+	require.NotContains(t, output, "isTemplate")
+}
+
 }
 
 func TestInitWithInvalidTemplateReturnsError(t *testing.T) {

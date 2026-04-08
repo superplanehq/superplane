@@ -65,7 +65,7 @@ func (c *initCommand) executeTemplate(ctx core.CommandContext, name string) erro
 		return fmt.Errorf("template %q not found; available templates: %s", name, strings.Join(available, ", "))
 	}
 
-	resource := models.CanvasResourceFromCanvas(*match)
+	resource := templateResourceFromCanvas(*match)
 	data, err := yaml.Marshal(resource)
 	if err != nil {
 		return fmt.Errorf("failed to marshal template: %w", err)
@@ -129,6 +129,34 @@ func (c *initCommand) writeToFile(path string, data []byte) error {
 
 	fmt.Fprintf(os.Stderr, "Canvas file written to %s\n", path)
 	return nil
+}
+
+// normalizeTemplateName converts a template name to a comparable form,
+// so both "Health Check Monitor" and "health-check-monitor" match.
+func normalizeTemplateName(name string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
+}
+
+// templateResourceFromCanvas creates a clean canvas resource suitable for
+// user output, stripping server-only fields like id, organizationId, and isTemplate.
+func templateResourceFromCanvas(canvas openapi_client.CanvasesCanvas) models.Canvas {
+	var cleanMetadata *openapi_client.CanvasesCanvasMetadata
+	if canvas.Metadata != nil {
+		cleanMetadata = &openapi_client.CanvasesCanvasMetadata{}
+		name := canvas.Metadata.GetName()
+		cleanMetadata.SetName(name)
+		description := canvas.Metadata.GetDescription()
+		if description != "" {
+			cleanMetadata.SetDescription(description)
+		}
+	}
+
+	return models.Canvas{
+		APIVersion: core.APIVersion,
+		Kind:       models.CanvasKind,
+		Metadata:   cleanMetadata,
+		Spec:       canvas.Spec,
+	}
 }
 
 func fetchTemplates(ctx core.CommandContext) ([]openapi_client.CanvasesCanvas, error) {
