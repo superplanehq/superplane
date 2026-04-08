@@ -15,6 +15,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Annotation" href="#create-annotation" description="Create an annotation in Grafana to mark deploys, incidents, or other operational events on timelines" />
+  <LinkCard title="Delete Annotation" href="#delete-annotation" description="Delete an existing Grafana annotation by ID" />
+  <LinkCard title="List Annotations" href="#list-annotations" description="List Grafana annotations filtered by tag, dashboard, or time range" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
 </CardGrid>
 
@@ -82,6 +85,142 @@ The trigger emits the full Grafana webhook payload, including:
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.alert.firing"
+}
+```
+
+<a id="create-annotation"></a>
+
+## Create Annotation
+
+The Create Annotation component writes an annotation into Grafana, marking operational events on dashboard timelines.
+
+### Use Cases
+
+- **Deploy tracking**: Annotate graphs at the exact moment a deployment is triggered or completes
+- **Incident markers**: Place a marker when an incident is opened or resolved for post-incident correlation
+- **Maintenance windows**: Mark the start and end of a maintenance window as a region annotation
+- **Change correlation**: Record configuration changes, feature flag toggles, or rollbacks directly on the timeline
+
+### Configuration
+
+	- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
+	- **Panel**: Optional panel within the selected dashboard to attach the annotation to
+	- **Text**: The annotation message (required)
+	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
+	- **Time**: Optional start time expression. Example: `now()`
+	- **Time End**: Optional end time expression for a region annotation. Example: `now() + duration("24h")`
+
+### Output
+
+Returns the ID of the newly created annotation.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": 42,
+    "url": "https://grafana.example.com/d/production-overview/production-overview?from=1739376783362\u0026to=1739377383362"
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotation.created"
+}
+```
+
+<a id="delete-annotation"></a>
+
+## Delete Annotation
+
+The Delete Annotation component removes an annotation from Grafana by ID.
+
+### Use Cases
+
+- **Cleanup incorrect markers**: Remove an annotation that was created with wrong text or tags
+- **Automated lifecycle**: Delete temporary markers (e.g. maintenance window start) once the event is complete
+- **Idempotent workflows**: Allow re-runs to clean up previously created annotations before re-creating them
+
+### Configuration
+
+- **Annotation**: The annotation to delete, chosen from your Grafana instance (required)
+
+### Output
+
+Returns the annotation ID and a confirmation that the annotation was deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": 42
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotation.deleted"
+}
+```
+
+<a id="list-annotations"></a>
+
+## List Annotations
+
+The List Annotations component retrieves annotations from Grafana, optionally filtered by tag, dashboard, or time range.
+
+### Use Cases
+
+- **Audit operational events**: Review recent deploy, incident, or change markers on a timeline
+- **Correlate incidents**: Retrieve annotations from around an incident time window for post-incident analysis
+- **Workflow branching**: Check for existing markers before creating duplicate annotations
+
+### Configuration
+
+	- **Dashboard**: Optional — filter to annotations on a specific dashboard from your Grafana instance
+	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
+	- **Text**: Optional — filter annotations whose text contains this value
+	- **Tags**: Filter to annotations matching all of the specified tags (optional)
+	- **From / To**: Time range filter expressions (optional). Examples: `{{ now() + duration("-1h") }}` and `{{ now() }}`
+	- **Limit**: Maximum number of annotations to return (optional)
+
+### Output
+
+Returns a list of annotation objects including ID, text, tags, time, and dashboard/panel references.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": [
+      {
+        "dashboardUID": "abc123",
+        "id": 42,
+        "panelId": 3,
+        "tags": [
+          "deploy",
+          "production"
+        ],
+        "text": "Deploy v1.2.3 to production",
+        "time": 1739376000000,
+        "timeEnd": 1739376000000,
+        "type": "annotation"
+      },
+      {
+        "dashboardUID": "abc123",
+        "id": 41,
+        "panelId": 3,
+        "tags": [
+          "rollback",
+          "production"
+        ],
+        "text": "Rollback to v1.2.2",
+        "time": 1739289600000,
+        "timeEnd": 1739289600000,
+        "type": "annotation"
+      }
+    ]
+  },
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "type": "grafana.annotations"
 }
 ```
 
