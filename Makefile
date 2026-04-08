@@ -77,8 +77,9 @@ test.license.check:
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
+# Subset: CASES=comma-separated names from agent/evals/cases.py (optional).
 test.agent.evals:
-	$(COMPOSE) exec $(if $(EVAL_CASES),-e EVAL_CASES=$(EVAL_CASES),) agent uv run python -m evals.runner $(AGENT_EVAL_RUNNER_ARGS)
+	$(COMPOSE) exec $(if $(CASES),-e CASES=$(CASES),) agent uv run python -m evals.runner $(AGENT_EVAL_RUNNER_ARGS)
 
 test.agent.setup:
 	@touch agent/.env

@@ -114,7 +114,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--cases",
         metavar="NAMES",
-        help="Comma-separated eval case names. When set, overrides the EVAL_CASES environment variable.",
+        help="Comma-separated eval case names. When set, overrides the CASES environment variable.",
     )
     parser.add_argument(
         "--list-cases",
@@ -132,7 +132,7 @@ def main(argv: list[str] | None = None) -> None:
         return
     selected = split_case_names(args.cases)
     if selected is None:
-        selected = split_case_names(os.getenv("EVAL_CASES"))
+        selected = split_case_names(os.getenv("CASES"))
     asyncio.run(runner(selected_case_names=selected))
 
 
