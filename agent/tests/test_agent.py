@@ -21,6 +21,14 @@ def test_load_system_prompt_covers_expr_datetime_semantics() -> None:
     assert "root().data" in text
 
 
+def test_load_system_prompt_documents_canvas_node_tools() -> None:
+    text = load_system_prompt()
+    assert "get_node_details" in text
+    assert "list_node_events" in text
+    assert "list_node_executions" in text
+    assert "get_canvas_shape" in text
+
+
 def test_build_prompt_contains_question() -> None:
     prompt = build_prompt(CanvasQuestionRequest(question="What triggers this flow?"))
     assert "triggers" in prompt

@@ -6,7 +6,15 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
 
 from ai.config import config
-from ai.models import CanvasAnswer, CanvasQuestionRequest, CanvasSummary
+from ai.models import (
+    CanvasAnswer,
+    CanvasQuestionRequest,
+    CanvasShape,
+    CanvasSummary,
+    NodeDetails,
+    NodeEvent,
+    NodeExecution,
+)
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
 from ai.patterns import search_decision_patterns as search_markdown_patterns
@@ -265,5 +273,89 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         except Exception as error:
             _tool_debug(f"list_integration_resources failed: {error}")
             return [_tool_error_entry("list_integration_resources", error)]
+
+    @agent.tool
+    def get_canvas_shape(ctx: RunContext[AgentDeps]) -> CanvasShape:
+        """Compact canvas topology using node display names (no edge channels).
+
+        Use for explaining graph shape in human-readable form. For edits and
+        exact ids or subscription channels, call get_canvas instead. Prefer at
+        most one of get_canvas or get_canvas_shape per answer unless the user
+        asks to refresh.
+        """
+        return ctx.deps.client.get_canvas_shape(ctx.deps.canvas_id)
+
+    @agent.tool
+    def get_node_details(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        include_recent_events: bool = True,
+    ) -> NodeDetails | dict[str, Any]:
+        """Fetch one node's catalog identity, configuration, validation messages,
+        integration binding summary, and recent events.
+
+        Use for questions about a specific node's settings, errors, or activity.
+        Request one node at a time unless the user explicitly asks for several;
+        configuration payloads can be large.
+        """
+        try:
+            return ctx.deps.client.get_node_details(
+                ctx.deps.canvas_id,
+                node_id,
+                include_recent_events=include_recent_events,
+            )
+        except Exception as error:
+            _tool_debug(f"get_node_details failed for {node_id}: {error}")
+            err = _tool_error_entry("get_node_details", error)
+            err["node_id"] = node_id
+            return err
+
+    @agent.tool
+    def list_node_events(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        limit: int = 10,
+    ) -> list[NodeEvent | dict[str, Any]]:
+        """List recent events for a canvas node (payload history / activity).
+
+        Use when the user needs more event rows than get_node_details includes,
+        or when only events matter. Keep limit modest (default 10).
+        """
+        try:
+            return ctx.deps.client.list_node_events(
+                ctx.deps.canvas_id,
+                node_id,
+                limit=limit,
+            )
+        except Exception as error:
+            _tool_debug(f"list_node_events failed for {node_id}: {error}")
+            entry = _tool_error_entry("list_node_events", error)
+            entry["node_id"] = node_id
+            return [entry]
+
+    @agent.tool
+    def list_node_executions(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        limit: int = 10,
+        results: list[str] | None = None,
+    ) -> list[NodeExecution | dict[str, Any]]:
+        """List recent executions for a node (state, result, messages, timestamps).
+
+        Use for run failures and execution outcomes. Optional results filters
+        API enum values such as RESULT_FAILED. Default limit is 10.
+        """
+        try:
+            return ctx.deps.client.list_node_executions(
+                ctx.deps.canvas_id,
+                node_id,
+                limit=limit,
+                results=results,
+            )
+        except Exception as error:
+            _tool_debug(f"list_node_executions failed for {node_id}: {error}")
+            entry = _tool_error_entry("list_node_executions", error)
+            entry["node_id"] = node_id
+            return [entry]
 
     return agent
