@@ -114,7 +114,7 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--cases",
         metavar="NAMES",
-        help="Comma-separated eval case names. When set, overrides the CASES environment variable.",
+        help="Comma-separated eval case names; overrides CASES when set.",
     )
     parser.add_argument(
         "--list-cases",
