@@ -131,6 +131,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
       DB_SSLMODE: ${DB_SSLMODE:-disable}
       APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
+      AGENT_CHAT_RETENTION_DAYS: ${AGENT_CHAT_RETENTION_DAYS:-14}
       REPL_WEB_DEBUG: ${REPL_WEB_DEBUG:-true}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
     command: >-
