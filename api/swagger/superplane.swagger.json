@@ -7044,6 +7044,9 @@
         "id": {
           "type": "string"
         },
+        "name": {
+          "type": "string"
+        },
         "email": {
           "type": "string"
         },
@@ -7065,6 +7068,12 @@
           }
         },
         "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "groups": {
           "type": "array",
           "items": {
             "type": "string"

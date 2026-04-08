@@ -7,6 +7,11 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { QueryDataSourceConfiguration } from "./types";
+<<<<<<< feat/grafana-alert-control
+=======
+import { truncate } from "../safeMappers";
+import { renderTimeAgo } from "@/components/TimeAgo";
+>>>>>>> main
 import { formatTimestamp } from "../utils";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 
@@ -69,8 +74,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (configuration?.query) {
-    const preview =
-      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
+    const preview = truncate(configuration.query, 50);
     metadata.push({ icon: "code", label: preview });
   }
 

@@ -14,9 +14,7 @@ interface HistoryQueuePageProps {
   onEventClick?: (event: SidebarEvent) => void;
   onTriggerNavigate?: (event: SidebarEvent) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
-  onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
@@ -44,9 +42,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   onEventClick,
   onTriggerNavigate,
   getTabData,
-  onPushThrough,
   onCancelExecution,
-  supportsPushThrough,
   onReEmit,
   loadExecutionChain,
   getExecutionState,
@@ -78,9 +74,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 onEventClick={onEventClick}
                 onTriggerNavigate={onTriggerNavigate}
                 tabData={getTabData?.(event)}
-                onPushThrough={onPushThrough}
                 onCancelExecution={onCancelExecution}
-                supportsPushThrough={supportsPushThrough}
                 onReEmit={onReEmit}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}

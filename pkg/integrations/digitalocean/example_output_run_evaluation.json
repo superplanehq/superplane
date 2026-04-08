@@ -1,0 +1,75 @@
+{
+  "data": {
+    "evaluationRunUUID": "ba42b577-9dab-40a9-a375-315a5be1922e",
+    "testCaseUUID": "c6d75370-2f3e-11f1-b074-4e013e2ddde4",
+    "testCaseName": "Product Knowledge Baseline",
+    "agentUUID": "7d5c762a-2e66-11f1-b074-4e013e2ddde4",
+    "agentName": "support-agent",
+    "passed": true,
+    "status": "successful",
+    "starMetric": {
+      "metricName": "Correctness (general hallucinations)",
+      "numberValue": 93.33,
+      "stringValue": ""
+    },
+    "runLevelMetrics": [
+      {
+        "metricName": "Retrieved context relevance",
+        "numberValue": 0,
+        "stringValue": ""
+      },
+      {
+        "metricName": "Response-context completeness",
+        "numberValue": 0,
+        "stringValue": ""
+      },
+      {
+        "metricName": "Correctness (general hallucinations)",
+        "numberValue": 93.33,
+        "stringValue": ""
+      }
+    ],
+    "prompts": [
+      {
+        "input": "What is a Droplet?",
+        "output": "A Droplet is a type of virtual private server (VPS) provided by a cloud platform.",
+        "groundTruth": "A Droplet is a virtual machine that runs on DigitalOcean's cloud infrastructure.",
+        "metrics": [
+          {
+            "metricName": "Correctness (general hallucinations)",
+            "numberValue": 100,
+            "stringValue": ""
+          },
+          {
+            "metricName": "Retrieved context relevance",
+            "numberValue": 0,
+            "stringValue": ""
+          }
+        ]
+      },
+      {
+        "input": "What is the pricing for Droplet?",
+        "output": "The pricing for Droplet starts at $5/month for a basic plan.",
+        "groundTruth": "Droplets have flexible pricing based on instance type, region, and options you select.",
+        "metrics": [
+          {
+            "metricName": "Correctness (general hallucinations)",
+            "numberValue": 66.67,
+            "stringValue": ""
+          },
+          {
+            "metricName": "Retrieved context relevance",
+            "numberValue": 0,
+            "stringValue": ""
+          }
+        ]
+      }
+    ],
+    "startedAt": "2025-01-01T00:00:00Z",
+    "finishedAt": "2025-01-01T00:03:44Z"
+  },
+  "timestamp": "2025-01-01T00:03:44Z",
+  "type": "digitalocean.evaluation.passed"
+}
+
+

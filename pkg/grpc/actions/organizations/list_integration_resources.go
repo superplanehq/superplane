@@ -42,6 +42,20 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 		return nil, status.Error(codes.Internal, "failed to load integration")
 	}
 
+	if instance.State == models.IntegrationStateError {
+		log.WithFields(log.Fields{
+			"integration_id":   instance.ID,
+			"integration_name": instance.AppName,
+		}).Warn("integration is in error state")
+		return nil, status.Error(codes.FailedPrecondition, "integration is in error state")
+	}
+
+	if instance.State != models.IntegrationStateReady {
+		return &pb.ListIntegrationResourcesResponse{
+			Resources: []*pb.IntegrationResourceRef{},
+		}, nil
+	}
+
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "integration %s is unavailable", instance.AppName)
@@ -69,8 +83,8 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	resources, err := integration.ListResources(resourceType, listCtx)
 	if err != nil {
-		log.WithError(err).WithField("integration_id", instance.ID).Error("failed to list resources")
-		return nil, status.Error(codes.Internal, "failed to list integration resources")
+		log.WithError(err).WithField("integration_id", instance.ID).Warn("failed to list integration resources")
+		return nil, status.Error(codes.FailedPrecondition, "failed to list integration resources")
 	}
 
 	return &pb.ListIntegrationResourcesResponse{
