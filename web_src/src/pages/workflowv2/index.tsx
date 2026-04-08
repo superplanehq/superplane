@@ -1,7 +1,7 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { isAgentReplEnabled } from "@/lib/env";
+import { isAgentEnabled } from "@/lib/env";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
@@ -513,7 +513,7 @@ export function WorkflowPageV2() {
   const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
-  const showAiBuilderTab = isAgentReplEnabled();
+  const showAiBuilderTab = isAgentEnabled();
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 

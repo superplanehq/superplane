@@ -68,6 +68,7 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      AGENT_ENABLED: ${AGENT_ENABLED:-yes}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
       AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
@@ -82,7 +83,6 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
-      VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
 
     ports:
