@@ -40,7 +40,7 @@ export const createAnnotationMapper: ComponentBaseMapper = {
     };
 
     if (configuration?.text) {
-      details["Text"] =
+      details["Annotation"] =
         configuration.text.length > 80 ? configuration.text.substring(0, 80) + "..." : configuration.text;
     }
 
@@ -59,9 +59,6 @@ export const createAnnotationMapper: ComponentBaseMapper = {
     }
 
     const output = payload?.data as CreateAnnotationOutput | undefined;
-    if (output != null && typeof output.id === "number") {
-      details["Annotation ID"] = String(output.id);
-    }
     if (output?.url) {
       details["Annotation URL"] = output.url;
     }

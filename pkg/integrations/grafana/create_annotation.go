@@ -60,8 +60,8 @@ func (c *CreateAnnotation) Documentation() string {
 	- **Panel**: Optional panel within the selected dashboard to attach the annotation to
 	- **Text**: The annotation message (required)
 	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
-	- **Time**: Optional start time expression. Example: ` + "`{{ now() }}`" + `
-	- **Time End**: Optional end time expression for a region annotation. Example: ` + "`{{ now() + duration(\"24h\") }}`" + `
+	- **Time**: Optional start time expression. Example: ` + "`now()`" + `
+	- **Time End**: Optional end time expression for a region annotation. Example: ` + "`now() + duration(\"24h\")`" + `
 
 ## Output
 
@@ -144,8 +144,8 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Start time",
-			Default:     `{{ now() }}`,
-			Placeholder: `{{ now() }}`,
+			Default:     `now()`,
+			Placeholder: `now()`,
 		},
 		{
 			Name:        "timeEnd",
@@ -153,7 +153,7 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "End time",
-			Placeholder: `{{ now() + duration("24h") }}`,
+			Placeholder: `now() + duration("24h")`,
 		},
 	}
 }

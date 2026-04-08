@@ -140,7 +140,7 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Return annotations at or after this time",
-			Placeholder: `{{ now() + duration("-1h") }}`,
+			Placeholder: `now() + duration("-1h")`,
 		},
 		{
 			Name:        "to",
@@ -148,7 +148,7 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Return annotations at or before this time",
-			Placeholder: `{{ now() }}`,
+			Placeholder: `now()`,
 		},
 		{
 			Name:        "limit",
