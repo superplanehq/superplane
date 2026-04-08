@@ -176,13 +176,13 @@ func readCoverageProfile(profilePath string, ignoredPackagePrefixes []string) (c
 		filePath := strings.SplitN(fileWithRange, ":", 2)[0]
 		packagePath := toPackagePath(filePath)
 
+		if shouldIgnorePackage(packagePath, ignoredPackagePrefixes) {
+			continue
+		}
+
 		totalStatements += statementCount
 		if executionCount > 0 {
 			totalCoveredStatements += statementCount
-		}
-
-		if shouldIgnorePackage(packagePath, ignoredPackagePrefixes) {
-			continue
 		}
 
 		t := packageStats[packagePath]
