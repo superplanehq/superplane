@@ -52,7 +52,7 @@ func (c *CreateDashboardShareLink) Documentation() string {
 ## Configuration
 
 - **Dashboard**: The Grafana dashboard UID for the share link
-- **Panel ID**: If set, link opens the dashboard at this specific panel
+- **Panel**: If set, link opens the dashboard at this specific panel
 - **From**: Start of the time range (e.g. now-1h)
 - **To**: End of the time range (e.g. now)
 
@@ -89,10 +89,18 @@ func (c *CreateDashboardShareLink) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "panelId",
-			Label:       "Panel ID",
-			Type:        configuration.FieldTypeNumber,
+			Label:       "Panel",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Description: "If set, link opens the dashboard at this specific panel",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypePanel,
+					Parameters: []configuration.ParameterRef{
+						{Name: "dashboardUid", ValueFrom: &configuration.ParameterValueFrom{Field: "dashboardUid"}},
+					},
+				},
+			},
 		},
 		{
 			Name:        "from",
@@ -121,7 +129,7 @@ func (c *CreateDashboardShareLink) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	storeDashboardNodeMetadata(ctx, spec.DashboardUID)
+	storeDashboardNodeMetadata(ctx, spec.DashboardUID, spec.PanelID)
 	return nil
 }
 

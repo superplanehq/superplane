@@ -12,7 +12,7 @@ import type {
 } from "../types";
 import { formatTimestamp } from "../utils";
 import { buildDashboardMetadata, buildGrafanaEventSections } from "./dashboard_shared";
-import type { DashboardDetails } from "./types";
+import type { DashboardDetails, GetDashboardConfiguration } from "./types";
 
 export const getDashboardMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -25,7 +25,10 @@ export const getDashboardMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: buildDashboardMetadata(context.node),
+      metadata: buildDashboardMetadata(
+        context.node,
+        context.node.configuration as GetDashboardConfiguration | undefined,
+      ),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };

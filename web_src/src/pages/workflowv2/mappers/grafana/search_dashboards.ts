@@ -11,8 +11,8 @@ import type {
   SubtitleContext,
 } from "../types";
 import { formatTimestamp } from "../utils";
-import { buildGrafanaEventSections } from "./dashboard_shared";
-import type { SearchDashboardsOutput } from "./types";
+import { buildGrafanaEventSections, previewMetadataItem } from "./dashboard_shared";
+import type { SearchDashboardsConfiguration, SearchDashboardsOutput } from "./types";
 
 export const searchDashboardsMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -25,7 +25,7 @@ export const searchDashboardsMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: [],
+      metadata: buildMetadata(context.node.configuration as SearchDashboardsConfiguration | undefined),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -78,3 +78,14 @@ export const searchDashboardsMapper: ComponentBaseMapper = {
     );
   },
 };
+
+function buildMetadata(configuration: SearchDashboardsConfiguration | undefined) {
+  return [
+    previewMetadataItem("search", "Query: ", configuration?.query),
+    previewMetadataItem("folder", "Folder: ", configuration?.folderUID),
+    previewMetadataItem("tag", "Tag: ", configuration?.tag),
+    previewMetadataItem("hash", "Limit: ", configuration?.limit),
+  ]
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, 3);
+}

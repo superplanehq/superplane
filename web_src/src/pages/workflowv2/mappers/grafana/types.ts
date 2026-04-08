@@ -63,6 +63,35 @@ export interface DashboardDetails {
 
 export interface DashboardNodeMetadata {
   dashboardTitle?: string;
+  panelTitle?: string;
+  panelLabel?: string;
+}
+
+export interface GetDashboardConfiguration {
+  dashboardUid?: string;
+}
+
+export interface CreateDashboardShareLinkConfiguration {
+  dashboardUid?: string;
+  panelId?: string | number;
+  from?: string;
+  to?: string;
+}
+
+export interface RenderPanelConfiguration {
+  dashboardUid?: string;
+  panelId?: string | number;
+  width?: number;
+  height?: number;
+  from?: string;
+  to?: string;
+}
+
+export interface SearchDashboardsConfiguration {
+  query?: string;
+  folderUID?: string;
+  tag?: string;
+  limit?: number;
 }
 
 export interface SearchDashboardsOutput {

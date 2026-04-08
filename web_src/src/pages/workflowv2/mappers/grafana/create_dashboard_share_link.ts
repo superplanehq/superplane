@@ -11,8 +11,17 @@ import type {
   SubtitleContext,
 } from "../types";
 import { formatTimestamp } from "../utils";
-import { buildDashboardMetadata, buildGrafanaEventSections } from "./dashboard_shared";
-import type { CreateDashboardShareLinkOutput } from "./types";
+import {
+  buildDashboardSelectionMetadata,
+  buildGrafanaEventSections,
+  buildPanelMetadata,
+  buildTimeRangeMetadata,
+} from "./dashboard_shared";
+import type {
+  CreateDashboardShareLinkConfiguration,
+  CreateDashboardShareLinkOutput,
+  DashboardNodeMetadata,
+} from "./types";
 
 export const createDashboardShareLinkMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -25,7 +34,7 @@ export const createDashboardShareLinkMapper: ComponentBaseMapper = {
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition.label || "Unnamed component",
       eventSections: lastExecution ? buildGrafanaEventSections(context.nodes, lastExecution, componentName) : undefined,
-      metadata: buildDashboardMetadata(context.node),
+      metadata: buildMetadata(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -71,3 +80,14 @@ export const createDashboardShareLinkMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function buildMetadata(node: ComponentBaseContext["node"]) {
+  const configuration = node.configuration as CreateDashboardShareLinkConfiguration | undefined;
+  const nodeMetadata = node.metadata as DashboardNodeMetadata | undefined;
+
+  return [
+    buildDashboardSelectionMetadata(nodeMetadata, configuration?.dashboardUid),
+    buildPanelMetadata(nodeMetadata),
+    buildTimeRangeMetadata(configuration?.from, configuration?.to),
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
+}

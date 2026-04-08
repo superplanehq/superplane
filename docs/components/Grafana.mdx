@@ -104,7 +104,7 @@ The Create Dashboard Share Link component constructs a shareable URL for a Grafa
 ### Configuration
 
 - **Dashboard**: The Grafana dashboard UID for the share link
-- **Panel ID**: If set, link opens the dashboard at this specific panel
+- **Panel**: If set, link opens the dashboard at this specific panel
 - **From**: Start of the time range (e.g. now-1h)
 - **To**: End of the time range (e.g. now)
 
@@ -267,7 +267,7 @@ The Render Panel component constructs a Grafana image render URL for a dashboard
 ### Configuration
 
 - **Dashboard**: The Grafana dashboard containing the panel to render
-- **Panel ID**: The ID of the panel to render
+- **Panel**: The panel to render
 - **Width**: Image width in pixels (default 1000)
 - **Height**: Image height in pixels (default 500)
 - **From**: Start of the time range (e.g. now-1h)
@@ -275,7 +275,7 @@ The Render Panel component constructs a Grafana image render URL for a dashboard
 
 ### Output
 
-Returns the Grafana render URL along with the dashboard UID and panel ID.
+Returns the Grafana render URL along with the dashboard UID and panel.
 
 ### Example Output
 

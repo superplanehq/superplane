@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -12,6 +13,7 @@ import (
 const resourceTypeDataSource = "data-source"
 const resourceTypeFolder = "folder"
 const resourceTypeDashboard = "dashboard"
+const resourceTypePanel = "panel"
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -114,7 +116,7 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
-	case resourceTypeFolder, resourceTypeDataSource, resourceTypeDashboard:
+	case resourceTypeFolder, resourceTypeDataSource, resourceTypeDashboard, resourceTypePanel:
 		// Known types require a Grafana API client.
 	default:
 		return []core.IntegrationResource{}, nil
@@ -144,9 +146,36 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 			return nil, err
 		}
 		return grafanaResourcesFromList(resourceTypeDashboard, dashboards, func(d DashboardSummary) string { return d.UID }, func(d DashboardSummary) string { return d.Title }), nil
+	case resourceTypePanel:
+		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboardUid"])
+		if dashboardUID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		dashboard, err := client.GetDashboard(dashboardUID)
+		if err != nil {
+			return nil, err
+		}
+
+		return grafanaResourcesFromList(
+			resourceTypePanel,
+			dashboard.Panels,
+			func(p PanelSummary) string { return strconv.Itoa(p.ID) },
+			func(p PanelSummary) string { return formatPanelResourceLabel(p) },
+		), nil
 	}
 
 	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
+}
+
+func formatPanelResourceLabel(panel PanelSummary) string {
+	idLabel := fmt.Sprintf("Panel %d", panel.ID)
+	title := strings.TrimSpace(panel.Title)
+	if title == "" {
+		return idLabel
+	}
+
+	return fmt.Sprintf("%s (%s)", title, idLabel)
 }
 
 // grafanaResourcesFromList maps Grafana API list rows to workflow integration resources.

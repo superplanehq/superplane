@@ -352,6 +352,48 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, "prom", resources[0].ID)
 		require.Equal(t, resourceTypeDataSource, resources[0].Type)
 	})
+
+	t.Run("panel returns dashboard panels for selected dashboard", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"dashboard": {
+							"uid": "abc123",
+							"title": "Production Overview",
+							"panels": [
+								{"id": 1, "title": "CPU", "type": "timeseries"},
+								{"id": 2, "title": "", "type": "stat"}
+							]
+						},
+						"meta": {
+							"slug": "production-overview",
+							"url": "/d/abc123/production-overview"
+						}
+					}`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypePanel, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+			Parameters: map[string]string{"dashboardUid": "abc123"},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		require.Equal(t, "CPU (Panel 1)", resources[0].Name)
+		require.Equal(t, "1", resources[0].ID)
+		require.Equal(t, resourceTypePanel, resources[0].Type)
+		require.Equal(t, "Panel 2", resources[1].Name)
+		require.Equal(t, "2", resources[1].ID)
+	})
 }
 
 func Test__notificationPolicyRoot__PreservesUnknownRootAndRouteFields(t *testing.T) {

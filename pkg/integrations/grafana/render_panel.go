@@ -53,7 +53,7 @@ func (c *RenderPanel) Documentation() string {
 ## Configuration
 
 - **Dashboard**: The Grafana dashboard containing the panel to render
-- **Panel ID**: The ID of the panel to render
+- **Panel**: The panel to render
 - **Width**: Image width in pixels (default 1000)
 - **Height**: Image height in pixels (default 500)
 - **From**: Start of the time range (e.g. now-1h)
@@ -61,7 +61,7 @@ func (c *RenderPanel) Documentation() string {
 
 ## Output
 
-Returns the Grafana render URL along with the dashboard UID and panel ID.`
+Returns the Grafana render URL along with the dashboard UID and panel.`
 }
 
 func (c *RenderPanel) Icon() string {
@@ -92,10 +92,18 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "panelId",
-			Label:       "Panel ID",
-			Type:        configuration.FieldTypeNumber,
+			Label:       "Panel",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The ID of the panel to render",
+			Description: "The Grafana panel to render",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: resourceTypePanel,
+					Parameters: []configuration.ParameterRef{
+						{Name: "dashboardUid", ValueFrom: &configuration.ParameterValueFrom{Field: "dashboardUid"}},
+					},
+				},
+			},
 		},
 		{
 			Name:        "width",
@@ -114,16 +122,18 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 		{
 			Name:        "from",
 			Label:       "From",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "Start of the time range (e.g. now-1h)",
+			Description: "Start of the time range",
+			Placeholder: "e.g. {{now() - duration(\"1h\")}}",
 		},
 		{
 			Name:        "to",
 			Label:       "To",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "End of the time range (e.g. now)",
+			Description: "End of the time range",
+			Placeholder: "e.g. {{now()}}",
 		},
 	}
 }
@@ -138,7 +148,7 @@ func (c *RenderPanel) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	storeDashboardNodeMetadata(ctx, spec.DashboardUID)
+	storeDashboardNodeMetadata(ctx, spec.DashboardUID, &spec.PanelID)
 	return nil
 }
 
@@ -242,7 +252,7 @@ func validateRenderPanelSpec(spec RenderPanelSpec) error {
 		return errors.New("dashboardUid is required")
 	}
 	if spec.PanelID == 0 {
-		return errors.New("panelId is required")
+		return errors.New("panel is required")
 	}
 
 	return nil

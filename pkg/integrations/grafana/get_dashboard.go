@@ -87,7 +87,7 @@ func (c *GetDashboard) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	storeDashboardNodeMetadata(ctx, spec.DashboardUID)
+	storeDashboardNodeMetadata(ctx, spec.DashboardUID, nil)
 	return nil
 }
 
