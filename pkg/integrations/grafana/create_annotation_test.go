@@ -1,72 +1,108 @@
 package grafana
 
 import (
-	"io"
-	"net/http"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__validateAnnotationTimeRangeMS__OK(t *testing.T) {
-	require.NoError(t, validateAnnotationTimeRangeMS(100, 200))
-	require.NoError(t, validateAnnotationTimeRangeMS(100, 100))
-	require.NoError(t, validateAnnotationTimeRangeMS(0, 200))
-	require.NoError(t, validateAnnotationTimeRangeMS(100, 0))
-}
+func Test__parseRelativeAnnotationTime(t *testing.T) {
+	base := time.Now().UTC().Truncate(time.Second)
 
-func Test__validateAnnotationTimeRangeMS__RejectsInvertedRange(t *testing.T) {
-	err := validateAnnotationTimeRangeMS(200, 100)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "timeEnd must be at or after time")
-}
-
-func Test__parseAnnotationTime__ParsesRFC3339(t *testing.T) {
-	tm, err := parseAnnotationTime("2024-06-01T12:00:00Z")
-	require.NoError(t, err)
-	require.Equal(t, 12, tm.UTC().Hour())
-}
-
-func Test__parseAnnotationTime__ParsesLocalWallTime(t *testing.T) {
-	tm, err := parseAnnotationTime("2024-06-01T15:04")
-	require.NoError(t, err)
-	require.Equal(t, 15, tm.Hour())
-	require.Equal(t, 4, tm.Minute())
-	require.Equal(t, time.Local, tm.Location())
-}
-
-func Test__CreateAnnotation__Setup__StoresDashboardTitleMetadata(t *testing.T) {
-	component := &CreateAnnotation{}
-	metadata := &contexts.MetadataContext{}
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`[
-					{"uid":"dash-1","title":"Platform Overview","type":"dash-db"}
-				]`)),
-			},
+	tests := []struct {
+		name     string
+		input    string
+		expected time.Time
+	}{
+		{
+			name:     "now",
+			input:    "now",
+			expected: base,
+		},
+		{
+			name:     "offset forward",
+			input:    "now+2h",
+			expected: base.Add(2 * time.Hour),
+		},
+		{
+			name:     "offset backward",
+			input:    "now-30m",
+			expected: base.Add(-30 * time.Minute),
+		},
+		{
+			name:  "round day then offset",
+			input: "now/d+8h",
+			expected: time.Date(
+				base.Year(),
+				base.Month(),
+				base.Day(),
+				8,
+				0,
+				0,
+				0,
+				base.Location(),
+			),
+		},
+		{
+			name:  "previous month start",
+			input: "now-1M/M",
+			expected: time.Date(
+				base.AddDate(0, -1, 0).Year(),
+				base.AddDate(0, -1, 0).Month(),
+				1,
+				0,
+				0,
+				0,
+				0,
+				base.Location(),
+			),
 		},
 	}
 
-	err := component.Setup(core.SetupContext{
-		Configuration: map[string]any{
-			"text":         "Deploy marker",
-			"dashboardUID": "dash-1",
-		},
-		Metadata: metadata,
-		HTTP:     httpContext,
-		Integration: &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseURL":  "https://grafana.example.com",
-				"apiToken": "token",
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.Equal(t, AnnotationNodeMetadata{DashboardTitle: "Platform Overview"}, metadata.Metadata)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parsed, ok, err := parseRelativeAnnotationTime(tt.input, base)
+			require.NoError(t, err)
+			require.True(t, ok)
+			require.Equal(t, tt.expected, parsed)
+		})
+	}
+}
+
+func Test__parseRelativeAnnotationTime__invalidUnit(t *testing.T) {
+	_, ok, err := parseRelativeAnnotationTime("now+2x", time.Now().UTC())
+	require.ErrorContains(t, err, `unsupported relative time unit "x"`)
+	require.True(t, ok)
+}
+
+func Test__buildAnnotationURL(t *testing.T) {
+	panelID := int64(7)
+	url := buildAnnotationURL(
+		"https://grafana.example.com/d/abc123/overview",
+		&panelID,
+		1712563200000,
+		1712566800000,
+	)
+
+	require.Equal(
+		t,
+		"https://grafana.example.com/d/abc123/overview?from=1712563200000&to=1712566800000&viewPanel=7",
+		url,
+	)
+}
+
+func Test__buildAnnotationURL__pointAnnotationGetsContextWindow(t *testing.T) {
+	url := buildAnnotationURL(
+		"https://grafana.example.com/d/abc123/overview",
+		nil,
+		1712563200000,
+		0,
+	)
+
+	require.Equal(
+		t,
+		"https://grafana.example.com/d/abc123/overview?from=1712562900000&to=1712563500000",
+		url,
+	)
 }

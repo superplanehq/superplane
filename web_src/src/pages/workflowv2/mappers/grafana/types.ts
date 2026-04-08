@@ -57,6 +57,7 @@ export interface CreateAnnotationConfiguration {
 
 export interface CreateAnnotationOutput {
   id: number;
+  url?: string;
 }
 
 export interface ListAnnotationsConfiguration {

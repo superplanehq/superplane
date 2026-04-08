@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +27,8 @@ type CreateAnnotationSpec struct {
 }
 
 type CreateAnnotationOutput struct {
-	ID int64 `json:"id"`
+	ID  int64  `json:"id"`
+	URL string `json:"url,omitempty"`
 }
 
 func (c *CreateAnnotation) Name() string {
@@ -56,8 +59,8 @@ func (c *CreateAnnotation) Documentation() string {
 - **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
 - **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
 - **Panel ID**: Optional panel ID within the dashboard to attach the annotation to
-- **Time**: Optional start time (defaults to now if omitted)
-- **Time End**: Optional end time — providing this creates a region annotation spanning the window
+- **Time**: Optional start time (defaults to now if omitted). Supports absolute values like ` + "`2026-04-08T15:30`" + ` or relative Grafana values like ` + "`now+2h`" + `
+- **Time End**: Optional end time — providing this creates a region annotation spanning the window. Supports absolute or relative Grafana values
 
 ## Output
 
@@ -124,26 +127,18 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 		{
 			Name:        "time",
 			Label:       "Time",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Annotation start time (defaults to now if omitted)",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Placeholder: "now, now+2h, or 2026-04-08T15:30",
 		},
 		{
 			Name:        "timeEnd",
 			Label:       "Time End",
-			Type:        configuration.FieldTypeDateTime,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Annotation end time — providing this creates a region annotation",
-			TypeOptions: &configuration.TypeOptions{
-				DateTime: &configuration.DateTimeTypeOptions{
-					Format: grafanaDateTimeFormat,
-				},
-			},
+			Placeholder: "now+2h or 2026-04-08T17:30",
 		},
 	}
 }
@@ -212,10 +207,20 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating annotation: %w", err)
 	}
 
+	annotationURL := ""
+	if strings.TrimSpace(spec.DashboardUID) != "" {
+		annotationURL = buildAnnotationURL(
+			client.buildURL(fmt.Sprintf("/d/%s", url.PathEscape(strings.TrimSpace(spec.DashboardUID)))),
+			spec.PanelID,
+			timeMS,
+			timeEndMS,
+		)
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.annotation.created",
-		[]any{CreateAnnotationOutput{ID: id}},
+		[]any{CreateAnnotationOutput{ID: id, URL: annotationURL}},
 	)
 }
 
@@ -273,13 +278,211 @@ func validateAnnotationTimeRangeMS(timeMS, timeEndMS int64) error {
 	return nil
 }
 
-// parseAnnotationTime accepts RFC3339, RFC3339Nano, or local wall time "2006-01-02T15:04".
+// parseAnnotationTime accepts Unix milliseconds, RFC3339, RFC3339Nano,
+// local wall time "2006-01-02T15:04", or relative Grafana values like "now+2h".
 func parseAnnotationTime(s string) (time.Time, error) {
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return time.Time{}, errors.New("time value is required")
+	}
+
+	if t, ok, err := parseRelativeAnnotationTime(trimmed, time.Now().UTC()); err != nil {
+		return time.Time{}, err
+	} else if ok {
 		return t, nil
 	}
-	if t, err := time.Parse(time.RFC3339Nano, s); err == nil {
+
+	if ms, err := strconv.ParseInt(trimmed, 10, 64); err == nil {
+		return time.UnixMilli(ms).UTC(), nil
+	}
+
+	if t, err := time.Parse(time.RFC3339, trimmed); err == nil {
 		return t, nil
 	}
-	return time.ParseInLocation(grafanaDateTimeFormat, s, time.Local)
+	if t, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+		return t, nil
+	}
+	return time.ParseInLocation(grafanaDateTimeFormat, trimmed, time.Local)
+}
+
+func parseRelativeAnnotationTime(value string, now time.Time) (time.Time, bool, error) {
+	trimmed := strings.TrimSpace(value)
+	if !strings.HasPrefix(trimmed, "now") {
+		return time.Time{}, false, nil
+	}
+
+	current := now
+	remaining := strings.TrimPrefix(trimmed, "now")
+
+	for len(remaining) > 0 {
+		switch remaining[0] {
+		case '+', '-':
+			sign := int64(1)
+			if remaining[0] == '-' {
+				sign = -1
+			}
+
+			amount, unit, rest, err := consumeRelativeAnnotationOffset(remaining[1:])
+			if err != nil {
+				return time.Time{}, true, err
+			}
+
+			current, err = applyRelativeAnnotationOffset(current, sign*amount, unit)
+			if err != nil {
+				return time.Time{}, true, err
+			}
+
+			remaining = rest
+		case '/':
+			unit, rest, err := consumeRelativeAnnotationRoundingUnit(remaining[1:])
+			if err != nil {
+				return time.Time{}, true, err
+			}
+
+			current, err = roundRelativeAnnotationTime(current, unit)
+			if err != nil {
+				return time.Time{}, true, err
+			}
+
+			remaining = rest
+		default:
+			return time.Time{}, true, fmt.Errorf("unsupported relative time syntax %q", value)
+		}
+	}
+
+	return current, true, nil
+}
+
+func consumeRelativeAnnotationOffset(input string) (int64, string, string, error) {
+	index := 0
+	for index < len(input) && input[index] >= '0' && input[index] <= '9' {
+		index++
+	}
+	if index == 0 {
+		return 0, "", "", fmt.Errorf("expected relative time amount in %q", input)
+	}
+
+	unitStart := index
+	for index < len(input) && ((input[index] >= 'a' && input[index] <= 'z') || (input[index] >= 'A' && input[index] <= 'Z')) {
+		index++
+	}
+	if unitStart == index {
+		return 0, "", "", fmt.Errorf("expected relative time unit in %q", input)
+	}
+
+	amount, err := strconv.ParseInt(input[:unitStart], 10, 64)
+	if err != nil {
+		return 0, "", "", fmt.Errorf("invalid relative time amount %q", input[:unitStart])
+	}
+
+	return amount, input[unitStart:index], input[index:], nil
+}
+
+func consumeRelativeAnnotationRoundingUnit(input string) (string, string, error) {
+	index := 0
+	for index < len(input) && ((input[index] >= 'a' && input[index] <= 'z') || (input[index] >= 'A' && input[index] <= 'Z')) {
+		index++
+	}
+	if index == 0 {
+		return "", "", fmt.Errorf("expected rounding unit in %q", input)
+	}
+
+	return input[:index], input[index:], nil
+}
+
+func applyRelativeAnnotationOffset(base time.Time, amount int64, unit string) (time.Time, error) {
+	switch unit {
+	case "s":
+		return base.Add(time.Duration(amount) * time.Second), nil
+	case "m":
+		return base.Add(time.Duration(amount) * time.Minute), nil
+	case "h":
+		return base.Add(time.Duration(amount) * time.Hour), nil
+	case "d":
+		return base.AddDate(0, 0, int(amount)), nil
+	case "w":
+		return base.AddDate(0, 0, int(amount*7)), nil
+	case "M":
+		return base.AddDate(0, int(amount), 0), nil
+	case "Q":
+		return base.AddDate(0, int(amount*3), 0), nil
+	case "y", "Y":
+		return base.AddDate(int(amount), 0, 0), nil
+	default:
+		return time.Time{}, fmt.Errorf("unsupported relative time unit %q", unit)
+	}
+}
+
+func roundRelativeAnnotationTime(base time.Time, unit string) (time.Time, error) {
+	location := base.Location()
+	switch unit {
+	case "s":
+		return base.Truncate(time.Second), nil
+	case "m":
+		return base.Truncate(time.Minute), nil
+	case "h":
+		return base.Truncate(time.Hour), nil
+	case "d":
+		year, month, day := base.Date()
+		return time.Date(year, month, day, 0, 0, 0, 0, location), nil
+	case "w":
+		year, month, day := base.Date()
+		start := time.Date(year, month, day, 0, 0, 0, 0, location)
+		weekdayOffset := (int(start.Weekday()) + 6) % 7
+		return start.AddDate(0, 0, -weekdayOffset), nil
+	case "M":
+		year, month, _ := base.Date()
+		return time.Date(year, month, 1, 0, 0, 0, 0, location), nil
+	case "Q":
+		year, month, _ := base.Date()
+		quarterStartMonth := time.Month(((int(month)-1)/3)*3 + 1)
+		return time.Date(year, quarterStartMonth, 1, 0, 0, 0, 0, location), nil
+	case "y", "Y":
+		year, _, _ := base.Date()
+		return time.Date(year, time.January, 1, 0, 0, 0, 0, location), nil
+	default:
+		return time.Time{}, fmt.Errorf("unsupported rounding unit %q", unit)
+	}
+}
+
+func buildAnnotationURL(dashboardURL string, panelID *int64, timeMS, timeEndMS int64) string {
+	trimmed := strings.TrimSpace(dashboardURL)
+	if trimmed == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed
+	}
+
+	query := parsed.Query()
+	if panelID != nil && *panelID > 0 {
+		query.Set("viewPanel", strconv.FormatInt(*panelID, 10))
+	}
+
+	if fromMS, toMS, ok := annotationURLTimeRangeMS(timeMS, timeEndMS); ok {
+		query.Set("from", strconv.FormatInt(fromMS, 10))
+		query.Set("to", strconv.FormatInt(toMS, 10))
+	}
+
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func annotationURLTimeRangeMS(timeMS, timeEndMS int64) (int64, int64, bool) {
+	if timeMS > 0 && timeEndMS > 0 {
+		return timeMS, timeEndMS, true
+	}
+
+	if timeMS > 0 {
+		padding := int64((5 * time.Minute).Milliseconds())
+		fromMS := timeMS - padding
+		if fromMS < 0 {
+			fromMS = 0
+		}
+		return fromMS, timeMS + padding, true
+	}
+
+	return 0, 0, false
 }

@@ -2,6 +2,7 @@
   "type": "grafana.annotation.created",
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "data": {
-    "id": 42
+    "id": 42,
+    "url": "https://grafana.example.com/d/production-overview/production-overview?from=1739376783362&to=1739377383362"
   }
 }

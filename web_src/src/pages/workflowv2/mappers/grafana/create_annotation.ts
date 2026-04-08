@@ -62,6 +62,9 @@ export const createAnnotationMapper: ComponentBaseMapper = {
     if (output != null && typeof output.id === "number") {
       details["Annotation ID"] = String(output.id);
     }
+    if (output?.url) {
+      details["Annotation URL"] = output.url;
+    }
 
     return details;
   },
