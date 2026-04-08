@@ -10,7 +10,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
@@ -448,6 +448,11 @@ def _create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/health")
+    async def health() -> Response:
+        # Match pkg/public Server.HealthCheck: 200 with empty body for load balancers / probes.
+        return Response(status_code=200)
 
     @app.post("/agents/chats/{chat_id}/stream")
     async def stream_repl(

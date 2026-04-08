@@ -20,6 +20,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import Tippy from "@tippyjs/react/headless";
 import "tippy.js/dist/tippy.css";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
 
 // Helper function to detect if a value contains expressions
 function hasExpressions(value: string): boolean {
@@ -81,6 +82,7 @@ export const waitMapper: ComponentBaseMapper = {
       includeEmptyState: !lastExecution,
       hideMetadataList: false,
       eventStateMap: getStateMap(componentName),
+      customField: getWaitCustomField(context),
     };
   },
 
@@ -126,6 +128,24 @@ export const waitMapper: ComponentBaseMapper = {
     return details;
   },
 };
+
+function getWaitCustomField(context: ComponentBaseContext): React.ReactNode {
+  const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+  if (!lastExecution) {
+    return null;
+  }
+
+  if (lastExecution.state === "STATE_FINISHED") {
+    return null;
+  }
+
+  return React.createElement(PushThroughHandler, {
+    onPushThrough: async () => {
+      if (!lastExecution?.id) return;
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "pushThrough", null);
+    },
+  });
+}
 
 export const WAIT_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,

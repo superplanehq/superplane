@@ -1,7 +1,5 @@
 import * as React from "react";
-
 import { cn } from "@/lib/utils";
-
 import { Check, Circle, MessageCircle, Paperclip, X } from "lucide-react";
 import { Button } from "../button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -9,11 +7,6 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "../hoverCard";
 import { Input } from "../input";
 import { Item, ItemContent, ItemTitle } from "../item";
 import { Label } from "../label";
-
-export interface ArtifactField {
-  label: string;
-  optional?: boolean;
-}
 
 export interface ApprovalItemProps {
   id: string;
@@ -23,14 +16,12 @@ export interface ApprovalItemProps {
   href?: string;
   className?: string;
   interactive?: boolean;
-  onApprove?: (artifacts?: Record<string, string>) => void | Promise<void>;
-  onReject?: (comment?: string) => void | Promise<void>;
+  onApprove?: (comment?: string) => void | Promise<void>;
+  onReject?: (reason: string) => void | Promise<void>;
   approverName?: string;
   approverAvatar?: string;
-  requireArtifacts?: ArtifactField[];
-  artifactCount?: number;
-  artifacts?: Record<string, string>;
-  rejectionComment?: string;
+  approvalComment?: string;
+  rejectionReason?: string;
 }
 
 export const ApprovalItem: React.FC<ApprovalItemProps> = ({
@@ -43,15 +34,13 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
   onReject,
   approverName,
   approverAvatar,
-  requireArtifacts = [],
-  artifactCount,
-  artifacts: providedArtifacts,
-  rejectionComment,
+  approvalComment,
+  rejectionReason,
 }) => {
   const [showRejectionForm, setShowRejectionForm] = React.useState(false);
   const [showApprovalForm, setShowApprovalForm] = React.useState(false);
-  const [rejectionCommentInput, setRejectionCommentInput] = React.useState("");
-  const [artifacts, setArtifacts] = React.useState<Record<string, string>>({});
+  const [rejectionReasonInput, setRejectionReasonInput] = React.useState("");
+  const [approvalCommentInput, setApprovalCommentInput] = React.useState("");
   const [isApproving, setIsApproving] = React.useState(false);
   const [isRejecting, setIsRejecting] = React.useState(false);
 
@@ -73,35 +62,24 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
       <ItemContent>
         <ItemTitle className="text-base font-normal flex items-center gap-2">
           {title}
-          {artifactCount !== undefined && artifactCount > 0 && providedArtifacts && (
+          {approvalComment && (
             <HoverCard openDelay={150} closeDelay={150}>
               <HoverCardTrigger asChild>
                 <span className="flex items-center gap-1 text-muted-foreground cursor-pointer">
                   <Paperclip className="size-4" />
-                  <span className="text-sm">{artifactCount}</span>
+                  <span className="text-sm">{approvalComment}</span>
                 </span>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-64 space-y-3 text-xs">
                 <p className="text-sm font-medium text-neutral-900">Artifacts</p>
                 <div className="space-y-3">
-                  {Object.entries(providedArtifacts).map(([name, value]) => (
-                    <div key={name} className="space-y-1">
-                      <p className="font-medium text-neutral-900">{name}</p>
-                      <a
-                        href={value}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 underline block break-all text-xs"
-                      >
-                        {value}
-                      </a>
-                    </div>
-                  ))}
+                  <p className="font-medium text-neutral-900">Comment</p>
+                  <p className="text-muted-foreground">{approvalComment}</p>
                 </div>
               </HoverCardContent>
             </HoverCard>
           )}
-          {rejected && rejectionComment && (
+          {rejected && rejectionReason && (
             <HoverCard openDelay={150} closeDelay={150}>
               <HoverCardTrigger asChild>
                 <span className="flex items-center gap-1 text-muted-foreground cursor-pointer">
@@ -109,8 +87,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                 </span>
               </HoverCardTrigger>
               <HoverCardContent side="top" className="w-64 text-xs">
-                <p className="text-sm font-medium text-neutral-900 mb-2">Rejection Comment</p>
-                <p className="text-muted-foreground">{rejectionComment}</p>
+                <p className="text-sm font-medium text-neutral-900 mb-2">Rejection Reason</p>
+                <p className="text-muted-foreground">{rejectionReason}</p>
               </HoverCardContent>
             </HoverCard>
           )}
@@ -138,16 +116,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
             onClick={async (e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (requireArtifacts.length > 0) {
-                setShowApprovalForm(true);
-              } else {
-                setIsApproving(true);
-                try {
-                  await onApprove?.();
-                } finally {
-                  setIsApproving(false);
-                }
-              }
+              setShowApprovalForm(true);
             }}
           >
             Approve
@@ -205,8 +174,8 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
               <Input
                 id="rejection-comment"
                 placeholder="Reason for rejection…"
-                value={rejectionCommentInput}
-                onChange={(e) => setRejectionCommentInput(e.target.value)}
+                value={rejectionReasonInput}
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
                 className="w-full outline-none focus-visible:ring-0 focus-visible:ring-offset-0 "
               />
               <div className="flex items-center justify-end gap-2">
@@ -218,7 +187,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowRejectionForm(false);
-                    setRejectionCommentInput("");
+                    setRejectionReasonInput("");
                   }}
                 >
                   Cancel
@@ -233,14 +202,14 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                     e.stopPropagation();
                     setIsRejecting(true);
                     try {
-                      await onReject?.(rejectionCommentInput);
+                      await onReject?.(rejectionReasonInput);
                     } finally {
                       setIsRejecting(false);
                     }
                     setShowRejectionForm(false);
-                    setRejectionCommentInput("");
+                    setRejectionReasonInput("");
                   }}
-                  disabled={!rejectionCommentInput.trim()}
+                  disabled={!rejectionReasonInput.trim()}
                 >
                   Confirm Rejection
                 </LoadingButton>
@@ -254,30 +223,22 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-4">
-              {requireArtifacts.map((artifact, index) => (
-                <div key={index} className="flex flex-col gap-2">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <Label htmlFor={`artifact-${index}`} className="text-sm font-semibold text-neutral-900">
-                        {artifact.label}
-                      </Label>
-                      <span className="ml-2 text-sm text-muted-foreground">{artifact.optional ? "Optional" : ""}</span>
-                    </div>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <Label htmlFor="approval-comment" className="text-sm font-semibold text-neutral-900">
+                      Comment
+                    </Label>
                   </div>
-                  <Input
-                    id={`artifact-${index}`}
-                    placeholder={"Enter " + artifact.label + "..."}
-                    value={artifacts[artifact.label] || ""}
-                    onChange={(e) =>
-                      setArtifacts((prev) => ({
-                        ...prev,
-                        [artifact.label]: e.target.value,
-                      }))
-                    }
-                    className="w-full outline-none  focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
                 </div>
-              ))}
+                <Input
+                  id="approval-comment"
+                  placeholder="Enter comment..."
+                  value={approvalCommentInput}
+                  onChange={(e) => setApprovalCommentInput(e.target.value)}
+                  className="w-full outline-none  focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+              </div>
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="outline"
@@ -286,7 +247,7 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowApprovalForm(false);
-                    setArtifacts({});
+                    setApprovalCommentInput("");
                   }}
                 >
                   Cancel
@@ -300,16 +261,13 @@ export const ApprovalItem: React.FC<ApprovalItemProps> = ({
                     e.stopPropagation();
                     setIsApproving(true);
                     try {
-                      await onApprove?.(artifacts);
+                      await onApprove?.(approvalCommentInput);
                     } finally {
                       setIsApproving(false);
                     }
                     setShowApprovalForm(false);
-                    setArtifacts({});
+                    setApprovalCommentInput("");
                   }}
-                  disabled={requireArtifacts
-                    .filter((artifact) => !artifact.optional)
-                    .some((artifact) => !artifacts[artifact.label]?.trim())}
                 >
                   Confirm Approval
                 </LoadingButton>

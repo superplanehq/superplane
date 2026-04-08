@@ -22,7 +22,6 @@ import { getTriggerRenderer } from "..";
 import type { MetadataItem } from "@/ui/metadataList";
 import telegramIcon from "@/assets/icons/integrations/telegram.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 interface WaitForButtonClickConfiguration {
   chatId?: string;
@@ -67,7 +66,7 @@ const WAIT_FOR_BUTTON_CLICK_STATE_MAP: EventStateMap = {
   },
 };
 
-const waitForButtonClickStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+const waitForButtonClickStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (execution.result === "RESULT_CANCELLED") {
     return "cancelled";
   }

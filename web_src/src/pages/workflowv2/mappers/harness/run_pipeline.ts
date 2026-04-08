@@ -23,7 +23,6 @@ import type { MetadataItem } from "@/ui/metadataList";
 import HarnessIcon from "@/assets/icons/integrations/harness.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from "..";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -47,7 +46,7 @@ export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   },
 };
 
-export const runPipelineStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const runPipelineStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (
