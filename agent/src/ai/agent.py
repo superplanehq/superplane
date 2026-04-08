@@ -87,6 +87,35 @@ def build_prompt(payload: CanvasQuestionRequest) -> str:
     return payload.question
 
 
+def _tool_failure(
+    tool_name: str,
+    message: str,
+    *,
+    code: str | None = None,
+    **context: Any,
+) -> dict[str, Any]:
+    """Uniform tool error / failure dict for the model (and logging).
+
+    Always includes ``__tool_error__`` (human-readable message) and
+    ``__tool_name__``. Optional ``__tool_error_code__`` for stable categories.
+    Extra keyword arguments are copied when not None (e.g. pattern_id, name).
+    """
+    payload: dict[str, Any] = {
+        "__tool_error__": message,
+        "__tool_name__": tool_name,
+    }
+    if code is not None:
+        payload["__tool_error_code__"] = code
+    for key, value in context.items():
+        if value is not None:
+            payload[key] = value
+    return payload
+
+
+def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
+    return _tool_failure(tool_name, str(error))
+
+
 def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, CanvasAnswer]:
     resolved_model: str | TestModel
     if model == "test":
@@ -103,12 +132,6 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     def _tool_debug(message: str) -> None:
         if config.debug:
             print(f"[web][agent] {message}", flush=True)
-
-    def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
-        return {
-            "__tool_error__": str(error),
-            "__tool_name__": tool_name,
-        }
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:
@@ -129,7 +152,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return list_markdown_patterns()
         except Exception as error:
             _tool_debug(f"list_decision_patterns failed: {error}")
-            return [{"error": str(error)}]
+            return [_tool_error_entry("list_decision_patterns", error)]
 
     @agent.tool
     def search_decision_patterns(
@@ -150,11 +173,16 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         try:
             pattern = get_markdown_pattern(pattern_id=pattern_id)
             if pattern is None:
-                return {"id": pattern_id, "error": "pattern_not_found"}
+                return _tool_failure(
+                    "get_decision_pattern",
+                    "pattern not found",
+                    code="pattern_not_found",
+                    pattern_id=pattern_id,
+                )
             return pattern
         except Exception as error:
             _tool_debug(f"get_decision_pattern failed for {pattern_id}: {error}")
-            return {"id": pattern_id, "error": str(error)}
+            return _tool_failure("get_decision_pattern", str(error), pattern_id=pattern_id)
 
     @agent.tool
     def list_components(
@@ -188,7 +216,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return ctx.deps.client.describe_component(name)
         except Exception as error:
             _tool_debug(f"describe_component failed for {name}: {error}")
-            return {"name": name, "error": str(error)}
+            return _tool_failure("describe_component", str(error), name=name)
 
     @agent.tool
     def list_triggers(
@@ -222,7 +250,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return ctx.deps.client.describe_trigger(name)
         except Exception as error:
             _tool_debug(f"describe_trigger failed for {name}: {error}")
-            return {"name": name, "error": str(error)}
+            return _tool_failure("describe_trigger", str(error), name=name)
 
     @agent.tool
     def list_org_integrations(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
@@ -306,9 +334,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             )
         except Exception as error:
             _tool_debug(f"get_node_details failed for {node_id}: {error}")
-            err = _tool_error_entry("get_node_details", error)
-            err["node_id"] = node_id
-            return err
+            return _tool_failure("get_node_details", str(error), node_id=node_id)
 
     @agent.tool
     def list_node_events(
@@ -329,9 +355,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             )
         except Exception as error:
             _tool_debug(f"list_node_events failed for {node_id}: {error}")
-            entry = _tool_error_entry("list_node_events", error)
-            entry["node_id"] = node_id
-            return [entry]
+            return [_tool_failure("list_node_events", str(error), node_id=node_id)]
 
     @agent.tool
     def list_node_executions(
@@ -354,8 +378,6 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             )
         except Exception as error:
             _tool_debug(f"list_node_executions failed for {node_id}: {error}")
-            entry = _tool_error_entry("list_node_executions", error)
-            entry["node_id"] = node_id
-            return [entry]
+            return [_tool_failure("list_node_executions", str(error), node_id=node_id)]
 
     return agent
