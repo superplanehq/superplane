@@ -71,6 +71,14 @@ test.coverage:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
 	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
 
+test.coverage.check:
+	$(MAKE) test.coverage
+	$(MAKE) check.coverage.go
+
+test.coverage.baseline.update:
+	$(MAKE) test.coverage
+	$(MAKE) check.coverage.go.baseline.update
+
 test.license.check:
 	bash ./scripts/license-check.sh
 
@@ -203,6 +211,12 @@ check.lint.ui.baseline.update:
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
+
+check.coverage.go:
+	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out
+
+check.coverage.go.baseline.update:
+	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out --update-baseline
 
 
 storybook:
