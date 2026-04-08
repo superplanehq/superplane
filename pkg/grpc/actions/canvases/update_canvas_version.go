@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/linter"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
@@ -92,6 +93,20 @@ func UpdateCanvasVersionWithUsage(
 	nodes, edges, err = applyCanvasAutoLayout(nodes, edges, autoLayout, registry)
 	if err != nil {
 		return nil, err
+	}
+
+	// Quality gate: lint the canvas after layout and log results.
+	// Runs in warn-only mode — does not block saves, so users can always
+	// save their work. Issues are surfaced via the lint badge and API.
+	lintResult := linter.LintCanvas(nodes, edges, registry)
+	if lintResult.Summary.ErrorCount > 0 || lintResult.Summary.WarningCount > 0 {
+		log.WithFields(log.Fields{
+			"canvas_id":     canvasID,
+			"quality_score": lintResult.QualityScore,
+			"quality_grade": string(lintResult.QualityGrade),
+			"error_count":   lintResult.Summary.ErrorCount,
+			"warning_count": lintResult.Summary.WarningCount,
+		}).Warn("Canvas has quality issues")
 	}
 
 	expandedNodes, err := expandNodes(organizationID, nodes)
