@@ -1,47 +1,20 @@
 from __future__ import annotations
 
-import argparse
 import asyncio
 import os
-import sys
 import time
-from collections.abc import Collection, Sequence
 from datetime import UTC, datetime
-from typing import Any
 
 from pydantic_ai.usage import RunUsage
 from pydantic_evals import Dataset
 
 from ai.agent import AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from evals.case_filter import case_filter, select_cases
 from evals.case_logger import CaseLogger
-from evals.case_names import eval_case_name
 from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.cases import dataset
 from evals.report import ReportBuilder
-
-
-def split_case_names(value: str | None) -> list[str] | None:
-    if value is None:
-        return None
-    names = [part.strip() for part in value.split(",")]
-    names = [n for n in names if n]
-    return names if names else None
-
-
-def select_cases(all_cases: Sequence[Any], selected: Collection[str] | None) -> list[Any]:
-    if not selected:
-        return list(all_cases)
-    wanted = frozenset(selected)
-    known = {eval_case_name(c, i) for i, c in enumerate(all_cases)}
-    unknown = sorted(wanted - known)
-    if unknown:
-        available = "\n  ".join(sorted(known))
-        sys.stderr.write(
-            f"Unknown eval case name(s): {', '.join(unknown)}\nValid names:\n  {available}\n"
-        )
-        raise SystemExit(2)
-    return [c for i, c in enumerate(all_cases) if eval_case_name(c, i) in wanted]
 
 
 def load_env() -> dict[str, str]:
@@ -107,31 +80,9 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
         case_logger.close()
 
 
-def _parse_args(argv: list[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run SuperPlane canvas agent evals.")
-    parser.add_argument(
-        "--cases",
-        metavar="NAMES",
-        help="Comma-separated eval case names; overrides CASES when set.",
-    )
-    parser.add_argument(
-        "--list-cases",
-        action="store_true",
-        help="Print eval case names and exit.",
-    )
-    return parser.parse_args(argv)
-
-
 def main(argv: list[str] | None = None) -> None:
-    args = _parse_args(argv)
-    if args.list_cases:
-        for index, case in enumerate(dataset.cases):
-            print(eval_case_name(case, index))
-        return
-    selected = split_case_names(args.cases)
-    if selected is None:
-        selected = split_case_names(os.getenv("CASES"))
-    asyncio.run(runner(selected_case_names=selected))
+    selected_case_names = case_filter(argv)
+    asyncio.run(runner(selected_case_names=selected_case_names))
 
 
 if __name__ == "__main__":
