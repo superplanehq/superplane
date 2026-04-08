@@ -8,7 +8,7 @@ Starting points:
 - Evals are in `agent/evals/cases.py`
 - Patterns are in `agent/patterns`
 - Run evals with `make test.agent.evals`
-- Run a subset by name: `EVAL_CASES=github_and_slack,manual_run_then_two_noops make test.agent.evals`, or pass CLI flags: `make test.agent.evals AGENT_EVAL_RUNNER_ARGS='--cases github_and_slack'`
+- Run a subset by case `name` from `evals/cases.py` (comma-separated; one or many): `make test.agent.evals CASES=github_and_slack` or `CASES=github_and_slack,manual_run_then_two_noops`
 - List eval case names: `make test.agent.evals AGENT_EVAL_RUNNER_ARGS=--list-cases`
 - Run unit tests with `make test.agent.unit`
 - Lint with `make -C agent lint` (auto-fix: `make -C agent lint.fix`)
