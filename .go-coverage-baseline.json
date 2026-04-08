@@ -65,7 +65,7 @@
     "pkg/components",
     "pkg/integrations",
     "pkg/openapi_client",
-    "pkg/protos/",
+    "pkg/protos",
     "pkg/triggers",
     "pkg/web/assets"
   ],
