@@ -82,7 +82,11 @@ func (g *GetSilence) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateGetSilenceSpec(spec)
+	if err := validateGetSilenceSpec(spec); err != nil {
+		return err
+	}
+
+	return resolveSilenceNodeMetadata(ctx, spec.SilenceID)
 }
 
 func (g *GetSilence) Execute(ctx core.ExecutionContext) error {

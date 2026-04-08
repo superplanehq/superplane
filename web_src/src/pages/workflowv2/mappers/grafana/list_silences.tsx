@@ -10,10 +10,16 @@ import type { ListSilencesOutput } from "./types";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
 import { grafanaComponentBaseProps } from "./base";
+import { buildSilenceFilterMetadata } from "./silenceMetadata";
+
+interface ListSilencesConfiguration {
+  filter?: string;
+}
 
 export const listSilencesMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
-    return grafanaComponentBaseProps(context, []);
+    const configuration = context.node.configuration as ListSilencesConfiguration | undefined;
+    return grafanaComponentBaseProps(context, buildSilenceFilterMetadata(configuration?.filter));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {

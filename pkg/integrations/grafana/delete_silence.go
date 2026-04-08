@@ -87,7 +87,11 @@ func (d *DeleteSilence) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateDeleteSilenceSpec(spec)
+	if err := validateDeleteSilenceSpec(spec); err != nil {
+		return err
+	}
+
+	return resolveSilenceNodeMetadata(ctx, spec.SilenceID)
 }
 
 func (d *DeleteSilence) Execute(ctx core.ExecutionContext) error {

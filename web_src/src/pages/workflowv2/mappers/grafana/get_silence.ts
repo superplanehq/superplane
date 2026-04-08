@@ -2,10 +2,17 @@ import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext
 import type { Silence } from "./types";
 import { formatTimestamp } from "../utils";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
+import { buildSilenceSelectionMetadata, type SilenceSelectionNodeMetadata } from "./silenceMetadata";
+
+interface GetSilenceConfiguration {
+  silenceId?: string;
+}
 
 export const getSilenceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext) {
-    return grafanaComponentBaseProps(context, []);
+    const configuration = context.node.configuration as GetSilenceConfiguration | undefined;
+    const nodeMetadata = context.node.metadata as SilenceSelectionNodeMetadata | undefined;
+    return grafanaComponentBaseProps(context, buildSilenceSelectionMetadata(nodeMetadata, configuration?.silenceId));
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
