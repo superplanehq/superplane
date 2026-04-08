@@ -222,7 +222,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	}
 	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a named template (e.g. health-check-monitor)")
 	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available template names")
-	initCmd.Flags().StringVarP(&initOutputFile, "output-file", "o", "", "write to a file instead of stdout")
+	initCmd.Flags().StringVar(&initOutputFile, "output-file", "", "write to a file instead of stdout")
 	core.Bind(initCmd, &initCommand{
 		template:      &initTemplate,
 		listTemplates: &initListTemplates,
