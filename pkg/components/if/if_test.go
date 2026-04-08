@@ -1,6 +1,7 @@
 package ifp
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,249 +10,78 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func TestIf_Execute_EmitsEmptyEvents(t *testing.T) {
-	tests := []struct {
-		name            string
-		configuration   map[string]any
-		inputData       any
-		expectedChannel string
-	}{
-		{
-			name:            "if with true condition emits empty event",
-			configuration:   map[string]any{"expression": "true"},
-			inputData:       map[string]any{"test": "value"},
-			expectedChannel: "true",
-		},
-		{
-			name:            "if with false condition emits empty event",
-			configuration:   map[string]any{"expression": "false"},
-			inputData:       map[string]any{"test": "value"},
-			expectedChannel: "false",
-		},
-		{
-			name:            "if with complex true condition emits empty event",
-			configuration:   map[string]any{"expression": "$.test == 'value'"},
-			inputData:       map[string]any{"test": "value"},
-			expectedChannel: "true",
-		},
-		{
-			name:            "if with complex false condition emits empty event",
-			configuration:   map[string]any{"expression": "$.test == 'different'"},
-			inputData:       map[string]any{"test": "value"},
-			expectedChannel: "false",
-		},
-	}
+func Test__If__Execute(t *testing.T) {
+	component := &If{}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	t.Run("error executing expressions should return error", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
 
-			ifComponent := &If{}
-
-			stateCtx := &contexts.ExecutionStateContext{}
-			metadataCtx := &contexts.MetadataContext{}
-
-			ctx := core.ExecutionContext{
-				Data:           tt.inputData,
-				Configuration:  tt.configuration,
-				ExecutionState: stateCtx,
-				Metadata:       metadataCtx,
-			}
-
-			err := ifComponent.Execute(ctx)
-
-			assert.NoError(t, err)
-			assert.True(t, stateCtx.Passed)
-			assert.True(t, stateCtx.Finished)
-
-			// Verify that the expression is stored in metadata
-			assert.NotNil(t, metadataCtx.Metadata)
-			metadata, ok := metadataCtx.Metadata.(map[string]any)
-			assert.True(t, ok)
-			assert.Equal(t, tt.configuration["expression"], metadata["expression"])
-
-			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
-			assert.Equal(t, "if.executed", stateCtx.Type)
-			assert.Len(t, stateCtx.Payloads, 1)
-
-			// Verify payload structure follows SuperPlane conventions
-			payload, ok := stateCtx.Payloads[0].(map[string]any)
-			assert.True(t, ok, "payload should be a map")
-			assert.Equal(t, "if.executed", payload["type"])
-			assert.NotEmpty(t, payload["timestamp"])
-			assert.Contains(t, payload, "data")
-			data, ok := payload["data"].(map[string]any)
-			assert.True(t, ok, "data should be a map")
-			assert.Empty(t, data, "data should be empty")
-		})
-	}
-}
-
-func TestIf_Execute_InvalidExpression_ShouldReturnError(t *testing.T) {
-	ifComponent := &If{}
-
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{}
-
-	ctx := core.ExecutionContext{
-		Data:           map[string]any{"test": "value"},
-		Configuration:  map[string]any{"expression": "invalid expression syntax +++"},
-		ExecutionState: stateCtx,
-		Metadata:       metadataCtx,
-	}
-
-	err := ifComponent.Execute(ctx)
-	assert.Error(t, err)
-
-}
-
-func TestIf_Execute_NonBooleanResult_ShouldReturnError(t *testing.T) {
-	ifComponent := &If{}
-
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{}
-
-	ctx := core.ExecutionContext{
-		Data:           map[string]any{"test": "value"},
-		Configuration:  map[string]any{"expression": "$.test"},
-		ExecutionState: stateCtx,
-		Metadata:       metadataCtx,
-	}
-
-	err := ifComponent.Execute(ctx)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid operation: bool(string)")
-}
-
-func TestIf_Execute_BothTrueAndFalsePathsEmitEmpty(t *testing.T) {
-	tests := []struct {
-		name            string
-		configuration   map[string]any
-		expectedChannel string
-	}{
-		{
-			name:            "true condition previously went to true channel, now emits empty",
-			configuration:   map[string]any{"expression": "true"},
-			expectedChannel: "true",
-		},
-		{
-			name:            "false condition previously went to false channel, now emits empty",
-			configuration:   map[string]any{"expression": "false"},
-			expectedChannel: "false",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ifComponent := &If{}
-
-			stateCtx := &contexts.ExecutionStateContext{}
-			metadataCtx := &contexts.MetadataContext{}
-
-			ctx := core.ExecutionContext{
-				Data:           map[string]any{"test": "value"},
-				Configuration:  tt.configuration,
-				ExecutionState: stateCtx,
-				Metadata:       metadataCtx,
-			}
-
-			err := ifComponent.Execute(ctx)
-			assert.NoError(t, err)
-			assert.True(t, stateCtx.Passed)
-			assert.True(t, stateCtx.Finished)
-
-			// Verify that the expression is stored in metadata
-			assert.NotNil(t, metadataCtx.Metadata)
-			metadata, ok := metadataCtx.Metadata.(map[string]any)
-			assert.True(t, ok)
-			assert.Equal(t, tt.configuration["expression"], metadata["expression"])
-
-			assert.Equal(t, tt.expectedChannel, stateCtx.Channel)
-			assert.Equal(t, "if.executed", stateCtx.Type)
-			assert.Len(t, stateCtx.Payloads, 1)
-
-			// Verify payload structure follows SuperPlane conventions
-			payload, ok := stateCtx.Payloads[0].(map[string]any)
-			assert.True(t, ok, "payload should be a map")
-			assert.Equal(t, "if.executed", payload["type"])
-			assert.NotEmpty(t, payload["timestamp"])
-			assert.Contains(t, payload, "data")
-			data, ok := payload["data"].(map[string]any)
-			assert.True(t, ok, "data should be a map")
-			assert.Empty(t, data, "data should be empty")
-		})
-	}
-}
-
-func TestIf_Execute_NodeReferenceExpression(t *testing.T) {
-	ifComponent := &If{}
-
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{}
-
-	ctx := core.ExecutionContext{
-		Data: map[string]any{
-			"data": map[string]any{
-				"test": "value",
+		ctx := core.ExecutionContext{
+			Data:           map[string]any{"test": "value"},
+			Configuration:  map[string]any{"expression": "invalid expression syntax +++"},
+			ExecutionState: stateCtx,
+			Expressions: &contexts.ExpressionContext{
+				Error: fmt.Errorf("variable x not found"),
 			},
-		},
-		SourceNodeID:   "upstream-node",
-		Configuration:  map[string]any{"expression": "$[\"other-node\"].data.test == 'value'"},
-		ExecutionState: stateCtx,
-		Metadata:       metadataCtx,
-		ExpressionEnv: func(expression string) (map[string]any, error) {
-			return map[string]any{
-				"$": map[string]any{
-					"other-node": map[string]any{
-						"data": map[string]any{
-							"test": "value",
-						},
-					},
-				},
-			}, nil
-		},
-	}
+		}
 
-	err := ifComponent.Execute(ctx)
-	assert.NoError(t, err)
-	assert.True(t, stateCtx.Passed)
-	assert.True(t, stateCtx.Finished)
-	assert.Equal(t, ChannelNameTrue, stateCtx.Channel)
-}
+		err := component.Execute(ctx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "variable x not found")
+	})
 
-func TestIf_Execute_RootAndPreviousExpressions(t *testing.T) {
-	ifComponent := &If{}
+	t.Run("non boolean result should return error", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			ExecutionState: stateCtx,
+			Data:           map[string]any{"test": "value"},
+			Configuration:  map[string]any{"expression": "$.test"},
+			Expressions: &contexts.ExpressionContext{
+				Output: "not a boolean",
+			},
+		}
 
-	stateCtx := &contexts.ExecutionStateContext{}
-	metadataCtx := &contexts.MetadataContext{}
+		err := component.Execute(ctx)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "expression must evaluate to boolean, got string: not a boolean")
+		assert.False(t, stateCtx.Passed)
+	})
 
-	ctx := core.ExecutionContext{
-		Configuration: map[string]any{
-			"expression": "root().data.ref == 'main' && previous(2).data.ok == true",
-		},
-		ExecutionState: stateCtx,
-		Metadata:       metadataCtx,
-		ExpressionEnv: func(expression string) (map[string]any, error) {
-			return map[string]any{
-				"$": map[string]any{},
-				"__root": map[string]any{
-					"data": map[string]any{
-						"ref": "main",
-					},
-				},
-				"__previousByDepth": map[string]any{
-					"2": map[string]any{
-						"data": map[string]any{
-							"ok": true,
-						},
-					},
-				},
-			}, nil
-		},
-	}
+	t.Run("true expression emits on true output channel", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			ExecutionState: stateCtx,
+			Configuration:  map[string]any{"expression": "true"},
+			Expressions: &contexts.ExpressionContext{
+				Output: true,
+			},
+		}
 
-	err := ifComponent.Execute(ctx)
-	assert.NoError(t, err)
-	assert.True(t, stateCtx.Passed)
-	assert.True(t, stateCtx.Finished)
-	assert.Equal(t, ChannelNameTrue, stateCtx.Channel)
+		err := component.Execute(ctx)
+		assert.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Equal(t, ChannelNameTrue, stateCtx.Channel)
+		assert.Equal(t, "if.executed", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+	})
+
+	t.Run("false expression emits on false output channel", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		ctx := core.ExecutionContext{
+			ExecutionState: stateCtx,
+			Configuration:  map[string]any{"expression": "false"},
+			Expressions: &contexts.ExpressionContext{
+				Output: false,
+			},
+		}
+
+		err := component.Execute(ctx)
+		assert.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+		assert.True(t, stateCtx.Finished)
+		assert.Equal(t, ChannelNameFalse, stateCtx.Channel)
+		assert.Equal(t, "if.executed", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+	})
 }

@@ -1,6 +1,6 @@
 import Tippy from "@tippyjs/react/headless";
-import { ReactElement } from "react";
-import { ComponentBaseSpecValue } from "./index";
+import type { ReactElement } from "react";
+import type { ComponentBaseSpecValue } from "./index";
 import "tippy.js/dist/tippy.css";
 
 interface SpecsTooltipProps {

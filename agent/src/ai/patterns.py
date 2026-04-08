@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from ai.config import config
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 _KEYWORDS_PREFIX = "keywords:"
@@ -19,12 +20,8 @@ class DecisionPattern:
 
 
 def _resolve_pattern_dir() -> Path:
-    env_value = os.getenv("AGENT_PATTERN_DIR", "").strip()
-    if env_value:
-        env_dir = Path(env_value).expanduser()
-        return env_dir
-
-    # Default to <repo>/agent/patterns
+    if config.pattern_dir:
+        return Path(config.pattern_dir).expanduser()
     return Path(__file__).resolve().parents[2] / "patterns"
 
 

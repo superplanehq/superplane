@@ -2,6 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import { truncate } from "../safeMappers";
 import type { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import type { Agent } from "./types";
@@ -42,7 +43,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data?.data as OnIncidentStatusUpdateEventData;
     const incident = eventData?.incident;
     const statusUpdate = eventData?.status_update;
-    const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", context.event?.createdAt);
+    const subtitle = buildSubtitle(truncate(statusUpdate?.message, 50), context.event?.createdAt);
 
     return {
       title: incident?.summary || incident?.id || "Status Update",
@@ -102,7 +103,7 @@ export const onIncidentStatusUpdateTriggerRenderer: TriggerRenderer = {
       const eventData = lastEvent.data as OnIncidentStatusUpdateEventData;
       const incident = eventData?.incident;
       const statusUpdate = eventData?.status_update;
-      const subtitle = buildSubtitle(statusUpdate?.message?.substring(0, 50) || "", lastEvent.createdAt);
+      const subtitle = buildSubtitle(truncate(statusUpdate?.message, 50), lastEvent.createdAt);
 
       props.lastEventData = {
         title: incident?.summary || incident?.id || "Status Update",

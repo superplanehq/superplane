@@ -2,9 +2,10 @@ import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { isAgentReplEnabled } from "@/lib/env";
-import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
-import { ArrowLeft, Loader2, Puzzle } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import * as yaml from "js-yaml";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -12,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
-import {
+import type {
   BlueprintsBlueprint,
   ComponentsIntegrationRef,
   ComponentsComponent,
@@ -26,16 +27,11 @@ import {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
-  canvasesEmitNodeEvent,
-  canvasesUpdateNodePause,
   OrganizationsIntegration,
+  SuperplaneMeUser,
 } from "@/api-client";
-import {
-  useOrganization,
-  useOrganizationGroups,
-  useOrganizationRoles,
-  useOrganizationUsers,
-} from "@/hooks/useOrganizationData";
+import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -66,52 +62,31 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
+import type { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
-import {
-  CANVAS_SIDEBAR_STORAGE_KEY,
-  CanvasEdge,
-  CanvasNode,
-  CanvasPage,
-  NewNodeData,
-  NodeEditData,
-  SidebarData,
-  type MissingIntegration,
-} from "@/ui/CanvasPage";
-import { EventState, EventStateMap } from "@/ui/componentBase";
-import { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
-import { CompositeProps, LastRunState } from "@/ui/composite";
-import { GROUP_CHILD_EDGE_PADDING, GROUP_CHILD_MIN_Y_OFFSET, normalizeGroupColor } from "@/ui/groupNode/constants";
-import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
+import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
+import type { EventState, EventStateMap } from "@/ui/componentBase";
+import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
+import { getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { Button } from "@/components/ui/button";
-import {
-  getComponentAdditionalDataBuilder,
-  getComponentBaseMapper,
-  getTriggerRenderer,
-  getCustomFieldRenderer,
-  getState,
-  getStateMap,
-} from "./mappers";
+import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
 import { CanvasCliView } from "./CanvasCliView";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId, estimateNodeSize } from "./autoLayout";
-import { useAccount } from "@/contexts/AccountContext";
+import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
@@ -119,23 +94,18 @@ import {
   buildTabData,
   generateNodeId,
   generateUniqueNodeName,
-  getNextInQueueInfo,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
   summarizeWorkflowChanges,
-  buildNodeInfo,
-  buildEventInfo,
-  buildComponentDefinition,
   buildExecutionInfo,
-  buildQueueItemInfo,
-  collectGroupChildIds,
   buildChildToGroupMap,
+  buildUserInfo,
 } from "./utils";
-import { SidebarEvent } from "@/ui/componentSidebar/types";
-import { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { SidebarEvent } from "@/ui/componentSidebar/types";
+import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
@@ -144,12 +114,20 @@ import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConfli
 import { CanvasSettingsView } from "./CanvasSettingsView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
+import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
+import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-node-preparation";
 import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import { deleteNodesFromWorkflow, groupWorkflowNodes, ungroupWorkflowNode } from "./lib/workflow-groups";
-
-const BUNDLE_ICON_SLUG = "component";
-const BUNDLE_COLOR = "gray";
+import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
+import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
+import {
+  deleteNodesFromCanvas,
+  groupCanvasNodes,
+  prepareGroupNode,
+  ungroupCanvasNode,
+  wireGroupParentChildRelationships,
+} from "./lib/canvas-groups";
+import type { User } from "./mappers/types";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -202,7 +180,6 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { account } = useAccount();
   const { data: me } = useMe();
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -372,7 +349,7 @@ export function WorkflowPageV2() {
 
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
-        avatarUrl: user.spec?.accountProviders?.[0]?.avatarUrl || undefined,
+        avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
       });
     });
     return profilesByID;
@@ -586,7 +563,6 @@ export function WorkflowPageV2() {
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
   const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
-  const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -1047,32 +1023,6 @@ export function WorkflowPageV2() {
   const visibleNodeQueueItemsMap = isViewingLiveVersion ? nodeQueueItemsMap : {};
   const visibleNodeEventsMap = isViewingLiveVersion ? nodeEventsMap : {};
 
-  const approvalGroupNames = useMemo(() => {
-    if (!organizationId) return [];
-
-    const groupNames = new Set<string>();
-    Object.values(visibleNodeExecutionsMap).forEach((executions) => {
-      executions.forEach((execution) => {
-        const metadata = execution.metadata as { records?: Array<{ type?: string; group?: string }> } | undefined;
-        const records = metadata?.records;
-        if (!Array.isArray(records)) return;
-
-        records.forEach((record) => {
-          if (record.type === "group" && record.group) {
-            groupNames.add(record.group);
-          }
-        });
-      });
-    });
-
-    return Array.from(groupNames);
-  }, [organizationId, visibleNodeExecutionsMap]);
-
-  const groupUsersUpdatedAt = useApprovalGroupUsersPrefetch({
-    organizationId,
-    groupNames: approvalGroupNames,
-  }).updatedAt;
-
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(canvasId!, queryClient, canvas);
 
@@ -1189,6 +1139,15 @@ export function WorkflowPageV2() {
       if (!organizationId || !canvasId || !version?.spec) {
         return;
       }
+
+      // Mark the saved version as already applied so the version sync effect
+      // (which replaces canvas spec with loadedCanvasVersion.spec) doesn't
+      // overwrite the merged positions we set below.
+      const versionId = version.metadata?.id;
+      lastAppliedVersionSnapshotRef.current =
+        versionId && versionId === activeCanvasVersionIdRef.current
+          ? `${versionId}:${version.metadata?.updatedAt || ""}`
+          : lastAppliedVersionSnapshotRef.current;
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
         if (!current || getWorkflowSaveSignature(current) !== getWorkflowSaveSignature(workflow)) {
@@ -1746,8 +1705,8 @@ export function WorkflowPageV2() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints, availableIntegrations),
-    [triggers, components, blueprints, availableIntegrations],
+    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
+    [triggers, components, availableIntegrations],
   );
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
@@ -1765,8 +1724,7 @@ export function WorkflowPageV2() {
       visibleNodeQueueItemsMap,
       canvasId!,
       queryClient,
-      organizationId!,
-      account ? { id: account.id, email: account.email } : undefined,
+      me,
     );
   }, [
     canvas,
@@ -1776,7 +1734,6 @@ export function WorkflowPageV2() {
     visibleNodeEventsMap,
     visibleNodeExecutionsMap,
     visibleNodeQueueItemsMap,
-    groupUsersUpdatedAt,
     canvasId,
     queryClient,
     canvasLoading,
@@ -1785,7 +1742,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     integrationsLoading,
     organizationId,
-    account,
+    me,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -1826,10 +1783,6 @@ export function WorkflowPageV2() {
         eventsMapForSidebar,
         totalHistoryCount,
         totalQueueCount,
-        canvasId,
-        queryClient,
-        organizationId,
-        account ? { id: account.id, email: account.email } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -1838,19 +1791,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [
-      canvas,
-      canvasId,
-      blueprints,
-      allComponents,
-      allTriggers,
-      visibleNodeEventsMap,
-      isViewingLiveVersion,
-      getNodeData,
-      queryClient,
-      organizationId,
-      account,
-    ],
+    [canvas, blueprints, allComponents, allTriggers, visibleNodeEventsMap, isViewingLiveVersion, getNodeData],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -2178,9 +2119,6 @@ export function WorkflowPageV2() {
     nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
     allNodes: canvas?.spec?.nodes || [],
     enabled: !!currentHistoryNode && !!canvasId && isViewingLiveVersion,
-    components,
-    organizationId: organizationId || "",
-    queryClient,
   });
 
   const queueHistoryQuery = useQueueHistory({
@@ -2611,7 +2549,6 @@ export function WorkflowPageV2() {
 
         return result;
       } catch (error: any) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         setLastCanvasSaveError(displayMessage);
@@ -2993,7 +2930,9 @@ export function WorkflowPageV2() {
     if (!canAutoSave) {
       return;
     }
-  }, [canAutoSave]);
+
+    debouncedAnnotationAutoSave.flush();
+  }, [canAutoSave, debouncedAnnotationAutoSave]);
 
   const clearPendingAutoSaveWork = useCallback(() => {
     debouncedAutoSave.cancel();
@@ -3021,47 +2960,41 @@ export function WorkflowPageV2() {
       const { x, y, ...configurationUpdates } = updates;
       const hasPositionUpdate = x !== undefined || y !== undefined;
       const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
-      const hasOnlyTextUpdate =
-        !hasPositionUpdate && Object.keys(configurationUpdates).length === 1 && configurationUpdates.text !== undefined;
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+          return node;
+        }
 
-      const shouldUpdateCache = !canAutoSave || !hasOnlyTextUpdate;
-      if (shouldUpdateCache) {
-        const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
-          if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
-            return node;
-          }
+        const updatedNode = { ...node };
 
-          const updatedNode = { ...node };
+        // Update position if provided
+        if (hasPositionUpdate) {
+          updatedNode.position = {
+            x: x !== undefined ? x : node.position?.x || 0,
+            y: y !== undefined ? y : node.position?.y || 0,
+          };
+        }
 
-          // Update position if provided
-          if (hasPositionUpdate) {
-            updatedNode.position = {
-              x: x !== undefined ? x : node.position?.x || 0,
-              y: y !== undefined ? y : node.position?.y || 0,
-            };
-          }
+        // Update configuration if provided
+        if (hasConfigurationUpdate) {
+          updatedNode.configuration = {
+            ...node.configuration,
+            ...configurationUpdates,
+          };
+        }
 
-          // Update configuration if provided
-          if (hasConfigurationUpdate) {
-            updatedNode.configuration = {
-              ...node.configuration,
-              ...configurationUpdates,
-            };
-          }
+        return updatedNode;
+      });
 
-          return updatedNode;
-        });
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
 
-        const updatedWorkflow = {
-          ...latestWorkflow,
-          spec: {
-            ...latestWorkflow.spec,
-            nodes: updatedNodes,
-          },
-        };
-
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (hasConfigurationUpdate) {
         if (canAutoSave) {
@@ -3176,7 +3109,8 @@ export function WorkflowPageV2() {
       const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+      const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
+      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
 
       // Generate a unique node ID
       const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
@@ -3564,7 +3498,7 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromWorkflow(specNodes, [nodeId]);
+      const updatedNodes = deleteNodesFromCanvas(specNodes, [nodeId]);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
 
       const updatedEdges = canvas.spec?.edges?.filter(
@@ -3610,7 +3544,7 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(canvas);
 
       const specNodes = canvas.spec?.nodes || [];
-      const updatedNodes = deleteNodesFromWorkflow(specNodes, nodeIds);
+      const updatedNodes = deleteNodesFromCanvas(specNodes, nodeIds);
       const survivingNodeIds = new Set(updatedNodes.map((node) => node.id).filter(Boolean));
       const updatedEdges = canvas.spec?.edges?.filter(
         (edge) =>
@@ -3693,7 +3627,7 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(latestWorkflow);
 
-      const updatedWorkflow = groupWorkflowNodes(latestWorkflow, bounds, nodePositions);
+      const updatedWorkflow = groupCanvasNodes(latestWorkflow, bounds, nodePositions);
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (canAutoSave) {
@@ -3723,7 +3657,7 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(latestWorkflow);
 
-      const updatedWorkflow = ungroupWorkflowNode(latestWorkflow, groupNodeId);
+      const updatedWorkflow = ungroupCanvasNode(latestWorkflow, groupNodeId);
       if (!updatedWorkflow) return;
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -4076,22 +4010,6 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const handleConfigure = useCallback(
-    (nodeId: string) => {
-      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId && canvas) {
-        // Pass workflow info as URL parameters
-        const params = new URLSearchParams({
-          fromWorkflow: canvasId!,
-          workflowName: canvas.metadata?.name || "Canvas",
-        });
-        navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
-      }
-    },
-    [canvas, organizationId, canvasId, navigate],
-  );
-
   const handleRun = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!canvasId) return;
@@ -4344,7 +4262,6 @@ export function WorkflowPageV2() {
           setInitialWorkflowSnapshot(null);
         }
       } catch (error) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }
@@ -5047,13 +4964,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, createWorkflowMutation, navigate, queryClient, canvasId],
   );
 
-  // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
-  const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
-    canvasId: canvasId!,
-    organizationId,
-    canvas,
-  });
-
   const { onCancelExecution } = useCancelExecutionHandler({
     canvasId: canvasId!,
     canvas,
@@ -5140,15 +5050,12 @@ export function WorkflowPageV2() {
 
       // Return a function that takes the current configuration
       return (configuration?: Record<string, unknown>) => {
-        const nodeWithConfiguration = {
-          ...node,
-          configuration: configuration ?? node.configuration,
-        };
-
-        return renderer.render(
-          buildNodeInfo(nodeWithConfiguration),
-          Object.keys(context).length > 0 ? context : undefined,
-        );
+        return renderCanvasNodeCustomField({
+          renderer,
+          node,
+          configuration,
+          context: Object.keys(context).length > 0 ? context : undefined,
+        });
       };
     },
     [canvas],
@@ -5309,8 +5216,7 @@ export function WorkflowPageV2() {
       componentsLoading ||
       widgetsLoading ||
       usersLoading ||
-      rolesLoading ||
-      groupsLoading);
+      rolesLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
@@ -5632,17 +5538,6 @@ export function WorkflowPageV2() {
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
-          onNodeExpand={(nodeId) => {
-            if (isViewingDraftVersion) {
-              return;
-            }
-
-            const latestExecution = visibleNodeExecutionsMap[nodeId]?.[0];
-            const executionId = latestExecution?.id;
-            if (executionId) {
-              navigate(`/${organizationId}/canvases/${canvasId}/nodes/${nodeId}/${executionId}`);
-            }
-          }}
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
           topViewMode={topViewMode}
@@ -5669,7 +5564,6 @@ export function WorkflowPageV2() {
           edges={edges}
           organizationId={organizationId}
           canvasId={canvasId}
-          onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           getTabData={getTabData}
@@ -5699,7 +5593,6 @@ export function WorkflowPageV2() {
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
-          onConfigure={!isReadOnly ? handleConfigure : undefined}
           buildingBlocks={buildingBlocks}
           showAiBuilderTab={showAiBuilderTab}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
@@ -5749,8 +5642,6 @@ export function WorkflowPageV2() {
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
-          onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
-          supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}
           onCancelExecution={isViewingLiveVersion ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}
           onLoadMoreHistory={handleLoadMoreHistory}
@@ -6010,22 +5901,6 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
   return nodesBefore;
 }
 
-function wireGroupParentChildRelationships(workflow: CanvasesCanvas, nodes: CanvasNode[]): CanvasNode[] {
-  const groupChildMap = buildChildToGroupMap(workflow?.spec?.nodes || []);
-
-  const wiredNodes = nodes.map((node) => {
-    const parentId = groupChildMap.get(node.id);
-    if (!parentId) return node;
-
-    const x = Math.max(node.position?.x ?? 0, GROUP_CHILD_EDGE_PADDING);
-    const y = Math.max(node.position?.y ?? 0, GROUP_CHILD_MIN_Y_OFFSET);
-    return { ...node, parentId, position: { x, y } };
-  });
-
-  const groupNodeIds = new Set(wiredNodes.filter((n) => n.data?.type === "group").map((n) => n.id));
-  return [...wiredNodes.filter((n) => groupNodeIds.has(n.id)), ...wiredNodes.filter((n) => !groupNodeIds.has(n.id))];
-}
-
 function prepareData(
   workflow: CanvasesCanvas,
   triggers: TriggersTrigger[],
@@ -6036,19 +5911,20 @@ function prepareData(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
-  organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  user?: SuperplaneMeUser | null,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
+  const currentUser = buildUserInfo(user);
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
   const workflowEdges = workflow?.spec?.edges || [];
+  const workflowNodes = workflow?.spec?.nodes || [];
   const nodes =
-    workflow?.spec?.nodes
+    workflowNodes
       ?.map((node) => {
         return prepareNode(
-          workflow?.spec?.nodes!,
+          workflowNodes,
           node,
           triggers,
           blueprints,
@@ -6058,7 +5934,6 @@ function prepareData(
           nodeQueueItemsMap,
           workflowId,
           queryClient,
-          organizationId,
           currentUser,
           workflowEdges,
         );
@@ -6072,143 +5947,6 @@ function prepareData(
   return { nodes: sortedNodes, edges };
 }
 
-function prepareTriggerNode(
-  node: ComponentsNode,
-  triggers: TriggersTrigger[],
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-): CanvasNode {
-  const triggerMetadata = triggers.find((t) => t.name === node.trigger?.name);
-  const renderer = getTriggerRenderer(node.trigger?.name || "");
-  const lastEvent = nodeEventsMap[node.id!]?.[0];
-  const triggerProps = renderer.getTriggerProps({
-    node: buildNodeInfo(node),
-    definition: buildComponentDefinition(triggerMetadata),
-    lastEvent: buildEventInfo(lastEvent),
-  });
-
-  // Use node name if available, otherwise fall back to trigger label (from metadata)
-  const displayLabel = node.name || triggerMetadata?.label || node.trigger?.name || "Trigger";
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x!, y: node.position?.y! },
-    data: {
-      type: "trigger",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: ["default"],
-      trigger: {
-        ...triggerProps,
-        collapsed: node.isCollapsed,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-      },
-    },
-  };
-}
-
-function prepareCompositeNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  blueprints: BlueprintsBlueprint[],
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-): CanvasNode {
-  const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
-  const isMissing = !blueprintMetadata;
-  const color = BUNDLE_COLOR;
-  const executions = nodeExecutionsMap[node.id!] || [];
-
-  // Use node name if available, otherwise fall back to blueprint name (from metadata)
-  const displayLabel = node.name || blueprintMetadata?.name!;
-
-  const configurationFields = blueprintMetadata?.configuration || [];
-  const fieldLabelMap = configurationFields.reduce<Record<string, string>>((acc, field) => {
-    if (field.name) {
-      acc[field.name] = field.label || field.name;
-    }
-    return acc;
-  }, {});
-
-  const canvasNode: CanvasNode = {
-    id: node.id!,
-    position: { x: node.position?.x!, y: node.position?.y! },
-    data: {
-      type: "composite",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: blueprintMetadata?.outputChannels?.map((c) => c.name!) || ["default"],
-      composite: {
-        iconSlug: BUNDLE_ICON_SLUG,
-        iconColor: getColorClass(color),
-        collapsedBackground: getBackgroundColorClass(color),
-        collapsed: node.isCollapsed,
-        title: displayLabel,
-        description: blueprintMetadata?.description,
-        isMissing: isMissing,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-        paused: !!node.paused,
-        parameters:
-          Object.keys(node.configuration!).length > 0
-            ? [
-                {
-                  icon: "cog",
-                  items: Object.keys(node.configuration!).reduce(
-                    (acc, key) => {
-                      const displayKey = fieldLabelMap[key] || key;
-                      acc[displayKey] = `${node.configuration![key]}`;
-                      return acc;
-                    },
-                    {} as Record<string, string>,
-                  ),
-                },
-              ]
-            : [],
-      },
-    },
-  };
-
-  if (executions.length > 0) {
-    const execution = executions[0];
-    const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-    const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.trigger?.name || "");
-    const eventInfo = buildEventInfo(execution.rootEvent!);
-    const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: eventInfo });
-    (canvasNode.data.composite as CompositeProps).lastRunItem = {
-      title: title,
-      subtitle: subtitle,
-      id: execution.rootEvent?.id,
-      receivedAt: new Date(execution.createdAt!),
-      state: getRunItemState(execution),
-      values: rootTriggerRenderer.getRootEventValues({ event: eventInfo }),
-      childEventsInfo: {
-        count: execution.childExecutions?.length || 0,
-        waitingInfos: [],
-      },
-    };
-  }
-
-  const nextInQueueInfo = getNextInQueueInfo(nodeQueueItemsMap, node.id!, nodes);
-  if (nextInQueueInfo) {
-    (canvasNode.data.composite as CompositeProps).nextInQueue = nextInQueueInfo;
-  }
-
-  return canvasNode;
-}
-
-function getRunItemState(execution: CanvasesCanvasNodeExecution): LastRunState {
-  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
-    return "running";
-  }
-
-  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    return "success";
-  }
-
-  return "failed";
-}
-
 function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
@@ -6219,15 +5957,14 @@ function prepareNode(
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
-  queryClient: any,
-  organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  queryClient: QueryClient,
+  currentUser?: User,
   edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap);
-    case "TYPE_BLUEPRINT":
+    case "TYPE_BLUEPRINT": {
       const componentMetadata = components.find((c) => c.name === node.component?.name);
       const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
 
@@ -6243,6 +5980,7 @@ function prepareNode(
       }
 
       return compositeNode;
+    }
     case "TYPE_WIDGET":
       if (node.widget?.name === "group") {
         return prepareGroupNode(node, nodes);
@@ -6250,245 +5988,18 @@ function prepareNode(
       return prepareAnnotationNode(node);
 
     default:
-      return prepareComponentNode(
+      return prepareComponentNode({
         nodes,
         node,
         components,
         nodeExecutionsMap,
         nodeQueueItemsMap,
-        workflowId,
+        canvasId: workflowId,
         queryClient,
-        organizationId,
         currentUser,
         edges,
-      );
+      });
   }
-}
-
-function prepareAnnotationNode(node: ComponentsNode): CanvasNode {
-  const width = (node.configuration?.width as number) || 320;
-  const height = (node.configuration?.height as number) || 200;
-  return {
-    id: node.id!,
-    position: { x: node.position?.x!, y: node.position?.y! },
-    selectable: true,
-    style: { width, height },
-    data: {
-      type: "annotation",
-      label: node.name || "Annotation",
-      state: "pending" as const,
-      outputChannels: [],
-      annotation: {
-        title: node.name || "Annotation",
-        annotationText: node.configuration?.text || "",
-        annotationColor: node.configuration?.color || "yellow",
-        width,
-        height,
-      },
-    },
-  };
-}
-
-function buildGroupNodeData(node: ComponentsNode): CanvasNode["data"] {
-  const label = node.name || "Group";
-  return {
-    type: "group",
-    label,
-    state: "pending" as const,
-    outputChannels: [],
-    group: {
-      groupLabel: (node.configuration?.label as string) || label,
-      groupDescription: (node.configuration?.description as string) || "",
-      groupColor: normalizeGroupColor(node.configuration?.color as string),
-    },
-  };
-}
-
-const DEFAULT_GROUP_WIDTH = 480;
-const DEFAULT_GROUP_HEIGHT = 320;
-const GROUP_SIZE_PADDING = 10;
-
-function computeGroupSize(groupNode: ComponentsNode, allNodes: ComponentsNode[]): { width: number; height: number } {
-  const childIds = collectGroupChildIds(groupNode);
-  if (childIds.length === 0) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
-
-  let maxX = 0;
-  let maxY = 0;
-  let found = false;
-
-  for (const childId of childIds) {
-    const child = allNodes.find((n) => n.id === childId);
-    if (!child?.position) continue;
-    found = true;
-    const cx = child.position.x ?? 0;
-    const cy = child.position.y ?? 0;
-    const { width: cw, height: ch } = estimateNodeSize(child);
-    if (cx + cw > maxX) maxX = cx + cw;
-    if (cy + ch > maxY) maxY = cy + ch;
-  }
-
-  if (!found) return { width: DEFAULT_GROUP_WIDTH, height: DEFAULT_GROUP_HEIGHT };
-
-  return {
-    width: Math.max(DEFAULT_GROUP_WIDTH, Math.round(maxX + GROUP_SIZE_PADDING)),
-    height: Math.max(DEFAULT_GROUP_HEIGHT, Math.round(maxY + GROUP_SIZE_PADDING)),
-  };
-}
-
-function prepareGroupNode(node: ComponentsNode, allNodes: ComponentsNode[]): CanvasNode {
-  const { width, height } = computeGroupSize(node, allNodes);
-  return {
-    id: node.id!,
-    type: "group",
-    position: { x: node.position?.x ?? 0, y: node.position?.y ?? 0 },
-    selectable: true,
-    width,
-    height,
-    style: { width, height, zIndex: -1 },
-    data: buildGroupNodeData(node),
-  };
-}
-
-function prepareComponentNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  workflowId: string,
-  queryClient: QueryClient,
-  organizationId?: string,
-  currentUser?: { id?: string; email?: string },
-  edges?: ComponentsEdge[],
-): CanvasNode {
-  // Detect placeholder nodes (no component reference, name is "New Component")
-  const isPlaceholder = !node.component?.name && node.name === "New Component";
-
-  if (isPlaceholder) {
-    // Render placeholder as a ComponentBase with error state styling
-    const canvasNode: CanvasNode = {
-      id: node.id!,
-      position: { x: node.position?.x!, y: node.position?.y! },
-      data: {
-        type: "component",
-        label: "New Component",
-        state: "pending" as const,
-        outputChannels: ["default"],
-        component: {
-          iconSlug: "box-dashed",
-          iconColor: getColorClass("gray"),
-          collapsedBackground: getBackgroundColorClass("gray"),
-          collapsed: false,
-          title: "New Component",
-          includeEmptyState: true,
-          emptyStateProps: {
-            icon: Puzzle,
-            title: "Select a component from the sidebar",
-          },
-          error: "Select a component from the sidebar",
-          parameters: [],
-        },
-      },
-    };
-    return canvasNode;
-  }
-
-  return prepareComponentBaseNode(
-    nodes,
-    node,
-    components,
-    nodeExecutionsMap,
-    nodeQueueItemsMap,
-    workflowId,
-    queryClient,
-    organizationId || "",
-    currentUser,
-    edges,
-  );
-}
-
-function prepareComponentBaseNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  components: ComponentsComponent[],
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  workflowId: string,
-  queryClient: QueryClient,
-  organizationId: string,
-  currentUser?: { id?: string; email?: string },
-  edges?: ComponentsEdge[],
-): CanvasNode {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const metadata = components.find((c) => c.name === node.component?.name);
-  const displayLabel = node.name || metadata?.label;
-  const componentDef = components.find((c) => c.name === node.component?.name);
-  const fallbackComponentDef = componentDef || {
-    name: node.component?.name,
-    label: node.name,
-  };
-  const nodeQueueItems = nodeQueueItemsMap?.[node.id!];
-
-  const additionalData = componentDef
-    ? getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-        nodes: nodes.map((n) => buildNodeInfo(n)),
-        node: buildNodeInfo(node),
-        componentDefinition: buildComponentDefinition(componentDef!),
-        lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-        edges,
-        canvasId: workflowId,
-        queryClient: queryClient,
-        organizationId: organizationId,
-        currentUser: currentUser,
-      })
-    : undefined;
-
-  const componentBaseProps = getComponentBaseMapper(node.component?.name || "").props({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
-    componentDefinition: buildComponentDefinition(fallbackComponentDef),
-    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-    nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
-    additionalData: additionalData,
-  });
-
-  // If the mapper didn't provide a custom icon, resolve from the app logo map
-  if (!componentBaseProps.iconSrc) {
-    const resolvedIconSrc = getHeaderIconSrc(node.component?.name);
-    if (resolvedIconSrc) {
-      componentBaseProps.iconSrc = resolvedIconSrc;
-    }
-  }
-
-  // If there's an error and empty state is shown, customize the message
-  const hasError = !!node.errorMessage;
-  const showingEmptyState = componentBaseProps.includeEmptyState;
-  const emptyStateProps =
-    hasError && showingEmptyState
-      ? {
-          ...componentBaseProps.emptyStateProps,
-          icon: componentBaseProps.emptyStateProps?.icon || Puzzle,
-          title: "Finish configuring this component",
-        }
-      : componentBaseProps.emptyStateProps;
-
-  return {
-    id: node.id!,
-    position: { x: node.position?.x || 0, y: node.position?.y || 0 },
-    data: {
-      type: "component",
-      label: displayLabel,
-      state: "pending" as const,
-      outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
-      component: {
-        ...componentBaseProps,
-        emptyStateProps,
-        error: node.errorMessage,
-        warning: node.warningMessage,
-        paused: !!node.paused,
-      },
-    },
-  };
 }
 
 function prepareEdge(edge: ComponentsEdge): CanvasEdge {
@@ -6513,10 +6024,6 @@ function prepareSidebarData(
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   totalHistoryCount?: number,
   totalQueueCount?: number,
-  workflowId?: string,
-  queryClient?: QueryClient,
-  organizationId?: string,
-  currentUser?: { id?: string; email?: string },
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -6536,8 +6043,8 @@ function prepareSidebarData(
   let color = "indigo";
 
   if (blueprintMetadata) {
-    iconSlug = BUNDLE_ICON_SLUG;
-    color = BUNDLE_COLOR;
+    iconSlug = CANVAS_BUNDLE_ICON_SLUG;
+    color = CANVAS_BUNDLE_COLOR;
   } else if (componentMetadata) {
     iconSlug = componentMetadata.icon || iconSlug;
     color = componentMetadata.color || color;
@@ -6546,21 +6053,10 @@ function prepareSidebarData(
     color = triggerMetadata.color || color;
   }
 
-  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
-    componentDefinition: buildComponentDefinition(componentMetadata!),
-    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-    canvasId: workflowId || "",
-    queryClient: queryClient as QueryClient,
-    organizationId: organizationId || "",
-    currentUser: currentUser,
-  });
-
   const latestEvents =
     node.type === "TYPE_TRIGGER"
       ? mapTriggerEventsToSidebarEvents(events, node, 5)
-      : mapExecutionsToSidebarEvents(executions, nodes, 5, additionalData);
+      : mapExecutionsToSidebarEvents(executions, nodes, 5);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);

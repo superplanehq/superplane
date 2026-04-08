@@ -10,7 +10,7 @@ import { showErrorToast } from "@/lib/toast";
 interface AddMembersSectionProps {
   showRoleSelection?: boolean;
   organizationId: string;
-  groupName?: string;
+  groupName: string;
   onMemberAdded?: () => void;
   className?: string;
 }
@@ -29,12 +29,12 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       data: orgUsers = [],
       isLoading: loadingOrgUsers,
       error: orgUsersError,
-    } = useOrganizationUsers(organizationId, true);
+    } = useOrganizationUsers(organizationId);
     const {
       data: groupUsers = [],
       isLoading: loadingGroupUsers,
       error: groupUsersError,
-    } = useOrganizationGroupUsers(organizationId, groupName || "");
+    } = useOrganizationGroupUsers(organizationId, groupName);
 
     // Mutations
     const addUserToGroupMutation = useAddUserToGroup(organizationId);
@@ -44,11 +44,9 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
     // Calculate available members (org users who aren't in the group)
     const existingMembers = useMemo(() => {
-      if (!groupName) return [];
-
       const existingMemberIds = new Set(groupUsers.map((user) => user.metadata?.id));
       return orgUsers.filter((user) => !existingMemberIds.has(user.metadata?.id));
-    }, [orgUsers, groupUsers, groupName]);
+    }, [orgUsers, groupUsers]);
 
     const loadingMembers = loadingOrgUsers || loadingGroupUsers;
 
@@ -71,27 +69,11 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
         // Process each selected member
         for (const member of selectedUsers) {
-          if (groupName) {
-            // Add user to specific group - try both userId and email
-            try {
-              await addUserToGroupMutation.mutateAsync({
-                groupName,
-                userId: member.metadata?.id || "",
-                organizationId,
-              });
-            } catch (err) {
-              // If userId fails, try with email
-              if (member.metadata?.email) {
-                await addUserToGroupMutation.mutateAsync({
-                  groupName,
-                  userEmail: member.metadata?.email,
-                  organizationId,
-                });
-              } else {
-                throw err;
-              }
-            }
-          }
+          await addUserToGroupMutation.mutateAsync({
+            groupName,
+            userId: member.metadata?.id || "",
+            organizationId,
+          });
         }
 
         setSelectedMembers(new Set());
@@ -191,7 +173,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                         }}
                       />
                       <Avatar
-                        src={member.spec?.accountProviders?.[0]?.avatarUrl}
+                        src={member.status?.accountProviders?.[0]?.avatarUrl}
                         initials={member.spec?.displayName?.charAt(0) || "U"}
                         className="size-8"
                       />

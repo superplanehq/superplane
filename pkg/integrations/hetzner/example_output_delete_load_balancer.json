@@ -1,0 +1,7 @@
+{
+  "type": "hetzner.load_balancer.deleted",
+  "data": {
+    "loadBalancerId": "12345"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

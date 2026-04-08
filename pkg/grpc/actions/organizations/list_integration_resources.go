@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
@@ -33,12 +35,30 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	instance, err := models.FindIntegration(org, ID)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "integration not found")
+		}
+
+		return nil, status.Error(codes.Internal, "failed to load integration")
+	}
+
+	if instance.State == models.IntegrationStateError {
+		log.WithFields(log.Fields{
+			"integration_id":   instance.ID,
+			"integration_name": instance.AppName,
+		}).Warn("integration is in error state")
+		return nil, status.Error(codes.FailedPrecondition, "integration is in error state")
+	}
+
+	if instance.State != models.IntegrationStateReady {
+		return &pb.ListIntegrationResourcesResponse{
+			Resources: []*pb.IntegrationResourceRef{},
+		}, nil
 	}
 
 	integration, err := registry.GetIntegration(instance.AppName)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "integration %s not found", instance.AppName)
+		return nil, status.Errorf(codes.FailedPrecondition, "integration %s is unavailable", instance.AppName)
 	}
 
 	integrationCtx := contexts.NewIntegrationContext(
@@ -63,8 +83,8 @@ func ListIntegrationResources(ctx context.Context, registry *registry.Registry, 
 
 	resources, err := integration.ListResources(resourceType, listCtx)
 	if err != nil {
-		log.WithError(err).Errorf("failed to list resources for integration %s", instance.ID)
-		return nil, status.Error(codes.Internal, "failed to list integration resources")
+		log.WithError(err).WithField("integration_id", instance.ID).Warn("failed to list integration resources")
+		return nil, status.Error(codes.FailedPrecondition, "failed to list integration resources")
 	}
 
 	return &pb.ListIntegrationResourcesResponse{

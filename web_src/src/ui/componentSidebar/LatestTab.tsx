@@ -1,9 +1,9 @@
 import { TextAlignStart } from "lucide-react";
 import { SidebarEventItem } from "./SidebarEventItem";
-import { TabData } from "./SidebarEventItem/SidebarEventItem";
-import { SidebarEvent } from "./types";
-import { ComponentsComponent, ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
-import { EventState, EventStateMap } from "../componentBase";
+import type { TabData } from "./SidebarEventItem/SidebarEventItem";
+import type { SidebarEvent } from "./types";
+import type { ComponentsComponent, ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
+import type { EventState, EventStateMap } from "../componentBase";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
 
 interface LatestTabProps {
@@ -20,8 +20,6 @@ interface LatestTabProps {
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  onPushThrough?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
@@ -51,8 +49,6 @@ export const LatestTab = ({
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
-  onPushThrough,
-  supportsPushThrough,
   onReEmit,
   loadExecutionChain,
   getExecutionState,
@@ -107,9 +103,7 @@ export const LatestTab = ({
                     onEventClick={onEventClick}
                     onTriggerNavigate={handleTriggerNavigate}
                     tabData={getTabData?.(event)}
-                    onPushThrough={onPushThrough}
                     onCancelExecution={onCancelExecution}
-                    supportsPushThrough={supportsPushThrough}
                     onReEmit={onReEmit}
                     loadExecutionChain={loadExecutionChain}
                     getExecutionState={getExecutionState}
@@ -152,8 +146,6 @@ export const LatestTab = ({
                       onTriggerNavigate={handleTriggerNavigate}
                       tabData={getTabData?.(event)}
                       onCancelQueueItem={onCancelQueueItem}
-                      onPushThrough={onPushThrough}
-                      supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}

@@ -1,4 +1,4 @@
-import { CanvasesCanvasVersion } from "@/api-client";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/ui/accordion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/ui/avatar";
 import { cn } from "@/lib/utils";

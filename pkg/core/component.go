@@ -144,7 +144,6 @@ type ExecutionContext struct {
 	BaseURL        string
 	Data           any
 	Configuration  any
-	ExpressionEnv  func(expression string) (map[string]any, error)
 	Logger         *log.Entry
 	HTTP           HTTPContext
 	Metadata       MetadataContext
@@ -157,6 +156,11 @@ type ExecutionContext struct {
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
 	Webhook        NodeWebhookContext
+	Expressions    ExpressionContext
+}
+
+type ExpressionContext interface {
+	Run(expression string) (any, error)
 }
 
 /*
@@ -277,7 +281,7 @@ type ProcessQueueContext struct {
 	SourceNodeID  string
 	Configuration any
 	Input         any
-	ExpressionEnv func(expression string) (map[string]any, error)
+	Expressions   ExpressionContext
 
 	//
 	// Deletes the queue item
@@ -308,16 +312,18 @@ type ProcessQueueContext struct {
 	DefaultProcessing func() (*uuid.UUID, error)
 
 	//
-	// CountDistinctIncomingSources returns the number of distinct upstream
+	// DistinctIncomingSources returns the distinct upstream
 	// source nodes connected to this node (ignoring multiple channels from the
 	// same source)
 	//
-	CountDistinctIncomingSources func() (int, error)
+	DistinctIncomingSources func() ([]Node, error)
 }
 
 type AuthContext interface {
 	AuthenticatedUser() *User
 	GetUser(id uuid.UUID) (*User, error)
+	GetRole(name string) (*RoleRef, error)
+	GetGroup(name string) (*GroupRef, error)
 	HasRole(role string) (bool, error)
 	InGroup(group string) (bool, error)
 }
@@ -341,4 +347,18 @@ type User struct {
 	ID    string `mapstructure:"id" json:"id"`
 	Name  string `mapstructure:"name" json:"name"`
 	Email string `mapstructure:"email" json:"email"`
+}
+
+type RoleRef struct {
+	Name        string `mapstructure:"name" json:"name"`
+	DisplayName string `mapstructure:"displayName" json:"displayName"`
+}
+
+type GroupRef struct {
+	Name        string `mapstructure:"name" json:"name"`
+	DisplayName string `mapstructure:"displayName" json:"displayName"`
+}
+
+type Node struct {
+	ID string `mapstructure:"id" json:"id"`
 }

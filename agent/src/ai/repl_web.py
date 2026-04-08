@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import threading
 import time
 from collections.abc import AsyncIterator
@@ -11,7 +10,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
@@ -29,12 +28,14 @@ from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
 
 from ai.agent import AgentDeps, build_agent
+from ai.config import config
 from ai.grpc import InternalAgentServer
-from ai.models import CanvasAnswer
 from ai.jwt import JwtClaims, JwtValidator
+from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
-from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
+from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
+from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.text import normalize_optional
 
@@ -48,7 +49,7 @@ class WebServerConfig:
 class ReplStreamRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     model: str = Field(
-        default=(os.getenv("AI_MODEL", "test").strip() or "test"),
+        default=config.ai_model,
         min_length=1,
         max_length=200,
     )
@@ -56,7 +57,7 @@ class ReplStreamRequest(BaseModel):
 
 
 def _debug_enabled() -> bool:
-    return os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    return config.debug
 
 
 def _debug_log(message: str, **fields: Any) -> None:
@@ -69,8 +70,8 @@ def _debug_log(message: str, **fields: Any) -> None:
     print(f"[web] {message}", flush=True)
 
 
-def _resolve_required(value: str | None, env_name: str) -> str:
-    resolved = normalize_optional(value) or normalize_optional(os.getenv(env_name))
+def _resolve_required(value: str | None, fallback: str | None, env_name: str) -> str:
+    resolved = normalize_optional(value) or normalize_optional(fallback)
     if resolved is None:
         raise ValueError(f"Missing required setting: {env_name}")
     return resolved
@@ -142,8 +143,12 @@ def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, S
     return claims, chat
 
 
-def _build_deps(payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str) -> AgentDeps:
-    base_url = _resolve_required(payload.base_url, "SUPERPLANE_BASE_URL")
+def _build_deps(
+    payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str
+) -> AgentDeps:
+    base_url = _resolve_required(
+        payload.base_url, config.superplane_base_url, "SUPERPLANE_BASE_URL"
+    )
     api_token = _resolve_required_bearer_token(request)
     client = SuperplaneClient(
         SuperplaneClientConfig(
@@ -171,7 +176,9 @@ async def _run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[Any]:
         yield event
 
 
-async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: Request) -> AsyncIterator[dict[str, Any]]:
+async def _stream_agent_run(
+    chat_id: str, payload: ReplStreamRequest, request: Request
+) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
     store: SessionStore = request.app.state.session_store
     claims: JwtClaims | None = None
@@ -307,9 +314,10 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
             continue
 
         if isinstance(event, PartDeltaEvent) and isinstance(event.delta, ToolCallPartDelta):
-            tool_call_id = event.delta.tool_call_id
-            if tool_call_id is None:
+            _raw_tool_call_id = event.delta.tool_call_id
+            if _raw_tool_call_id is None:
                 continue
+            tool_call_id = _raw_tool_call_id
 
             if output_tool_call_id is None and likely_output_tool_name(event.delta.tool_name_delta):
                 output_tool_call_id = tool_call_id
@@ -350,7 +358,9 @@ async def _stream_agent_run(chat_id: str, payload: ReplStreamRequest, request: R
             continue
 
         if isinstance(event, FunctionToolResultEvent):
-            tool_call_id = event.result.tool_call_id or event.result.tool_name
+            _raw_tool_call_id = event.result.tool_call_id or event.result.tool_name
+            assert _raw_tool_call_id is not None
+            tool_call_id = _raw_tool_call_id
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
             recorder.tool_finished(event)
@@ -413,19 +423,22 @@ def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         store = SessionStore()
+        tracker = ActiveStreamTracker()
         app.state.session_store = store
+        app.state.stream_tracker = tracker
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
         try:
             yield
         finally:
+            tracker.begin_shutdown()
+            await tracker.wait_for_drain()
             grpc_server.stop()
             store.close()
 
     app = FastAPI(lifespan=lifespan)
-    cors_origins_raw = os.getenv("REPL_WEB_CORS_ORIGINS", "*")
-    cors_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+    cors_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
     if not cors_origins:
         cors_origins = ["*"]
 
@@ -436,8 +449,19 @@ def _create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.get("/health")
+    async def health() -> Response:
+        # Match pkg/public Server.HealthCheck: 200 with empty body for load balancers / probes.
+        return Response(status_code=200)
+
     @app.post("/agents/chats/{chat_id}/stream")
-    async def stream_repl(chat_id: str, payload: ReplStreamRequest, request: Request) -> StreamingResponse:
+    async def stream_repl(
+        chat_id: str, payload: ReplStreamRequest, request: Request
+    ) -> StreamingResponse:
+        tracker: ActiveStreamTracker = request.app.state.stream_tracker
+        if tracker.is_shutting_down:
+            raise HTTPException(status_code=503, detail="Service is shutting down")
+
         if payload.model != "test" and _resolve_bearer_token(request) is None:
             raise HTTPException(status_code=401, detail="Authorization header is required")
 
@@ -445,35 +469,46 @@ def _create_app() -> FastAPI:
             "incoming stream request",
             chat_id=chat_id,
             model=payload.model,
-            has_base_url=bool(normalize_optional(payload.base_url) or normalize_optional(os.getenv("SUPERPLANE_BASE_URL"))),
+            has_base_url=bool(
+                normalize_optional(payload.base_url)
+                or normalize_optional(config.superplane_base_url)
+            ),
             has_token=bool(_resolve_bearer_token(request)),
         )
 
-        async def event_generator() -> AsyncIterator[str]:
-            try:
-                async for event in _stream_agent_run(chat_id, payload, request):
-                    if await request.is_disconnected():
-                        _debug_log("client disconnected", chat_id=chat_id)
-                        break
-                    yield _encode_sse_event(event)
-            except Exception as error:
-                _debug_log("stream failed", chat_id=chat_id, error=str(error))
-                yield _encode_sse_event(
-                    {
-                        "type": "run_failed",
-                        "error": str(error),
-                    }
-                )
-                yield _encode_sse_event({"type": "done"})
+        await tracker.acquire()
+        try:
 
-        return StreamingResponse(
-            event_generator(),
-            media_type="text/event-stream",
-            headers={
-                "cache-control": "no-cache",
-                "connection": "keep-alive",
-            },
-        )
+            async def event_generator() -> AsyncIterator[str]:
+                try:
+                    async for event in _stream_agent_run(chat_id, payload, request):
+                        if await request.is_disconnected():
+                            _debug_log("client disconnected", chat_id=chat_id)
+                            break
+                        yield _encode_sse_event(event)
+                except Exception as error:
+                    _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                    yield _encode_sse_event(
+                        {
+                            "type": "run_failed",
+                            "error": str(error),
+                        }
+                    )
+                    yield _encode_sse_event({"type": "done"})
+                finally:
+                    await tracker.release()
+
+            return StreamingResponse(
+                event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "cache-control": "no-cache",
+                    "connection": "keep-alive",
+                },
+            )
+        except BaseException:
+            await tracker.release()
+            raise
 
     return app
 

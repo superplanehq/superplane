@@ -2233,7 +2233,7 @@
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneMeUser"
+              "$ref": "#/definitions/MeMeResponse"
             }
           },
           "default": {
@@ -2243,6 +2243,14 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "includePermissions",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
         "tags": [
           "Me"
         ]
@@ -3911,108 +3919,10 @@
             "type": "string"
           },
           {
-            "name": "includeServiceAccounts",
+            "name": "includeRoles",
             "in": "query",
             "required": false,
             "type": "boolean"
-          }
-        ],
-        "tags": [
-          "Users"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/permissions": {
-      "get": {
-        "summary": "List user permissions",
-        "description": "Returns all permissions a user has within a specific domain",
-        "operationId": "Users_ListUserPermissions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/UsersListUserPermissionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Users"
-        ]
-      }
-    },
-    "/api/v1/users/{userId}/roles": {
-      "get": {
-        "summary": "Get user roles",
-        "description": "Returns the roles a user has within a specific domain",
-        "operationId": "Users_ListUserRoles",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/UsersListUserRolesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
@@ -4613,6 +4523,9 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "root": {
+          "type": "boolean"
         }
       }
     },
@@ -4728,9 +4641,6 @@
         },
         "resultMessage": {
           "type": "string"
-        },
-        "input": {
-          "type": "object"
         },
         "outputs": {
           "type": "object"
@@ -4858,13 +4768,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/CanvasesCanvasNodeExecution"
-          }
-        },
-        "nextQueueItems": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasNodeQueueItem"
           }
         },
         "lastEvents": {
@@ -6088,6 +5991,14 @@
         }
       }
     },
+    "MeMeResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/SuperplaneMeUser"
+        }
+      }
+    },
     "MeRegenerateTokenResponse": {
       "type": "object",
       "properties": {
@@ -7133,6 +7044,9 @@
         "id": {
           "type": "string"
         },
+        "name": {
+          "type": "string"
+        },
         "email": {
           "type": "string"
         },
@@ -7145,6 +7059,25 @@
         },
         "hasToken": {
           "type": "boolean"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -7252,48 +7185,6 @@
         }
       }
     },
-    "UsersListUserPermissionsResponse": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        }
-      }
-    },
-    "UsersListUserRolesResponse": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "roles": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/RolesRole"
-          }
-        }
-      }
-    },
     "UsersListUsersResponse": {
       "type": "object",
       "properties": {
@@ -7306,26 +7197,7 @@
         }
       }
     },
-    "UsersUserMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "UsersUserRoleAssignment": {
+    "UsersRoleAssignment": {
       "type": "object",
       "properties": {
         "roleName": {
@@ -7349,29 +7221,48 @@
         }
       }
     },
+    "UsersUserMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
     "UsersUserSpec": {
       "type": "object",
       "properties": {
         "displayName": {
           "type": "string"
-        },
-        "accountProviders": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/UsersAccountProvider"
-          }
         }
       }
     },
     "UsersUserStatus": {
       "type": "object",
       "properties": {
-        "roleAssignments": {
+        "accountProviders": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/UsersUserRoleAssignment"
+            "$ref": "#/definitions/UsersAccountProvider"
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersRoleAssignment"
           }
         }
       }

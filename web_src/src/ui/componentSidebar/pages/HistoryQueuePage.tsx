@@ -1,30 +1,27 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { Plus } from "lucide-react";
 import { SidebarEventItem } from "../SidebarEventItem";
-import { SidebarEvent } from "../types";
-import { TabData } from "../SidebarEventItem/SidebarEventItem";
-import { CanvasesCanvasNodeExecution } from "@/api-client";
-import { EventState, EventStateMap } from "../../componentBase";
+import type { SidebarEvent } from "../types";
+import type { TabData } from "../SidebarEventItem/SidebarEventItem";
+import type { CanvasesCanvasNodeExecution } from "@/api-client";
+import type { EventState, EventStateMap } from "../../componentBase";
 
 interface HistoryQueuePageProps {
   page: "history" | "queue";
-  filteredEvents: SidebarEvent[];
+  events: SidebarEvent[];
   openEventIds: Set<string>;
   onToggleOpen: (eventId: string) => void;
   onEventClick?: (event: SidebarEvent) => void;
   onTriggerNavigate?: (event: SidebarEvent) => void;
   getTabData?: (event: SidebarEvent) => TabData | undefined;
-  onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
     nodeId?: string,
     currentExecution?: Record<string, unknown>,
     forceReload?: boolean,
-  ) => Promise<any[]>;
+  ) => Promise<CanvasesCanvasNodeExecution[]>;
   getExecutionState?: (
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
@@ -35,23 +32,17 @@ interface HistoryQueuePageProps {
   loadingMoreItems: boolean;
   showMoreCount: number;
   onLoadMoreItems: () => void;
-
-  // Search and filter state
-  searchQuery: string;
-  statusFilter: string;
 }
 
 export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   page,
-  filteredEvents,
+  events,
   openEventIds,
   onToggleOpen,
   onEventClick,
   onTriggerNavigate,
   getTabData,
-  onPushThrough,
   onCancelExecution,
-  supportsPushThrough,
   onReEmit,
   loadExecutionChain,
   getExecutionState,
@@ -59,8 +50,6 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   loadingMoreItems,
   showMoreCount,
   onLoadMoreItems,
-  searchQuery,
-  statusFilter,
 }) => {
   return (
     <div className="flex-1 overflow-y-auto p-4 min-h-0">
@@ -70,13 +59,11 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
             <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Run History</h2>
           </div>
         )}
-        {filteredEvents.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">
-            {searchQuery || statusFilter !== "all" ? "No matching events found" : "No events found"}
-          </div>
+        {events.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 text-sm">No events found</div>
         ) : (
           <>
-            {filteredEvents.map((event, index) => (
+            {events.map((event, index) => (
               <SidebarEventItem
                 key={event.id}
                 event={event}
@@ -87,15 +74,13 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 onEventClick={onEventClick}
                 onTriggerNavigate={onTriggerNavigate}
                 tabData={getTabData?.(event)}
-                onPushThrough={onPushThrough}
                 onCancelExecution={onCancelExecution}
-                supportsPushThrough={supportsPushThrough}
                 onReEmit={onReEmit}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
               />
             ))}
-            {hasMoreItems && !searchQuery && statusFilter === "all" && (
+            {hasMoreItems && (
               <div className="flex justify-center pt-1">
                 <button
                   onClick={onLoadMoreItems}

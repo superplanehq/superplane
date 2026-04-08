@@ -1,4 +1,3 @@
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type React from "react";
 import CircleCILogo from "@/assets/icons/integrations/circleci.svg";
 import type {
@@ -47,7 +46,7 @@ export const RUN_PIPELINE_STATE_MAP: EventStateMap = {
   },
 };
 
-export const runPipelineStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const runPipelineStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (

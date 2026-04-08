@@ -4,22 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { isCustomComponentsEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import { ComponentBase } from "../componentBase";
-import {
-  AiChatSession,
-  AiBuilderMessage,
-  AiBuilderProposal,
-  loadChatConversation,
-  loadChatSessions,
-  pushAiMessages,
-  sendChatPrompt,
-} from "./agentChat";
+import type { AiChatSession, AiBuilderMessage, AiBuilderProposal } from "./agentChat";
+import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt } from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -603,17 +595,9 @@ function OpenBuildingBlocksSidebar({
     const categoryOrder: Record<string, number> = {
       Core: 0,
       Memory: 1,
-      Bundles: 2,
     };
 
-    const filteredCategories = (blocks || []).filter((category) => {
-      if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
-        return false;
-      }
-      return true;
-    });
-
-    return [...filteredCategories].sort((a, b) => {
+    return [...blocks].sort((a, b) => {
       const aOrder = categoryOrder[a.name] ?? Infinity;
       const bOrder = categoryOrder[b.name] ?? Infinity;
 
@@ -776,7 +760,8 @@ function OpenBuildingBlocksSidebar({
             </div>
             <div
               onClick={() => onToggle(false)}
-              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              data-testid="close-sidebar-button"
+              className="absolute top-4 right-4 z-40 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
             >
               <X size={16} />
             </div>
@@ -808,7 +793,8 @@ function OpenBuildingBlocksSidebar({
             </TabsList>
             <div
               onClick={() => onToggle(false)}
-              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              data-testid="close-sidebar-button"
+              className="absolute top-4 right-4 z-40 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
             >
               <X size={16} />
             </div>

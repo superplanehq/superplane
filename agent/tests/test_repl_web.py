@@ -1,18 +1,26 @@
-import asyncio
 import argparse
+import asyncio
 import socket
+from collections.abc import AsyncIterator
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, ToolReturnPart, UserPromptPart
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    ToolReturnPart,
+    UserPromptPart,
+)
+from starlette.testclient import TestClient
 
-from ai.models import CanvasQuestionRequest
 import ai.repl_web as repl_web
-from ai.session_store import AgentChatNotFoundError
-from ai.web import WebServer, WebServerConfig
 import repl.main as repl_main
+from ai.models import CanvasQuestionRequest
+from ai.session_store import AgentChatNotFoundError
+from ai.web import WebServer, WebServerConfig, create_app
 from repl.main import _parse_stream_event, _resolve_stream_url, _stream_repl_answer
 
 
@@ -26,17 +34,21 @@ def _next_free_port() -> int:
 def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_store = MagicMock()
     fake_store.get_agent_chat.side_effect = AgentChatNotFoundError("missing")
-    fake_store.create_agent_chat.side_effect = lambda org_id, user_id, canvas_id, chat_id=None: SimpleNamespace(
-        id=chat_id or "chat-123",
-        org_id=org_id,
-        user_id=user_id,
-        canvas_id=canvas_id,
+    fake_store.create_agent_chat.side_effect = lambda org_id, user_id, canvas_id, chat_id=None: (
+        SimpleNamespace(
+            id=chat_id or "chat-123",
+            org_id=org_id,
+            user_id=user_id,
+            canvas_id=canvas_id,
+        )
     )
     fake_store.count_chat_model_messages.return_value = 0
     fake_store.load_agent_chat_message_history.return_value = []
     fake_store.set_initial_chat_message_if_missing.return_value = None
-    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message: SimpleNamespace(
-        id="message-123",
+    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message: (
+        SimpleNamespace(
+            id="message-123",
+        )
     )
     fake_store.update_agent_chat_model_message.return_value = None
     fake_store.replace_agent_chat_messages_after.return_value = None
@@ -44,7 +56,18 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_grpc_server = MagicMock()
     fake_grpc_server.start.return_value = None
     fake_grpc_server.stop.return_value = None
-    monkeypatch.setattr(repl_web.InternalAgentServer, "from_env", MagicMock(return_value=fake_grpc_server))
+    monkeypatch.setattr(
+        repl_web.InternalAgentServer,  # type: ignore[attr-defined]
+        "from_env",
+        MagicMock(return_value=fake_grpc_server),
+    )
+
+
+def test_health_returns_200_with_empty_body() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.content == b""
 
 
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
@@ -154,11 +177,13 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
     store.load_agent_chat_message_history.side_effect = lambda chat_id: list(persisted_messages)
     store.set_initial_chat_message_if_missing.return_value = None
 
-    def fake_create_agent_chat_model_message(chat_id: str, message: ModelRequest) -> SimpleNamespace:
+    def fake_create_agent_chat_model_message(
+        chat_id: str, message: ModelRequest
+    ) -> SimpleNamespace:
         persisted_messages.append(message)
         return SimpleNamespace(id=f"message-{len(persisted_messages)}")
 
-    async def fake_run_stream_events(agent: Any, **kwargs: Any):
+    async def fake_run_stream_events(agent: Any, **kwargs: Any) -> AsyncIterator[None]:
         captured_run_kwargs.update(kwargs)
         if False:
             yield None
@@ -176,7 +201,7 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
         async for event in repl_web._stream_agent_run(
             "chat-123",
             repl_web.ReplStreamRequest(question="Current question", model="test"),
-            request,
+            request,  # type: ignore[arg-type]
         ):
             events.append(event)
         return events
@@ -204,9 +229,9 @@ def test_persisted_run_recorder_does_not_duplicate_final_assistant_message() -> 
         SimpleNamespace(id="tool-message-1"),
     ]
 
-    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "Current question")
+    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "Current question")  # type: ignore[attr-defined]
     recorder.tool_finished(
-        SimpleNamespace(
+        SimpleNamespace(  # type: ignore[arg-type]
             result=ToolReturnPart(
                 tool_name="get_canvas",
                 content={"ok": True},

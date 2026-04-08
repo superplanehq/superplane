@@ -10,6 +10,7 @@ import (
 	empty "github.com/golang/protobuf/ptypes/empty"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
+	authorization "github.com/superplanehq/superplane/pkg/protos/authorization"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
@@ -25,20 +26,112 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type MeRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	IncludePermissions bool                   `protobuf:"varint,1,opt,name=include_permissions,json=includePermissions,proto3" json:"include_permissions,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *MeRequest) Reset() {
+	*x = MeRequest{}
+	mi := &file_me_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MeRequest) ProtoMessage() {}
+
+func (x *MeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_me_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MeRequest.ProtoReflect.Descriptor instead.
+func (*MeRequest) Descriptor() ([]byte, []int) {
+	return file_me_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *MeRequest) GetIncludePermissions() bool {
+	if x != nil {
+		return x.IncludePermissions
+	}
+	return false
+}
+
+type MeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MeResponse) Reset() {
+	*x = MeResponse{}
+	mi := &file_me_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MeResponse) ProtoMessage() {}
+
+func (x *MeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_me_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MeResponse.ProtoReflect.Descriptor instead.
+func (*MeResponse) Descriptor() ([]byte, []int) {
+	return file_me_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MeResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 type User struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Email          string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
-	OrganizationId string                 `protobuf:"bytes,3,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	HasToken       bool                   `protobuf:"varint,5,opt,name=has_token,json=hasToken,proto3" json:"has_token,omitempty"`
+	state          protoimpl.MessageState      `protogen:"open.v1"`
+	Id             string                      `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name           string                      `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Email          string                      `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	OrganizationId string                      `protobuf:"bytes,4,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CreatedAt      *timestamp.Timestamp        `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	HasToken       bool                        `protobuf:"varint,6,opt,name=has_token,json=hasToken,proto3" json:"has_token,omitempty"`
+	Permissions    []*authorization.Permission `protobuf:"bytes,7,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	Roles          []string                    `protobuf:"bytes,8,rep,name=roles,proto3" json:"roles,omitempty"`
+	Groups         []string                    `protobuf:"bytes,9,rep,name=groups,proto3" json:"groups,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
 	*x = User{}
-	mi := &file_me_proto_msgTypes[0]
+	mi := &file_me_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +143,7 @@ func (x *User) String() string {
 func (*User) ProtoMessage() {}
 
 func (x *User) ProtoReflect() protoreflect.Message {
-	mi := &file_me_proto_msgTypes[0]
+	mi := &file_me_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,12 +156,19 @@ func (x *User) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use User.ProtoReflect.Descriptor instead.
 func (*User) Descriptor() ([]byte, []int) {
-	return file_me_proto_rawDescGZIP(), []int{0}
+	return file_me_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *User) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+func (x *User) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -101,6 +201,27 @@ func (x *User) GetHasToken() bool {
 	return false
 }
 
+func (x *User) GetPermissions() []*authorization.Permission {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *User) GetRoles() []string {
+	if x != nil {
+		return x.Roles
+	}
+	return nil
+}
+
+func (x *User) GetGroups() []string {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
 type RegenerateTokenResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
@@ -110,7 +231,7 @@ type RegenerateTokenResponse struct {
 
 func (x *RegenerateTokenResponse) Reset() {
 	*x = RegenerateTokenResponse{}
-	mi := &file_me_proto_msgTypes[1]
+	mi := &file_me_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -122,7 +243,7 @@ func (x *RegenerateTokenResponse) String() string {
 func (*RegenerateTokenResponse) ProtoMessage() {}
 
 func (x *RegenerateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_me_proto_msgTypes[1]
+	mi := &file_me_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -135,7 +256,7 @@ func (x *RegenerateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegenerateTokenResponse.ProtoReflect.Descriptor instead.
 func (*RegenerateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_me_proto_rawDescGZIP(), []int{1}
+	return file_me_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *RegenerateTokenResponse) GetToken() string {
@@ -149,18 +270,27 @@ var File_me_proto protoreflect.FileDescriptor
 
 const file_me_proto_rawDesc = "" +
 	"\n" +
-	"\bme.proto\x12\rSuperplane.Me\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xad\x01\n" +
-	"\x04User\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05email\x18\x02 \x01(\tR\x05email\x12'\n" +
-	"\x0forganization_id\x18\x03 \x01(\tR\x0eorganizationId\x129\n" +
+	"\bme.proto\x12\rSuperplane.Me\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\"<\n" +
+	"\tMeRequest\x12/\n" +
+	"\x13include_permissions\x18\x01 \x01(\bR\x12includePermissions\"5\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1b\n" +
-	"\thas_token\x18\x05 \x01(\bR\bhasToken\"/\n" +
+	"MeResponse\x12'\n" +
+	"\x04user\x18\x01 \x01(\v2\x13.Superplane.Me.UserR\x04user\"\xb7\x02\n" +
+	"\x04User\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12'\n" +
+	"\x0forganization_id\x18\x04 \x01(\tR\x0eorganizationId\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1b\n" +
+	"\thas_token\x18\x06 \x01(\bR\bhasToken\x12F\n" +
+	"\vpermissions\x18\a \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12\x14\n" +
+	"\x05roles\x18\b \x03(\tR\x05roles\x12\x16\n" +
+	"\x06groups\x18\t \x03(\tR\x06groups\"/\n" +
 	"\x17RegenerateTokenResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token2\xd2\x02\n" +
-	"\x02Me\x12\x88\x01\n" +
-	"\x02Me\x12\x16.google.protobuf.Empty\x1a\x13.Superplane.Me.User\"U\x92A@\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token2\xda\x02\n" +
+	"\x02Me\x12\x90\x01\n" +
+	"\x02Me\x12\x18.Superplane.Me.MeRequest\x1a\x19.Superplane.Me.MeResponse\"U\x92A@\n" +
 	"\x02Me\x12\x10Get current user\x1a(Returns the currently authenticated user\x82\xd3\xe4\x93\x02\f\x12\n" +
 	"/api/v1/me\x12\xc0\x01\n" +
 	"\x0fRegenerateToken\x12\x16.google.protobuf.Empty\x1a&.Superplane.Me.RegenerateTokenResponse\"m\x92AR\n" +
@@ -180,24 +310,29 @@ func file_me_proto_rawDescGZIP() []byte {
 	return file_me_proto_rawDescData
 }
 
-var file_me_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_me_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_me_proto_goTypes = []any{
-	(*User)(nil),                    // 0: Superplane.Me.User
-	(*RegenerateTokenResponse)(nil), // 1: Superplane.Me.RegenerateTokenResponse
-	(*timestamp.Timestamp)(nil),     // 2: google.protobuf.Timestamp
-	(*empty.Empty)(nil),             // 3: google.protobuf.Empty
+	(*MeRequest)(nil),                // 0: Superplane.Me.MeRequest
+	(*MeResponse)(nil),               // 1: Superplane.Me.MeResponse
+	(*User)(nil),                     // 2: Superplane.Me.User
+	(*RegenerateTokenResponse)(nil),  // 3: Superplane.Me.RegenerateTokenResponse
+	(*timestamp.Timestamp)(nil),      // 4: google.protobuf.Timestamp
+	(*authorization.Permission)(nil), // 5: Superplane.Authorization.Permission
+	(*empty.Empty)(nil),              // 6: google.protobuf.Empty
 }
 var file_me_proto_depIdxs = []int32{
-	2, // 0: Superplane.Me.User.created_at:type_name -> google.protobuf.Timestamp
-	3, // 1: Superplane.Me.Me.Me:input_type -> google.protobuf.Empty
-	3, // 2: Superplane.Me.Me.RegenerateToken:input_type -> google.protobuf.Empty
-	0, // 3: Superplane.Me.Me.Me:output_type -> Superplane.Me.User
-	1, // 4: Superplane.Me.Me.RegenerateToken:output_type -> Superplane.Me.RegenerateTokenResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 0: Superplane.Me.MeResponse.user:type_name -> Superplane.Me.User
+	4, // 1: Superplane.Me.User.created_at:type_name -> google.protobuf.Timestamp
+	5, // 2: Superplane.Me.User.permissions:type_name -> Superplane.Authorization.Permission
+	0, // 3: Superplane.Me.Me.Me:input_type -> Superplane.Me.MeRequest
+	6, // 4: Superplane.Me.Me.RegenerateToken:input_type -> google.protobuf.Empty
+	1, // 5: Superplane.Me.Me.Me:output_type -> Superplane.Me.MeResponse
+	3, // 6: Superplane.Me.Me.RegenerateToken:output_type -> Superplane.Me.RegenerateTokenResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_me_proto_init() }
@@ -211,7 +346,7 @@ func file_me_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_me_proto_rawDesc), len(file_me_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

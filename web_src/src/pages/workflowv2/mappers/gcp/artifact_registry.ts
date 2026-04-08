@@ -1,6 +1,7 @@
-import { ExecutionInfo, OutputPayload, StateFunction } from "../types";
-import { DEFAULT_EVENT_STATE_MAP, EventState } from "@/ui/componentBase";
-import { EventStateRegistry } from "../types";
+import type { ExecutionInfo, OutputPayload, StateFunction } from "../types";
+import type { EventState } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { EventStateRegistry } from "../types";
 
 export type ArtifactPushData = {
   action?: string;

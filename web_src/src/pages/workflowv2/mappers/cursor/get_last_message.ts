@@ -1,6 +1,7 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getState, getStateMap, getTriggerRenderer } from "..";
+import { truncate } from "../safeMappers";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -74,9 +75,7 @@ export const getLastMessageMapper: ComponentBaseMapper = {
     }
 
     if (data?.message?.text) {
-      const text = data.message.text;
-      const truncated = text.length > 100 ? text.substring(0, 100) + "..." : text;
-      details["Message Text"] = truncated;
+      details["Message Text"] = truncate(data.message.text, 100);
     }
 
     if (payload?.timestamp) {
