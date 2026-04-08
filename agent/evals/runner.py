@@ -10,6 +10,7 @@ from pydantic_evals import Dataset
 
 from ai.agent import AgentDeps, build_agent
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from evals.case_filter import case_filter, select_cases
 from evals.case_logger import CaseLogger
 from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.cases import dataset
@@ -26,9 +27,10 @@ def load_env() -> dict[str, str]:
     }
 
 
-async def runner() -> None:
+async def runner(*, selected_case_names: list[str] | None) -> None:
     env = load_env()
-    cases = list(dataset.cases)
+    full_cases = list(dataset.cases)
+    cases = select_cases(full_cases, selected_case_names)
     eval_dataset = Dataset(cases=cases)
 
     deps = AgentDeps(
@@ -46,7 +48,7 @@ async def runner() -> None:
     # Duplicate prompts across cases are not supported (detected under a lock).
     run_usages: dict[str, RunUsage] = {}
     usage_lock = asyncio.Lock()
-    question_to_case_name, case_names = build_case_name_index(cases)
+    question_to_case_name, case_names = build_case_name_index(cases, full_cases)
 
     case_logger = CaseLogger(
         run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%S_%fZ"),
@@ -78,8 +80,9 @@ async def runner() -> None:
         case_logger.close()
 
 
-def main() -> None:
-    asyncio.run(runner())
+def main(argv: list[str] | None = None) -> None:
+    selected_case_names = case_filter(argv)
+    asyncio.run(runner(selected_case_names=selected_case_names))
 
 
 if __name__ == "__main__":
