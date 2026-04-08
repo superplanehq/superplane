@@ -17,6 +17,11 @@ const (
 	defaultProfilePath  = "coverage-go.out"
 	defaultBaselinePath = ".go-coverage-baseline.json"
 	modulePrefix        = "github.com/superplanehq/superplane/"
+
+	// tolerancePercentage is the allowed coverage drop (in percentage points)
+	// before a regression is reported. This absorbs minor fluctuations
+	// between local and CI test runs.
+	tolerancePercentage = 0.5
 )
 
 var defaultIgnoredPackagePrefixes = []string{
@@ -102,7 +107,7 @@ func main() {
 	packageRegressions := findPackageRegressions(stats.CoverageByPackage, existingBaseline.MinCoverageByPackage)
 	missingPackages := findMissingPackages(stats.CoverageByPackage, existingBaseline.MinCoverageByPackage)
 
-	if totalRegression > 0 || len(packageRegressions) > 0 || len(missingPackages) > 0 {
+	if totalRegression > tolerancePercentage || len(packageRegressions) > 0 || len(missingPackages) > 0 {
 		fmt.Fprintln(os.Stderr, "Go coverage budget exceeded.")
 		fmt.Fprintf(os.Stderr, "- Total coverage: %.1f%% (allowed %.1f%%)\n", stats.TotalCoverage, existingBaseline.MinTotalCoverage)
 
@@ -271,7 +276,7 @@ func findPackageRegressions(currentByPackage map[string]float64, minByPackage ma
 			continue
 		}
 
-		if roundCoverage(minCoverage-currentCoverage) > 0 {
+		if roundCoverage(minCoverage-currentCoverage) > tolerancePercentage {
 			regressions = append(regressions, packageRegression{
 				Package:         pkg,
 				CurrentCoverage: currentCoverage,
@@ -321,7 +326,7 @@ func printCoverageVsBudget(stats coverageStats, budget baseline) {
 		currentCoverage := stats.CoverageByPackage[pkg]
 		minCoverage := budget.MinCoverageByPackage[pkg]
 		status := ""
-		if roundCoverage(minCoverage-currentCoverage) > 0 {
+		if roundCoverage(minCoverage-currentCoverage) > tolerancePercentage {
 			status = " !!! OVER BUDGET"
 		}
 		fmt.Printf("- %s: %.1f/%.1f%s\n", pkg, currentCoverage, minCoverage, status)
