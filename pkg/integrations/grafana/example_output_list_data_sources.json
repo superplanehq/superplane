@@ -1,0 +1,32 @@
+{
+  "type": "grafana.data-sources",
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "data": {
+    "dataSources": [
+      {
+        "id": 1,
+        "uid": "prometheus-uid",
+        "name": "Prometheus",
+        "type": "prometheus",
+        "url": "http://prometheus:9090",
+        "isDefault": true
+      },
+      {
+        "id": 2,
+        "uid": "loki-uid",
+        "name": "Loki",
+        "type": "loki",
+        "url": "http://loki:3100",
+        "isDefault": false
+      },
+      {
+        "id": 3,
+        "uid": "tempo-uid",
+        "name": "Tempo",
+        "type": "tempo",
+        "url": "http://tempo:3200",
+        "isDefault": false
+      }
+    ]
+  }
+}
