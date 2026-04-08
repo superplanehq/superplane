@@ -5564,7 +5564,6 @@ export function WorkflowPageV2() {
           edges={edges}
           organizationId={organizationId}
           canvasId={canvasId}
-          onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           getTabData={getTabData}
