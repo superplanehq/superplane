@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { createSafeComponentMapper, createSafeTriggerRenderer } from "./safeMappers";
+import type { ReactNode } from "react";
+import {
+  createSafeComponentMapper,
+  createSafeCustomFieldRenderer,
+  createSafeTriggerRenderer,
+  normalizeComponentBaseProps,
+  normalizeTriggerProps,
+  truncate,
+} from "./safeMappers";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
+  CustomFieldRenderer,
   ExecutionDetailsContext,
   ExecutionInfo,
   SubtitleContext,
@@ -35,7 +44,23 @@ function makeExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
 }
 
 function makeComponentBaseContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return { nodes: [], node: DEFAULT_NODE, componentDefinition: DEFAULT_DEFINITION, lastExecutions: [], ...overrides };
+  return {
+    nodes: [],
+    node: DEFAULT_NODE,
+    componentDefinition: DEFAULT_DEFINITION,
+    lastExecutions: [],
+    ...overrides,
+    currentUser: {
+      id: "user-1",
+      name: "John Doe",
+      email: "john.doe@example.com",
+      roles: ["admin"],
+      groups: ["developers"],
+    },
+    actions: {
+      invokeNodeExecutionAction: async () => {},
+    },
+  };
 }
 
 function makeSubtitleContext(): SubtitleContext {
@@ -95,7 +120,7 @@ describe("createSafeComponentMapper", () => {
     };
     const safe = createSafeComponentMapper(underlying, "test");
 
-    expect(safe.props(makeComponentBaseContext())).toBe(expected);
+    expect(safe.props(makeComponentBaseContext())).toMatchObject(expected);
     expect(safe.subtitle(makeSubtitleContext())).toBe("Sub");
     expect(safe.getExecutionDetails(makeExecutionDetailsContext())).toEqual({ Key: "Value" });
   });
@@ -168,9 +193,32 @@ describe("createSafeComponentMapper", () => {
     expect(safe.props(ctx).title).toBe("Test Node");
     consoleSpy.mockRestore();
   });
+
+  it("normalizes malformed mapper props into safe values", () => {
+    const result = normalizeComponentBaseProps(
+      {
+        title: undefined,
+        metadata: "bad",
+        specs: "bad",
+        eventSections: "bad",
+        error: { message: "boom" },
+        warning: 123,
+      } as unknown as ComponentBaseProps,
+      makeComponentBaseContext(),
+    );
+
+    expect(result.title).toBe("Test Node");
+    expect(result.metadata).toBeUndefined();
+    expect(result.specs).toBeUndefined();
+    expect(result.eventSections).toBeUndefined();
+    expect(result.error).toBe("");
+    expect(result.warning).toBe("");
+    expect(result.includeEmptyState).toBe(true);
+    expect(result.emptyStateProps?.title).toBe("Can't display");
+  });
 });
 
-describe("createSafeTriggerRenderer", () => {
+describe("createSafeTriggerRenderer core behavior", () => {
   it("delegates to the underlying renderer when no error occurs", () => {
     const expectedProps: TriggerProps = { title: "My Trigger", iconSlug: "bolt", metadata: [] };
     const underlying: TriggerRenderer = {
@@ -181,7 +229,7 @@ describe("createSafeTriggerRenderer", () => {
     };
     const safe = createSafeTriggerRenderer(underlying, "test");
 
-    expect(safe.getTriggerProps(makeTriggerRendererContext())).toBe(expectedProps);
+    expect(safe.getTriggerProps(makeTriggerRendererContext())).toMatchObject(expectedProps);
     expect(safe.getRootEventValues(makeTriggerEventContext())).toEqual({ key: "val" });
     expect(safe.getTitleAndSubtitle(makeTriggerEventContext())).toEqual({ title: "T", subtitle: "S" });
   });
@@ -255,10 +303,69 @@ describe("createSafeTriggerRenderer", () => {
     expect(safe.getEventState!(makeTriggerEventContext())).toBe("triggered");
     consoleSpy.mockRestore();
   });
+});
 
+describe("createSafeTriggerRenderer normalization", () => {
   it("does not wrap getEventState when the underlying renderer does not define it", () => {
     const safe = createSafeTriggerRenderer(baseTriggerRenderer(), "no-state");
     expect(safe.getEventState).toBeUndefined();
+  });
+
+  it("normalizes malformed trigger props into safe values", () => {
+    const result = normalizeTriggerProps(
+      {
+        title: undefined,
+        iconSlug: undefined,
+        metadata: "bad",
+        error: 1,
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(result.title).toBe("Test Trigger");
+    expect(result.iconSlug).toBe("bolt");
+    expect(result.metadata).toEqual([]);
+    expect(result.error).toBe("");
+  });
+
+  it("preserves fallback trigger title and icon when renderer returns empty strings", () => {
+    const result = normalizeTriggerProps(
+      {
+        title: "",
+        iconSlug: "",
+        metadata: [],
+        lastEventData: {
+          title: "",
+        },
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(result.title).toBe("Test Trigger");
+    expect(result.iconSlug).toBe("bolt");
+    expect(result.lastEventData?.title).toBe("Test Trigger");
+  });
+
+  it("preserves trigger customField identity and valid trigger-specific fields", () => {
+    const customField = vi.fn();
+    const result = normalizeTriggerProps(
+      {
+        title: "Trigger",
+        iconSlug: "bolt",
+        metadata: [{ title: "Region", value: "us-east-1" }],
+        customField,
+        warning: "be careful",
+        collapsed: true,
+      } as unknown as TriggerProps,
+      makeTriggerRendererContext(),
+    );
+
+    expect(typeof result.customField).toBe("function");
+    (result.customField as (...args: unknown[]) => unknown)();
+    expect(customField).toHaveBeenCalled();
+    expect(result.warning).toBe("be careful");
+    expect(result.collapsed).toBe(true);
+    expect(result.metadata).toEqual([{ title: "Region", value: "us-east-1" }]);
   });
 });
 
@@ -279,6 +386,123 @@ describe("safe mapper canvas resilience", () => {
     expect(safeBroken.props(ctx).title).toBe("Test Node");
     expect(safeWorking.props(ctx).title).toBe("Works");
     expect(safeWorking.props(ctx).iconSlug).toBe("check");
+    consoleSpy.mockRestore();
+  });
+});
+
+describe("custom field safety", () => {
+  it("returns null when a custom field renderer throws", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const safe = createSafeCustomFieldRenderer(
+      {
+        render: () => {
+          throw new Error("render failed");
+        },
+      } satisfies CustomFieldRenderer,
+      "github.runWorkflow",
+    );
+
+    expect(safe.render(DEFAULT_NODE)).toBeNull();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Custom field renderer "github.runWorkflow" threw in render()'),
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("returns null when a custom field renderer returns a non-renderable object", () => {
+    const safe = createSafeCustomFieldRenderer(
+      {
+        render: () => ({ invalid: true }) as unknown as ReactNode,
+      } satisfies CustomFieldRenderer,
+      "broken.customField",
+    );
+
+    expect(safe.render(DEFAULT_NODE)).toBeNull();
+  });
+});
+
+describe("truncate", () => {
+  it("returns the string unchanged when within the limit", () => {
+    expect(truncate("hello", 10)).toBe("hello");
+  });
+
+  it("truncates a long string and appends ellipsis", () => {
+    expect(truncate("hello world", 5)).toBe("hello...");
+  });
+
+  it("supports a custom ellipsis character", () => {
+    expect(truncate("hello world", 5, "\u2026")).toBe("hello\u2026");
+  });
+
+  it("handles undefined without throwing", () => {
+    expect(truncate(undefined, 10)).toBe("");
+  });
+
+  it("handles null without throwing", () => {
+    expect(truncate(null, 10)).toBe("");
+  });
+
+  it("handles a number by coercing to string", () => {
+    expect(truncate(12345, 3)).toBe("123...");
+  });
+
+  it("handles a boolean by coercing to string", () => {
+    expect(truncate(true, 10)).toBe("true");
+  });
+
+  it("handles an object by coercing to string", () => {
+    expect(truncate({ key: "value" }, 5)).toBe("[obje...");
+  });
+
+  it("handles an array by coercing to string", () => {
+    expect(truncate([1, 2, 3], 3)).toBe("1,2...");
+  });
+
+  it("returns empty string for empty string input", () => {
+    expect(truncate("", 10)).toBe("");
+  });
+});
+
+describe("safe mapper recovers from substring on non-string config values", () => {
+  it("recovers when subtitle calls substring on a number config value", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const underlying: ComponentBaseMapper = {
+      props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
+      subtitle: (ctx) => {
+        const config = ctx.node.configuration as Record<string, unknown>;
+        // Simulates the old bug: calling .substring() on a non-string
+        return (config.query as string).substring(0, 50);
+      },
+      getExecutionDetails: () => ({}),
+    };
+    const safe = createSafeComponentMapper(underlying, "broken-substring");
+    const ctx = makeSubtitleContext();
+    (ctx.node as unknown as Record<string, unknown>).configuration = { query: 12345 };
+
+    expect(safe.subtitle(ctx)).toBe("");
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Component mapper "broken-substring" threw in subtitle()'),
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("recovers when getExecutionDetails calls substring on an object config value", () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const underlying: ComponentBaseMapper = {
+      props: () => ({ iconSlug: "zap", collapsed: false, title: "T", includeEmptyState: false }),
+      subtitle: () => "",
+      getExecutionDetails: (ctx) => {
+        const config = ctx.node.configuration as Record<string, unknown>;
+        return { Preview: (config.body as string).substring(0, 50) };
+      },
+    };
+    const safe = createSafeComponentMapper(underlying, "broken-substring");
+    const ctx = makeExecutionDetailsContext();
+    (ctx.node as unknown as Record<string, unknown>).configuration = { body: { nested: true } };
+
+    expect(safe.getExecutionDetails(ctx)).toEqual({});
     consoleSpy.mockRestore();
   });
 });

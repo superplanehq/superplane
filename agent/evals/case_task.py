@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import textwrap
-from typing import Any
+from typing import Any, cast
 
 from pydantic_ai.messages import (
     FinalResultEvent,
@@ -16,15 +16,25 @@ from ai.agent import build_prompt
 from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from evals.case_logger import CaseLogger
+from evals.case_names import eval_case_name
 
 
-def build_case_name_index(cases: list[Any]) -> tuple[dict[str, str], list[str]]:
+def build_case_name_index(
+    selected_cases: list[Any],
+    full_dataset: list[Any],
+) -> tuple[dict[str, str], list[str]]:
+    index_by_id = {id(c): i for i, c in enumerate(full_dataset)}
     question_to_case_name: dict[str, str] = {}
     case_names: list[str] = []
-    for index, case in enumerate(cases):
+    for case in selected_cases:
+        idx = index_by_id.get(id(case))
+        if idx is None:
+            raise RuntimeError(
+                "Eval case not in full_dataset; pass the same Case instances as in cases.py."
+            )
         if not isinstance(case.inputs, str):
             raise RuntimeError(
-                f"Case {getattr(case, 'name', f'case_{index}')!r} has non-string input; "
+                f"Case {eval_case_name(case, idx)!r} has non-string input; "
                 "eval logging requires string case inputs."
             )
         if case.inputs in question_to_case_name:
@@ -32,7 +42,7 @@ def build_case_name_index(cases: list[Any]) -> tuple[dict[str, str], list[str]]:
                 "Duplicate eval case inputs are not supported for usage correlation "
                 f"(collision on {case.inputs[:120]!r}...)"
             )
-        case_name = getattr(case, "name", f"case_{index}")
+        case_name = eval_case_name(case, idx)
         question_to_case_name[case.inputs] = case_name
         case_names.append(case_name)
     return question_to_case_name, case_names
@@ -40,7 +50,9 @@ def build_case_name_index(cases: list[Any]) -> tuple[dict[str, str], list[str]]:
 
 def read_agent_system_prompt(agent: Any) -> str:
     raw_system_prompts = getattr(agent, "_system_prompts", ())
-    return "\n\n".join(prompt for prompt in raw_system_prompts if isinstance(prompt, str) and prompt)
+    return "\n\n".join(
+        prompt for prompt in raw_system_prompts if isinstance(prompt, str) and prompt
+    )
 
 
 def build_case_task(
@@ -94,7 +106,7 @@ def build_case_task(
                 f"output_tokens={run_usage.output_tokens}"
             ),
         )
-        return result.output
+        return cast(CanvasAnswer, result.output)
 
     return task
 

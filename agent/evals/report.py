@@ -24,12 +24,14 @@ class ReportBuilder:
         model: str,
         run_usages: dict[str, RunUsage],
         evaluate_wall_seconds: float,
+        case_names: list[str],
         interaction_log_paths_by_case_name: dict[str, str] | None = None,
     ) -> None:
         self.report = report
         self.model = model
         self.run_usages = run_usages
         self.evaluate_wall_seconds = evaluate_wall_seconds
+        self.case_names = case_names
         self.interaction_log_paths_by_case_name = interaction_log_paths_by_case_name or {}
 
     def render(self) -> None:
@@ -37,6 +39,11 @@ class ReportBuilder:
         output_dir = Path("/app/tmp/agent/evals")
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        if len(self.case_names) != len(self.report.cases):
+            raise RuntimeError(
+                f"case_names/report mismatch: {len(self.case_names)} names vs "
+                f"{len(self.report.cases)} report cases"
+            )
         if len(self.run_usages) != len(self.report.cases):
             raise RuntimeError(
                 f"usage/case count mismatch: {len(self.run_usages)} usage keys vs "
@@ -56,7 +63,7 @@ class ReportBuilder:
         print()
 
         for i, case_result in enumerate(self.report.cases):
-            case_name = getattr(case_result, "name", None) or f"case_{i}"
+            case_name = self.case_names[i]
             safe_case_name = re.sub(r"[^A-Za-z0-9_.-]", "_", case_name)
 
             serialized_output = self._serialize_output(case_result.output)
@@ -108,9 +115,7 @@ class ReportBuilder:
 
             total_assertions += len(assertion_values)
             passed_assertions += sum(
-                1
-                for assertion in assertion_values
-                if bool(getattr(assertion, "value", False))
+                1 for assertion in assertion_values if bool(getattr(assertion, "value", False))
             )
             if duration_seconds is not None:
                 task_time_sum_seconds += duration_seconds
@@ -269,5 +274,3 @@ class ReportBuilder:
         if value is None:
             return "-"
         return f"${value:.4f}"
-
-  

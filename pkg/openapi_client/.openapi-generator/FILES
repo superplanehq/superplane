@@ -73,6 +73,7 @@ docs/CanvasesCanvasEventWithExecutions.md
 docs/CanvasesCanvasMemory.md
 docs/CanvasesCanvasMetadata.md
 docs/CanvasesCanvasNodeExecution.md
+docs/CanvasesCanvasNodeExecutionRef.md
 docs/CanvasesCanvasNodeExecutionState.md
 docs/CanvasesCanvasNodeQueueItem.md
 docs/CanvasesCanvasSpec.md
@@ -162,6 +163,7 @@ docs/IntegrationAPI.md
 docs/IntegrationNodeRef.md
 docs/IntegrationsIntegrationDefinition.md
 docs/MeAPI.md
+docs/MeMeResponse.md
 docs/MeRegenerateTokenResponse.md
 docs/NodeBlueprintRef.md
 docs/NodeComponentRef.md
@@ -258,11 +260,9 @@ docs/TriggersListTriggersResponse.md
 docs/TriggersTrigger.md
 docs/UsersAPI.md
 docs/UsersAccountProvider.md
-docs/UsersListUserPermissionsResponse.md
-docs/UsersListUserRolesResponse.md
 docs/UsersListUsersResponse.md
+docs/UsersRoleAssignment.md
 docs/UsersUserMetadata.md
-docs/UsersUserRoleAssignment.md
 docs/UsersUserSpec.md
 docs/UsersUserStatus.md
 docs/WidgetAPI.md
@@ -311,6 +311,7 @@ model_canvases_canvas_event_with_executions.go
 model_canvases_canvas_memory.go
 model_canvases_canvas_metadata.go
 model_canvases_canvas_node_execution.go
+model_canvases_canvas_node_execution_ref.go
 model_canvases_canvas_node_execution_state.go
 model_canvases_canvas_node_queue_item.go
 model_canvases_canvas_spec.go
@@ -396,6 +397,7 @@ model_groups_update_group_body.go
 model_groups_update_group_response.go
 model_integration_node_ref.go
 model_integrations_integration_definition.go
+model_me_me_response.go
 model_me_regenerate_token_response.go
 model_node_blueprint_ref.go
 model_node_component_ref.go
@@ -486,11 +488,9 @@ model_triggers_describe_trigger_response.go
 model_triggers_list_triggers_response.go
 model_triggers_trigger.go
 model_users_account_provider.go
-model_users_list_user_permissions_response.go
-model_users_list_user_roles_response.go
 model_users_list_users_response.go
+model_users_role_assignment.go
 model_users_user_metadata.go
-model_users_user_role_assignment.go
 model_users_user_spec.go
 model_users_user_status.go
 model_widgets_describe_widget_response.go

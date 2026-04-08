@@ -1,41 +1,10 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Puzzle, type LucideIcon } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+export { resolveLucideIcon as resolveIcon } from "@/lib/iconRegistry";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-export const resolveIcon = (slug?: string): LucideIcon => {
-  if (!slug) {
-    return Puzzle;
-  }
-
-  const normalized = slug.toLowerCase();
-  const aliases: Record<string, string> = {
-    close: "X",
-    "x-mark": "X",
-    xmark: "X",
-  };
-  const alias = aliases[normalized];
-  if (alias && (LucideIcons as Record<string, unknown>)[alias]) {
-    return (LucideIcons as Record<string, unknown>)[alias] as LucideIcon;
-  }
-
-  const pascalCase = slug
-    .split("-")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join("");
-
-  const candidate = (LucideIcons as Record<string, unknown>)[pascalCase];
-
-  if (candidate && (typeof candidate === "function" || (typeof candidate === "object" && "render" in candidate))) {
-    return candidate as LucideIcon;
-  }
-
-  return Puzzle;
-};
 
 export const calcRelativeTimeFromDiff = (diff: number) => {
   const seconds = Math.floor(diff / 1000);
@@ -137,5 +106,17 @@ export function isUrl(value: string): boolean {
     return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
+  }
+}
+
+/**
+ * Handles keyboard activation of a handler.
+ * @param e - The keyboard event
+ * @param handler - The handler to activate
+ */
+export function handleKeyboardActivation(e: React.KeyboardEvent, handler: () => void) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    handler();
   }
 }

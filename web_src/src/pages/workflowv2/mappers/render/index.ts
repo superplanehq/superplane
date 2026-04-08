@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { deployMapper, DEPLOY_STATE_REGISTRY } from "./deploy";
 import { cancelDeployMapper } from "./cancel_deploy";
 import { getDeployMapper } from "./get_deploy";

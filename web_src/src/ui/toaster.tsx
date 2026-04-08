@@ -1,6 +1,7 @@
 "use client";
 
-import { Toast, ToastAction, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/ui/toast";
+import type { ToastAction } from "@/ui/toast";
+import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 
 export type ToastProps = React.ComponentProps<typeof Toast>;

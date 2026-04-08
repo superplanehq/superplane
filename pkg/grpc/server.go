@@ -128,7 +128,7 @@ func RunServer(
 	secretsService := NewSecretService(encryptor, authService)
 	secretPb.RegisterSecretsServer(grpcServer, secretsService)
 
-	meService := NewMeService()
+	meService := NewMeService(authService)
 	mepb.RegisterMeServer(grpcServer, meService)
 
 	componentService := NewComponentService(registry)

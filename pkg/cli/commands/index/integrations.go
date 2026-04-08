@@ -13,6 +13,7 @@ import (
 
 func newIntegrationsCommand(options core.BindOptions) *cobra.Command {
 	var name string
+	var full bool
 
 	cmd := &cobra.Command{
 		Use:   "integrations",
@@ -20,13 +21,15 @@ func newIntegrationsCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&name, "name", "", "integration definition name")
-	core.Bind(cmd, &integrationsCommand{name: &name}, options)
+	cmd.Flags().BoolVar(&full, "full", false, "show full output including all fields")
+	core.Bind(cmd, &integrationsCommand{name: &name, full: &full}, options)
 
 	return cmd
 }
 
 type integrationsCommand struct {
 	name *string
+	full *bool
 }
 
 func (c *integrationsCommand) Execute(ctx core.CommandContext) error {
@@ -40,14 +43,27 @@ func (c *integrationsCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
+	integrations := response.GetIntegrations()
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(response.GetIntegrations())
+		if c.full != nil && *c.full {
+			return ctx.Renderer.Render(integrations)
+		}
+
+		summary := make([]map[string]string, len(integrations))
+		for i, integration := range integrations {
+			summary[i] = map[string]string{
+				"name":        integration.GetName(),
+				"label":       integration.GetLabel(),
+				"description": integration.GetDescription(),
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "NAME\tLABEL\tDESCRIPTION")
-		for _, integration := range response.GetIntegrations() {
+		for _, integration := range integrations {
 			_, _ = fmt.Fprintf(writer, "%s\t%s\t%s\n", integration.GetName(), integration.GetLabel(), integration.GetDescription())
 		}
 		return writer.Flush()

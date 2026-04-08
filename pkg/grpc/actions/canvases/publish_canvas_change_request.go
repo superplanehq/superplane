@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -27,6 +28,7 @@ func PublishCanvasChangeRequest(
 	canvasID string,
 	changeRequestID string,
 	webhookBaseURL string,
+	authService authorization.Authorization,
 ) (*models.CanvasChangeRequest, *models.CanvasVersion, error) {
 	_, ok := authentication.GetUserIdFromMetadata(ctx)
 	if !ok {
@@ -179,7 +181,7 @@ func PublishCanvasChangeRequest(
 			}
 
 			if workflowNode.State == models.CanvasNodeStateReady {
-				setupErr := setupNode(ctx, tx, encryptor, registry, workflowNode, webhookBaseURL)
+				setupErr := setupNode(ctx, tx, encryptor, registry, workflowNode, organizationUUID, authService, webhookBaseURL)
 				if setupErr != nil {
 					workflowNode.State = models.CanvasNodeStateError
 					errorMsg := setupErr.Error()

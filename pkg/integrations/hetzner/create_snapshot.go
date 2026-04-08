@@ -70,16 +70,6 @@ func (c *CreateSnapshot) OutputChannels(configuration any) []core.OutputChannel 
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *CreateSnapshot) ExampleOutput() map[string]any {
-	return map[string]any{
-		"actionId":     "12345",
-		"imageId":      67890,
-		"imageType":    "snapshot",
-		"serverId":     "42",
-		"snapshotName": "workflow-snapshot",
-	}
-}
-
 func (c *CreateSnapshot) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

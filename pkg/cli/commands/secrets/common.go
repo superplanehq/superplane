@@ -68,6 +68,11 @@ func resourceToSecret(resource secretResource) openapi_client.SecretsSecret {
 }
 
 func renderSecretListText(stdout io.Writer, items []openapi_client.SecretsSecret) error {
+	if len(items) == 0 {
+		_, err := fmt.Fprintln(stdout, "No secrets found.")
+		return err
+	}
+
 	writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 	_, _ = fmt.Fprintln(writer, "ID\tNAME\tPROVIDER\tKEYS\tCREATED_AT")
 

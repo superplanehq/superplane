@@ -63,11 +63,11 @@ func ResolveOrganizationID(ctx CommandContext) (string, error) {
 		return "", err
 	}
 
-	if !me.HasOrganizationId() || strings.TrimSpace(me.GetOrganizationId()) == "" {
+	if !me.User.HasOrganizationId() || strings.TrimSpace(me.User.GetOrganizationId()) == "" {
 		return "", fmt.Errorf("organization id not found for authenticated user")
 	}
 
-	return me.GetOrganizationId(), nil
+	return me.User.GetOrganizationId(), nil
 }
 
 func ResolveCanvasID(ctx CommandContext, canvasID string) (string, error) {

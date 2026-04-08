@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { isCancelledError } from "@tanstack/react-query";
 import { resolveIcon, flattenObject, calcRelativeTimeFromDiff } from "@/lib/utils";
 import { ChainItem, type ChainItemData } from "../../chainItem";
 import type { SidebarEvent } from "../types";
@@ -39,19 +40,6 @@ function buildExecutionTabData(
 
     currentData = {
       ...flattened,
-    };
-  }
-
-  // Only add error if it's not already in custom details
-  // Custom details (like from filter mapper) handle error positioning themselves
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
-    !("Error" in currentData)
-  ) {
-    currentData["Error"] = {
-      __type: "error",
-      message: execution.resultMessage,
     };
   }
 
@@ -175,6 +163,7 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
   const [chainItems, setChainItems] = useState<ChainItemData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadInFlightRef = useRef(false);
 
   // Ref for the scrollable executions container
   const executionsScrollRef = useRef<HTMLDivElement>(null);
@@ -221,7 +210,12 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
       return;
     }
 
+    if (loadInFlightRef.current) {
+      return;
+    }
+
     try {
+      loadInFlightRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -329,11 +323,15 @@ export const ExecutionChainPage: React.FC<ExecutionChainPageProps> = ({
 
       setChainItems(transformedItems);
     } catch (err) {
+      if (isCancelledError(err)) {
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to load execution chain");
     } finally {
+      loadInFlightRef.current = false;
       setLoading(false);
     }
-  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints]);
+  }, [eventId, loadExecutionChain, workflowNodes, components, triggers, blueprints, getExecutionState]);
 
   // Load execution chain data
   useEffect(() => {

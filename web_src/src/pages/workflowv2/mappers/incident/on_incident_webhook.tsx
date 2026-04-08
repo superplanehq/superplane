@@ -9,7 +9,7 @@ import {
   type CanvasesCanvas,
   type CanvasesCanvasVersion,
 } from "@/api-client";
-import { CustomFieldRenderer, NodeInfo } from "../types";
+import type { CustomFieldRenderer, NodeInfo } from "../types";
 import { Icon } from "@/components/Icon";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

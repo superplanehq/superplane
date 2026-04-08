@@ -28,6 +28,12 @@ import {
   widgetsListWidgets,
   widgetsDescribeWidget,
 } from "../api-client/sdk.gen";
+import type {
+  CanvasesCanvas,
+  CanvasesCanvasVersion,
+  ComponentsNode,
+  ComponentsPosition,
+} from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 
 // Query Keys
@@ -158,6 +164,7 @@ export const useCanvas = (organizationId: string, canvasId: string) => {
       return response.data?.canvas;
     },
     staleTime: 0,
+    refetchOnWindowFocus: false,
     enabled: !!organizationId && !!canvasId,
   });
 };
@@ -237,7 +244,7 @@ export const useCanvasChangeRequests = (organizationId: string, canvasId: string
       const response = await canvasesListCanvasChangeRequests(
         withOrganizationHeader({
           path: { canvasId },
-          query: { limit: 100, statusFilter: "all" },
+          query: { limit: 25, statusFilter: "all" },
         }),
       );
       return response.data?.changeRequests || [];
@@ -248,7 +255,17 @@ export const useCanvasChangeRequests = (organizationId: string, canvasId: string
 
 type CanvasChangeRequestFilter = "open" | "rejected" | "merged" | "all";
 
-const versionSortTimestamp = (version: any): number => {
+type CanvasGraphData = {
+  nodes?: unknown[];
+  edges?: unknown[];
+};
+
+type PositionedNode = ComponentsNode & {
+  id: string;
+  position: ComponentsPosition;
+};
+
+const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
   const raw = version?.metadata?.publishedAt || version?.metadata?.updatedAt || version?.metadata?.createdAt;
   if (!raw) return 0;
   const parsed = Date.parse(raw);
@@ -326,7 +343,7 @@ export const useCreateCanvas = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; description?: string; nodes?: any[]; edges?: any[] }) => {
+    mutationFn: async (data: { name: string; description?: string } & CanvasGraphData) => {
       const payload = {
         metadata: {
           name: data.name,
@@ -393,7 +410,7 @@ export const useUpdateCanvas = (organizationId: string, canvasId: string) => {
 
       const updatedCanvas = response?.data?.canvas;
       if (updatedCanvas) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
           if (!current) {
             return current;
           }
@@ -450,9 +467,11 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
       versionId?: string;
       name: string;
       description?: string;
-      nodes?: any[];
-      edges?: any[];
+      nodes?: unknown[];
+      edges?: unknown[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
+      preserveLocalCanvasState?: boolean;
+      invalidateRelatedQueries?: boolean;
     }) => {
       const body = {
         canvas: {
@@ -496,7 +515,7 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
       }
 
-      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: any[] | undefined) => {
+      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
         if (!current) {
           return current;
         }
@@ -518,40 +537,50 @@ export const useUpdateCanvasVersion = (organizationId: string, canvasId: string)
         return next;
       });
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: any | undefined) => {
-        if (!current) {
-          return current;
-        }
-
-        // When the server computed a new layout (autoLayout), accept the
-        // server positions as authoritative.  Otherwise preserve current
-        // local node positions to avoid overwriting positions that changed
-        // while the save was in flight.
-        if (variables.autoLayout) {
-          return { ...current, spec: version.spec };
-        }
-
-        const currentPositionsByNodeId = new Map(
-          (current.spec?.nodes ?? []).filter((n: any) => n.id && n.position).map((n: any) => [n.id, n.position]),
-        );
-
-        const mergedNodes = (version.spec?.nodes ?? []).map((serverNode: any) => {
-          const localPosition = currentPositionsByNodeId.get(serverNode.id);
-          if (localPosition) {
-            return { ...serverNode, position: localPosition };
+      if (!variables.preserveLocalCanvasState) {
+        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
+          if (!current) {
+            return current;
           }
-          return serverNode;
+
+          // When the server computed a new layout (autoLayout), accept the
+          // server positions as authoritative. Otherwise preserve current
+          // local node positions to avoid overwriting positions that changed
+          // while the save was in flight.
+          if (variables.autoLayout) {
+            return { ...current, spec: version.spec };
+          }
+
+          const currentPositionsByNodeId = new Map(
+            (current.spec?.nodes ?? [])
+              .filter((node): node is PositionedNode => Boolean(node.id && node.position))
+              .map((node) => [node.id, node.position] as const),
+          );
+
+          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
+            if (!serverNode.id) {
+              return serverNode;
+            }
+
+            const localPosition = currentPositionsByNodeId.get(serverNode.id);
+            if (localPosition) {
+              return { ...serverNode, position: localPosition };
+            }
+            return serverNode;
+          });
+
+          return {
+            ...current,
+            spec: { ...version.spec, nodes: mergedNodes },
+          };
         });
+      }
 
-        return {
-          ...current,
-          spec: { ...version.spec, nodes: mergedNodes },
-        };
-      });
-
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-      queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      if (variables.invalidateRelatedQueries !== false) {
+        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      }
     },
   });
 };
@@ -622,8 +651,8 @@ export const useResolveCanvasChangeRequest = (organizationId: string, canvasId: 
       changeRequestId: string;
       name: string;
       description?: string;
-      nodes?: any[];
-      edges?: any[];
+      nodes?: unknown[];
+      edges?: unknown[];
       autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
     }) => {
       return await canvasesResolveCanvasChangeRequest(
@@ -691,7 +720,7 @@ export const useDeleteCanvas = (organizationId: string) => {
 };
 
 export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
-  const limit = 50;
+  const limit = 25;
 
   return useInfiniteQuery({
     queryKey: canvasKeys.infiniteEvents(canvasId),

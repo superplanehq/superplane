@@ -560,8 +560,7 @@ message Canvas {
 
   message Status {
     repeated CanvasNodeExecution last_executions = 1;
-    repeated CanvasNodeQueueItem next_queue_items = 2;
-    repeated CanvasEvent last_events = 3;
+    repeated CanvasEvent last_events = 2;
   }
 
   Metadata metadata = 1;
@@ -732,6 +731,26 @@ message ListChildExecutionsResponse {
   repeated CanvasNodeExecution executions = 1;
 }
 
+//
+// More succint description of a canvas node execution.
+// No input, outputs, root event, children.
+// Used to embed execution information into other messages.
+//
+message CanvasNodeExecutionRef {
+  string id = 1;
+  string node_id = 2;
+  CanvasNodeExecution.State state = 3;
+  CanvasNodeExecution.Result result = 4;
+  CanvasNodeExecution.ResultReason result_reason = 5;
+  string result_message = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+//
+// Full description of a canvas node execution.
+// Should only be used for endpoints specific to executions.
+//
 message CanvasNodeExecution {
   enum State {
     STATE_UNKNOWN = 0;
@@ -762,15 +781,14 @@ message CanvasNodeExecution {
   Result result = 7;
   ResultReason result_reason = 8;
   string result_message = 9;
-  google.protobuf.Struct input = 10;
-  google.protobuf.Struct outputs = 11;
-  google.protobuf.Timestamp created_at = 12;
-  google.protobuf.Timestamp updated_at = 13;
-  google.protobuf.Struct metadata = 14;
-  google.protobuf.Struct configuration = 15;
-  repeated CanvasNodeExecution child_executions = 16;
-  CanvasEvent root_event = 17;
-  UserRef cancelled_by = 18;
+  google.protobuf.Struct outputs = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Struct metadata = 13;
+  google.protobuf.Struct configuration = 14;
+  repeated CanvasNodeExecution child_executions = 15;
+  CanvasEvent root_event = 16;
+  UserRef cancelled_by = 17;
 }
 
 message CanvasNodeQueueItem {
@@ -844,6 +862,7 @@ message CanvasEvent {
   string custom_name = 5;
   google.protobuf.Struct data = 6;
   google.protobuf.Timestamp created_at = 7;
+  bool root = 8;
 }
 
 message CanvasEventWithExecutions {
@@ -853,7 +872,7 @@ message CanvasEventWithExecutions {
   string channel = 4;
   google.protobuf.Struct data = 5;
   google.protobuf.Timestamp created_at = 6;
-  repeated CanvasNodeExecution executions = 7;
+  repeated CanvasNodeExecutionRef executions = 7;
   string custom_name = 8;
 }
 

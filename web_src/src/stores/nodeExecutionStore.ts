@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { QueryClient } from "@tanstack/react-query";
-import {
+import type { QueryClient } from "@tanstack/react-query";
+import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasEvent,
@@ -194,17 +194,6 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       initialData.set(execution.nodeId, {
         ...existing,
         executions: [execution],
-      });
-    });
-
-    // Populate with next queue items from workflow.status
-    workflow.status?.nextQueueItems?.forEach((item) => {
-      if (!item.nodeId) return;
-
-      const existing = initialData.get(item.nodeId) || { ...emptyNodeData };
-      initialData.set(item.nodeId, {
-        ...existing,
-        queueItems: [item],
       });
     });
 

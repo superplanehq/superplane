@@ -43,12 +43,12 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if !me.HasOrganizationId() {
+	if !me.User.HasOrganizationId() {
 		return fmt.Errorf("organization id not found for authenticated user")
 	}
 
 	integrationResponse, _, err := ctx.API.OrganizationAPI.
-		OrganizationsDescribeIntegration(ctx.Context, me.GetOrganizationId(), *c.integrationID).
+		OrganizationsDescribeIntegration(ctx.Context, me.User.GetOrganizationId(), *c.integrationID).
 		Execute()
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 
 	response, err := listIntegrationResourcesRequest(
 		ctx,
-		me.GetOrganizationId(),
+		me.User.GetOrganizationId(),
 		metadata.GetId(),
 		extraParameters,
 	)
@@ -73,6 +73,11 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		if len(response.Resources) == 0 {
+			_, err := fmt.Fprintln(stdout, "No integration resources found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "INTEGRATION_ID\tINTEGRATION_NAME\tINTEGRATION\tTYPE\tNAME\tID")
 		for _, resource := range response.Resources {
