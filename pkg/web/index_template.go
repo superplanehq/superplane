@@ -13,23 +13,18 @@ type indexTemplateData struct {
 	AgentEnabled      bool
 }
 
-// agentEnabledFromEnv is true only when AGENT_ENABLED is the lowercase literal "yes" (after TrimSpace).
-func agentEnabledFromEnv() bool {
-	v := strings.TrimSpace(os.Getenv("AGENT_ENABLED"))
-	return v == "yes"
+func agentEnabled() bool {
+	return strings.TrimSpace(os.Getenv("AGENT_ENABLED")) == "yes"
 }
 
 func newIndexTemplateDataFromEnv() indexTemplateData {
 	return indexTemplateData{
 		SentryDSN:         os.Getenv("SENTRY_DSN"),
 		SentryEnvironment: os.Getenv("SENTRY_ENVIRONMENT"),
-		AgentEnabled:      agentEnabledFromEnv(),
+		AgentEnabled:      agentEnabled(),
 	}
 }
 
-// RenderIndexTemplate renders the given index.html content as a Go template,
-// injecting configuration (e.g. Sentry; AGENT_ENABLED must be lowercase "yes" to enable the agent UI).
-// It returns an error if the template cannot be parsed or executed.
 func RenderIndexTemplate(raw []byte) ([]byte, error) {
 	tmpl, err := template.New("index.html").Parse(string(raw))
 	if err != nil {
