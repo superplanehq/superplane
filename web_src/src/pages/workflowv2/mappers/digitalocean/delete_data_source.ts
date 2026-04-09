@@ -59,26 +59,7 @@ export const deleteDataSourceMapper: ComponentBaseMapper = {
     }
 
     const job = result.indexingJob as Record<string, unknown> | undefined;
-    if (job) {
-      details["Indexing Status"] = `${formatIndexingStatus(String(job.status))}`;
-
-      const completed = job.completedDataSources ?? 0;
-      const total = job.totalDataSources ?? 0;
-      details["Data Sources Indexed"] = `${completed}/${total} completed`;
-
-      if (job.totalTokens) {
-        details["Total Tokens"] = String(job.totalTokens);
-      }
-
-      const finishedAt = job.finishedAt as string | undefined;
-      if (finishedAt) {
-        details["Indexing finished at"] = new Date(finishedAt).toLocaleString();
-      }
-
-      if (kbUUID) {
-        details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}/activity`;
-      }
-    }
+    if (job) appendIndexingJobDetails(details, job, kbUUID);
 
     return details;
   },
@@ -88,6 +69,27 @@ export const deleteDataSourceMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function appendIndexingJobDetails(
+  details: Record<string, string>,
+  job: Record<string, unknown>,
+  kbUUID?: string,
+): void {
+  details["Indexing Status"] = formatIndexingStatus(String(job.status));
+  const completed = job.completedDataSources ?? 0;
+  const total = job.totalDataSources ?? 0;
+  details["Data Sources Indexed"] = `${completed}/${total} completed`;
+  if (job.totalTokens) {
+    details["Total Tokens"] = String(job.totalTokens);
+  }
+  const finishedAt = job.finishedAt as string | undefined;
+  if (finishedAt) {
+    details["Indexing finished at"] = new Date(finishedAt).toLocaleString();
+  }
+  if (kbUUID) {
+    details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}/activity`;
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

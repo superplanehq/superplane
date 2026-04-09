@@ -56,31 +56,10 @@ export const getKnowledgeBaseMapper: ComponentBaseMapper = {
     }
 
     const db = result.database as Record<string, unknown> | undefined;
-    if (db) {
-      const dbName = db.name ? String(db.name) : String(db.id || "-");
-      details["Database"] = dbName;
-
-      const dbId = db.id as string | undefined;
-      if (dbId) {
-        details["View Database"] = `https://cloud.digitalocean.com/databases/${dbId}`;
-      }
-    }
+    if (db) appendDatabaseDetails(details, db);
 
     const job = result.lastIndexingJob as Record<string, unknown> | undefined;
-    if (job) {
-      const completed = job.completedDataSources ?? 0;
-      const total = job.totalDataSources ?? 0;
-      details["Last Indexing"] = `${formatIndexingStatus(String(job.status))} — ${completed}/${total} sources`;
-
-      const finishedAt = job.finishedAt as string | undefined;
-      if (finishedAt) {
-        details["Last Indexed At"] = new Date(finishedAt).toLocaleString();
-      }
-
-      if (uuid) {
-        details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${uuid}/activity`;
-      }
-    }
+    if (job) appendLastIndexingJobDetails(details, job, uuid);
 
     return details;
   },
@@ -90,6 +69,31 @@ export const getKnowledgeBaseMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function appendDatabaseDetails(details: Record<string, string>, db: Record<string, unknown>): void {
+  details["Database"] = db.name ? String(db.name) : String(db.id || "-");
+  const dbId = db.id as string | undefined;
+  if (dbId) {
+    details["View Database"] = `https://cloud.digitalocean.com/databases/${dbId}`;
+  }
+}
+
+function appendLastIndexingJobDetails(
+  details: Record<string, string>,
+  job: Record<string, unknown>,
+  uuid?: string,
+): void {
+  const completed = job.completedDataSources ?? 0;
+  const total = job.totalDataSources ?? 0;
+  details["Last Indexing"] = `${formatIndexingStatus(String(job.status))} — ${completed}/${total} sources`;
+  const finishedAt = job.finishedAt as string | undefined;
+  if (finishedAt) {
+    details["Last Indexed At"] = new Date(finishedAt).toLocaleString();
+  }
+  if (uuid) {
+    details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${uuid}/activity`;
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

@@ -252,7 +252,7 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 		require.Equal(t, "poll", requests.Action)
 	})
 
-	t.Run("failed job returns error", func(t *testing.T) {
+	t.Run("failed job fails execution", func(t *testing.T) {
 		kbWithFailedJob := `{
 			"database_status": "ONLINE",
 			"knowledge_base": {
@@ -271,19 +271,22 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 			},
 		}
 
+		executionState := &contexts.ExecutionStateContext{}
+
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
 			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"apiToken": "test-token"},
 			},
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: executionState,
 			Metadata:       &contexts.MetadataContext{Metadata: meta},
 			Requests:       &contexts.RequestContext{},
 		})
 
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "INDEX_JOB_STATUS_FAILED")
+		require.NoError(t, err)
+		require.False(t, executionState.Passed)
+		require.Contains(t, executionState.FailureMessage, "INDEX_JOB_STATUS_FAILED")
 	})
 
 	t.Run("no indexing job yet reschedules poll", func(t *testing.T) {
