@@ -29,16 +29,41 @@ func resolveGrafanaTimeInput(value string, timezone *string, expressions core.Ex
 		return trimmed, nil
 	}
 
-	if expressions != nil && looksLikeBareExpression(trimmed) {
-		resolved, err := expressions.Run(trimmed)
-		if err != nil {
-			return "", err
+	if expressions != nil {
+		if wrapped, ok := unwrapExpressionTemplate(trimmed); ok {
+			resolved, err := expressions.Run(wrapped)
+			if err != nil {
+				return "", err
+			}
+
+			return normalizeEvaluatedGrafanaTime(resolved, timezone)
 		}
 
-		return normalizeEvaluatedGrafanaTime(resolved, timezone)
+		if looksLikeBareExpression(trimmed) {
+			resolved, err := expressions.Run(trimmed)
+			if err != nil {
+				return "", err
+			}
+
+			return normalizeEvaluatedGrafanaTime(resolved, timezone)
+		}
 	}
 
 	return trimmed, nil
+}
+
+func unwrapExpressionTemplate(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	if !strings.HasPrefix(trimmed, "{{") || !strings.HasSuffix(trimmed, "}}") {
+		return "", false
+	}
+
+	inner := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "{{"), "}}"))
+	if inner == "" {
+		return "", false
+	}
+
+	return inner, true
 }
 
 func looksLikeGrafanaRelativeTime(value string) bool {

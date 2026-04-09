@@ -15,11 +15,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
-  <LinkCard title="Create Dashboard Share Link" href="#create-dashboard-share-link" description="Construct a shareable URL for a Grafana dashboard or panel" />
   <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
   <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
-  <LinkCard title="Search Dashboards" href="#search-dashboards" description="Search Grafana dashboards by title, folder, or tag" />
 </CardGrid>
 
 ## Instructions
@@ -86,43 +84,6 @@ The trigger emits the full Grafana webhook payload, including:
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.alert.firing"
-}
-```
-
-<a id="create-dashboard-share-link"></a>
-
-## Create Dashboard Share Link
-
-The Create Dashboard Share Link component constructs a shareable URL for a Grafana dashboard or panel.
-
-### Use Cases
-
-- **Incident response**: include a direct link to the relevant dashboard in notifications or tickets
-- **Workflow enrichment**: embed dashboard links in Slack messages, Jira issues, or approval steps
-- **Panel deep links**: link directly to a specific panel with a preset time range
-
-### Configuration
-
-- **Dashboard**: The Grafana dashboard UID for the share link
-- **Panel**: If set, link opens the dashboard at this specific panel
-- **From**: Optional expression for the start of the time range (e.g. `now() - duration("1h")`)
-- **To**: Optional expression for the end of the time range (e.g. `now()`)
-
-### Output
-
-Returns the constructed shareable URL along with the dashboard title and UID.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "dashboardTitle": "Production Overview",
-    "dashboardUid": "cIBgcSjkk",
-    "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview?viewPanel=2"
-  },
-  "timestamp": "2026-03-31T10:24:30Z",
-  "type": "grafana.dashboard.shareLink"
 }
 ```
 
@@ -288,63 +249,6 @@ Returns the Grafana render URL along with the dashboard UID and panel.
   },
   "timestamp": "2026-03-31T10:24:30Z",
   "type": "grafana.panel.image"
-}
-```
-
-<a id="search-dashboards"></a>
-
-## Search Dashboards
-
-The Search Dashboards component searches Grafana dashboards using the Grafana Search HTTP API.
-
-### Use Cases
-
-- **Dashboard discovery**: find dashboards by title, folder, or tag for downstream automation
-- **Workflow enrichment**: include dashboard lists in notifications, tickets, or approval steps
-- **Audit and inventory**: enumerate dashboards matching specific criteria for review or cleanup
-
-### Configuration
-
-- **Query**: Optional title filter for dashboards
-- **Folder**: Optional folder to filter dashboards by
-- **Tag**: Optional tag to filter dashboards by
-- **Limit**: Optional maximum number of dashboards to return
-
-### Output
-
-Returns an object containing the list of matching Grafana dashboard summaries, including each dashboard UID, title, URL, folder, and tags.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "dashboards": [
-      {
-        "folderTitle": "Platform",
-        "folderUid": "fdg4m1rt63hj8q",
-        "tags": [
-          "production",
-          "platform"
-        ],
-        "title": "Production Overview",
-        "uid": "cIBgcSjkk",
-        "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview"
-      },
-      {
-        "folderTitle": "Platform",
-        "folderUid": "fdg4m1rt63hj8q",
-        "tags": [
-          "latency"
-        ],
-        "title": "Service Latency",
-        "uid": "dJChfTmkk",
-        "url": "https://grafana.example.com/d/dJChfTmkk/service-latency"
-      }
-    ]
-  },
-  "timestamp": "2026-03-31T10:24:30Z",
-  "type": "grafana.dashboards"
 }
 ```
 

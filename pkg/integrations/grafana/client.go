@@ -32,6 +32,7 @@ type contactPoint struct {
 type DataSource struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 type Folder struct {
@@ -63,6 +64,16 @@ type DashboardDetails struct {
 	FolderUID   string         `json:"folderUid"`
 	Tags        []string       `json:"tags"`
 	Panels      []PanelSummary `json:"panels"`
+}
+
+type dashboardGetResponse struct {
+	Dashboard json.RawMessage `json:"dashboard"`
+	Meta      struct {
+		Slug        string `json:"slug"`
+		URL         string `json:"url"`
+		FolderTitle string `json:"folderTitle"`
+		FolderUID   string `json:"folderUid"`
+	} `json:"meta"`
 }
 
 // dashboardURLPathSlug is the path segment after /d/{uid}/ for viewer and image-renderer URLs.
@@ -657,6 +668,37 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	return sources, nil
 }
 
+func (c *Client) GetDataSourceLabelValues(uid, label string) ([]string, error) {
+	trimmedUID := strings.TrimSpace(uid)
+	trimmedLabel := strings.TrimSpace(label)
+	if trimmedUID == "" || trimmedLabel == "" {
+		return nil, fmt.Errorf("datasource uid and label are required")
+	}
+
+	path := fmt.Sprintf(
+		"/api/datasources/uid/%s/resources/api/v1/label/%s/values",
+		url.PathEscape(trimmedUID),
+		url.PathEscape(trimmedLabel),
+	)
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error getting label values: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana label values", status, responseBody)
+	}
+
+	var response struct {
+		Data []string `json:"data"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing label values response: %v", err)
+	}
+
+	return response.Data, nil
+}
+
 func (c *Client) ListFolders() ([]Folder, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
 	if err != nil {
@@ -711,7 +753,7 @@ func (c *Client) SearchDashboards(query, folderUID, tag string, limit int) ([]Da
 	return results, nil
 }
 
-func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
+func (c *Client) getDashboardResponse(uid string) (*dashboardGetResponse, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/dashboards/uid/%s", uid), nil, "")
 	if err != nil {
 		return nil, fmt.Errorf("error getting dashboard: %v", err)
@@ -720,36 +762,45 @@ func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
 		return nil, newAPIStatusError("grafana dashboard get", status, responseBody)
 	}
 
-	var response struct {
-		Dashboard struct {
-			UID    string            `json:"uid"`
-			Title  string            `json:"title"`
-			Tags   []string          `json:"tags"`
-			Panels []json.RawMessage `json:"panels"`
-		} `json:"dashboard"`
-		Meta struct {
-			Slug        string `json:"slug"`
-			URL         string `json:"url"`
-			FolderTitle string `json:"folderTitle"`
-			FolderUID   string `json:"folderUid"`
-		} `json:"meta"`
-	}
+	var response dashboardGetResponse
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
 	}
 
-	panels := collectDashboardPanelSummaries(response.Dashboard.Panels)
+	return &response, nil
+}
 
+func (c *Client) buildDashboardDetails(response *dashboardGetResponse) (*DashboardDetails, error) {
+	var dashboard struct {
+		UID    string            `json:"uid"`
+		Title  string            `json:"title"`
+		Tags   []string          `json:"tags"`
+		Panels []json.RawMessage `json:"panels"`
+	}
+	if err := json.Unmarshal(response.Dashboard, &dashboard); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	panels := collectDashboardPanelSummaries(dashboard.Panels)
 	return &DashboardDetails{
-		UID:         strings.TrimSpace(response.Dashboard.UID),
-		Title:       strings.TrimSpace(response.Dashboard.Title),
+		UID:         strings.TrimSpace(dashboard.UID),
+		Title:       strings.TrimSpace(dashboard.Title),
 		Slug:        strings.TrimSpace(response.Meta.Slug),
 		URL:         c.resolveURL(response.Meta.URL),
 		FolderTitle: strings.TrimSpace(response.Meta.FolderTitle),
 		FolderUID:   strings.TrimSpace(response.Meta.FolderUID),
-		Tags:        response.Dashboard.Tags,
+		Tags:        dashboard.Tags,
 		Panels:      panels,
 	}, nil
+}
+
+func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
+	response, err := c.getDashboardResponse(uid)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.buildDashboardDetails(response)
 }
 
 func (c *Client) RenderPanelURL(uid, slug string, panelID, width, height int, from, to string) string {

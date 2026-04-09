@@ -420,6 +420,7 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, "Panel 2", resources[1].Name)
 		require.Equal(t, "2", resources[1].ID)
 	})
+
 }
 
 func Test__notificationPolicyRoot__PreservesUnknownRootAndRouteFields(t *testing.T) {

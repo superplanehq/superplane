@@ -7,13 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
 
-func Test__Grafana__timeRangeFieldsUseExpressionInputs(t *testing.T) {
-	t.Run("create dashboard share link", func(t *testing.T) {
-		fields := (&CreateDashboardShareLink{}).Configuration()
-		require.Equal(t, configuration.FieldTypeExpression, fieldByName(fields, "from").Type)
-		require.Equal(t, configuration.FieldTypeExpression, fieldByName(fields, "to").Type)
-	})
-
+func Test__Grafana__timeRangeFieldsUseExpectedInputs(t *testing.T) {
 	t.Run("render panel", func(t *testing.T) {
 		fields := (&RenderPanel{}).Configuration()
 		require.Equal(t, configuration.FieldTypeExpression, fieldByName(fields, "from").Type)

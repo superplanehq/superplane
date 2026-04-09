@@ -83,11 +83,9 @@ func (g *Grafana) HandleAction(ctx core.IntegrationActionContext) error {
 
 func (g *Grafana) Components() []core.Component {
 	return []core.Component{
-		&CreateDashboardShareLink{},
 		&GetDashboard{},
 		&QueryDataSource{},
 		&RenderPanel{},
-		&SearchDashboards{},
 	}
 }
 

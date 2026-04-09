@@ -283,18 +283,31 @@ func resolveQueryTimeValue(value string, timezone *string) (string, error) {
 }
 
 func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, error) {
+	normalizedValue := normalizeResolvedGoTimeString(value)
+
 	for _, format := range []string{
 		time.RFC3339Nano,
 		time.RFC3339,
 		"2006-01-02T15:04Z07:00",
 	} {
-		if parsed, err := time.Parse(format, value); err == nil {
+		if parsed, err := time.Parse(format, normalizedValue); err == nil {
+			return parsed, true, nil
+		}
+	}
+
+	for _, format := range []string{
+		"2006-01-02 15:04:05.999999999 -0700 MST",
+		"2006-01-02 15:04:05.999999999 -0700",
+		"2006-01-02 15:04:05 -0700 MST",
+		"2006-01-02 15:04:05 -0700",
+	} {
+		if parsed, err := time.Parse(format, normalizedValue); err == nil {
 			return parsed, true, nil
 		}
 	}
 
 	for _, format := range []string{"2006-01-02T15:04:05", grafanaDateTimeFormat} {
-		if _, err := time.Parse(format, value); err != nil {
+		if _, err := time.Parse(format, normalizedValue); err != nil {
 			continue
 		}
 
@@ -303,7 +316,7 @@ func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, err
 			return time.Time{}, false, err
 		}
 
-		parsed, err := time.ParseInLocation(format, value, location)
+		parsed, err := time.ParseInLocation(format, normalizedValue, location)
 		if err != nil {
 			return time.Time{}, false, err
 		}
@@ -312,6 +325,19 @@ func parseGrafanaQueryTime(value string, timezone *string) (time.Time, bool, err
 	}
 
 	return time.Time{}, false, nil
+}
+
+func normalizeResolvedGoTimeString(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return ""
+	}
+
+	if monotonicIndex := strings.Index(trimmed, " m=+"); monotonicIndex >= 0 {
+		return strings.TrimSpace(trimmed[:monotonicIndex])
+	}
+
+	return trimmed
 }
 
 func parseGrafanaQueryTimezone(timezone *string) (*time.Location, error) {
