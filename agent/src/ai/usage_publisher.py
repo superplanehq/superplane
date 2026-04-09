@@ -24,6 +24,7 @@ def publish_agent_tokens_used(organization_id: str, tokens: int) -> None:
     if tokens <= 0:
         return
 
+    connection = None
     try:
         message = agents_pb2.AgentTokensUsedMessage(  # type: ignore[attr-defined]
             organization_id=organization_id,
@@ -40,6 +41,8 @@ def publish_agent_tokens_used(organization_id: str, tokens: int) -> None:
             routing_key=AGENT_TOKENS_USED_ROUTING_KEY,
             body=body,
         )
-        connection.close()
     except Exception as error:
         print(f"[web] failed to publish agent token usage: {error}", flush=True)
+    finally:
+        if connection and not connection.is_closed:
+            connection.close()
