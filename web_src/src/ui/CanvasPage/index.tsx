@@ -53,17 +53,15 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   ComponentsNode,
-  ComponentsComponent,
-  TriggersTrigger,
-  BlueprintsBlueprint,
   ComponentsIntegrationRef,
   OrganizationsIntegration,
 } from "@/api-client";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
+import type { Registry } from "@/lib/index/registry";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import type { BuildingBlock } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -254,7 +252,6 @@ export interface CanvasPageProps {
   runsIsFetchingNextPage?: boolean;
   onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
-  runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
@@ -279,7 +276,6 @@ export interface CanvasPageProps {
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
 
   // Building blocks for adding new nodes
-  buildingBlocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
   onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
@@ -335,9 +331,7 @@ export interface CanvasPageProps {
 
   // Workflow metadata for ExecutionChainPage
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
-  triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
+  registry: Registry;
 
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
@@ -1242,7 +1236,7 @@ function CanvasPage(props: CanvasPageProps) {
             <BuildingBlocksSidebar
               isOpen={isBuildingBlocksSidebarOpen}
               onToggle={handleSidebarToggle}
-              blocks={props.buildingBlocks || []}
+              blocks={props.registry.buildingBlocks}
               showAiBuilderTab={props.showAiBuilderTab}
               canvasId={props.canvasId}
               organizationId={props.organizationId}
@@ -1354,7 +1348,7 @@ function CanvasPage(props: CanvasPageProps) {
                 runsIsFetchingNextPage={props.runsIsFetchingNextPage}
                 onRunsLoadMore={props.onRunsLoadMore}
                 runsNodes={props.runsNodes}
-                runsComponentIconMap={props.runsComponentIconMap}
+                registry={props.registry}
                 runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
                 onRunNodeSelect={props.onRunNodeSelect}
                 onRunExecutionSelect={props.onRunExecutionSelect}
@@ -1394,9 +1388,7 @@ function CanvasPage(props: CanvasPageProps) {
               getCustomField={props.getCustomField}
               integrations={props.integrations}
               workflowNodes={props.workflowNodes}
-              components={props.components}
-              triggers={props.triggers}
-              blueprints={props.blueprints}
+              registry={props.registry}
               onHighlightedNodesChange={setHighlightedNodeIds}
               focusRequest={props.focusRequest}
               onExecutionChainHandled={props.onExecutionChainHandled}
@@ -1458,9 +1450,7 @@ function Sidebar({
   getCustomField,
   integrations,
   workflowNodes,
-  components,
-  triggers,
-  blueprints,
+  registry,
   onHighlightedNodesChange,
   focusRequest,
   onExecutionChainHandled,
@@ -1508,9 +1498,7 @@ function Sidebar({
   ) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
-  components?: ComponentsComponent[];
-  triggers?: TriggersTrigger[];
-  blueprints?: BlueprintsBlueprint[];
+  registry: Registry;
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
@@ -1564,7 +1552,7 @@ function Sidebar({
     const blockName = editingNodeData?.blockName;
     if (!blockName) return null;
 
-    const matchedComponent = components?.find((c) => c.name === blockName);
+    const matchedComponent = registry.getComponent(blockName);
     if (matchedComponent) {
       return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
         label: matchedComponent.label,
@@ -1574,7 +1562,7 @@ function Sidebar({
       });
     }
 
-    const matchedTrigger = triggers?.find((t) => t.name === blockName);
+    const matchedTrigger = registry.getTrigger(blockName);
     if (matchedTrigger) {
       return buildSidebarComponentDocsPayload(blockName, editingNodeData, {
         label: matchedTrigger.label,
@@ -1590,8 +1578,7 @@ function Sidebar({
     editingNodeData?.displayLabel,
     editingNodeData?.integrationName,
     editingNodeData?.integrationLabel,
-    components,
-    triggers,
+    registry,
   ]);
 
   if (!sidebarData) {
@@ -1682,9 +1669,9 @@ function Sidebar({
       currentTab={isAnnotationNode ? "settings" : currentTab}
       onTabChange={onTabChange}
       workflowNodes={workflowNodes}
-      components={components}
-      triggers={triggers}
-      blueprints={blueprints}
+      components={registry.allComponents}
+      triggers={registry.allTriggers}
+      blueprints={registry.blueprints}
       onHighlightedNodesChange={onHighlightedNodesChange}
       executionChainEventId={focusRequest?.executionChain?.eventId || null}
       executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
@@ -1907,7 +1894,7 @@ function CanvasContent({
   runsIsFetchingNextPage,
   onRunsLoadMore,
   runsNodes,
-  runsComponentIconMap,
+  registry,
   runsNodeQueueItemsMap,
   onRunNodeSelect,
   onRunExecutionSelect,
@@ -1974,7 +1961,7 @@ function CanvasContent({
   runsIsFetchingNextPage?: boolean;
   onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
-  runsComponentIconMap?: Record<string, string>;
+  registry: Registry;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
@@ -1991,6 +1978,7 @@ function CanvasContent({
   const { fitView, screenToFlowPosition, getViewport, getInternalNode } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
+  const runsComponentIconMap = registry.getIconMap();
 
   // Determine selection key code to support both Control (Windows/Linux) and Meta (Mac)
   // Similar to existing keyboard shortcuts that check (e.ctrlKey || e.metaKey)

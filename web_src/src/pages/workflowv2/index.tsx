@@ -14,12 +14,10 @@ import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "@/pages/canvas/templateMetadata";
 
 import type {
-  BlueprintsBlueprint,
   ComponentsIntegrationRef,
   ComponentsComponent,
   ComponentsEdge,
   ComponentsNode,
-  TriggersTrigger,
   CanvasesListEventExecutionsResponse,
   CanvasesCanvas,
   CanvasesCanvasVersion,
@@ -27,18 +25,20 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
+  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
   SuperplaneMeUser,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
-import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { useMe } from "@/hooks/useMe";
-import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useRegistry } from "@/hooks/useRegistry";
+import type { Registry } from "@/lib/index/registry";
 import {
   eventExecutionsQueryOptions,
   useCreateCanvas,
@@ -49,7 +49,6 @@ import {
   useResolveCanvasChangeRequest,
   useUpdateCanvasVersion,
   useCanvasChangeRequests,
-  useTriggers,
   useCanvas,
   useInfiniteCanvasEvents,
   useCanvasMemoryEntries,
@@ -57,11 +56,9 @@ import {
   useCanvasVersion,
   useCanvasVersions,
   useInfiniteCanvasLiveVersions,
-  useWidgets,
   canvasKeys,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
-import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
@@ -198,11 +195,7 @@ export function WorkflowPageV2() {
   const createCanvasChangeRequestMutation = useCreateCanvasChangeRequest(organizationId!, canvasId!);
   const actOnCanvasChangeRequestMutation = useActOnCanvasChangeRequest(organizationId!, canvasId!);
   const resolveCanvasChangeRequestMutation = useResolveCanvasChangeRequest(organizationId!, canvasId!);
-  const { data: triggers = [], isLoading: triggersLoading } = useTriggers();
-  const { data: blueprints = [], isLoading: blueprintsLoading } = useBlueprints(organizationId!);
-  const { data: components = [], isLoading: componentsLoading } = useComponents(organizationId!);
-  const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
-  const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
+  const { registry, loading: registryLoading } = useRegistry(organizationId!);
   const canReadIntegrations = canAct("integrations", "read");
   const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
@@ -492,16 +485,6 @@ export function WorkflowPageV2() {
     return { events, totalCount };
   }, [infiniteEventsQuery.data]);
   const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
-  const componentIconMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const c of components) {
-      if (c.name && c.icon) map[c.name] = c.icon;
-    }
-    for (const t of triggers) {
-      if (t.name && t.icon) map[t.name] = t.icon;
-    }
-    return map;
-  }, [components, triggers]);
   const {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
@@ -1456,11 +1439,11 @@ export function WorkflowPageV2() {
       return DefaultLayoutEngine.apply(workflow, {
         scope: "connected-component",
         nodeIds: [nodeID],
-        components,
-        blueprints,
+        components: registry.components,
+        blueprints: registry.blueprints,
       });
     },
-    [isAutoLayoutOnUpdateEnabled, components, blueprints],
+    [isAutoLayoutOnUpdateEnabled, registry],
   );
 
   /**
@@ -1683,42 +1666,14 @@ export function WorkflowPageV2() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasPendingLocalCanvasState]);
 
-  // Merge triggers and components from applications into the main arrays
-  const allTriggers = useMemo(() => {
-    const merged = [...triggers];
-    availableIntegrations.forEach((integration) => {
-      if (integration.triggers) {
-        merged.push(...integration.triggers);
-      }
-    });
-    return merged;
-  }, [triggers, availableIntegrations]);
-
-  const allComponents = useMemo(() => {
-    const merged = [...components];
-    availableIntegrations.forEach((integration) => {
-      if (integration.components) {
-        merged.push(...integration.components);
-      }
-    });
-    return merged;
-  }, [components, availableIntegrations]);
-
-  const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
-    [triggers, components, availableIntegrations],
-  );
-
   const { nodes: preparedNodes, edges } = useMemo(() => {
-    if (!canvas || canvasLoading || triggersLoading || blueprintsLoading || componentsLoading || integrationsLoading) {
+    if (!canvas || canvasLoading || registryLoading) {
       return { nodes: [], edges: [] };
     }
 
     return prepareData(
       canvas,
-      allTriggers,
-      blueprints,
-      allComponents,
+      registry,
       visibleNodeEventsMap,
       visibleNodeExecutionsMap,
       visibleNodeQueueItemsMap,
@@ -1728,19 +1683,14 @@ export function WorkflowPageV2() {
     );
   }, [
     canvas,
-    allTriggers,
-    blueprints,
-    allComponents,
+    registry,
     visibleNodeEventsMap,
     visibleNodeExecutionsMap,
     visibleNodeQueueItemsMap,
     canvasId,
     queryClient,
     canvasLoading,
-    triggersLoading,
-    blueprintsLoading,
-    componentsLoading,
-    integrationsLoading,
+    registryLoading,
     organizationId,
     me,
   ]);
@@ -1775,9 +1725,7 @@ export function WorkflowPageV2() {
       const sidebarData = prepareSidebarData(
         node,
         canvas?.spec?.nodes || [],
-        blueprints,
-        allComponents,
-        allTriggers,
+        registry,
         executionsMap,
         queueItemsMap,
         eventsMapForSidebar,
@@ -1791,7 +1739,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [canvas, blueprints, allComponents, allTriggers, visibleNodeEventsMap, isViewingLiveVersion, getNodeData],
+    [canvas, registry, visibleNodeEventsMap, isViewingLiveVersion, getNodeData],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -2276,7 +2224,7 @@ export function WorkflowPageV2() {
         }
 
         if (chainNode.type === "TYPE_TRIGGER") {
-          const triggerMetadata = allTriggers.find((trigger) => trigger.name === chainNode.trigger?.name);
+          const triggerMetadata = registry.getTrigger(chainNode.trigger?.name);
 
           // Store node metadata with trigger info
           nodeMetadata[chainNodeId] = {
@@ -2303,7 +2251,7 @@ export function WorkflowPageV2() {
         }
 
         // For components (non-triggers)
-        const componentMetadata = allComponents.find((component) => component.name === chainNode.component?.name);
+        const componentMetadata = registry.getComponent(chainNode.component?.name);
 
         // Store node metadata with component info
         nodeMetadata[chainNodeId] = {
@@ -2472,7 +2420,7 @@ export function WorkflowPageV2() {
 
       return namedExampleObj;
     },
-    [canvas, visibleNodeExecutionsMap, visibleNodeEventsMap, allComponents, allTriggers],
+    [canvas, visibleNodeExecutionsMap, visibleNodeEventsMap, registry],
   );
 
   const handleSaveWorkflow = useCallback(
@@ -2596,29 +2544,25 @@ export function WorkflowPageV2() {
       let blockName: string | undefined;
 
       if (node.type === "TYPE_BLUEPRINT") {
-        const blueprintMetadata = blueprints.find((b) => b.id === node.blueprint?.id);
+        const blueprintMetadata = registry.getBlueprint(node.blueprint?.id);
         configurationFields = blueprintMetadata?.configuration || [];
         displayLabel = blueprintMetadata?.name || displayLabel;
       } else if (node.type === "TYPE_COMPONENT") {
-        const componentMetadata = allComponents.find((c) => c.name === node.component?.name);
+        const componentMetadata = registry.getComponent(node.component?.name);
         configurationFields = componentMetadata?.configuration || [];
         displayLabel = componentMetadata?.label || displayLabel;
         blockName = node.component?.name;
-        integrationName = getNodeIntegrationName(node, availableIntegrations);
-        integrationLabel = integrationName
-          ? availableIntegrations.find((i) => i.name === integrationName)?.label
-          : undefined;
+        integrationName = getNodeIntegrationName(node, registry.availableIntegrations);
+        integrationLabel = integrationName ? registry.getAvailableIntegrationLabel(integrationName) : undefined;
       } else if (node.type === "TYPE_TRIGGER") {
-        const triggerMetadata = allTriggers.find((t) => t.name === node.trigger?.name);
+        const triggerMetadata = registry.getTrigger(node.trigger?.name);
         configurationFields = triggerMetadata?.configuration || [];
         displayLabel = triggerMetadata?.label || displayLabel;
         blockName = node.trigger?.name;
-        integrationName = getNodeIntegrationName(node, availableIntegrations);
-        integrationLabel = integrationName
-          ? availableIntegrations.find((i) => i.name === integrationName)?.label
-          : undefined;
+        integrationName = getNodeIntegrationName(node, registry.availableIntegrations);
+        integrationLabel = integrationName ? registry.getAvailableIntegrationLabel(integrationName) : undefined;
       } else if (node.type === "TYPE_WIDGET") {
-        const widget = widgets.find((w) => w.name === node.widget?.name);
+        const widget = registry.getWidget(node.widget?.name);
         if (widget) {
           configurationFields = widget.configuration || [];
           displayLabel = widget.label || "Widget";
@@ -2652,7 +2596,7 @@ export function WorkflowPageV2() {
         integrationRef: node.integration,
       };
     },
-    [canvas, blueprints, allComponents, allTriggers, availableIntegrations, widgets],
+    [canvas, registry],
   );
 
   const createIntegrationMutation = useCreateIntegration(organizationId ?? "");
@@ -2660,8 +2604,8 @@ export function WorkflowPageV2() {
   const [justConnectedIntegrations, setJustConnectedIntegrations] = useState<Set<string>>(new Set());
 
   const integrationDialogDefinition = useMemo(
-    () => (integrationDialogName ? availableIntegrations.find((d) => d.name === integrationDialogName) : undefined),
-    [availableIntegrations, integrationDialogName],
+    () => (integrationDialogName ? registry.getAvailableIntegration(integrationDialogName) : undefined),
+    [integrationDialogName, registry],
   );
 
   const integrationDialogPendingInstance = useMemo(() => {
@@ -2686,14 +2630,14 @@ export function WorkflowPageV2() {
       string,
       {
         count: number;
-        definition?: (typeof availableIntegrations)[0];
+        definition?: IntegrationsIntegrationDefinition;
         state?: "pending" | "error";
         stateDescription?: string;
       }
     >();
 
     for (const node of canvas.spec.nodes) {
-      const integrationName = getNodeIntegrationName(node, availableIntegrations);
+      const integrationName = getNodeIntegrationName(node, registry.availableIntegrations);
       if (!integrationName) continue;
 
       const hasReadyInstance = integrations.some(
@@ -2711,7 +2655,7 @@ export function WorkflowPageV2() {
         const rawState = nonReadyInstance?.status?.state;
         missingMap.set(integrationName, {
           count: 1,
-          definition: availableIntegrations.find((d) => d.name === integrationName),
+          definition: registry.getAvailableIntegration(integrationName),
           state: rawState === "error" ? "error" : rawState === "pending" ? "pending" : undefined,
           stateDescription: nonReadyInstance?.status?.stateDescription,
         });
@@ -2726,7 +2670,7 @@ export function WorkflowPageV2() {
       state,
       stateDescription,
     }));
-  }, [canvas?.spec?.nodes, availableIntegrations, integrations, canReadIntegrations, justConnectedIntegrations]);
+  }, [canvas?.spec?.nodes, integrations, canReadIntegrations, justConnectedIntegrations, registry]);
 
   const handleConnectIntegration = useCallback((integrationName: string) => {
     setIntegrationDialogName(integrationName);
@@ -2753,7 +2697,7 @@ export function WorkflowPageV2() {
       };
 
       const updatedNodes = canvas.spec?.nodes?.map((node) => {
-        const nodeIntegrationName = getNodeIntegrationName(node, availableIntegrations);
+        const nodeIntegrationName = getNodeIntegrationName(node, registry.availableIntegrations);
         if (nodeIntegrationName === integrationDialogName && !node.integration?.id) {
           return { ...node, integration: integrationRef };
         }
@@ -2778,7 +2722,7 @@ export function WorkflowPageV2() {
       organizationId,
       canvasId,
       integrationDialogName,
-      availableIntegrations,
+      registry,
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
@@ -3218,10 +3162,10 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(latestWorkflow);
       const builder = new CanvasBuilder({
         canvas: latestWorkflow,
-        buildingBlocks,
+        buildingBlocks: registry.buildingBlocks,
         integrations,
-        components,
-        blueprints,
+        components: registry.components,
+        blueprints: registry.blueprints,
       });
       const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
 
@@ -3240,17 +3184,15 @@ export function WorkflowPageV2() {
       }
     },
     [
-      buildingBlocks,
       canAutoSave,
       canvas,
       canvasId,
       handleSaveWorkflow,
-      components,
-      blueprints,
       markUnsavedChange,
       integrations,
       organizationId,
       queryClient,
+      registry,
       saveWorkflowSnapshot,
     ],
   );
@@ -3585,8 +3527,8 @@ export function WorkflowPageV2() {
       const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
         nodeIds,
         scope: "connected-component",
-        components,
-        blueprints,
+        components: registry.components,
+        blueprints: registry.blueprints,
       });
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -3599,11 +3541,10 @@ export function WorkflowPageV2() {
     },
     [
       canvas,
-      components,
-      blueprints,
       organizationId,
       canvasId,
       queryClient,
+      registry,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
       canAutoSave,
@@ -3700,16 +3641,7 @@ export function WorkflowPageV2() {
 
         let baseName = nodeToDuplicate.name?.trim() || "";
         if (!baseName) {
-          if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-            baseName = nodeToDuplicate.trigger.name;
-          } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
-            baseName = nodeToDuplicate.component.name;
-          } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-            const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
-            baseName = blueprintMetadata?.name || "blueprint";
-          } else {
-            baseName = "node";
-          }
+          baseName = registry.getDefaultNodeBaseName(nodeToDuplicate);
         }
 
         const allNames = [...existingNodeNames, ...newNodes.map((n) => n.name || "")];
@@ -3773,7 +3705,7 @@ export function WorkflowPageV2() {
       canvas,
       organizationId,
       canvasId,
-      blueprints,
+      registry,
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
@@ -4110,17 +4042,7 @@ export function WorkflowPageV2() {
 
       let baseName = nodeToDuplicate.name?.trim() || "";
       if (!baseName) {
-        if (nodeToDuplicate.type === "TYPE_TRIGGER" && nodeToDuplicate.trigger?.name) {
-          baseName = nodeToDuplicate.trigger.name;
-        } else if (nodeToDuplicate.type === "TYPE_COMPONENT" && nodeToDuplicate.component?.name) {
-          baseName = nodeToDuplicate.component.name;
-        } else if (nodeToDuplicate.type === "TYPE_BLUEPRINT" && nodeToDuplicate.blueprint?.id) {
-          // For blueprints, we need to find the blueprint metadata to get the name
-          const blueprintMetadata = blueprints.find((b) => b.id === nodeToDuplicate.blueprint?.id);
-          baseName = blueprintMetadata?.name || "blueprint";
-        } else {
-          baseName = "node";
-        }
+        baseName = registry.getDefaultNodeBaseName(nodeToDuplicate);
       }
 
       // Generate unique node name based on the existing node name + ordinal
@@ -4168,7 +4090,7 @@ export function WorkflowPageV2() {
       canvas,
       organizationId,
       canvasId,
-      blueprints,
+      registry,
       queryClient,
       saveWorkflowSnapshot,
       handleSaveWorkflow,
@@ -5204,15 +5126,7 @@ export function WorkflowPageV2() {
     [importYamlGuardError, canvas, activeCanvasVersionId, enqueueCanvasSave, organizationId, canvasId, queryClient],
   );
 
-  const isInitialCanvasBootstrapLoading =
-    !canvas &&
-    (canvasLoading ||
-      triggersLoading ||
-      blueprintsLoading ||
-      componentsLoading ||
-      widgetsLoading ||
-      usersLoading ||
-      rolesLoading);
+  const isInitialCanvasBootstrapLoading = !canvas && (canvasLoading || registryLoading || usersLoading || rolesLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
@@ -5589,7 +5503,6 @@ export function WorkflowPageV2() {
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
-          buildingBlocks={buildingBlocks}
           showAiBuilderTab={showAiBuilderTab}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
           onApplyAiOperations={!isReadOnly ? handleApplyAiOperations : undefined}
@@ -5651,9 +5564,7 @@ export function WorkflowPageV2() {
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvas?.spec?.nodes}
-          components={allComponents}
-          triggers={allTriggers}
-          blueprints={blueprints}
+          registry={registry}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
           runsTotalCount={isViewingLiveVersion ? runsEventsData.totalCount : 0}
@@ -5661,7 +5572,6 @@ export function WorkflowPageV2() {
           runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
           onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
           runsNodes={canvas?.spec?.nodes || []}
-          runsComponentIconMap={componentIconMap}
           runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
@@ -5899,9 +5809,7 @@ function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): S
 
 function prepareData(
   workflow: CanvasesCanvas,
-  triggers: TriggersTrigger[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
+  registry: Registry,
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -5922,9 +5830,7 @@ function prepareData(
         return prepareNode(
           workflowNodes,
           node,
-          triggers,
-          blueprints,
-          components,
+          registry,
           nodeEventsMap,
           nodeExecutionsMap,
           nodeQueueItemsMap,
@@ -5946,9 +5852,7 @@ function prepareData(
 function prepareNode(
   nodes: ComponentsNode[],
   node: ComponentsNode,
-  triggers: TriggersTrigger[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
+  registry: Registry,
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
@@ -5959,10 +5863,16 @@ function prepareNode(
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap);
+      return prepareTriggerNode(node, registry.allTriggers, nodeEventsMap);
     case "TYPE_BLUEPRINT": {
-      const componentMetadata = components.find((c) => c.name === node.component?.name);
-      const compositeNode = prepareCompositeNode(nodes, node, blueprints, nodeExecutionsMap, nodeQueueItemsMap);
+      const componentMetadata = registry.getComponent(node.component?.name);
+      const compositeNode = prepareCompositeNode(
+        nodes,
+        node,
+        registry.blueprints,
+        nodeExecutionsMap,
+        nodeQueueItemsMap,
+      );
 
       // Override outputChannels with component metadata if available
       if (componentMetadata?.outputChannels) {
@@ -5987,7 +5897,7 @@ function prepareNode(
       return prepareComponentNode({
         nodes,
         node,
-        components,
+        components: registry.allComponents,
         nodeExecutionsMap,
         nodeQueueItemsMap,
         canvasId: workflowId,
@@ -6012,9 +5922,7 @@ function prepareEdge(edge: ComponentsEdge): CanvasEdge {
 function prepareSidebarData(
   node: ComponentsNode,
   nodes: ComponentsNode[],
-  blueprints: BlueprintsBlueprint[],
-  components: ComponentsComponent[],
-  triggers: TriggersTrigger[],
+  registry: Registry,
   nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
@@ -6026,12 +5934,9 @@ function prepareSidebarData(
   const events = nodeEventsMap[node.id!] || [];
 
   // Get metadata based on node type
-  const blueprintMetadata =
-    node.type === "TYPE_BLUEPRINT" ? blueprints.find((b) => b.id === node.blueprint?.id) : undefined;
-  const componentMetadata =
-    node.type === "TYPE_COMPONENT" ? components.find((c) => c.name === node.component?.name) : undefined;
-  const triggerMetadata =
-    node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.trigger?.name) : undefined;
+  const blueprintMetadata = node.type === "TYPE_BLUEPRINT" ? registry.getBlueprint(node.blueprint?.id) : undefined;
+  const componentMetadata = node.type === "TYPE_COMPONENT" ? registry.getComponent(node.component?.name) : undefined;
+  const triggerMetadata = node.type === "TYPE_TRIGGER" ? registry.getTrigger(node.trigger?.name) : undefined;
 
   const nodeTitle =
     componentMetadata?.label || blueprintMetadata?.name || triggerMetadata?.label || node.name || "Unknown";
