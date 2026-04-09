@@ -13,8 +13,6 @@ from private import agents_pb2
 AGENT_EXCHANGE = "superplane.agent-exchange"
 AGENT_RUN_FINISHED_ROUTING_KEY = "agent-run-finished"
 
-_STOP_SENTINEL = object()
-
 
 class UsagePublisher:
     """RabbitMQ publisher that processes all publishes on a single dedicated thread.
@@ -26,7 +24,8 @@ class UsagePublisher:
 
     def __init__(self, rabbitmq_url: str) -> None:
         self._rabbitmq_url = rabbitmq_url
-        self._queue: queue.Queue[object] = queue.Queue()
+        self._queue: queue.Queue[bytes] = queue.Queue()
+        self._stopped = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
@@ -54,7 +53,7 @@ class UsagePublisher:
         self._queue.put(message.SerializeToString())
 
     def close(self) -> None:
-        self._queue.put(_STOP_SENTINEL)
+        self._stopped.set()
         self._thread.join(timeout=5.0)
 
     def _run(self) -> None:
@@ -62,11 +61,10 @@ class UsagePublisher:
         connection: pika.BlockingConnection | None = None
         channel: pika.adapters.blocking_connection.BlockingChannel | None = None
 
-        while True:
+        while not self._stopped.is_set() or not self._queue.empty():
             try:
-                item = self._queue.get(timeout=1.0)
+                body = self._queue.get(timeout=1.0)
             except queue.Empty:
-                # Process pika heartbeats while idle.
                 if connection is not None and connection.is_open:
                     try:
                         connection.process_data_events(time_limit=0)
@@ -74,11 +72,6 @@ class UsagePublisher:
                         connection = None
                         channel = None
                 continue
-
-            if item is _STOP_SENTINEL:
-                break
-
-            body: bytes = item  # type: ignore[assignment]
 
             try:
                 if connection is None or not connection.is_open:
