@@ -158,6 +158,18 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+function formatElapsedMs(ms: number): string {
+  if (ms < 1) {
+    return "< 1ms";
+  }
+
+  if (ms >= 1000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+
+  return `${Math.round(ms)}ms`;
+}
+
 function createToolCallId(toolName: string, toolCallId?: string): string {
   return typeof toolCallId === "string" && toolCallId.trim().length > 0 ? toolCallId : `${toolName}-${Date.now()}`;
 }
@@ -216,42 +228,45 @@ function createAssistantStreamController({
 
   const applyToolEvent = (event: ToolEvent): boolean => {
     const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
+    const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
     const toolCallId = createToolCallId(toolName, event.tool_call_id);
     const toolLabel = formatToolLabel(toolName);
     const content =
       event.type === "tool_started"
         ? `${toolLabel}...`
         : typeof event.elapsed_ms === "number"
-          ? `${toolLabel} (${event.elapsed_ms.toFixed(1)}ms)`
+          ? `${toolLabel} (${formatElapsedMs(event.elapsed_ms)})`
           : toolLabel;
     const toolStatus = event.type === "tool_started" ? "running" : "completed";
-    const isNew = !flushedToolCallIds.has(toolCallId);
 
-    if (isNew) {
-      flushedToolCallIds.add(toolCallId);
-    }
+    let didInsertNew = false;
 
     setAiMessages((previous) => {
-      const existingIndex = previous.findIndex(
-        (message) => message.role === "tool" && message.toolCallId === toolCallId,
-      );
-      const nextMessage: AiBuilderMessage = {
-        id: existingIndex >= 0 ? previous[existingIndex].id : `tool-${toolCallId}`,
-        role: "tool",
-        content,
-        toolCallId,
-        toolStatus,
-      };
+      let existingIndex = previous.findIndex((message) => message.role === "tool" && message.toolCallId === toolCallId);
+
+      if (existingIndex < 0 && event.type === "tool_finished" && !hasExplicitCallId) {
+        existingIndex = previous.findIndex(
+          (message) =>
+            message.role === "tool" && message.toolStatus === "running" && message.content.startsWith(toolLabel),
+        );
+      }
+
       if (existingIndex >= 0) {
         const updated = [...previous];
-        updated[existingIndex] = nextMessage;
+        updated[existingIndex] = { ...previous[existingIndex], content, toolStatus };
         return trimAiMessages(updated);
       }
 
-      return insertAiMessageBefore(previous, nextMessage, assistantMessageId);
+      didInsertNew = true;
+      flushedToolCallIds.add(toolCallId);
+      return insertAiMessageBefore(
+        previous,
+        { id: `tool-${toolCallId}`, role: "tool", content, toolCallId, toolStatus },
+        assistantMessageId,
+      );
     });
 
-    return isNew;
+    return didInsertNew;
   };
 
   const flushPendingToolEvents = async () => {
@@ -264,16 +279,24 @@ function createAssistantStreamController({
       while (pendingToolEvents.length > 0) {
         const event = pendingToolEvents.shift()!;
         const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
-        const toolCallId = createToolCallId(toolName, event.tool_call_id);
+        const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
 
         let effectiveEvent = event;
         if (event.type === "tool_started") {
-          const finishedIdx = pendingToolEvents.findIndex(
-            (e) =>
-              e.type === "tool_finished" &&
-              createToolCallId(typeof e.tool_name === "string" ? e.tool_name : "unknown", e.tool_call_id) ===
-                toolCallId,
-          );
+          const finishedIdx = pendingToolEvents.findIndex((e) => {
+            if (e.type !== "tool_finished") {
+              return false;
+            }
+
+            const eName = typeof e.tool_name === "string" ? e.tool_name : "unknown";
+            const eHasId = typeof e.tool_call_id === "string" && e.tool_call_id.trim().length > 0;
+
+            if (hasExplicitCallId && eHasId) {
+              return e.tool_call_id === event.tool_call_id;
+            }
+
+            return eName === toolName;
+          });
           if (finishedIdx >= 0) {
             effectiveEvent = pendingToolEvents.splice(finishedIdx, 1)[0];
           }
@@ -282,7 +305,7 @@ function createAssistantStreamController({
         const isNewInsertion = applyToolEvent(effectiveEvent);
 
         if (isNewInsertion) {
-          await sleep(80);
+          await sleep(150);
         }
       }
     } finally {
