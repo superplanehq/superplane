@@ -125,7 +125,7 @@ def test_flatten_message_record_ignores_output_tool_returns() -> None:
 
     assert len(messages) == 1
     assert messages[0].role == "tool"
-    assert messages[0].content == "Get canvas"
+    assert messages[0].content == "Reading canvas"
     assert messages[0].tool_call_id == "toolu_012wJyWVffYDcQqR3Ne9W6FN"
     assert messages[0].tool_status == "completed"
 

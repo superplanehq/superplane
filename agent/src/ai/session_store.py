@@ -37,8 +37,12 @@ def _from_db_time(value: datetime | str) -> datetime:
 def _format_tool_label(tool_name: str) -> str:
     normalized = tool_name.strip().lower()
     label_by_tool = {
+        "get_canvas": "Reading canvas",
         "get_canvas_shape": "Reading canvas structure",
         "get_canvas_details": "Reading canvas details",
+        "get_node_details": "Reading node details",
+        "list_node_events": "Listing node events",
+        "list_node_executions": "Listing node executions",
         "list_available_blocks": "Listing available components",
     }
     if normalized in label_by_tool:
