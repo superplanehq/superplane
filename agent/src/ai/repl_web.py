@@ -148,7 +148,8 @@ def _record_usage(
     except Exception as error:
         print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
 
-    # DB write and RabbitMQ publish are independent — a DB failure won't prevent publishing, and each has its own error logging
+    # DB write and RabbitMQ publish are independent
+    # a DB failure won't prevent publishing, and each has its own error logging
     try:
         publisher.publish_agent_run_finished(
             organization_id=org_id,
