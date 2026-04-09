@@ -42,7 +42,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["src/private", "src/superplaneapi"]
+extend-exclude = ["src/private", "src/superplaneapi", "src/usage_pb2.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -55,3 +55,7 @@ python_version = "3.12"
 strict = true
 files = ["src", "tests", "evals"]
 exclude = ["src/private", "src/superplaneapi"]
+
+[[tool.mypy.overrides]]
+module = "usage_pb2"
+ignore_errors = true
