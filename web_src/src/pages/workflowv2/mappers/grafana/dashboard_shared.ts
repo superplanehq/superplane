@@ -98,7 +98,7 @@ export function buildGrafanaEventSections(
   const subtitleTimestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : legacy ? "-" : "";
 
-  const receivedAtRaw = execution.createdAt || execution.updatedAt;
+  const receivedAtRaw = legacy ? execution.createdAt : execution.createdAt || execution.updatedAt;
   const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : undefined;
 
   const eventId = legacy ? (execution.rootEvent?.id ?? "") : (execution.rootEvent?.id ?? execution.id);
