@@ -152,7 +152,7 @@ func RunServer(
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
-	agentsService := NewAgentsService(authService, jwtSigner, usageService)
+	agentsService := NewAgentsService(authService, jwtSigner)
 	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
 
 	reflection.Register(grpcServer)
