@@ -79,9 +79,7 @@ class UsagePublisher:
         params = pika.URLParameters(self._rabbitmq_url)
         self._connection = pika.BlockingConnection(params)
         self._channel = self._connection.channel()
-        self._channel.exchange_declare(
-            exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True
-        )
+        self._channel.exchange_declare(exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True)
         return self._channel
 
     def _close(self) -> None:
