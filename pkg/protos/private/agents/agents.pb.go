@@ -746,6 +746,90 @@ func (x *DescribeOrganizationAgentUsageResponse) GetUsage() *ChatUsage {
 	return nil
 }
 
+type AgentRunFinishedMessage struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	ChatId         string                 `protobuf:"bytes,2,opt,name=chat_id,json=chatId,proto3" json:"chat_id,omitempty"`
+	Model          string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	InputTokens    int64                  `protobuf:"varint,4,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
+	OutputTokens   int64                  `protobuf:"varint,5,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
+	TotalTokens    int64                  `protobuf:"varint,6,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AgentRunFinishedMessage) Reset() {
+	*x = AgentRunFinishedMessage{}
+	mi := &file_private_agents_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentRunFinishedMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentRunFinishedMessage) ProtoMessage() {}
+
+func (x *AgentRunFinishedMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_private_agents_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentRunFinishedMessage.ProtoReflect.Descriptor instead.
+func (*AgentRunFinishedMessage) Descriptor() ([]byte, []int) {
+	return file_private_agents_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AgentRunFinishedMessage) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
+func (x *AgentRunFinishedMessage) GetChatId() string {
+	if x != nil {
+		return x.ChatId
+	}
+	return ""
+}
+
+func (x *AgentRunFinishedMessage) GetModel() string {
+	if x != nil {
+		return x.Model
+	}
+	return ""
+}
+
+func (x *AgentRunFinishedMessage) GetInputTokens() int64 {
+	if x != nil {
+		return x.InputTokens
+	}
+	return 0
+}
+
+func (x *AgentRunFinishedMessage) GetOutputTokens() int64 {
+	if x != nil {
+		return x.OutputTokens
+	}
+	return 0
+}
+
+func (x *AgentRunFinishedMessage) GetTotalTokens() int64 {
+	if x != nil {
+		return x.TotalTokens
+	}
+	return 0
+}
+
 var File_private_agents_proto protoreflect.FileDescriptor
 
 const file_private_agents_proto_rawDesc = "" +
@@ -799,7 +883,14 @@ const file_private_agents_proto_rawDesc = "" +
 	"%DescribeOrganizationAgentUsageRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\"e\n" +
 	"&DescribeOrganizationAgentUsageResponse\x12;\n" +
-	"\x05usage\x18\x01 \x01(\v2%.Superplane.Internal.Agents.ChatUsageR\x05usage2\xb9\x05\n" +
+	"\x05usage\x18\x01 \x01(\v2%.Superplane.Internal.Agents.ChatUsageR\x05usage\"\xdc\x01\n" +
+	"\x17AgentRunFinishedMessage\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x17\n" +
+	"\achat_id\x18\x02 \x01(\tR\x06chatId\x12\x14\n" +
+	"\x05model\x18\x03 \x01(\tR\x05model\x12!\n" +
+	"\finput_tokens\x18\x04 \x01(\x03R\vinputTokens\x12#\n" +
+	"\routput_tokens\x18\x05 \x01(\x03R\foutputTokens\x12!\n" +
+	"\ftotal_tokens\x18\x06 \x01(\x03R\vtotalTokens2\xb9\x05\n" +
 	"\x06Agents\x12z\n" +
 	"\x0fCreateAgentChat\x122.Superplane.Internal.Agents.CreateAgentChatRequest\x1a3.Superplane.Internal.Agents.CreateAgentChatResponse\x12w\n" +
 	"\x0eListAgentChats\x121.Superplane.Internal.Agents.ListAgentChatsRequest\x1a2.Superplane.Internal.Agents.ListAgentChatsResponse\x12\x80\x01\n" +
@@ -819,7 +910,7 @@ func file_private_agents_proto_rawDescGZIP() []byte {
 	return file_private_agents_proto_rawDescData
 }
 
-var file_private_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_private_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_private_agents_proto_goTypes = []any{
 	(*ListAgentChatsRequest)(nil),                  // 0: Superplane.Internal.Agents.ListAgentChatsRequest
 	(*ListAgentChatsResponse)(nil),                 // 1: Superplane.Internal.Agents.ListAgentChatsResponse
@@ -834,15 +925,16 @@ var file_private_agents_proto_goTypes = []any{
 	(*ChatUsage)(nil),                              // 10: Superplane.Internal.Agents.ChatUsage
 	(*DescribeOrganizationAgentUsageRequest)(nil),  // 11: Superplane.Internal.Agents.DescribeOrganizationAgentUsageRequest
 	(*DescribeOrganizationAgentUsageResponse)(nil), // 12: Superplane.Internal.Agents.DescribeOrganizationAgentUsageResponse
-	(*timestamp.Timestamp)(nil),                    // 13: google.protobuf.Timestamp
+	(*AgentRunFinishedMessage)(nil),                // 13: Superplane.Internal.Agents.AgentRunFinishedMessage
+	(*timestamp.Timestamp)(nil),                    // 14: google.protobuf.Timestamp
 }
 var file_private_agents_proto_depIdxs = []int32{
 	9,  // 0: Superplane.Internal.Agents.ListAgentChatsResponse.chats:type_name -> Superplane.Internal.Agents.ChatInfo
 	9,  // 1: Superplane.Internal.Agents.DescribeAgentChatResponse.chat:type_name -> Superplane.Internal.Agents.ChatInfo
 	6,  // 2: Superplane.Internal.Agents.ListAgentChatMessagesResponse.messages:type_name -> Superplane.Internal.Agents.AgentChatMessage
-	13, // 3: Superplane.Internal.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
+	14, // 3: Superplane.Internal.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
 	9,  // 4: Superplane.Internal.Agents.CreateAgentChatResponse.chat:type_name -> Superplane.Internal.Agents.ChatInfo
-	13, // 5: Superplane.Internal.Agents.ChatInfo.created_at:type_name -> google.protobuf.Timestamp
+	14, // 5: Superplane.Internal.Agents.ChatInfo.created_at:type_name -> google.protobuf.Timestamp
 	10, // 6: Superplane.Internal.Agents.DescribeOrganizationAgentUsageResponse.usage:type_name -> Superplane.Internal.Agents.ChatUsage
 	7,  // 7: Superplane.Internal.Agents.Agents.CreateAgentChat:input_type -> Superplane.Internal.Agents.CreateAgentChatRequest
 	0,  // 8: Superplane.Internal.Agents.Agents.ListAgentChats:input_type -> Superplane.Internal.Agents.ListAgentChatsRequest
@@ -872,7 +964,7 @@ func file_private_agents_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_private_agents_proto_rawDesc), len(file_private_agents_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
