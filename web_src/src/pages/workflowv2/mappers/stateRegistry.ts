@@ -1,5 +1,6 @@
-import { DEFAULT_EVENT_STATE_MAP, EventState } from "@/ui/componentBase";
-import { EventStateRegistry, ExecutionInfo, StateFunction } from "./types";
+import type { EventState } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { EventStateRegistry, ExecutionInfo, StateFunction } from "./types";
 
 /**
  * Default state logic function used by most components
@@ -19,11 +20,11 @@ export const defaultStateFunction: StateFunction = (execution: ExecutionInfo): E
     return "cancelled";
   }
 
-  if (execution.state == "STATE_PENDING" || execution.state == "STATE_STARTED") {
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
     return "running";
   }
 
-  if (execution.state == "STATE_FINISHED" && execution.result == "RESULT_PASSED") {
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     return "success";
   }
 

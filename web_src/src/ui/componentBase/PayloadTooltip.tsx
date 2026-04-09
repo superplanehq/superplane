@@ -1,5 +1,5 @@
 import Tippy from "@tippyjs/react/headless";
-import { ReactElement } from "react";
+import type { ReactElement } from "react";
 import Editor from "@monaco-editor/react";
 import "tippy.js/dist/tippy.css";
 

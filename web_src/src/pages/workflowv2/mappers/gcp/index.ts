@@ -1,4 +1,4 @@
-import { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
+import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { baseMapper, cloudBuildBaseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";

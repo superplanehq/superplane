@@ -1,7 +1,7 @@
-import { MetadataItem } from "@/ui/metadataList";
-import { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
 import { baseMapper } from "./base";
-import { ComponentBaseSpec } from "@/ui/componentBase";
+import type { ComponentBaseSpec } from "@/ui/componentBase";
 
 interface CreateRepositorySandboxConfiguration {
   snapshot?: string;
@@ -97,7 +97,7 @@ function createRepositorySandboxSpecs(node: ComponentBaseContext["node"]): Compo
   const config = node.configuration as CreateRepositorySandboxConfiguration | undefined;
   const specs: ComponentBaseSpec[] = [];
 
-  if (config?.bootstrap?.from == "inline" && config?.bootstrap?.script) {
+  if (config?.bootstrap?.from === "inline" && config?.bootstrap?.script) {
     specs.push({ title: "Script", value: config.bootstrap.script });
   }
 

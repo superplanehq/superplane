@@ -2,6 +2,8 @@ package canvases
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
@@ -66,8 +68,8 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 		request.SetAutoLayout(buildDefaultAutoLayout())
 	}
 
-	_, _, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-	return err
+	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
+	return validateAndPrintCreateResponse(ctx, resp, httpResp, err)
 }
 
 func (c *createCommand) createFromFile(
@@ -104,6 +106,36 @@ func (c *createCommand) createFromFile(
 		}
 	}
 
-	_, _, err = ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
-	return err
+	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
+	return validateAndPrintCreateResponse(ctx, resp, httpResp, err)
+}
+
+func validateAndPrintCreateResponse(
+	ctx core.CommandContext,
+	resp *openapi_client.CanvasesCreateCanvasResponse,
+	httpResp *http.Response,
+	err error,
+) error {
+	if err != nil {
+		return err
+	}
+
+	if httpResp != nil && (httpResp.StatusCode < 200 || httpResp.StatusCode >= 300) {
+		return fmt.Errorf("unexpected response status: %s", httpResp.Status)
+	}
+
+	if resp == nil || resp.Canvas == nil || resp.Canvas.Metadata == nil || resp.Canvas.Metadata.GetId() == "" {
+		return fmt.Errorf("failed to create canvas: the server returned an empty response")
+	}
+
+	canvas := *resp.Canvas
+	resource := models.CanvasResourceFromCanvas(canvas)
+	if !ctx.Renderer.IsText() {
+		return ctx.Renderer.Render(resource)
+	}
+
+	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		_, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId())
+		return err
+	})
 }

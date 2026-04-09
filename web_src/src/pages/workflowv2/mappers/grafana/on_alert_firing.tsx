@@ -1,21 +1,12 @@
-import { useState, type FC } from "react";
-import React from "react";
+import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import type {
-  CustomFieldRenderer,
-  NodeInfo,
-  TriggerEventContext,
-  TriggerRenderer,
-  TriggerRendererContext,
-} from "../types";
+import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import type { TriggerProps } from "@/ui/trigger";
+import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
-import type { OnAlertFiringEventData } from "./types";
-import { stringOrDash } from "../utils";
-import { formatTimestamp } from "./utils";
-import { Icon } from "@/components/Icon";
-import { showErrorToast } from "@/lib/toast";
+import type { OnAlertFiringConfiguration, OnAlertFiringEventData } from "./types";
+import { stringOrDash, formatTimestamp } from "../utils";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger
@@ -50,108 +41,21 @@ export const onAlertFiringTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadataItems = [];
-
-    if (lastEvent?.data) {
-      const eventData = lastEvent.data as OnAlertFiringEventData;
-      const alertName = getAlertName(eventData);
-      if (alertName) {
-        metadataItems.push({
-          icon: "bell",
-          label: alertName,
-        });
-      }
-    }
+    const configuration = node.configuration as OnAlertFiringConfiguration | undefined;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: grafanaIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildTriggerMetadata(configuration, lastEvent?.data as OnAlertFiringEventData | undefined).slice(0, 3),
     };
 
-    if (lastEvent) {
-      const eventData = lastEvent.data as OnAlertFiringEventData | undefined;
-      const status = eventData?.status || "firing";
-      const alertName = getAlertName(eventData);
-      const subtitle = buildSubtitle(status, lastEvent.createdAt);
-
-      props.lastEventData = {
-        title: alertName || "Grafana alert firing",
-        subtitle,
-        receivedAt: new Date(lastEvent.createdAt),
-        state: "triggered",
-        eventId: lastEvent.id,
-      };
+    const lastEventData = buildLastEventData(lastEvent);
+    if (lastEventData) {
+      props.lastEventData = lastEventData;
     }
 
     return props;
-  },
-};
-
-interface OnAlertFiringMetadata {
-  webhookUrl?: string;
-  webhook_url?: string;
-  url?: string;
-}
-
-const CopyWebhookUrlButton: FC<{ webhookUrl: string }> = ({ webhookUrl }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(webhookUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (_err) {
-      showErrorToast("Failed to copy webhook URL");
-    }
-  };
-
-  return (
-    <button
-      onClick={handleCopy}
-      className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 border-1 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800"
-      title={copied ? "Copied!" : "Copy webhook URL"}
-    >
-      <Icon name={copied ? "check" : "copy"} size="sm" />
-      {copied ? "Copied" : "Copy"}
-    </button>
-  );
-};
-
-export const onAlertFiringCustomFieldRenderer: CustomFieldRenderer = {
-  render: (node: NodeInfo) => {
-    const metadata = node.metadata as OnAlertFiringMetadata | undefined;
-    const webhookUrl =
-      metadata?.webhookUrl || metadata?.webhook_url || metadata?.url || "[URL GENERATED ONCE THE CANVAS IS SAVED]";
-
-    return (
-      <div className="border-t-1 border-gray-200 pt-4">
-        <div className="space-y-3">
-          <div>
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Grafana Contact Point Setup</span>
-            <div className="text-xs text-gray-800 dark:text-gray-100 mt-2 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-              <ol className="list-decimal ml-4 space-y-1">
-                <li>Save the canvas to generate the webhook URL.</li>
-                <li>SuperPlane auto-provisions a Grafana webhook contact point in the background after save.</li>
-                <li>If it is not created immediately, wait a moment and re-open the node.</li>
-                <li>If provisioning still fails, create/update the contact point manually using the URL below.</li>
-              </ol>
-              <div className="mt-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-gray-700 dark:text-gray-200">Webhook URL</span>
-                  <CopyWebhookUrlButton webhookUrl={webhookUrl} />
-                </div>
-                <pre className="mt-1 text-xs text-gray-800 dark:text-gray-100 border-1 border-gray-300 dark:border-gray-600 px-2.5 py-2 bg-white dark:bg-gray-900 rounded-md font-mono whitespace-pre-wrap break-all">
-                  {webhookUrl}
-                </pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
   },
 };
 
@@ -184,4 +88,54 @@ function buildSubtitle(status: string, createdAt?: string): string | React.React
     return status;
   }
   return createdAt ? renderTimeAgo(new Date(createdAt)) : "-";
+}
+
+function buildTriggerMetadata(
+  configuration: OnAlertFiringConfiguration | undefined,
+  eventData: OnAlertFiringEventData | undefined,
+): MetadataItem[] {
+  const configuredAlertNameMetadata = buildConfiguredAlertNameMetadata(configuration);
+  if (configuredAlertNameMetadata.length > 0) {
+    return configuredAlertNameMetadata;
+  }
+
+  const alertName = getAlertName(eventData);
+  if (!alertName) {
+    return [];
+  }
+
+  return [{ icon: "bell", label: alertName }];
+}
+
+function buildConfiguredAlertNameMetadata(configuration: OnAlertFiringConfiguration | undefined): MetadataItem[] {
+  const alertNames = configuration?.alertNames?.filter((predicate) => predicate.value.trim().length > 0) ?? [];
+  if (alertNames.length === 0) {
+    return [];
+  }
+
+  const label =
+    alertNames.length > 3
+      ? `Alert Names: ${alertNames.length} selected`
+      : `Alert Names: ${alertNames.map((predicate) => predicate.value).join(", ")}`;
+
+  return [{ icon: "bell", label }];
+}
+
+function buildLastEventData(lastEvent: TriggerRendererContext["lastEvent"]): TriggerProps["lastEventData"] | undefined {
+  if (!lastEvent) {
+    return undefined;
+  }
+
+  const eventData = lastEvent.data as OnAlertFiringEventData | undefined;
+  const status = eventData?.status || "firing";
+  const alertName = getAlertName(eventData);
+  const subtitle = buildSubtitle(status, lastEvent.createdAt);
+
+  return {
+    title: alertName || "Grafana alert firing",
+    subtitle,
+    receivedAt: new Date(lastEvent.createdAt),
+    state: "triggered",
+    eventId: lastEvent.id,
+  };
 }

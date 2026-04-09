@@ -207,7 +207,7 @@ CREATE TABLE public.canvas_memories (
 
 CREATE TABLE public.casbin_rule (
     id integer NOT NULL,
-    ptype character varying(100) NOT NULL,
+    ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
     v2 character varying(100),
@@ -291,6 +291,7 @@ CREATE TABLE public.installation_metadata (
     installation_id character varying(64) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    allow_private_network_access boolean DEFAULT false NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
@@ -1194,6 +1195,13 @@ CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USIN
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1980,7 +1988,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260327195840	f
+20260408122133	f
 \.
 
 

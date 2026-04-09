@@ -15,6 +15,7 @@ import (
 	"github.com/renderedtext/go-tackle"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -33,6 +34,7 @@ var ErrRecordLocked = errors.New("record locked")
 type NodeExecutor struct {
 	encryptor      crypto.Encryptor
 	registry       *registry.Registry
+	authService    authorization.Authorization
 	baseURL        string
 	webhookBaseURL string
 	semaphore      *semaphore.Weighted
@@ -42,7 +44,7 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
@@ -51,6 +53,7 @@ func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, ba
 		semaphore:      semaphore.NewWeighted(25),
 		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
 		rabbitMQURL:    rabbitMQURL,
+		authService:    authService,
 	}
 }
 
@@ -358,6 +361,14 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		return fmt.Errorf("failed to find workflow: %v", err)
 	}
 
+	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithRootEvent(&execution.RootEventID).
+		WithInput(map[string]any{inputEvent.NodeID: input})
+	if execution.PreviousExecutionID != nil {
+		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
+	}
+
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -374,21 +385,12 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
-		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, w.authService, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 		CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
 		Webhook:        contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
-	}
-	ctx.ExpressionEnv = func(expression string) (map[string]any, error) {
-		builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
-			WithNodeID(node.NodeID).
-			WithRootEvent(&execution.RootEventID).
-			WithInput(map[string]any{inputEvent.NodeID: input})
-		if execution.PreviousExecutionID != nil {
-			builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
-		}
-		return builder.BuildExpressionEnv(expression)
+		Expressions:    contexts.NewExpressionContext(builder),
 	}
 
 	if node.AppInstallationID != nil {

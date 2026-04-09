@@ -31,7 +31,7 @@ from typing_extensions import Self
 
 class CanvasesCanvasNodeExecution(BaseModel):
     """
-    CanvasesCanvasNodeExecution
+    Full description of a canvas node execution. Should only be used for endpoints specific to executions.
     """ # noqa: E501
     id: Optional[StrictStr] = None
     canvas_id: Optional[StrictStr] = Field(default=None, alias="canvasId")
@@ -42,7 +42,6 @@ class CanvasesCanvasNodeExecution(BaseModel):
     result: Optional[CanvasNodeExecutionResult] = CanvasNodeExecutionResult.RESULT_UNKNOWN
     result_reason: Optional[CanvasNodeExecutionResultReason] = Field(default=CanvasNodeExecutionResultReason.RESULT_REASON_OK, alias="resultReason")
     result_message: Optional[StrictStr] = Field(default=None, alias="resultMessage")
-    input: Optional[Dict[str, Any]] = None
     outputs: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
@@ -51,7 +50,7 @@ class CanvasesCanvasNodeExecution(BaseModel):
     child_executions: Optional[List[CanvasesCanvasNodeExecution]] = Field(default=None, alias="childExecutions")
     root_event: Optional[CanvasesCanvasEvent] = Field(default=None, alias="rootEvent")
     cancelled_by: Optional[SuperplaneCanvasesUserRef] = Field(default=None, alias="cancelledBy")
-    __properties: ClassVar[List[str]] = ["id", "canvasId", "nodeId", "parentExecutionId", "previousExecutionId", "state", "result", "resultReason", "resultMessage", "input", "outputs", "createdAt", "updatedAt", "metadata", "configuration", "childExecutions", "rootEvent", "cancelledBy"]
+    __properties: ClassVar[List[str]] = ["id", "canvasId", "nodeId", "parentExecutionId", "previousExecutionId", "state", "result", "resultReason", "resultMessage", "outputs", "createdAt", "updatedAt", "metadata", "configuration", "childExecutions", "rootEvent", "cancelledBy"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -126,7 +125,6 @@ class CanvasesCanvasNodeExecution(BaseModel):
             "result": obj.get("result") if obj.get("result") is not None else CanvasNodeExecutionResult.RESULT_UNKNOWN,
             "resultReason": obj.get("resultReason") if obj.get("resultReason") is not None else CanvasNodeExecutionResultReason.RESULT_REASON_OK,
             "resultMessage": obj.get("resultMessage"),
-            "input": obj.get("input"),
             "outputs": obj.get("outputs"),
             "createdAt": obj.get("createdAt"),
             "updatedAt": obj.get("updatedAt"),

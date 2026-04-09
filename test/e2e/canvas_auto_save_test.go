@@ -3,6 +3,7 @@ package e2e
 import (
 	"strings"
 	"testing"
+	"time"
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
@@ -25,6 +26,53 @@ func TestCanvasAutoSave(t *testing.T) {
 		steps.dismissSidebar()
 		steps.moveNode("Auto Save Node", 100, 80)
 		steps.waitForSaved()
+	})
+
+	t.Run("versioned canvas keeps the latest position after two quick moves", func(t *testing.T) {
+		steps := &canvasAutoSaveSteps{t: t}
+		steps.start()
+		steps.givenCanvasWithVersioningEnabled("E2E Auto Save Queue")
+		steps.enterEditMode()
+		steps.addNoopNode("Queued Move Node", models.Position{X: 500, Y: 220})
+		steps.waitForSaved()
+		steps.dismissSidebar()
+
+		initialCenter := steps.nodeCenter("Queued Move Node")
+		steps.moveNode("Queued Move Node", 140, 60)
+		steps.moveNode("Queued Move Node", 90, 55)
+		steps.waitForSaved()
+
+		finalCenter := steps.nodeCenter("Queued Move Node")
+		require.Greater(t, finalCenter.X, initialCenter.X+180)
+		require.Greater(t, finalCenter.Y, initialCenter.Y+80)
+
+		steps.session.Sleep(1500)
+
+		stableCenter := steps.nodeCenter("Queued Move Node")
+		require.InDelta(t, finalCenter.X, stableCenter.X, 2)
+		require.InDelta(t, finalCenter.Y, stableCenter.Y, 2)
+	})
+
+	t.Run("versioned canvas auto-saves note edits on blur", func(t *testing.T) {
+		steps := &canvasAutoSaveSteps{t: t}
+		steps.start()
+		steps.givenCanvasWithVersioningEnabled("E2E Note Auto Save")
+		steps.enterEditMode()
+		steps.addNote()
+
+		steps.startEditingNoteWithText("Double click to add and edit notes...")
+		steps.fillNote("Initial note body")
+		steps.blurNoteEditor()
+		steps.waitForSaved()
+		steps.assertNotePreview("Initial note body")
+
+		updatedText := "Updated note body on blur"
+		steps.startEditingNoteWithText("Initial note body")
+		steps.fillNote(updatedText)
+		steps.blurNoteEditor()
+		steps.waitForSaved()
+		steps.assertNotePreview(updatedText)
+		steps.assertNoteTextInDB(updatedText)
 	})
 }
 
@@ -56,7 +104,24 @@ func (s *canvasAutoSaveSteps) givenCanvasWithVersioningEnabled(name string) {
 }
 
 func (s *canvasAutoSaveSteps) enterEditMode() {
-	s.session.Click(q.Locator(`header button:has-text("Edit")`))
+	editButton := q.Locator(`header button:has-text("Edit")`).Run(s.session)
+	deadline := time.Now().Add(15 * time.Second)
+
+	for {
+		disabled, err := editButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			s.t.Fatalf("edit button did not become enabled")
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
 }
 
@@ -65,9 +130,56 @@ func (s *canvasAutoSaveSteps) addNoopNode(name string, pos models.Position) {
 	s.session.AssertText(name)
 }
 
+func (s *canvasAutoSaveSteps) addNote() {
+	s.canvas.AddNote()
+}
+
 func (s *canvasAutoSaveSteps) dismissSidebar() {
 	s.canvas.ClickOnEmptyCanvasArea()
 	s.session.Sleep(300)
+}
+
+func (s *canvasAutoSaveSteps) startEditingNoteWithText(text string) {
+	note := q.Text(text).Run(s.session)
+	err := note.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(10000),
+	})
+	require.NoError(s.t, err)
+	require.NoError(s.t, note.Dblclick(pw.LocatorDblclickOptions{Timeout: pw.Float(10000)}))
+	s.session.AssertVisible(q.Locator(`textarea[aria-label="Note note"]`))
+}
+
+func (s *canvasAutoSaveSteps) fillNote(text string) {
+	s.session.FillIn(q.Locator(`textarea[aria-label="Note note"]`), text)
+}
+
+func (s *canvasAutoSaveSteps) blurNoteEditor() {
+	s.canvas.ClickOnEmptyCanvasArea()
+}
+
+func (s *canvasAutoSaveSteps) assertNotePreview(text string) {
+	s.session.AssertHidden(q.Locator(`textarea[aria-label="Note note"]`))
+	s.session.AssertText(text)
+}
+
+func (s *canvasAutoSaveSteps) assertNoteTextInDB(expected string) {
+	require.Eventually(s.t, func() bool {
+		versions, err := models.ListCanvasVersions(s.canvas.WorkflowID)
+		if err != nil || len(versions) == 0 {
+			return false
+		}
+
+		// Find the "Note" node in the latest version's nodes
+		for _, node := range versions[0].Nodes {
+			if node.Name == "Note" {
+				text, _ := node.Configuration["text"].(string)
+				return text == expected
+			}
+		}
+
+		return false
+	}, 10*time.Second, 200*time.Millisecond)
 }
 
 // nodeHeaderSelector builds the correct data-testid selector for a node header,
@@ -105,6 +217,27 @@ func (s *canvasAutoSaveSteps) moveNode(name string, deltaX, deltaY int) {
 	require.NoError(s.t, s.session.Page().Mouse().Up())
 
 	s.session.Sleep(300)
+}
+
+func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
+	loc := nodeHeaderSelector(name).Run(s.session)
+
+	err := loc.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(10000),
+	})
+	require.NoError(s.t, err)
+
+	box, err := loc.BoundingBox()
+	require.NoError(s.t, err)
+	require.NotNil(s.t, box)
+
+	return &pw.Rect{
+		X:      box.X + box.Width/2,
+		Y:      box.Y + box.Height/2,
+		Width:  box.Width,
+		Height: box.Height,
+	}
 }
 
 // waitForSaved polls the canvas save status indicator until it reports "saved".

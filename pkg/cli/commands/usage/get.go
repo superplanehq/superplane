@@ -18,7 +18,7 @@ const unlimitedValue = "-1"
 type getCommand struct{}
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
-	organizationID, err := resolveOrganizationID(ctx)
+	organizationID, err := core.ResolveOrganizationID(ctx)
 	if err != nil {
 		return err
 	}
@@ -31,25 +31,12 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(response)
+		return ctx.Renderer.Render(normalizeUsageResponse(response))
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		return renderUsageText(stdout, response)
 	})
-}
-
-func resolveOrganizationID(ctx core.CommandContext) (string, error) {
-	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
-	if err != nil {
-		return "", err
-	}
-
-	if !me.HasOrganizationId() || strings.TrimSpace(me.GetOrganizationId()) == "" {
-		return "", fmt.Errorf("organization id not found for authenticated user")
-	}
-
-	return me.GetOrganizationId(), nil
 }
 
 func renderUsageText(stdout io.Writer, response *openapi_client.OrganizationsDescribeUsageResponse) error {
@@ -133,6 +120,71 @@ func formatStringLimit(value *string, ok bool) string {
 	}
 
 	return *value
+}
+
+func normalizeUsageResponse(response *openapi_client.OrganizationsDescribeUsageResponse) map[string]any {
+	if response == nil {
+		return map[string]any{}
+	}
+
+	result := map[string]any{
+		"enabled": response.GetEnabled(),
+	}
+
+	if response.HasStatusMessage() {
+		result["statusMessage"] = response.GetStatusMessage()
+	}
+
+	if response.HasUsage() {
+		usage := response.GetUsage()
+		usageMap := map[string]any{}
+		if v, ok := usage.GetCanvasesOk(); ok {
+			usageMap["canvases"] = *v
+		}
+		if v, ok := usage.GetEventBucketLevelOk(); ok {
+			usageMap["eventBucketLevel"] = *v
+		}
+		if v, ok := usage.GetEventBucketCapacityOk(); ok {
+			usageMap["eventBucketCapacity"] = *v
+		}
+		if v, ok := usage.GetEventBucketLastUpdatedAtOk(); ok {
+			usageMap["eventBucketLastUpdatedAt"] = *v
+		}
+		if v, ok := usage.GetNextEventBucketDecreaseAtOk(); ok {
+			usageMap["nextEventBucketDecreaseAt"] = *v
+		}
+		result["usage"] = usageMap
+	}
+
+	if response.HasLimits() {
+		limits := response.GetLimits()
+		limitsMap := map[string]any{}
+		if v, ok := limits.GetMaxCanvasesOk(); ok {
+			limitsMap["maxCanvases"] = *v
+		}
+		if v, ok := limits.GetMaxNodesPerCanvasOk(); ok {
+			limitsMap["maxNodesPerCanvas"] = *v
+		}
+		if v, ok := limits.GetMaxUsersOk(); ok {
+			limitsMap["maxUsers"] = *v
+		}
+		if v, ok := limits.GetRetentionWindowDaysOk(); ok {
+			limitsMap["retentionWindowDays"] = *v
+		}
+		if v, ok := limits.GetMaxEventsPerMonthOk(); ok {
+			if parsed, err := strconv.ParseInt(*v, 10, 64); err == nil {
+				limitsMap["maxEventsPerMonth"] = parsed
+			} else {
+				limitsMap["maxEventsPerMonth"] = *v
+			}
+		}
+		if v, ok := limits.GetMaxIntegrationsOk(); ok {
+			limitsMap["maxIntegrations"] = *v
+		}
+		result["limits"] = limitsMap
+	}
+
+	return result
 }
 
 func formatFloat64Value(value *float64, ok bool) string {

@@ -1,0 +1,9 @@
+{
+  "type": "hetzner.load_balancer.created",
+  "data": {
+    "id": "12345",
+    "name": "my-load-balancer",
+    "status": "running"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

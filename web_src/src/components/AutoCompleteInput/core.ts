@@ -1114,7 +1114,7 @@ function findTailDotContext(input: string): DotContext | null {
       continue;
     }
     if (ch === "(") {
-      if (parenDepth == 0) {
+      if (parenDepth === 0) {
         return null;
       }
       parenDepth = Math.max(0, parenDepth - 1);
@@ -1387,7 +1387,7 @@ function listKeys(value: unknown): string[] {
 function getProp(obj: unknown, key: string): unknown {
   if (obj == null) return undefined;
   try {
-    return (obj as any)[key];
+    return (obj as Record<string, unknown>)[key];
   } catch {
     return undefined;
   }

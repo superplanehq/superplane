@@ -21,11 +21,15 @@ var _ MappedNullable = &SuperplaneMeUser{}
 
 // SuperplaneMeUser struct for SuperplaneMeUser
 type SuperplaneMeUser struct {
-	Id             *string    `json:"id,omitempty"`
-	Email          *string    `json:"email,omitempty"`
-	OrganizationId *string    `json:"organizationId,omitempty"`
-	CreatedAt      *time.Time `json:"createdAt,omitempty"`
-	HasToken       *bool      `json:"hasToken,omitempty"`
+	Id             *string                   `json:"id,omitempty"`
+	Name           *string                   `json:"name,omitempty"`
+	Email          *string                   `json:"email,omitempty"`
+	OrganizationId *string                   `json:"organizationId,omitempty"`
+	CreatedAt      *time.Time                `json:"createdAt,omitempty"`
+	HasToken       *bool                     `json:"hasToken,omitempty"`
+	Permissions    []AuthorizationPermission `json:"permissions,omitempty"`
+	Roles          []string                  `json:"roles,omitempty"`
+	Groups         []string                  `json:"groups,omitempty"`
 }
 
 // NewSuperplaneMeUser instantiates a new SuperplaneMeUser object
@@ -75,6 +79,38 @@ func (o *SuperplaneMeUser) HasId() bool {
 // SetId gets a reference to the given string and assigns it to the Id field.
 func (o *SuperplaneMeUser) SetId(v string) {
 	o.Id = &v
+}
+
+// GetName returns the Name field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetName() string {
+	if o == nil || IsNil(o.Name) {
+		var ret string
+		return ret
+	}
+	return *o.Name
+}
+
+// GetNameOk returns a tuple with the Name field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetNameOk() (*string, bool) {
+	if o == nil || IsNil(o.Name) {
+		return nil, false
+	}
+	return o.Name, true
+}
+
+// HasName returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasName() bool {
+	if o != nil && !IsNil(o.Name) {
+		return true
+	}
+
+	return false
+}
+
+// SetName gets a reference to the given string and assigns it to the Name field.
+func (o *SuperplaneMeUser) SetName(v string) {
+	o.Name = &v
 }
 
 // GetEmail returns the Email field value if set, zero value otherwise.
@@ -205,6 +241,102 @@ func (o *SuperplaneMeUser) SetHasToken(v bool) {
 	o.HasToken = &v
 }
 
+// GetPermissions returns the Permissions field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetPermissions() []AuthorizationPermission {
+	if o == nil || IsNil(o.Permissions) {
+		var ret []AuthorizationPermission
+		return ret
+	}
+	return o.Permissions
+}
+
+// GetPermissionsOk returns a tuple with the Permissions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetPermissionsOk() ([]AuthorizationPermission, bool) {
+	if o == nil || IsNil(o.Permissions) {
+		return nil, false
+	}
+	return o.Permissions, true
+}
+
+// HasPermissions returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasPermissions() bool {
+	if o != nil && !IsNil(o.Permissions) {
+		return true
+	}
+
+	return false
+}
+
+// SetPermissions gets a reference to the given []AuthorizationPermission and assigns it to the Permissions field.
+func (o *SuperplaneMeUser) SetPermissions(v []AuthorizationPermission) {
+	o.Permissions = v
+}
+
+// GetRoles returns the Roles field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetRoles() []string {
+	if o == nil || IsNil(o.Roles) {
+		var ret []string
+		return ret
+	}
+	return o.Roles
+}
+
+// GetRolesOk returns a tuple with the Roles field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetRolesOk() ([]string, bool) {
+	if o == nil || IsNil(o.Roles) {
+		return nil, false
+	}
+	return o.Roles, true
+}
+
+// HasRoles returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasRoles() bool {
+	if o != nil && !IsNil(o.Roles) {
+		return true
+	}
+
+	return false
+}
+
+// SetRoles gets a reference to the given []string and assigns it to the Roles field.
+func (o *SuperplaneMeUser) SetRoles(v []string) {
+	o.Roles = v
+}
+
+// GetGroups returns the Groups field value if set, zero value otherwise.
+func (o *SuperplaneMeUser) GetGroups() []string {
+	if o == nil || IsNil(o.Groups) {
+		var ret []string
+		return ret
+	}
+	return o.Groups
+}
+
+// GetGroupsOk returns a tuple with the Groups field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneMeUser) GetGroupsOk() ([]string, bool) {
+	if o == nil || IsNil(o.Groups) {
+		return nil, false
+	}
+	return o.Groups, true
+}
+
+// HasGroups returns a boolean if a field has been set.
+func (o *SuperplaneMeUser) HasGroups() bool {
+	if o != nil && !IsNil(o.Groups) {
+		return true
+	}
+
+	return false
+}
+
+// SetGroups gets a reference to the given []string and assigns it to the Groups field.
+func (o *SuperplaneMeUser) SetGroups(v []string) {
+	o.Groups = v
+}
+
 func (o SuperplaneMeUser) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -218,6 +350,9 @@ func (o SuperplaneMeUser) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
 	}
+	if !IsNil(o.Name) {
+		toSerialize["name"] = o.Name
+	}
 	if !IsNil(o.Email) {
 		toSerialize["email"] = o.Email
 	}
@@ -229,6 +364,15 @@ func (o SuperplaneMeUser) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.HasToken) {
 		toSerialize["hasToken"] = o.HasToken
+	}
+	if !IsNil(o.Permissions) {
+		toSerialize["permissions"] = o.Permissions
+	}
+	if !IsNil(o.Roles) {
+		toSerialize["roles"] = o.Roles
+	}
+	if !IsNil(o.Groups) {
+		toSerialize["groups"] = o.Groups
 	}
 	return toSerialize, nil
 }

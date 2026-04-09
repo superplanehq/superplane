@@ -88,7 +88,7 @@ export function General({ organization }: GeneralProps) {
 
       setSaveMessage("Organization updated successfully");
       setTimeout(() => setSaveMessage(null), 3000);
-    } catch (err) {
+    } catch {
       setSaveMessage("Failed to update organization");
       setTimeout(() => setSaveMessage(null), 3000);
     }
@@ -109,7 +109,7 @@ export function General({ organization }: GeneralProps) {
       setDeleteError(null);
       await deleteOrganizationMutation.mutateAsync();
       window.location.href = "/";
-    } catch (err) {
+    } catch {
       setDeleteError("Failed to delete organization. Please try again.");
     }
   };
@@ -196,8 +196,14 @@ export function General({ organization }: GeneralProps) {
     <div className="space-y-6 pt-6 text-left">
       <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6 space-y-6">
         <Field className="space-y-4">
-          <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Organization Name</Label>
+          <Label
+            htmlFor="organization-name-input"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+          >
+            Organization Name
+          </Label>
           <Input
+            id="organization-name-input"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -240,7 +246,7 @@ export function General({ organization }: GeneralProps) {
         >
           <div className="flex items-start justify-between gap-6">
             <div>
-              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Mode</Label>
+              <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Mode</p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {openAIKeyConfigured || agentModeEnabled
                   ? "Agent Mode is enabled."
@@ -301,8 +307,14 @@ export function General({ organization }: GeneralProps) {
                 }}
               >
                 <div className="space-y-2">
-                  <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300">OpenAI API key</Label>
+                  <Label
+                    htmlFor="agent-openai-key-input"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    OpenAI API key
+                  </Label>
                   <Input
+                    id="agent-openai-key-input"
                     type="password"
                     value={agentApiKey}
                     onChange={(e) => {
@@ -354,7 +366,10 @@ export function General({ organization }: GeneralProps) {
         <Fieldset className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
           <div className="flex items-start justify-between gap-6">
             <div>
-              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <Label
+                htmlFor="organization-canvas-versioning-switch"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
                 Canvas Versioning
               </Label>
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -371,6 +386,7 @@ export function General({ organization }: GeneralProps) {
                 {versioningEnabled ? "Enabled" : "Disabled"}
               </span>
               <Switch
+                id="organization-canvas-versioning-switch"
                 checked={versioningEnabled}
                 onCheckedChange={handleCanvasVersioningToggle}
                 disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
@@ -417,10 +433,14 @@ export function General({ organization }: GeneralProps) {
               </p>
             </div>
             <Field>
-              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <Label
+                htmlFor="delete-organization-confirmation-input"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
                 Type "{organization.metadata?.name}" to confirm
               </Label>
               <Input
+                id="delete-organization-confirmation-input"
                 type="text"
                 value={deleteConfirmation}
                 onChange={(e) => setDeleteConfirmation(e.target.value)}

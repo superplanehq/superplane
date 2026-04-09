@@ -10,7 +10,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
-type listCommand struct{}
+type listCommand struct {
+	full *bool
+}
 
 func (c *listCommand) Execute(ctx core.CommandContext) error {
 	response, _, err := ctx.API.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
@@ -25,10 +27,32 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if !ctx.Renderer.IsText() {
-		return ctx.Renderer.Render(resources)
+		if c.full != nil && *c.full {
+			return ctx.Renderer.Render(resources)
+		}
+
+		summary := make([]map[string]string, len(canvases))
+		for i, canvas := range canvases {
+			metadata := canvas.GetMetadata()
+			createdAt := ""
+			if metadata.HasCreatedAt() {
+				createdAt = metadata.GetCreatedAt().Format(time.RFC3339)
+			}
+			summary[i] = map[string]string{
+				"id":        metadata.GetId(),
+				"name":      metadata.GetName(),
+				"createdAt": createdAt,
+			}
+		}
+		return ctx.Renderer.Render(summary)
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		if len(canvases) == 0 {
+			_, err := fmt.Fprintln(stdout, "No canvases found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tNAME\tCREATED_AT")
 

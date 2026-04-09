@@ -2,11 +2,10 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: dev
-
+      target: dev-base
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
-
     command: bash /app/docker-entrypoint.dev.sh
     environment:
       DB_HOST: "db"
@@ -29,7 +28,7 @@ services:
       GOCACHE: "/app/tmp/go-build"
       XDG_CACHE_HOME: "/app/tmp"
       # Lock Playwright browsers location so install and runtime match
-      PLAYWRIGHT_BROWSERS_PATH: "/app/tmp/ms-playwright"
+      PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
@@ -69,6 +68,7 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      AGENT_ENABLED: ${AGENT_ENABLED:-yes}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
       AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
@@ -83,8 +83,6 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
-      VITE_ENABLE_CUSTOM_COMPONENTS: "true"
-      VITE_ENABLE_AGENT_REPL: ${VITE_ENABLE_AGENT_REPL:-true}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
 
     ports:
@@ -97,7 +95,6 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
-      - otel:otel
 
     depends_on:
       db:
@@ -117,11 +114,12 @@ services:
       context: agent
       dockerfile: Dockerfile
       target: dev
+      cache_from:
+        - ghcr.io/superplanehq/superplane-dev-base:agent-latest
     working_dir: /app/agent
     env_file:
       - agent/.env
     environment:
-      IN_DOCKER: "1"
       APP_PORT: ${APP_PORT:-8000}
       SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
       INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
@@ -140,15 +138,18 @@ services:
       --factory
       --host 0.0.0.0
       --port 8090
+      --timeout-graceful-shutdown ${AGENT_UVICORN_GRACEFUL_SHUTDOWN:-0}
       --reload
       --reload-dir /app/agent/src
       --reload-dir /app/agent/evals"
+    stop_grace_period: ${AGENT_STOP_GRACE_PERIOD:-0s}
     tty: true
     stdin_open: true
     ports:
       - ${AGENT_REPL_WEB_PORT:-8090}:8090
     volumes:
       - .:/app
+      - ./tmp/agent/evals:/app/tmp/agent/evals
       - uv-cache:/root/.cache/uv
     healthcheck:
       test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
@@ -158,6 +159,7 @@ services:
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
+    profiles: [dev]
     command: [ "--config=/etc/otel-collector-config.yaml" ]
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
@@ -180,6 +182,7 @@ services:
 
   pgweb:
     image: sosedoff/pgweb
+    profiles: [dev]
     environment:
       DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
     ports:
@@ -192,6 +195,9 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
+    volumes:
+      - ./scripts/docker/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./scripts/docker/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
     ports:
       - ${RABBITMQ_PORT:-5672}:${RABBITMQ_PORT:-5672}
       - ${RABBITMQ_MANAGEMENT_PORT:-15672}:${RABBITMQ_MANAGEMENT_PORT:-15672}

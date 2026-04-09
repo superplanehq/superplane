@@ -50,8 +50,7 @@ export function Members({ organizationId }: MembersProps) {
   }>({ key: null, direction: "asc" });
   const [removalError, setRemovalError] = useState<string | null>(null);
 
-  // Use React Query hooks for data fetching
-  const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId);
+  const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId, true);
   const {
     data: organizationRoles = [],
     isLoading: loadingRoles,
@@ -76,7 +75,7 @@ export function Members({ organizationId }: MembersProps) {
   const error = usersError || rolesError;
   const ownerIds = useMemo(() => {
     const ids = users
-      .filter((user) => user.status?.roleAssignments?.some((role) => role.roleName === "org_owner"))
+      .filter((user) => user.status?.roles?.some((role) => role.roleName === "org_owner"))
       .map((user) => user.metadata?.id)
       .filter((id): id is string => Boolean(id));
 
@@ -110,8 +109,8 @@ export function Members({ organizationId }: MembersProps) {
         .slice(0, 2);
 
       // Get primary role name and display name from role assignments
-      const primaryRoleName = user.status?.roleAssignments?.[0]?.roleName || "Member";
-      const primaryRoleDisplayName = user.status?.roleAssignments?.[0]?.roleDisplayName || primaryRoleName;
+      const primaryRoleName = user.status?.roles?.[0]?.roleName || "Member";
+      const primaryRoleDisplayName = user.status?.roles?.[0]?.roleDisplayName || primaryRoleName;
 
       return {
         id: user.metadata?.id || "",
@@ -120,7 +119,7 @@ export function Members({ organizationId }: MembersProps) {
         role: primaryRoleDisplayName,
         roleName: primaryRoleName,
         initials: initials,
-        avatar: user.spec?.accountProviders?.[0]?.avatarUrl,
+        avatar: user.status?.accountProviders?.[0]?.avatarUrl,
         type: "member",
         status: "active",
       };
@@ -169,7 +168,7 @@ export function Members({ organizationId }: MembersProps) {
         userId: memberId,
         roleName: newRoleName,
       });
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to update role.");
     }
   };
@@ -188,7 +187,7 @@ export function Members({ organizationId }: MembersProps) {
           userId: member.id,
         });
       }
-    } catch (err) {
+    } catch {
       setRemovalError("Unable to remove this member.");
     }
   };
@@ -196,7 +195,7 @@ export function Members({ organizationId }: MembersProps) {
   const handleInviteLinkToggle = async (enabled: boolean) => {
     try {
       await updateInviteLinkMutation.mutateAsync(enabled);
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to update invite link.");
     }
   };
@@ -205,7 +204,7 @@ export function Members({ organizationId }: MembersProps) {
     try {
       await resetInviteLinkMutation.mutateAsync();
       showSuccessToast("Invite link reset.");
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to reset invite link.");
     }
   };
@@ -216,7 +215,7 @@ export function Members({ organizationId }: MembersProps) {
     try {
       await navigator.clipboard.writeText(inviteLinkUrl);
       showSuccessToast("Invite link copied.");
-    } catch (_err) {
+    } catch {
       showErrorToast("Failed to copy invite link.");
     }
   };

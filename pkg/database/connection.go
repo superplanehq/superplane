@@ -106,6 +106,7 @@ func TruncateTables() error {
 			casbin_rule,
 			role_metadata,
 			group_metadata,
+			installation_metadata,
 			blueprints,
 			workflows,
 			workflow_nodes,

@@ -5,6 +5,7 @@ import type {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
+  OutputPayload,
   SubtitleContext,
 } from "./types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
@@ -17,6 +18,53 @@ import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 const SSH_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
 };
+
+type SSHResultPayload = {
+  stdout?: string;
+  stderr?: string;
+  Stdout?: string;
+  Stderr?: string;
+  exitCode?: number | string;
+  ExitCode?: number | string;
+};
+
+function extractSSHResultFromPayload(payload: unknown): SSHResultPayload | undefined {
+  if (!payload || typeof payload !== "object") {
+    return undefined;
+  }
+
+  return payload as SSHResultPayload;
+}
+
+function getSSHResult(execution: ExecutionInfo): SSHResultPayload | undefined {
+  const outputs = execution.outputs as
+    | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
+    | undefined;
+
+  const payloadResult =
+    extractSSHResultFromPayload(outputs?.failed?.[0]?.data) ??
+    extractSSHResultFromPayload(outputs?.success?.[0]?.data) ??
+    extractSSHResultFromPayload(outputs?.default?.[0]?.data);
+  if (payloadResult) {
+    return payloadResult;
+  }
+
+  const metadata = execution.metadata as Record<string, unknown> | undefined;
+  return extractSSHResultFromPayload(metadata?.result);
+}
+
+function getSSHExitCode(execution: ExecutionInfo): number | undefined {
+  const result = getSSHResult(execution);
+  const code = result?.exitCode ?? result?.ExitCode;
+  if (typeof code === "number") {
+    return Number.isFinite(code) ? code : undefined;
+  }
+  if (typeof code === "string" && code.trim() !== "") {
+    const parsed = Number(code);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
 
 const sshStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
@@ -38,13 +86,19 @@ const sshStateFunction = (execution: ExecutionInfo): EventState => {
   }
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const metadata = execution.metadata as Record<string, unknown> | undefined;
-    const result = metadata?.result as { exitCode?: number; ExitCode?: number } | undefined;
-    const code = result?.exitCode ?? result?.ExitCode;
+    const outputs = execution.outputs as { failed?: OutputPayload[] } | undefined;
+    if (outputs?.failed?.length) {
+      return "failed";
+    }
+
+    const code = getSSHExitCode(execution);
     if (code === 0) {
       return "success";
     }
-    return "failed";
+    if (typeof code === "number") {
+      return "failed";
+    }
+    return "success";
   }
 
   return "failed";
@@ -87,7 +141,7 @@ export const sshMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
     const metadata = context.execution.metadata as Record<string, unknown> | undefined;
-    const result = metadata?.result as { stdout?: string; stderr?: string; exitCode?: number } | undefined;
+    const result = getSSHResult(context.execution);
     const host = metadata?.host as string | undefined;
     const port = metadata?.port as number | undefined;
     const username = metadata?.user as string | undefined;
@@ -112,17 +166,17 @@ export const sshMapper: ComponentBaseMapper = {
       details["Connection retry"] = `${retryAttempt} / ${retryConfig.retries ?? "?"}`;
     }
 
-    if (result?.exitCode !== undefined) {
-      details["Exit code"] = String(result.exitCode);
+    const exitCode = getSSHExitCode(context.execution);
+    if (exitCode !== undefined) {
+      details["Exit code"] = String(exitCode);
     }
-    if (result?.stdout !== undefined && result.stdout !== "") {
-      details["Stdout"] = result.stdout;
+    const stdout = result?.stdout ?? result?.Stdout;
+    if (stdout !== undefined && stdout !== "") {
+      details["Stdout"] = stdout;
     }
-    if (result?.stderr !== undefined && result.stderr !== "") {
-      details["Stderr"] = result.stderr;
-    }
-    if (context.execution.resultMessage) {
-      details["Error"] = context.execution.resultMessage;
+    const stderr = result?.stderr ?? result?.Stderr;
+    if (stderr !== undefined && stderr !== "") {
+      details["Stderr"] = stderr;
     }
 
     return details;
@@ -142,9 +196,8 @@ export const sshMapper: ComponentBaseMapper = {
     }
 
     if (state === "success" || state === "failed") {
-      const metadata = context.execution.metadata as Record<string, unknown> | undefined;
-      const result = metadata?.result as { exitCode?: number } | undefined;
-      const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
+      const exitCode = getSSHExitCode(context.execution);
+      const exitStr = exitCode !== undefined ? `Exit ${exitCode}` : "";
       if (exitStr && context.execution.updatedAt) {
         return renderWithTimeAgo(exitStr, new Date(context.execution.updatedAt));
       }
@@ -203,9 +256,8 @@ function getSSHEventSections(
         : `Running for ${Math.floor(durationMs / 60000)}m`;
     }
     if (state === "success" || state === "failed") {
-      const metadata = execution.metadata as Record<string, unknown> | undefined;
-      const result = metadata?.result as { exitCode?: number } | undefined;
-      const exitStr = result?.exitCode !== undefined ? `Exit ${result.exitCode}` : "";
+      const exitCode = getSSHExitCode(execution);
+      const exitStr = exitCode !== undefined ? `Exit ${exitCode}` : "";
       if (exitStr && execution.updatedAt) return renderWithTimeAgo(exitStr, new Date(execution.updatedAt));
       if (execution.updatedAt) return renderTimeAgo(new Date(execution.updatedAt));
     }

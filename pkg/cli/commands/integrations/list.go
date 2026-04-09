@@ -17,11 +17,11 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if !me.HasOrganizationId() {
+	if !me.User.HasOrganizationId() {
 		return fmt.Errorf("organization id not found for authenticated user")
 	}
 
-	connectedResponse, _, err := ctx.API.OrganizationAPI.OrganizationsListIntegrations(ctx.Context, me.GetOrganizationId()).Execute()
+	connectedResponse, _, err := ctx.API.OrganizationAPI.OrganizationsListIntegrations(ctx.Context, me.User.GetOrganizationId()).Execute()
 	if err != nil {
 		return err
 	}
@@ -42,6 +42,11 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		if len(connected) == 0 {
+			_, err := fmt.Fprintln(stdout, "No integrations found.")
+			return err
+		}
+
 		writer := tabwriter.NewWriter(stdout, 0, 8, 2, ' ', 0)
 		_, _ = fmt.Fprintln(writer, "ID\tNAME\tINTEGRATION\tLABEL\tDESCRIPTION\tSTATE")
 		for _, integration := range connected {

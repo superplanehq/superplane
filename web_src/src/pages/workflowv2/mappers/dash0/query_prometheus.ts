@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { QueryPrometheusConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const queryPrometheusMapper: ComponentBaseMapper = {
@@ -54,7 +55,7 @@ export const queryPrometheusMapper: ComponentBaseMapper = {
     try {
       const formatted = JSON.stringify(responseData, null, 2);
       details["Response Data"] = formatted;
-    } catch (error) {
+    } catch {
       details["Response Data"] = String(responseData);
     }
 
@@ -72,8 +73,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.query) {
     // Show a preview of the query (first 50 chars)
-    const queryPreview =
-      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
+    const queryPreview = truncate(configuration.query, 50);
     metadata.push({ icon: "code", label: queryPreview });
   }
 

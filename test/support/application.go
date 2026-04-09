@@ -7,6 +7,88 @@ import (
 )
 
 //
+// Dummy trigger implementation for testing
+//
+
+type DummyTriggerOptions struct {
+	SetupFunc         func(ctx core.TriggerContext) error
+	HandleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
+	CleanupFunc       func(ctx core.SetupContext) error
+}
+
+type DummyTrigger struct {
+	setupFunc         func(ctx core.TriggerContext) error
+	handleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
+	cleanupFunc       func(ctx core.SetupContext) error
+}
+
+func NewDummyTrigger(options DummyTriggerOptions) *DummyTrigger {
+	return &DummyTrigger{
+		setupFunc:         options.SetupFunc,
+		handleWebhookFunc: options.HandleWebhookFunc,
+		cleanupFunc:       options.CleanupFunc,
+	}
+}
+
+func (t *DummyTrigger) Name() string {
+	return "dummy"
+}
+
+func (t *DummyTrigger) Label() string {
+	return "dummy"
+}
+
+func (t *DummyTrigger) Description() string {
+	return "Just a dummy trigger used in unit tests"
+}
+
+func (t *DummyTrigger) Documentation() string {
+	return ""
+}
+
+func (t *DummyTrigger) Icon() string {
+	return "dummy"
+}
+
+func (t *DummyTrigger) Color() string {
+	return "dummy"
+}
+
+func (t *DummyTrigger) ExampleData() map[string]any {
+	return nil
+}
+
+func (t *DummyTrigger) Configuration() []configuration.Field {
+	return nil
+}
+
+func (t *DummyTrigger) Actions() []core.Action {
+	return nil
+}
+
+func (t *DummyTrigger) Setup(ctx core.TriggerContext) error {
+	if t.setupFunc == nil {
+		return nil
+	}
+	return t.setupFunc(ctx)
+}
+
+func (t *DummyTrigger) HandleAction(ctx core.TriggerActionContext) (map[string]any, error) {
+	return nil, nil
+}
+
+func (t *DummyTrigger) Cleanup(ctx core.TriggerContext) error {
+	return nil
+}
+
+func (t *DummyTrigger) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	if t.handleWebhookFunc == nil {
+		return 200, nil, nil
+	}
+	return t.handleWebhookFunc(ctx)
+}
+
+//
 // Dummy application implementation for testing
 //
 
@@ -132,31 +214,34 @@ func (t *DummyComponent) Cleanup(ctx core.SetupContext) error {
 }
 
 type DummyIntegration struct {
-	components   []core.Component
-	triggers     []core.Trigger
-	actions      []core.Action
-	handleAction func(ctx core.IntegrationActionContext) error
-	onSync       func(ctx core.SyncContext) error
-	onCleanup    func(ctx core.IntegrationCleanupContext) error
+	components    []core.Component
+	triggers      []core.Trigger
+	actions       []core.Action
+	handleAction  func(ctx core.IntegrationActionContext) error
+	onSync        func(ctx core.SyncContext) error
+	onCleanup     func(ctx core.IntegrationCleanupContext) error
+	listResources func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 }
 
 type DummyIntegrationOptions struct {
-	Components   []core.Component
-	Triggers     []core.Trigger
-	Actions      []core.Action
-	HandleAction func(ctx core.IntegrationActionContext) error
-	OnSync       func(ctx core.SyncContext) error
-	OnCleanup    func(ctx core.IntegrationCleanupContext) error
+	Components    []core.Component
+	Triggers      []core.Trigger
+	Actions       []core.Action
+	HandleAction  func(ctx core.IntegrationActionContext) error
+	OnSync        func(ctx core.SyncContext) error
+	OnCleanup     func(ctx core.IntegrationCleanupContext) error
+	ListResources func(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error)
 }
 
 func NewDummyIntegration(options DummyIntegrationOptions) *DummyIntegration {
 	return &DummyIntegration{
-		components:   options.Components,
-		triggers:     options.Triggers,
-		actions:      options.Actions,
-		handleAction: options.HandleAction,
-		onSync:       options.OnSync,
-		onCleanup:    options.OnCleanup,
+		components:    options.Components,
+		triggers:      options.Triggers,
+		actions:       options.Actions,
+		handleAction:  options.HandleAction,
+		onSync:        options.OnSync,
+		onCleanup:     options.OnCleanup,
+		listResources: options.ListResources,
 	}
 }
 
@@ -218,6 +303,9 @@ func (t *DummyIntegration) Cleanup(ctx core.IntegrationCleanupContext) error {
 }
 
 func (t *DummyIntegration) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if t.listResources != nil {
+		return t.listResources(resourceType, ctx)
+	}
 	return []core.IntegrationResource{}, nil
 }
 

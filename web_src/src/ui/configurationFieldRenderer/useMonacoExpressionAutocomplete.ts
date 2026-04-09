@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { Monaco } from "@monaco-editor/react";
-import type { editor as MonacoEditor, IDisposable, languages as MonacoLanguages } from "monaco-editor";
+import type { editor as MonacoEditor, IDisposable, IPosition, languages as MonacoLanguages } from "monaco-editor";
 import { getSuggestions } from "@/components/AutoCompleteInput/core";
 
 type ModelContext = {
@@ -17,6 +17,16 @@ type UseMonacoExpressionAutocompleteProps = {
   prefix?: string;
   suffix?: string;
   allowOutsideExpression?: boolean;
+};
+
+type MonacoKeyEvent = {
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  browserEvent: {
+    key?: string;
+  };
+  keyCode: number;
 };
 
 const suggestionSortPriority = {
@@ -65,7 +75,7 @@ const normalizeBracketQuotes = (insertText: string) => {
   return next;
 };
 
-const shouldTriggerForKey = (event: any, monaco: Monaco) => {
+const shouldTriggerForKey = (event: MonacoKeyEvent, monaco: Monaco) => {
   if (event.ctrlKey || event.metaKey || event.altKey) {
     return false;
   }
@@ -200,7 +210,7 @@ export const useMonacoExpressionAutocomplete = ({
       if (!providerRegistry.has(languageId)) {
         const disposable = monaco.languages.registerCompletionItemProvider(languageId, {
           triggerCharacters: ["$", ".", "[", "'", '"'],
-          provideCompletionItems: (completionModel, position) => {
+          provideCompletionItems: (completionModel: MonacoEditor.ITextModel, position: IPosition) => {
             const context = modelContextMap.get(completionModel);
             if (!context) {
               return { suggestions: [] };

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { QueryClient } from "@tanstack/react-query";
-import {
+import type { QueryClient } from "@tanstack/react-query";
+import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasEvent,
@@ -9,7 +9,12 @@ import {
   CanvasesListNodeQueueItemsResponse,
   CanvasesListNodeEventsResponse,
 } from "@/api-client";
-import { nodeExecutionsQueryOptions, nodeQueueItemsQueryOptions, nodeEventsQueryOptions } from "@/hooks/useCanvasData";
+import {
+  NODE_EXECUTION_HISTORY_PAGE_SIZE,
+  nodeExecutionsQueryOptions,
+  nodeQueueItemsQueryOptions,
+  nodeEventsQueryOptions,
+} from "@/hooks/useCanvasData";
 
 interface NodeExecutionData {
   executions: CanvasesCanvasNodeExecution[];
@@ -161,7 +166,9 @@ async function fetchNodeData(
 ): Promise<[CanvasesListNodeExecutionsResponse, CanvasesListNodeQueueItemsResponse, CanvasesListNodeEventsResponse]> {
   return await Promise.all([
     nodeType !== "TYPE_TRIGGER"
-      ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
+      ? queryClient.fetchQuery(
+          nodeExecutionsQueryOptions(workflowId, nodeId, { limit: NODE_EXECUTION_HISTORY_PAGE_SIZE }),
+        )
       : Promise.resolve({ executions: [] }),
     nodeType !== "TYPE_TRIGGER"
       ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
@@ -187,17 +194,6 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
       initialData.set(execution.nodeId, {
         ...existing,
         executions: [execution],
-      });
-    });
-
-    // Populate with next queue items from workflow.status
-    workflow.status?.nextQueueItems?.forEach((item) => {
-      if (!item.nodeId) return;
-
-      const existing = initialData.get(item.nodeId) || { ...emptyNodeData };
-      initialData.set(item.nodeId, {
-        ...existing,
-        queueItems: [item],
       });
     });
 
@@ -252,7 +248,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (_error) {
+    } catch {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);
@@ -291,7 +287,9 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         CanvasesListNodeEventsResponse,
       ] = await Promise.all([
         nodeType !== "TYPE_TRIGGER"
-          ? queryClient.fetchQuery(nodeExecutionsQueryOptions(workflowId, nodeId))
+          ? queryClient.fetchQuery(
+              nodeExecutionsQueryOptions(workflowId, nodeId, { limit: NODE_EXECUTION_HISTORY_PAGE_SIZE }),
+            )
           : Promise.resolve({ executions: [] }),
         nodeType !== "TYPE_TRIGGER"
           ? queryClient.fetchQuery(nodeQueueItemsQueryOptions(workflowId, nodeId))
@@ -316,7 +314,7 @@ export const useNodeExecutionStore = create<NodeExecutionStore>((set, get) => ({
         });
         return { data: newData, version: state.version + 1 };
       });
-    } catch (_error) {
+    } catch {
       // Mark as not loading on error
       set((state) => {
         const newData = new Map(state.data);

@@ -62,7 +62,7 @@ type SetupOptions struct {
 	Approvals int
 }
 
-func Setup(t *testing.T) *ResourceRegistry {
+func Setup(t require.TestingT) *ResourceRegistry {
 	return SetupWithOptions(t, SetupOptions{
 		Source:    true,
 		Stage:     true,
@@ -70,7 +70,7 @@ func Setup(t *testing.T) *ResourceRegistry {
 	})
 }
 
-func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
+func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
 	encryptor := crypto.NewNoOpEncryptor()
@@ -97,6 +97,22 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	}
 
 	account, err := models.CreateAccountInTransaction(tx, "test@example.com", "test")
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	accountProvider := &models.AccountProvider{
+		AccountID:  account.ID,
+		Provider:   "github",
+		ProviderID: "testuser",
+		Username:   "testuser",
+		Email:      account.Email,
+		Name:       account.Name,
+		AvatarURL:  "https://github.com/testuser.png",
+	}
+
+	err = tx.Create(accountProvider).Error
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
@@ -139,13 +155,13 @@ func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
 }
 
-func AuthService(t *testing.T) *authorization.AuthService {
+func AuthService(t require.TestingT) *authorization.AuthService {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 	return authService
 }
 
-func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
+func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
 	tx := database.Conn().Begin()
 	organization, err := models.CreateOrganizationInTransaction(tx, RandomName("org"), RandomName("org-display"))
 	if !assert.NoError(t, err) {
@@ -178,12 +194,12 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	return user
 }
 
-func EmitCanvasEventForNode(t *testing.T, canvasID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.CanvasEvent {
+func EmitCanvasEventForNode(t require.TestingT, canvasID uuid.UUID, nodeID string, channel string, executionID *uuid.UUID) *models.CanvasEvent {
 	return EmitCanvasEventForNodeWithData(t, canvasID, nodeID, channel, executionID, map[string]any{"key": "value"})
 }
 
 func EmitCanvasEventForNodeWithData(
-	t *testing.T,
+	t require.TestingT,
 	canvasID uuid.UUID,
 	nodeID string,
 	channel string,
@@ -206,7 +222,7 @@ func EmitCanvasEventForNodeWithData(
 	return &event
 }
 
-func CreateQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) *models.CanvasNodeQueueItem {
+func CreateQueueItem(t require.TestingT, workflowID uuid.UUID, nodeID string, rootEventID uuid.UUID, eventID uuid.UUID) *models.CanvasNodeQueueItem {
 	now := time.Now()
 
 	queueItem := models.CanvasNodeQueueItem{
@@ -224,7 +240,7 @@ func CreateQueueItem(t *testing.T, workflowID uuid.UUID, nodeID string, rootEven
 }
 
 func CreateNodeExecutionWithConfiguration(
-	t *testing.T,
+	t require.TestingT,
 	workflowID uuid.UUID,
 	nodeID string,
 	rootEventID uuid.UUID,
@@ -252,7 +268,7 @@ func CreateNodeExecutionWithConfiguration(
 }
 
 func CreateCanvasNodeExecution(
-	t *testing.T,
+	t require.TestingT,
 	canvasID uuid.UUID,
 	nodeID string,
 	rootEventID uuid.UUID,
@@ -279,7 +295,7 @@ func CreateCanvasNodeExecution(
 }
 
 func CreateNextNodeExecution(
-	t *testing.T,
+	t require.TestingT,
 	workflowID uuid.UUID,
 	nodeID string,
 	rootEventID uuid.UUID,
@@ -305,7 +321,7 @@ func CreateNextNodeExecution(
 	return &execution
 }
 
-func CreateCanvas(t *testing.T, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
+func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
 	canvasVersioningEnabled, err := models.IsCanvasVersioningEnabled(orgID)
@@ -418,7 +434,7 @@ func CreateBlueprint(t *testing.T, orgID uuid.UUID, nodes []models.Node, edges [
 	return &blueprint
 }
 
-func VerifyCanvasEventsCount(t *testing.T, canvasID uuid.UUID, expected int) {
+func VerifyCanvasEventsCount(t require.TestingT, canvasID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
@@ -431,7 +447,7 @@ func VerifyCanvasEventsCount(t *testing.T, canvasID uuid.UUID, expected int) {
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyCanvasNodeEventsCount(t *testing.T, canvasID uuid.UUID, nodeID string, expected int) {
+func VerifyCanvasNodeEventsCount(t require.TestingT, canvasID uuid.UUID, nodeID string, expected int) {
 	var actual int64
 
 	err := database.Conn().
@@ -445,7 +461,7 @@ func VerifyCanvasNodeEventsCount(t *testing.T, canvasID uuid.UUID, nodeID string
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeExecutionsCount(t require.TestingT, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
@@ -458,7 +474,7 @@ func VerifyNodeExecutionsCount(t *testing.T, workflowID uuid.UUID, expected int)
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeQueueCount(t require.TestingT, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
@@ -471,7 +487,7 @@ func VerifyNodeQueueCount(t *testing.T, workflowID uuid.UUID, expected int) {
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyNodeExecutionKVCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeExecutionKVCount(t require.TestingT, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
@@ -484,7 +500,7 @@ func VerifyNodeExecutionKVCount(t *testing.T, workflowID uuid.UUID, expected int
 	require.Equal(t, expected, int(actual))
 }
 
-func VerifyNodeRequestCount(t *testing.T, workflowID uuid.UUID, expected int) {
+func VerifyNodeRequestCount(t require.TestingT, workflowID uuid.UUID, expected int) {
 	var actual int64
 
 	err := database.Conn().
@@ -497,7 +513,7 @@ func VerifyNodeRequestCount(t *testing.T, workflowID uuid.UUID, expected int) {
 	require.Equal(t, expected, int(actual))
 }
 
-func ensureCanvasNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string) {
+func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID string) {
 	var existingNode models.CanvasNode
 	err := database.Conn().
 		Where("workflow_id = ? AND node_id = ?", workflowID, nodeID).
@@ -527,7 +543,7 @@ func ensureCanvasNodeExists(t *testing.T, workflowID uuid.UUID, nodeID string) {
 	require.NoError(t, database.Conn().Create(&node).Error)
 }
 
-func expandBlueprintNodes(t *testing.T, orgID uuid.UUID, nodes []models.Node) ([]models.Node, error) {
+func expandBlueprintNodes(t require.TestingT, orgID uuid.UUID, nodes []models.Node) ([]models.Node, error) {
 	expanded := make([]models.Node, 0, len(nodes))
 
 	for _, n := range nodes {

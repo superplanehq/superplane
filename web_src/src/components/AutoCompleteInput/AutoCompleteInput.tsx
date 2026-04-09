@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
-import { getSuggestions, Suggestion } from "./core";
+import type { Suggestion } from "./core";
+import { getSuggestions } from "./core";
 import { Eye, EyeOff } from "lucide-react";
 import { evaluateExpr, formatExprResult } from "@/lib/exprEvaluator";
 
@@ -27,6 +28,8 @@ const suggestionSortPriority = {
   root: 2,
   previous: 3,
 } as const;
+
+type IndexableValue = Record<string, unknown> | null | undefined;
 
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
@@ -652,7 +655,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           if (!next) return cur;
           if (next.t !== "ident") return undefined;
           try {
-            cur = (cur as any)?.[next.v];
+            cur = (cur as IndexableValue)?.[next.v];
           } catch {
             return undefined;
           }
@@ -662,7 +665,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
 
         if (tok.t === "key") {
           try {
-            cur = (cur as any)?.[tok.v];
+            cur = (cur as IndexableValue)?.[tok.v];
           } catch {
             return undefined;
           }
@@ -734,7 +737,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
           continue;
         }
         if (ch === "(") {
-          if (parenDepth == 0) {
+          if (parenDepth === 0) {
             return s.slice(i + 1).trim();
           }
           parenDepth = Math.max(0, parenDepth - 1);

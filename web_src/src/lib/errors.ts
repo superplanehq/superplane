@@ -25,9 +25,9 @@ export async function getResponseErrorMessage(response: Response, fallback = "An
 
   try {
     const parsedBody = JSON.parse(trimmedBody) as unknown;
-    return getApiErrorMessage(parsedBody, trimmedBody);
+    return getApiErrorMessage(parsedBody, fallback);
   } catch {
-    return trimmedBody;
+    return getApiErrorMessage(trimmedBody, fallback);
   }
 }
 
@@ -66,5 +66,30 @@ function getNonEmptyString(value: unknown): string | null {
   }
 
   const trimmed = value.trim();
-  return trimmed ? value : null;
+  if (!trimmed || looksLikeHtmlDocument(trimmed) || looksLikeBrowserNetworkError(trimmed)) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function looksLikeHtmlDocument(value: string): boolean {
+  const normalized = value.slice(0, 1024).trim().toLowerCase();
+
+  return (
+    normalized.startsWith("<!doctype html") ||
+    normalized.startsWith("<html") ||
+    (normalized.includes("<html") && normalized.includes("</html>"))
+  );
+}
+
+function looksLikeBrowserNetworkError(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+
+  return (
+    normalized === "failed to fetch" ||
+    normalized === "load failed" ||
+    normalized === "network request failed" ||
+    normalized.includes("networkerror when attempting to fetch resource")
+  );
 }

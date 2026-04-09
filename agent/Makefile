@@ -1,8 +1,23 @@
-.PHONY: db.create db.delete db.migration.create db.migrate
+.PHONY: db.create db.delete db.migration.create db.migrate lint lint.fix format format.check typecheck
 
 COMPOSE=docker compose -f ../docker-compose.dev.yml
 DB_NAME ?= agents_dev
 DB_PASSWORD ?= the-cake-is-a-lie
+
+lint:
+	$(COMPOSE) run --rm agent uv run --group dev ruff check
+
+lint.fix:
+	$(COMPOSE) run --rm agent uv run --group dev ruff check --fix
+
+format:
+	$(COMPOSE) run --rm agent uv run --group dev ruff format
+
+format.check:
+	$(COMPOSE) run --rm agent uv run --group dev ruff format --check
+
+typecheck:
+	$(COMPOSE) run --rm agent bash -c "uv sync --group dev && .venv/bin/python -m mypy"
 
 db.create:
 	-$(COMPOSE) run --rm -e PGPASSWORD=$(DB_PASSWORD) app createdb -h db -p 5432 -U postgres $(DB_NAME)

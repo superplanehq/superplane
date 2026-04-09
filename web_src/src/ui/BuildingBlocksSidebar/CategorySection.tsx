@@ -6,7 +6,6 @@ import { useState } from "react";
 import { toTestId } from "../../lib/testID";
 import { getComponentSubtype } from "../buildingBlocks";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import { BuildingBlockPreview } from "./BuildingBlockPreview";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const SUBTYPE_HOVER_BG: Record<string, string> = {
@@ -82,61 +81,59 @@ function BlockItem({
   const badgeColor = SUBTYPE_BADGE_COLOR[subtype] || SUBTYPE_BADGE_COLOR.action;
 
   return (
-    <BuildingBlockPreview block={block}>
-      <Item
-        data-testid={toTestId(`building-block-${block.name}`)}
-        draggable
-        onClick={() => {
-          if (onBlockClick) onBlockClick(block);
-        }}
-        onMouseEnter={() => {
-          setHoveredBlock(block);
-        }}
-        onMouseLeave={() => {
-          setHoveredBlock(null);
-        }}
-        onDragStart={(e) => {
-          isDraggingRef.current = true;
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
-          setupDragPreview(e, dragPreviewRef, canvasZoom);
-        }}
-        onDragEnd={() => {
-          isDraggingRef.current = false;
-          setHoveredBlock(null);
-        }}
-        className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${hoverBg}`}
-        size="sm"
-      >
-        <ItemMedia>
-          {appIconSrc ? (
-            <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
-          ) : (
-            <IconComponent size={14} className="text-gray-500" />
-          )}
-        </ItemMedia>
+    <Item
+      data-testid={toTestId(`building-block-${block.name}`)}
+      draggable
+      onClick={() => {
+        if (onBlockClick) onBlockClick(block);
+      }}
+      onMouseEnter={() => {
+        setHoveredBlock(block);
+      }}
+      onMouseLeave={() => {
+        setHoveredBlock(null);
+      }}
+      onDragStart={(e) => {
+        isDraggingRef.current = true;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
+        setupDragPreview(e, dragPreviewRef, canvasZoom);
+      }}
+      onDragEnd={() => {
+        isDraggingRef.current = false;
+        setHoveredBlock(null);
+      }}
+      className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${hoverBg}`}
+      size="sm"
+    >
+      <ItemMedia>
+        {appIconSrc ? (
+          <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
+        ) : (
+          <IconComponent size={14} className="text-gray-500" />
+        )}
+      </ItemMedia>
 
-        <ItemContent>
-          <div className="flex items-center gap-2 w-full min-w-0">
-            <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
-              <span className="block min-w-0 truncate">{block.label || block.name}</span>
-            </ItemTitle>
-            <span
-              className={`inline-block text-left px-1.5 py-0.5 text-[11px] font-medium ${badgeColor} rounded whitespace-nowrap flex-shrink-0 ml-auto`}
-            >
-              {SUBTYPE_LABEL[subtype] || "Action"}
+      <ItemContent>
+        <div className="flex items-center gap-2 w-full min-w-0">
+          <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
+            <span className="block min-w-0 truncate">{block.label || block.name}</span>
+          </ItemTitle>
+          <span
+            className={`inline-block text-left px-1.5 py-0.5 text-[11px] font-medium ${badgeColor} rounded whitespace-nowrap flex-shrink-0 ml-auto`}
+          >
+            {SUBTYPE_LABEL[subtype] || "Action"}
+          </span>
+          {block.deprecated && (
+            <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
+              Deprecated
             </span>
-            {block.deprecated && (
-              <span className="px-1.5 py-0.5 text-[11px] font-medium bg-gray-950/5 text-gray-500 rounded whitespace-nowrap flex-shrink-0">
-                Deprecated
-              </span>
-            )}
-          </div>
-        </ItemContent>
+          )}
+        </div>
+      </ItemContent>
 
-        <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
-      </Item>
-    </BuildingBlockPreview>
+      <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
+    </Item>
   );
 }
 
@@ -234,8 +231,6 @@ export function CategorySection({
     CategoryIcon = resolveIcon("zap");
   } else if (category.name === "Memory") {
     CategoryIcon = resolveIcon("database");
-  } else if (category.name === "Bundles") {
-    CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {
     CategoryIcon = resolveIcon("mail");
   } else if (categoryIconSrc) {

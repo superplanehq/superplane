@@ -16,11 +16,11 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	organizationLabel := response.GetOrganizationId()
+	organizationLabel := response.User.GetOrganizationId()
 	var versioningEnabled *bool
-	if response.HasOrganizationId() && response.GetOrganizationId() != "" {
+	if response.User.HasOrganizationId() && response.User.GetOrganizationId() != "" {
 		orgResponse, _, err := ctx.API.OrganizationAPI.
-			OrganizationsDescribeOrganization(ctx.Context, response.GetOrganizationId()).
+			OrganizationsDescribeOrganization(ctx.Context, response.User.GetOrganizationId()).
 			Execute()
 
 		if err == nil && orgResponse != nil && orgResponse.Organization != nil && orgResponse.Organization.Metadata != nil {
@@ -46,9 +46,9 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 				}
 			}
 
-			_, _ = fmt.Fprintf(stdout, "ID: %s\n", response.GetId())
-			_, _ = fmt.Fprintf(stdout, "Email: %s\n", response.GetEmail())
-			_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", response.GetOrganizationId())
+			_, _ = fmt.Fprintf(stdout, "ID: %s\n", response.User.GetId())
+			_, _ = fmt.Fprintf(stdout, "Email: %s\n", response.User.GetEmail())
+			_, _ = fmt.Fprintf(stdout, "Organization ID: %s\n", response.User.GetOrganizationId())
 			_, _ = fmt.Fprintf(stdout, "Organization: %s\n", organizationLabel)
 			_, _ = fmt.Fprintf(stdout, "Canvas Versioning: %s\n", versioningLabel)
 			return nil
@@ -56,19 +56,18 @@ func (w *whoamiCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.Render(map[string]any{
-		"id":                response.GetId(),
-		"email":             response.GetEmail(),
-		"organizationId":    response.GetOrganizationId(),
+		"id":                response.User.GetId(),
+		"email":             response.User.GetEmail(),
+		"organizationId":    response.User.GetOrganizationId(),
 		"organizationName":  organizationLabel,
 		"versioningEnabled": versioningEnabled,
 	})
 }
 
 var whoamiCmd = &cobra.Command{
-	Use:     "whoami",
-	Short:   "Get information about the currently authenticated user",
-	Aliases: []string{"events"},
-	Args:    cobra.NoArgs,
+	Use:   "whoami",
+	Short: "Get information about the currently authenticated user",
+	Args:  cobra.NoArgs,
 }
 
 func init() {

@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { meRegenerateToken } from "../../../api-client/sdk.gen";
-import type { SuperplaneMeUser } from "../../../api-client/types.gen";
-import { Avatar } from "../../../components/Avatar/avatar";
-import { Heading } from "../../../components/Heading/heading";
-import { Icon } from "../../../components/Icon";
-import { Input } from "../../../components/Input/input";
-import { Text } from "../../../components/Text/text";
+import { meRegenerateToken } from "@/api-client/sdk.gen";
+import { Avatar } from "@/components/Avatar/avatar";
+import { Heading } from "@/components/Heading/heading";
+import { Icon } from "@/components/Icon";
+import { Input } from "@/components/Input/input";
+import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { withOrganizationHeader } from "../../../lib/withOrganizationHeader";
-import { useOrganizationId } from "../../../hooks/useOrganizationId";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
+import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
 
 export function Profile() {
   usePageTitle(["Profile"]);
@@ -34,15 +34,7 @@ export function Profile() {
       const response = await meRegenerateToken(withOrganizationHeader({ organizationId }));
       setToken(response.data.token || "");
       setTokenVisible(true);
-      // Update user to reflect token existence
-      if (organizationId) {
-        queryClient.setQueryData<SuperplaneMeUser | null>(meKeys.me(organizationId), (currentUser) => {
-          if (!currentUser) {
-            return currentUser;
-          }
-          return { ...currentUser, hasToken: true };
-        });
-      }
+      queryClient.invalidateQueries({ queryKey: meKeys.me(organizationId!, true) });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
     } finally {
@@ -50,8 +42,15 @@ export function Profile() {
     }
   };
 
-  const copyToken = () => {
-    navigator.clipboard.writeText(token);
+  const copyToken = async () => {
+    if (!token) return;
+
+    try {
+      await navigator.clipboard.writeText(token);
+      showSuccessToast("API token copied.");
+    } catch {
+      showErrorToast("Failed to copy API token.");
+    }
   };
 
   if (loading) {

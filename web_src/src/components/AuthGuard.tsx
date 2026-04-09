@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useAccount } from "../contexts/AccountContext";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -10,14 +10,16 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { account, loading } = useAccount();
   const navigate = useNavigate();
   const location = useLocation();
+  const shouldRedirectToLogin = !loading && !account;
 
-  // If account is not loaded and not loading, redirect to login
-  if (!loading && !account) {
-    console.log("[AuthGuard] No account, redirecting to organization select from:", location.pathname);
+  useEffect(() => {
+    if (!shouldRedirectToLogin) {
+      return;
+    }
+
     const redirectParam = encodeURIComponent(`${location.pathname}${location.search}`);
     navigate(`/login?redirect=${redirectParam}`, { replace: true });
-    return null;
-  }
+  }, [location.pathname, location.search, navigate, shouldRedirectToLogin]);
 
   // Show loading spinner while fetching account
   if (loading) {
@@ -29,6 +31,10 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         </div>
       </div>
     );
+  }
+
+  if (shouldRedirectToLogin) {
+    return null;
   }
 
   // Account is authenticated, render the protected content

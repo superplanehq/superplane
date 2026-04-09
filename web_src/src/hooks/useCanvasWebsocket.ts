@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
-import { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
+import type { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { canvasKeys } from "./useCanvasData";
 
@@ -34,7 +34,7 @@ export function useCanvasWebsocket(
   onNodeEvent?: (nodeId: string, event: string) => void,
   onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void,
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
-  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => void,
+  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void,
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
@@ -62,9 +62,15 @@ export function useCanvasWebsocket(
             const workflowEvent = payload as CanvasesCanvasEvent;
             nodeExecutionStore.updateNodeEvent(workflowEvent.nodeId!, workflowEvent);
 
-            queryClient.invalidateQueries({
-              queryKey: canvasKeys.infiniteEvents(canvasId),
-            });
+            /*
+             * We only invalidate the canvas root events query
+             * if the event being received is a root canvas event.
+             */
+            if (workflowEvent.root) {
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.infiniteEvents(canvasId),
+              });
+            }
 
             onNodeEvent?.(workflowEvent.nodeId!, data.event);
             onWorkflowEvent?.(workflowEvent, data.event);
@@ -102,10 +108,6 @@ export function useCanvasWebsocket(
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.addNodeQueueItem(queueItem.nodeId!, queueItem);
 
-            queryClient.invalidateQueries({
-              queryKey: canvasKeys.infiniteEvents(canvasId),
-            });
-
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
@@ -113,10 +115,6 @@ export function useCanvasWebsocket(
           if (payload && "nodeId" in payload && payload.nodeId && "id" in payload && payload.id) {
             const queueItem = payload as CanvasesCanvasNodeQueueItem;
             nodeExecutionStore.removeNodeQueueItem(queueItem.nodeId!, queueItem.id!);
-
-            queryClient.invalidateQueries({
-              queryKey: canvasKeys.infiniteEvents(canvasId),
-            });
 
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
@@ -134,11 +132,18 @@ export function useCanvasWebsocket(
             break;
           }
 
-          onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, data.event);
+          const shouldInvalidateLifecycleQueries =
+            onCanvasLifecycleEvent?.(canvasMessage as CanvasWebsocketPayload, data.event) !== false;
 
           if (data.event === "canvas_deleted") {
-            queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
-            queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+            if (shouldInvalidateLifecycleQueries) {
+              queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
+              queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+            }
+            break;
+          }
+
+          if (!shouldInvalidateLifecycleQueries) {
             break;
           }
 

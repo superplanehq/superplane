@@ -1,0 +1,61 @@
+version: v1.0
+name: "Build and Push SuperPlane Agent Image"
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: DOCKER_BUILDKIT
+      value: "1"
+    - name: AGENT_IMAGE_REPO
+      value: "ghcr.io/superplanehq/superplane-agent"
+
+  secrets:
+    - name: ghcr-push-token
+
+  prologue:
+    commands:
+      - git clone https://github.com/superplanehq/superplane.git
+      - cd superplane
+      - touch agent/.env
+      - git checkout "$REL_SHA"
+      - echo "$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
+
+blocks:
+  - name: "amd64 Image"
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: f1-standard-2
+          os_image: ubuntu2204
+
+      jobs:
+        - name: "Build"
+          commands:
+            - bash release/agent-image/build.sh "$REL_VERSION" "amd64"
+
+  - name: "arm64 Image"
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: r1-standard-4
+          os_image: ubuntu2404
+
+      jobs:
+        - name: "Build"
+          commands:
+            - bash release/agent-image/build.sh "$REL_VERSION" "arm64"
+
+  - name: "Build Multi-Platform Manifest"
+    dependencies: ["amd64 Image", "arm64 Image"]
+    task:
+      jobs:
+        - name: "Create and Push Manifest"
+          commands:
+            - docker manifest create "$AGENT_IMAGE_REPO:$REL_VERSION" "$AGENT_IMAGE_REPO:$REL_VERSION-amd64" "$AGENT_IMAGE_REPO:$REL_VERSION-arm64"
+            - docker manifest push $AGENT_IMAGE_REPO:$REL_VERSION

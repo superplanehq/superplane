@@ -1,7 +1,7 @@
 import { Icon } from "@/components/Icon";
 import { showErrorToast } from "@/lib/toast";
 import { useState } from "react";
-import { IntegrationMetadataRenderer } from "./types";
+import type { IntegrationMetadataRenderer } from "./types";
 
 export const dash0MetadataRenderer: IntegrationMetadataRenderer = ({ integration }) => {
   const metadata = integration.status?.metadata as Record<string, unknown> | undefined;
@@ -20,7 +20,7 @@ export const dash0MetadataRenderer: IntegrationMetadataRenderer = ({ integration
         await navigator.clipboard.writeText(normalizedWebhookURL);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-      } catch (_error) {
+      } catch {
         showErrorToast("Failed to copy webhook URL");
       }
     };

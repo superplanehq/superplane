@@ -39,29 +39,21 @@ type SaveState = "saved" | "saving" | "unsaved" | "error";
 interface HeaderProps {
   breadcrumbs: BreadcrumbItem[];
   onSave?: () => void;
-  onCreateVersion?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onUndo?: () => void;
   canUndo?: boolean;
   onLogoClick?: () => void;
   organizationId?: string;
-  versionLabel?: string;
   unsavedMessage?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
-  createVersionDisabled?: boolean;
-  createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  isAutoSaveEnabled?: boolean;
-  onToggleAutoSave?: () => void;
-  autoSaveDisabled?: boolean;
-  autoSaveDisabledTooltip?: string;
   topViewMode?: "canvas" | "yaml" | "cli" | "memory" | "settings";
   onTopViewModeChange?: (mode: "canvas" | "yaml" | "cli" | "memory" | "settings") => void;
   onExportYamlCopy?: () => void;
@@ -559,7 +551,7 @@ export function Header({
                   />
                 ) : null}
                 {onUndo && canUndo ? (
-                  <Button onClick={onUndo} size="sm" variant="outline">
+                  <Button onClick={onUndo} size="sm" variant="outline" disabled={saveState === "saving"}>
                     <Undo2 />
                     Revert
                   </Button>

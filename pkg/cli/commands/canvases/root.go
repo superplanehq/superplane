@@ -18,7 +18,9 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "List canvases",
 		Args:  cobra.NoArgs,
 	}
-	core.Bind(listCmd, &listCommand{}, options)
+	var listFull bool
+	listCmd.Flags().BoolVar(&listFull, "full", false, "show full output including all fields")
+	core.Bind(listCmd, &listCommand{full: &listFull}, options)
 
 	getCmd := &cobra.Command{
 		Use:   "get <name-or-id>",
@@ -209,11 +211,38 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 	changeRequestsCmd.AddCommand(changeRequestsPublishCmd)
 	changeRequestsCmd.AddCommand(changeRequestsResolveCmd)
 
+	var initTemplate string
+	var initListTemplates bool
+	var initOutputFile string
+	initCmd := &cobra.Command{
+		Use:   "init",
+		Short: "Generate a starter canvas YAML definition",
+		Long:  "Print a starter canvas YAML definition to stdout. Use --template to start from an existing template, or --list-templates to see available options.",
+		Args:  cobra.NoArgs,
+	}
+	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a named template (e.g. health-check-monitor)")
+	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available template names")
+	initCmd.Flags().StringVar(&initOutputFile, "output-file", "", "write to a file instead of stdout")
+	core.Bind(initCmd, &initCommand{
+		template:      &initTemplate,
+		listTemplates: &initListTemplates,
+		outputFile:    &initOutputFile,
+	}, options)
+
+	deleteCmd := &cobra.Command{
+		Use:   "delete <name-or-id>",
+		Short: "Delete a canvas",
+		Args:  cobra.ExactArgs(1),
+	}
+	core.Bind(deleteCmd, &deleteCommand{}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
+	root.AddCommand(initCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root

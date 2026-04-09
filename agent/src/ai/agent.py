@@ -1,15 +1,48 @@
-import os
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from pathlib import Path
+from typing import Any, Literal, cast
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.test import TestModel
 
-from ai.models import CanvasAnswer, CanvasQuestionRequest, CanvasSummary
+from ai.config import config
+from ai.models import (
+    CanvasAnswer,
+    CanvasQuestionRequest,
+    CanvasShape,
+    CanvasSummary,
+    NodeDetails,
+    NodeEvent,
+    NodeExecution,
+)
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
 from ai.patterns import search_decision_patterns as search_markdown_patterns
 from ai.superplane_client import SuperplaneClient
+
+CatalogListKind = Literal["components", "triggers"]
+
+
+def _catalog_list_cache_key(
+    kind: CatalogListKind,
+    provider: str | None,
+    query: str | None,
+) -> tuple[str, str, str]:
+    p = provider.strip().lower() if isinstance(provider, str) else ""
+    q = query.strip().lower() if isinstance(query, str) else ""
+    return (kind, p, q)
+
+
+def _clone_catalog_list_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Detach cached rows so callers cannot mutate the in-session cache."""
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        cloned = dict(row)
+        ocn = cloned.get("output_channel_names")
+        if isinstance(ocn, list):
+            cloned["output_channel_names"] = list(ocn)
+        out.append(cloned)
+    return out
 
 
 @dataclass
@@ -17,10 +50,70 @@ class AgentDeps:
     client: SuperplaneClient
     canvas_id: str
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
+    catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(
+        default_factory=dict
+    )
+
+
+def _get_cached_catalog_list(
+    deps: AgentDeps,
+    kind: CatalogListKind,
+    provider: str | None,
+    query: str | None,
+) -> list[dict[str, Any]] | None:
+    key = _catalog_list_cache_key(kind, provider, query)
+    hit = deps.catalog_list_cache.get(key)
+    if hit is None:
+        return None
+    return _clone_catalog_list_rows(hit)
+
+
+def _put_cached_catalog_list(
+    deps: AgentDeps,
+    kind: CatalogListKind,
+    provider: str | None,
+    query: str | None,
+    rows: list[dict[str, Any]],
+) -> None:
+    key = _catalog_list_cache_key(kind, provider, query)
+    deps.catalog_list_cache[key] = _clone_catalog_list_rows(rows)
+
+
+def load_system_prompt() -> str:
+    return (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
 
 
 def build_prompt(payload: CanvasQuestionRequest) -> str:
     return payload.question
+
+
+def _tool_failure(
+    tool_name: str,
+    message: str,
+    *,
+    code: str | None = None,
+    **context: Any,
+) -> dict[str, Any]:
+    """Uniform tool error / failure dict for the model (and logging).
+
+    Always includes ``__tool_error__`` (human-readable message) and
+    ``__tool_name__``. Optional ``__tool_error_code__`` for stable categories.
+    Extra keyword arguments are copied when not None (e.g. pattern_id, name).
+    """
+    payload: dict[str, Any] = {
+        "__tool_error__": message,
+        "__tool_name__": tool_name,
+    }
+    if code is not None:
+        payload["__tool_error_code__"] = code
+    for key, value in context.items():
+        if value is not None:
+            payload[key] = value
+    return payload
+
+
+def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
+    return _tool_failure(tool_name, str(error))
 
 
 def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, CanvasAnswer]:
@@ -33,55 +126,12 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     agent: Agent[AgentDeps, CanvasAnswer] = Agent(
         model=resolved_model,
         output_type=CanvasAnswer,
-        system_prompt=(
-            "You answer questions about Superplane canvases. "
-            "Use tools to fetch real canvas and catalog data before answering. "
-            "Be concise and factual."
-            "Use list_available_integrations to verify provider availability when needed. "
-            "Do not block proposing provider nodes just because org integrations are missing; "
-            "it is valid to add nodes first and configure integration bindings later. "
-            "When integration is missing, still provide the node proposal and mention setup as a follow-up. "
-            "When a request sounds like a known workflow archetype, call list_decision_patterns or search_decision_patterns first. "
-            "After selecting a pattern, always call get_decision_pattern and follow the retrieved pattern content as closely as possible. "
-            "If a relevant pattern is found, follow it as closely as possible and only deviate when required by the user's explicit request or current canvas constraints. "
-            "Do not claim a provider is unavailable unless a catalog tool succeeds and clearly shows no matches. "
-            "If catalog tools fail, state that availability could not be verified and proceed with a best-effort proposal. "
-            "When the user asks for canvas edits, include a structured proposal with "
-            "operations that can be applied in the UI. Supported operation types are: "
-            "add_node, connect_nodes, disconnect_nodes, update_node_config, and delete_node. "
-            "Use exact block names from catalog tools, include node references by nodeId "
-            "for existing nodes, and keep operation order executable. "
-            "Do not invent unknown fields or operation types. "
-            "In proposals, expression fields use this model: $ is the message chain—"
-            "a map of upstream node outputs keyed by each node's name on the canvas. "
-            "To access data from any upstream node, use $['Exact node name']... (or "
-            "double quotes inside the brackets); the name must match that node's canvas "
-            "label. That form is not the run-start event object. "
-            "root() is the original event that started the run; "
-            "when that payload nests under data, "
-            "use root().data.... previous() refers to upstream output. "
-            "Never use $.data. for run-start payload fields; use root().data. or the correct path "
-            "under root() instead. "
-            "Use get_canvas at most once per answer unless the user asks to refresh or "
-            "use a different canvas. "
-            "Keep responses short by default (about 3-5 lines) unless the user asks for "
-            "deep analysis. "
-            "If a tool returns an error payload, continue with other tools and provide the "
-            "best-effort proposal instead of aborting. "
-            "Common patterns: "
-            "- if the user says 'pull-request comments' it maps to 'github.onPRComment'"
-        ),
+        system_prompt=load_system_prompt(),
     )
 
     def _tool_debug(message: str) -> None:
-        if os.getenv("REPL_WEB_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if config.debug:
             print(f"[web][agent] {message}", flush=True)
-
-    def _tool_error_entry(tool_name: str, error: Exception) -> dict[str, Any]:
-        return {
-            "__tool_error__": str(error),
-            "__tool_name__": tool_name,
-        }
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:
@@ -102,7 +152,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return list_markdown_patterns()
         except Exception as error:
             _tool_debug(f"list_decision_patterns failed: {error}")
-            return [{"error": str(error)}]
+            return [_tool_error_entry("list_decision_patterns", error)]
 
     @agent.tool
     def search_decision_patterns(
@@ -118,18 +168,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return [_tool_error_entry("search_decision_patterns", error)]
 
     @agent.tool
-    def get_decision_pattern(
-        _ctx: RunContext[AgentDeps], pattern_id: str
-    ) -> dict[str, Any]:
+    def get_decision_pattern(_ctx: RunContext[AgentDeps], pattern_id: str) -> dict[str, Any]:
         """Fetch full markdown content for one decision pattern by id."""
         try:
             pattern = get_markdown_pattern(pattern_id=pattern_id)
             if pattern is None:
-                return {"id": pattern_id, "error": "pattern_not_found"}
+                return _tool_failure(
+                    "get_decision_pattern",
+                    "pattern not found",
+                    code="pattern_not_found",
+                    pattern_id=pattern_id,
+                )
             return pattern
         except Exception as error:
             _tool_debug(f"get_decision_pattern failed for {pattern_id}: {error}")
-            return {"id": pattern_id, "error": str(error)}
+            return _tool_failure("get_decision_pattern", str(error), pattern_id=pattern_id)
 
     @agent.tool
     def list_components(
@@ -137,9 +190,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List available components; optionally filter by provider or text query."""
+        """List components (compact catalog rows).
+
+        Returns name, label, description, provider, output_channel_names.
+        For configuration fields and types needed in proposals,
+        call describe_component on the chosen name.
+        Prefer a single list call per request with provider/query;
+        reuse prior results when possible.
+        """
         try:
-            return ctx.deps.client.list_components(provider=provider, query=query)
+            cached = _get_cached_catalog_list(ctx.deps, "components", provider, query)
+            if cached is not None:
+                return cached
+            rows = ctx.deps.client.list_components(provider=provider, query=query)
+            _put_cached_catalog_list(ctx.deps, "components", provider, query, rows)
+            return _clone_catalog_list_rows(rows)
         except Exception as error:
             _tool_debug(f"list_components failed: {error}")
             return [_tool_error_entry("list_components", error)]
@@ -151,7 +216,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return ctx.deps.client.describe_component(name)
         except Exception as error:
             _tool_debug(f"describe_component failed for {name}: {error}")
-            return {"name": name, "error": str(error)}
+            return _tool_failure("describe_component", str(error), name=name)
 
     @agent.tool
     def list_triggers(
@@ -159,9 +224,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         provider: str | None = None,
         query: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List available triggers; optionally filter by provider or text query."""
+        """List triggers (compact catalog rows).
+
+        Returns name, label, description, provider.
+        For configuration fields and types needed in proposals,
+        call describe_trigger on the chosen name.
+        Prefer a single list call per request with provider/query;
+        reuse prior results when possible.
+        """
         try:
-            return ctx.deps.client.list_triggers(provider=provider, query=query)
+            cached = _get_cached_catalog_list(ctx.deps, "triggers", provider, query)
+            if cached is not None:
+                return cached
+            rows = ctx.deps.client.list_triggers(provider=provider, query=query)
+            _put_cached_catalog_list(ctx.deps, "triggers", provider, query, rows)
+            return _clone_catalog_list_rows(rows)
         except Exception as error:
             _tool_debug(f"list_triggers failed: {error}")
             return [_tool_error_entry("list_triggers", error)]
@@ -173,7 +250,7 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
             return ctx.deps.client.describe_trigger(name)
         except Exception as error:
             _tool_debug(f"describe_trigger failed for {name}: {error}")
-            return {"name": name, "error": str(error)}
+            return _tool_failure("describe_trigger", str(error), name=name)
 
     @agent.tool
     def list_org_integrations(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
@@ -200,7 +277,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         type: str,
         parameters: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
-        """List selectable resources for an org integration resource type."""
+        """List selectable resources for an org integration resource type.
+
+        Returns [] without calling the API when integration_id or type
+        is missing or blank. For results, both must be set: use
+        describe_component / describe_trigger to read
+        integration-resource field metadata for the correct type string.
+        """
+        if not isinstance(integration_id, str) or not integration_id.strip():
+            _tool_debug("list_integration_resources skipped: empty integration_id")
+            return []
+        if not isinstance(type, str) or not type.strip():
+            _tool_debug(
+                "list_integration_resources skipped: empty type (resource type is required by API)"
+            )
+            return []
         try:
             return ctx.deps.client.list_integration_resources(
                 integration_id=integration_id,
@@ -210,5 +301,89 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         except Exception as error:
             _tool_debug(f"list_integration_resources failed: {error}")
             return [_tool_error_entry("list_integration_resources", error)]
+
+    @agent.tool
+    def get_canvas_shape(ctx: RunContext[AgentDeps]) -> CanvasShape | dict[str, Any]:
+        """Compact canvas topology using node display names (no edge channels).
+
+        Use for explaining graph shape in human-readable form. For edits and
+        exact ids or subscription channels, call get_canvas instead. Prefer at
+        most one of get_canvas or get_canvas_shape per answer unless the user
+        asks to refresh.
+        """
+        try:
+            return ctx.deps.client.get_canvas_shape(ctx.deps.canvas_id)
+        except Exception as error:
+            _tool_debug(f"get_canvas_shape failed: {error}")
+            return _tool_failure("get_canvas_shape", str(error))
+
+    @agent.tool
+    def get_node_details(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        include_recent_events: bool = True,
+    ) -> NodeDetails | dict[str, Any]:
+        """Fetch one node's catalog identity, configuration, validation messages,
+        integration binding summary, and recent events.
+
+        Use for questions about a specific node's settings, errors, or activity.
+        Request one node at a time unless the user explicitly asks for several;
+        configuration payloads can be large.
+        """
+        try:
+            return ctx.deps.client.get_node_details(
+                ctx.deps.canvas_id,
+                node_id,
+                include_recent_events=include_recent_events,
+            )
+        except Exception as error:
+            _tool_debug(f"get_node_details failed for {node_id}: {error}")
+            return _tool_failure("get_node_details", str(error), node_id=node_id)
+
+    @agent.tool
+    def list_node_events(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        limit: int = 10,
+    ) -> list[NodeEvent | dict[str, Any]]:
+        """List recent events for a canvas node (payload history / activity).
+
+        Use when the user needs more event rows than get_node_details includes,
+        or when only events matter. Keep limit modest (default 10).
+        """
+        try:
+            events = ctx.deps.client.list_node_events(
+                ctx.deps.canvas_id,
+                node_id,
+                limit=limit,
+            )
+            return cast(list[NodeEvent | dict[str, Any]], events)
+        except Exception as error:
+            _tool_debug(f"list_node_events failed for {node_id}: {error}")
+            return [_tool_failure("list_node_events", str(error), node_id=node_id)]
+
+    @agent.tool
+    def list_node_executions(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        limit: int = 10,
+        results: list[str] | None = None,
+    ) -> list[NodeExecution | dict[str, Any]]:
+        """List recent executions for a node (state, result, messages, timestamps).
+
+        Use for run failures and execution outcomes. Optional results filters
+        API enum values such as RESULT_FAILED. Default limit is 10.
+        """
+        try:
+            executions = ctx.deps.client.list_node_executions(
+                ctx.deps.canvas_id,
+                node_id,
+                limit=limit,
+                results=results,
+            )
+            return cast(list[NodeExecution | dict[str, Any]], executions)
+        except Exception as error:
+            _tool_debug(f"list_node_executions failed for {node_id}: {error}")
+            return [_tool_failure("list_node_executions", str(error), node_id=node_id)]
 
     return agent

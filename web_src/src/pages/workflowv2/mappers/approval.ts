@@ -1,17 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { GroupsGroup, RolesRole, SuperplaneUsersUser, CanvasesCanvasNodeExecution } from "@/api-client";
-import { groupsListGroupUsers, canvasesInvokeNodeExecutionAction } from "@/api-client";
 import type {
-  AdditionalDataBuilderContext,
-  ComponentAdditionalDataBuilder,
   ComponentBaseContext,
   ComponentBaseMapper,
   EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
+  GroupRef,
   NodeInfo,
+  RoleRef,
   StateFunction,
   SubtitleContext,
+  User,
 } from "./types";
 import type {
   ComponentBaseProps,
@@ -25,28 +23,38 @@ import { getTriggerRenderer } from ".";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { ApprovalGroup } from "@/ui/approvalGroup";
 import React from "react";
-import type { ApprovalItemProps } from "@/ui/approvalItem";
-import type { QueryClient } from "@tanstack/react-query";
-import { organizationKeys } from "@/hooks/useOrganizationData";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
-import { canvasKeys } from "@/hooks/useCanvasData";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { showErrorToast } from "@/lib/toast";
+import { formatRelativeTime } from "@/lib/timezone";
+import type { ApprovalItemProps } from "@/ui/approvalGroup/ApprovalItem";
 
-type ApprovalConfiguration = {
-  items: ApprovalItem[];
+type Metadata = {
+  records: ApprovalRecord[];
 };
 
-type ApprovalItem = {
+type ExecutionMetadata = {
+  result: string;
+  records: ApprovalRecord[];
+};
+
+type ApprovalRecord = {
+  index: number;
+  state: string;
   type: string;
-  user?: string;
-  role?: string;
-  group?: string;
+  user?: User;
+  roleRef?: RoleRef;
+  groupRef?: GroupRef;
+  approval?: ApprovalDetail;
+  rejection?: RejectionDetail;
 };
 
-type ApprovalLabelMaps = {
-  rolesByName?: Record<string, string>;
-  groupsByName?: Record<string, string>;
+type ApprovalDetail = {
+  approvedAt?: string;
+  comment?: string;
+};
+
+type RejectionDetail = {
+  rejectedAt?: string;
+  reason?: string;
 };
 
 export const APPROVAL_STATE_MAP: EventStateMap = {
@@ -86,8 +94,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 /**
  * Approval-specific state logic function
  */
-// eslint-disable-next-line complexity
-export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (
     execution.resultMessage &&
     (execution.resultReason === "RESULT_REASON_ERROR" ||
@@ -112,7 +119,7 @@ export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNo
 
   // Check execution outputs for approval/rejection decision
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const metadata = execution.metadata as Record<string, any> | undefined;
+    const metadata = execution.metadata as ExecutionMetadata | undefined;
     if (metadata?.result === "approved") {
       return "approved";
     }
@@ -140,9 +147,8 @@ export const APPROVAL_STATE_REGISTRY: EventStateRegistry = {
 export const approvalMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const configuration = context.node.configuration as ApprovalConfiguration;
-    const items = (configuration.items || []) as ApprovalItem[];
-    const approvals = (context.additionalData as { approvals?: ApprovalItemProps[] })?.approvals || [];
+    const nodeMetadata = context.node.metadata as Metadata | undefined;
+    const items = nodeMetadata?.records || [];
 
     return {
       iconSlug: context.componentDefinition.icon || "hand",
@@ -150,24 +156,21 @@ export const approvalMapper: ComponentBaseMapper = {
       collapsedBackground: getBackgroundColorClass("orange"),
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Approval",
-      eventSections: lastExecution
-        ? getApprovalEventSections(context.nodes, lastExecution, context.additionalData)
-        : undefined,
+      eventSections: lastExecution ? getApprovalEventSections(context.nodes, lastExecution) : undefined,
       includeEmptyState: !lastExecution,
-      specs: getApprovalSpecs(items, context.additionalData),
-      customField: getApprovalCustomField(lastExecution, approvals),
+      specs: getApprovalSpecs(items),
       eventStateMap: APPROVAL_STATE_MAP,
+      customField: getApprovalCustomField(context),
     };
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    return getComponentSubtitle(context.execution, context.additionalData);
+    return getComponentSubtitle(context.execution);
   },
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, any> = {};
-    const metadata = context.execution.metadata as Record<string, unknown> | undefined;
-    const records = (metadata?.records as ApprovalRecord[] | undefined) || [];
+    const details: Record<string, string> = {};
+    const metadata = context.execution.metadata as ExecutionMetadata | undefined;
 
     if (context.execution.createdAt) {
       details["Started at"] = new Date(context.execution.createdAt).toLocaleString();
@@ -177,85 +180,209 @@ export const approvalMapper: ComponentBaseMapper = {
       details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
 
-    if (context.execution.result !== "RESULT_CANCELLED") {
-      details["Approvals"] = buildApprovalTimeline(records);
+    if (!metadata) {
+      return details;
     }
 
-    return details;
+    return withApprovals(details, metadata!);
   },
 };
 
-function getApprovalCustomField(
-  lastExecution: ExecutionInfo | null,
-  approvals: ApprovalItemProps[],
-): React.ReactNode | undefined {
-  const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
-  if (!lastExecution) return;
-  if (!isAwaitingApproval || approvals.length == 0) return;
-  return React.createElement(ApprovalGroup, { approvals, awaitingApproval: isAwaitingApproval });
+function getRecordTypeLabel(record: ApprovalRecord): string {
+  switch (record.type) {
+    case "role":
+      return ` as ${record.roleRef?.displayName || "Role"}`;
+    case "group":
+      return ` as ${record.groupRef?.displayName || "Group"}`;
+    default:
+      return "";
+  }
 }
 
-function getApprovalSpecs(items: ApprovalItem[], additionalData?: unknown): ComponentBaseSpec[] {
-  if (items.length === 0) return [];
+function getApprovalDetail(detail: ApprovalDetail, record: ApprovalRecord): string {
+  if (!detail.approvedAt) {
+    return "-";
+  }
 
-  const usersById = (additionalData as { usersById?: Record<string, any> })?.usersById || {};
-  const rolesByName = (additionalData as { rolesByName?: Record<string, any> })?.rolesByName || {};
+  let label = `Approved ${formatRelativeTime(detail.approvedAt, true)}` + getRecordTypeLabel(record);
+  if (detail.comment) {
+    label += ` - ${detail.comment}`;
+  }
+
+  return label;
+}
+
+function getRejectionDetail(detail: RejectionDetail, record: ApprovalRecord): string {
+  if (!detail.rejectedAt) {
+    return "-";
+  }
+
+  return `Rejected ${formatRelativeTime(detail.rejectedAt, true)}` + getRecordTypeLabel(record);
+}
+
+function withApprovals(details: Record<string, string>, metadata: ExecutionMetadata): Record<string, string> {
+  details["State"] = metadata.result.charAt(0).toUpperCase() + metadata.result.slice(1);
+
+  //
+  // Show approval information first
+  //
+  const approvedRecords = sortedApprovalRecords(metadata.records);
+  for (const record of approvedRecords) {
+    if (record.approval) {
+      const userLabel = record.user?.name || record.user?.email || "User";
+      details[userLabel] = getApprovalDetail(record.approval, record);
+      continue;
+    }
+  }
+
+  const rejectedRecord = metadata.records.find((record) => record.state === "rejected");
+  if (rejectedRecord) {
+    if (rejectedRecord.rejection) {
+      const userLabel = rejectedRecord.user?.name || rejectedRecord.user?.email || "User";
+      details[userLabel] = getRejectionDetail(rejectedRecord.rejection, rejectedRecord);
+      details["Rejection Reason"] = rejectedRecord.rejection.reason || "-";
+    }
+  }
+
+  if (rejectedRecord) {
+    return details;
+  }
+
+  //
+  // Add pending information last, only if no rejected records exist
+  //
+  const pendingRecordLabels = metadata.records
+    .filter((record) => record.state === "pending")
+    .map((record) => getApprovalItemLabel(record));
+
+  details["Pending"] = pendingRecordLabels.join(", ");
+  return details;
+}
+
+function sortedApprovalRecords(records: ApprovalRecord[]): ApprovalRecord[] {
+  return records
+    .filter((record) => record.state === "approved")
+    .sort(
+      (a, b) => new Date(a.approval?.approvedAt || "").getTime() - new Date(b.approval?.approvedAt || "").getTime(),
+    );
+}
+
+function getApprovalCustomField(context: ComponentBaseContext): React.ReactNode | undefined {
+  const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+  if (!lastExecution) {
+    return;
+  }
+
+  const isAwaitingApproval = ["STATE_STARTED", "STATE_PENDING"].includes(lastExecution?.state || "");
+  if (!isAwaitingApproval) {
+    return;
+  }
+
+  const metadata = lastExecution.metadata as ExecutionMetadata | undefined;
+  if (!metadata || !metadata.records) {
+    return;
+  }
+
+  if (metadata.records.length === 0) {
+    return;
+  }
+
+  return React.createElement(ApprovalGroup, {
+    awaitingApproval: isAwaitingApproval,
+    approvals: metadata.records.map((record: ApprovalRecord) => {
+      return approvalItemPropsForRecord(context, lastExecution, metadata.records, record, isAwaitingApproval);
+    }),
+  });
+}
+
+function approvalItemPropsForRecord(
+  context: ComponentBaseContext,
+  lastExecution: ExecutionInfo,
+  records: ApprovalRecord[],
+  record: ApprovalRecord,
+  isAwaitingApproval: boolean,
+): ApprovalItemProps {
+  const canAct =
+    record.state === "pending" &&
+    isAwaitingApproval &&
+    canCurrentUserActOnRecord(record, context.currentUser) &&
+    !hasUserGivenInputInAnyRecord(records, context.currentUser);
+
+  const title = getApprovalItemLabel(record);
+
+  return {
+    id: `${record.index}`,
+    title: title || "",
+    approved: record.state === "approved",
+    rejected: record.state === "rejected",
+    approverName: record.user?.name,
+    approvalComment: record.approval?.comment,
+    rejectionReason: record.rejection?.reason,
+    interactive: canAct,
+    onApprove: async (comment?: string) => {
+      if (!lastExecution?.id) return;
+
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "approve", {
+        index: record.index,
+        comment: comment,
+      });
+    },
+    onReject: async (reason: string) => {
+      if (!lastExecution?.id) return;
+
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "reject", {
+        index: record.index,
+        reason: reason,
+      });
+    },
+  };
+}
+
+function getApprovalSpecs(items: ApprovalRecord[]): ComponentBaseSpec[] {
+  if (items.length === 0) return [];
 
   return [
     {
-      title: "approvals required",
-      tooltipTitle: "approvals required",
-      values: items.map(
-        // eslint-disable-next-line complexity
-        (item) => {
-          const type = (item.type || "").toString();
-          let value =
-            type === "anyone"
-              ? "Anyone"
-              : type === "user"
-                ? item.user || ""
-                : type === "role"
-                  ? item.role || ""
-                  : type === "group"
-                    ? item.group || ""
-                    : "";
-          const label = type ? `${type[0].toUpperCase()}${type.slice(1)}` : "Item";
+      title: "approval",
+      tooltipTitle: "approval",
+      values: items.map((item) => {
+        let value = "";
+        const label = item.type ? `${item.type[0].toUpperCase()}${item.type.slice(1)}` : "Item";
 
-          // Pretty-print values
-          if (type === "user" && value && usersById[value]) {
-            value = usersById[value].email || usersById[value].name || value;
-          }
-          if (type === "role" && value) {
-            value = rolesByName[value] || value.replace(/^(org_|canvas_)/i, "");
-            // Fallback to simple suffix mapping when not found
-            const suffix = (item.role || "").split("_").pop();
-            if (!rolesByName[item.role || ""] && suffix) {
-              const map: any = { viewer: "Viewer", admin: "Admin", owner: "Owner" };
-              value = map[suffix] || value;
-            }
-          }
-          return {
-            badges: [
-              { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
-              { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
-            ],
-          };
-        },
-      ),
+        if (item.type === "anyone") {
+          value = "Anyone";
+        }
+
+        if (item.type === "user") {
+          value = item.user?.name || item.user?.email || "User";
+        }
+
+        if (item.type === "role") {
+          value = item.roleRef?.displayName || "Role";
+        }
+
+        if (item.type === "group") {
+          value = item.groupRef?.displayName || "Group";
+        }
+
+        // Pretty-print values
+        return {
+          badges: [
+            { label: `${label}:`, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+            { label: value || "—", bgColor: "bg-emerald-100", textColor: "text-emerald-800" },
+          ],
+        };
+      }),
     },
   ];
 }
 
-function getApprovalEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  additionalData?: unknown,
-): EventSection[] {
+function getApprovalEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title: eventTitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const eventSubtitle = getComponentSubtitle(execution, additionalData);
+  const eventSubtitle = getComponentSubtitle(execution);
 
   const eventSection: EventSection = {
     receivedAt: new Date(execution.createdAt!),
@@ -268,12 +395,14 @@ function getApprovalEventSections(
   return [eventSection];
 }
 
-function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown): string | React.ReactNode {
+function getComponentSubtitle(execution: ExecutionInfo): string | React.ReactNode {
+  const metadata = execution.metadata as ExecutionMetadata | undefined;
+  if (!metadata) return "";
+
   // Show progress for in-progress approvals
   if (execution.state === "STATE_STARTED") {
-    const approvals = (additionalData as { approvals?: ApprovalItemProps[] })?.approvals;
-    const approvalsCount = approvals?.length || 0;
-    const approvalsApprovedCount = approvals?.filter((approval) => approval.approved).length || 0;
+    const approvalsCount = metadata.records.length || 0;
+    const approvalsApprovedCount = metadata.records.filter((record) => record.state === "approved").length || 0;
     const subtitle = `${approvalsApprovedCount}/${approvalsCount} approved`;
     if (execution.createdAt) {
       return renderWithTimeAgo(subtitle, new Date(execution.createdAt));
@@ -304,472 +433,53 @@ function getComponentSubtitle(execution: ExecutionInfo, additionalData?: unknown
   return "";
 }
 
-// eslint-disable-next-line complexity
-function getApprovalDecisionLabel(record: ApprovalRecord, labelMaps?: ApprovalLabelMaps): string {
-  const rolesByName = labelMaps?.rolesByName;
-  const groupsByName = labelMaps?.groupsByName;
-
+function getApprovalItemLabel(record: ApprovalRecord): string {
   if (record.type === "user") {
-    return record.user?.name || record.user?.email || "User";
+    return record.user?.name || "User";
   }
 
-  if (record.user?.name || record.user?.email) {
-    return record.user?.name || record.user?.email || "User";
+  if (record.type === "role" && record.roleRef) {
+    return record.roleRef.displayName || "Role";
   }
 
-  if (record.type === "role") {
-    return (record.role ? rolesByName?.[record.role] : undefined) || record.role || "Role";
+  if (record.type === "group" && record.groupRef) {
+    return record.groupRef.displayName || "Group";
   }
 
-  if (record.type === "group") {
-    return (record.group ? groupsByName?.[record.group] : undefined) || record.group || "Group";
-  }
-
-  if (record.type === "anyone") {
-    return "Everyone";
-  }
-
-  return "Approver";
+  return "Any user";
 }
 
-function buildApprovalTimeline(records: ApprovalRecord[]) {
-  return [...records]
-    .sort((a, b) => {
-      const aTimestamp = getApprovalDecisionTimestampValue(a);
-      const bTimestamp = getApprovalDecisionTimestampValue(b);
-
-      if (aTimestamp === null && bTimestamp === null) return 0;
-      if (aTimestamp === null) return 1;
-      if (bTimestamp === null) return -1;
-
-      return aTimestamp - bTimestamp;
-    })
-    .map((record) => {
-      const meta = getApprovalDecisionMeta(record);
-      return {
-        label: getApprovalDecisionLabel(record),
-        status: meta.status,
-        timestamp: meta.timestamp,
-        comment: meta.comment,
-      };
-    });
-}
-
-function getApprovalDecisionMeta(record: ApprovalRecord): {
-  status: string;
-  timestamp?: string | React.ReactNode;
-  comment?: string;
-} {
-  const approvalComment = record.approval?.comment?.trim();
-  const rejectionReason = record.rejection?.reason?.trim();
-  const comment = approvalComment || rejectionReason;
-
-  if (record.state === "approved") {
-    return {
-      status: "Approved",
-      timestamp: formatDecisionTimestamp(record.approval?.approvedAt),
-      comment,
-    };
+function hasUserGivenInputInAnyRecord(records: ApprovalRecord[], user?: User): boolean {
+  if (!user) {
+    return false;
   }
 
-  if (record.state === "rejected") {
-    return {
-      status: "Rejected",
-      timestamp: formatDecisionTimestamp(record.rejection?.rejectedAt),
-      comment,
-    };
-  }
-
-  return {
-    status: "Pending",
-    comment,
-  };
+  return records.some((record) => record.state !== "pending" && record.user?.id === user.id);
 }
 
-function formatDecisionTimestamp(timestamp?: string): string | React.ReactNode | undefined {
-  if (!timestamp) return undefined;
-
-  const parsed = new Date(timestamp);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-
-  return renderTimeAgo(parsed);
-}
-
-function getApprovalDecisionTimestampValue(record: ApprovalRecord): number | null {
-  const timestamp =
-    record.state === "approved"
-      ? record.approval?.approvedAt
-      : record.state === "rejected"
-        ? record.rejection?.rejectedAt
-        : undefined;
-
-  if (!timestamp) {
-    return null;
+function canCurrentUserActOnRecord(record: ApprovalRecord, currentUser?: User): boolean {
+  if (!currentUser) {
+    return false;
   }
 
-  const parsed = new Date(timestamp).getTime();
-  if (Number.isNaN(parsed)) {
-    return null;
-  }
-
-  return parsed;
-}
-
-// ----------------------- Data Builder -----------------------
-
-type ApprovalRecord = {
-  index: number;
-  state: string;
-  type: string;
-  user?: { id?: string; name?: string; email?: string; avatarUrl?: string };
-  role?: string;
-  group?: string;
-  approval?: { approvedAt?: string; comment?: string };
-  rejection?: { rejectedAt?: string; reason?: string };
-};
-
-export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
-  buildAdditionalData(context: AdditionalDataBuilderContext) {
-    const { node, lastExecutions, canvasId, queryClient, organizationId, currentUser } = context;
-    const execution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-    const executionMetadata = execution?.metadata as Record<string, unknown> | undefined;
-    const usersById: Record<string, { email?: string; name?: string }> = {};
-    const rolesByName: Record<string, string> = {};
-    const groupsByName: Record<string, string> = {};
-    let currentUserRoles: string[] = [];
-    const currentUserId = currentUser?.id;
-    const currentUserEmail = currentUser?.email;
-    if (organizationId) {
-      const usersResp: SuperplaneUsersUser[] | undefined = queryClient.getQueryData(
-        organizationKeys.users(organizationId),
-      );
-      if (Array.isArray(usersResp)) {
-        usersResp.forEach((u: SuperplaneUsersUser) => {
-          const id = u.metadata?.id;
-          const email = u.metadata?.email;
-          const name = u.spec?.displayName;
-          if (id) usersById[id] = { email, name };
-        });
-
-        if (currentUserId || currentUserEmail) {
-          const currentOrgUser = usersResp.find(
-            (u) =>
-              (currentUserId && u.metadata?.id === currentUserId) ||
-              (currentUserEmail && u.metadata?.email === currentUserEmail),
-          );
-          if (currentOrgUser?.status?.roleAssignments) {
-            currentUserRoles = currentOrgUser.status.roleAssignments
-              .filter((assignment) => !assignment.domainId || assignment.domainId === organizationId)
-              .map((assignment) => assignment.roleName)
-              .filter((roleName): roleName is string => !!roleName);
-          }
-        }
-      }
-
-      const rolesResp: RolesRole[] | undefined = queryClient.getQueryData(organizationKeys.roles(organizationId));
-      if (Array.isArray(rolesResp)) {
-        rolesResp.forEach((r: RolesRole) => {
-          const name = r.metadata?.name;
-          const display = r.spec?.displayName;
-          if (name) rolesByName[name] = display || name;
-        });
-      }
-
-      const groupsResp: GroupsGroup[] | undefined = queryClient.getQueryData(organizationKeys.groups(organizationId));
-      if (Array.isArray(groupsResp)) {
-        groupsResp.forEach((group: GroupsGroup) => {
-          const name = group.metadata?.name;
-          const display = group.spec?.displayName;
-          if (name) groupsByName[name] = display || name;
-        });
-      }
-    }
-
-    if (organizationId) {
-      const groupNames = new Set(
-        ((executionMetadata?.records as ApprovalRecord[] | undefined) || [])
-          .filter((record) => record.type === "group" && record.group)
-          .map((record) => record.group as string),
-      );
-
-      groupNames.forEach((groupName) => {
-        const queryKey = organizationKeys.groupUsers(organizationId, groupName);
-        if (queryClient.getQueryData(queryKey)) return;
-        queryClient.prefetchQuery({
-          queryKey,
-          queryFn: async () => {
-            const response = await groupsListGroupUsers(
-              withOrganizationHeader({
-                path: { groupName },
-                query: { domainId: organizationId, domainType: "DOMAIN_TYPE_ORGANIZATION" },
-              }),
-            );
-            return response.data?.users || [];
-          },
-          staleTime: 5 * 60 * 1000,
-          gcTime: 10 * 60 * 1000,
-        });
-      });
-    }
-
-    const approvalRecords = (executionMetadata?.records as ApprovalRecord[] | undefined) || [];
-    const hasApprovedAnyRecord = hasCurrentUserApprovedAnyRecord(approvalRecords, currentUserId, currentUserEmail);
-    const pendingUserRecordIndex = getPendingUserApprovalIndex(approvalRecords, currentUserId, currentUserEmail);
-    const isExecutionActive = execution?.state === "STATE_STARTED" || execution?.state === "STATE_PENDING";
-    const interactiveApprovalIndex =
-      hasApprovedAnyRecord || !isExecutionActive
-        ? undefined
-        : getInteractiveApprovalIndex(approvalRecords, {
-            currentUserId,
-            currentUserEmail,
-            currentUserRoles,
-            organizationId,
-            queryClient,
-          });
-
-    // Map backend records to approval items
-    const labelMaps = { rolesByName, groupsByName };
-    const approvals = approvalRecords.map((record: ApprovalRecord) => {
-      const isPending = record.state === "pending";
-      const approveIndex =
-        record.type === "anyone" && pendingUserRecordIndex !== undefined ? pendingUserRecordIndex : record.index;
-      const canAct =
-        !hasApprovedAnyRecord &&
-        isPending &&
-        isExecutionActive &&
-        record.index === interactiveApprovalIndex &&
-        canCurrentUserActOnApproval(record, {
-          currentUserId,
-          currentUserEmail,
-          currentUserRoles,
-          organizationId,
-          queryClient,
-        });
-
-      const approvalComment = record.approval?.comment as string | undefined;
-      const hasApprovalArtifacts = record.state === "approved" && approvalComment;
-
-      const userLabel = record.user?.name || record.user?.email;
-      const title =
-        userLabel ||
-        (record.type === "user"
-          ? record.user?.name || record.user?.email
-          : record.type === "role" || record.type === "group"
-            ? getApprovalDecisionLabel(record, labelMaps)
-            : record.type === "anyone"
-              ? "Everyone"
-              : "Unknown");
-
-      return {
-        id: `${record.index}`,
-        title,
-        approved: record.state === "approved",
-        rejected: record.state === "rejected",
-        approverName: record.user?.name,
-        approverAvatar: record.user?.avatarUrl,
-        rejectionComment: record.rejection?.reason,
-        interactive: canAct,
-        requireArtifacts: canAct
-          ? [
-              {
-                label: "comment",
-                optional: true,
-              },
-            ]
-          : undefined,
-        artifacts: hasApprovalArtifacts
-          ? {
-              Comment: approvalComment,
-            }
-          : undefined,
-        artifactCount: hasApprovalArtifacts ? 1 : undefined,
-        onApprove: async (artifacts?: Record<string, string>) => {
-          if (!execution?.id) return;
-
-          try {
-            await canvasesInvokeNodeExecutionAction(
-              withOrganizationHeader({
-                path: {
-                  canvasId: canvasId,
-                  executionId: execution.id,
-                  actionName: "approve",
-                },
-                body: {
-                  parameters: {
-                    index: approveIndex,
-                    comment: artifacts?.comment,
-                  },
-                },
-              }),
-            );
-
-            queryClient.invalidateQueries({
-              queryKey: canvasKeys.nodeExecution(canvasId, node.id!),
-            });
-          } catch (_error) {
-            showErrorToast("Failed to approve");
-          }
-        },
-        onReject: async (comment?: string) => {
-          if (!execution?.id) return;
-
-          try {
-            await canvasesInvokeNodeExecutionAction(
-              withOrganizationHeader({
-                path: {
-                  canvasId: canvasId,
-                  executionId: execution.id,
-                  actionName: "reject",
-                },
-                body: {
-                  parameters: {
-                    index: record.index,
-                    reason: comment,
-                  },
-                },
-              }),
-            );
-
-            queryClient.invalidateQueries({
-              queryKey: canvasKeys.nodeExecution(canvasId, node.id!),
-            });
-          } catch (_error) {
-            showErrorToast("Failed to reject");
-          }
-        },
-      };
-    });
-
-    return {
-      approvals,
-      usersById,
-      rolesByName,
-      groupsByName,
-    };
-  },
-};
-
-function canCurrentUserActOnApproval(
-  record: ApprovalRecord,
-  {
-    currentUserId,
-    currentUserEmail,
-    currentUserRoles,
-    organizationId,
-    queryClient,
-  }: {
-    currentUserId?: string;
-    currentUserEmail?: string;
-    currentUserRoles: string[];
-    organizationId?: string;
-    queryClient: QueryClient;
-  },
-): boolean {
   switch (record.type) {
     case "anyone":
-      return !!(currentUserId || currentUserEmail);
+      return true;
+
     case "user":
-      return (
-        (!!currentUserId && record.user?.id === currentUserId) ||
-        (!!currentUserEmail && record.user?.email === currentUserEmail)
-      );
+      return record.user?.id === currentUser.id || record.user?.email === currentUser.email;
+
     case "role":
-      return !!record.role && currentUserRoles.includes(record.role);
+      return !!record.roleRef && currentUser.roles.includes(record.roleRef.name);
+
     case "group": {
-      if (!record.group || !organizationId) return false;
-      const groupUsers = queryClient.getQueryData<SuperplaneUsersUser[]>(
-        organizationKeys.groupUsers(organizationId, record.group),
-      );
-      if (!Array.isArray(groupUsers)) return false;
-      return groupUsers.some(
-        (user) =>
-          (!!currentUserId && user.metadata?.id === currentUserId) ||
-          (!!currentUserEmail && user.metadata?.email === currentUserEmail),
-      );
-    }
-    default:
-      return false;
-  }
-}
+      if (!record.groupRef) {
+        return false;
+      }
 
-function hasCurrentUserApprovedAnyRecord(
-  records: ApprovalRecord[],
-  currentUserId?: string,
-  currentUserEmail?: string,
-): boolean {
-  if (!currentUserId && !currentUserEmail) return false;
-
-  return records.some(
-    (record) =>
-      record.state === "approved" &&
-      ((currentUserId && record.user?.id === currentUserId) ||
-        (currentUserEmail && record.user?.email === currentUserEmail)),
-  );
-}
-
-function getPendingUserApprovalIndex(
-  records: ApprovalRecord[],
-  currentUserId?: string,
-  currentUserEmail?: string,
-): number | undefined {
-  if (!currentUserId && !currentUserEmail) return undefined;
-
-  const match = records.find(
-    (record) =>
-      record.type === "user" &&
-      record.state === "pending" &&
-      ((currentUserId && record.user?.id === currentUserId) ||
-        (currentUserEmail && record.user?.email === currentUserEmail)),
-  );
-
-  return match?.index;
-}
-
-function getInteractiveApprovalIndex(
-  records: ApprovalRecord[],
-  {
-    currentUserId,
-    currentUserEmail,
-    currentUserRoles,
-    organizationId,
-    queryClient,
-  }: {
-    currentUserId?: string;
-    currentUserEmail?: string;
-    currentUserRoles: string[];
-    organizationId?: string;
-    queryClient: QueryClient;
-  },
-): number | undefined {
-  const pendingUserIndex = getPendingUserApprovalIndex(records, currentUserId, currentUserEmail);
-  if (pendingUserIndex !== undefined) {
-    const pendingUserRecord = records.find((record) => record.index === pendingUserIndex);
-    if (
-      pendingUserRecord &&
-      pendingUserRecord.state === "pending" &&
-      canCurrentUserActOnApproval(pendingUserRecord, {
-        currentUserId,
-        currentUserEmail,
-        currentUserRoles,
-        organizationId,
-        queryClient,
-      })
-    ) {
-      return pendingUserIndex;
+      return currentUser.groups.includes(record.groupRef.name);
     }
   }
 
-  const fallback = records.find(
-    (record) =>
-      record.state === "pending" &&
-      canCurrentUserActOnApproval(record, {
-        currentUserId,
-        currentUserEmail,
-        currentUserRoles,
-        organizationId,
-        queryClient,
-      }),
-  );
-
-  return fallback?.index;
+  return false;
 }
