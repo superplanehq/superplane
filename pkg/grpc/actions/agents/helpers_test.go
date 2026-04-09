@@ -40,6 +40,17 @@ func (m *mockAgentsServer) ListAgentChatMessages(ctx context.Context, req *inter
 	}, nil
 }
 
+func (m *mockAgentsServer) DescribeOrganizationAgentUsage(ctx context.Context, req *internalpb.DescribeOrganizationAgentUsageRequest) (*internalpb.DescribeOrganizationAgentUsageResponse, error) {
+	return &internalpb.DescribeOrganizationAgentUsageResponse{
+		Usage: &internalpb.ChatUsage{
+			TotalInputTokens:      100,
+			TotalOutputTokens:     200,
+			TotalTokens:           300,
+			TotalEstimatedCostUsd: 0.05,
+		},
+	}, nil
+}
+
 // connTracker is a gRPC stats handler that counts open connections.
 type connTracker struct {
 	stats.Handler

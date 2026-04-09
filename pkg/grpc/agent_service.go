@@ -71,11 +71,6 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 		return nil, err
 	}
 
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
 	return agents.ResumeAgentChat(
 		ctx,
 		s.authService,
@@ -133,4 +128,14 @@ func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListA
 	}
 
 	return agents.ListAgentChatMessages(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+}
+
+func (s *AgentsService) DescribeAgentUsage(ctx context.Context, _ *pb.DescribeAgentUsageRequest) (*pb.DescribeAgentUsageResponse, error) {
+	url := config.AgentGRPCURL()
+	if url == "" {
+		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
+	}
+
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return agents.DescribeAgentUsage(ctx, url, organizationID)
 }
