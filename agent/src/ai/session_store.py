@@ -537,7 +537,7 @@ class SessionStore:
                 if deleted < batch_size:
                     break
         return total
-      3
+
     def create_agent_chat_run(self, chat_id: str, model: str) -> str:
         run_id = str(uuid.uuid4())
         now = _utcnow()
