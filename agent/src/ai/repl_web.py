@@ -39,6 +39,7 @@ from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentCh
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
+from ai.usage_publisher import publish_agent_tokens_used
 from ai.text import normalize_optional
 
 
@@ -126,7 +127,7 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _record_usage(store: SessionStore, run_id: str, usage: RunUsage) -> None:
+def _record_usage(store: SessionStore, run_id: str, usage: RunUsage, org_id: str) -> None:
     try:
         store.update_run_usage(
             run_id=run_id,
@@ -138,6 +139,10 @@ def _record_usage(store: SessionStore, run_id: str, usage: RunUsage) -> None:
         )
     except Exception as error:
         print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
+
+    total = usage.total_tokens or 0
+    if total > 0:
+        publish_agent_tokens_used(org_id, total)
 
 
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
@@ -262,7 +267,7 @@ async def _stream_agent_run(
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
                 usage = result.usage()
-                _record_usage(store, run_id, usage)
+                _record_usage(store, run_id, usage, chat.org_id)
                 record_agent_run_tokens(usage)
                 yield {
                     "type": "final_answer",
