@@ -6,13 +6,12 @@ from pydantic_evals.evaluators import EvaluationReason, Evaluator, EvaluatorCont
 from ai.models import CanvasAnswer
 from evals.run_tool_registry import count_tool_calls
 
-TOOL_NAME = "validate_canvas_proposal"
-
 
 @dataclass
-class CalledValidateCanvasProposal(Evaluator):
-    """Requires the agent to call validate_canvas_proposal at least ``min_calls`` time(s)."""
+class ToolCalled(Evaluator):
+    """Assert the agent invoked a tool at least ``min_calls`` time(s) during the case run."""
 
+    tool_name: str
     min_calls: int = 1
 
     def evaluate(self, ctx: EvaluatorContext[str, CanvasAnswer, Any]) -> EvaluationReason:
@@ -21,15 +20,18 @@ class CalledValidateCanvasProposal(Evaluator):
                 value=False,
                 reason=f"Invalid min_calls={self.min_calls}; expected >= 1",
             )
-        observed = count_tool_calls(ctx.inputs, TOOL_NAME)
+        if not self.tool_name.strip():
+            return EvaluationReason(value=False, reason="tool_name must be non-empty")
+
+        observed = count_tool_calls(ctx.inputs, self.tool_name)
         if observed >= self.min_calls:
             return EvaluationReason(
                 value=True,
-                reason=f"{TOOL_NAME} called {observed} time(s) (min {self.min_calls})",
+                reason=f"{self.tool_name!r} called {observed} time(s) (min {self.min_calls})",
             )
         return EvaluationReason(
             value=False,
             reason=(
-                f"{TOOL_NAME} called {observed} time(s), expected at least {self.min_calls}"
+                f"{self.tool_name!r} called {observed} time(s), expected at least {self.min_calls}"
             ),
         )
