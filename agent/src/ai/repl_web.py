@@ -33,7 +33,7 @@ from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
 from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
-from ai.proposal_validate_repair import apply_deterministic_proposal_finalize_to_answer
+from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
@@ -388,7 +388,7 @@ async def _stream_agent_run(
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
                 canvas_summary = deps.canvas_cache.get(deps.canvas_id)
-                resolved_output = apply_deterministic_proposal_finalize_to_answer(
+                resolved_output = coerce_canvas_answer_proposal(
                     deps.client,
                     resolved_output,
                     canvas_summary,
