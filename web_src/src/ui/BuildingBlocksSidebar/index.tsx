@@ -48,41 +48,57 @@ export interface BuildingBlocksSidebarProps {
   onAddNote?: () => void;
 }
 
+export interface AiCanvasNodeRef {
+  nodeKey?: string;
+  nodeId?: string;
+  nodeName?: string;
+}
+
+export interface AiCanvasSourceNodeRef extends AiCanvasNodeRef {
+  handleId?: string | null;
+}
+
+export interface AiAddNodeOperation {
+  type: "add_node";
+  nodeKey?: string;
+  blockName: string;
+  nodeName?: string;
+  configuration?: Record<string, unknown>;
+  position?: { x: number; y: number };
+  source?: AiCanvasSourceNodeRef;
+}
+
+export interface AiConnectNodesOperation {
+  type: "connect_nodes";
+  source: AiCanvasSourceNodeRef;
+  target: AiCanvasNodeRef;
+}
+
+export interface AiDisconnectNodesOperation {
+  type: "disconnect_nodes";
+  source: AiCanvasSourceNodeRef;
+  target: AiCanvasNodeRef;
+}
+
+export type AiConnectionNodesOperation = AiConnectNodesOperation | AiDisconnectNodesOperation;
+
+export interface AiUpdateNodeConfigOperation {
+  type: "update_node_config";
+  target: AiCanvasNodeRef;
+  configuration: Record<string, unknown>;
+  nodeName?: string;
+}
+
+export interface AiDeleteNodeOperation {
+  type: "delete_node";
+  target: AiCanvasNodeRef;
+}
+
 export type AiCanvasOperation =
-  | {
-      type: "add_node";
-      nodeKey?: string;
-      blockName: string;
-      nodeName?: string;
-      configuration?: Record<string, unknown>;
-      position?: { x: number; y: number };
-      source?: {
-        nodeKey?: string;
-        nodeId?: string;
-        nodeName?: string;
-        handleId?: string | null;
-      };
-    }
-  | {
-      type: "connect_nodes";
-      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-    }
-  | {
-      type: "disconnect_nodes";
-      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-    }
-  | {
-      type: "update_node_config";
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-      configuration: Record<string, unknown>;
-      nodeName?: string;
-    }
-  | {
-      type: "delete_node";
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-    };
+  | AiAddNodeOperation
+  | AiConnectionNodesOperation
+  | AiUpdateNodeConfigOperation
+  | AiDeleteNodeOperation;
 
 export function BuildingBlocksSidebar({
   isOpen,

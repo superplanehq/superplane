@@ -84,7 +84,7 @@ import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
+import { CanvasUpdater } from "./applyAiOperationsToWorkflow";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
@@ -3216,12 +3216,8 @@ export function WorkflowPageV2() {
       }
 
       saveWorkflowSnapshot(latestWorkflow);
-      const updatedWorkflow = applyAiOperationsToWorkflow({
-        workflow: latestWorkflow,
-        operations,
-        buildingBlocks,
-        integrations,
-      });
+      const updater = new CanvasUpdater(latestWorkflow, buildingBlocks, integrations);
+      const updatedWorkflow = updater.apply(operations);
 
       const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
       const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])

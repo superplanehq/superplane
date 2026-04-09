@@ -5,15 +5,17 @@ import type {
   ComponentsNode,
   OrganizationsIntegration,
 } from "@/api-client";
-import type { AiCanvasOperation, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
+import type {
+  AiAddNodeOperation,
+  AiCanvasNodeRef,
+  AiCanvasOperation,
+  AiCanvasSourceNodeRef,
+  AiConnectionNodesOperation,
+  AiDeleteNodeOperation,
+  AiUpdateNodeConfigOperation,
+  BuildingBlockCategory,
+} from "@/ui/BuildingBlocksSidebar";
 import { generateNodeId, generateUniqueNodeName } from "./utils";
-
-type ApplyAiOperationsToWorkflowInput = {
-  workflow: CanvasesCanvas;
-  operations: AiCanvasOperation[];
-  buildingBlocks: BuildingBlockCategory[];
-  integrations?: OrganizationsIntegration[];
-};
 
 function normalizeIntegrationName(name?: string): string {
   return (name || "")
@@ -51,56 +53,118 @@ function resolveIntegrationRefForBlock(
   };
 }
 
-export function applyAiOperationsToWorkflow({
-  workflow,
-  operations,
-  buildingBlocks,
-  integrations = [],
-}: ApplyAiOperationsToWorkflowInput): CanvasesCanvas {
-  const blockLookup = new Map(
-    buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
-  );
-  const createdNodeIdsByKey = new Map<string, string>();
-  const addedNodeBlockNameByKey = new Map<string, string>();
-  for (const operation of operations) {
-    if (operation.type === "add_node" && operation.nodeKey) {
-      addedNodeBlockNameByKey.set(operation.nodeKey, operation.blockName);
+type ScoredChannel = {
+  name: string;
+  label: string;
+  description: string;
+};
+
+export class CanvasUpdater {
+  private readonly workflow: CanvasesCanvas;
+  private readonly integrations: OrganizationsIntegration[];
+  private readonly blockLookup: Map<string, BuildingBlockCategory["blocks"][number]>;
+  private createdNodeIdsByKey: Map<string, string>;
+  private addedNodeBlockNameByKey: Map<string, string>;
+  private updatedNodes: ComponentsNode[];
+  private updatedEdges: ComponentsEdge[];
+
+  constructor(
+    workflow: CanvasesCanvas,
+    buildingBlocks: BuildingBlockCategory[],
+    integrations: OrganizationsIntegration[] = [],
+  ) {
+    this.workflow = workflow;
+    this.integrations = integrations;
+    this.blockLookup = new Map(
+      buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
+    );
+    this.createdNodeIdsByKey = new Map();
+    this.addedNodeBlockNameByKey = new Map();
+    this.updatedNodes = [];
+    this.updatedEdges = [];
+  }
+
+  apply(operations: AiCanvasOperation[]): CanvasesCanvas {
+    this.initializeState(operations);
+
+    for (const operation of operations) {
+      switch (operation.type) {
+        case "add_node":
+          this.applyAddNodeOperation(operation);
+          break;
+        case "connect_nodes":
+        case "disconnect_nodes":
+          this.applyConnectionOperation(operation);
+          break;
+        case "update_node_config":
+          this.applyUpdateNodeConfigOperation(operation);
+          break;
+        case "delete_node":
+          this.applyDeleteNodeOperation(operation);
+          break;
+      }
+    }
+
+    return {
+      ...this.workflow,
+      spec: {
+        ...this.workflow.spec,
+        nodes: this.updatedNodes,
+        edges: this.updatedEdges,
+      },
+    };
+  }
+
+  private initializeState(operations: AiCanvasOperation[]): void {
+    this.createdNodeIdsByKey = new Map();
+    this.addedNodeBlockNameByKey = new Map();
+    this.updatedNodes = [...(this.workflow.spec?.nodes || [])];
+    this.updatedEdges = [...(this.workflow.spec?.edges || [])];
+
+    for (const operation of operations) {
+      if (operation.type === "add_node" && operation.nodeKey) {
+        this.addedNodeBlockNameByKey.set(operation.nodeKey, operation.blockName);
+      }
     }
   }
-  const updatedNodes: ComponentsNode[] = [...(workflow.spec?.nodes || [])];
-  const updatedEdges: ComponentsEdge[] = [...(workflow.spec?.edges || [])];
 
-  const resolveNodeId = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
-    if (!ref) return null;
-    if (ref.nodeKey && createdNodeIdsByKey.has(ref.nodeKey)) {
-      return createdNodeIdsByKey.get(ref.nodeKey) || null;
+  private resolveNodeId(ref?: AiCanvasNodeRef): string | null {
+    if (!ref) {
+      return null;
     }
-    if (ref.nodeId) return ref.nodeId;
+
+    if (ref.nodeKey && this.createdNodeIdsByKey.has(ref.nodeKey)) {
+      return this.createdNodeIdsByKey.get(ref.nodeKey) || null;
+    }
+    if (ref.nodeId) {
+      return ref.nodeId;
+    }
     if (ref.nodeName) {
-      const found = updatedNodes.find((node) => node.id === ref.nodeName || node.name === ref.nodeName);
+      const found = this.updatedNodes.find((node) => node.id === ref.nodeName || node.name === ref.nodeName);
       return found?.id || null;
     }
-    return null;
-  };
 
-  const getBlockNameForNodeRef = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
+    return null;
+  }
+
+  private getBlockNameForNodeRef(ref?: AiCanvasNodeRef): string | null {
     if (!ref) {
       return null;
     }
 
     if (ref.nodeKey) {
-      const blockNameFromKey = addedNodeBlockNameByKey.get(ref.nodeKey);
+      const blockNameFromKey = this.addedNodeBlockNameByKey.get(ref.nodeKey);
       if (blockNameFromKey) {
         return blockNameFromKey;
       }
     }
 
-    const nodeId = resolveNodeId(ref);
+    const nodeId = this.resolveNodeId(ref);
     if (!nodeId) {
       return null;
     }
 
-    const node = updatedNodes.find((candidate) => candidate.id === nodeId);
+    const node = this.updatedNodes.find((candidate) => candidate.id === nodeId);
     if (!node) {
       return null;
     }
@@ -113,15 +177,15 @@ export function applyAiOperationsToWorkflow({
     }
 
     return null;
-  };
+  }
 
-  const resolveOutputChannelsForSourceRef = (ref?: { nodeKey?: string; nodeId?: string; nodeName?: string }) => {
-    const blockName = getBlockNameForNodeRef(ref);
+  private resolveOutputChannelsForSourceRef(ref?: AiCanvasNodeRef): ScoredChannel[] {
+    const blockName = this.getBlockNameForNodeRef(ref);
     if (!blockName) {
       return [];
     }
 
-    const block = blockLookup.get(blockName);
+    const block = this.blockLookup.get(blockName);
     if (!block?.outputChannels) {
       return [];
     }
@@ -132,21 +196,21 @@ export function applyAiOperationsToWorkflow({
         label: "label" in channel ? channel.label || "" : "",
         description: "description" in channel ? channel.description || "" : "",
       }))
-      .filter((channel): channel is { name: string; label: string; description: string } => channel.name.length > 0);
-  };
+      .filter((channel): channel is ScoredChannel => channel.name.length > 0);
+  }
 
-  const normalizedTokens = (value: string) =>
-    value
+  private normalizedTokens(value: string): string[] {
+    return value
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, " ")
       .trim()
       .split(/\s+/)
       .filter(Boolean);
+  }
 
-  const scoreChannelAsSuccessPath = (channel: { name: string; label: string; description: string }) => {
+  private scoreChannelAsSuccessPath(channel: ScoredChannel): number {
     const text = `${channel.name} ${channel.label} ${channel.description}`.toLowerCase();
-    const tokens = new Set(normalizedTokens(text));
-
+    const tokens = new Set(this.normalizedTokens(text));
     const hasToken = (token: string) => tokens.has(token);
 
     const positiveTokens = [
@@ -208,20 +272,15 @@ export function applyAiOperationsToWorkflow({
     }
 
     return score;
-  };
+  }
 
-  const resolveConnectionChannel = (source: {
-    nodeKey?: string;
-    nodeId?: string;
-    nodeName?: string;
-    handleId?: string | null;
-  }) => {
-    const explicitChannel = source.handleId?.trim();
+  private resolveConnectionChannel(source?: AiCanvasSourceNodeRef): string {
+    const explicitChannel = source?.handleId?.trim();
     if (explicitChannel) {
       return explicitChannel;
     }
 
-    const outputChannels = resolveOutputChannelsForSourceRef(source);
+    const outputChannels = this.resolveOutputChannelsForSourceRef(source);
     const outputChannelNames = outputChannels.map((channel) => channel.name);
     if (outputChannelNames.includes("default")) {
       return "default";
@@ -229,176 +288,156 @@ export function applyAiOperationsToWorkflow({
 
     if (outputChannels.length > 0) {
       const sorted = [...outputChannels].sort((left, right) => {
-        return scoreChannelAsSuccessPath(right) - scoreChannelAsSuccessPath(left);
+        return this.scoreChannelAsSuccessPath(right) - this.scoreChannelAsSuccessPath(left);
       });
       return sorted[0].name;
     }
 
     return "default";
-  };
+  }
 
-  for (const operation of operations) {
-    if (operation.type === "add_node") {
-      const block = blockLookup.get(operation.blockName);
-      if (!block) {
-        continue;
-      }
+  private applyAddNodeOperation(operation: AiAddNodeOperation): void {
+    const block = this.blockLookup.get(operation.blockName);
+    if (!block) {
+      return;
+    }
 
-      const existingNodeNames = updatedNodes.map((node) => node.name || "").filter(Boolean);
-      const uniqueNodeName = generateUniqueNodeName(operation.nodeName || block.name || "node", existingNodeNames);
-      const newNodeId = generateNodeId(block.name || "node", uniqueNodeName);
+    const existingNodeNames = this.updatedNodes.map((node) => node.name || "").filter(Boolean);
+    const uniqueNodeName = generateUniqueNodeName(operation.nodeName || block.name || "node", existingNodeNames);
+    const newNodeId = generateNodeId(block.name || "node", uniqueNodeName);
 
-      const newNode: ComponentsNode = {
-        id: newNodeId,
-        name: uniqueNodeName,
-        type:
-          block.type === "trigger"
-            ? "TYPE_TRIGGER"
-            : block.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : block.name === "annotation"
-                ? "TYPE_WIDGET"
-                : "TYPE_COMPONENT",
-        configuration: operation.configuration || {},
-        position: operation.position
-          ? {
-              x: Math.round(operation.position.x),
-              y: Math.round(operation.position.y),
-            }
-          : {
-              x: 0,
-              y: 0,
-            },
-      };
+    const newNode: ComponentsNode = {
+      id: newNodeId,
+      name: uniqueNodeName,
+      type:
+        block.type === "trigger"
+          ? "TYPE_TRIGGER"
+          : block.type === "blueprint"
+            ? "TYPE_BLUEPRINT"
+            : block.name === "annotation"
+              ? "TYPE_WIDGET"
+              : "TYPE_COMPONENT",
+      configuration: operation.configuration || {},
+      position: operation.position
+        ? {
+            x: Math.round(operation.position.x),
+            y: Math.round(operation.position.y),
+          }
+        : {
+            x: 0,
+            y: 0,
+          },
+    };
 
-      const integrationRef = resolveIntegrationRefForBlock(block.integrationName, integrations);
-      if (integrationRef) {
-        newNode.integration = integrationRef;
-      }
+    const integrationRef = resolveIntegrationRefForBlock(block.integrationName, this.integrations);
+    if (integrationRef) {
+      newNode.integration = integrationRef;
+    }
 
-      if (block.name === "annotation") {
-        newNode.widget = { name: "annotation" };
-        newNode.configuration = { text: "", color: "yellow" };
-      } else if (block.type === "component") {
-        newNode.component = { name: block.name };
-      } else if (block.type === "trigger") {
-        newNode.trigger = { name: block.name };
-      } else if (block.type === "blueprint") {
-        newNode.blueprint = { id: block.id };
-      }
+    if (block.name === "annotation") {
+      newNode.widget = { name: "annotation" };
+      newNode.configuration = { text: "", color: "yellow" };
+    } else if (block.type === "component") {
+      newNode.component = { name: block.name };
+    } else if (block.type === "trigger") {
+      newNode.trigger = { name: block.name };
+    } else if (block.type === "blueprint") {
+      newNode.blueprint = { id: block.id };
+    }
 
-      updatedNodes.push(newNode);
-      if (operation.nodeKey) {
-        createdNodeIdsByKey.set(operation.nodeKey, newNodeId);
-      }
+    this.updatedNodes.push(newNode);
+    if (operation.nodeKey) {
+      this.createdNodeIdsByKey.set(operation.nodeKey, newNodeId);
+    }
 
-      const sourceNodeId = resolveNodeId(operation.source);
-      if (sourceNodeId) {
-        updatedEdges.push({
-          sourceId: sourceNodeId,
-          targetId: newNodeId,
-          channel: resolveConnectionChannel(operation.source || {}),
-        });
-      }
-      continue;
+    const sourceNodeId = this.resolveNodeId(operation.source);
+    if (!sourceNodeId) {
+      return;
+    }
+
+    this.updatedEdges.push({
+      sourceId: sourceNodeId,
+      targetId: newNodeId,
+      channel: this.resolveConnectionChannel(operation.source),
+    });
+  }
+
+  private applyConnectionOperation(operation: AiConnectionNodesOperation): void {
+    const sourceId = this.resolveNodeId(operation.source);
+    const targetId = this.resolveNodeId(operation.target);
+    if (!sourceId || !targetId) {
+      return;
     }
 
     if (operation.type === "connect_nodes") {
-      const sourceId = resolveNodeId(operation.source);
-      const targetId = resolveNodeId(operation.target);
-      if (!sourceId || !targetId) {
-        continue;
-      }
-      const channel = resolveConnectionChannel(operation.source);
-
-      const edgeExists = updatedEdges.some(
+      const channel = this.resolveConnectionChannel(operation.source);
+      const edgeExists = this.updatedEdges.some(
         (edge) => edge.sourceId === sourceId && edge.targetId === targetId && edge.channel === channel,
       );
       if (!edgeExists) {
-        updatedEdges.push({
+        this.updatedEdges.push({
           sourceId,
           targetId,
           channel,
         });
       }
-      continue;
+      return;
     }
 
-    if (operation.type === "disconnect_nodes") {
-      const sourceId = resolveNodeId(operation.source);
-      const targetId = resolveNodeId(operation.target);
-      if (!sourceId || !targetId) {
+    const explicitChannel = operation.source.handleId?.trim();
+    for (let edgeIndex = this.updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
+      const edge = this.updatedEdges[edgeIndex];
+      if (edge.sourceId !== sourceId || edge.targetId !== targetId) {
         continue;
       }
-
-      const explicitChannel = operation.source.handleId?.trim();
-      for (let edgeIndex = updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
-        const edge = updatedEdges[edgeIndex];
-        if (edge.sourceId !== sourceId || edge.targetId !== targetId) {
-          continue;
-        }
-        if (explicitChannel && edge.channel !== explicitChannel) {
-          continue;
-        }
-        updatedEdges.splice(edgeIndex, 1);
-      }
-      continue;
-    }
-
-    if (operation.type === "update_node_config") {
-      const targetId = resolveNodeId(operation.target);
-      if (!targetId) {
+      if (explicitChannel && edge.channel !== explicitChannel) {
         continue;
       }
-
-      const nodeIndex = updatedNodes.findIndex((node) => node.id === targetId);
-      if (nodeIndex === -1) {
-        continue;
-      }
-
-      const targetNode = updatedNodes[nodeIndex];
-      const configuration = {
-        ...(targetNode.configuration || {}),
-        ...(operation.configuration || {}),
-      };
-
-      updatedNodes[nodeIndex] = {
-        ...targetNode,
-        name: operation.nodeName || targetNode.name,
-        configuration: configuration,
-      };
-
-      continue;
-    }
-
-    if (operation.type === "delete_node") {
-      const targetId = resolveNodeId(operation.target);
-      if (!targetId) {
-        continue;
-      }
-
-      const nodeIndex = updatedNodes.findIndex((node) => node.id === targetId);
-      if (nodeIndex === -1) {
-        continue;
-      }
-
-      updatedNodes.splice(nodeIndex, 1);
-
-      for (let edgeIndex = updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
-        const edge = updatedEdges[edgeIndex];
-        if (edge.sourceId === targetId || edge.targetId === targetId) {
-          updatedEdges.splice(edgeIndex, 1);
-        }
-      }
+      this.updatedEdges.splice(edgeIndex, 1);
     }
   }
 
-  return {
-    ...workflow,
-    spec: {
-      ...workflow.spec,
-      nodes: updatedNodes,
-      edges: updatedEdges,
-    },
-  };
+  private applyUpdateNodeConfigOperation(operation: AiUpdateNodeConfigOperation): void {
+    const targetId = this.resolveNodeId(operation.target);
+    if (!targetId) {
+      return;
+    }
+
+    const nodeIndex = this.updatedNodes.findIndex((node) => node.id === targetId);
+    if (nodeIndex === -1) {
+      return;
+    }
+
+    const targetNode = this.updatedNodes[nodeIndex];
+    const configuration = {
+      ...(targetNode.configuration || {}),
+      ...(operation.configuration || {}),
+    };
+
+    this.updatedNodes[nodeIndex] = {
+      ...targetNode,
+      name: operation.nodeName || targetNode.name,
+      configuration: configuration,
+    };
+  }
+
+  private applyDeleteNodeOperation(operation: AiDeleteNodeOperation): void {
+    const targetId = this.resolveNodeId(operation.target);
+    if (!targetId) {
+      return;
+    }
+
+    const nodeIndex = this.updatedNodes.findIndex((node) => node.id === targetId);
+    if (nodeIndex === -1) {
+      return;
+    }
+
+    this.updatedNodes.splice(nodeIndex, 1);
+    for (let edgeIndex = this.updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
+      const edge = this.updatedEdges[edgeIndex];
+      if (edge.sourceId === targetId || edge.targetId === targetId) {
+        this.updatedEdges.splice(edgeIndex, 1);
+      }
+    }
+  }
 }
