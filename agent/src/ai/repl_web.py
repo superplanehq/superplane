@@ -241,7 +241,7 @@ async def _stream_agent_run(
     else:
         claims, chat = _resolve_agent_context(chat_id, request)
 
-    limit_checker.check_agent_token_limit(chat.org_id)
+    await limit_checker.check_agent_token_limit(chat.org_id)
 
     message_history = _load_message_history(store, chat.id)
     resolved_canvas_id = chat.canvas_id

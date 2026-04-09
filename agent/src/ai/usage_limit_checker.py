@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 import grpc  # type: ignore[import-untyped]
+import grpc.aio  # type: ignore[import-untyped]
 
 import usage_pb2
 
@@ -15,7 +16,7 @@ class AgentTokenLimitExceeded(Exception):
 
 
 class AgentUsageLimitChecker(Protocol):
-    def check_agent_token_limit(self, organization_id: str) -> None:
+    async def check_agent_token_limit(self, organization_id: str) -> None:
         """Raise AgentTokenLimitExceeded if the org has exceeded its agent token budget."""
         ...
 
@@ -34,19 +35,19 @@ def _format_next_decrease_hint(next_leak_at_unix: int) -> str:
 
 
 class UsageLimitChecker:
-    """Checks agent token limits via the saas usage gRPC service."""
+    """Checks agent token limits via the saas usage gRPC service (async)."""
 
     def __init__(self, usage_grpc_url: str) -> None:
-        self._channel = grpc.insecure_channel(usage_grpc_url)
+        self._channel = grpc.aio.insecure_channel(usage_grpc_url)
         self._call = self._channel.unary_unary(
             _DESCRIBE_USAGE_METHOD,
             request_serializer=usage_pb2.DescribeOrganizationUsageRequest.SerializeToString,  # type: ignore[attr-defined]
             response_deserializer=usage_pb2.DescribeOrganizationUsageResponse.FromString,  # type: ignore[attr-defined]
         )
 
-    def check_agent_token_limit(self, organization_id: str) -> None:
+    async def check_agent_token_limit(self, organization_id: str) -> None:
         try:
-            response = self._call(
+            response = await self._call(
                 usage_pb2.DescribeOrganizationUsageRequest(organization_id=organization_id),  # type: ignore[attr-defined]
                 timeout=5,
             )
@@ -76,7 +77,7 @@ class UsageLimitChecker:
 class NoopUsageLimitChecker:
     """No-op checker used when USAGE_GRPC_URL is not configured."""
 
-    def check_agent_token_limit(self, organization_id: str) -> None:
+    async def check_agent_token_limit(self, organization_id: str) -> None:
         pass
 
     def close(self) -> None:
