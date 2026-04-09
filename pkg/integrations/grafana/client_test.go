@@ -255,6 +255,14 @@ func Test__Client__RenderPanelURL(t *testing.T) {
 		"https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?from=now-1h&height=500&panelId=2&to=now&tz=UTC&width=1000",
 		got,
 	)
+
+	got = client.RenderPanelURL("team/ops", "prod overview/v2", 2, 1000, 500, "now-1h", "now")
+
+	require.Equal(
+		t,
+		"https://grafana.example.com/render/d-solo/team%2Fops/prod%20overview%2Fv2?from=now-1h&height=500&panelId=2&to=now&tz=UTC&width=1000",
+		got,
+	)
 }
 
 func Test__Client__GetDashboard__BuildsAbsoluteDashboardURL(t *testing.T) {
@@ -291,6 +299,39 @@ func Test__Client__GetDashboard__BuildsAbsoluteDashboardURL(t *testing.T) {
 	require.Equal(t, "https://grafana.example.com/d/abc123/production-overview", dashboard.URL)
 	require.Equal(t, "Production Overview", dashboard.Title)
 	require.Len(t, dashboard.Panels, 1)
+}
+
+func Test__Client__GetDashboard__EscapesUIDPathSegment(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"dashboard": {
+						"uid": "folder/dashboard",
+						"title": "Production Overview",
+						"tags": [],
+						"panels": []
+					},
+					"meta": {
+						"slug": "production-overview",
+						"url": "/d/folder%2Fdashboard/production-overview"
+					}
+				}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	_, err := client.GetDashboard("folder/dashboard")
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, "/api/dashboards/uid/folder%2Fdashboard", httpContext.Requests[0].URL.EscapedPath())
 }
 
 func Test__Client__SearchDashboards__ResolvesRelativeURLs(t *testing.T) {

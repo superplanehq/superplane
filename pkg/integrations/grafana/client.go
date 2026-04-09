@@ -665,37 +665,6 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	return sources, nil
 }
 
-func (c *Client) GetDataSourceLabelValues(uid, label string) ([]string, error) {
-	trimmedUID := strings.TrimSpace(uid)
-	trimmedLabel := strings.TrimSpace(label)
-	if trimmedUID == "" || trimmedLabel == "" {
-		return nil, fmt.Errorf("datasource uid and label are required")
-	}
-
-	path := fmt.Sprintf(
-		"/api/datasources/uid/%s/resources/api/v1/label/%s/values",
-		url.PathEscape(trimmedUID),
-		url.PathEscape(trimmedLabel),
-	)
-
-	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
-	if err != nil {
-		return nil, fmt.Errorf("error getting label values: %v", err)
-	}
-	if status < 200 || status >= 300 {
-		return nil, newAPIStatusError("grafana label values", status, responseBody)
-	}
-
-	var response struct {
-		Data []string `json:"data"`
-	}
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing label values response: %v", err)
-	}
-
-	return response.Data, nil
-}
-
 func (c *Client) ListFolders() ([]Folder, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
 	if err != nil {
@@ -751,7 +720,13 @@ func (c *Client) SearchDashboards(query, folderUID, tag string, limit int) ([]Da
 }
 
 func (c *Client) getDashboardResponse(uid string) (*dashboardGetResponse, error) {
-	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/dashboards/uid/%s", uid), nil, "")
+	trimmedUID := strings.TrimSpace(uid)
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(trimmedUID)),
+		nil,
+		"",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting dashboard: %v", err)
 	}
@@ -801,6 +776,8 @@ func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
 }
 
 func (c *Client) RenderPanelURL(uid, slug string, panelID, width, height int, from, to string) string {
+	escapedUID := url.PathEscape(strings.TrimSpace(uid))
+	escapedSlug := url.PathEscape(strings.TrimSpace(slug))
 	params := url.Values{}
 	params.Set("panelId", fmt.Sprintf("%d", panelID))
 	params.Set("width", fmt.Sprintf("%d", width))
@@ -816,8 +793,8 @@ func (c *Client) RenderPanelURL(uid, slug string, panelID, width, height int, fr
 	return fmt.Sprintf(
 		"%s/render/d-solo/%s/%s?%s",
 		strings.TrimSuffix(c.BaseURL, "/"),
-		uid,
-		slug,
+		escapedUID,
+		escapedSlug,
 		params.Encode(),
 	)
 }

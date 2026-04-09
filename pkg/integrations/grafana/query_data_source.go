@@ -333,7 +333,7 @@ func normalizeResolvedGoTimeString(value string) string {
 		return ""
 	}
 
-	if monotonicIndex := strings.Index(trimmed, " m=+"); monotonicIndex >= 0 {
+	if monotonicIndex := strings.Index(trimmed, " m="); monotonicIndex >= 0 {
 		return strings.TrimSpace(trimmed[:monotonicIndex])
 	}
 

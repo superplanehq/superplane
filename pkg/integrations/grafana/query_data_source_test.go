@@ -346,6 +346,12 @@ func Test__resolveQueryTimeValue(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "1775721600000", value)
 	})
+
+	t.Run("strips negative monotonic suffixes from resolved go timestamps", func(t *testing.T) {
+		value, err := resolveQueryTimeValue("2026-04-09 08:00:00 +0000 UTC m=-0.123456789", nil)
+		require.NoError(t, err)
+		require.Equal(t, "1775721600000", value)
+	})
 }
 
 func Test__parseGrafanaQueryTimezone__acceptsQuarterHourOffsets(t *testing.T) {
