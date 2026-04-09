@@ -9,19 +9,22 @@ import (
 	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
+	"github.com/superplanehq/superplane/pkg/usage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type AgentsService struct {
-	authService authorization.Authorization
-	jwtSigner   *jwt.Signer
+	authService  authorization.Authorization
+	jwtSigner    *jwt.Signer
+	usageService usage.Service
 }
 
-func NewAgentsService(authService authorization.Authorization, jwtSigner *jwt.Signer) *AgentsService {
+func NewAgentsService(authService authorization.Authorization, jwtSigner *jwt.Signer, usageService usage.Service) *AgentsService {
 	return &AgentsService{
-		authService: authService,
-		jwtSigner:   jwtSigner,
+		authService:  authService,
+		jwtSigner:    jwtSigner,
+		usageService: usageService,
 	}
 }
 
@@ -39,6 +42,10 @@ func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgent
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	userID, err := userIDFromContext(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := agents.EnsureAgentTokensWithinLimits(ctx, s.usageService, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -68,6 +75,10 @@ func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgent
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	userID, err := userIDFromContext(ctx)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := agents.EnsureAgentTokensWithinLimits(ctx, s.usageService, organizationID); err != nil {
 		return nil, err
 	}
 
