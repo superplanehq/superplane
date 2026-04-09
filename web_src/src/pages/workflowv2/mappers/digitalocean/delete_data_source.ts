@@ -46,7 +46,8 @@ export const deleteDataSourceMapper: ComponentBaseMapper = {
 
     const nodeMetadata = context.node.metadata as DeleteDSNodeMetadata | undefined;
 
-    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseName || result.knowledgeBaseUUID || "-");
+    details["Knowledge Base"] =
+      nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseName || result.knowledgeBaseUUID || "-");
 
     const kbUUID = result.knowledgeBaseUUID as string | undefined;
     if (kbUUID) {

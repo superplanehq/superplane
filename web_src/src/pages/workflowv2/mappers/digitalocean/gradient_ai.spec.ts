@@ -155,7 +155,10 @@ describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
               // name: "my-kb",
               databaseStatus: "ONLINE",
               database: { id: "db-1", name: "my-kb-os" },
-              dataSources: [{ uuid: "ds-1", type: "spaces" }, { uuid: "ds-2", type: "web" }],
+              dataSources: [
+                { uuid: "ds-1", type: "spaces" },
+                { uuid: "ds-2", type: "web" },
+              ],
               lastIndexingJob: {
                 status: "INDEX_JOB_STATUS_COMPLETED",
                 completedDataSources: 2,
@@ -359,7 +362,9 @@ describe("addDataSourceMapper.getExecutionDetails", () => {
     const ctx = buildDetailsCtx({
       execution: {
         outputs: {
-          default: [buildOutput({ dataSourceUUID: "ds-fallback", knowledgeBaseUUID: "kb-uuid", knowledgeBaseName: "my-kb" })],
+          default: [
+            buildOutput({ dataSourceUUID: "ds-fallback", knowledgeBaseUUID: "kb-uuid", knowledgeBaseName: "my-kb" }),
+          ],
         },
       },
     });

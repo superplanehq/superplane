@@ -44,8 +44,6 @@ export const getKnowledgeBaseMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    // details["Knowledge Base"] = String(result.name || result.uuid || "-");
-
     const uuid = result.uuid as string | undefined;
     if (uuid) {
       details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${uuid}`;
