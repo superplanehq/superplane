@@ -15,6 +15,7 @@ from evals.case_logger import CaseLogger
 from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.cases import dataset
 from evals.report import ReportBuilder
+from evals.run_tool_registry import clear_tool_call_registry
 
 
 def load_env() -> dict[str, str]:
@@ -31,7 +32,11 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
     env = load_env()
     full_cases = list(dataset.cases)
     cases = select_cases(full_cases, selected_case_names)
-    eval_dataset = Dataset(cases=cases)
+    eval_dataset = Dataset(
+        cases=cases,
+        evaluators=dataset.evaluators,
+        report_evaluators=dataset.report_evaluators,
+    )
 
     deps = AgentDeps(
         client=SuperplaneClient(
@@ -66,6 +71,7 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
     )
 
     wall_start = time.perf_counter()
+    clear_tool_call_registry()
     try:
         report = await eval_dataset.evaluate(task, progress=True)
         evaluate_wall_seconds = time.perf_counter() - wall_start
@@ -78,6 +84,7 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
             interaction_log_paths_by_case_name=case_logger.display_paths_by_case_name,
         ).render()
     finally:
+        clear_tool_call_registry()
         case_logger.close()
 
 

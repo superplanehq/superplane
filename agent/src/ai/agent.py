@@ -8,6 +8,7 @@ from pydantic_ai.models.test import TestModel
 from ai.config import config
 from ai.models import (
     CanvasAnswer,
+    CanvasProposal,
     CanvasQuestionRequest,
     CanvasShape,
     CanvasSummary,
@@ -18,6 +19,7 @@ from ai.models import (
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
 from ai.patterns import search_decision_patterns as search_markdown_patterns
+from ai.proposal_validate_repair import finalize_canvas_proposal_deterministic
 from ai.superplane_client import SuperplaneClient
 
 CatalogListKind = Literal["components", "triggers"]
@@ -132,6 +134,51 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     def _tool_debug(message: str) -> None:
         if config.debug:
             print(f"[web][agent] {message}", flush=True)
+
+    def _canvas_summary_for_validation(ctx: RunContext[AgentDeps]) -> CanvasSummary | None:
+        resolved_canvas_id = ctx.deps.canvas_id
+        cached = ctx.deps.canvas_cache.get(resolved_canvas_id)
+        if cached is not None:
+            return cached
+        try:
+            summary = ctx.deps.client.describe_canvas(resolved_canvas_id)
+            ctx.deps.canvas_cache[resolved_canvas_id] = summary
+            return summary
+        except Exception as error:
+            _tool_debug(f"describe_canvas failed for proposal validation: {error}")
+            return None
+
+    @agent.tool
+    def validate_canvas_proposal(
+        ctx: RunContext[AgentDeps],
+        proposal: CanvasProposal,
+    ) -> dict[str, Any]:
+        """Validate and normalize a draft canvas proposal against live catalog schemas.
+
+        Call this with the same structured proposal you plan to include in your final
+        answer when the user asked for canvas edits. The server applies the same
+        coercion and type checks as the workflow UI. On success, copy the returned
+        ``proposal`` into your final ``CanvasAnswer``. On failure, read ``errors``,
+        fix configurations (use describe_component / describe_trigger), and call again.
+        """
+        canvas_summary = _canvas_summary_for_validation(ctx)
+        normalized, errors = finalize_canvas_proposal_deterministic(
+            ctx.deps.client, proposal, canvas_summary
+        )
+        if errors:
+            return {
+                "ok": False,
+                "errors": errors,
+                "hint": (
+                    "Fix add_node and update_node_config configurations to match field types "
+                    "from describe_component / describe_trigger. Object fields must be "
+                    "JSON objects, not stringified JSON."
+                ),
+            }
+        return {
+            "ok": True,
+            "proposal": normalized.model_dump(mode="json", by_alias=True),
+        }
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:

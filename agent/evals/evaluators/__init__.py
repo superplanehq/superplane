@@ -1,4 +1,5 @@
 from .bracket_selectors_match_canvas_name import BracketSelectorsMatchCanvasNames
+from .called_validate_canvas_proposal import CalledValidateCanvasProposal
 from .canvas_has_node import CanvasHasNode
 from .canvas_has_trigger import CanvasHasTrigger
 from .canvas_has_workflow import CanvasHasWorkflow
@@ -7,6 +8,7 @@ from .contains_datetime_expression import ContainsDatetimeExpression
 from .no_dollar_data_as_root import NoDollarDataAsRoot
 
 __all__ = [
+    "CalledValidateCanvasProposal",
     "CanvasHasNode",
     "CanvasHasTrigger",
     "CanvasHasWorkflow",
