@@ -84,7 +84,7 @@ export function Usage({ organizationId }: UsageProps) {
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <UsageMetricCard
           title="Canvases"
           value={canvasUsage.value}

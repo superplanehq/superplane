@@ -338,6 +338,25 @@ async function fetchChatStreamResponse({
   return response;
 }
 
+function refreshChatSessions({
+  canvasId,
+  organizationId,
+  setChatSessions,
+}: {
+  canvasId: string;
+  organizationId: string;
+  setChatSessions?: Dispatch<SetStateAction<AiChatSession[]>>;
+}) {
+  if (!setChatSessions) {
+    return;
+  }
+
+  loadChatSessions({ canvasId, organizationId }).then(
+    (sessions) => setChatSessions(sessions),
+    () => {},
+  );
+}
+
 export async function sendChatPrompt({
   value,
   aiInput,
@@ -427,6 +446,8 @@ export async function sendChatPrompt({
       testModeHint: TEST_MODE_HINT,
       testModelSentinel: TEST_MODEL_SENTINEL,
     });
+
+    refreshChatSessions({ canvasId, organizationId, setChatSessions });
   } catch (error) {
     applyChatPromptFailure({
       assistantMessageId,
