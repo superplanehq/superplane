@@ -100,7 +100,6 @@ import {
   mapWorkflowEventsToRunLogEntries,
   summarizeWorkflowChanges,
   buildExecutionInfo,
-  buildChildToGroupMap,
   buildUserInfo,
 } from "./utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
@@ -127,6 +126,7 @@ import {
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
 import type { User } from "./mappers/types";
+import { buildChildToGroupMap } from "@/lib/canvas/groups";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;

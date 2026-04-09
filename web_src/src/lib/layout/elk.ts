@@ -1,6 +1,7 @@
 import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent, ComponentsNode } from "@/api-client";
 import ELK from "elkjs/lib/elk.bundled.js";
 import type { LayoutEngine, LayoutEngineApplyOptions } from "./types";
+import { buildChildToGroupMap } from "@/lib/canvas/groups";
 
 const DEFAULT_NODE_WIDTH = 420;
 const DEFAULT_NODE_HEIGHT = 180;
@@ -42,7 +43,7 @@ export class ElkLayoutEngine implements LayoutEngine {
       return workflow;
     }
 
-    const childToGroup = this.buildChildToGroupMap(nodes);
+    const childToGroup = buildChildToGroupMap(nodes);
     const flowNodes = this.resolveFlowNodes(nodes, childToGroup);
     if (flowNodes.length === 0) {
       return workflow;
@@ -90,29 +91,6 @@ export class ElkLayoutEngine implements LayoutEngine {
   private normalizeChannel(channel?: string): string {
     const normalizedChannel = (channel || "").trim();
     return normalizedChannel.length > 0 ? normalizedChannel : "default";
-  }
-
-  private collectGroupChildIds(node: ComponentsNode): string[] {
-    if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") {
-      return [];
-    }
-
-    return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
-  }
-
-  private buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
-    const map = new Map<string, string>();
-    for (const node of nodes) {
-      if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group" || !node.id) {
-        continue;
-      }
-
-      for (const childId of this.collectGroupChildIds(node)) {
-        map.set(childId, node.id);
-      }
-    }
-
-    return map;
   }
 
   private isAnnotationWidget(node: ComponentsNode): boolean {
