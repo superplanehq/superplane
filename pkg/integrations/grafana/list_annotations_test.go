@@ -172,3 +172,33 @@ func Test__ListAnnotations__Execute__emitsResolvedTimeRange(t *testing.T) {
 	require.Equal(t, base.Add(-time.Hour).UTC().Format(time.RFC3339Nano), output.From)
 	require.Equal(t, base.UTC().Format(time.RFC3339Nano), output.To)
 }
+
+func Test__ListAnnotations__Execute__PassesPanelIDToGrafanaAndKeepsLimit(t *testing.T) {
+	component := &ListAnnotations{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[]`)),
+			},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"dashboardUID": "dash-1",
+			"panel":        "7",
+			"limit":        100,
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: executionState,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+	query := httpCtx.Requests[0].URL.Query()
+	require.Equal(t, "7", query.Get("panelId"))
+	require.Equal(t, "100", query.Get("limit"))
+}

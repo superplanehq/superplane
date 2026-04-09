@@ -153,7 +153,6 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "End time",
-			Default:     `{{ now() + duration("24h") }}`,
 			Placeholder: `{{ now() + duration("24h") }}`,
 		},
 	}

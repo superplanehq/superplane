@@ -223,7 +223,7 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 			return nil, fmt.Errorf("error creating client: %w", err)
 		}
 
-		annotations, err := client.ListAnnotations(nil, "", 0, 0, 5000)
+		annotations, err := client.ListAnnotations(nil, "", nil, 0, 0, 5000)
 		if err != nil {
 			return nil, err
 		}

@@ -213,16 +213,17 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 	}
 
 	fetchLimit := spec.Limit
-	if fetchLimit <= 0 && (panelID != nil || strings.TrimSpace(spec.Text) != "") {
+	if fetchLimit <= 0 && strings.TrimSpace(spec.Text) != "" {
 		fetchLimit = 5000
 	}
-	if fetchLimit > 0 && fetchLimit < 5000 && (panelID != nil || strings.TrimSpace(spec.Text) != "") {
+	if fetchLimit > 0 && fetchLimit < 5000 && strings.TrimSpace(spec.Text) != "" {
 		fetchLimit = 5000
 	}
 
 	annotations, err := client.ListAnnotations(
 		spec.Tags,
 		strings.TrimSpace(spec.DashboardUID),
+		panelID,
 		fromMS,
 		toMS,
 		fetchLimit,
@@ -231,7 +232,7 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error listing annotations: %w", err)
 	}
 
-	annotations = filterAnnotations(annotations, panelID, strings.TrimSpace(spec.Text))
+	annotations = filterAnnotations(annotations, nil, strings.TrimSpace(spec.Text))
 	if spec.Limit > 0 && int64(len(annotations)) > spec.Limit {
 		annotations = annotations[:spec.Limit]
 	}

@@ -536,6 +536,35 @@ func Test__Client__CreateAnnotation__ReturnsRateLimitAfterRetries(t *testing.T) 
 	require.Len(t, httpContext.Requests, 3)
 }
 
+func Test__Client__ListAnnotations__IncludesPanelIDQuery(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	panelID := int64(7)
+	annotations, err := client.ListAnnotations([]string{"deploy"}, "dashboard-1", &panelID, 100, 200, 50)
+	require.NoError(t, err)
+	require.Empty(t, annotations)
+	require.Len(t, httpContext.Requests, 1)
+	require.Equal(t, "7", httpContext.Requests[0].URL.Query().Get("panelId"))
+	require.Equal(t, "dashboard-1", httpContext.Requests[0].URL.Query().Get("dashboardUID"))
+	require.Equal(t, "100", httpContext.Requests[0].URL.Query().Get("from"))
+	require.Equal(t, "200", httpContext.Requests[0].URL.Query().Get("to"))
+	require.Equal(t, "50", httpContext.Requests[0].URL.Query().Get("limit"))
+	require.Equal(t, []string{"deploy"}, httpContext.Requests[0].URL.Query()["tags"])
+}
+
 func Test__Grafana__ListResources__Annotations(t *testing.T) {
 	g := &Grafana{}
 	httpContext := &contexts.HTTPContext{

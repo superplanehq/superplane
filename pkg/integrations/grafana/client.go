@@ -618,7 +618,7 @@ func (c *Client) CreateAnnotation(text string, tags []string, dashboardUID strin
 	}
 }
 
-func (c *Client) ListAnnotations(tags []string, dashboardUID string, from, to, limit int64) ([]Annotation, error) {
+func (c *Client) ListAnnotations(tags []string, dashboardUID string, panelID *int64, from, to, limit int64) ([]Annotation, error) {
 	q := url.Values{}
 	for _, tag := range tags {
 		if strings.TrimSpace(tag) != "" {
@@ -627,6 +627,9 @@ func (c *Client) ListAnnotations(tags []string, dashboardUID string, from, to, l
 	}
 	if strings.TrimSpace(dashboardUID) != "" {
 		q.Set("dashboardUID", strings.TrimSpace(dashboardUID))
+	}
+	if panelID != nil && *panelID > 0 {
+		q.Set("panelId", fmt.Sprintf("%d", *panelID))
 	}
 	if from > 0 {
 		q.Set("from", fmt.Sprintf("%d", from))
