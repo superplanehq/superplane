@@ -33,8 +33,10 @@ export function Usage({ organizationId }: UsageProps) {
     error: integrationsError,
   } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
+  const anyLoading = [isLoading, isLoadingUsers, isLoadingIntegrations].some(Boolean);
+  const anyError = [error, usersError, integrationsError].find(Boolean);
 
-  if (isLoading || isLoadingUsers || isLoadingIntegrations) {
+  if (anyLoading) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -44,7 +46,6 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  const anyError = error || usersError || integrationsError;
   if (anyError) {
     return (
       <div className="pt-6">
@@ -75,12 +76,15 @@ export function Usage({ organizationId }: UsageProps) {
     return <Navigate to={`/${organizationId}/settings/general`} replace />;
   }
 
+  const memberCount = users ? users.length : 0;
+  const integrationCount = integrations ? integrations.length : 0;
+
   return (
     <UsageContent
       data={data}
       isPreviewMode={forceUsagePage && data.enabled !== true}
-      memberCount={users?.length ?? 0}
-      integrationCount={integrations?.length ?? 0}
+      memberCount={memberCount}
+      integrationCount={integrationCount}
     />
   );
 }
