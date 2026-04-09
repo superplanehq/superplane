@@ -89,3 +89,8 @@ message DescribeOrganizationAgentUsageRequest {
 message DescribeOrganizationAgentUsageResponse {
   ChatUsage usage = 1;
 }
+
+message AgentTokensUsedMessage {
+  string organization_id = 1;
+  int64 tokens = 2;
+}
