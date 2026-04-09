@@ -3,6 +3,9 @@ from typing import Any
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from superplaneapi.models.canvases_describe_canvas_response import CanvasesDescribeCanvasResponse
 from superplaneapi.models.canvases_list_node_events_response import CanvasesListNodeEventsResponse
+from superplaneapi.models.canvases_list_node_executions_response import (
+    CanvasesListNodeExecutionsResponse,
+)
 from superplaneapi.models.components_list_components_response import (
     ComponentsListComponentsResponse,
 )
@@ -45,6 +48,24 @@ class FakeCanvasNodeApi:
         if payload is None:
             raise ValueError(f"Missing payload for node events: {canvas_id}/{node_id}")
         result = CanvasesListNodeEventsResponse.from_dict(payload)
+        assert result is not None
+        return result
+
+    def canvases_list_node_executions(
+        self,
+        canvas_id: str,
+        node_id: str,
+        states: list[str] | None = None,
+        results: list[str] | None = None,
+        limit: int | None = None,
+        before: object | None = None,
+        _request_timeout: int | tuple[int, int] | None = None,
+    ) -> CanvasesListNodeExecutionsResponse:
+        _ = (states, results, before, _request_timeout)
+        payload = self._payloads.get(f"/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions")
+        if payload is None:
+            raise ValueError(f"Missing payload for node executions: {canvas_id}/{node_id}")
+        result = CanvasesListNodeExecutionsResponse.from_dict(payload)
         assert result is not None
         return result
 
@@ -169,6 +190,11 @@ def test_get_node_details_includes_recent_events() -> None:
                                 "name": "Notify Slack",
                                 "type": "TYPE_COMPONENT",
                                 "component": {"name": "slack.sendTextMessage"},
+                                "configuration": {"channel": "#alerts", "text": "hello"},
+                                "errorMessage": "missing scope",
+                                "warningMessage": "deprecated field",
+                                "paused": True,
+                                "integration": {"id": "int-1", "name": "Slack workspace"},
                             }
                         ],
                         "edges": [],
@@ -192,8 +218,49 @@ def test_get_node_details_includes_recent_events() -> None:
     details = client.get_node_details(canvas_id="canvas-1", node_id="node-action")
 
     assert details.node.id == "node-action"
+    assert details.configuration == {"channel": "#alerts", "text": "hello"}
+    assert details.error_message == "missing scope"
+    assert details.warning_message == "deprecated field"
+    assert details.paused is True
+    assert details.integration == {"id": "int-1", "name": "Slack workspace"}
     assert len(details.recent_events) == 1
     assert details.recent_events[0].id == "evt-1"
+
+
+def test_list_node_executions_maps_rows() -> None:
+    client = FakeSuperplaneClient(
+        payloads={
+            "/api/v1/canvases/canvas-1": {
+                "canvas": {
+                    "metadata": {"id": "canvas-1"},
+                    "spec": {"nodes": [{"id": "n1", "type": "TYPE_COMPONENT"}], "edges": []},
+                }
+            },
+            "/api/v1/canvases/canvas-1/nodes/n1/executions": {
+                "executions": [
+                    {
+                        "id": "ex-1",
+                        "state": "STATE_FINISHED",
+                        "result": "RESULT_FAILED",
+                        "resultReason": "RESULT_REASON_ERROR",
+                        "resultMessage": "timeout",
+                        "createdAt": "2026-01-02T00:00:00Z",
+                        "updatedAt": "2026-01-02T00:01:00Z",
+                    }
+                ]
+            },
+        }
+    )
+
+    rows = client.list_node_executions("canvas-1", "n1", limit=5)
+    assert len(rows) == 1
+    assert rows[0].id == "ex-1"
+    assert rows[0].state == "STATE_FINISHED"
+    assert rows[0].result == "RESULT_FAILED"
+    assert rows[0].result_reason == "RESULT_REASON_ERROR"
+    assert rows[0].result_message == "timeout"
+    assert rows[0].created_at is not None
+    assert rows[0].updated_at is not None
 
 
 def test_get_canvas_shape_returns_nodes_and_connections_without_channel_details() -> None:

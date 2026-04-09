@@ -42,34 +42,6 @@ export interface ChainItemData {
   };
 }
 
-type DetailValue = {
-  text: string;
-  comment?: string;
-};
-
-type ErrorValue = {
-  __type: "error";
-  message: string;
-};
-
-type IssueListEntry = {
-  status: "degraded" | "critical";
-  checkName: string;
-  checkSummary?: string;
-  checkDescription?: string;
-};
-
-type PagerDutyIncidentEntry = {
-  id: string;
-  title: string;
-  status: string;
-  urgency: string;
-  service?: string;
-  priority?: string;
-  html_url?: string;
-  created_at?: string;
-};
-
 interface ChainItemProps {
   item: ChainItemData;
   index: number;
@@ -203,51 +175,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
     () => (item.tabData?.configuration ? escapeStringValuesForJsonView(item.tabData.configuration) : undefined),
     [item.tabData],
   );
-  const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
 
+  const modalPayloadPreview = useMemo(() => escapeStringValuesForJsonView(modalPayload), [modalPayload]);
   const showConnectingLine = totalItems && index < totalItems - 1;
-  const isDetailValue = (value: unknown): value is DetailValue => {
-    if (!value || typeof value !== "object") return false;
-    return "text" in value && typeof (value as DetailValue).text === "string";
-  };
-  const isErrorValue = (value: unknown): value is ErrorValue => {
-    if (!value || typeof value !== "object") return false;
-    return "__type" in value && (value as ErrorValue).__type === "error";
-  };
-  const isIssuesList = (value: unknown): value is IssueListEntry[] => {
-    if (!Array.isArray(value)) return false;
-    return value.every(
-      (entry) =>
-        entry &&
-        typeof entry === "object" &&
-        "status" in entry &&
-        ((entry as IssueListEntry).status === "degraded" || (entry as IssueListEntry).status === "critical") &&
-        "checkName" in entry &&
-        typeof (entry as IssueListEntry).checkName === "string",
-    );
-  };
-  const isPagerDutyIncidentsList = (value: unknown): value is PagerDutyIncidentEntry[] => {
-    if (!Array.isArray(value)) return false;
-    if (value.length === 0) return false;
-    return value.every(
-      (entry) =>
-        entry &&
-        typeof entry === "object" &&
-        "id" in entry &&
-        "title" in entry &&
-        "status" in entry &&
-        "urgency" in entry &&
-        typeof (entry as PagerDutyIncidentEntry).id === "string" &&
-        typeof (entry as PagerDutyIncidentEntry).title === "string" &&
-        ((entry as PagerDutyIncidentEntry).status === "triggered" ||
-          (entry as PagerDutyIncidentEntry).status === "acknowledged" ||
-          (entry as PagerDutyIncidentEntry).status === "resolved"),
-    );
-  };
-  const getUrgencyDotColor = (urgency: string) => {
-    if (urgency === "high") return "bg-red-500";
-    return "bg-yellow-500";
-  };
+  const isError =
+    item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && item.originalExecution?.resultMessage;
 
   return (
     <div className="relative">
@@ -409,182 +341,6 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             {activeTab === "current" && item.tabData.current && (
               <div className="w-full flex flex-col gap-1 items-center justify-between my-1 px-2 pt-2 pb-3">
                 {Object.entries(item.tabData.current).map(([key, value]) => {
-                  if (isIssuesList(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
-                          <div className="flex flex-col gap-4">
-                            {value.map((issue, issueIndex) => (
-                              <div key={`${issue.checkName}-${issueIndex}`} className="flex flex-col">
-                                <div className="flex items-start gap-2">
-                                  {/* Status badge replaces the dot */}
-                                  <span
-                                    className={`text-xs font-medium px-1 py-0.5 rounded flex-shrink-0 uppercase leading-tight self-start ${
-                                      issue.status === "critical"
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-yellow-100 text-yellow-700"
-                                    }`}
-                                  >
-                                    {issue.status}
-                                  </span>
-
-                                  <div className="flex-1 min-w-0">
-                                    {/* Check name */}
-                                    <div className="mb-1">
-                                      <span
-                                        className="text-[13px] font-semibold text-gray-900 break-words"
-                                        title={issue.checkName}
-                                      >
-                                        {issue.checkName}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Check summary - spans full width below badge */}
-                                {issue.checkSummary && (
-                                  <div
-                                    className="text-[12px] text-gray-700 break-words mt-1 w-full"
-                                    title={issue.checkSummary}
-                                  >
-                                    {issue.checkSummary}
-                                  </div>
-                                )}
-
-                                {/* Check description - spans full width below badge */}
-                                {issue.checkDescription && (
-                                  <div
-                                    className="text-[12px] text-gray-500 italic break-words mt-1 w-full"
-                                    title={issue.checkDescription}
-                                  >
-                                    {issue.checkDescription}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (isPagerDutyIncidentsList(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
-                          {value.length === 0 ? (
-                            <span className="text-gray-500 italic">No incidents</span>
-                          ) : (
-                            <div className="flex flex-col gap-3">
-                              {value.map((incident, incidentIndex) => (
-                                <div key={`${incident.id}-${incidentIndex}`} className="relative pl-4">
-                                  {/* Timeline dot - colored by urgency */}
-                                  <div
-                                    className={`absolute left-0 top-1.5 h-2 w-2 rounded-full ${getUrgencyDotColor(incident.urgency)}`}
-                                  />
-                                  {/* Timeline connecting line */}
-                                  {incidentIndex < value.length - 1 && (
-                                    <div className="absolute left-[3px] top-4 bottom-[-12px] w-px bg-gray-200" />
-                                  )}
-
-                                  {/* Incident title with link */}
-                                  <div className="text-[13px] text-gray-800 font-medium">
-                                    {incident.html_url ? (
-                                      <a
-                                        href={incident.html_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="break-words"
-                                        style={{ textDecoration: "underline 1px" }}
-                                        title={incident.title}
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        {incident.title}
-                                      </a>
-                                    ) : (
-                                      <span className="break-words" title={incident.title}>
-                                        {incident.title}
-                                      </span>
-                                    )}
-                                    {incident.created_at && (
-                                      <>
-                                        {" · "}
-                                        <span className="text-[12px] font-normal text-gray-500">
-                                          <TimeAgo date={new Date(incident.created_at)} />
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {/* Service, status, and priority info */}
-                                  <div className="text-[12px] text-gray-600 truncate">
-                                    <span className="capitalize">{incident.status}</span>
-                                    {incident.service && (
-                                      <>
-                                        {" · "}
-                                        <span title={incident.service}>{incident.service}</span>
-                                      </>
-                                    )}
-                                    {incident.priority && (
-                                      <>
-                                        {" · "}
-                                        <span title={`Priority: ${incident.priority}`}>{incident.priority}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (isErrorValue(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span
-                          className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600"
-                          title={key}
-                        >
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-red-600 min-w-0">
-                          <div className="break-words whitespace-normal" title={value.message}>
-                            {value.message}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  if (isDetailValue(value)) {
-                    return (
-                      <div key={key} className="flex items-start gap-1 px-2 rounded-md w-full min-w-0 font-medium">
-                        <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate" title={key}>
-                          {key}:
-                        </span>
-                        <div className="text-[13px] flex-1 text-left w-[70%] text-gray-800 min-w-0">
-                          <div className="truncate" title={value.text}>
-                            {value.text}
-                          </div>
-                          {value.comment && (
-                            <div className="text-[12px] text-gray-500 italic truncate" title={value.comment}>
-                              "{value.comment}"
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-
                   const stringValue = String(value);
                   const isUrlValue = isUrl(stringValue);
 
@@ -616,6 +372,19 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     </div>
                   );
                 })}
+                {isError && (
+                  <div className="flex items-center gap-1 px-2 rounded-md w-full min-w-0 font-medium">
+                    <span className="text-[13px] flex-shrink-0 text-right w-[30%] truncate text-red-600" title="Error">
+                      Error:
+                    </span>
+                    <span
+                      className="text-[13px] flex-1 truncate text-left w-[70%] text-red-600 truncate"
+                      title={item.originalExecution?.resultMessage}
+                    >
+                      {item.originalExecution?.resultMessage}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

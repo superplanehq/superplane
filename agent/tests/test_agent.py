@@ -3,6 +3,8 @@ from ai.agent import (
     _catalog_list_cache_key,
     _get_cached_catalog_list,
     _put_cached_catalog_list,
+    _tool_error_entry,
+    _tool_failure,
     build_agent,
     build_prompt,
     load_system_prompt,
@@ -19,6 +21,40 @@ def test_load_system_prompt_covers_expr_datetime_semantics() -> None:
     assert "three-argument" in text
     assert "date(str, format, timezone)" in text
     assert "root().data" in text
+
+
+def test_load_system_prompt_documents_canvas_node_tools() -> None:
+    text = load_system_prompt()
+    assert "get_node_details" in text
+    assert "list_node_events" in text
+    assert "list_node_executions" in text
+    assert "get_canvas_shape" in text
+
+
+def test_tool_failure_uniform_shape() -> None:
+    err = ValueError("boom")
+    row = _tool_error_entry("list_components", err)
+    assert row == {
+        "__tool_error__": "boom",
+        "__tool_name__": "list_components",
+    }
+
+    missing = _tool_failure(
+        "get_decision_pattern",
+        "pattern not found",
+        code="pattern_not_found",
+        pattern_id="p1",
+    )
+    assert missing["__tool_name__"] == "get_decision_pattern"
+    assert missing["__tool_error__"] == "pattern not found"
+    assert missing["__tool_error_code__"] == "pattern_not_found"
+    assert missing["pattern_id"] == "p1"
+
+
+def test_load_system_prompt_documents_tool_error_shape() -> None:
+    text = load_system_prompt()
+    assert "__tool_error__" in text
+    assert "__tool_name__" in text
 
 
 def test_build_prompt_contains_question() -> None:

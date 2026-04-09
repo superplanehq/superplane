@@ -42,7 +42,7 @@ blocks:
             - make lint
         - name: Unit Tests
           commands:
-            - make test.coverage
+            - make test.coverage.check
         - name: E2E Tests
           parallelism: 10
           commands:
@@ -58,6 +58,9 @@ blocks:
         - name: "Check: Go Format"
           commands:
             - make format.go.check
+        - name: "Check: Example Payloads"
+          commands:
+            - go run ./scripts/check_example_payloads.go
       epilogue:
         always:
           commands:

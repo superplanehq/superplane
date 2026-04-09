@@ -10,7 +10,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
@@ -37,6 +37,7 @@ from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
 from ai.text import normalize_optional
 
 
@@ -243,10 +244,12 @@ async def _stream_agent_run(
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
+                run_usage = result.usage()
+                record_agent_run_tokens(run_usage)
                 yield {
                     "type": "final_answer",
                     "output": output,
-                    "usage": _to_jsonable(result.usage()),
+                    "usage": _to_jsonable(run_usage),
                 }
 
         yield {
@@ -406,10 +409,12 @@ async def _stream_agent_run(
                         await asyncio.sleep(0.01)
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
+            run_usage = result.usage()
+            record_agent_run_tokens(run_usage)
             yield {
                 "type": "final_answer",
                 "output": output,
-                "usage": _to_jsonable(result.usage()),
+                "usage": _to_jsonable(run_usage),
             }
 
     yield {
@@ -422,6 +427,7 @@ async def _stream_agent_run(
 def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        init_metrics()
         store = SessionStore()
         tracker = ActiveStreamTracker()
         app.state.session_store = store
@@ -436,6 +442,7 @@ def _create_app() -> FastAPI:
             await tracker.wait_for_drain()
             grpc_server.stop()
             store.close()
+            shutdown_metrics()
 
     app = FastAPI(lifespan=lifespan)
     cors_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
@@ -448,6 +455,11 @@ def _create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/health")
+    async def health() -> Response:
+        # Match pkg/public Server.HealthCheck: 200 with empty body for load balancers / probes.
+        return Response(status_code=200)
 
     @app.post("/agents/chats/{chat_id}/stream")
     async def stream_repl(
