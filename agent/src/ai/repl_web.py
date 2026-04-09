@@ -145,10 +145,7 @@ def _record_usage(
             cache_write_tokens=usage.cache_write_tokens or 0,
             total_tokens=usage.total_tokens or 0,
         )
-    except Exception as error:
-        print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
 
-    try:
         publisher.publish_agent_run_finished(
             organization_id=org_id,
             chat_id=chat_id,
