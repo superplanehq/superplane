@@ -1,7 +1,4 @@
-"""Validate proposal node configuration against describe_* field schemas (UI parity).
-
-Mirrors web_src/src/pages/workflowv2/applyAiOperationsToWorkflow.ts validation.
-"""
+"""Validate proposal node configuration against describe_* field schemas (UI parity)."""
 
 from __future__ import annotations
 

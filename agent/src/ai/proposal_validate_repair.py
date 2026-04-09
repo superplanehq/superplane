@@ -1,4 +1,4 @@
-"""Coerce, validate, deterministically repair, and optionally LLM-repair canvas proposals."""
+"""Coerce, validate, and deterministically repair canvas proposals (UI schema parity)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ import copy
 import json
 import logging
 from typing import Any
-
-from pydantic_ai import Agent
 
 from ai.models import (
     AddNodeOperation,
@@ -281,82 +279,50 @@ def _repair_operations_locally(
     return reconciled
 
 
-async def _llm_repair_proposal(
-    model: str,
-    summary: str,
-    operations: list[CanvasOperation],
-    error_lines: list[str],
-) -> CanvasProposal | None:
-    system_prompt = (
-        "You repair SuperPlane AI Builder canvas proposals. "
-        "Output a CanvasProposal with the same summary, the same number of operations, "
-        "the same operation order, and the same operation types and structural fields "
-        "(blockName, nodeKey, nodeName, source, target, positions, etc.). "
-        "Fix only configuration payloads on add_node and update_node_config operations "
-        "so they satisfy the validation errors. "
-        "Use plain JSON-compatible values (objects not stringified JSON for object fields)."
-    )
-    agent: Agent[None, CanvasProposal] = Agent(
-        model=model,
-        output_type=CanvasProposal,
-        system_prompt=system_prompt,
-    )
-    payload = json.dumps(
-        {
-            "summary": summary,
-            "operations": [
-                op.model_dump(mode="json", by_alias=True) for op in operations
-            ],
-        },
-        indent=2,
-    )
-    errs = "\n".join(error_lines)
-    try:
-        result = await agent.run(
-            user_prompt=f"Validation errors:\n{errs}\n\nProposal to fix:\n{payload}",
-        )
-    except Exception as exc:
-        _LOG.warning("LLM proposal repair failed: %s", exc)
-        return None
-    return result.output
-
-
-async def finalize_canvas_answer_proposal_async(
+def finalize_canvas_proposal_deterministic(
     client: SuperplaneClient,
-    answer: CanvasAnswer,
+    proposal: CanvasProposal,
     canvas: CanvasSummary | None,
-    *,
-    repair_model: str | None,
-) -> CanvasAnswer:
-    """Coerce, validate, repair deterministically, then optionally one LLM repair pass."""
-    if answer.proposal is None or not answer.proposal.operations:
-        return answer
+) -> tuple[CanvasProposal, list[str]]:
+    """Coerce and apply deterministic schema repair (API field types).
 
-    current = coerce_canvas_answer_proposal(client, answer, canvas)
+    Returns ``(normalized_proposal, [])`` when valid, or ``(last_attempt, errors)``.
+    """
+    temp = CanvasAnswer(
+        answer=".",
+        confidence=0.5,
+        proposal=proposal,
+    )
+    current = coerce_canvas_answer_proposal(client, temp, canvas)
     if current.proposal is None:
-        return current
+        return proposal, ["proposal_missing_after_coerce"]
 
     schema_cache: dict[str, list[dict[str, Any]] | None] = {}
     node_config_cache: dict[str, dict[str, Any]] = {}
 
     operations = list(current.proposal.operations)
+    proposal_acc = current.proposal
+
     for _ in range(_MAX_DETERMINISTIC_PASSES):
         errs = list_proposal_configuration_errors(
             client, operations, canvas, schema_cache, node_config_cache
         )
         if not errs:
-            new_proposal = current.proposal.model_copy(update={"operations": operations})
-            return current.model_copy(update={"proposal": new_proposal})
+            return proposal_acc.model_copy(update={"operations": operations}), []
+
         operations = _repair_operations_locally(
             client, operations, canvas, schema_cache, node_config_cache
         )
-        current = current.model_copy(
-            update={"proposal": current.proposal.model_copy(update={"operations": operations})}
+        proposal_acc = proposal_acc.model_copy(update={"operations": operations})
+        recoerced = coerce_canvas_answer_proposal(
+            client,
+            CanvasAnswer(answer=".", confidence=0.5, proposal=proposal_acc),
+            canvas,
         )
-        current = coerce_canvas_answer_proposal(client, current, canvas)
-        if current.proposal is None:
-            return current
-        operations = list(current.proposal.operations)
+        if recoerced.proposal is None:
+            return proposal_acc, ["proposal_missing_after_coerce"]
+        operations = list(recoerced.proposal.operations)
+        proposal_acc = recoerced.proposal
 
     flat_errors = [
         f"[op {idx}] {msg}"
@@ -368,40 +334,33 @@ async def finalize_canvas_answer_proposal_async(
             node_config_cache,
         )
     ]
+    return proposal_acc, flat_errors
 
-    if flat_errors and repair_model:
-        fixed = await _llm_repair_proposal(
-            repair_model,
-            current.proposal.summary,
-            operations,
-            flat_errors,
-        )
-        if fixed is not None and len(fixed.operations) == len(operations):
-            current = current.model_copy(
-                update={"proposal": fixed},
-            )
-            current = coerce_canvas_answer_proposal(client, current, canvas)
-            if current.proposal:
-                operations = list(current.proposal.operations)
-                flat_errors = [
-                    f"[op {idx}] {msg}"
-                    for idx, msg in list_proposal_configuration_errors(
-                        client, operations, canvas, schema_cache, node_config_cache
-                    )
-                ]
 
-    if flat_errors:
-        note = (
-            "\n\nCould not auto-fix every proposed node configuration "
-            f"({len(flat_errors)} schema issue(s)). The structured proposal was removed "
-            "so Apply is not blocked; retry or adjust nodes manually."
-        )
-        _LOG.info("proposal validation still failing after repair: %s", flat_errors[:10])
-        return current.model_copy(
-            update={
-                "proposal": None,
-                "answer": (current.answer or "").rstrip() + note,
-            }
-        )
+def apply_deterministic_proposal_finalize_to_answer(
+    client: SuperplaneClient,
+    answer: CanvasAnswer,
+    canvas: CanvasSummary | None,
+) -> CanvasAnswer:
+    """Post-run safety net: normalize proposal or strip it if still invalid."""
+    if answer.proposal is None or not answer.proposal.operations:
+        return answer
 
-    return current
+    normalized, errs = finalize_canvas_proposal_deterministic(
+        client, answer.proposal, canvas
+    )
+    if not errs:
+        return answer.model_copy(update={"proposal": normalized})
+
+    note = (
+        "\n\nCould not auto-fix every proposed node configuration "
+        f"({len(errs)} schema issue(s)). The structured proposal was removed "
+        "so Apply is not blocked; retry or adjust nodes manually."
+    )
+    _LOG.info("post-run proposal validation failed: %s", errs[:10])
+    return answer.model_copy(
+        update={
+            "proposal": None,
+            "answer": (answer.answer or "").rstrip() + note,
+        }
+    )
