@@ -2,7 +2,7 @@
 title: "Grafana"
 ---
 
-Connect Grafana alerts and data queries to SuperPlane workflows
+Connect Grafana alerts, alert rules, and data queries to SuperPlane workflows
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -15,7 +15,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Alert Rule" href="#create-alert-rule" description="Create a Grafana-managed alert rule from structured alert settings" />
+  <LinkCard title="Delete Alert Rule" href="#delete-alert-rule" description="Delete an existing Grafana-managed alert rule" />
+  <LinkCard title="Get Alert Rule" href="#get-alert-rule" description="Retrieve a Grafana-managed alert rule by UID" />
+  <LinkCard title="List Alert Rules" href="#list-alert-rules" description="List Grafana-managed alert rules for the connected Grafana instance" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
+  <LinkCard title="Update Alert Rule" href="#update-alert-rule" description="Update an existing Grafana-managed alert rule from structured alert settings" />
 </CardGrid>
 
 ## Instructions
@@ -41,7 +46,7 @@ The On Alert Firing trigger starts a workflow when Grafana Unified Alerting send
 
 1. SuperPlane automatically creates or updates a Grafana Webhook contact point and notification policy route for this trigger when provisioning succeeds.
 2. SuperPlane manages webhook bearer authentication automatically.
-3. If Grafana provisioning is unavailable or rejected, manual setup may still be required.
+3. Provisioning requires a Grafana integration with **Base URL** and **Service Account Token** and sufficient permissions for alerting and provisioning APIs.
 
 ### Configuration
 
@@ -85,6 +90,237 @@ The trigger emits the full Grafana webhook payload, including:
 }
 ```
 
+<a id="create-alert-rule"></a>
+
+## Create Alert Rule
+
+The Create Alert Rule component creates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Monitoring onboarding**: create baseline alerts when a new service or environment is provisioned
+- **Incident automation**: create temporary alert rules during an incident or validation workflow
+- **Policy rollout**: standardize alert coverage across teams using a shared rule definition
+
+### Configuration
+
+- **Title**: Human-readable alert name shown in Grafana
+- **Folder**: Existing Grafana folder that should contain the rule
+- **Rule Group**: Grafana rule group to create the rule in
+- **Data Source**: Existing Grafana data source the query should use
+- **Query**: Expression Grafana evaluates when checking the alert
+- **Lookback Window**: How far back to query when evaluating the rule
+- **Reducer / Condition / Threshold(s)**: How the series is reduced, how it is compared to thresholds, and optional upper bound for range conditions
+- **For**: How long the condition must hold before firing
+- **No Data / Execution Error State**: Grafana behavior when the query returns no data or errors
+- **Contact Point**: Optional Grafana contact point for notifications when the rule fires
+- **Labels / Annotations**: Optional routing and context metadata attached to the rule
+- **Paused**: Whether the rule starts paused
+
+### Output
+
+Returns the created Grafana alert rule object, including identifiers and evaluation metadata.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "A",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
+<a id="delete-alert-rule"></a>
+
+## Delete Alert Rule
+
+The Delete Alert Rule component deletes a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Alert cleanup**: remove temporary or obsolete rules after a rollout or incident
+- **Service retirement**: delete rules that are no longer needed when an environment is decommissioned
+- **Controlled cleanup**: pair deletions with approvals, notifications, or audit workflows
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule UID to delete
+
+### Output
+
+Returns a confirmation object with the deleted alert rule UID, title, and deletion status.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRuleDeleted"
+}
+```
+
+<a id="get-alert-rule"></a>
+
+## Get Alert Rule
+
+The Get Alert Rule component fetches a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Configuration review**: inspect the current source of truth before changing a rule
+- **Workflow enrichment**: include alert rule details in notifications, tickets, or approvals
+- **Drift checks**: compare the current Grafana rule against an expected configuration
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule UID to retrieve
+
+### Output
+
+Returns the full Grafana alert rule object, including title, folder, group, condition, queries, labels, and annotations.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "A",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
+}
+```
+
+<a id="list-alert-rules"></a>
+
+## List Alert Rules
+
+The List Alert Rules component lists Grafana-managed alert rules using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Alert audits**: review which Grafana alert rules currently exist
+- **Workflow enrichment**: send alert inventories to Slack, Jira, or documentation steps
+- **Follow-up automation**: feed alert rule summaries into downstream review or cleanup workflows
+
+### Configuration
+
+All fields are optional:
+
+- **Folder**: When set, only alert rules in this Grafana folder are listed
+- **Rule Group**: When set, only rules in this Grafana rule group are listed
+
+When both are omitted, the component lists alert rules across the instance (subject to Grafana permissions).
+
+### Output
+
+Returns an object containing the list of Grafana alert rule summaries, including each rule UID and title.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertRules": [
+      {
+        "title": "High error rate",
+        "uid": "cergr5pm79hj4d"
+      },
+      {
+        "title": "High latency",
+        "uid": "aer9k2pm71sh2b"
+      },
+      {
+        "title": "Service unavailable",
+        "uid": "bfg4m1rt63hj8q"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.alertRules"
+}
+```
+
 <a id="query-data-source"></a>
 
 ## Query Data Source
@@ -101,8 +337,8 @@ The Query Data Source component executes a query against a Grafana data source u
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional range as Grafana relative times (e.g. now-5m, now), RFC3339 timestamps, or local datetimes (2006-01-02T15:04) with **Timezone** below
+- **Timezone**: Required for local datetime strings without an offset; ignored for relative times and RFC3339 values
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -150,6 +386,80 @@ Returns the Grafana query API response JSON.
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.query.result"
+}
+```
+
+<a id="update-alert-rule"></a>
+
+## Update Alert Rule
+
+The Update Alert Rule component updates a Grafana-managed alert rule using the Alerting Provisioning HTTP API.
+
+### Use Cases
+
+- **Threshold tuning**: refine alert conditions after incidents or noisy periods
+- **Ownership changes**: update labels and annotations used for routing and context
+- **Rollout safety**: adjust alert rules during migrations or environment transitions
+
+### Configuration
+
+- **Alert Rule**: The Grafana alert rule UID to update
+- **All other fields are optional**: only the values you provide will be changed
+- **Folder / Rule Group**: Optional location changes for the rule in Grafana
+- **Data Source / Query**: Optional query details Grafana evaluates
+- **Lookback / Reducer / Condition / Threshold(s)**: Optional changes to evaluation and thresholds
+- **Contact Point**: Set to a contact point to attach notifications; clear the value to remove notification settings from the rule
+- **Labels / Annotations**: Optional metadata to update alongside the rule
+
+### Output
+
+Returns the updated Grafana alert rule object after the provisioning API applies the change.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "annotations": {
+      "summary": "High error rate detected"
+    },
+    "condition": "A",
+    "data": [
+      {
+        "datasourceUid": "prometheus-main",
+        "model": {
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "intervalMs": 1000,
+          "maxDataPoints": 43200,
+          "refId": "A"
+        },
+        "queryType": "",
+        "refId": "A",
+        "relativeTimeRange": {
+          "from": 300,
+          "to": 0
+        }
+      }
+    ],
+    "execErrState": "Alerting",
+    "folderUID": "infra",
+    "for": "5m",
+    "id": 42,
+    "isPaused": false,
+    "labels": {
+      "service": "api",
+      "severity": "critical"
+    },
+    "noDataState": "NoData",
+    "orgID": 1,
+    "ruleGroup": "service-health",
+    "title": "High error rate",
+    "uid": "cergr5pm79hj4d",
+    "updated": "2026-03-31T10:20:30Z"
+  },
+  "timestamp": "2026-03-31T10:20:30Z",
+  "type": "grafana.alertRule"
 }
 ```
 
