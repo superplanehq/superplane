@@ -178,9 +178,6 @@ export const sshMapper: ComponentBaseMapper = {
     if (stderr !== undefined && stderr !== "") {
       details["Stderr"] = stderr;
     }
-    if (context.execution.resultMessage) {
-      details["Error"] = context.execution.resultMessage;
-    }
 
     return details;
   },

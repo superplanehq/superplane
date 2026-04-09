@@ -78,8 +78,6 @@ interface ComponentSidebarProps {
   // Execution and Queue actions
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  onPushThrough?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
 
   // Full history props
   getAllHistoryEvents?: () => SidebarEvent[];
@@ -181,8 +179,6 @@ export const ComponentSidebar = ({
   getTabData,
   onCancelQueueItem,
   onCancelExecution,
-  onPushThrough,
-  supportsPushThrough,
   onLoadMoreHistory,
   getAllHistoryEvents,
   getHasMoreHistory,
@@ -722,8 +718,6 @@ export const ComponentSidebar = ({
                 getTabData={getTabData}
                 onCancelQueueItem={onCancelQueueItem}
                 onCancelExecution={onCancelExecution}
-                onPushThrough={onPushThrough}
-                supportsPushThrough={supportsPushThrough}
                 onReEmit={onReEmit}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
@@ -826,9 +820,7 @@ export const ComponentSidebar = ({
                         }
                       }}
                       getTabData={getTabData}
-                      onPushThrough={onPushThrough}
                       onCancelExecution={onCancelExecution}
-                      supportsPushThrough={supportsPushThrough}
                       onReEmit={onReEmit}
                       loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}

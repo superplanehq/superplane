@@ -629,7 +629,7 @@ describe("runEvaluationMapper.getExecutionDetails", () => {
     });
     const details = runEvaluationMapper.getExecutionDetails(ctx);
     expect(details["Test Case"]).toBe("Bad Test");
-    expect(details["Error"]).toBe("timeout");
+    expect(details["Evaluation Error"]).toBe("timeout");
   });
 
   it("prefers passed output over failed when both are present", () => {

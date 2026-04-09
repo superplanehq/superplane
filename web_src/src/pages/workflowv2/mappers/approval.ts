@@ -1,4 +1,3 @@
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -95,7 +94,7 @@ export const APPROVAL_STATE_MAP: EventStateMap = {
 /**
  * Approval-specific state logic function
  */
-export const approvalStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const approvalStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (
     execution.resultMessage &&
     (execution.resultReason === "RESULT_REASON_ERROR" ||
