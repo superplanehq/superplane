@@ -3,11 +3,9 @@ import type {
   ComponentsEdge,
   ComponentsIntegrationRef,
   ComponentsNode,
-  ConfigurationField,
   OrganizationsIntegration,
 } from "@/api-client";
 import type { AiCanvasOperation, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
-import { filterVisibleConfiguration } from "@/lib/components";
 import { generateNodeId, generateUniqueNodeName } from "./utils";
 
 type ApplyAiOperationsToWorkflowInput = {
@@ -246,19 +244,6 @@ export function applyAiOperationsToWorkflow({
         continue;
       }
 
-      const schemaValidationErrors = validateConfigurationBySchema(
-        operation.configuration || {},
-        block.configuration || [],
-      );
-      if (schemaValidationErrors.length > 0) {
-        throw new Error(`Invalid node configuration for '${block.name}': ${schemaValidationErrors.join("; ")}`);
-      }
-
-      const filteredConfiguration = filterVisibleConfiguration(
-        operation.configuration || {},
-        block.configuration || [],
-      );
-
       const existingNodeNames = updatedNodes.map((node) => node.name || "").filter(Boolean);
       const uniqueNodeName = generateUniqueNodeName(operation.nodeName || block.name || "node", existingNodeNames);
       const newNodeId = generateNodeId(block.name || "node", uniqueNodeName);
@@ -274,7 +259,7 @@ export function applyAiOperationsToWorkflow({
               : block.name === "annotation"
                 ? "TYPE_WIDGET"
                 : "TYPE_COMPONENT",
-        configuration: filteredConfiguration,
+        configuration: operation.configuration || {},
         position: operation.position
           ? {
               x: Math.round(operation.position.x),
@@ -372,26 +357,17 @@ export function applyAiOperationsToWorkflow({
       }
 
       const targetNode = updatedNodes[nodeIndex];
-      const targetBlockName = getBlockNameForNodeRef(operation.target);
-      const targetBlock = targetBlockName ? blockLookup.get(targetBlockName) : undefined;
-      const mergedConfiguration = {
+      const configuration = {
         ...(targetNode.configuration || {}),
         ...(operation.configuration || {}),
       };
-      const targetSchema = targetBlock?.configuration || [];
-      if (targetSchema.length > 0) {
-        const schemaValidationErrors = validateConfigurationBySchema(mergedConfiguration, targetSchema);
-        if (schemaValidationErrors.length > 0) {
-          throw new Error(`Invalid node configuration for '${targetBlockName}': ${schemaValidationErrors.join("; ")}`);
-        }
-      }
-      const nextConfiguration =
-        targetSchema.length > 0 ? filterVisibleConfiguration(mergedConfiguration, targetSchema) : mergedConfiguration;
+
       updatedNodes[nodeIndex] = {
         ...targetNode,
         name: operation.nodeName || targetNode.name,
-        configuration: nextConfiguration,
+        configuration: configuration,
       };
+
       continue;
     }
 
@@ -425,90 +401,4 @@ export function applyAiOperationsToWorkflow({
       edges: updatedEdges,
     },
   };
-}
-
-// Validate configuration by schema
-
-const LIST_LIKE_FIELD_TYPES = new Set(["multi-select", "list", "any-predicate-list", "days-of-week"]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function validateConfigurationBySchema(
-  configuration: Record<string, unknown>,
-  fields: ConfigurationField[],
-  pathPrefix = "configuration",
-): string[] {
-  const errors: string[] = [];
-  const fieldsByName = new Map(fields.map((field) => [field.name || "", field]));
-
-  for (const [name, value] of Object.entries(configuration)) {
-    const field = fieldsByName.get(name);
-    if (!field?.type) {
-      continue;
-    }
-    errors.push(...validateConfigurationFieldValue(field, value, `${pathPrefix}.${name}`));
-  }
-
-  return errors;
-}
-
-function validateConfigurationFieldValue(field: ConfigurationField, value: unknown, fieldPath: string): string[] {
-  if (!field.type) {
-    return [];
-  }
-
-  if (LIST_LIKE_FIELD_TYPES.has(field.type)) {
-    return validateListLikeConfigurationField(field, value, fieldPath);
-  }
-
-  if (field.type === "object") {
-    return validateObjectConfigurationField(field, value, fieldPath);
-  }
-
-  if (field.type === "number" && typeof value !== "number") {
-    return [`${fieldPath} must be a number`];
-  }
-
-  if (field.type === "boolean" && typeof value !== "boolean") {
-    return [`${fieldPath} must be a boolean`];
-  }
-
-  return [];
-}
-
-function validateListLikeConfigurationField(field: ConfigurationField, value: unknown, fieldPath: string): string[] {
-  if (!Array.isArray(value)) {
-    return [`${fieldPath} must be an array for field type '${field.type}'`];
-  }
-
-  const itemSchema = field.typeOptions?.list?.itemDefinition?.schema;
-  if (!itemSchema) {
-    return [];
-  }
-
-  const errors: string[] = [];
-  for (let index = 0; index < value.length; index += 1) {
-    const item = value[index];
-    if (!isRecord(item)) {
-      continue;
-    }
-    errors.push(...validateConfigurationBySchema(item, itemSchema, `${fieldPath}[${index}]`));
-  }
-
-  return errors;
-}
-
-function validateObjectConfigurationField(field: ConfigurationField, value: unknown, fieldPath: string): string[] {
-  if (!isRecord(value)) {
-    return [`${fieldPath} must be an object`];
-  }
-
-  const objectSchema = field.typeOptions?.object?.schema;
-  if (!objectSchema) {
-    return [];
-  }
-
-  return validateConfigurationBySchema(value, objectSchema, fieldPath);
 }
