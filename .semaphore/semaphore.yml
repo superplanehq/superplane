@@ -42,7 +42,7 @@ blocks:
             - make lint
         - name: Unit Tests
           commands:
-            - make test.coverage
+            - make test.coverage.check
         - name: E2E Tests
           parallelism: 10
           commands:
