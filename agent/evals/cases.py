@@ -12,6 +12,7 @@ dataset = Dataset(
                 "Build me a basic workflow that starts with a manual run and runs two noop actions"
             ),
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("start"),
                 evals.CanvasHasNode("noop", count=2),
                 evals.CanvasTotalNodeCount(count=3),
@@ -23,6 +24,7 @@ dataset = Dataset(
                 "Listen to pull-request comments and send a slack message when a comment is made"
             ),
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("github.onPRComment"),
                 evals.CanvasHasNode("slack.sendTextMessage", count=1),
                 evals.CanvasTotalNodeCount(count=2),
@@ -35,6 +37,7 @@ dataset = Dataset(
                 "that includes the issue title"
             ),
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("github.onIssue"),
                 evals.CanvasHasNode("discord.sendTextMessage"),
                 evals.CanvasTotalNodeCount(count=2),
@@ -49,6 +52,7 @@ dataset = Dataset(
                 "and the time the filter node was executed"
             ),
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("github.onPRComment"),
                 evals.CanvasHasNode("filter"),
                 evals.CanvasHasNode("slack.sendTextMessage"),
@@ -68,6 +72,7 @@ dataset = Dataset(
                 "On PR close or after 48 hours, tear it down."
             ),
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("github.onPullRequest"),
                 evals.CanvasHasNode("daytona.createRepositorySandbox"),
                 evals.CanvasHasNode("wait"),
@@ -94,6 +99,7 @@ dataset = Dataset(
             name="agent_labeled_issue_auto_resolve",
             inputs="Build a workflow that auto-resolves GitHub issues",
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("github.onIssue"),
                 evals.CanvasHasWorkflow(
                     "github.onIssue",
@@ -113,6 +119,7 @@ dataset = Dataset(
                 "if that PR had been open for more than an hour."
             ),
             evaluators=(
+                evals.CalledValidateCanvasProposal(),
                 evals.CanvasHasTrigger("github.onPullRequest"),
                 evals.CanvasHasNode("filter", count=1),
                 evals.CanvasHasWorkflow(
