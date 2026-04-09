@@ -77,7 +77,7 @@ func Test__IndexKnowledgeBase__Execute(t *testing.T) {
 	}`
 
 	startJobResponse := `{
-		"index_job": {
+		"job": {
 			"uuid": "job-uuid-1",
 			"status": "INDEX_JOB_STATUS_PENDING",
 			"knowledge_base_uuid": "kb-uuid-1"
@@ -112,6 +112,10 @@ func Test__IndexKnowledgeBase__Execute(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, executionState.Passed)
 		require.Equal(t, "poll", requests.Action)
+
+		stored, ok := metadata.Metadata.(indexKBMetadata)
+		require.True(t, ok)
+		require.Equal(t, "job-uuid-1", stored.JobID)
 	})
 
 	t.Run("returns error when start job fails", func(t *testing.T) {
