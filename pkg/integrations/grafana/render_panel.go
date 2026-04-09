@@ -56,8 +56,8 @@ func (c *RenderPanel) Documentation() string {
 - **Panel**: The panel to render
 - **Width**: Image width in pixels (default 1000)
 - **Height**: Image height in pixels (default 500)
-- **From**: Start of the time range (e.g. now-1h)
-- **To**: End of the time range (e.g. now)
+- **From**: Optional expression for the start of the time range (e.g. ` + "`{{now() - duration(\"1h\")}}`" + `)
+- **To**: Optional expression for the end of the time range (e.g. ` + "`{{now()}}`" + `)
 
 ## Output
 

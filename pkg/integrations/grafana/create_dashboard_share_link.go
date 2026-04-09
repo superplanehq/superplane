@@ -53,8 +53,8 @@ func (c *CreateDashboardShareLink) Documentation() string {
 
 - **Dashboard**: The Grafana dashboard UID for the share link
 - **Panel**: If set, link opens the dashboard at this specific panel
-- **From**: Start of the time range (e.g. now-1h)
-- **To**: End of the time range (e.g. now)
+- **From**: Optional expression for the start of the time range (e.g. ` + "`{{now() - duration(\"1h\")}}`" + `)
+- **To**: Optional expression for the end of the time range (e.g. ` + "`{{now()}}`" + `)
 
 ## Output
 
@@ -105,16 +105,18 @@ func (c *CreateDashboardShareLink) Configuration() []configuration.Field {
 		{
 			Name:        "from",
 			Label:       "From",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "Start of the time range (e.g. now-1h)",
+			Description: "Start of the time range",
+			Placeholder: "e.g. {{now() - duration(\"1h\")}}",
 		},
 		{
 			Name:        "to",
 			Label:       "To",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeExpression,
 			Required:    false,
-			Description: "End of the time range (e.g. now)",
+			Description: "End of the time range",
+			Placeholder: "e.g. {{now()}}",
 		},
 	}
 }

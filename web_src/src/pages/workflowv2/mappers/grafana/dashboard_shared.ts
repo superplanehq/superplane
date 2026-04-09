@@ -96,7 +96,8 @@ export function buildGrafanaEventSections(
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
   const subtitleTimestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : legacy ? "-" : "";
+  const emptySubtitle = legacy ? "-" : "";
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : emptySubtitle;
 
   const receivedAtRaw = legacy ? execution.createdAt : execution.createdAt || execution.updatedAt;
   const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : undefined;
