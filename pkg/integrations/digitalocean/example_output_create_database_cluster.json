@@ -15,7 +15,7 @@
     "private_network_uuid": "7e6d2691-182b-4dd1-8452-529f88feb996",
     "region": "nyc1",
     "size": "db-s-1vcpu-1gb",
-    "status": "creating",
+    "status": "online",
     "version": "18.0"
   },
   "timestamp": "2026-03-27T13:00:05Z",
