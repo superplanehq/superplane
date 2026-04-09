@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvas } from "@/api-client";
-import { applyHorizontalAutoLayout } from "./autoLayout";
+import { ElkLayoutEngine } from "@/lib/layout";
 
-describe("applyHorizontalAutoLayout", () => {
-  it("does not crash when an edge channel is missing from channelsByNodeId", async () => {
+describe("ElkLayoutEngine", () => {
+  it("does not crash when an edge channel is missing from outputChannelsByNodeId", async () => {
     const workflow: CanvasesCanvas = {
       metadata: {
         id: "canvas-1",
@@ -36,16 +36,11 @@ describe("applyHorizontalAutoLayout", () => {
       },
     };
 
-    const channelsByNodeId = new Map<string, string[]>([
-      ["list-main-changes", ["default"]],
-      ["notify", ["default"]],
-    ]);
-
+    const autoLayout = new ElkLayoutEngine();
     await expect(
-      applyHorizontalAutoLayout(workflow, {
+      autoLayout.apply(workflow, {
         scope: "connected-component",
         nodeIds: ["list-main-changes"],
-        channelsByNodeId,
       }),
     ).resolves.toMatchObject({
       spec: {
@@ -112,16 +107,9 @@ describe("applyHorizontalAutoLayout", () => {
       },
     };
 
-    const channelsByNodeId = new Map<string, string[]>([
-      ["component-a-1", ["default"]],
-      ["component-a-2", ["default"]],
-      ["component-b-1", ["default"]],
-      ["component-b-2", ["default"]],
-    ]);
-
-    const result = await applyHorizontalAutoLayout(workflow, {
+    const autoLayout = new ElkLayoutEngine();
+    const result = await autoLayout.apply(workflow, {
       scope: "full-canvas",
-      channelsByNodeId,
     });
 
     const byId = new Map((result.spec?.nodes || []).map((node) => [node.id!, node]));

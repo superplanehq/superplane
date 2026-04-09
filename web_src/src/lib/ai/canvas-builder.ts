@@ -1,11 +1,14 @@
 import type {
+  BlueprintsBlueprint,
   CanvasesCanvas,
+  ComponentsComponent,
   ComponentsEdge,
   ComponentsIntegrationRef,
   ComponentsNode,
   ComponentsNodeType,
   OrganizationsIntegration,
 } from "@/api-client";
+import type { LayoutEngine } from "@/lib/layout";
 import type { BuildingBlock, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { generateNodeId, generateUniqueNodeName } from "@/pages/workflowv2/utils";
 import type {
@@ -24,41 +27,43 @@ type ScoredChannel = {
   description: string;
 };
 
+export type CanvasBuilderOptions = {
+  canvas: CanvasesCanvas;
+  buildingBlocks: BuildingBlockCategory[];
+  integrations?: OrganizationsIntegration[];
+  components?: ComponentsComponent[];
+  blueprints?: BlueprintsBlueprint[];
+};
+
 /*
  * Applies a list of AI-generated canvas operations to a canvas.
  * The operations are applied in the order they are provided.
  *
- * @param canvas - The canvas to apply the operations to.
- * @param buildingBlocks - The building blocks to use for the canvas.
- * @param integrations - The integrations to use for the canvas.
+ * @param options - Builder configuration with canvas, building blocks and optional metadata.
  * @returns The updated canvas.
  */
 export class CanvasBuilder {
-  private readonly canvas: CanvasesCanvas;
-  private readonly integrations: OrganizationsIntegration[];
+  private readonly options: CanvasBuilderOptions;
   private readonly blockLookup: Map<string, BuildingBlockCategory["blocks"][number]>;
   private createdNodeIdsByKey: Map<string, string>;
   private addedNodeBlockNameByKey: Map<string, string>;
+  private addedNodeIds: Set<string>;
   private updatedNodes: ComponentsNode[];
   private updatedEdges: ComponentsEdge[];
 
-  constructor(
-    canvas: CanvasesCanvas,
-    buildingBlocks: BuildingBlockCategory[],
-    integrations: OrganizationsIntegration[] = [],
-  ) {
-    this.canvas = canvas;
-    this.integrations = integrations;
+  constructor(options: CanvasBuilderOptions) {
+    this.options = options;
     this.blockLookup = new Map(
-      buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
+      options.buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
     );
     this.createdNodeIdsByKey = new Map();
     this.addedNodeBlockNameByKey = new Map();
+    this.addedNodeIds = new Set();
     this.updatedNodes = [];
     this.updatedEdges = [];
   }
 
-  apply(operations: CanvasOperation[]): CanvasesCanvas {
+  async apply(operations: CanvasOperation[], layout?: LayoutEngine): Promise<CanvasesCanvas> {
     this.initializeState(operations);
 
     for (const operation of operations) {
@@ -79,21 +84,38 @@ export class CanvasBuilder {
       }
     }
 
-    return {
-      ...this.canvas,
+    const updatedCanvas = {
+      ...this.options.canvas,
       spec: {
-        ...this.canvas.spec,
+        ...this.options.canvas.spec,
         nodes: this.updatedNodes,
         edges: this.updatedEdges,
       },
     };
+
+    //
+    // If no layout engine is provided or no new nodes were added, return the updated canvas.
+    //
+    if (!layout || this.addedNodeIds.size === 0) {
+      return updatedCanvas;
+    }
+
+    //
+    // Otherwise, apply the layout engine to the updated canvas,
+    // so new nodes are positioned correctly.
+    //
+    return layout.apply(updatedCanvas, {
+      components: this.options.components || [],
+      blueprints: this.options.blueprints || [],
+    });
   }
 
   private initializeState(operations: CanvasOperation[]): void {
     this.createdNodeIdsByKey = new Map();
     this.addedNodeBlockNameByKey = new Map();
-    this.updatedNodes = [...(this.canvas.spec?.nodes || [])];
-    this.updatedEdges = [...(this.canvas.spec?.edges || [])];
+    this.addedNodeIds = new Set();
+    this.updatedNodes = [...(this.options.canvas.spec?.nodes || [])];
+    this.updatedEdges = [...(this.options.canvas.spec?.edges || [])];
 
     for (const operation of operations) {
       if (operation.type === "add_node" && operation.nodeKey) {
@@ -308,7 +330,7 @@ export class CanvasBuilder {
       position: this.positionFromOperation(operation),
     };
 
-    const integrationRef = resolveIntegrationRefForBlock(block.integrationName, this.integrations);
+    const integrationRef = resolveIntegrationRefForBlock(block.integrationName, this.options.integrations || []);
     if (integrationRef) {
       newNode.integration = integrationRef;
     }
@@ -325,6 +347,7 @@ export class CanvasBuilder {
     }
 
     this.updatedNodes.push(newNode);
+    this.addedNodeIds.add(newNodeId);
     if (operation.nodeKey) {
       this.createdNodeIdsByKey.set(operation.nodeKey, newNodeId);
     }
@@ -411,7 +434,11 @@ export class CanvasBuilder {
       return;
     }
 
+    const targetNodeId = this.updatedNodes[nodeIndex]?.id;
     this.updatedNodes.splice(nodeIndex, 1);
+    if (typeof targetNodeId === "string") {
+      this.addedNodeIds.delete(targetNodeId);
+    }
     for (let edgeIndex = this.updatedEdges.length - 1; edgeIndex >= 0; edgeIndex -= 1) {
       const edge = this.updatedEdges[edgeIndex];
       if (edge.sourceId === targetId || edge.targetId === targetId) {
