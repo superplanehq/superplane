@@ -8,7 +8,7 @@ option go_package = "github.com/superplanehq/superplane/pkg/protos/private/agent
 
 //
 // The internal gRPC service exposed by the Agent Service.
-// This is used by SuperPlane for /api/v1/agents/* endpoints.
+// SuperPlane's public HTTP for builder chats lives under /api/v1/agents/builder/* (see protos/agents.proto).
 // See: protos/agents.proto
 //
 service Agents {

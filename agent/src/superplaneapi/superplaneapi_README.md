@@ -64,11 +64,12 @@ All URIs are relative to *http://localhost*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
-*AgentApi* | [**agents_create_agent_chat**](superplaneapi/docs/AgentApi.md#agents_create_agent_chat) | **POST** /api/v1/agents/chats | Creates a new agent chat
-*AgentApi* | [**agents_describe_agent_chat**](superplaneapi/docs/AgentApi.md#agents_describe_agent_chat) | **GET** /api/v1/agents/chats/{chatId} | Describes an agent chat for the authenticated user
-*AgentApi* | [**agents_list_agent_chat_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_chat_messages) | **GET** /api/v1/agents/chats/{chatId}/messages | List the messages in an agent chat
-*AgentApi* | [**agents_list_agent_chats**](superplaneapi/docs/AgentApi.md#agents_list_agent_chats) | **GET** /api/v1/agents/chats | List agent chats for the authenticated user
-*AgentApi* | [**agents_resume_agent_chat**](superplaneapi/docs/AgentApi.md#agents_resume_agent_chat) | **POST** /api/v1/agents/chats/{chatId}/resume | Resume an agent chat
+*AgentApi* | [**agents_create_agent_chat**](superplaneapi/docs/AgentApi.md#agents_create_agent_chat) | **POST** /api/v1/agents/builder/chats | Creates a new agent chat
+*AgentApi* | [**agents_describe_agent_chat**](superplaneapi/docs/AgentApi.md#agents_describe_agent_chat) | **GET** /api/v1/agents/builder/chats/{chatId} | Describes an agent chat for the authenticated user
+*AgentApi* | [**agents_list_agent_chat_messages**](superplaneapi/docs/AgentApi.md#agents_list_agent_chat_messages) | **GET** /api/v1/agents/builder/chats/{chatId}/messages | List the messages in an agent chat
+*AgentApi* | [**agents_list_agent_chats**](superplaneapi/docs/AgentApi.md#agents_list_agent_chats) | **GET** /api/v1/agents/builder/chats | List agent chats for the authenticated user
+*AgentApi* | [**agents_prepare_config_assistant_suggest**](superplaneapi/docs/AgentApi.md#agents_prepare_config_assistant_suggest) | **POST** /api/v1/agents/config/prepare-suggest | Prepare config assistant field suggest
+*AgentApi* | [**agents_resume_agent_chat**](superplaneapi/docs/AgentApi.md#agents_resume_agent_chat) | **POST** /api/v1/agents/builder/chats/{chatId}/resume | Resume an agent chat
 *BlueprintApi* | [**blueprints_create_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_create_blueprint) | **POST** /api/v1/blueprints | Create blueprint
 *BlueprintApi* | [**blueprints_delete_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_delete_blueprint) | **DELETE** /api/v1/blueprints/{id} | Delete blueprint
 *BlueprintApi* | [**blueprints_describe_blueprint**](superplaneapi/docs/BlueprintApi.md#blueprints_describe_blueprint) | **GET** /api/v1/blueprints/{id} | Describe blueprint
@@ -177,6 +178,8 @@ Class | Method | HTTP request | Description
  - [AgentsDescribeAgentChatResponse](superplaneapi/docs/AgentsDescribeAgentChatResponse.md)
  - [AgentsListAgentChatMessagesResponse](superplaneapi/docs/AgentsListAgentChatMessagesResponse.md)
  - [AgentsListAgentChatsResponse](superplaneapi/docs/AgentsListAgentChatsResponse.md)
+ - [AgentsPrepareConfigAssistantSuggestRequest](superplaneapi/docs/AgentsPrepareConfigAssistantSuggestRequest.md)
+ - [AgentsPrepareConfigAssistantSuggestResponse](superplaneapi/docs/AgentsPrepareConfigAssistantSuggestResponse.md)
  - [AgentsResumeAgentChatBody](superplaneapi/docs/AgentsResumeAgentChatBody.md)
  - [AgentsResumeAgentChatResponse](superplaneapi/docs/AgentsResumeAgentChatResponse.md)
  - [AuthorizationDomainType](superplaneapi/docs/AuthorizationDomainType.md)

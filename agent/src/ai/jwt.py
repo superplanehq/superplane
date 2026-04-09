@@ -5,6 +5,15 @@ import jwt
 from ai.config import config
 from ai.text import normalize_optional
 
+ALLOWED_JWT_PURPOSES = frozenset({"agent-builder", "config-assistant"})
+
+AGENT_BUILDER_PURPOSE = "agent-builder"
+CONFIG_ASSISTANT_PURPOSE = "config-assistant"
+
+
+class WrongScopedPurposeError(ValueError):
+    """Purpose is a known scoped purpose but not valid for this endpoint."""
+
 
 @dataclass(frozen=True)
 class JwtClaims:
@@ -52,8 +61,8 @@ class JwtValidator:
             raise ValueError("Invalid JWT type.")
 
         purpose = payload.get("purpose")
-        if not isinstance(purpose, str) or purpose.strip() != "agent-builder":
-            raise ValueError("purpose is required.")
+        if not isinstance(purpose, str) or purpose.strip() not in ALLOWED_JWT_PURPOSES:
+            raise ValueError("purpose is invalid.")
 
         subject = payload.get("sub")
         if not isinstance(subject, str) or not subject.strip():
@@ -73,6 +82,20 @@ class JwtValidator:
             purpose=purpose.strip(),
             scopes=self._parse_scopes(scopes),
         )
+
+    def decode_agent_builder_token(self, token: str) -> JwtClaims:
+        """Decode scoped JWT; purpose must be agent-builder (AI Builder)."""
+        claims = self.decode(token)
+        if claims.purpose != AGENT_BUILDER_PURPOSE:
+            raise WrongScopedPurposeError("Scoped token purpose is not valid for AI Builder.")
+        return claims
+
+    def decode_config_assistant_token(self, token: str) -> JwtClaims:
+        """Decode a scoped JWT and require purpose config-assistant (inline field suggest)."""
+        claims = self.decode(token)
+        if claims.purpose != CONFIG_ASSISTANT_PURPOSE:
+            raise WrongScopedPurposeError("Scoped token purpose is not valid for config assistant.")
+        return claims
 
     def _parse_scopes(self, raw: list[object]) -> list[str]:
         scopes: list[str] = []

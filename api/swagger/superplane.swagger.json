@@ -64,7 +64,7 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/agents/chats": {
+    "/api/v1/agents/builder/chats": {
       "get": {
         "summary": "List agent chats for the authenticated user",
         "description": "Returns a list of agent chats for the authenticated user",
@@ -128,7 +128,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}": {
+    "/api/v1/agents/builder/chats/{chatId}": {
       "get": {
         "summary": "Describes an agent chat for the authenticated user",
         "description": "Describes an agent chat for the authenticated user",
@@ -166,7 +166,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}/messages": {
+    "/api/v1/agents/builder/chats/{chatId}/messages": {
       "get": {
         "summary": "List the messages in an agent chat",
         "description": "List the messages in an agent chat",
@@ -204,7 +204,7 @@
         ]
       }
     },
-    "/api/v1/agents/chats/{chatId}/resume": {
+    "/api/v1/agents/builder/chats/{chatId}/resume": {
       "post": {
         "summary": "Resume an agent chat",
         "description": "Resumes an agent chat. The response includes the URL and token for resuming the chat",
@@ -236,6 +236,40 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/AgentsResumeAgentChatBody"
+            }
+          }
+        ],
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agents/config/prepare-suggest": {
+      "post": {
+        "summary": "Prepare config assistant field suggest",
+        "description": "Mints a short-lived JWT and returns the agent URL for POST /config-assistant/suggest. The browser should call that URL with the token and the suggest payload.",
+        "operationId": "Agents_PrepareConfigAssistantSuggest",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AgentsPrepareConfigAssistantSuggestResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AgentsPrepareConfigAssistantSuggestRequest"
             }
           }
         ],
@@ -4087,6 +4121,26 @@
             "type": "object",
             "$ref": "#/definitions/AgentsAgentChatInfo"
           }
+        }
+      }
+    },
+    "AgentsPrepareConfigAssistantSuggestRequest": {
+      "type": "object",
+      "properties": {
+        "canvasId": {
+          "type": "string"
+        }
+      }
+    },
+    "AgentsPrepareConfigAssistantSuggestResponse": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "suggestUrl": {
+          "type": "string",
+          "description": "Full URL for POST (e.g. {AGENT_HTTP_URL}/config-assistant/suggest)."
         }
       }
     },

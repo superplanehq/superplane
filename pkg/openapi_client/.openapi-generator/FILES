@@ -33,6 +33,8 @@ docs/AgentsCreateAgentChatResponse.md
 docs/AgentsDescribeAgentChatResponse.md
 docs/AgentsListAgentChatMessagesResponse.md
 docs/AgentsListAgentChatsResponse.md
+docs/AgentsPrepareConfigAssistantSuggestRequest.md
+docs/AgentsPrepareConfigAssistantSuggestResponse.md
 docs/AgentsResumeAgentChatBody.md
 docs/AgentsResumeAgentChatResponse.md
 docs/AuthorizationDomainType.md
@@ -278,6 +280,8 @@ model_agents_create_agent_chat_response.go
 model_agents_describe_agent_chat_response.go
 model_agents_list_agent_chat_messages_response.go
 model_agents_list_agent_chats_response.go
+model_agents_prepare_config_assistant_suggest_request.go
+model_agents_prepare_config_assistant_suggest_response.go
 model_agents_resume_agent_chat_body.go
 model_agents_resume_agent_chat_response.go
 model_authorization_domain_type.go
