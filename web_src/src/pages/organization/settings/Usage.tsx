@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
+import { Activity, Cpu, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -105,6 +105,7 @@ function UsageContent({
     [data.limits, memberCount, integrationCount],
   );
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
+  const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
   const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
   return (
@@ -119,7 +120,7 @@ function UsageContent({
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         <UsageMetricCard
           title="Canvases"
           value={canvasUsage.value}
@@ -133,6 +134,13 @@ function UsageContent({
           subtitle={eventUsage.subtitle}
           progress={eventUsage.progress}
           icon={Activity}
+        />
+        <UsageMetricCard
+          title="Agent Token Budget"
+          value={agentTokenUsage.value}
+          subtitle={agentTokenUsage.subtitle}
+          progress={agentTokenUsage.progress}
+          icon={Cpu}
         />
       </div>
 
@@ -215,14 +223,45 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
   const nextDecreaseAt = data?.usage?.nextEventBucketDecreaseAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const capacityLabel = isUnlimited ? "∞" : formatNumber(capacity ?? 0);
-  const value = `${formatNumber(displayedLevel)} / ${capacityLabel}`;
+  const value = isUnlimited
+    ? `${formatNumber(displayedLevel)} consumed`
+    : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
 
   return {
     value,
     subtitle: formatEventUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
     progress: isUnlimited ? null : percentage(displayedLevel, capacity),
   };
+}
+
+function buildAgentTokenUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
+  const level = data?.usage?.agentTokenBucketLevel ?? 0;
+  const displayedLevel = Math.max(0, Math.ceil(level));
+  const capacity = data?.usage?.agentTokenBucketCapacity;
+  const lastUpdatedAt = data?.usage?.agentTokenBucketLastUpdatedAt;
+  const nextDecreaseAt = data?.usage?.nextAgentTokenBucketDecreaseAt;
+  const isUnlimited = typeof capacity === "number" && capacity === -1;
+  const value = isUnlimited
+    ? `${formatNumber(displayedLevel)} consumed`
+    : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
+
+  return {
+    value,
+    subtitle: formatAgentTokenUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
+    progress: isUnlimited ? null : percentage(displayedLevel, capacity),
+  };
+}
+
+function formatAgentTokenUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
+  if (nextDecreaseAt) {
+    return `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
+  }
+
+  if (lastUpdatedAt) {
+    return `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
+  }
+
+  return "Rolling agent token usage for the current 30-day window.";
 }
 
 function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
@@ -276,6 +315,12 @@ function buildLimitCards(
       value: formatStringLimit(limits?.maxEventsPerMonth),
       icon: Gauge,
       description: "Rolling 30-day event allowance.",
+    },
+    {
+      label: "Agent tokens per month",
+      value: formatStringLimit(limits?.maxAgentTokensPerMonth),
+      icon: Cpu,
+      description: "Rolling 30-day agent token allowance.",
     },
   ];
 }

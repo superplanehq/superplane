@@ -25,13 +25,14 @@ const (
 type LimitName int32
 
 const (
-	LimitName_LIMIT_NAME_UNSPECIFIED          LimitName = 0
-	LimitName_LIMIT_NAME_MAX_ORGANIZATIONS    LimitName = 1
-	LimitName_LIMIT_NAME_MAX_CANVASES         LimitName = 2
-	LimitName_LIMIT_NAME_MAX_NODES_PER_CANVAS LimitName = 3
-	LimitName_LIMIT_NAME_MAX_USERS            LimitName = 4
-	LimitName_LIMIT_NAME_MAX_EVENTS_PER_MONTH LimitName = 5
-	LimitName_LIMIT_NAME_MAX_INTEGRATIONS     LimitName = 6
+	LimitName_LIMIT_NAME_UNSPECIFIED                LimitName = 0
+	LimitName_LIMIT_NAME_MAX_ORGANIZATIONS          LimitName = 1
+	LimitName_LIMIT_NAME_MAX_CANVASES               LimitName = 2
+	LimitName_LIMIT_NAME_MAX_NODES_PER_CANVAS       LimitName = 3
+	LimitName_LIMIT_NAME_MAX_USERS                  LimitName = 4
+	LimitName_LIMIT_NAME_MAX_EVENTS_PER_MONTH       LimitName = 5
+	LimitName_LIMIT_NAME_MAX_INTEGRATIONS           LimitName = 6
+	LimitName_LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH LimitName = 7
 )
 
 // Enum value maps for LimitName.
@@ -44,15 +45,17 @@ var (
 		4: "LIMIT_NAME_MAX_USERS",
 		5: "LIMIT_NAME_MAX_EVENTS_PER_MONTH",
 		6: "LIMIT_NAME_MAX_INTEGRATIONS",
+		7: "LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH",
 	}
 	LimitName_value = map[string]int32{
-		"LIMIT_NAME_UNSPECIFIED":          0,
-		"LIMIT_NAME_MAX_ORGANIZATIONS":    1,
-		"LIMIT_NAME_MAX_CANVASES":         2,
-		"LIMIT_NAME_MAX_NODES_PER_CANVAS": 3,
-		"LIMIT_NAME_MAX_USERS":            4,
-		"LIMIT_NAME_MAX_EVENTS_PER_MONTH": 5,
-		"LIMIT_NAME_MAX_INTEGRATIONS":     6,
+		"LIMIT_NAME_UNSPECIFIED":                0,
+		"LIMIT_NAME_MAX_ORGANIZATIONS":          1,
+		"LIMIT_NAME_MAX_CANVASES":               2,
+		"LIMIT_NAME_MAX_NODES_PER_CANVAS":       3,
+		"LIMIT_NAME_MAX_USERS":                  4,
+		"LIMIT_NAME_MAX_EVENTS_PER_MONTH":       5,
+		"LIMIT_NAME_MAX_INTEGRATIONS":           6,
+		"LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH": 7,
 	}
 )
 
@@ -764,15 +767,16 @@ func (x *CheckAccountLimitsResponse) GetViolations() []*LimitViolation {
 }
 
 type OrganizationLimits struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	MaxCanvases         int32                  `protobuf:"varint,1,opt,name=max_canvases,json=maxCanvases,proto3" json:"max_canvases,omitempty"`
-	MaxNodesPerCanvas   int32                  `protobuf:"varint,2,opt,name=max_nodes_per_canvas,json=maxNodesPerCanvas,proto3" json:"max_nodes_per_canvas,omitempty"`
-	MaxUsers            int32                  `protobuf:"varint,3,opt,name=max_users,json=maxUsers,proto3" json:"max_users,omitempty"`
-	RetentionWindowDays int32                  `protobuf:"varint,4,opt,name=retention_window_days,json=retentionWindowDays,proto3" json:"retention_window_days,omitempty"`
-	MaxEventsPerMonth   int64                  `protobuf:"varint,5,opt,name=max_events_per_month,json=maxEventsPerMonth,proto3" json:"max_events_per_month,omitempty"`
-	MaxIntegrations     int32                  `protobuf:"varint,6,opt,name=max_integrations,json=maxIntegrations,proto3" json:"max_integrations,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	MaxCanvases            int32                  `protobuf:"varint,1,opt,name=max_canvases,json=maxCanvases,proto3" json:"max_canvases,omitempty"`
+	MaxNodesPerCanvas      int32                  `protobuf:"varint,2,opt,name=max_nodes_per_canvas,json=maxNodesPerCanvas,proto3" json:"max_nodes_per_canvas,omitempty"`
+	MaxUsers               int32                  `protobuf:"varint,3,opt,name=max_users,json=maxUsers,proto3" json:"max_users,omitempty"`
+	RetentionWindowDays    int32                  `protobuf:"varint,4,opt,name=retention_window_days,json=retentionWindowDays,proto3" json:"retention_window_days,omitempty"`
+	MaxEventsPerMonth      int64                  `protobuf:"varint,5,opt,name=max_events_per_month,json=maxEventsPerMonth,proto3" json:"max_events_per_month,omitempty"`
+	MaxIntegrations        int32                  `protobuf:"varint,6,opt,name=max_integrations,json=maxIntegrations,proto3" json:"max_integrations,omitempty"`
+	MaxAgentTokensPerMonth int64                  `protobuf:"varint,7,opt,name=max_agent_tokens_per_month,json=maxAgentTokensPerMonth,proto3" json:"max_agent_tokens_per_month,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *OrganizationLimits) Reset() {
@@ -843,6 +847,13 @@ func (x *OrganizationLimits) GetMaxEventsPerMonth() int64 {
 func (x *OrganizationLimits) GetMaxIntegrations() int32 {
 	if x != nil {
 		return x.MaxIntegrations
+	}
+	return 0
+}
+
+func (x *OrganizationLimits) GetMaxAgentTokensPerMonth() int64 {
+	if x != nil {
+		return x.MaxAgentTokensPerMonth
 	}
 	return 0
 }
@@ -1004,14 +1015,18 @@ func (x *AccountState) GetOrganizations() int32 {
 }
 
 type OrganizationUsage struct {
-	state                               protoimpl.MessageState `protogen:"open.v1"`
-	Canvases                            int32                  `protobuf:"varint,1,opt,name=canvases,proto3" json:"canvases,omitempty"`
-	EventBucketLevel                    float64                `protobuf:"fixed64,2,opt,name=event_bucket_level,json=eventBucketLevel,proto3" json:"event_bucket_level,omitempty"`
-	EventBucketCapacity                 float64                `protobuf:"fixed64,3,opt,name=event_bucket_capacity,json=eventBucketCapacity,proto3" json:"event_bucket_capacity,omitempty"`
-	EventBucketLastUpdatedAtUnixSeconds int64                  `protobuf:"varint,4,opt,name=event_bucket_last_updated_at_unix_seconds,json=eventBucketLastUpdatedAtUnixSeconds,proto3" json:"event_bucket_last_updated_at_unix_seconds,omitempty"`
-	NextEventBucketLeakAtUnixSeconds    int64                  `protobuf:"varint,5,opt,name=next_event_bucket_leak_at_unix_seconds,json=nextEventBucketLeakAtUnixSeconds,proto3" json:"next_event_bucket_leak_at_unix_seconds,omitempty"`
-	unknownFields                       protoimpl.UnknownFields
-	sizeCache                           protoimpl.SizeCache
+	state                                    protoimpl.MessageState `protogen:"open.v1"`
+	Canvases                                 int32                  `protobuf:"varint,1,opt,name=canvases,proto3" json:"canvases,omitempty"`
+	EventBucketLevel                         float64                `protobuf:"fixed64,2,opt,name=event_bucket_level,json=eventBucketLevel,proto3" json:"event_bucket_level,omitempty"`
+	EventBucketCapacity                      float64                `protobuf:"fixed64,3,opt,name=event_bucket_capacity,json=eventBucketCapacity,proto3" json:"event_bucket_capacity,omitempty"`
+	EventBucketLastUpdatedAtUnixSeconds      int64                  `protobuf:"varint,4,opt,name=event_bucket_last_updated_at_unix_seconds,json=eventBucketLastUpdatedAtUnixSeconds,proto3" json:"event_bucket_last_updated_at_unix_seconds,omitempty"`
+	NextEventBucketLeakAtUnixSeconds         int64                  `protobuf:"varint,5,opt,name=next_event_bucket_leak_at_unix_seconds,json=nextEventBucketLeakAtUnixSeconds,proto3" json:"next_event_bucket_leak_at_unix_seconds,omitempty"`
+	AgentTokenBucketLevel                    float64                `protobuf:"fixed64,6,opt,name=agent_token_bucket_level,json=agentTokenBucketLevel,proto3" json:"agent_token_bucket_level,omitempty"`
+	AgentTokenBucketCapacity                 float64                `protobuf:"fixed64,7,opt,name=agent_token_bucket_capacity,json=agentTokenBucketCapacity,proto3" json:"agent_token_bucket_capacity,omitempty"`
+	AgentTokenBucketLastUpdatedAtUnixSeconds int64                  `protobuf:"varint,8,opt,name=agent_token_bucket_last_updated_at_unix_seconds,json=agentTokenBucketLastUpdatedAtUnixSeconds,proto3" json:"agent_token_bucket_last_updated_at_unix_seconds,omitempty"`
+	NextAgentTokenBucketLeakAtUnixSeconds    int64                  `protobuf:"varint,9,opt,name=next_agent_token_bucket_leak_at_unix_seconds,json=nextAgentTokenBucketLeakAtUnixSeconds,proto3" json:"next_agent_token_bucket_leak_at_unix_seconds,omitempty"`
+	unknownFields                            protoimpl.UnknownFields
+	sizeCache                                protoimpl.SizeCache
 }
 
 func (x *OrganizationUsage) Reset() {
@@ -1075,6 +1090,34 @@ func (x *OrganizationUsage) GetEventBucketLastUpdatedAtUnixSeconds() int64 {
 func (x *OrganizationUsage) GetNextEventBucketLeakAtUnixSeconds() int64 {
 	if x != nil {
 		return x.NextEventBucketLeakAtUnixSeconds
+	}
+	return 0
+}
+
+func (x *OrganizationUsage) GetAgentTokenBucketLevel() float64 {
+	if x != nil {
+		return x.AgentTokenBucketLevel
+	}
+	return 0
+}
+
+func (x *OrganizationUsage) GetAgentTokenBucketCapacity() float64 {
+	if x != nil {
+		return x.AgentTokenBucketCapacity
+	}
+	return 0
+}
+
+func (x *OrganizationUsage) GetAgentTokenBucketLastUpdatedAtUnixSeconds() int64 {
+	if x != nil {
+		return x.AgentTokenBucketLastUpdatedAtUnixSeconds
+	}
+	return 0
+}
+
+func (x *OrganizationUsage) GetNextAgentTokenBucketLeakAtUnixSeconds() int64 {
+	if x != nil {
+		return x.NextAgentTokenBucketLeakAtUnixSeconds
 	}
 	return 0
 }
@@ -1291,14 +1334,15 @@ const file_usage_proto_rawDesc = "" +
 	"\x06limits\x18\x02 \x01(\v2\".superplane.usage.v1.AccountLimitsR\x06limits\x12C\n" +
 	"\n" +
 	"violations\x18\x03 \x03(\v2#.superplane.usage.v1.LimitViolationR\n" +
-	"violations\"\x95\x02\n" +
+	"violations\"\xd1\x02\n" +
 	"\x12OrganizationLimits\x12!\n" +
 	"\fmax_canvases\x18\x01 \x01(\x05R\vmaxCanvases\x12/\n" +
 	"\x14max_nodes_per_canvas\x18\x02 \x01(\x05R\x11maxNodesPerCanvas\x12\x1b\n" +
 	"\tmax_users\x18\x03 \x01(\x05R\bmaxUsers\x122\n" +
 	"\x15retention_window_days\x18\x04 \x01(\x05R\x13retentionWindowDays\x12/\n" +
 	"\x14max_events_per_month\x18\x05 \x01(\x03R\x11maxEventsPerMonth\x12)\n" +
-	"\x10max_integrations\x18\x06 \x01(\x05R\x0fmaxIntegrations\"\xda\x01\n" +
+	"\x10max_integrations\x18\x06 \x01(\x05R\x0fmaxIntegrations\x12:\n" +
+	"\x1amax_agent_tokens_per_month\x18\a \x01(\x03R\x16maxAgentTokensPerMonth\"\xda\x01\n" +
 	"\x17OrganizationPlanChanged\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1b\n" +
 	"\tplan_name\x18\x02 \x01(\tR\bplanName\x12?\n" +
@@ -1307,13 +1351,17 @@ const file_usage_proto_rawDesc = "" +
 	"\rAccountLimits\x12+\n" +
 	"\x11max_organizations\x18\x01 \x01(\x05R\x10maxOrganizations\"4\n" +
 	"\fAccountState\x12$\n" +
-	"\rorganizations\x18\x01 \x01(\x05R\rorganizations\"\xbb\x02\n" +
+	"\rorganizations\x18\x01 \x01(\x05R\rorganizations\"\xf3\x04\n" +
 	"\x11OrganizationUsage\x12\x1a\n" +
 	"\bcanvases\x18\x01 \x01(\x05R\bcanvases\x12,\n" +
 	"\x12event_bucket_level\x18\x02 \x01(\x01R\x10eventBucketLevel\x122\n" +
 	"\x15event_bucket_capacity\x18\x03 \x01(\x01R\x13eventBucketCapacity\x12V\n" +
 	")event_bucket_last_updated_at_unix_seconds\x18\x04 \x01(\x03R#eventBucketLastUpdatedAtUnixSeconds\x12P\n" +
-	"&next_event_bucket_leak_at_unix_seconds\x18\x05 \x01(\x03R nextEventBucketLeakAtUnixSeconds\"i\n" +
+	"&next_event_bucket_leak_at_unix_seconds\x18\x05 \x01(\x03R nextEventBucketLeakAtUnixSeconds\x127\n" +
+	"\x18agent_token_bucket_level\x18\x06 \x01(\x01R\x15agentTokenBucketLevel\x12=\n" +
+	"\x1bagent_token_bucket_capacity\x18\a \x01(\x01R\x18agentTokenBucketCapacity\x12a\n" +
+	"/agent_token_bucket_last_updated_at_unix_seconds\x18\b \x01(\x03R(agentTokenBucketLastUpdatedAtUnixSeconds\x12[\n" +
+	",next_agent_token_bucket_leak_at_unix_seconds\x18\t \x01(\x03R%nextAgentTokenBucketLeakAtUnixSeconds\"i\n" +
 	"\x11OrganizationState\x12\x1a\n" +
 	"\bcanvases\x18\x01 \x01(\x05R\bcanvases\x12\x14\n" +
 	"\x05users\x18\x02 \x01(\x05R\x05users\x12\"\n" +
@@ -1323,7 +1371,7 @@ const file_usage_proto_rawDesc = "" +
 	"\x0eLimitViolation\x124\n" +
 	"\x05limit\x18\x01 \x01(\x0e2\x1e.superplane.usage.v1.LimitNameR\x05limit\x12)\n" +
 	"\x10configured_limit\x18\x02 \x01(\x03R\x0fconfiguredLimit\x12#\n" +
-	"\rcurrent_value\x18\x03 \x01(\x03R\fcurrentValue*\xeb\x01\n" +
+	"\rcurrent_value\x18\x03 \x01(\x03R\fcurrentValue*\x96\x02\n" +
 	"\tLimitName\x12\x1a\n" +
 	"\x16LIMIT_NAME_UNSPECIFIED\x10\x00\x12 \n" +
 	"\x1cLIMIT_NAME_MAX_ORGANIZATIONS\x10\x01\x12\x1b\n" +
@@ -1331,7 +1379,8 @@ const file_usage_proto_rawDesc = "" +
 	"\x1fLIMIT_NAME_MAX_NODES_PER_CANVAS\x10\x03\x12\x18\n" +
 	"\x14LIMIT_NAME_MAX_USERS\x10\x04\x12#\n" +
 	"\x1fLIMIT_NAME_MAX_EVENTS_PER_MONTH\x10\x05\x12\x1f\n" +
-	"\x1bLIMIT_NAME_MAX_INTEGRATIONS\x10\x062\xfb\x06\n" +
+	"\x1bLIMIT_NAME_MAX_INTEGRATIONS\x10\x06\x12)\n" +
+	"%LIMIT_NAME_MAX_AGENT_TOKENS_PER_MONTH\x10\a2\xfb\x06\n" +
 	"\x05Usage\x12r\n" +
 	"\x11SetupOrganization\x12-.superplane.usage.v1.SetupOrganizationRequest\x1a..superplane.usage.v1.SetupOrganizationResponse\x12c\n" +
 	"\fSetupAccount\x12(.superplane.usage.v1.SetupAccountRequest\x1a).superplane.usage.v1.SetupAccountResponse\x12\x8d\x01\n" +
