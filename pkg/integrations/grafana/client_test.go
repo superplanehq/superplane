@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -391,7 +392,7 @@ func Test__Client__ListDashboardPanels(t *testing.T) {
 					"dashboard": {
 						"panels": [
 							{"id": 2, "title": "CPU"},
-							{"collapsed": false, "panels": [
+							{"id": 3, "type": "row", "title": "Row", "collapsed": false, "panels": [
 								{"id": 4, "title": "Memory"},
 								{"id": 6, "title": ""}
 							]}
@@ -464,6 +465,75 @@ func Test__Client__GetAnnotation(t *testing.T) {
 	require.Equal(t, int64(42), annotation.ID)
 	require.Equal(t, "deploy", annotation.Text)
 	require.Contains(t, httpContext.Requests[0].URL.Path, "/api/annotations/42")
+}
+
+func Test__Client__CreateAnnotation__RetriesRateLimit(t *testing.T) {
+	originalRetryDelays := createAnnotationRetryDelays
+	createAnnotationRetryDelays = []time.Duration{0}
+	defer func() {
+		createAnnotationRetryDelays = originalRetryDelays
+	}()
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(strings.NewReader(`Too Many Requests`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":42,"message":"Annotation added"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	panelID := int64(7)
+	id, err := client.CreateAnnotation("deploy", []string{"prod"}, "dashboard-1", &panelID, 1, 2)
+	require.NoError(t, err)
+	require.Equal(t, int64(42), id)
+	require.Len(t, httpContext.Requests, 2)
+}
+
+func Test__Client__CreateAnnotation__ReturnsRateLimitAfterRetries(t *testing.T) {
+	originalRetryDelays := createAnnotationRetryDelays
+	createAnnotationRetryDelays = []time.Duration{0, 0}
+	defer func() {
+		createAnnotationRetryDelays = originalRetryDelays
+	}()
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(strings.NewReader(`Too Many Requests`)),
+			},
+			{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(strings.NewReader(`Too Many Requests`)),
+			},
+			{
+				StatusCode: http.StatusTooManyRequests,
+				Body:       io.NopCloser(strings.NewReader(`Too Many Requests`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	panelID := int64(7)
+	_, err := client.CreateAnnotation("deploy", nil, "dashboard-1", &panelID, 1, 2)
+	require.ErrorContains(t, err, "status 429")
+	require.Len(t, httpContext.Requests, 3)
 }
 
 func Test__Grafana__ListResources__Annotations(t *testing.T) {

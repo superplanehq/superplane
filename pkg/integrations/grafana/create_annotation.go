@@ -19,7 +19,7 @@ type CreateAnnotation struct{}
 
 type CreateAnnotationSpec struct {
 	DashboardUID string   `json:"dashboardUID" mapstructure:"dashboardUID"`
-	Panel        string   `json:"panel,omitempty" mapstructure:"panel"`
+	Panel        string   `json:"panel" mapstructure:"panel"`
 	PanelID      *int64   `json:"panelId,omitempty" mapstructure:"panelId"`
 	Text         string   `json:"text" mapstructure:"text"`
 	Tags         []string `json:"tags" mapstructure:"tags"`
@@ -57,11 +57,11 @@ func (c *CreateAnnotation) Documentation() string {
 ## Configuration
 
 	- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
-	- **Panel**: Optional panel within the selected dashboard to attach the annotation to
+	- **Panel**: Required — choose the panel within the selected dashboard to attach the annotation to
 	- **Text**: The annotation message (required)
 	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
-	- **Time**: Optional start time expression. Example: ` + "`now()`" + `
-	- **Time End**: Optional end time expression for a region annotation. Example: ` + "`now() + duration(\"24h\")`" + `
+	- **Time**: Optional start time value. Examples: ` + "`{{ now() }}`" + ` or ` + "`{{ now() - duration(\"5m\") }}`" + `
+	- **Time End**: Optional end time value for a region annotation. Examples: ` + "`{{ now() }}`" + ` or ` + "`{{ now() + duration(\"24h\") }}`" + `
 
 ## Output
 
@@ -99,7 +99,7 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 			Name:        "panel",
 			Label:       "Panel",
 			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    false,
+			Required:    true,
 			Description: "Panel to attach the annotation to",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -141,19 +141,20 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 		{
 			Name:        "time",
 			Label:       "Time",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Start time",
-			Default:     `now()`,
-			Placeholder: `now()`,
+			Default:     `{{ now() }}`,
+			Placeholder: `{{ now() }}`,
 		},
 		{
 			Name:        "timeEnd",
 			Label:       "Time End",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "End time",
-			Placeholder: `now() + duration("24h")`,
+			Default:     `{{ now() + duration("24h") }}`,
+			Placeholder: `{{ now() + duration("24h") }}`,
 		},
 	}
 }
@@ -223,12 +224,17 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 		timeEndMS,
 	)
 	if err != nil {
+		if panelID != nil {
+			return fmt.Errorf("error creating annotation for panel %d: %w", *panelID, err)
+		}
 		return fmt.Errorf("error creating annotation: %w", err)
 	}
 
-	annotationURL := ""
+	output := CreateAnnotationOutput{
+		ID: id,
+	}
 	if strings.TrimSpace(spec.DashboardUID) != "" {
-		annotationURL = buildAnnotationURL(
+		output.URL = buildAnnotationURL(
 			client.buildURL(fmt.Sprintf("/d/%s", url.PathEscape(strings.TrimSpace(spec.DashboardUID)))),
 			panelID,
 			timeMS,
@@ -239,7 +245,7 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.annotation.created",
-		[]any{CreateAnnotationOutput{ID: id, URL: annotationURL}},
+		[]any{output},
 	)
 }
 
@@ -287,17 +293,20 @@ func validateCreateAnnotationSpec(spec CreateAnnotationSpec) error {
 	if strings.TrimSpace(spec.Text) == "" {
 		return errors.New("text is required")
 	}
+	if _, err := resolveAnnotationPanelID(spec.Panel, spec.PanelID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(spec.Panel) == "" && (spec.PanelID == nil || *spec.PanelID <= 0) {
+		return errors.New("panel is required")
+	}
 	return nil
 }
 
 func resolveAnnotationPanelID(panel string, legacyPanelID *int64) (*int64, error) {
 	if strings.TrimSpace(panel) != "" {
-		parsed, err := strconv.ParseInt(strings.TrimSpace(panel), 10, 64)
+		parsed, err := parseAnnotationPanelID(panel)
 		if err != nil {
-			return nil, fmt.Errorf("panel must be a valid panel resource ID")
-		}
-		if parsed <= 0 {
-			return nil, fmt.Errorf("panel must be greater than zero")
+			return nil, err
 		}
 		return &parsed, nil
 	}
@@ -307,6 +316,17 @@ func resolveAnnotationPanelID(panel string, legacyPanelID *int64) (*int64, error
 	}
 
 	return nil, nil
+}
+
+func parseAnnotationPanelID(value string) (int64, error) {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("panel must be a valid panel resource ID")
+	}
+	if parsed <= 0 {
+		return 0, fmt.Errorf("panel must be greater than zero")
+	}
+	return parsed, nil
 }
 
 func validateAnnotationTimeRangeMS(timeMS, timeEndMS int64) error {

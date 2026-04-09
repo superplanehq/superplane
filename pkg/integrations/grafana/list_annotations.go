@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -27,6 +28,8 @@ type ListAnnotationsSpec struct {
 
 type ListAnnotationsOutput struct {
 	Annotations []Annotation `json:"annotations"`
+	From        string       `json:"from,omitempty"`
+	To          string       `json:"to,omitempty"`
 }
 
 func (l *ListAnnotations) Name() string {
@@ -56,7 +59,7 @@ func (l *ListAnnotations) Documentation() string {
 	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
 	- **Text**: Optional — filter annotations whose text contains this value
 	- **Tags**: Filter to annotations matching all of the specified tags (optional)
-	- **From / To**: Time range filter expressions (optional). Examples: ` + "`{{ now() + duration(\"-1h\") }}`" + ` and ` + "`{{ now() }}`" + `
+	- **From / To**: Time range filter values (optional). Examples: ` + "`{{ now() - duration(\"1h\") }}`" + ` and ` + "`{{ now() }}`" + `
 	- **Limit**: Maximum number of annotations to return (optional)
 
 ## Output
@@ -137,18 +140,20 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 		{
 			Name:        "from",
 			Label:       "From",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Return annotations at or after this time",
-			Placeholder: `now() + duration("-1h")`,
+			Default:     `{{ now() - duration("1h") }}`,
+			Placeholder: `{{ now() - duration("1h") }}`,
 		},
 		{
 			Name:        "to",
 			Label:       "To",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Return annotations at or before this time",
-			Placeholder: `now()`,
+			Default:     `{{ now() }}`,
+			Placeholder: `{{ now() }}`,
 		},
 		{
 			Name:        "limit",
@@ -234,7 +239,11 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.annotations",
-		[]any{ListAnnotationsOutput{Annotations: annotations}},
+		[]any{ListAnnotationsOutput{
+			Annotations: annotations,
+			From:        formatAnnotationOutputTime(fromMS),
+			To:          formatAnnotationOutputTime(toMS),
+		}},
 	)
 }
 
@@ -267,6 +276,13 @@ func validateListAnnotationTimeRangeMS(fromMS, toMS int64) error {
 		return errors.New("to must be at or after from")
 	}
 	return nil
+}
+
+func formatAnnotationOutputTime(value int64) string {
+	if value <= 0 {
+		return ""
+	}
+	return time.UnixMilli(value).UTC().Format(time.RFC3339Nano)
 }
 
 func decodeListAnnotationsSpec(config any) (ListAnnotationsSpec, error) {

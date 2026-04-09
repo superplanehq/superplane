@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -23,6 +24,27 @@ func Test__validateListAnnotationTimeRangeMS__RejectsInvertedRange(t *testing.T)
 	err := validateListAnnotationTimeRangeMS(200, 100)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "to must be at or after from")
+}
+
+func Test__ListAnnotations__Configuration__timeFieldsAreStrings(t *testing.T) {
+	component := &ListAnnotations{}
+	fields := component.Configuration()
+
+	fieldTypes := map[string]string{}
+	fieldDefaults := map[string]any{}
+	fieldPlaceholders := map[string]string{}
+	for _, field := range fields {
+		fieldTypes[field.Name] = field.Type
+		fieldDefaults[field.Name] = field.Default
+		fieldPlaceholders[field.Name] = field.Placeholder
+	}
+
+	require.Equal(t, "string", fieldTypes["from"])
+	require.Equal(t, "string", fieldTypes["to"])
+	require.Equal(t, `{{ now() - duration("1h") }}`, fieldDefaults["from"])
+	require.Equal(t, `{{ now() - duration("1h") }}`, fieldPlaceholders["from"])
+	require.Equal(t, `{{ now() }}`, fieldDefaults["to"])
+	require.Equal(t, `{{ now() }}`, fieldPlaceholders["to"])
 }
 
 func Test__ListAnnotations__Setup__StoresDashboardTitleMetadata(t *testing.T) {
@@ -115,4 +137,38 @@ func Test__filterAnnotations(t *testing.T) {
 	require.Len(t, filtered, 2)
 	require.Equal(t, int64(1), filtered[0].ID)
 	require.Equal(t, int64(3), filtered[1].ID)
+}
+
+func Test__ListAnnotations__Execute__emitsResolvedTimeRange(t *testing.T) {
+	component := &ListAnnotations{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"id":1,"text":"Deploy completed","time":0}
+				]`)),
+			},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+	base := time.Now().UTC().Truncate(time.Second)
+	from := base.Add(-time.Hour).Format(time.RFC3339)
+	to := base.Format(time.RFC3339)
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"from": from,
+			"to":   to,
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: executionState,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, executionState.Payloads, 1)
+	output := executionState.Payloads[0].(map[string]any)["data"].(ListAnnotationsOutput)
+	require.Equal(t, base.Add(-time.Hour).UTC().Format(time.RFC3339Nano), output.From)
+	require.Equal(t, base.UTC().Format(time.RFC3339Nano), output.To)
 }

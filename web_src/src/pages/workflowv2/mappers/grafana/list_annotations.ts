@@ -46,14 +46,13 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
       details["Text Filter"] =
         configuration.text.length > 80 ? configuration.text.substring(0, 80) + "..." : configuration.text;
     }
-    if (configuration?.from) {
-      details["From"] = configuration.from;
-    }
-    if (configuration?.to) {
-      details["To"] = configuration.to;
-    }
-
     if (!outputs || !outputs.default || outputs.default.length === 0) {
+      if (configuration?.from) {
+        details["From"] = configuration.from;
+      }
+      if (configuration?.to) {
+        details["To"] = configuration.to;
+      }
       details["Count"] = "0";
       return details;
     }
@@ -66,6 +65,20 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
 
     const output = payload?.data as ListAnnotationsOutput | undefined;
     const annotations = output?.annotations ?? [];
+    const outputFrom = formatTimestamp(output?.from);
+    const outputTo = formatTimestamp(output?.to);
+
+    if (outputFrom !== "-") {
+      details["From"] = outputFrom;
+    } else if (configuration?.from) {
+      details["From"] = configuration.from;
+    }
+
+    if (outputTo !== "-") {
+      details["To"] = outputTo;
+    } else if (configuration?.to) {
+      details["To"] = configuration.to;
+    }
 
     details["Count"] = String(annotations.length);
 

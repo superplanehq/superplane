@@ -1,10 +1,16 @@
 package grafana
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__parseRelativeAnnotationTime(t *testing.T) {
@@ -93,6 +99,47 @@ func Test__parseAnnotationTime__acceptsGoTimeStringOutput(t *testing.T) {
 	require.Equal(t, time.Date(2026, time.April, 8, 11, 53, 5, 866556510, time.UTC), parsed.UTC())
 }
 
+func Test__CreateAnnotation__Configuration__timeFieldsAreStrings(t *testing.T) {
+	component := &CreateAnnotation{}
+	fields := component.Configuration()
+
+	fieldTypes := map[string]string{}
+	fieldDefaults := map[string]any{}
+	fieldPlaceholders := map[string]string{}
+	for _, field := range fields {
+		fieldTypes[field.Name] = field.Type
+		fieldDefaults[field.Name] = field.Default
+		fieldPlaceholders[field.Name] = field.Placeholder
+	}
+
+	require.Equal(t, "string", fieldTypes["time"])
+	require.Equal(t, "string", fieldTypes["timeEnd"])
+	require.Equal(t, `{{ now() }}`, fieldDefaults["time"])
+	require.Equal(t, `{{ now() }}`, fieldPlaceholders["time"])
+	require.Equal(t, `{{ now() + duration("24h") }}`, fieldDefaults["timeEnd"])
+	require.Equal(t, `{{ now() + duration("24h") }}`, fieldPlaceholders["timeEnd"])
+}
+
+func Test__CreateAnnotation__Configuration__panelIsRequiredSingleResource(t *testing.T) {
+	component := &CreateAnnotation{}
+	fields := component.Configuration()
+
+	for _, field := range fields {
+		if field.Name != "panel" {
+			continue
+		}
+
+		require.True(t, field.Required)
+		require.False(t, field.Togglable)
+		require.NotNil(t, field.TypeOptions)
+		require.NotNil(t, field.TypeOptions.Resource)
+		require.False(t, field.TypeOptions.Resource.Multi)
+		return
+	}
+
+	t.Fatal("panel field not found")
+}
+
 func Test__resolveAnnotationPanelID(t *testing.T) {
 	panelID, err := resolveAnnotationPanelID("7", nil)
 	require.NoError(t, err)
@@ -107,6 +154,14 @@ func Test__resolveAnnotationPanelID(t *testing.T) {
 
 	_, err = resolveAnnotationPanelID("abc", nil)
 	require.ErrorContains(t, err, "panel must be a valid panel resource")
+}
+
+func Test__validateCreateAnnotationSpec__requiresPanel(t *testing.T) {
+	err := validateCreateAnnotationSpec(CreateAnnotationSpec{
+		Text: "deploy",
+	})
+
+	require.ErrorContains(t, err, "panel is required")
 }
 
 func Test__buildAnnotationURL(t *testing.T) {
@@ -138,4 +193,44 @@ func Test__buildAnnotationURL__pointAnnotationGetsContextWindow(t *testing.T) {
 		"https://grafana.example.com/d/abc123/overview?from=1712562900000&to=1712563500000",
 		url,
 	)
+}
+
+func Test__CreateAnnotation__Execute__createsAnnotationForSelectedPanel(t *testing.T) {
+	component := &CreateAnnotation{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":41}`)),
+			},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"dashboardUID": "dash-1",
+			"panel":        "7",
+			"text":         "deploy",
+			"time":         "now",
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: executionState,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, float64(7), payload["panelId"])
+
+	require.Len(t, executionState.Payloads, 1)
+	output := executionState.Payloads[0].(map[string]any)["data"].(CreateAnnotationOutput)
+	require.Equal(t, int64(41), output.ID)
+	require.NotEmpty(t, output.URL)
 }

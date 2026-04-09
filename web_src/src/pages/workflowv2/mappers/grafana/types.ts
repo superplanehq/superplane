@@ -72,6 +72,8 @@ export interface ListAnnotationsConfiguration {
 
 export interface ListAnnotationsOutput {
   annotations: Annotation[];
+  from?: string;
+  to?: string;
 }
 
 export interface DeleteAnnotationConfiguration {

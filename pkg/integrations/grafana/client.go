@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,6 +18,12 @@ import (
 const (
 	maxResponseSize = 2 * 1024 * 1024 // 2MB
 )
+
+var createAnnotationRetryDelays = []time.Duration{
+	500 * time.Millisecond,
+	1 * time.Second,
+	2 * time.Second,
+}
 
 type Client struct {
 	BaseURL  string
@@ -582,22 +589,33 @@ func (c *Client) CreateAnnotation(text string, tags []string, dashboardUID strin
 		return 0, fmt.Errorf("error marshaling annotation payload: %v", err)
 	}
 
-	responseBody, status, err := c.execRequest(http.MethodPost, "/api/annotations", bytes.NewReader(body), "application/json")
-	if err != nil {
-		return 0, fmt.Errorf("error creating annotation: %v", err)
-	}
-	if status < 200 || status >= 300 {
-		return 0, newAPIStatusError("grafana annotation create", status, responseBody)
-	}
+	for attempt := 0; ; attempt++ {
+		responseBody, status, err := c.execRequest(
+			http.MethodPost,
+			"/api/annotations",
+			bytes.NewReader(body),
+			"application/json",
+		)
+		if err != nil {
+			return 0, fmt.Errorf("error creating annotation: %v", err)
+		}
+		if status == http.StatusTooManyRequests && attempt < len(createAnnotationRetryDelays) {
+			time.Sleep(createAnnotationRetryDelays[attempt])
+			continue
+		}
+		if status < 200 || status >= 300 {
+			return 0, newAPIStatusError("grafana annotation create", status, responseBody)
+		}
 
-	var result struct {
-		ID      int64  `json:"id"`
-		Message string `json:"message"`
+		var result struct {
+			ID      int64  `json:"id"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(responseBody, &result); err != nil {
+			return 0, fmt.Errorf("error parsing create annotation response: %v", err)
+		}
+		return result.ID, nil
 	}
-	if err := json.Unmarshal(responseBody, &result); err != nil {
-		return 0, fmt.Errorf("error parsing create annotation response: %v", err)
-	}
-	return result.ID, nil
 }
 
 func (c *Client) ListAnnotations(tags []string, dashboardUID string, from, to, limit int64) ([]Annotation, error) {
@@ -795,6 +813,11 @@ func collectDashboardPanels(values []any, destination *[]DashboardPanel) {
 
 		if nestedPanels, ok := panel["panels"].([]any); ok {
 			collectDashboardPanels(nestedPanels, destination)
+		}
+
+		panelType, _ := panel["type"].(string)
+		if strings.EqualFold(strings.TrimSpace(panelType), "row") {
+			continue
 		}
 
 		idValue, ok := panel["id"]

@@ -2,6 +2,8 @@
   "type": "grafana.annotations",
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "data": {
+    "from": "2026-02-12T15:18:03.362582388Z",
+    "to": "2026-02-12T16:18:03.362582388Z",
     "annotations": [
       {
         "id": 42,

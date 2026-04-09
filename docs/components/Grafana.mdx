@@ -104,11 +104,11 @@ The Create Annotation component writes an annotation into Grafana, marking opera
 ### Configuration
 
 	- **Dashboard**: Optional — choose a dashboard from your Grafana instance to scope the annotation
-	- **Panel**: Optional panel within the selected dashboard to attach the annotation to
+	- **Panel**: Required — choose the panel within the selected dashboard to attach the annotation to
 	- **Text**: The annotation message (required)
 	- **Tags**: Optional list of tags to label the annotation (e.g. deploy, rollback, incident)
-	- **Time**: Optional start time expression. Example: `now()`
-	- **Time End**: Optional end time expression for a region annotation. Example: `now() + duration("24h")`
+	- **Time**: Optional start time value. Examples: `{{ now() }}` or `{{ now() - duration("5m") }}`
+	- **Time End**: Optional end time value for a region annotation. Examples: `{{ now() }}` or `{{ now() + duration("24h") }}`
 
 ### Output
 
@@ -178,7 +178,7 @@ The List Annotations component retrieves annotations from Grafana, optionally fi
 	- **Panel**: Optional — filter to annotations on a specific panel within the selected dashboard
 	- **Text**: Optional — filter annotations whose text contains this value
 	- **Tags**: Filter to annotations matching all of the specified tags (optional)
-	- **From / To**: Time range filter expressions (optional). Examples: `{{ now() + duration("-1h") }}` and `{{ now() }}`
+	- **From / To**: Time range filter values (optional). Examples: `{{ now() - duration("1h") }}` and `{{ now() }}`
 	- **Limit**: Maximum number of annotations to return (optional)
 
 ### Output
@@ -217,7 +217,9 @@ Returns a list of annotation objects including ID, text, tags, time, and dashboa
         "timeEnd": 1739289600000,
         "type": "annotation"
       }
-    ]
+    ],
+    "from": "2026-02-12T15:18:03.362582388Z",
+    "to": "2026-02-12T16:18:03.362582388Z"
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.annotations"
