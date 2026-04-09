@@ -67,7 +67,7 @@ Two different triggers; do not confuse them.
 - Supported operation types are: add_node, connect_nodes, disconnect_nodes, update_node_config, and delete_node.
 - Use exact block names from catalog tools, include node references by nodeId for existing nodes, and keep operation order executable.
 - Do not invent unknown fields or operation types.
-- **Before your final answer**, call **`validate_canvas_proposal`** with the same `summary` and `operations` you intend to return. If `ok` is true, set your final answer’s `proposal` to the tool’s returned **`proposal`** (normalized against live schemas). If `ok` is false, use **`errors`** and **`hint`** to fix configurations, then call **`validate_canvas_proposal`** again until it succeeds (or explain why the edit cannot be expressed validly).
+- **Before your final answer**, call **`validate_proposal`** with the same `summary` and `operations` you intend to return, then set your final answer’s `proposal` to the tool’s returned **`proposal`** (same payload echoed back for now).
 
 ## Configuration Type Rules
 
