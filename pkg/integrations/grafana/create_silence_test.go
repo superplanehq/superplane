@@ -28,6 +28,13 @@ func Test__parseSilenceInstant__acceptsTimeValue(t *testing.T) {
 	require.True(t, tm.Equal(ref))
 }
 
+func Test__parseSilenceInstant__acceptsGoTimeStringOutput(t *testing.T) {
+	ref := time.Now().UTC().Truncate(time.Second)
+	tm, err := parseSilenceInstant(ref.String())
+	require.NoError(t, err)
+	require.True(t, tm.Equal(ref))
+}
+
 func Test__parseSilenceInstant__acceptsNowExpressions(t *testing.T) {
 	start := time.Now().UTC()
 
@@ -58,6 +65,19 @@ func Test__resolveSilenceInstant__evaluatesTemplateExpression(t *testing.T) {
 	got, err := resolveSilenceInstant(`{{ now() + duration("24h") }}`, &contexts.ExpressionContext{Output: expected})
 	require.NoError(t, err)
 	require.True(t, got.Equal(expected))
+}
+
+func Test__CreateSilence__Configuration__timeFieldsAreStrings(t *testing.T) {
+	component := &CreateSilence{}
+	fields := component.Configuration()
+
+	fieldTypes := map[string]string{}
+	for _, field := range fields {
+		fieldTypes[field.Name] = field.Type
+	}
+
+	require.Equal(t, "string", fieldTypes["startsAt"])
+	require.Equal(t, "string", fieldTypes["endsAt"])
 }
 
 func Test__validateCreateSilenceSpec__matcherValueRequired(t *testing.T) {
@@ -207,4 +227,42 @@ func Test__CreateSilence__Execute__evaluatesBareExpressions(t *testing.T) {
 	output := execCtx.Payloads[0].(map[string]any)["data"].(CreateSilenceOutput)
 	require.Equal(t, start.Format(time.RFC3339), output.StartsAt)
 	require.Equal(t, end.Format(time.RFC3339), output.EndsAt)
+}
+
+func Test__CreateSilence__Execute__acceptsResolvedTemplateStringValues(t *testing.T) {
+	component := CreateSilence{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"silenceID":"silence-123"}`)),
+			},
+		},
+	}
+	execCtx := &contexts.ExecutionStateContext{}
+	start := time.Now().UTC().Truncate(time.Second)
+	end := start.Add(24 * time.Hour)
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"matchers": []any{map[string]any{"name": "alertname", "value": "HighCPU"}},
+			"startsAt": start.String(),
+			"endsAt":   end.String(),
+			"comment":  "deploy",
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpCtx.Requests, 1)
+
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, start.Format(time.RFC3339), payload["startsAt"])
+	require.Equal(t, end.Format(time.RFC3339), payload["endsAt"])
 }

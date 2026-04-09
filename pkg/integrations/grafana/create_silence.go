@@ -140,7 +140,7 @@ func (c *CreateSilence) Configuration() []configuration.Field {
 		{
 			Name:        "startsAt",
 			Label:       "Starts At",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     "now()",
 			Placeholder: "now()",
@@ -149,7 +149,7 @@ func (c *CreateSilence) Configuration() []configuration.Field {
 		{
 			Name:        "endsAt",
 			Label:       "Ends At",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Default:     `now() + duration("24h")`,
 			Placeholder: `now() + duration("24h")`,
@@ -395,6 +395,8 @@ func parseSilenceInstant(value any) (time.Time, error) {
 		timezoneFormats := []string{
 			time.RFC3339,
 			time.RFC3339Nano,
+			"2006-01-02 15:04:05 -0700 MST",
+			"2006-01-02 15:04:05.999999999 -0700 MST",
 			"2006-01-02T15:04Z",
 			"2006-01-02T15:04:05Z",
 			"2006-01-02T15:04:05.000Z",
