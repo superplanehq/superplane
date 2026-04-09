@@ -6,7 +6,7 @@
     "folderUID": "infra",
     "ruleGroup": "service-health",
     "title": "High error rate",
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "refId": "A",
@@ -19,9 +19,66 @@
         "model": {
           "editorMode": "code",
           "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "intervalMs": 1000,
           "maxDataPoints": 43200,
           "refId": "A"
+        }
+      },
+      {
+        "refId": "B",
+        "queryType": "",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "datasourceUid": "__expr__",
+        "model": {
+          "id": "reduce",
+          "type": "reduce",
+          "expression": "A",
+          "reducer": "last",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "refId": "B"
+        }
+      },
+      {
+        "refId": "C",
+        "queryType": "",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        },
+        "datasourceUid": "__expr__",
+        "model": {
+          "id": "threshold",
+          "type": "threshold",
+          "expression": "B",
+          "conditions": [
+            {
+              "evaluator": {
+                "type": "gt",
+                "params": [
+                  1
+                ]
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "refId": "C"
         }
       }
     ],
