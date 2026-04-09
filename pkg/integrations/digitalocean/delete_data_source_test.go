@@ -87,7 +87,15 @@ func Test__DeleteDataSource__Execute(t *testing.T) {
 
 	kbResponse := `{
 		"database_status": "ONLINE",
-		"knowledge_base": {"uuid": "kb-uuid-1", "name": "my-kb", "region": "tor1"}
+		"knowledge_base": {
+			"uuid": "kb-uuid-1",
+			"name": "my-kb",
+			"region": "tor1",
+			"last_indexing_job": {
+				"uuid": "job-uuid-old",
+				"status": "INDEX_JOB_STATUS_COMPLETED"
+			}
+		}
 	}`
 
 	deleteResponse := `{}`
@@ -102,6 +110,7 @@ func Test__DeleteDataSource__Execute(t *testing.T) {
 
 		requests := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{}
+		metadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -113,13 +122,17 @@ func Test__DeleteDataSource__Execute(t *testing.T) {
 				Configuration: map[string]any{"apiToken": "test-token"},
 			},
 			ExecutionState: executionState,
-			Metadata:       &contexts.MetadataContext{},
+			Metadata:       metadata,
 			Requests:       requests,
 		})
 
 		require.NoError(t, err)
 		require.False(t, executionState.Passed)
 		require.Equal(t, "poll", requests.Action)
+
+		stored, ok := metadata.Metadata.(deleteDSMetadata)
+		require.True(t, ok)
+		require.Equal(t, "job-uuid-old", stored.PrevIndexingJobID)
 	})
 }
 
@@ -127,9 +140,10 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 	component := &DeleteDataSource{}
 
 	meta := map[string]any{
-		"kbUUID":         "kb-uuid-1",
-		"kbName":         "my-kb",
-		"dataSourceUUID": "ds-uuid-1",
+		"kbUUID":            "kb-uuid-1",
+		"kbName":            "my-kb",
+		"dataSourceUUID":    "ds-uuid-1",
+		"prevIndexingJobId": "",
 		"output": map[string]any{
 			"dataSourceUUID":    "ds-uuid-1",
 			"knowledgeBaseUUID": "kb-uuid-1",
@@ -182,6 +196,48 @@ func Test__DeleteDataSource__HandleAction(t *testing.T) {
 
 		job := data["indexingJob"].(map[string]any)
 		assert.Equal(t, "INDEX_JOB_STATUS_COMPLETED", job["status"])
+	})
+
+	t.Run("old completed job does not emit until job UUID changes", func(t *testing.T) {
+		kbWithOldCompletedJob := `{
+			"database_status": "ONLINE",
+			"knowledge_base": {
+				"uuid": "kb-uuid-1",
+				"name": "my-kb",
+				"last_indexing_job": {
+					"uuid": "job-uuid-old",
+					"status": "INDEX_JOB_STATUS_COMPLETED"
+				}
+			}
+		}`
+
+		requests := &contexts.RequestContext{}
+		executionState := &contexts.ExecutionStateContext{}
+
+		metaWithPrev := map[string]any{}
+		for k, v := range meta {
+			metaWithPrev[k] = v
+		}
+		metaWithPrev["prevIndexingJobId"] = "job-uuid-old"
+
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithOldCompletedJob))},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			ExecutionState: executionState,
+			Metadata:       &contexts.MetadataContext{Metadata: metaWithPrev},
+			Requests:       requests,
+		})
+
+		require.NoError(t, err)
+		require.False(t, executionState.Passed)
+		require.Equal(t, "poll", requests.Action)
 	})
 
 	t.Run("running job reschedules poll", func(t *testing.T) {

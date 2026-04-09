@@ -123,10 +123,15 @@ func (d *DeleteDataSource) Setup(ctx core.SetupContext) error {
 
 // deleteDSMetadata is stored between poll ticks
 type deleteDSMetadata struct {
-	KBUUID         string         `json:"kbUUID" mapstructure:"kbUUID"`
-	KBName         string         `json:"kbName" mapstructure:"kbName"`
-	DataSourceUUID string         `json:"dataSourceUUID" mapstructure:"dataSourceUUID"`
-	Output         map[string]any `json:"output" mapstructure:"output"`
+	KBUUID         string `json:"kbUUID" mapstructure:"kbUUID"`
+	KBName         string `json:"kbName" mapstructure:"kbName"`
+	DataSourceUUID string `json:"dataSourceUUID" mapstructure:"dataSourceUUID"`
+	// PrevIndexingJobID is the knowledge base's last indexing job UUID observed
+	// immediately before the delete request. DigitalOcean auto-triggers a new
+	// re-indexing job after deletion; we wait until last_indexing_job changes to
+	// avoid mistakenly treating an older completed job as the re-indexing result.
+	PrevIndexingJobID string         `json:"prevIndexingJobId" mapstructure:"prevIndexingJobId"`
+	Output            map[string]any `json:"output" mapstructure:"output"`
 }
 
 func (d *DeleteDataSource) Execute(ctx core.ExecutionContext) error {
@@ -142,8 +147,12 @@ func (d *DeleteDataSource) Execute(ctx core.ExecutionContext) error {
 
 	// Fetch KB name for the output
 	var kbName string
+	var prevIndexingJobID string
 	if kb, err := client.GetKnowledgeBase(spec.KnowledgeBase); err == nil {
 		kbName = kb.Name
+		if kb.LastIndexingJob != nil {
+			prevIndexingJobID = kb.LastIndexingJob.UUID
+		}
 	}
 
 	if err := client.DeleteKBDataSource(spec.KnowledgeBase, spec.DataSource); err != nil {
@@ -158,10 +167,11 @@ func (d *DeleteDataSource) Execute(ctx core.ExecutionContext) error {
 
 	// DO auto-triggers re-indexing after delete — poll until it completes
 	if err := ctx.Metadata.Set(deleteDSMetadata{
-		KBUUID:         spec.KnowledgeBase,
-		KBName:         kbName,
-		DataSourceUUID: spec.DataSource,
-		Output:         output,
+		KBUUID:            spec.KnowledgeBase,
+		KBName:            kbName,
+		DataSourceUUID:    spec.DataSource,
+		PrevIndexingJobID: prevIndexingJobID,
+		Output:            output,
 	}); err != nil {
 		return fmt.Errorf("failed to store metadata: %v", err)
 	}
@@ -215,6 +225,18 @@ func (d *DeleteDataSource) HandleAction(ctx core.ActionContext) error {
 	}
 
 	job := kb.LastIndexingJob
+	if strings.TrimSpace(job.UUID) == "" {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, deleteDSPollInterval)
+	}
+
+	// If the KB already had a completed last_indexing_job from before the delete,
+	// the auto-triggered re-indexing may not have started yet. In that window,
+	// last_indexing_job will still point to the old job; keep polling until it
+	// changes.
+	if strings.TrimSpace(meta.PrevIndexingJobID) != "" && job.UUID == meta.PrevIndexingJobID {
+		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, deleteDSPollInterval)
+	}
+
 	switch indexingJobState(job.Status) {
 	case "completed", "successful", "no_changes":
 		meta.Output["indexingJob"] = map[string]any{
