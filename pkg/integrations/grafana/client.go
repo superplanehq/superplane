@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -17,6 +18,12 @@ import (
 const (
 	maxResponseSize = 2 * 1024 * 1024 // 2MB
 )
+
+var createAnnotationRetryDelays = []time.Duration{
+	500 * time.Millisecond,
+	1 * time.Second,
+	2 * time.Second,
+}
 
 type Client struct {
 	BaseURL  string
@@ -546,6 +553,147 @@ func (c *Client) RemoveNotificationPolicyRoute(contactPointName string) error {
 	return c.putNotificationPolicies(root)
 }
 
+type Annotation struct {
+	ID           int64    `json:"id"`
+	DashboardUID string   `json:"dashboardUID"`
+	PanelID      int64    `json:"panelId"`
+	Time         int64    `json:"time"`
+	TimeEnd      int64    `json:"timeEnd"`
+	Text         string   `json:"text"`
+	Tags         []string `json:"tags"`
+	Type         string   `json:"type"`
+}
+
+func (c *Client) CreateAnnotation(text string, tags []string, dashboardUID string, panelID *int64, timeMS, timeEndMS int64) (int64, error) {
+	payload := map[string]any{
+		"text": text,
+	}
+	if len(tags) > 0 {
+		payload["tags"] = tags
+	}
+	if strings.TrimSpace(dashboardUID) != "" {
+		payload["dashboardUID"] = strings.TrimSpace(dashboardUID)
+	}
+	if panelID != nil {
+		payload["panelId"] = *panelID
+	}
+	if timeMS > 0 {
+		payload["time"] = timeMS
+	}
+	if timeEndMS > 0 {
+		payload["timeEnd"] = timeEndMS
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return 0, fmt.Errorf("error marshaling annotation payload: %v", err)
+	}
+
+	for attempt := 0; ; attempt++ {
+		responseBody, status, err := c.execRequest(
+			http.MethodPost,
+			"/api/annotations",
+			bytes.NewReader(body),
+			"application/json",
+		)
+		if err != nil {
+			return 0, fmt.Errorf("error creating annotation: %v", err)
+		}
+		if status == http.StatusTooManyRequests && attempt < len(createAnnotationRetryDelays) {
+			time.Sleep(createAnnotationRetryDelays[attempt])
+			continue
+		}
+		if status < 200 || status >= 300 {
+			return 0, newAPIStatusError("grafana annotation create", status, responseBody)
+		}
+
+		var result struct {
+			ID      int64  `json:"id"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(responseBody, &result); err != nil {
+			return 0, fmt.Errorf("error parsing create annotation response: %v", err)
+		}
+		return result.ID, nil
+	}
+}
+
+func (c *Client) ListAnnotations(tags []string, dashboardUID string, from, to, limit int64) ([]Annotation, error) {
+	q := url.Values{}
+	for _, tag := range tags {
+		if strings.TrimSpace(tag) != "" {
+			q.Add("tags", strings.TrimSpace(tag))
+		}
+	}
+	if strings.TrimSpace(dashboardUID) != "" {
+		q.Set("dashboardUID", strings.TrimSpace(dashboardUID))
+	}
+	if from > 0 {
+		q.Set("from", fmt.Sprintf("%d", from))
+	}
+	if to > 0 {
+		q.Set("to", fmt.Sprintf("%d", to))
+	}
+	if limit > 0 {
+		q.Set("limit", fmt.Sprintf("%d", limit))
+	}
+
+	path := "/api/annotations"
+	if encoded := q.Encode(); encoded != "" {
+		path = path + "?" + encoded
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, path, nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing annotations: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana annotation list", status, responseBody)
+	}
+
+	var annotations []Annotation
+	if err := json.Unmarshal(responseBody, &annotations); err != nil {
+		return nil, fmt.Errorf("error parsing annotations response: %v", err)
+	}
+	return annotations, nil
+}
+
+func (c *Client) GetAnnotation(id int64) (Annotation, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/annotations/%d", id),
+		nil,
+		"",
+	)
+	if err != nil {
+		return Annotation{}, fmt.Errorf("error getting annotation: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return Annotation{}, newAPIStatusError("grafana annotation get", status, responseBody)
+	}
+
+	var annotation Annotation
+	if err := json.Unmarshal(responseBody, &annotation); err != nil {
+		return Annotation{}, fmt.Errorf("error parsing annotation response: %v", err)
+	}
+	return annotation, nil
+}
+
+func (c *Client) DeleteAnnotation(id int64) error {
+	responseBody, status, err := c.execRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/annotations/%d", id),
+		nil, "",
+	)
+	if err != nil {
+		return fmt.Errorf("error deleting annotation: %v", err)
+	}
+	if status == http.StatusNotFound || (status >= 200 && status < 300) {
+		return nil
+	}
+	return newAPIStatusError("grafana annotation delete", status, responseBody)
+}
+
 func (c *Client) ListDataSources() ([]DataSource, error) {
 	responseBody, status, err := c.execRequest(http.MethodGet, "/api/datasources", nil, "")
 	if err != nil {
@@ -562,4 +710,135 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	}
 
 	return sources, nil
+}
+
+// DashboardSearchHit matches Grafana GET /api/search entries for type=dash-db.
+type DashboardSearchHit struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type DashboardPanel struct {
+	ID    int64
+	Title string
+}
+
+// SearchDashboards lists dashboards via the folder/dashboard search API (dashboard UID + title).
+func (c *Client) SearchDashboards() ([]DashboardSearchHit, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/search?type=dash-db&limit=5000", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error searching dashboards: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard search", status, responseBody)
+	}
+
+	var hits []DashboardSearchHit
+	if err := json.Unmarshal(responseBody, &hits); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard search response: %v", err)
+	}
+
+	return hits, nil
+}
+
+// GetDashboardTitle loads a dashboard by UID and returns its title (GET /api/dashboards/uid/:uid).
+func (c *Client) GetDashboardTitle(uid string) (string, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(strings.TrimSpace(uid))),
+		nil,
+		"",
+	)
+	if err != nil {
+		return "", fmt.Errorf("error getting dashboard: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return "", newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response struct {
+		Dashboard struct {
+			Title string `json:"title"`
+		} `json:"dashboard"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return "", fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+	return strings.TrimSpace(response.Dashboard.Title), nil
+}
+
+func (c *Client) ListDashboardPanels(uid string) ([]DashboardPanel, error) {
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(strings.TrimSpace(uid))),
+		nil,
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting dashboard: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response struct {
+		Dashboard map[string]any `json:"dashboard"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	return extractDashboardPanels(response.Dashboard), nil
+}
+
+func extractDashboardPanels(dashboard map[string]any) []DashboardPanel {
+	var panels []DashboardPanel
+	if dashboard == nil {
+		return panels
+	}
+
+	rootPanels, _ := dashboard["panels"].([]any)
+	collectDashboardPanels(rootPanels, &panels)
+	return panels
+}
+
+func collectDashboardPanels(values []any, destination *[]DashboardPanel) {
+	for _, value := range values {
+		panel, ok := value.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		if nestedPanels, ok := panel["panels"].([]any); ok {
+			collectDashboardPanels(nestedPanels, destination)
+		}
+
+		panelType, _ := panel["type"].(string)
+		if strings.EqualFold(strings.TrimSpace(panelType), "row") {
+			continue
+		}
+
+		idValue, ok := panel["id"]
+		if !ok {
+			continue
+		}
+
+		idFloat, ok := idValue.(float64)
+		if !ok {
+			continue
+		}
+
+		id := int64(idFloat)
+		if id <= 0 {
+			continue
+		}
+
+		title, _ := panel["title"].(string)
+		*destination = append(*destination, DashboardPanel{
+			ID:    id,
+			Title: title,
+		})
+	}
 }
