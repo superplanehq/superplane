@@ -62,7 +62,6 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
@@ -84,7 +83,7 @@ import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
+import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
@@ -3204,7 +3203,7 @@ export function WorkflowPageV2() {
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: AiCanvasOperation[]) => {
+    async (operations: CanvasOperation[]) => {
       if (!operations.length || !organizationId || !canvasId) {
         return;
       }
@@ -3216,12 +3215,8 @@ export function WorkflowPageV2() {
       }
 
       saveWorkflowSnapshot(latestWorkflow);
-      const updatedWorkflow = applyAiOperationsToWorkflow({
-        workflow: latestWorkflow,
-        operations,
-        buildingBlocks,
-        integrations,
-      });
+      const builder = new CanvasBuilder(latestWorkflow, buildingBlocks, integrations);
+      const updatedWorkflow = builder.apply(operations);
 
       const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
       const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])
