@@ -105,8 +105,8 @@ The Create Dashboard Share Link component constructs a shareable URL for a Grafa
 
 - **Dashboard**: The Grafana dashboard UID for the share link
 - **Panel**: If set, link opens the dashboard at this specific panel
-- **From**: Optional expression for the start of the time range (e.g. `{{now() - duration("1h")}}`)
-- **To**: Optional expression for the end of the time range (e.g. `{{now()}}`)
+- **From**: Optional expression for the start of the time range (e.g. `now() - duration("1h")`)
+- **To**: Optional expression for the end of the time range (e.g. `now()`)
 
 ### Output
 
@@ -200,7 +200,7 @@ The Query Data Source component executes a query against a Grafana data source u
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional expressions for the query range (for example `{{now() - duration("5m")}}` and `{{now()}}`)
+- **Time From / Time To**: Optional expressions for the query range (for example `now() - duration("5m")` and `now()`)
 - **Timezone**: Interprets datetime-local expression results using the selected timezone offset
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
@@ -270,8 +270,8 @@ The Render Panel component constructs a Grafana image render URL for a dashboard
 - **Panel**: The panel to render
 - **Width**: Image width in pixels (default 1000)
 - **Height**: Image height in pixels (default 500)
-- **From**: Optional expression for the start of the time range (e.g. `{{now() - duration("1h")}}`)
-- **To**: Optional expression for the end of the time range (e.g. `{{now()}}`)
+- **From**: Optional expression for the start of the time range (e.g. `now() - duration("1h")`)
+- **To**: Optional expression for the end of the time range (e.g. `now()`)
 
 ### Output
 

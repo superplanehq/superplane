@@ -69,7 +69,7 @@ func (q *QueryDataSource) Documentation() string {
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional expressions for the query range (for example ` + "`{{now() - duration(\"5m\")}}`" + ` and ` + "`{{now()}}`" + `)
+- **Time From / Time To**: Optional expressions for the query range (for example ` + "`now() - duration(\"5m\")`" + ` and ` + "`now()`" + `)
 - **Timezone**: Interprets datetime-local expression results using the selected timezone offset
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
@@ -120,7 +120,7 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Optional start of the query time range",
-			Placeholder: "e.g. {{now() - duration(\"5m\")}}",
+			Placeholder: "e.g. now() - duration(\"5m\")",
 		},
 		{
 			Name:        "timeTo",
@@ -128,7 +128,7 @@ func (q *QueryDataSource) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Optional end of the query time range",
-			Placeholder: "e.g. {{now()}}",
+			Placeholder: "e.g. now()",
 		},
 		{
 			Name:        "timezone",
@@ -183,14 +183,14 @@ func (q *QueryDataSource) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		request.From, err = resolveGrafanaTimeInput(*spec.TimeFrom, spec.Timezone, ctx.Expressions)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		request.To, err = resolveGrafanaTimeInput(*spec.TimeTo, spec.Timezone, ctx.Expressions)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}

@@ -56,8 +56,8 @@ func (c *RenderPanel) Documentation() string {
 - **Panel**: The panel to render
 - **Width**: Image width in pixels (default 1000)
 - **Height**: Image height in pixels (default 500)
-- **From**: Optional expression for the start of the time range (e.g. ` + "`{{now() - duration(\"1h\")}}`" + `)
-- **To**: Optional expression for the end of the time range (e.g. ` + "`{{now()}}`" + `)
+- **From**: Optional expression for the start of the time range (e.g. ` + "`now() - duration(\"1h\")`" + `)
+- **To**: Optional expression for the end of the time range (e.g. ` + "`now()`" + `)
 
 ## Output
 
@@ -125,7 +125,7 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Start of the time range",
-			Placeholder: "e.g. {{now() - duration(\"1h\")}}",
+			Placeholder: "e.g. now() - duration(\"1h\")",
 		},
 		{
 			Name:        "to",
@@ -133,7 +133,7 @@ func (c *RenderPanel) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "End of the time range",
-			Placeholder: "e.g. {{now()}}",
+			Placeholder: "e.g. now()",
 		},
 	}
 }
@@ -181,14 +181,24 @@ func (c *RenderPanel) Execute(ctx core.ExecutionContext) error {
 		height = 500
 	}
 
+	from, err := resolveGrafanaTimeInput(spec.From, nil, ctx.Expressions)
+	if err != nil {
+		return fmt.Errorf("invalid from value %q: %w", strings.TrimSpace(spec.From), err)
+	}
+
+	to, err := resolveGrafanaTimeInput(spec.To, nil, ctx.Expressions)
+	if err != nil {
+		return fmt.Errorf("invalid to value %q: %w", strings.TrimSpace(spec.To), err)
+	}
+
 	renderURL := client.RenderPanelURL(
 		spec.DashboardUID,
 		dashboardURLPathSlug(dashboard),
 		spec.PanelID,
 		width,
 		height,
-		spec.From,
-		spec.To,
+		from,
+		to,
 	)
 
 	return ctx.ExecutionState.Emit(

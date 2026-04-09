@@ -53,8 +53,8 @@ func (c *CreateDashboardShareLink) Documentation() string {
 
 - **Dashboard**: The Grafana dashboard UID for the share link
 - **Panel**: If set, link opens the dashboard at this specific panel
-- **From**: Optional expression for the start of the time range (e.g. ` + "`{{now() - duration(\"1h\")}}`" + `)
-- **To**: Optional expression for the end of the time range (e.g. ` + "`{{now()}}`" + `)
+- **From**: Optional expression for the start of the time range (e.g. ` + "`now() - duration(\"1h\")`" + `)
+- **To**: Optional expression for the end of the time range (e.g. ` + "`now()`" + `)
 
 ## Output
 
@@ -108,7 +108,7 @@ func (c *CreateDashboardShareLink) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Start of the time range",
-			Placeholder: "e.g. {{now() - duration(\"1h\")}}",
+			Placeholder: "e.g. now() - duration(\"1h\")",
 		},
 		{
 			Name:        "to",
@@ -116,7 +116,7 @@ func (c *CreateDashboardShareLink) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "End of the time range",
-			Placeholder: "e.g. {{now()}}",
+			Placeholder: "e.g. now()",
 		},
 	}
 }
@@ -162,10 +162,18 @@ func (c *CreateDashboardShareLink) Execute(ctx core.ExecutionContext) error {
 		params.Set("viewPanel", fmt.Sprintf("%d", *spec.PanelID))
 	}
 	if strings.TrimSpace(spec.From) != "" {
-		params.Set("from", spec.From)
+		from, err := resolveGrafanaTimeInput(spec.From, nil, ctx.Expressions)
+		if err != nil {
+			return fmt.Errorf("invalid from value %q: %w", strings.TrimSpace(spec.From), err)
+		}
+		params.Set("from", from)
 	}
 	if strings.TrimSpace(spec.To) != "" {
-		params.Set("to", spec.To)
+		to, err := resolveGrafanaTimeInput(spec.To, nil, ctx.Expressions)
+		if err != nil {
+			return fmt.Errorf("invalid to value %q: %w", strings.TrimSpace(spec.To), err)
+		}
+		params.Set("to", to)
 	}
 
 	shareURL := baseURL
