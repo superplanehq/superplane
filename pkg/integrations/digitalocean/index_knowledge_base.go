@@ -184,16 +184,22 @@ func (i *IndexKnowledgeBase) HandleAction(ctx core.ActionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	kb, err := client.GetKnowledgeBase(meta.KBUUID)
+	job, err := client.GetIndexingJob(meta.JobID)
 	if err != nil {
-		return fmt.Errorf("failed to get knowledge base: %v", err)
+		var apiErr *DOAPIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, indexPollInterval)
+		}
+		return fmt.Errorf("failed to get indexing job %s: %v", meta.JobID, err)
 	}
 
-	if kb.LastIndexingJob == nil {
-		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, indexPollInterval)
+	if job.KnowledgeBaseUUID != "" && job.KnowledgeBaseUUID != meta.KBUUID {
+		return ctx.ExecutionState.Fail(
+			"error",
+			fmt.Sprintf("indexing job %s belongs to knowledge base %s (expected %s)", job.UUID, job.KnowledgeBaseUUID, meta.KBUUID),
+		)
 	}
 
-	job := kb.LastIndexingJob
 	state := indexingJobState(job.Status)
 	switch state {
 	case "completed", "successful", "no_changes":

@@ -154,30 +154,25 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 	}
 
 	t.Run("completed job emits output", func(t *testing.T) {
-		kbWithCompletedJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb",
-				"last_indexing_job": {
-					"uuid": "job-uuid-1",
-					"status": "INDEX_JOB_STATUS_COMPLETED",
-					"phase": "BATCH_JOB_PHASE_SUCCEEDED",
-					"tokens": 500,
-					"total_tokens": "1500",
-					"completed_datasources": 2,
-					"total_datasources": 2,
-					"started_at": "2025-06-01T00:00:00Z",
-					"finished_at": "2025-06-01T00:05:32Z",
-					"is_report_available": true,
-					"knowledge_base_uuid": "kb-uuid-1"
-				}
+		jobCompleted := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_COMPLETED",
+				"phase": "BATCH_JOB_PHASE_SUCCEEDED",
+				"tokens": 500,
+				"total_tokens": "1500",
+				"completed_datasources": 2,
+				"total_datasources": 2,
+				"started_at": "2025-06-01T00:00:00Z",
+				"finished_at": "2025-06-01T00:05:32Z",
+				"is_report_available": true,
+				"knowledge_base_uuid": "kb-uuid-1"
 			}
 		}`
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithCompletedJob))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobCompleted))},
 			},
 		}
 
@@ -214,24 +209,20 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 	})
 
 	t.Run("running job reschedules poll", func(t *testing.T) {
-		kbWithRunningJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb",
-				"last_indexing_job": {
-					"uuid": "job-uuid-1",
-					"status": "INDEX_JOB_STATUS_RUNNING",
-					"phase": "BATCH_JOB_PHASE_RUNNING",
-					"completed_datasources": 1,
-					"total_datasources": 2
-				}
+		jobRunning := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_RUNNING",
+				"phase": "BATCH_JOB_PHASE_RUNNING",
+				"completed_datasources": 1,
+				"total_datasources": 2,
+				"knowledge_base_uuid": "kb-uuid-1"
 			}
 		}`
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithRunningJob))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobRunning))},
 			},
 		}
 
@@ -253,21 +244,17 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 	})
 
 	t.Run("failed job fails execution", func(t *testing.T) {
-		kbWithFailedJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb",
-				"last_indexing_job": {
-					"uuid": "job-uuid-1",
-					"status": "INDEX_JOB_STATUS_FAILED"
-				}
+		jobFailed := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_FAILED",
+				"knowledge_base_uuid": "kb-uuid-1"
 			}
 		}`
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithFailedJob))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobFailed))},
 			},
 		}
 
@@ -289,18 +276,12 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 		require.Contains(t, executionState.FailureMessage, "INDEX_JOB_STATUS_FAILED")
 	})
 
-	t.Run("no indexing job yet reschedules poll", func(t *testing.T) {
-		kbNoJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb"
-			}
-		}`
+	t.Run("job not found yet reschedules poll", func(t *testing.T) {
+		notFound := `{"message":"not found"}`
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbNoJob))},
+				{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(notFound))},
 			},
 		}
 
@@ -319,6 +300,39 @@ func Test__IndexKnowledgeBase__HandleAction(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Equal(t, "poll", requests.Action)
+	})
+
+	t.Run("mismatched kb uuid fails execution", func(t *testing.T) {
+		jobWrongKB := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_COMPLETED",
+				"knowledge_base_uuid": "kb-uuid-other"
+			}
+		}`
+
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobWrongKB))},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{}
+
+		err := component.HandleAction(core.ActionContext{
+			Name: "poll",
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			ExecutionState: executionState,
+			Metadata:       &contexts.MetadataContext{Metadata: meta},
+			Requests:       &contexts.RequestContext{},
+		})
+
+		require.NoError(t, err)
+		require.False(t, executionState.Passed)
+		require.Contains(t, executionState.FailureMessage, "belongs to knowledge base")
 	})
 }
 

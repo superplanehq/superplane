@@ -2497,6 +2497,29 @@ type IndexJob struct {
 	KnowledgeBaseUUID    string `json:"knowledge_base_uuid"`
 }
 
+// GetIndexingJob retrieves an indexing job by its UUID.
+func (c *Client) GetIndexingJob(jobUUID string) (*IndexJob, error) {
+	url := fmt.Sprintf("%s/gen-ai/indexing_jobs/%s", c.BaseURL, jobUUID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Job IndexJob `json:"job"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if strings.TrimSpace(response.Job.UUID) == "" {
+		return nil, fmt.Errorf("error parsing response: missing job uuid")
+	}
+
+	return &response.Job, nil
+}
+
 // StartIndexingJob triggers a new indexing job for a knowledge base.
 // If dataSourceUUIDs are provided, only those data sources will be indexed.
 // If none are provided, all data sources in the knowledge base will be indexed.
