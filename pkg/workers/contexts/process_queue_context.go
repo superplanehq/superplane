@@ -135,6 +135,9 @@ func BuildProcessQueueContext(
 			canvasName = workflow.Name
 		}
 
+		executionState := NewExecutionStateContext(tx, &execution, onNewEvents)
+		executionState.SetConfigBuilder(builder)
+
 		return &core.ExecutionContext{
 			ID:             execution.ID,
 			WorkflowID:     execution.WorkflowID.String(),
@@ -146,7 +149,7 @@ func BuildProcessQueueContext(
 			HTTP:           httpCtx,
 			Metadata:       NewExecutionMetadataContext(tx, &execution),
 			NodeMetadata:   NewNodeMetadataContext(tx, node),
-			ExecutionState: NewExecutionStateContext(tx, &execution, onNewEvents),
+			ExecutionState: executionState,
 			Requests:       NewExecutionRequestContext(tx, &execution),
 			Logger:         logging.WithExecution(logging.ForNode(*node), &execution, nil),
 			Notifications:  NewNotificationContext(tx, orgUUID, execution.WorkflowID),

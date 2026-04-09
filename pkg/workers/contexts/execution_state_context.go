@@ -93,10 +93,6 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 }
 
 func (s *ExecutionStateContext) resolveReportEntry() {
-	if s.configBuilder == nil {
-		return
-	}
-
 	config := s.execution.Configuration.Data()
 	if config == nil {
 		return
@@ -117,14 +113,15 @@ func (s *ExecutionStateContext) resolveReportEntry() {
 		return
 	}
 
-	resolved, err := s.configBuilder.ResolveTemplateExpressions(tmpl)
-	if err != nil {
-		return
+	if s.configBuilder != nil {
+		resolved, err := s.configBuilder.ResolveTemplateExpressions(tmpl)
+		if err == nil {
+			tmpl = strings.TrimSpace(fmt.Sprintf("%v", resolved))
+		}
 	}
 
-	resolvedStr := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedStr != "" {
-		s.execution.ReportEntry = resolvedStr
+	if tmpl != "" {
+		s.execution.ReportEntry = tmpl
 	}
 }
 

@@ -482,13 +482,14 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	//
 	// Update execution state
 	//
-	err = tx.Model(e).
-		Updates(map[string]interface{}{
-			"state":      CanvasNodeExecutionStateFinished,
-			"result":     CanvasNodeExecutionResultPassed,
-			"updated_at": &now,
-		}).Error
+	updates := map[string]interface{}{
+		"state":        CanvasNodeExecutionStateFinished,
+		"result":       CanvasNodeExecutionResultPassed,
+		"updated_at":   &now,
+		"report_entry": e.ReportEntry,
+	}
 
+	err = tx.Model(e).Updates(updates).Error
 	if err != nil {
 		return nil, err
 	}

@@ -308,74 +308,19 @@ export function RunSummary({ runData, workflowNodes, componentIconMap }: RunSumm
         </div>
 
         {/* Report */}
-        {steps.length > 0 && (
-          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Report</h3>
-            <div className="flex flex-col">
-              {steps.map((step, i) => {
-                const style = STATUS_STYLES[step.status];
-                const isLast = i === steps.length - 1;
-
-                return (
-                  <div
-                    key={`${step.nodeId}-${i}`}
-                    className={cn("relative flex gap-3 pb-4", !isLast && "ml-[7px] border-l border-gray-200")}
-                  >
-                    <div
-                      className={cn(
-                        "relative z-10 flex h-4 w-4 shrink-0 items-center justify-center rounded-full",
-                        style.dot,
-                        !isLast ? "-ml-2" : "ml-0",
-                      )}
-                    >
-                      {step.status === "success" ? (
-                        <Check className="h-2.5 w-2.5 text-white" />
-                      ) : step.status === "error" ? (
-                        <AlertTriangle className="h-2.5 w-2.5 text-white" />
-                      ) : step.status === "running" ? (
-                        <Clock className="h-2.5 w-2.5 text-white" />
-                      ) : (
-                        <Circle className="h-2.5 w-2.5 text-white" />
-                      )}
-                    </div>
-
-                    <div className="-mt-0.5 flex min-w-0 flex-1 flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-800">{step.name}</span>
-                        <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase", style.badge)}>
-                          {style.label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        {step.durationMs > 0 ? (
-                          <span>Duration: {formatMs(step.durationMs)}</span>
-                        ) : step.isTrigger ? (
-                          <span>Trigger</span>
-                        ) : (
-                          <span>Instant</span>
-                        )}
-                        {step.startOffsetMs > 0 && (
-                          <>
-                            <span>&middot;</span>
-                            <span>+{formatMs(step.startOffsetMs)}</span>
-                          </>
-                        )}
-                      </div>
-                      {step.reportEntry && (
-                        <div className="mt-1.5 prose prose-xs prose-gray max-w-none text-xs text-gray-700 [&_a]:text-blue-600 [&_a]:underline [&_p]:my-0.5 [&_ul]:my-0.5 [&_ol]:my-0.5 [&_li]:my-0 [&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[10px]">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.reportEntry}</ReactMarkdown>
-                        </div>
-                      )}
-                      {step.error && (
-                        <div className="mt-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">{step.error}</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">Report</h3>
+          {steps.some((s) => s.reportEntry) ? (
+            <div className="prose prose-sm prose-gray max-w-none text-sm text-gray-700 [&_a]:text-blue-600 [&_a]:underline [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mb-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mb-1">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {steps
+                  .filter((s) => s.reportEntry)
+                  .map((s) => s.reportEntry)
+                  .join("\n\n")}
+              </ReactMarkdown>
             </div>
-          </div>
-        )}
+          ) : null}
+        </div>
       </div>
     </div>
   );

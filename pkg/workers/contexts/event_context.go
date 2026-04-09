@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -59,7 +60,9 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	reportEntry, err := s.resolveConfigTemplate("reportTemplate", wrappedPayload)
-	if err == nil && reportEntry != nil {
+	if err != nil {
+		log.Errorf("failed to resolve reportTemplate for node %s: %v", s.node.NodeID, err)
+	} else if reportEntry != nil {
 		event.ReportEntry = reportEntry
 	}
 

@@ -50,7 +50,9 @@ func EmitNodeEvent(
 	}
 
 	reportEntry, err := resolveConfigTemplate(node, "reportTemplate", data)
-	if err == nil && reportEntry != nil {
+	if err != nil {
+		log.Errorf("failed to resolve reportTemplate for node %s: %v", node.NodeID, err)
+	} else if reportEntry != nil {
 		event.ReportEntry = reportEntry
 	}
 
