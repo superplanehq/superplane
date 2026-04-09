@@ -3,27 +3,59 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
 
 import pika  # type: ignore[import-untyped]
 import pika.exceptions  # type: ignore[import-untyped]
 
-from ai.config import config
 from private import agents_pb2
 
 AGENT_EXCHANGE = "superplane.agent-exchange"
 AGENT_RUN_FINISHED_ROUTING_KEY = "agent-run-finished"
 
 
-class _Publisher:
+class UsagePublisher:
     """Thread-safe RabbitMQ publisher that reuses a single connection."""
 
-    def __init__(self) -> None:
+    def __init__(self, rabbitmq_url: str) -> None:
+        self._rabbitmq_url = rabbitmq_url
         self._lock = threading.Lock()
         self._connection: pika.BlockingConnection | None = None
         self._channel: pika.adapters.blocking_connection.BlockingChannel | None = None
 
-    def publish(self, body: bytes) -> None:
+    def publish_agent_run_finished(
+        self,
+        organization_id: str,
+        chat_id: str,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        total_tokens: int,
+    ) -> None:
+        """Publish an agent-run-finished message in a background thread.
+
+        Fails silently with a log message if RabbitMQ is unavailable.
+        """
+        if total_tokens <= 0:
+            return
+
+        message = agents_pb2.AgentRunFinishedMessage(  # type: ignore[attr-defined]
+            organization_id=organization_id,
+            chat_id=chat_id,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
+        body = message.SerializeToString()
+
+        thread = threading.Thread(target=self._publish, args=(body,), daemon=True)
+        thread.start()
+
+    def close(self) -> None:
+        with self._lock:
+            self._close()
+
+    def _publish(self, body: bytes) -> None:
         with self._lock:
             try:
                 channel = self._ensure_channel()
@@ -32,9 +64,9 @@ class _Publisher:
                     routing_key=AGENT_RUN_FINISHED_ROUTING_KEY,
                     body=body,
                 )
-            except Exception:
+            except Exception as error:
                 self._close()
-                raise
+                print(f"[web] failed to publish agent run finished: {error}", flush=True)
 
     def _ensure_channel(self) -> pika.adapters.blocking_connection.BlockingChannel:
         has_connection = self._connection is not None and self._connection.is_open
@@ -44,11 +76,12 @@ class _Publisher:
 
         self._close()
 
-        rabbitmq_url = config.rabbitmq_url
-        params = pika.URLParameters(rabbitmq_url)
+        params = pika.URLParameters(self._rabbitmq_url)
         self._connection = pika.BlockingConnection(params)
         self._channel = self._connection.channel()
-        self._channel.exchange_declare(exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True)
+        self._channel.exchange_declare(
+            exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True
+        )
         return self._channel
 
     def _close(self) -> None:
@@ -61,49 +94,19 @@ class _Publisher:
         self._channel = None
 
 
-_publisher = _Publisher()
-_executor = threading.Thread  # just used for typing reference below
+class NoopUsagePublisher:
+    """No-op publisher used when RABBITMQ_URL is not configured."""
 
+    def publish_agent_run_finished(
+        self,
+        organization_id: str,
+        chat_id: str,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        total_tokens: int,
+    ) -> None:
+        pass
 
-def _publish_in_background(task: Callable[[], None]) -> None:
-    thread = threading.Thread(target=task, daemon=True)
-    thread.start()
-
-
-def publish_agent_run_finished(
-    organization_id: str,
-    chat_id: str,
-    model: str,
-    input_tokens: int,
-    output_tokens: int,
-    total_tokens: int,
-) -> None:
-    """Publish an agent-run-finished message to RabbitMQ.
-
-    Runs in a background thread to avoid blocking the async event loop.
-    Fails silently with a log message if RabbitMQ is unavailable.
-    """
-    rabbitmq_url = config.rabbitmq_url
-    if not rabbitmq_url:
-        return
-
-    if total_tokens <= 0:
-        return
-
-    message = agents_pb2.AgentRunFinishedMessage(  # type: ignore[attr-defined]
-        organization_id=organization_id,
-        chat_id=chat_id,
-        model=model,
-        input_tokens=input_tokens,
-        output_tokens=output_tokens,
-        total_tokens=total_tokens,
-    )
-    body = message.SerializeToString()
-
-    def _do_publish() -> None:
-        try:
-            _publisher.publish(body)
-        except Exception as error:
-            print(f"[web] failed to publish agent run finished: {error}", flush=True)
-
-    _publish_in_background(_do_publish)
+    def close(self) -> None:
+        pass
