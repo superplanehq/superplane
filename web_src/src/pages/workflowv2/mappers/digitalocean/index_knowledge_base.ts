@@ -1,12 +1,11 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -15,6 +14,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { IndexKBNodeMetadata, IndexKnowledgeBaseConfiguration } from "./types";
+import { baseEventSections, formatIndexingStatus } from "./event_helpers";
 
 export const indexKnowledgeBaseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -77,21 +77,6 @@ export const indexKnowledgeBaseMapper: ComponentBaseMapper = {
   },
 };
 
-function formatIndexingStatus(status: string): string {
-  const lower = status.toLowerCase().replace(/^index_job_status_/, "");
-  const map: Record<string, string> = {
-    completed: "Completed",
-    successful: "Successful",
-    no_changes: "No changes",
-    partial: "Partially completed",
-    running: "Running",
-    pending: "Pending",
-    failed: "Failed",
-    cancelled: "Cancelled",
-  };
-  return map[lower] ?? status;
-}
-
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as IndexKBNodeMetadata | undefined;
@@ -104,25 +89,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootEvent = execution.rootEvent;
-  if (!rootEvent?.id || !execution.createdAt) return [];
-
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-  if (!rootTriggerNode?.componentName) return [];
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt),
-      eventTitle: title,
-      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id,
-    },
-  ];
 }
