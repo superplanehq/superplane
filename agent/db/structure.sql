@@ -137,6 +137,13 @@ CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING bt
 
 
 --
+-- Name: idx_agent_chats_updated_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_chats_updated_at ON public.agent_chats USING btree (updated_at);
+
+
+--
 -- Name: agent_chat_messages agent_chat_messages_chat_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -192,6 +199,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
+20260407135406	f
 20260403134227	f
 \.
 
