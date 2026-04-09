@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import MagicMock
 
 import psycopg
 import pytest
@@ -223,6 +224,59 @@ def test_load_agent_chat_message_history_skips_undeserializable_records(
     assert len(history) == 1
     assert isinstance(history[0].parts[0], UserPromptPart)
     assert history[0].parts[0].content == "What is in my canvas?"
+
+
+def test_delete_expired_chats_uses_batched_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _build_store()
+    mock_cursor = MagicMock()
+    mock_cursor.rowcount = 3
+    mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+    mock_cursor.__exit__ = MagicMock(return_value=False)
+
+    mock_conn = MagicMock()
+    mock_conn.closed = False
+    mock_conn.broken = False
+    mock_conn.cursor = MagicMock(return_value=mock_cursor)
+
+    monkeypatch.setattr(psycopg, "connect", lambda **kwargs: mock_conn)
+
+    deleted = store.delete_expired_chats(retention_days=14, batch_size=500)
+
+    assert deleted == 3
+    sql, params = mock_cursor.execute.call_args.args
+    assert "DELETE FROM agent_chats" in sql
+    assert "LIMIT" in sql
+    assert params == (14, 500, 14)
+
+
+def test_delete_expired_chats_loops_until_batch_underflows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = _build_store()
+    batch_rowcounts = iter([500, 500, 200])
+    mock_cursor = MagicMock()
+    mock_cursor.__enter__ = MagicMock(return_value=mock_cursor)
+    mock_cursor.__exit__ = MagicMock(return_value=False)
+
+    original_execute = mock_cursor.execute
+
+    def execute_with_rowcount(*args: Any, **kwargs: Any) -> None:
+        original_execute(*args, **kwargs)
+        mock_cursor.rowcount = next(batch_rowcounts)
+
+    mock_cursor.execute = MagicMock(side_effect=execute_with_rowcount)
+
+    mock_conn = MagicMock()
+    mock_conn.closed = False
+    mock_conn.broken = False
+    mock_conn.cursor = MagicMock(return_value=mock_cursor)
+
+    monkeypatch.setattr(psycopg, "connect", lambda **kwargs: mock_conn)
+
+    deleted = store.delete_expired_chats(retention_days=30, batch_size=500)
+
+    assert deleted == 1200
+    assert mock_cursor.execute.call_count == 3
 
 
 def test_connect_reuses_open_connection_until_closed(monkeypatch: pytest.MonkeyPatch) -> None:

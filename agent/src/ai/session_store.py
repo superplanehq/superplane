@@ -500,6 +500,28 @@ class SessionStore:
                 (initial_message.strip(), now, chat_id),
             )
 
+    def delete_expired_chats(self, retention_days: int, batch_size: int = 500) -> int:
+        total = 0
+        while True:
+            with self._cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM agent_chats
+                    WHERE id IN (
+                        SELECT id FROM agent_chats
+                        WHERE updated_at < NOW() - make_interval(days => %s)
+                        LIMIT %s
+                    )
+                    AND updated_at < NOW() - make_interval(days => %s)
+                    """,
+                    (retention_days, batch_size, retention_days),
+                )
+                deleted = int(cur.rowcount)
+                total += deleted
+                if deleted < batch_size:
+                    break
+        return total
+
     def _flatten_message_record(
         self, record: StoredAgentChatMessageRecord
     ) -> list[StoredAgentChatMessage]:

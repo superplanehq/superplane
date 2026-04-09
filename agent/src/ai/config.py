@@ -27,6 +27,10 @@ class Config:
         self.db_sslmode: str = self._parse_str("DB_SSLMODE", default="disable")
         self.application_name: str = self._parse_str("APPLICATION_NAME", default="superplane-agent")
 
+        self.chat_retention_days: int = self._parse_int(
+            "AGENT_CHAT_RETENTION_DAYS", lower=0, upper=3650, default=14
+        )
+
         self.jwt_secret: str = self._parse_str("JWT_SECRET")
 
         self.grpc_host: str = self._parse_str("INTERNAL_GRPC_HOST", default="0.0.0.0")
