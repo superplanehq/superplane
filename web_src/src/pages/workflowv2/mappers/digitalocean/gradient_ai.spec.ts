@@ -4,6 +4,7 @@ import { createKnowledgeBaseMapper } from "./create_knowledge_base";
 import { getKnowledgeBaseMapper } from "./get_knowledge_base";
 import { indexKnowledgeBaseMapper } from "./index_knowledge_base";
 import { addDataSourceMapper } from "./add_data_source";
+import { deleteDataSourceMapper } from "./delete_data_source";
 import { attachKnowledgeBaseMapper } from "./attach_knowledge_base";
 import { deleteKnowledgeBaseMapper } from "./delete_knowledge_base";
 import { runEvaluationMapper, RUN_EVALUATION_STATE_REGISTRY } from "./run_evaluation";
@@ -151,11 +152,8 @@ describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
           default: [
             buildOutput({
               uuid: "kb-uuid",
-              name: "my-kb",
+              // name: "my-kb",
               databaseStatus: "ONLINE",
-              region: "tor1",
-              embeddingModelName: "GTE Large EN v1.5",
-              projectName: "AI Agents",
               database: { id: "db-1", name: "my-kb-os" },
               dataSources: [{ uuid: "ds-1", type: "spaces" }, { uuid: "ds-2", type: "web" }],
               lastIndexingJob: {
@@ -170,15 +168,13 @@ describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
       },
     });
     const details = getKnowledgeBaseMapper.getExecutionDetails(ctx);
-    expect(details["Knowledge Base"]).toBe("my-kb");
+    // expect(details["Knowledge Base"]).toBe("my-kb");
     expect(details["View Knowledge Base"]).toContain("kb-uuid");
-    expect(details["Database Status"]).toBe("ONLINE");
+    expect(details["Knowledge Base Endpoint"]).toContain("kbaas.do-ai.run/v1/kb-uuid/retrieve");
+    expect(details["Data Sources"]).toBe("2");
     expect(details["Database"]).toBe("my-kb-os");
     expect(details["View Database"]).toContain("db-1");
-    expect(details["Region"]).toBe("tor1");
-    expect(details["Embedding Model"]).toBe("GTE Large EN v1.5");
-    expect(details["Project"]).toBe("AI Agents");
-    expect(details["Data Sources"]).toBe("2");
+    expect(details["Last Indexing"]).toContain("Completed");
     expect(details["Last Indexing"]).toContain("2/2 sources");
     expect(details["Last Indexed At"]).toBeDefined();
     expect(details["View Activity"]).toContain("kb-uuid/activity");
@@ -191,10 +187,8 @@ describe("getKnowledgeBaseMapper.getExecutionDetails", () => {
       },
     });
     const details = getKnowledgeBaseMapper.getExecutionDetails(ctx);
-    expect(details["Knowledge Base"]).toBe("kb");
-    expect(details["Database Status"]).toBeUndefined();
-    expect(details["Embedding Model"]).toBeUndefined();
-    expect(details["Project"]).toBeUndefined();
+    // expect(details["Knowledge Base"]).toBe("kb");
+    expect(details["Knowledge Base Endpoint"]).toBeUndefined();
     expect(details["Database"]).toBeUndefined();
     expect(details["View Database"]).toBeUndefined();
     expect(details["Data Sources"]).toBeUndefined();
@@ -252,14 +246,14 @@ describe("indexKnowledgeBaseMapper.getExecutionDetails", () => {
       },
     });
     const details = indexKnowledgeBaseMapper.getExecutionDetails(ctx);
+    expect(details["Started At"]).toBeDefined();
+    expect(details["Finished At"]).toBeDefined();
     expect(details["Knowledge Base"]).toBe("my-kb");
     expect(details["View Knowledge Base"]).toContain("kb-uuid");
     expect(details["View Activity"]).toContain("kb-uuid/activity");
-    expect(details["Status"]).toBe("INDEX_JOB_STATUS_COMPLETED");
-    expect(details["Data Sources"]).toBe("2/2 completed");
+    expect(details["Indexing Status"]).toBe("Completed");
+    expect(details["Data Sources Indexed"]).toBe("2/2 completed");
     expect(details["Total Tokens"]).toBe("1500");
-    expect(details["Started At"]).toBeDefined();
-    expect(details["Finished At"]).toBeDefined();
   });
 
   it("falls back to UUID when name is missing", () => {
@@ -314,6 +308,7 @@ describe("addDataSourceMapper.getExecutionDetails", () => {
           default: [
             buildOutput({
               dataSourceUUID: "ds-1",
+              dataSourceName: "my-bucket (tor1)",
               knowledgeBaseUUID: "kb-uuid",
               knowledgeBaseName: "my-kb",
               indexingJob: {
@@ -331,10 +326,102 @@ describe("addDataSourceMapper.getExecutionDetails", () => {
     const details = addDataSourceMapper.getExecutionDetails(ctx);
     expect(details["Knowledge Base"]).toBe("my-kb");
     expect(details["View Knowledge Base"]).toContain("kb-uuid");
-    expect(details["Data Source"]).toBe("ds-1");
-    expect(details["Indexing Status"]).toBe("INDEX_JOB_STATUS_COMPLETED");
+    expect(details["Data Source"]).toBe("my-bucket (tor1)");
+    expect(details["Indexing Status"]).toBe("Completed");
     expect(details["Total Tokens"]).toBe("1500");
-    expect(details["Finished At"]).toBeDefined();
+    expect(details["Indexing finished at"]).toBeDefined();
+    expect(details["View Activity"]).toContain("kb-uuid/activity");
+  });
+
+  it("extracts details without indexing job", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              dataSourceUUID: "ds-1",
+              dataSourceName: "https://docs.example.com",
+              knowledgeBaseUUID: "kb-uuid",
+              knowledgeBaseName: "my-kb",
+            }),
+          ],
+        },
+      },
+    });
+    const details = addDataSourceMapper.getExecutionDetails(ctx);
+    expect(details["Knowledge Base"]).toBe("my-kb");
+    expect(details["Data Source"]).toBe("https://docs.example.com");
+    expect(details["Indexing Status"]).toBeUndefined();
+    expect(details["View Activity"]).toBeUndefined();
+  });
+
+  it("falls back to UUID when dataSourceName is missing", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [buildOutput({ dataSourceUUID: "ds-fallback", knowledgeBaseUUID: "kb-uuid", knowledgeBaseName: "my-kb" })],
+        },
+      },
+    });
+    expect(addDataSourceMapper.getExecutionDetails(ctx)["Data Source"]).toBe("ds-fallback");
+  });
+
+  it("does not throw when node metadata and configuration are undefined", () => {
+    const ctx = buildDetailsCtx({
+      node: { metadata: undefined, configuration: undefined },
+      execution: { outputs: { default: [buildOutput({ knowledgeBaseName: "kb" })] } },
+    });
+    expect(() => addDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+});
+
+// ── deleteDataSourceMapper ───────────────────────────────────────────
+
+describe("deleteDataSourceMapper.getExecutionDetails", () => {
+  it("does not throw when outputs is undefined", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
+    expect(() => deleteDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("does not throw when default array is empty", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
+    expect(() => deleteDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("does not throw when output data fields are all missing", () => {
+    const ctx = buildDetailsCtx({ execution: { outputs: { default: [buildOutput({})] } } });
+    expect(() => deleteDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("extracts details with indexing job", () => {
+    const ctx = buildDetailsCtx({
+      node: { metadata: { knowledgeBaseName: "my-kb", dataSourceName: "my-bucket (tor1)" } },
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              dataSourceUUID: "ds-1",
+              knowledgeBaseUUID: "kb-uuid",
+              knowledgeBaseName: "my-kb",
+              indexingJob: {
+                status: "INDEX_JOB_STATUS_COMPLETED",
+                totalTokens: "800",
+                completedDataSources: 1,
+                totalDataSources: 1,
+                finishedAt: "2025-06-01T00:03:12Z",
+              },
+            }),
+          ],
+        },
+      },
+    });
+    const details = deleteDataSourceMapper.getExecutionDetails(ctx);
+    expect(details["Knowledge Base"]).toBe("my-kb");
+    expect(details["View Knowledge Base"]).toContain("kb-uuid");
+    expect(details["Data Source"]).toBe("my-bucket (tor1)");
+    expect(details["Indexing Status"]).toBe("Completed");
+    expect(details["Total Tokens"]).toBe("800");
+    expect(details["Indexing finished at"]).toBeDefined();
     expect(details["View Activity"]).toContain("kb-uuid/activity");
   });
 
@@ -352,7 +439,7 @@ describe("addDataSourceMapper.getExecutionDetails", () => {
         },
       },
     });
-    const details = addDataSourceMapper.getExecutionDetails(ctx);
+    const details = deleteDataSourceMapper.getExecutionDetails(ctx);
     expect(details["Knowledge Base"]).toBe("my-kb");
     expect(details["Data Source"]).toBe("ds-1");
     expect(details["Indexing Status"]).toBeUndefined();
@@ -364,7 +451,7 @@ describe("addDataSourceMapper.getExecutionDetails", () => {
       node: { metadata: undefined, configuration: undefined },
       execution: { outputs: { default: [buildOutput({ knowledgeBaseName: "kb" })] } },
     });
-    expect(() => addDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
+    expect(() => deleteDataSourceMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 });
 

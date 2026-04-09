@@ -40,24 +40,6 @@ export const indexKnowledgeBaseMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    details["Knowledge Base"] = String(result.knowledgeBaseName || result.knowledgeBaseUUID || "-");
-
-    const kbUUID = result.knowledgeBaseUUID as string | undefined;
-    if (kbUUID) {
-      details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}`;
-      details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}/activity`;
-    }
-
-    details["Status"] = String(result.status || "-");
-
-    const completed = result.completedDataSources ?? 0;
-    const total = result.totalDataSources ?? 0;
-    details["Data Sources"] = `${completed}/${total} completed`;
-
-    if (result.totalTokens) {
-      details["Total Tokens"] = String(result.totalTokens);
-    }
-
     const startedAt = result.startedAt as string | undefined;
     if (startedAt) {
       details["Started At"] = new Date(startedAt).toLocaleString();
@@ -66,6 +48,24 @@ export const indexKnowledgeBaseMapper: ComponentBaseMapper = {
     const finishedAt = result.finishedAt as string | undefined;
     if (finishedAt) {
       details["Finished At"] = new Date(finishedAt).toLocaleString();
+    }
+
+    details["Knowledge Base"] = String(result.knowledgeBaseName || result.knowledgeBaseUUID || "-");
+
+    const kbUUID = result.knowledgeBaseUUID as string | undefined;
+    if (kbUUID) {
+      details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}`;
+      details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}/activity`;
+    }
+
+    details["Indexing Status"] = formatIndexingStatus(String(result.status || "-"));
+
+    const completed = result.completedDataSources ?? 0;
+    const total = result.totalDataSources ?? 0;
+    details["Data Sources Indexed"] = `${completed}/${total} completed`;
+
+    if (result.totalTokens) {
+      details["Total Tokens"] = String(result.totalTokens);
     }
 
     return details;
@@ -77,15 +77,30 @@ export const indexKnowledgeBaseMapper: ComponentBaseMapper = {
   },
 };
 
+function formatIndexingStatus(status: string): string {
+  const lower = status.toLowerCase().replace(/^index_job_status_/, "");
+  const map: Record<string, string> = {
+    completed: "Completed",
+    successful: "Successful",
+    no_changes: "No changes",
+    partial: "Partially completed",
+    running: "Running",
+    pending: "Pending",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+  return map[lower] ?? status;
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as IndexKBNodeMetadata | undefined;
   const configuration = node.configuration as IndexKnowledgeBaseConfiguration | undefined;
 
   if (nodeMetadata?.knowledgeBaseName) {
-    metadata.push({ icon: "brain", label: nodeMetadata.knowledgeBaseName });
+    metadata.push({ icon: "book-marked", label: nodeMetadata.knowledgeBaseName });
   } else if (configuration?.knowledgeBase) {
-    metadata.push({ icon: "brain", label: `KB: ${configuration.knowledgeBase}` });
+    metadata.push({ icon: "book-marked", label: `KB: ${configuration.knowledgeBase}` });
   }
 
   return metadata;

@@ -120,6 +120,7 @@ func (d *DigitalOcean) Components() []core.Component {
 		&GetKnowledgeBase{},
 		&IndexKnowledgeBase{},
 		&AddDataSource{},
+		&DeleteDataSource{},
 		&AttachKnowledgeBase{},
 		&DetachKnowledgeBase{},
 		&DeleteKnowledgeBase{},

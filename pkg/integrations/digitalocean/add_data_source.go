@@ -60,7 +60,7 @@ Each data source has its own independent chunking configuration:
 
 ## Indexing
 
-When **Index after adding** is enabled, the component starts an indexing job after adding the data source and polls every 30 seconds until the job completes. Disable it if you want to add multiple data sources first and index them all at once using the Index Knowledge Base component.
+When **Index after adding** is enabled, the component starts an indexing job scoped **only to the newly added data source** and polls every 30 seconds until the job completes. Other existing data sources in the knowledge base are not re-indexed. Disable it if you want to add multiple data sources first and index them all at once using the Index Knowledge Base component.
 
 ## Output
 
@@ -110,7 +110,19 @@ func (a *AddDataSource) Configuration() []configuration.Field {
 		},
 	}
 
-	fields = append(fields, dataSourceItemSchema()...)
+	dsFields := dataSourceItemSchema()
+	for i, field := range dsFields {
+		switch field.Name {
+		case "maxChunkSize":
+			dsFields[i].Description = "Tokens per chunk. Range: 100–256 (All MiniLM), 100–512 (Multi QA), 100–8192 (GTE Large / Qwen3)."
+		case "parentChunkSize":
+			dsFields[i].Description = "Context chunk tokens. Range: 100–256 (All MiniLM), 100–512 (Multi QA), 100–8192 (GTE Large / Qwen3). Must be larger than child chunk size."
+		case "childChunkSize":
+			dsFields[i].Description = "Retrieval chunk tokens. Range: 100–256 (All MiniLM), 100–512 (Multi QA), 100–8192 (GTE Large / Qwen3). Must be smaller than parent chunk size."
+		}
+	}
+
+	fields = append(fields, dsFields...)
 	return fields
 }
 
@@ -168,6 +180,7 @@ func (a *AddDataSource) Execute(ctx core.ExecutionContext) error {
 
 	output := map[string]any{
 		"dataSourceUUID":    added.UUID,
+		"dataSourceName":    dataSourceName(added),
 		"knowledgeBaseUUID": spec.KnowledgeBase,
 		"knowledgeBaseName": kbName,
 	}
@@ -180,12 +193,13 @@ func (a *AddDataSource) Execute(ctx core.ExecutionContext) error {
 		)
 	}
 
-	// Start indexing and poll
-	job, err := client.StartIndexingJob(spec.KnowledgeBase)
+	// Start indexing for the newly added data source only
+	job, err := client.StartIndexingJob(spec.KnowledgeBase, added.UUID)
 	if err != nil {
 		return fmt.Errorf("failed to start indexing job: %v", err)
 	}
 
+	_ = job // job UUID tracked via KB's last_indexing_job
 	if err := ctx.Metadata.Set(addDSMetadata{
 		KBUUID:         spec.KnowledgeBase,
 		KBName:         kbName,
@@ -195,7 +209,6 @@ func (a *AddDataSource) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to store metadata: %v", err)
 	}
 
-	_ = job // job UUID tracked via KB's last_indexing_job
 	return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
 }
 
@@ -246,7 +259,7 @@ func (a *AddDataSource) HandleAction(ctx core.ActionContext) error {
 
 	job := kb.LastIndexingJob
 	switch indexingJobState(job.Status) {
-	case "completed", "successful", "no_changes":
+	case "completed", "successful", "no_changes", "partial":
 		meta.Output["indexingJob"] = map[string]any{
 			"status":               job.Status,
 			"totalTokens":          job.TotalTokens,
@@ -262,7 +275,7 @@ func (a *AddDataSource) HandleAction(ctx core.ActionContext) error {
 		)
 	case "running", "pending":
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
-	case "failed", "cancelled", "partial":
+	case "failed", "cancelled":
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("indexing job %s for knowledge base %s: %s", job.UUID, meta.KBUUID, job.Status))
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
@@ -281,6 +294,22 @@ func (a *AddDataSource) Cleanup(ctx core.SetupContext) error {
 type AddDSNodeMetadata struct {
 	KnowledgeBaseID   string `json:"knowledgeBaseId" mapstructure:"knowledgeBaseId"`
 	KnowledgeBaseName string `json:"knowledgeBaseName" mapstructure:"knowledgeBaseName"`
+}
+
+// dataSourceName returns a human-readable label for a data source:
+// "bucket (region)" for Spaces sources, the base URL for web sources,
+// or the UUID as a fallback.
+func dataSourceName(ds *KBDataSourceInfo) string {
+	if ds.BucketName != "" {
+		if ds.Region != "" {
+			return fmt.Sprintf("%s (%s)", ds.BucketName, ds.Region)
+		}
+		return ds.BucketName
+	}
+	if ds.WebCrawlerDataSource != nil && ds.WebCrawlerDataSource.BaseURL != "" {
+		return ds.WebCrawlerDataSource.BaseURL
+	}
+	return ds.UUID
 }
 
 func resolveAddDSMetadata(ctx core.SetupContext, kbID string) error {

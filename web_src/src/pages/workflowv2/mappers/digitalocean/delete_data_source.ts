@@ -14,9 +14,9 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { GetKBNodeMetadata, GetKnowledgeBaseConfiguration } from "./types";
+import type { DeleteDSNodeMetadata, DeleteDataSourceConfiguration } from "./types";
 
-export const getKnowledgeBaseMapper: ComponentBaseMapper = {
+export const deleteDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "digitalocean";
@@ -44,43 +44,38 @@ export const getKnowledgeBaseMapper: ComponentBaseMapper = {
     const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
     if (!result) return details;
 
-    // details["Knowledge Base"] = String(result.name || result.uuid || "-");
+    const nodeMetadata = context.node.metadata as DeleteDSNodeMetadata | undefined;
 
-    const uuid = result.uuid as string | undefined;
-    if (uuid) {
-      details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${uuid}`;
-      details["Knowledge Base Endpoint"] = `https://kbaas.do-ai.run/v1/${uuid}/retrieve`;
+    details["Knowledge Base"] = nodeMetadata?.knowledgeBaseName || String(result.knowledgeBaseName || result.knowledgeBaseUUID || "-");
+
+    const kbUUID = result.knowledgeBaseUUID as string | undefined;
+    if (kbUUID) {
+      details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}`;
     }
 
-    const dataSources = result.dataSources as unknown[] | undefined;
-    if (dataSources && dataSources.length > 0) {
-      details["Data Sources"] = String(dataSources.length);
+    if (result.dataSourceUUID) {
+      details["Data Source"] = nodeMetadata?.dataSourceName || String(result.dataSourceUUID);
     }
 
-    const db = result.database as Record<string, unknown> | undefined;
-    if (db) {
-      const dbName = db.name ? String(db.name) : String(db.id || "-");
-      details["Database"] = dbName;
-
-      const dbId = db.id as string | undefined;
-      if (dbId) {
-        details["View Database"] = `https://cloud.digitalocean.com/databases/${dbId}`;
-      }
-    }
-
-    const job = result.lastIndexingJob as Record<string, unknown> | undefined;
+    const job = result.indexingJob as Record<string, unknown> | undefined;
     if (job) {
+      details["Indexing Status"] = `${formatIndexingStatus(String(job.status))}`;
+
       const completed = job.completedDataSources ?? 0;
       const total = job.totalDataSources ?? 0;
-      details["Last Indexing"] = `${formatIndexingStatus(String(job.status))} — ${completed}/${total} sources`;
+      details["Data Sources Indexed"] = `${completed}/${total} completed`;
+
+      if (job.totalTokens) {
+        details["Total Tokens"] = String(job.totalTokens);
+      }
 
       const finishedAt = job.finishedAt as string | undefined;
       if (finishedAt) {
-        details["Last Indexed At"] = new Date(finishedAt).toLocaleString();
+        details["Indexing finished at"] = new Date(finishedAt).toLocaleString();
       }
 
-      if (uuid) {
-        details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${uuid}/activity`;
+      if (kbUUID) {
+        details["View Activity"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}/activity`;
       }
     }
 
@@ -111,13 +106,17 @@ function formatIndexingStatus(status: string): string {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as GetKBNodeMetadata | undefined;
-  const configuration = node.configuration as GetKnowledgeBaseConfiguration | undefined;
+  const nodeMetadata = node.metadata as DeleteDSNodeMetadata | undefined;
+  const configuration = node.configuration as DeleteDataSourceConfiguration | undefined;
 
   if (nodeMetadata?.knowledgeBaseName) {
     metadata.push({ icon: "book-marked", label: nodeMetadata.knowledgeBaseName });
   } else if (configuration?.knowledgeBase) {
     metadata.push({ icon: "book-marked", label: `KB: ${configuration.knowledgeBase}` });
+  }
+
+  if (nodeMetadata?.dataSourceName) {
+    metadata.push({ icon: "database", label: nodeMetadata.dataSourceName });
   }
 
   return metadata;

@@ -51,13 +51,13 @@ export const addDataSourceMapper: ComponentBaseMapper = {
       details["View Knowledge Base"] = `https://cloud.digitalocean.com/gen-ai/knowledge-bases/${kbUUID}`;
     }
 
-    if (result.dataSourceUUID) {
-      details["Data Source"] = String(result.dataSourceUUID);
+    if (result.dataSourceName || result.dataSourceUUID) {
+      details["Data Source"] = String(result.dataSourceName || result.dataSourceUUID);
     }
 
     const job = result.indexingJob as Record<string, unknown> | undefined;
     if (job) {
-      details["Indexing Status"] = String(job.status || "-");
+      details["Indexing Status"] = `${formatIndexingStatus(String(job.status))}`;
 
       const completed = job.completedDataSources ?? 0;
       const total = job.totalDataSources ?? 0;
@@ -69,7 +69,7 @@ export const addDataSourceMapper: ComponentBaseMapper = {
 
       const finishedAt = job.finishedAt as string | undefined;
       if (finishedAt) {
-        details["Finished At"] = new Date(finishedAt).toLocaleString();
+        details["Indexing finished at"] = new Date(finishedAt).toLocaleString();
       }
 
       if (kbUUID) {
@@ -86,15 +86,31 @@ export const addDataSourceMapper: ComponentBaseMapper = {
   },
 };
 
+function formatIndexingStatus(status: string): string {
+  const lower = status.toLowerCase().replace(/^index_job_status_/, "");
+  const map: Record<string, string> = {
+    completed: "Completed",
+    successful: "Successful",
+    no_changes: "No changes",
+    partial: "Partially completed",
+    running: "Running",
+    pending: "Pending",
+    failed: "Failed",
+    cancelled: "Cancelled",
+    in_progress: "In progress"
+  };
+  return map[lower] ?? status;
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as AddDSNodeMetadata | undefined;
   const configuration = node.configuration as AddDataSourceConfiguration | undefined;
 
   if (nodeMetadata?.knowledgeBaseName) {
-    metadata.push({ icon: "brain", label: nodeMetadata.knowledgeBaseName });
+    metadata.push({ icon: "book-marked", label: nodeMetadata.knowledgeBaseName });
   } else if (configuration?.knowledgeBase) {
-    metadata.push({ icon: "brain", label: `KB: ${configuration.knowledgeBase}` });
+    metadata.push({ icon: "book-marked", label: `KB: ${configuration.knowledgeBase}` });
   }
 
   return metadata;

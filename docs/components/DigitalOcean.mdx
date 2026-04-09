@@ -9,6 +9,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Add Data Source" href="#add-data-source" description="Add a Spaces bucket or web URL data source to an existing DigitalOcean Gradient AI knowledge base" />
   <LinkCard title="Assign Reserved IP" href="#assign-reserved-ip" description="Assign or unassign a DigitalOcean Reserved IP to a Droplet" />
   <LinkCard title="Attach Knowledge Base" href="#attach-knowledge-base" description="Attach a knowledge base to a DigitalOcean Gradient AI agent" />
   <LinkCard title="Copy Object" href="#copy-object" description="Copy or move an object within DigitalOcean Spaces Object Storage" />
@@ -22,6 +23,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Alert Policy" href="#delete-alert-policy" description="Delete a DigitalOcean monitoring alert policy" />
   <LinkCard title="Delete App" href="#delete-app" description="Delete a DigitalOcean App Platform application" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a DigitalOcean domain" />
+  <LinkCard title="Delete Data Source" href="#delete-data-source" description="Remove a data source from a DigitalOcean Gradient AI knowledge base" />
   <LinkCard title="Delete Droplet" href="#delete-droplet" description="Delete a DigitalOcean Droplet by ID" />
   <LinkCard title="Delete Knowledge Base" href="#delete-knowledge-base" description="Delete a DigitalOcean Gradient AI knowledge base and optionally its OpenSearch database" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a DigitalOcean Load Balancer" />
@@ -34,6 +36,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Droplet Metrics" href="#get-droplet-metrics" description="Fetch CPU, memory, and network bandwidth metrics for a DigitalOcean Droplet" />
   <LinkCard title="Get Knowledge Base" href="#get-knowledge-base" description="Retrieve detailed information about a DigitalOcean Gradient AI knowledge base" />
   <LinkCard title="Get Object" href="#get-object" description="Retrieve an object and its metadata from DigitalOcean Spaces Object Storage" />
+  <LinkCard title="Index Knowledge Base" href="#index-knowledge-base" description="Start an indexing job for a DigitalOcean Gradient AI knowledge base and wait for it to complete" />
   <LinkCard title="Manage Droplet Power" href="#manage-droplet-power" description="Perform power operations on a DigitalOcean Droplet" />
   <LinkCard title="Put Object" href="#put-object" description="Upload an object to DigitalOcean Spaces Object Storage" />
   <LinkCard title="Run Evaluation" href="#run-evaluation" description="Run a Gradient AI evaluation test case against an agent and report pass or fail" />
@@ -61,6 +64,67 @@ Create an [Access Key ID & Secret Access Key](https://cloud.digitalocean.com/spa
 - Scope: **Full Access** (all buckets) or **Limited Access** (specific buckets)
 
 > **Note:** The Personal Access Token and Secret Access Key are shown only once — store them somewhere safe before continuing.
+
+<a id="add-data-source"></a>
+
+## Add Data Source
+
+The Add Data Source component adds a new data source to an existing knowledge base on the DigitalOcean Gradient AI Platform.
+
+### How it works
+
+Adds a single data source — either a Spaces bucket or a web/sitemap URL — to a knowledge base. When **Index after adding** is enabled (the default), the component also starts an indexing job and waits for it to complete before emitting the output.
+
+### Data Source Types
+
+- **Spaces Bucket or Folder** — indexes all supported files in a DigitalOcean Spaces bucket or folder
+- **Web or Sitemap URL** — crawls a public website (seed URL) or a list of URLs from a sitemap
+
+### Chunking Strategies
+
+Each data source has its own independent chunking configuration:
+
+- **Section-based** (default) — splits on structural elements like headings and paragraphs; fast and low-cost
+- **Semantic** — groups sentences by meaning; slower but context-aware
+- **Hierarchical** — creates parent (context) and child (retrieval) chunk pairs
+- **Fixed-length** — splits strictly by token count; best for logs and unstructured text
+
+### Indexing
+
+When **Index after adding** is enabled, the component starts an indexing job scoped **only to the newly added data source** and polls every 30 seconds until the job completes. Other existing data sources in the knowledge base are not re-indexed. Disable it if you want to add multiple data sources first and index them all at once using the Index Knowledge Base component.
+
+### Output
+
+Returns the added data source details:
+- **dataSourceUUID**: UUID of the newly added data source
+- **knowledgeBaseUUID**: UUID of the knowledge base
+- **knowledgeBaseName**: Name of the knowledge base
+
+When indexing is enabled, the output also includes:
+- **indexingJob**: Full indexing job details (status, totalTokens, completedDataSources, totalDataSources, startedAt, finishedAt)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dataSourceName": "https://example.com/",
+    "dataSourceUUID": "e374bb5e-33e6-11f1-b074-4e01edede4",
+    "indexingJob": {
+      "completedDataSources": 1,
+      "finishedAt": "2026-04-09T07:37:51Z",
+      "startedAt": "2026-04-09T07:36:58Z",
+      "status": "INDEX_JOB_STATUS_COMPLETED",
+      "totalDataSources": 1,
+      "totalTokens": "21"
+    },
+    "knowledgeBaseName": "ecommerce-knowledge-base",
+    "knowledgeBaseUUID": "3b88fe18-31bb-11f1-b074-4e013hhjte4"
+  },
+  "timestamp": "2026-04-09T07:38:01.304486131Z",
+  "type": "digitalocean.data_source.added"
+}
+```
 
 <a id="assign-reserved-ip"></a>
 
@@ -820,6 +884,45 @@ Returns information about the deleted record:
 }
 ```
 
+<a id="delete-data-source"></a>
+
+## Delete Data Source
+
+The Delete Data Source component removes a data source from an existing knowledge base on the DigitalOcean Gradient AI Platform.
+
+### How it works
+
+Deletes a single data source from a knowledge base. DigitalOcean automatically triggers a re-indexing job after every deletion to clean up stale embeddings from the OpenSearch database. The component waits for that job to complete before emitting the output.
+
+### Output
+
+Returns the deleted data source details:
+- **dataSourceUUID**: UUID of the deleted data source
+- **knowledgeBaseUUID**: UUID of the knowledge base
+- **knowledgeBaseName**: Name of the knowledge base
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dataSourceUUID": "650d31b0-3338-11f1-b074-4e013e2bere4",
+    "indexingJob": {
+      "completedDataSources": 1,
+      "finishedAt": "2026-04-09T10:29:39Z",
+      "startedAt": "2026-04-09T10:28:58Z",
+      "status": "INDEX_JOB_STATUS_COMPLETED",
+      "totalDataSources": 1,
+      "totalTokens": ""
+    },
+    "knowledgeBaseName": "ecommerce-knowledge-base-v2",
+    "knowledgeBaseUUID": "3f3d8984-32a2-11f1-b074-4e01dffdde4"
+  },
+  "timestamp": "2026-04-09T10:29:59.190938313Z",
+  "type": "digitalocean.data_source.deleted"
+}
+```
+
 <a id="delete-droplet"></a>
 
 ## Delete Droplet
@@ -1473,7 +1576,7 @@ Returns the full knowledge base object including:
 - **projectId**, **projectName** — associated project
 - **database** — OpenSearch database object with id, name, and status
 - **dataSources** — array of all attached data sources with type and source details
-- **lastIndexingJob** — full indexing job details: status, phase, tokens, data source progress, timing, and report availability
+- **lastIndexingJob** — full indexing job details: status, phase, totalTokens, data source progress, timing, and report availability
 - **createdAt**, **updatedAt** — timestamps
 
 ### Example Output
@@ -1517,7 +1620,6 @@ Returns the full knowledge base object including:
       "phase": "BATCH_JOB_PHASE_COMPLETE",
       "startedAt": "2025-06-01T00:00:00Z",
       "status": "INDEX_JOB_STATUS_COMPLETED",
-      "tokens": 123,
       "totalDataSources": 2,
       "totalTokens": "12345",
       "uuid": "b2c3d4e5-0000-0000-0000-000000000001"
@@ -1603,6 +1705,58 @@ Spaces Access Key ID and Secret Access Key must be configured in the DigitalOcea
   },
   "timestamp": "2026-03-25T09:00:00Z",
   "type": "digitalocean.spaces.object.fetched"
+}
+```
+
+<a id="index-knowledge-base"></a>
+
+## Index Knowledge Base
+
+The Index Knowledge Base component triggers a new indexing job on an existing knowledge base and polls until it completes.
+
+### How it works
+
+Starts an indexing job that re-processes all data sources attached to the knowledge base. The component polls the job status every 30 seconds until the indexing job finishes successfully or fails.
+
+### Use Cases
+
+- **Content refresh**: Re-index a knowledge base after updating files in a Spaces bucket or changing a website
+- **Scheduled re-indexing**: Combine with a Schedule trigger to re-index on a regular cadence (e.g. nightly)
+- **Pipeline orchestration**: Re-index after an upstream component adds or modifies data sources
+
+### Output
+
+Returns the completed indexing job details:
+- **knowledgeBaseUUID**: UUID of the knowledge base
+- **knowledgeBaseName**: Name of the knowledge base
+- **jobUUID**: UUID of the indexing job
+- **status**: Final job status (e.g. INDEX_JOB_STATUS_COMPLETED)
+- **phase**: Final job phase (e.g. BATCH_JOB_PHASE_SUCCEEDED)
+- **totalTokens**: Total tokens consumed by the indexing job
+- **completedDataSources**: Number of data sources that finished indexing
+- **totalDataSources**: Total number of data sources
+- **startedAt**, **finishedAt**: Timing information
+- **isReportAvailable**: Whether a detailed indexing report is available
+
+### Example Output
+
+```json
+{
+  "data": {
+    "completedDataSources": 2,
+    "finishedAt": "2025-06-01T00:05:32Z",
+    "isReportAvailable": true,
+    "jobUUID": "b2c3d4e5-0000-0000-0000-000000000001",
+    "knowledgeBaseName": "product-catalog-v2",
+    "knowledgeBaseUUID": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "phase": "BATCH_JOB_PHASE_SUCCEEDED",
+    "startedAt": "2025-06-01T00:00:00Z",
+    "status": "INDEX_JOB_STATUS_COMPLETED",
+    "totalDataSources": 2,
+    "totalTokens": "1500"
+  },
+  "timestamp": "2025-06-01T00:05:32Z",
+  "type": "digitalocean.knowledge_base.indexed"
 }
 ```
 

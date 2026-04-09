@@ -46,6 +46,8 @@ func (d *DigitalOcean) ListResources(resourceType string, ctx core.ListResources
 		return listAgents(ctx)
 	case "knowledge_base":
 		return listKnowledgeBases(ctx)
+	case "knowledge_base_data_source":
+		return listKBDataSources(ctx)
 	case "agent_available_knowledge_base":
 		return listAgentAvailableKnowledgeBases(ctx)
 	case "agent_knowledge_base":
@@ -584,6 +586,41 @@ func listKnowledgeBases(ctx core.ListResourcesContext) ([]core.IntegrationResour
 			Type: "knowledge_base",
 			Name: kb.Name,
 			ID:   kb.UUID,
+		})
+	}
+
+	return resources, nil
+}
+
+func listKBDataSources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	kbUUID := ctx.Parameters["knowledgeBase"]
+	if kbUUID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	dataSources, err := client.ListKBDataSources(kbUUID)
+	if err != nil {
+		return nil, fmt.Errorf("error listing data sources: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(dataSources))
+	for _, ds := range dataSources {
+		name := ds.UUID
+		if ds.BucketName != "" {
+			name = fmt.Sprintf("%s (%s)", ds.BucketName, ds.Region)
+		} else if ds.WebCrawlerDataSource != nil && ds.WebCrawlerDataSource.BaseURL != "" {
+			name = ds.WebCrawlerDataSource.BaseURL
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "knowledge_base_data_source",
+			Name: name,
+			ID:   ds.UUID,
 		})
 	}
 

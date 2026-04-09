@@ -277,6 +277,16 @@ func (a *AddDataSource) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddDataSourceOnce, exampleOutputAddDataSourceBytes, &exampleOutputAddDataSource)
 }
 
+//go:embed example_output_delete_data_source.json
+var exampleOutputDeleteDataSourceBytes []byte
+
+var exampleOutputDeleteDataSourceOnce sync.Once
+var exampleOutputDeleteDataSource map[string]any
+
+func (d *DeleteDataSource) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteDataSourceOnce, exampleOutputDeleteDataSourceBytes, &exampleOutputDeleteDataSource)
+}
+
 //go:embed example_output_index_knowledge_base.json
 var exampleOutputIndexKnowledgeBaseBytes []byte
 

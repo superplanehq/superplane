@@ -259,6 +259,18 @@ export interface AddDataSourceConfiguration {
   indexAfterAdding?: boolean;
 }
 
+export interface DeleteDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+  dataSourceId?: string;
+  dataSourceName?: string;
+}
+
+export interface DeleteDataSourceConfiguration {
+  knowledgeBase: string;
+  dataSource: string;
+}
+
 export interface KBNodeMetadata {
   agentId?: string;
   agentName?: string;

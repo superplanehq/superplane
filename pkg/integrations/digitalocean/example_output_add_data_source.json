@@ -1,17 +1,18 @@
 {
   "data": {
-    "dataSourceUUID": "a1b2c3d4-0000-0000-0000-000000000001",
-    "knowledgeBaseUUID": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
-    "knowledgeBaseName": "product-catalog-v2",
+    "dataSourceName": "https://example.com/",
+    "dataSourceUUID": "e374bb5e-33e6-11f1-b074-4e01edede4",
     "indexingJob": {
+      "completedDataSources": 1,
+      "finishedAt": "2026-04-09T07:37:51Z",
+      "startedAt": "2026-04-09T07:36:58Z",
       "status": "INDEX_JOB_STATUS_COMPLETED",
-      "totalTokens": "1500",
-      "completedDataSources": 2,
-      "totalDataSources": 2,
-      "startedAt": "2025-06-01T00:00:00Z",
-      "finishedAt": "2025-06-01T00:05:32Z"
-    }
+      "totalDataSources": 1,
+      "totalTokens": "21"
+    },
+    "knowledgeBaseName": "ecommerce-knowledge-base",
+    "knowledgeBaseUUID": "3b88fe18-31bb-11f1-b074-4e013hhjte4"
   },
-  "timestamp": "2025-06-01T00:05:32Z",
+  "timestamp": "2026-04-09T07:38:01.304486131Z",
   "type": "digitalocean.data_source.added"
 }
