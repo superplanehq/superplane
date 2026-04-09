@@ -43,11 +43,8 @@ export type CanvasBuilderOptions = {
  * @returns The updated canvas.
  */
 export class CanvasBuilder {
-  private readonly canvas: CanvasesCanvas;
-  private readonly integrations: OrganizationsIntegration[];
+  private readonly options: CanvasBuilderOptions;
   private readonly blockLookup: Map<string, BuildingBlockCategory["blocks"][number]>;
-  private readonly layoutComponents: ComponentsComponent[];
-  private readonly layoutBlueprints: BlueprintsBlueprint[];
   private createdNodeIdsByKey: Map<string, string>;
   private addedNodeBlockNameByKey: Map<string, string>;
   private addedNodeIds: Set<string>;
@@ -55,15 +52,10 @@ export class CanvasBuilder {
   private updatedEdges: ComponentsEdge[];
 
   constructor(options: CanvasBuilderOptions) {
-    const { canvas, buildingBlocks, integrations = [], components = [], blueprints = [] } = options;
-
-    this.canvas = canvas;
-    this.integrations = integrations;
+    this.options = options;
     this.blockLookup = new Map(
-      buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
+      options.buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
     );
-    this.layoutComponents = components;
-    this.layoutBlueprints = blueprints;
     this.createdNodeIdsByKey = new Map();
     this.addedNodeBlockNameByKey = new Map();
     this.addedNodeIds = new Set();
@@ -93,23 +85,37 @@ export class CanvasBuilder {
     }
 
     const updatedCanvas = {
-      ...this.canvas,
+      ...this.options.canvas,
       spec: {
-        ...this.canvas.spec,
+        ...this.options.canvas.spec,
         nodes: this.updatedNodes,
         edges: this.updatedEdges,
       },
     };
 
-    return this.applyLayoutIfNewNodesWereAdded(updatedCanvas, layout);
+    //
+    // If no layout engine is provided or no new nodes were added, return the updated canvas.
+    //
+    if (!layout || this.addedNodeIds.size === 0) {
+      return updatedCanvas;
+    }
+
+    //
+    // Otherwise, apply the layout engine to the updated canvas,
+    // so new nodes are positioned correctly.
+    //
+    return layout.apply(updatedCanvas, {
+      components: this.options.components || [],
+      blueprints: this.options.blueprints || [],
+    });
   }
 
   private initializeState(operations: CanvasOperation[]): void {
     this.createdNodeIdsByKey = new Map();
     this.addedNodeBlockNameByKey = new Map();
     this.addedNodeIds = new Set();
-    this.updatedNodes = [...(this.canvas.spec?.nodes || [])];
-    this.updatedEdges = [...(this.canvas.spec?.edges || [])];
+    this.updatedNodes = [...(this.options.canvas.spec?.nodes || [])];
+    this.updatedEdges = [...(this.options.canvas.spec?.edges || [])];
 
     for (const operation of operations) {
       if (operation.type === "add_node" && operation.nodeKey) {
@@ -324,7 +330,7 @@ export class CanvasBuilder {
       position: this.positionFromOperation(operation),
     };
 
-    const integrationRef = resolveIntegrationRefForBlock(block.integrationName, this.integrations);
+    const integrationRef = resolveIntegrationRefForBlock(block.integrationName, this.options.integrations || []);
     if (integrationRef) {
       newNode.integration = integrationRef;
     }
@@ -439,24 +445,6 @@ export class CanvasBuilder {
         this.updatedEdges.splice(edgeIndex, 1);
       }
     }
-  }
-
-  private async applyLayoutIfNewNodesWereAdded(
-    updatedCanvas: CanvasesCanvas,
-    layout?: LayoutEngine,
-  ): Promise<CanvasesCanvas> {
-    if (!layout) {
-      return updatedCanvas;
-    }
-
-    if (this.addedNodeIds.size === 0) {
-      return updatedCanvas;
-    }
-
-    return layout.apply(updatedCanvas, {
-      components: this.layoutComponents,
-      blueprints: this.layoutBlueprints,
-    });
   }
 }
 
