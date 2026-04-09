@@ -916,7 +916,7 @@ func Test__CreateKnowledgeBase__Poll(t *testing.T) {
 	kbCompletedJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_COMPLETED"}}}`
 	kbSuccessfulJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_SUCCESSFUL"}}}`
 	kbFailedJob := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "active", "last_indexing_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_FAILED"}}}`
-	startJobResponse := `{"index_job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_PENDING"}}`
+	startJobResponse := `{"job": {"uuid": "job-1", "status": "INDEX_JOB_STATUS_PENDING"}}`
 
 	kbProvisioningResponse := `{"knowledge_base": {"uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4", "status": "provisioning"}}`
 

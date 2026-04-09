@@ -2526,6 +2526,10 @@ func (c *Client) StartIndexingJob(kbUUID string, dataSourceUUIDs ...string) (*In
 		return nil, fmt.Errorf("error parsing response: %v", err)
 	}
 
+	if strings.TrimSpace(response.Job.UUID) == "" {
+		return nil, fmt.Errorf("error parsing response: missing job uuid")
+	}
+
 	return &response.Job, nil
 }
 
