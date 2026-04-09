@@ -503,7 +503,7 @@ def _create_app() -> FastAPI:
             await tracker.wait_for_drain()
             grpc_server.stop()
             publisher.close()
-            limit_checker.close()
+            await limit_checker.close()
             store.close()
             shutdown_metrics()
 

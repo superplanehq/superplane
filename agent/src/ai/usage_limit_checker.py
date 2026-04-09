@@ -20,7 +20,7 @@ class AgentUsageLimitChecker(Protocol):
         """Raise AgentTokenLimitExceeded if the org has exceeded its agent token budget."""
         ...
 
-    def close(self) -> None: ...
+    async def close(self) -> None: ...
 
 
 _DESCRIBE_USAGE_METHOD = "/superplane.usage.v1.Usage/DescribeOrganizationUsage"
@@ -70,7 +70,7 @@ class UsageLimitChecker:
             hint = _format_next_decrease_hint(next_leak_at)
             raise AgentTokenLimitExceeded(f"Agent token limit exceeded.{hint}")
 
-    def close(self) -> None:
+    async def close(self) -> None:
         self._channel.close()
 
 
@@ -80,5 +80,5 @@ class NoopUsageLimitChecker:
     async def check_agent_token_limit(self, organization_id: str) -> None:
         pass
 
-    def close(self) -> None:
+    async def close(self) -> None:
         pass

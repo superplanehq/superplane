@@ -77,6 +77,9 @@ def test_check_allows_on_grpc_error(capsys: pytest.CaptureFixture[str]) -> None:
 
 
 def test_noop_checker_does_nothing() -> None:
-    checker = NoopUsageLimitChecker()
-    asyncio.run(checker.check_agent_token_limit("org-123"))
-    checker.close()
+    async def _run() -> None:
+        checker = NoopUsageLimitChecker()
+        await checker.check_agent_token_limit("org-123")
+        await checker.close()
+
+    asyncio.run(_run())
