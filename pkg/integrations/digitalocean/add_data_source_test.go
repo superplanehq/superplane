@@ -117,6 +117,7 @@ func Test__AddDataSource__Execute(t *testing.T) {
 
 		requests := &contexts.RequestContext{}
 		executionState := &contexts.ExecutionStateContext{}
+		metadata := &contexts.MetadataContext{}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -130,13 +131,17 @@ func Test__AddDataSource__Execute(t *testing.T) {
 				Configuration: map[string]any{"apiToken": "test-token"},
 			},
 			ExecutionState: executionState,
-			Metadata:       &contexts.MetadataContext{},
+			Metadata:       metadata,
 			Requests:       requests,
 		})
 
 		require.NoError(t, err)
 		require.False(t, executionState.Passed)
 		require.Equal(t, "poll", requests.Action)
+
+		stored, ok := metadata.Metadata.(addDSMetadata)
+		require.True(t, ok)
+		require.Equal(t, "job-uuid-1", stored.JobID)
 	})
 
 	t.Run("adds data source and emits immediately when indexAfterAdding is false", func(t *testing.T) {
@@ -185,6 +190,7 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 		"kbUUID":         "kb-uuid-1",
 		"kbName":         "my-kb",
 		"dataSourceUUID": "ds-uuid-1",
+		"jobId":          "job-uuid-1",
 		"output": map[string]any{
 			"dataSourceUUID":    "ds-uuid-1",
 			"knowledgeBaseUUID": "kb-uuid-1",
@@ -193,32 +199,29 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 	}
 
 	t.Run("completed job emits output with indexing details", func(t *testing.T) {
-		kbWithCompletedJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb",
-				"last_indexing_job": {
-					"uuid": "job-uuid-1",
-					"status": "INDEX_JOB_STATUS_COMPLETED",
-					"total_tokens": "500",
-					"completed_datasources": 1,
-					"total_datasources": 1,
-					"started_at": "2025-06-01T00:00:00Z",
-					"finished_at": "2025-06-01T00:05:32Z"
-				}
+		jobCompleted := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_COMPLETED",
+				"total_tokens": "500",
+				"completed_datasources": 1,
+				"total_datasources": 1,
+				"started_at": "2025-06-01T00:00:00Z",
+				"finished_at": "2025-06-01T00:05:32Z",
+				"knowledge_base_uuid": "kb-uuid-1"
 			}
 		}`
 
 		executionState := &contexts.ExecutionStateContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobCompleted))},
+			},
+		}
 
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
-			HTTP: &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithCompletedJob))},
-				},
-			},
+			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"apiToken": "test-token"},
 			},
@@ -229,6 +232,8 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 
 		require.NoError(t, err)
 		require.True(t, executionState.Passed)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.Path, "/gen-ai/indexing_jobs/job-uuid-1")
 
 		wrapped := executionState.Payloads[0].(map[string]any)
 		data := wrapped["data"].(map[string]any)
@@ -241,27 +246,24 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 	})
 
 	t.Run("running job reschedules poll", func(t *testing.T) {
-		kbWithRunningJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb",
-				"last_indexing_job": {
-					"uuid": "job-uuid-1",
-					"status": "INDEX_JOB_STATUS_RUNNING"
-				}
+		jobRunning := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_RUNNING",
+				"knowledge_base_uuid": "kb-uuid-1"
 			}
 		}`
 
 		requests := &contexts.RequestContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobRunning))},
+			},
+		}
 
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
-			HTTP: &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithRunningJob))},
-				},
-			},
+			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"apiToken": "test-token"},
 			},
@@ -272,30 +274,29 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Equal(t, "poll", requests.Action)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.Path, "/gen-ai/indexing_jobs/job-uuid-1")
 	})
 
 	t.Run("failed job fails execution", func(t *testing.T) {
-		kbWithFailedJob := `{
-			"database_status": "ONLINE",
-			"knowledge_base": {
-				"uuid": "kb-uuid-1",
-				"name": "my-kb",
-				"last_indexing_job": {
-					"uuid": "job-uuid-1",
-					"status": "INDEX_JOB_STATUS_FAILED"
-				}
+		jobFailed := `{
+			"job": {
+				"uuid": "job-uuid-1",
+				"status": "INDEX_JOB_STATUS_FAILED",
+				"knowledge_base_uuid": "kb-uuid-1"
 			}
 		}`
 
 		executionState := &contexts.ExecutionStateContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(jobFailed))},
+			},
+		}
 
 		err := component.HandleAction(core.ActionContext{
 			Name: "poll",
-			HTTP: &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(kbWithFailedJob))},
-				},
-			},
+			HTTP: httpContext,
 			Integration: &contexts.IntegrationContext{
 				Configuration: map[string]any{"apiToken": "test-token"},
 			},
@@ -308,6 +309,8 @@ func Test__AddDataSource__HandleAction(t *testing.T) {
 		require.True(t, executionState.Finished)
 		require.False(t, executionState.Passed)
 		require.Contains(t, executionState.FailureMessage, "INDEX_JOB_STATUS_FAILED")
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.Path, "/gen-ai/indexing_jobs/job-uuid-1")
 	})
 }
 

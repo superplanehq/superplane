@@ -158,6 +158,7 @@ type addDSMetadata struct {
 	KBUUID         string         `json:"kbUUID" mapstructure:"kbUUID"`
 	KBName         string         `json:"kbName" mapstructure:"kbName"`
 	DataSourceUUID string         `json:"dataSourceUUID" mapstructure:"dataSourceUUID"`
+	JobID          string         `json:"jobId" mapstructure:"jobId"`
 	Output         map[string]any `json:"output" mapstructure:"output"`
 }
 
@@ -205,11 +206,11 @@ func (a *AddDataSource) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to start indexing job: %v", err)
 	}
 
-	_ = job // job UUID tracked via KB's last_indexing_job
 	if err := ctx.Metadata.Set(addDSMetadata{
 		KBUUID:         spec.KnowledgeBase,
 		KBName:         kbName,
 		DataSourceUUID: added.UUID,
+		JobID:          job.UUID,
 		Output:         output,
 	}); err != nil {
 		return fmt.Errorf("failed to store metadata: %v", err)
@@ -254,16 +255,28 @@ func (a *AddDataSource) HandleAction(ctx core.ActionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	kb, err := client.GetKnowledgeBase(meta.KBUUID)
-	if err != nil {
-		return fmt.Errorf("failed to get knowledge base: %v", err)
-	}
-
-	if kb.LastIndexingJob == nil {
+	// Poll the specific job we started to avoid mistakenly observing an older
+	// completed KB job (kb.last_indexing_job can lag or point to a previous run).
+	if strings.TrimSpace(meta.JobID) == "" {
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
 	}
 
-	job := kb.LastIndexingJob
+	job, err := client.GetIndexingJob(meta.JobID)
+	if err != nil {
+		var apiErr *DOAPIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
+			return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
+		}
+		return fmt.Errorf("failed to get indexing job %s: %v", meta.JobID, err)
+	}
+
+	if job.KnowledgeBaseUUID != "" && job.KnowledgeBaseUUID != meta.KBUUID {
+		return ctx.ExecutionState.Fail(
+			"error",
+			fmt.Sprintf("indexing job %s belongs to knowledge base %s (expected %s)", job.UUID, job.KnowledgeBaseUUID, meta.KBUUID),
+		)
+	}
+
 	switch indexingJobState(job.Status) {
 	case "completed", "successful", "no_changes":
 		meta.Output["indexingJob"] = map[string]any{
