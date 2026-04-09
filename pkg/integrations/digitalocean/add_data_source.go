@@ -144,6 +144,12 @@ func (a *AddDataSource) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error resolving metadata: %v", err)
 	}
 
+	if !strings.Contains(spec.KnowledgeBase, "{{") && hasAnyChunkSize(spec.DataSourceSpec) {
+		if err := validateChunkSizesAgainstModel(ctx, spec.KnowledgeBase, spec.DataSourceSpec); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -310,6 +316,53 @@ func dataSourceName(ds *KBDataSourceInfo) string {
 		return ds.WebCrawlerDataSource.BaseURL
 	}
 	return ds.UUID
+}
+
+// hasAnyChunkSize reports whether any chunk size field is set in the spec.
+func hasAnyChunkSize(ds DataSourceSpec) bool {
+	return ds.MaxChunkSize > 0 || ds.ParentChunkSize > 0 || ds.ChildChunkSize > 0
+}
+
+// validateChunkSizesAgainstModel fetches the KB's embedding model and validates
+// any configured chunk sizes against the model's min/max limits.
+// Validation is skipped silently if the API is unreachable.
+func validateChunkSizesAgainstModel(ctx core.SetupContext, kbID string, ds DataSourceSpec) error {
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil
+	}
+
+	kb, err := client.GetKnowledgeBase(kbID)
+	if err != nil {
+		return nil
+	}
+
+	models, err := client.ListEmbeddingModels()
+	if err != nil {
+		return nil
+	}
+
+	for _, m := range models {
+		if m.UUID == kb.EmbeddingModelUUID {
+			return validateChunkSizeRange(ds, m.KBMinChunkSize, m.KBMaxChunkSize)
+		}
+	}
+
+	return nil
+}
+
+// validateChunkSizeRange checks that each set chunk size falls within [min, max].
+func validateChunkSizeRange(ds DataSourceSpec, min, max int) error {
+	if ds.MaxChunkSize > 0 && (ds.MaxChunkSize < min || ds.MaxChunkSize > max) {
+		return fmt.Errorf("maxChunkSize %d is out of range for the selected model (valid: %d–%d)", ds.MaxChunkSize, min, max)
+	}
+	if ds.ParentChunkSize > 0 && (ds.ParentChunkSize < min || ds.ParentChunkSize > max) {
+		return fmt.Errorf("parentChunkSize %d is out of range for the selected model (valid: %d–%d)", ds.ParentChunkSize, min, max)
+	}
+	if ds.ChildChunkSize > 0 && (ds.ChildChunkSize < min || ds.ChildChunkSize > max) {
+		return fmt.Errorf("childChunkSize %d is out of range for the selected model (valid: %d–%d)", ds.ChildChunkSize, min, max)
+	}
+	return nil
 }
 
 func resolveAddDSMetadata(ctx core.SetupContext, kbID string) error {
