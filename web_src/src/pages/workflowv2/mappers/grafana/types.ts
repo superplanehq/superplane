@@ -70,6 +70,8 @@ export interface ListSilencesOutput {
 export interface CreateSilenceOutput {
   silenceId?: string;
   silenceUrl?: string;
+  startsAt?: string;
+  endsAt?: string;
 }
 
 export interface CreateSilenceConfiguration {

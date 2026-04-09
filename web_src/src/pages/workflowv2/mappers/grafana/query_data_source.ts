@@ -7,11 +7,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { QueryDataSourceConfiguration } from "./types";
-<<<<<<< feat/grafana-alert-control
-=======
 import { truncate } from "../safeMappers";
-import { renderTimeAgo } from "@/components/TimeAgo";
->>>>>>> main
 import { formatTimestamp } from "../utils";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 

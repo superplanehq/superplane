@@ -1,6 +1,10 @@
 package grafana
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +42,22 @@ func Test__parseSilenceInstant__acceptsNowExpressions(t *testing.T) {
 	minus30m, err := parseSilenceInstant("now-30m")
 	require.NoError(t, err)
 	require.WithinDuration(t, start.Add(-30*time.Minute), minus30m, 2*time.Second)
+}
+
+func Test__resolveSilenceInstant__evaluatesBareExpression(t *testing.T) {
+	expected := time.Now().UTC().Truncate(time.Second)
+
+	got, err := resolveSilenceInstant(`now() - duration("24h")`, &contexts.ExpressionContext{Output: expected})
+	require.NoError(t, err)
+	require.True(t, got.Equal(expected))
+}
+
+func Test__resolveSilenceInstant__evaluatesTemplateExpression(t *testing.T) {
+	expected := time.Now().UTC().Truncate(time.Second)
+
+	got, err := resolveSilenceInstant(`{{ now() + duration("24h") }}`, &contexts.ExpressionContext{Output: expected})
+	require.NoError(t, err)
+	require.True(t, got.Equal(expected))
 }
 
 func Test__validateCreateSilenceSpec__matcherValueRequired(t *testing.T) {
@@ -121,4 +141,70 @@ func Test__CreateSilence__Execute__endsAtMustBeAfterStartsAt(t *testing.T) {
 
 	require.ErrorContains(t, err, "endsAt must be after startsAt")
 	require.False(t, execCtx.Finished)
+}
+
+type sequenceExpressionContext struct {
+	outputs []any
+	calls   []string
+}
+
+func (c *sequenceExpressionContext) Run(expression string) (any, error) {
+	c.calls = append(c.calls, expression)
+	if len(c.outputs) == 0 {
+		return nil, nil
+	}
+
+	output := c.outputs[0]
+	c.outputs = c.outputs[1:]
+	return output, nil
+}
+
+func Test__CreateSilence__Execute__evaluatesBareExpressions(t *testing.T) {
+	component := CreateSilence{}
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"silenceID":"silence-123"}`)),
+			},
+		},
+	}
+	execCtx := &contexts.ExecutionStateContext{}
+	start := time.Now().UTC().Truncate(time.Second)
+	end := start.Add(24 * time.Hour)
+	expressions := &sequenceExpressionContext{
+		outputs: []any{start, end},
+	}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"matchers": []any{map[string]any{"name": "alertname", "value": "HighCPU"}},
+			"startsAt": `now()`,
+			"endsAt":   `now() + duration("24h")`,
+			"comment":  "deploy",
+		},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},
+		Expressions:    expressions,
+		ExecutionState: execCtx,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{`now()`, `now() + duration("24h")`}, expressions.calls)
+	require.Len(t, httpCtx.Requests, 1)
+
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(body, &payload))
+	require.Equal(t, start.Format(time.RFC3339), payload["startsAt"])
+	require.Equal(t, end.Format(time.RFC3339), payload["endsAt"])
+	require.True(t, execCtx.Finished)
+	require.True(t, execCtx.Passed)
+
+	require.Len(t, execCtx.Payloads, 1)
+	output := execCtx.Payloads[0].(map[string]any)["data"].(CreateSilenceOutput)
+	require.Equal(t, start.Format(time.RFC3339), output.StartsAt)
+	require.Equal(t, end.Format(time.RFC3339), output.EndsAt)
 }

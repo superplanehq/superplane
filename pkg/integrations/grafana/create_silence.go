@@ -35,6 +35,8 @@ type SilenceMatcherInput struct {
 type CreateSilenceOutput struct {
 	SilenceID  string `json:"silenceId"`
 	SilenceURL string `json:"silenceUrl,omitempty"`
+	StartsAt   string `json:"startsAt,omitempty"`
+	EndsAt     string `json:"endsAt,omitempty"`
 }
 
 func (c *CreateSilence) Name() string {
@@ -140,18 +142,18 @@ func (c *CreateSilence) Configuration() []configuration.Field {
 			Label:       "Starts At",
 			Type:        configuration.FieldTypeExpression,
 			Required:    true,
-			Default:     "{{now()}}",
-			Placeholder: "{{now()}}",
-			Description: "Silence start time",
+			Default:     "now()",
+			Placeholder: "now()",
+			Description: "Silence start time. Accepts RFC3339, now offsets, or expressions like now()",
 		},
 		{
 			Name:        "endsAt",
 			Label:       "Ends At",
 			Type:        configuration.FieldTypeExpression,
 			Required:    true,
-			Default:     "{{now() + duration(\"24h\")}}",
-			Placeholder: "{{now() + duration(\"24h\")}}",
-			Description: "Silence end time",
+			Default:     `now() + duration("24h")`,
+			Placeholder: `now() + duration("24h")`,
+			Description: "Silence end time. Accepts RFC3339, now offsets, or expressions like now() + duration(\"24h\")",
 		},
 		{
 			Name:        "comment",
@@ -180,12 +182,12 @@ func (c *CreateSilence) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	startsAt, err := parseSilenceInstant(spec.StartsAt)
+	startsAt, err := resolveSilenceInstant(spec.StartsAt, ctx.Expressions)
 	if err != nil {
 		return fmt.Errorf("invalid startsAt %s: %w", formatSilenceInstant(spec.StartsAt), err)
 	}
 
-	endsAt, err := parseSilenceInstant(spec.EndsAt)
+	endsAt, err := resolveSilenceInstant(spec.EndsAt, ctx.Expressions)
 	if err != nil {
 		return fmt.Errorf("invalid endsAt %s: %w", formatSilenceInstant(spec.EndsAt), err)
 	}
@@ -222,7 +224,12 @@ func (c *CreateSilence) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"grafana.silence.created",
-		[]any{CreateSilenceOutput{SilenceID: silenceID, SilenceURL: silenceURL}},
+		[]any{CreateSilenceOutput{
+			SilenceID:  silenceID,
+			SilenceURL: silenceURL,
+			StartsAt:   startsAt.UTC().Format(time.RFC3339),
+			EndsAt:     endsAt.UTC().Format(time.RFC3339),
+		}},
 	)
 }
 
@@ -323,6 +330,7 @@ func silenceMatcherFromInput(m SilenceMatcherInput) SilenceMatcher {
 
 var createdBySafeRe = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 var collapseCreatedByDashesRe = regexp.MustCompile(`-+`)
+var silenceExpressionFunctionRe = regexp.MustCompile(`[A-Za-z_][A-Za-z0-9_]*\s*\(`)
 
 func buildSilenceCreatedBy(organizationID string) string {
 	orgName := ""
@@ -418,6 +426,57 @@ func parseSilenceInstant(value any) (time.Time, error) {
 	default:
 		return time.Time{}, fmt.Errorf("unsupported time type %T", value)
 	}
+}
+
+func resolveSilenceInstant(value any, expressions core.ExpressionContext) (time.Time, error) {
+	instant, err := parseSilenceInstant(value)
+	if err == nil {
+		return instant, nil
+	}
+
+	expression, ok := extractSilenceInstantExpression(value)
+	if !ok || expressions == nil {
+		return time.Time{}, err
+	}
+
+	resolved, resolveErr := expressions.Run(expression)
+	if resolveErr != nil {
+		return time.Time{}, resolveErr
+	}
+
+	return parseSilenceInstant(resolved)
+}
+
+func extractSilenceInstantExpression(value any) (string, bool) {
+	s, ok := value.(string)
+	if !ok {
+		return "", false
+	}
+
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return "", false
+	}
+
+	if strings.HasPrefix(trimmed, "{{") && strings.HasSuffix(trimmed, "}}") {
+		inner := strings.TrimSpace(trimmed[2 : len(trimmed)-2])
+		return inner, inner != ""
+	}
+
+	if looksLikeBareExpression(trimmed) {
+		return trimmed, true
+	}
+
+	return "", false
+}
+
+func looksLikeBareExpression(value string) bool {
+	return silenceExpressionFunctionRe.MatchString(value) ||
+		strings.Contains(value, "$.") ||
+		strings.Contains(value, "config.") ||
+		strings.Contains(value, "memory.") ||
+		strings.Contains(value, "root(") ||
+		strings.Contains(value, "previous(")
 }
 
 func parseNowInstant(s string) (time.Time, bool, error) {

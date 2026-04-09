@@ -50,6 +50,18 @@ export const createSilenceMapper: ComponentBaseMapper = {
 
     const output = payload?.data as CreateSilenceOutput | undefined;
 
+    if (output?.startsAt) {
+      details["Starts At"] = formatTimestamp(output.startsAt);
+    } else if (configuration?.startsAt) {
+      details["Starts At"] = configuration.startsAt;
+    }
+
+    if (output?.endsAt) {
+      details["Ends At"] = formatTimestamp(output.endsAt);
+    } else if (configuration?.endsAt) {
+      details["Ends At"] = configuration.endsAt;
+    }
+
     if (output?.silenceUrl) {
       details["Silence URL"] = output.silenceUrl;
     }
