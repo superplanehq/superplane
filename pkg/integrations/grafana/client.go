@@ -107,17 +107,14 @@ func collectDashboardPanelSummaries(rawPanels []json.RawMessage) []PanelSummary 
 			if err := json.Unmarshal(raw, &node); err != nil {
 				continue
 			}
+			isRow := strings.EqualFold(strings.TrimSpace(node.Type), "row")
+			if node.ID != 0 && !isRow {
+				out = append(out, PanelSummary{ID: node.ID, Title: node.Title, Type: node.Type})
+			}
 			if len(node.Panels) > 0 {
 				walk(node.Panels)
 				continue
 			}
-			if node.ID == 0 {
-				continue
-			}
-			if strings.EqualFold(strings.TrimSpace(node.Type), "row") {
-				continue
-			}
-			out = append(out, PanelSummary{ID: node.ID, Title: node.Title, Type: node.Type})
 		}
 	}
 	walk(rawPanels)

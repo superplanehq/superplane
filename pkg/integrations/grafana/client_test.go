@@ -333,6 +333,20 @@ func Test__collectDashboardPanelSummaries__nestedUnderRows(t *testing.T) {
 	require.Equal(t, 3, got[2].ID)
 }
 
+func Test__collectDashboardPanelSummaries__keepsGroupPanelsAndNestedChildren(t *testing.T) {
+	raw := []json.RawMessage{
+		json.RawMessage(`{"id":20,"title":"Grouped","type":"group","panels":[{"id":21,"title":"Child CPU","type":"timeseries"}]}`),
+	}
+
+	got := collectDashboardPanelSummaries(raw)
+	require.Len(t, got, 2)
+	require.Equal(t, 20, got[0].ID)
+	require.Equal(t, "Grouped", got[0].Title)
+	require.Equal(t, "group", got[0].Type)
+	require.Equal(t, 21, got[1].ID)
+	require.Equal(t, "Child CPU", got[1].Title)
+}
+
 func Test__Grafana__ListResources(t *testing.T) {
 	g := &Grafana{}
 

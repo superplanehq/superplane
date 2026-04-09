@@ -81,6 +81,8 @@ func looksLikeBareExpression(value string) bool {
 
 func normalizeEvaluatedGrafanaTime(value any, timezone *string) (string, error) {
 	switch typed := value.(type) {
+	case nil:
+		return "", nil
 	case time.Time:
 		return fmt.Sprintf("%d", typed.UTC().UnixMilli()), nil
 	case *time.Time:

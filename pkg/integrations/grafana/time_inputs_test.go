@@ -62,6 +62,21 @@ func Test__resolveGrafanaTimeInput(t *testing.T) {
 		require.Equal(t, "1775723248443", value)
 	})
 
+	t.Run("returns empty value for nil expression result", func(t *testing.T) {
+		value, err := resolveGrafanaTimeInput(
+			`someExpression()`,
+			nil,
+			testExpressionContext{
+				run: func(expression string) (any, error) {
+					require.Equal(t, `someExpression()`, expression)
+					return nil, nil
+				},
+			},
+		)
+		require.NoError(t, err)
+		require.Equal(t, "", value)
+	})
+
 	t.Run("evaluates expressions that return relative strings", func(t *testing.T) {
 		value, err := resolveGrafanaTimeInput(
 			`someExpression()`,
