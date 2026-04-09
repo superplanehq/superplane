@@ -3,6 +3,7 @@ import type { AiBuilderMessage, AiBuilderProposal } from "./agentChat";
 import { normalizeAiProposal } from "./agentChatProposal";
 
 type JsonObject = Record<string, unknown>;
+type ToolEvent = Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>;
 
 export type ChatStreamEvent =
   | { type: "run_started"; model?: string }
@@ -157,6 +158,19 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
+function formatElapsedMs(ms: number): string {
+  if (ms < 1) {
+    return "< 1ms";
+  }
+
+  const rounded = Math.round(ms);
+  if (rounded >= 1000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
+
+  return `${rounded}ms`;
+}
+
 function createToolCallId(toolName: string, toolCallId?: string): string {
   return typeof toolCallId === "string" && toolCallId.trim().length > 0 ? toolCallId : `${toolName}-${Date.now()}`;
 }
@@ -177,6 +191,9 @@ function createAssistantStreamController({
   let assistantContentSnapshot = "";
   let pendingRenderBuffer = "";
   let isRenderLoopRunning = false;
+  let pendingToolEvents: ToolEvent[] = [];
+  let isToolLoopRunning = false;
+  const flushedToolCallIds = new Set<string>();
 
   const flushPendingRenderBuffer = async () => {
     if (isRenderLoopRunning) {
@@ -210,41 +227,102 @@ function createAssistantStreamController({
     void flushPendingRenderBuffer();
   };
 
-  const upsertToolMessage = (event: Extract<ChatStreamEvent, { type: "tool_started" | "tool_finished" }>) => {
+  const applyToolEvent = (event: ToolEvent): boolean => {
     const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
+    const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
     const toolCallId = createToolCallId(toolName, event.tool_call_id);
     const toolLabel = formatToolLabel(toolName);
     const content =
       event.type === "tool_started"
         ? `${toolLabel}...`
         : typeof event.elapsed_ms === "number"
-          ? `${toolLabel} (${event.elapsed_ms.toFixed(1)}ms)`
+          ? `${toolLabel} (${formatElapsedMs(event.elapsed_ms)})`
           : toolLabel;
     const toolStatus = event.type === "tool_started" ? "running" : "completed";
 
+    const isAlreadyTracked = flushedToolCallIds.has(toolCallId);
+    const isNameBasedUpdate = !isAlreadyTracked && event.type === "tool_finished" && !hasExplicitCallId;
+    const isNewInsertion = !isAlreadyTracked && !isNameBasedUpdate;
+
+    flushedToolCallIds.add(toolCallId);
+
     setAiMessages((previous) => {
-      const existingIndex = previous.findIndex(
-        (message) => message.role === "tool" && message.toolCallId === toolCallId,
-      );
-      const nextMessage: AiBuilderMessage = {
-        id: existingIndex >= 0 ? previous[existingIndex].id : `tool-${toolCallId}`,
-        role: "tool",
-        content,
-        toolCallId,
-        toolStatus,
-      };
+      let existingIndex = previous.findIndex((message) => message.role === "tool" && message.toolCallId === toolCallId);
+
+      if (existingIndex < 0 && event.type === "tool_finished" && !hasExplicitCallId) {
+        existingIndex = previous.findIndex(
+          (message) =>
+            message.role === "tool" && message.toolStatus === "running" && message.content.startsWith(toolLabel),
+        );
+      }
+
       if (existingIndex >= 0) {
         const updated = [...previous];
-        updated[existingIndex] = nextMessage;
+        updated[existingIndex] = { ...previous[existingIndex], content, toolStatus };
         return trimAiMessages(updated);
       }
 
-      return insertAiMessageBefore(previous, nextMessage, assistantMessageId);
+      return insertAiMessageBefore(
+        previous,
+        { id: `tool-${toolCallId}`, role: "tool", content, toolCallId, toolStatus },
+        assistantMessageId,
+      );
     });
+
+    return isNewInsertion;
+  };
+
+  const flushPendingToolEvents = async () => {
+    if (isToolLoopRunning) {
+      return;
+    }
+
+    isToolLoopRunning = true;
+    try {
+      while (pendingToolEvents.length > 0) {
+        const event = pendingToolEvents.shift()!;
+        const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
+        const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
+
+        let effectiveEvent = event;
+        if (event.type === "tool_started") {
+          const finishedIdx = pendingToolEvents.findIndex((e) => {
+            if (e.type !== "tool_finished") {
+              return false;
+            }
+
+            const eName = typeof e.tool_name === "string" ? e.tool_name : "unknown";
+            const eHasId = typeof e.tool_call_id === "string" && e.tool_call_id.trim().length > 0;
+
+            if (hasExplicitCallId && eHasId) {
+              return e.tool_call_id === event.tool_call_id;
+            }
+
+            return eName === toolName;
+          });
+          if (finishedIdx >= 0) {
+            effectiveEvent = pendingToolEvents.splice(finishedIdx, 1)[0];
+          }
+        }
+
+        const isNewInsertion = applyToolEvent(effectiveEvent);
+
+        if (isNewInsertion) {
+          await sleep(150);
+        }
+      }
+    } finally {
+      isToolLoopRunning = false;
+    }
+  };
+
+  const upsertToolMessage = (event: ToolEvent) => {
+    pendingToolEvents.push(event);
+    void flushPendingToolEvents();
   };
 
   const waitForRenderLoopIdle = async () => {
-    while (isRenderLoopRunning || pendingRenderBuffer.length > 0) {
+    while (isRenderLoopRunning || pendingRenderBuffer.length > 0 || isToolLoopRunning || pendingToolEvents.length > 0) {
       await sleep(10);
     }
   };
