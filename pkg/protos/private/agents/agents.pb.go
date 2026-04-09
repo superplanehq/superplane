@@ -543,7 +543,6 @@ type ChatInfo struct {
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	InitialMessage string                 `protobuf:"bytes,2,opt,name=initial_message,json=initialMessage,proto3" json:"initial_message,omitempty"`
 	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,3,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	Usage          *ChatUsage             `protobuf:"bytes,4,opt,name=usage,proto3" json:"usage,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -595,13 +594,6 @@ func (x *ChatInfo) GetInitialMessage() string {
 func (x *ChatInfo) GetCreatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *ChatInfo) GetUsage() *ChatUsage {
-	if x != nil {
-		return x.Usage
 	}
 	return nil
 }
@@ -794,13 +786,12 @@ const file_private_agents_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\"S\n" +
 	"\x17CreateAgentChatResponse\x128\n" +
-	"\x04chat\x18\x01 \x01(\v2$.Superplane.Internal.Agents.ChatInfoR\x04chat\"\xbb\x01\n" +
+	"\x04chat\x18\x01 \x01(\v2$.Superplane.Internal.Agents.ChatInfoR\x04chat\"~\n" +
 	"\bChatInfo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
-	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
-	"\x05usage\x18\x04 \x01(\v2%.Superplane.Internal.Agents.ChatUsageR\x05usage\"\x8c\x01\n" +
+	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x8c\x01\n" +
 	"\tChatUsage\x12,\n" +
 	"\x12total_input_tokens\x18\x01 \x01(\x03R\x10totalInputTokens\x12.\n" +
 	"\x13total_output_tokens\x18\x02 \x01(\x03R\x11totalOutputTokens\x12!\n" +
@@ -852,23 +843,22 @@ var file_private_agents_proto_depIdxs = []int32{
 	13, // 3: Superplane.Internal.Agents.AgentChatMessage.created_at:type_name -> google.protobuf.Timestamp
 	9,  // 4: Superplane.Internal.Agents.CreateAgentChatResponse.chat:type_name -> Superplane.Internal.Agents.ChatInfo
 	13, // 5: Superplane.Internal.Agents.ChatInfo.created_at:type_name -> google.protobuf.Timestamp
-	10, // 6: Superplane.Internal.Agents.ChatInfo.usage:type_name -> Superplane.Internal.Agents.ChatUsage
-	10, // 7: Superplane.Internal.Agents.DescribeOrganizationAgentUsageResponse.usage:type_name -> Superplane.Internal.Agents.ChatUsage
-	7,  // 8: Superplane.Internal.Agents.Agents.CreateAgentChat:input_type -> Superplane.Internal.Agents.CreateAgentChatRequest
-	0,  // 9: Superplane.Internal.Agents.Agents.ListAgentChats:input_type -> Superplane.Internal.Agents.ListAgentChatsRequest
-	2,  // 10: Superplane.Internal.Agents.Agents.DescribeAgentChat:input_type -> Superplane.Internal.Agents.DescribeAgentChatRequest
-	4,  // 11: Superplane.Internal.Agents.Agents.ListAgentChatMessages:input_type -> Superplane.Internal.Agents.ListAgentChatMessagesRequest
-	11, // 12: Superplane.Internal.Agents.Agents.DescribeOrganizationAgentUsage:input_type -> Superplane.Internal.Agents.DescribeOrganizationAgentUsageRequest
-	8,  // 13: Superplane.Internal.Agents.Agents.CreateAgentChat:output_type -> Superplane.Internal.Agents.CreateAgentChatResponse
-	1,  // 14: Superplane.Internal.Agents.Agents.ListAgentChats:output_type -> Superplane.Internal.Agents.ListAgentChatsResponse
-	3,  // 15: Superplane.Internal.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Internal.Agents.DescribeAgentChatResponse
-	5,  // 16: Superplane.Internal.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Internal.Agents.ListAgentChatMessagesResponse
-	12, // 17: Superplane.Internal.Agents.Agents.DescribeOrganizationAgentUsage:output_type -> Superplane.Internal.Agents.DescribeOrganizationAgentUsageResponse
-	13, // [13:18] is the sub-list for method output_type
-	8,  // [8:13] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	10, // 6: Superplane.Internal.Agents.DescribeOrganizationAgentUsageResponse.usage:type_name -> Superplane.Internal.Agents.ChatUsage
+	7,  // 7: Superplane.Internal.Agents.Agents.CreateAgentChat:input_type -> Superplane.Internal.Agents.CreateAgentChatRequest
+	0,  // 8: Superplane.Internal.Agents.Agents.ListAgentChats:input_type -> Superplane.Internal.Agents.ListAgentChatsRequest
+	2,  // 9: Superplane.Internal.Agents.Agents.DescribeAgentChat:input_type -> Superplane.Internal.Agents.DescribeAgentChatRequest
+	4,  // 10: Superplane.Internal.Agents.Agents.ListAgentChatMessages:input_type -> Superplane.Internal.Agents.ListAgentChatMessagesRequest
+	11, // 11: Superplane.Internal.Agents.Agents.DescribeOrganizationAgentUsage:input_type -> Superplane.Internal.Agents.DescribeOrganizationAgentUsageRequest
+	8,  // 12: Superplane.Internal.Agents.Agents.CreateAgentChat:output_type -> Superplane.Internal.Agents.CreateAgentChatResponse
+	1,  // 13: Superplane.Internal.Agents.Agents.ListAgentChats:output_type -> Superplane.Internal.Agents.ListAgentChatsResponse
+	3,  // 14: Superplane.Internal.Agents.Agents.DescribeAgentChat:output_type -> Superplane.Internal.Agents.DescribeAgentChatResponse
+	5,  // 15: Superplane.Internal.Agents.Agents.ListAgentChatMessages:output_type -> Superplane.Internal.Agents.ListAgentChatMessagesResponse
+	12, // 16: Superplane.Internal.Agents.Agents.DescribeOrganizationAgentUsage:output_type -> Superplane.Internal.Agents.DescribeOrganizationAgentUsageResponse
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_private_agents_proto_init() }

@@ -29,20 +29,11 @@ def _timestamp(value: datetime) -> Timestamp:
     return result
 
 
-def _serialize_chat_usage(chat: StoredAgentChat) -> Any:
-    return agents_pb2.ChatUsage(  # type: ignore[attr-defined]
-        total_input_tokens=chat.total_input_tokens,
-        total_output_tokens=chat.total_output_tokens,
-        total_tokens=chat.total_tokens,
-    )
-
-
 def _serialize_chat(chat: StoredAgentChat) -> Any:
     return agents_pb2.ChatInfo(  # type: ignore[attr-defined]
         id=chat.id,
         initial_message=chat.initial_message or "",
         created_at=_timestamp(chat.created_at),
-        usage=_serialize_chat_usage(chat),
     )
 
 

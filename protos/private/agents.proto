@@ -74,7 +74,6 @@ message ChatInfo {
   string id = 1;
   string initial_message = 2;
   google.protobuf.Timestamp created_at = 3;
-  ChatUsage usage = 4;
 }
 
 message ChatUsage {
