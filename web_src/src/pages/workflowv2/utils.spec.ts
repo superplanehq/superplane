@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasNodeExecutionRef } from "@/api-client";
+import { makeComponentsNode } from "@/test/factories";
 import { buildRunItemFromExecutionRef } from "./utils";
 
 function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {}): CanvasesCanvasNodeExecutionRef {
@@ -16,20 +17,11 @@ function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {
   } as CanvasesCanvasNodeExecutionRef;
 }
 
-function makeNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
-  return {
-    id: "node-1",
-    name: "Node 1",
-    type: "TYPE_COMPONENT",
-    ...overrides,
-  } as ComponentsNode;
-}
-
 describe("buildRunItemFromExecutionRef", () => {
   it("marks failed execution refs as error when no resolved state is provided", () => {
     const runItem = buildRunItemFromExecutionRef({
       execution: makeExecutionRef({ result: "RESULT_FAILED" }),
-      nodes: [makeNode()],
+      nodes: [makeComponentsNode()],
       onNodeSelect: vi.fn(),
     });
 
@@ -42,7 +34,7 @@ describe("buildRunItemFromExecutionRef", () => {
         result: "RESULT_FAILED",
         resultReason: "RESULT_REASON_ERROR_RESOLVED",
       }),
-      nodes: [makeNode()],
+      nodes: [makeComponentsNode()],
       onNodeSelect: vi.fn(),
     });
 

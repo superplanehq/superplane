@@ -274,6 +274,7 @@ service Organizations {
       tags: "Organization";
     };
   }
+
 }
 
 message Organization {
