@@ -32,7 +32,11 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
     env = load_env()
     full_cases = list(dataset.cases)
     cases = select_cases(full_cases, selected_case_names)
-    eval_dataset = Dataset(cases=cases)
+    eval_dataset = Dataset(
+        cases=cases,
+        evaluators=dataset.evaluators,
+        report_evaluators=dataset.report_evaluators,
+    )
 
     deps = AgentDeps(
         client=SuperplaneClient(
