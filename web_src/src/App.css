@@ -247,21 +247,15 @@
 
 @keyframes sp-tool-enter {
   from {
-    grid-template-rows: 0fr;
     opacity: 0;
+    transform: translateY(-4px);
   }
   to {
-    grid-template-rows: 1fr;
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
 .sp-tool-enter {
-  display: grid;
-  animation: sp-tool-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-.sp-tool-enter > * {
-  overflow: hidden;
-  min-height: 0;
+  animation: sp-tool-enter 0.2s ease-out both;
 }
