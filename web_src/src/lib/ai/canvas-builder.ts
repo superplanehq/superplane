@@ -3,55 +3,20 @@ import type {
   ComponentsEdge,
   ComponentsIntegrationRef,
   ComponentsNode,
+  ComponentsNodeType,
   OrganizationsIntegration,
 } from "@/api-client";
-import type {
-  AiAddNodeOperation,
-  AiCanvasNodeRef,
-  AiCanvasOperation,
-  AiCanvasSourceNodeRef,
-  AiConnectionNodesOperation,
-  AiDeleteNodeOperation,
-  AiUpdateNodeConfigOperation,
-  BuildingBlockCategory,
-} from "@/ui/BuildingBlocksSidebar";
+import type { BuildingBlock, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { generateNodeId, generateUniqueNodeName } from "@/pages/workflowv2/utils";
-
-function normalizeIntegrationName(name?: string): string {
-  return (name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_-]+/g, "");
-}
-
-function resolveIntegrationRefForBlock(
-  blockIntegrationName: string | undefined,
-  integrations: OrganizationsIntegration[],
-): ComponentsIntegrationRef | undefined {
-  const normalized = normalizeIntegrationName(blockIntegrationName);
-  if (!normalized) {
-    return undefined;
-  }
-
-  const matchingIntegrations = integrations.filter((integration) => {
-    return normalizeIntegrationName(integration.spec?.integrationName) === normalized;
-  });
-  if (matchingIntegrations.length === 0) {
-    return undefined;
-  }
-
-  const selectedIntegration =
-    matchingIntegrations.find((integration) => (integration.status?.state || "").toLowerCase() === "ready") ||
-    matchingIntegrations[0];
-  if (!selectedIntegration.metadata?.id && !selectedIntegration.metadata?.name) {
-    return undefined;
-  }
-
-  return {
-    id: selectedIntegration.metadata?.id,
-    name: selectedIntegration.metadata?.name,
-  };
-}
+import type {
+  CanvasOperation,
+  NodeRef,
+  SourceNodeRef,
+  AddNodeOperation,
+  ConnectionNodesOperation,
+  UpdateNodeConfigOperation,
+  DeleteNodeOperation,
+} from "./types";
 
 type ScoredChannel = {
   name: string;
@@ -59,8 +24,17 @@ type ScoredChannel = {
   description: string;
 };
 
+/*
+ * Applies a list of AI-generated canvas operations to a canvas.
+ * The operations are applied in the order they are provided.
+ *
+ * @param canvas - The canvas to apply the operations to.
+ * @param buildingBlocks - The building blocks to use for the canvas.
+ * @param integrations - The integrations to use for the canvas.
+ * @returns The updated canvas.
+ */
 export class CanvasBuilder {
-  private readonly workflow: CanvasesCanvas;
+  private readonly canvas: CanvasesCanvas;
   private readonly integrations: OrganizationsIntegration[];
   private readonly blockLookup: Map<string, BuildingBlockCategory["blocks"][number]>;
   private createdNodeIdsByKey: Map<string, string>;
@@ -69,11 +43,11 @@ export class CanvasBuilder {
   private updatedEdges: ComponentsEdge[];
 
   constructor(
-    workflow: CanvasesCanvas,
+    canvas: CanvasesCanvas,
     buildingBlocks: BuildingBlockCategory[],
     integrations: OrganizationsIntegration[] = [],
   ) {
-    this.workflow = workflow;
+    this.canvas = canvas;
     this.integrations = integrations;
     this.blockLookup = new Map(
       buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
@@ -84,7 +58,7 @@ export class CanvasBuilder {
     this.updatedEdges = [];
   }
 
-  apply(operations: AiCanvasOperation[]): CanvasesCanvas {
+  apply(operations: CanvasOperation[]): CanvasesCanvas {
     this.initializeState(operations);
 
     for (const operation of operations) {
@@ -106,20 +80,20 @@ export class CanvasBuilder {
     }
 
     return {
-      ...this.workflow,
+      ...this.canvas,
       spec: {
-        ...this.workflow.spec,
+        ...this.canvas.spec,
         nodes: this.updatedNodes,
         edges: this.updatedEdges,
       },
     };
   }
 
-  private initializeState(operations: AiCanvasOperation[]): void {
+  private initializeState(operations: CanvasOperation[]): void {
     this.createdNodeIdsByKey = new Map();
     this.addedNodeBlockNameByKey = new Map();
-    this.updatedNodes = [...(this.workflow.spec?.nodes || [])];
-    this.updatedEdges = [...(this.workflow.spec?.edges || [])];
+    this.updatedNodes = [...(this.canvas.spec?.nodes || [])];
+    this.updatedEdges = [...(this.canvas.spec?.edges || [])];
 
     for (const operation of operations) {
       if (operation.type === "add_node" && operation.nodeKey) {
@@ -128,7 +102,7 @@ export class CanvasBuilder {
     }
   }
 
-  private resolveNodeId(ref?: AiCanvasNodeRef): string | null {
+  private resolveNodeId(ref?: NodeRef): string | null {
     if (!ref) {
       return null;
     }
@@ -147,7 +121,7 @@ export class CanvasBuilder {
     return null;
   }
 
-  private getBlockNameForNodeRef(ref?: AiCanvasNodeRef): string | null {
+  private getBlockNameForNodeRef(ref?: NodeRef): string | null {
     if (!ref) {
       return null;
     }
@@ -179,7 +153,7 @@ export class CanvasBuilder {
     return null;
   }
 
-  private resolveOutputChannelsForSourceRef(ref?: AiCanvasNodeRef): ScoredChannel[] {
+  private resolveOutputChannelsForSourceRef(ref?: NodeRef): ScoredChannel[] {
     const blockName = this.getBlockNameForNodeRef(ref);
     if (!blockName) {
       return [];
@@ -274,7 +248,7 @@ export class CanvasBuilder {
     return score;
   }
 
-  private resolveConnectionChannel(source?: AiCanvasSourceNodeRef): string {
+  private resolveConnectionChannel(source?: SourceNodeRef): string {
     const explicitChannel = source?.handleId?.trim();
     if (explicitChannel) {
       return explicitChannel;
@@ -296,7 +270,27 @@ export class CanvasBuilder {
     return "default";
   }
 
-  private applyAddNodeOperation(operation: AiAddNodeOperation): void {
+  private blockTypeFromBlock(block: BuildingBlock): ComponentsNodeType {
+    switch (block.type) {
+      case "trigger":
+        return "TYPE_TRIGGER";
+      case "blueprint":
+        return "TYPE_BLUEPRINT";
+      default:
+        return block.name === "annotation" ? "TYPE_WIDGET" : "TYPE_COMPONENT";
+    }
+  }
+
+  private positionFromOperation(operation: AddNodeOperation): { x: number; y: number } {
+    return operation.position
+      ? {
+          x: Math.round(operation.position.x),
+          y: Math.round(operation.position.y),
+        }
+      : { x: 0, y: 0 };
+  }
+
+  private applyAddNodeOperation(operation: AddNodeOperation): void {
     const block = this.blockLookup.get(operation.blockName);
     if (!block) {
       return;
@@ -309,24 +303,9 @@ export class CanvasBuilder {
     const newNode: ComponentsNode = {
       id: newNodeId,
       name: uniqueNodeName,
-      type:
-        block.type === "trigger"
-          ? "TYPE_TRIGGER"
-          : block.type === "blueprint"
-            ? "TYPE_BLUEPRINT"
-            : block.name === "annotation"
-              ? "TYPE_WIDGET"
-              : "TYPE_COMPONENT",
+      type: this.blockTypeFromBlock(block),
       configuration: operation.configuration || {},
-      position: operation.position
-        ? {
-            x: Math.round(operation.position.x),
-            y: Math.round(operation.position.y),
-          }
-        : {
-            x: 0,
-            y: 0,
-          },
+      position: this.positionFromOperation(operation),
     };
 
     const integrationRef = resolveIntegrationRefForBlock(block.integrationName, this.integrations);
@@ -362,7 +341,7 @@ export class CanvasBuilder {
     });
   }
 
-  private applyConnectionOperation(operation: AiConnectionNodesOperation): void {
+  private applyConnectionOperation(operation: ConnectionNodesOperation): void {
     const sourceId = this.resolveNodeId(operation.source);
     const targetId = this.resolveNodeId(operation.target);
     if (!sourceId || !targetId) {
@@ -397,7 +376,7 @@ export class CanvasBuilder {
     }
   }
 
-  private applyUpdateNodeConfigOperation(operation: AiUpdateNodeConfigOperation): void {
+  private applyUpdateNodeConfigOperation(operation: UpdateNodeConfigOperation): void {
     const targetId = this.resolveNodeId(operation.target);
     if (!targetId) {
       return;
@@ -421,7 +400,7 @@ export class CanvasBuilder {
     };
   }
 
-  private applyDeleteNodeOperation(operation: AiDeleteNodeOperation): void {
+  private applyDeleteNodeOperation(operation: DeleteNodeOperation): void {
     const targetId = this.resolveNodeId(operation.target);
     if (!targetId) {
       return;
@@ -440,4 +419,40 @@ export class CanvasBuilder {
       }
     }
   }
+}
+
+function normalizeIntegrationName(name?: string): string {
+  return (name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+}
+
+function resolveIntegrationRefForBlock(
+  blockIntegrationName: string | undefined,
+  integrations: OrganizationsIntegration[],
+): ComponentsIntegrationRef | undefined {
+  const normalized = normalizeIntegrationName(blockIntegrationName);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const matchingIntegrations = integrations.filter((integration) => {
+    return normalizeIntegrationName(integration.spec?.integrationName) === normalized;
+  });
+  if (matchingIntegrations.length === 0) {
+    return undefined;
+  }
+
+  const selectedIntegration =
+    matchingIntegrations.find((integration) => (integration.status?.state || "").toLowerCase() === "ready") ||
+    matchingIntegrations[0];
+  if (!selectedIntegration.metadata?.id && !selectedIntegration.metadata?.name) {
+    return undefined;
+  }
+
+  return {
+    id: selectedIntegration.metadata?.id,
+    name: selectedIntegration.metadata?.name,
+  };
 }

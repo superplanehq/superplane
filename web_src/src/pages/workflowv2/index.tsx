@@ -62,7 +62,6 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
@@ -84,7 +83,7 @@ import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { CanvasBuilder } from "@/lib/ai";
+import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
 import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
@@ -3204,7 +3203,7 @@ export function WorkflowPageV2() {
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: AiCanvasOperation[]) => {
+    async (operations: CanvasOperation[]) => {
       if (!operations.length || !organizationId || !canvasId) {
         return;
       }

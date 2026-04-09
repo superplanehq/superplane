@@ -22,7 +22,7 @@ import {
   clearChatPrompt,
   prependChatSession,
 } from "./agentChatUi";
-import type { AiCanvasOperation } from "./index";
+import type { CanvasOperation } from "@/lib/ai";
 
 export type AiBuilderMessage = {
   id: string;
@@ -35,7 +35,7 @@ export type AiBuilderMessage = {
 export type AiBuilderProposal = {
   id: string;
   summary: string;
-  operations: AiCanvasOperation[];
+  operations: CanvasOperation[];
 };
 
 export type AiChatSession = {

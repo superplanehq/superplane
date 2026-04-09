@@ -15,6 +15,7 @@ import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt 
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
+import type { CanvasOperation } from "@/lib/ai";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
@@ -39,7 +40,7 @@ export interface BuildingBlocksSidebarProps {
     edges?: ComponentsEdge[];
   };
   selectedNodeIds?: string[];
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
@@ -47,58 +48,6 @@ export interface BuildingBlocksSidebarProps {
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
 }
-
-export interface AiCanvasNodeRef {
-  nodeKey?: string;
-  nodeId?: string;
-  nodeName?: string;
-}
-
-export interface AiCanvasSourceNodeRef extends AiCanvasNodeRef {
-  handleId?: string | null;
-}
-
-export interface AiAddNodeOperation {
-  type: "add_node";
-  nodeKey?: string;
-  blockName: string;
-  nodeName?: string;
-  configuration?: Record<string, unknown>;
-  position?: { x: number; y: number };
-  source?: AiCanvasSourceNodeRef;
-}
-
-export interface AiConnectNodesOperation {
-  type: "connect_nodes";
-  source: AiCanvasSourceNodeRef;
-  target: AiCanvasNodeRef;
-}
-
-export interface AiDisconnectNodesOperation {
-  type: "disconnect_nodes";
-  source: AiCanvasSourceNodeRef;
-  target: AiCanvasNodeRef;
-}
-
-export type AiConnectionNodesOperation = AiConnectNodesOperation | AiDisconnectNodesOperation;
-
-export interface AiUpdateNodeConfigOperation {
-  type: "update_node_config";
-  target: AiCanvasNodeRef;
-  configuration: Record<string, unknown>;
-  nodeName?: string;
-}
-
-export interface AiDeleteNodeOperation {
-  type: "delete_node";
-  target: AiCanvasNodeRef;
-}
-
-export type AiCanvasOperation =
-  | AiAddNodeOperation
-  | AiConnectionNodesOperation
-  | AiUpdateNodeConfigOperation
-  | AiDeleteNodeOperation;
 
 export function BuildingBlocksSidebar({
   isOpen,
@@ -221,7 +170,7 @@ interface OpenBuildingBlocksSidebarProps {
   showAiBuilderTab: boolean;
   canvasId?: string;
   organizationId?: string;
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   integrations: OrganizationsIntegration[];
   canvasZoom: number;
   disabled: boolean;
@@ -323,7 +272,7 @@ function OpenBuildingBlocksSidebar({
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useCallback((operation: AiCanvasOperation, proposal?: AiBuilderProposal) => {
+  const formatOperation = useCallback((operation: CanvasOperation, proposal?: AiBuilderProposal) => {
     const operationNodeLabels = new Map<string, string>();
     if (proposal) {
       for (const op of proposal.operations) {
