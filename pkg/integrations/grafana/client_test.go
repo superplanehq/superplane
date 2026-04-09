@@ -293,6 +293,32 @@ func Test__Client__GetDashboard__BuildsAbsoluteDashboardURL(t *testing.T) {
 	require.Len(t, dashboard.Panels, 1)
 }
 
+func Test__Client__SearchDashboards__ResolvesRelativeURLs(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"uid":"a","title":"A","url":"/d/a/slug-a","type":"dash-db"},
+					{"uid":"b","title":"B","url":"https://other.example/d/b/slug","type":"dash-db"}
+				]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	hits, err := client.SearchDashboards("", "", "", 0)
+	require.NoError(t, err)
+	require.Len(t, hits, 2)
+	require.Equal(t, "https://grafana.example.com/d/a/slug-a", hits[0].URL)
+	require.Equal(t, "https://other.example/d/b/slug", hits[1].URL)
+}
+
 func Test__collectDashboardPanelSummaries__nestedUnderRows(t *testing.T) {
 	raw := []json.RawMessage{
 		json.RawMessage(`{"id":10,"title":"Resources","type":"row","panels":[{"id":1,"title":"CPU","type":"timeseries"},{"id":2,"title":"Memory","type":"timeseries"}]}`),

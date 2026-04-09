@@ -704,6 +704,10 @@ func (c *Client) SearchDashboards(query, folderUID, tag string, limit int) ([]Da
 		return nil, fmt.Errorf("error parsing dashboard search response: %v", err)
 	}
 
+	for i := range results {
+		results[i].URL = c.resolveURL(results[i].URL)
+	}
+
 	return results, nil
 }
 

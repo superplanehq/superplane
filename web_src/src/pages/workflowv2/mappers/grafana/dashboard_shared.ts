@@ -77,23 +77,31 @@ export function previewMetadataItem(
   return { icon, label: `${prefix}${preview}` };
 }
 
+/** When set, matches the historical Query Data Source node event strip (subtitle + id fallbacks). */
+export type BuildGrafanaEventSectionsOptions = {
+  legacyQueryDataSource?: boolean;
+};
+
 export function buildGrafanaEventSections(
   nodes: NodeInfo[],
   execution: ExecutionInfo,
   componentName: string,
+  options?: BuildGrafanaEventSectionsOptions,
 ): EventSection[] {
+  const legacy = options?.legacyQueryDataSource === true;
+
   const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
   const triggerName = rootTriggerNode?.componentName ?? "";
   const rootTriggerRenderer = getTriggerRenderer(triggerName);
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+  const subtitleTimestamp = legacy ? execution.createdAt : execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : legacy ? "-" : "";
 
   const receivedAtRaw = execution.createdAt || execution.updatedAt;
   const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : undefined;
 
-  const eventId = execution.rootEvent?.id ?? execution.id;
+  const eventId = legacy ? (execution.rootEvent?.id ?? "") : (execution.rootEvent?.id ?? execution.id);
 
   return [
     {

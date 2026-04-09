@@ -4,7 +4,7 @@
       {
         "uid": "cIBgcSjkk",
         "title": "Production Overview",
-        "url": "/d/cIBgcSjkk/production-overview",
+        "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview",
         "folderTitle": "Platform",
         "folderUid": "fdg4m1rt63hj8q",
         "tags": ["production", "platform"]
@@ -12,7 +12,7 @@
       {
         "uid": "dJChfTmkk",
         "title": "Service Latency",
-        "url": "/d/dJChfTmkk/service-latency",
+        "url": "https://grafana.example.com/d/dJChfTmkk/service-latency",
         "folderTitle": "Platform",
         "folderUid": "fdg4m1rt63hj8q",
         "tags": ["latency"]
