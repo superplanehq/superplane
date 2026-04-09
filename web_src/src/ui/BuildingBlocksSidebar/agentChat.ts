@@ -96,6 +96,7 @@ function formatToolLabel(toolName: string): string {
     list_node_events: "Listing node events",
     list_node_executions: "Listing node executions",
     list_available_blocks: "Listing available components",
+    validate_proposal: "Validating proposal",
   };
   if (labelByTool[normalized]) {
     return labelByTool[normalized];

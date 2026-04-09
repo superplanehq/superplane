@@ -1176,6 +1176,24 @@ wheels = [
 ]
 
 [[package]]
+name = "opentelemetry-exporter-otlp-proto-grpc"
+version = "1.39.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "googleapis-common-protos" },
+    { name = "grpcio" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-common" },
+    { name = "opentelemetry-proto" },
+    { name = "opentelemetry-sdk" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/53/48/b329fed2c610c2c32c9366d9dc597202c9d1e58e631c137ba15248d8850f/opentelemetry_exporter_otlp_proto_grpc-1.39.1.tar.gz", hash = "sha256:772eb1c9287485d625e4dbe9c879898e5253fea111d9181140f51291b5fec3ad", size = 24650 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/a3/cc9b66575bd6597b98b886a2067eea2693408d2d5f39dad9ab7fc264f5f3/opentelemetry_exporter_otlp_proto_grpc-1.39.1-py3-none-any.whl", hash = "sha256:fa1c136a05c7e9b4c09f739469cbdb927ea20b34088ab1d959a849b5cc589c18", size = 19766 },
+]
+
+[[package]]
 name = "opentelemetry-exporter-otlp-proto-http"
 version = "1.39.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1650,6 +1668,9 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "grpcio" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "opentelemetry-sdk" },
     { name = "protobuf" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -1673,6 +1694,9 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.135.1" },
     { name = "grpcio", specifier = ">=1.71.0" },
+    { name = "opentelemetry-api", specifier = ">=1.30.0" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.30.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.30.0" },
     { name = "protobuf", specifier = ">=5.29.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2.9,<3.3.0" },
     { name = "pydantic", specifier = ">=2.11.0" },
