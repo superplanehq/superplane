@@ -37,7 +37,18 @@ from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
-from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
+from ai.telemetry import (
+    init_metrics,
+    record_agent_run_duration,
+    record_agent_run_first_token_duration,
+    record_agent_run_model_requests,
+    record_agent_run_outcome,
+    record_agent_run_retries,
+    record_agent_run_tokens,
+    record_agent_run_tool_calls,
+    record_agent_tool_duration,
+    shutdown_metrics,
+)
 from ai.text import normalize_optional
 
 
@@ -252,9 +263,12 @@ async def _stream_agent_run(
                     "usage": _to_jsonable(run_usage),
                 }
 
+        test_run_duration = time.perf_counter() - started_at
+        record_agent_run_duration(test_run_duration)
+        record_agent_run_outcome("success")
         yield {
             "type": "run_completed",
-            "elapsed_ms": (time.perf_counter() - started_at) * 1000,
+            "elapsed_ms": test_run_duration * 1000,
         }
         yield {"type": "done"}
         return
@@ -302,6 +316,7 @@ async def _stream_agent_run(
         normalized = tool_name.strip().lower()
         return normalized in output_tool_name_hints
 
+    first_token_at: float | None = None
     tool_started_at_by_call_id: dict[str, float] = {}
     async for event in _run_stream_events(agent, **run_kwargs):
         if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
@@ -332,6 +347,8 @@ async def _stream_agent_run(
                 recorder.tool_call_delta(tool_call_id, args_delta, event.delta.tool_name_delta)
                 maybe_delta = emit_answer_delta_from_output_args(tool_call_id, args_delta)
                 if maybe_delta is not None:
+                    if first_token_at is None:
+                        first_token_at = time.perf_counter()
                     yield maybe_delta
                 continue
 
@@ -346,6 +363,8 @@ async def _stream_agent_run(
                     continue
                 maybe_delta = emit_answer_delta_from_output_args(tool_call_id, parsed_args)
                 if maybe_delta is not None:
+                    if first_token_at is None:
+                        first_token_at = time.perf_counter()
                     yield maybe_delta
             continue
 
@@ -365,19 +384,23 @@ async def _stream_agent_run(
             assert _raw_tool_call_id is not None
             tool_call_id = _raw_tool_call_id
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
-            elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
+            tool_elapsed_s = time.perf_counter() - tool_started_at
             recorder.tool_finished(event)
+            if event.result.tool_name:
+                record_agent_tool_duration(event.result.tool_name, tool_elapsed_s)
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
                 "tool_call_id": tool_call_id,
-                "elapsed_ms": elapsed_ms,
+                "elapsed_ms": tool_elapsed_s * 1000,
             }
             continue
 
         if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
             chunk = event.delta.content_delta
             if chunk:
+                if first_token_at is None:
+                    first_token_at = time.perf_counter()
                 recorder.append_assistant_content(chunk)
                 yield {
                     "type": "model_delta",
@@ -411,15 +434,23 @@ async def _stream_agent_run(
                 recorder.set_assistant_content(output)
             run_usage = result.usage()
             record_agent_run_tokens(run_usage)
+            record_agent_run_tool_calls(run_usage.tool_calls)
+            record_agent_run_model_requests(run_usage.requests)
+            record_agent_run_retries(max(0, run_usage.requests - run_usage.tool_calls - 1))
             yield {
                 "type": "final_answer",
                 "output": output,
                 "usage": _to_jsonable(run_usage),
             }
 
+    run_duration = time.perf_counter() - started_at
+    record_agent_run_duration(run_duration)
+    record_agent_run_outcome("success")
+    if first_token_at is not None:
+        record_agent_run_first_token_duration(first_token_at - started_at)
     yield {
         "type": "run_completed",
-        "elapsed_ms": (time.perf_counter() - started_at) * 1000,
+        "elapsed_ms": run_duration * 1000,
     }
     yield {"type": "done"}
 
@@ -495,6 +526,7 @@ def _create_app() -> FastAPI:
                         yield _encode_sse_event(event)
                 except Exception as error:
                     _debug_log("stream failed", chat_id=chat_id, error=str(error))
+                    record_agent_run_outcome("failure")
                     yield _encode_sse_event(
                         {
                             "type": "run_failed",
