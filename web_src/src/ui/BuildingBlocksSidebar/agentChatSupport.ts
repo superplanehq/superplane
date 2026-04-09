@@ -175,6 +175,36 @@ function createToolCallId(toolName: string, toolCallId?: string): string {
   return typeof toolCallId === "string" && toolCallId.trim().length > 0 ? toolCallId : `${toolName}-${Date.now()}`;
 }
 
+function collapseWithFinishedEvent(
+  event: ToolEvent,
+  pendingEvents: ToolEvent[],
+): { effectiveEvent: ToolEvent; wasCollapsed: boolean } {
+  if (event.type !== "tool_started") {
+    return { effectiveEvent: event, wasCollapsed: false };
+  }
+
+  const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
+  const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
+
+  const finishedIdx = pendingEvents.findIndex((e) => {
+    if (e.type !== "tool_finished") {
+      return false;
+    }
+    const eName = typeof e.tool_name === "string" ? e.tool_name : "unknown";
+    const eHasId = typeof e.tool_call_id === "string" && e.tool_call_id.trim().length > 0;
+    if (hasExplicitCallId && eHasId) {
+      return e.tool_call_id === event.tool_call_id;
+    }
+    return eName === toolName;
+  });
+
+  if (finishedIdx >= 0) {
+    return { effectiveEvent: pendingEvents.splice(finishedIdx, 1)[0], wasCollapsed: true };
+  }
+
+  return { effectiveEvent: event, wasCollapsed: false };
+}
+
 function createAssistantStreamController({
   assistantMessageId,
   formatToolLabel,
@@ -191,7 +221,7 @@ function createAssistantStreamController({
   let assistantContentSnapshot = "";
   let pendingRenderBuffer = "";
   let isRenderLoopRunning = false;
-  let pendingToolEvents: ToolEvent[] = [];
+  const pendingToolEvents: ToolEvent[] = [];
   let isToolLoopRunning = false;
   const flushedToolCallIds = new Set<string>();
 
@@ -281,32 +311,7 @@ function createAssistantStreamController({
     try {
       while (pendingToolEvents.length > 0) {
         const event = pendingToolEvents.shift()!;
-        const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
-        const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
-
-        let effectiveEvent = event;
-        let wasCollapsed = false;
-        if (event.type === "tool_started") {
-          const finishedIdx = pendingToolEvents.findIndex((e) => {
-            if (e.type !== "tool_finished") {
-              return false;
-            }
-
-            const eName = typeof e.tool_name === "string" ? e.tool_name : "unknown";
-            const eHasId = typeof e.tool_call_id === "string" && e.tool_call_id.trim().length > 0;
-
-            if (hasExplicitCallId && eHasId) {
-              return e.tool_call_id === event.tool_call_id;
-            }
-
-            return eName === toolName;
-          });
-          if (finishedIdx >= 0) {
-            effectiveEvent = pendingToolEvents.splice(finishedIdx, 1)[0];
-            wasCollapsed = true;
-          }
-        }
-
+        const { effectiveEvent, wasCollapsed } = collapseWithFinishedEvent(event, pendingToolEvents);
         const isNewInsertion = applyToolEvent(effectiveEvent);
 
         if (isNewInsertion || wasCollapsed) {
