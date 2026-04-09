@@ -40,7 +40,7 @@ from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
 from ai.text import normalize_optional
-from ai.usage_publisher import NoopUsagePublisher, UsagePublisher
+from ai.usage_publisher import AgentUsagePublisher, NoopUsagePublisher, UsagePublisher
 
 
 @dataclass(frozen=True)
@@ -129,7 +129,7 @@ def _to_jsonable(value: Any) -> Any:
 
 def _record_usage(
     store: SessionStore,
-    publisher: UsagePublisher | NoopUsagePublisher,
+    publisher: AgentUsagePublisher,
     run_id: str,
     usage: RunUsage,
     org_id: str,
@@ -220,7 +220,7 @@ async def _stream_agent_run(
 ) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
     store: SessionStore = request.app.state.session_store
-    publisher: UsagePublisher | NoopUsagePublisher = request.app.state.publisher
+    publisher: AgentUsagePublisher = request.app.state.publisher
     claims: JwtClaims | None = None
     if payload.model == "test" and _resolve_bearer_token(request) is None:
         try:
@@ -474,7 +474,7 @@ def _create_app() -> FastAPI:
         store = SessionStore()
         tracker = ActiveStreamTracker()
         rabbitmq_url = config.rabbitmq_url
-        publisher: UsagePublisher | NoopUsagePublisher = (
+        publisher: AgentUsagePublisher = (
             UsagePublisher(rabbitmq_url) if rabbitmq_url else NoopUsagePublisher()
         )
         app.state.session_store = store

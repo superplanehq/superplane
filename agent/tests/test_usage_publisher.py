@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai.usage_publisher import NoopUsagePublisher, UsagePublisher
+from ai.usage_publisher import NoopUsagePublisher, UsagePublisher, _Connection
 from private import agents_pb2
 
 
@@ -12,8 +12,10 @@ def test_publisher_serializes_protobuf_correctly() -> None:
     """Verify the published body can be deserialized back into the proto message."""
     published_bodies: list[bytes] = []
     mock_channel = MagicMock()
+    mock_channel.is_open = True
     mock_connection = MagicMock()
     mock_connection.is_open = True
+    mock_connection.is_closed = False
     mock_connection.channel.return_value = mock_channel
 
     with patch("ai.usage_publisher.pika") as mock_pika:
@@ -45,61 +47,54 @@ def test_publisher_serializes_protobuf_correctly() -> None:
 
 def test_publisher_reuses_connection() -> None:
     mock_channel = MagicMock()
+    mock_channel.is_open = True
     mock_connection = MagicMock()
     mock_connection.is_open = True
+    mock_connection.is_closed = False
     mock_connection.channel.return_value = mock_channel
 
     with patch("ai.usage_publisher.pika") as mock_pika:
         mock_pika.URLParameters.return_value = "params"
         mock_pika.BlockingConnection.return_value = mock_connection
 
-        publisher = UsagePublisher("amqp://localhost")
-        publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100)
-        publisher.publish_agent_run_finished("org-1", "c-2", "test", 10, 20, 200)
-        time.sleep(0.3)
-        publisher.close()
+        conn = _Connection()
+        conn.ensure("amqp://localhost")
+        conn.ensure("amqp://localhost")
 
     mock_pika.BlockingConnection.assert_called_once()
-    assert mock_channel.basic_publish.call_count == 2
 
 
-def test_publisher_reconnects_on_closed_connection() -> None:
-    closed_connection = MagicMock()
-    closed_connection.is_open = False
+def test_connection_reconnects_when_closed() -> None:
+    closed_conn = MagicMock()
+    closed_conn.is_open = False
+    closed_conn.is_closed = True
 
     fresh_channel = MagicMock()
-    fresh_connection = MagicMock()
-    fresh_connection.is_open = True
-    fresh_connection.channel.return_value = fresh_channel
+    fresh_channel.is_open = True
+    fresh_conn = MagicMock()
+    fresh_conn.is_open = True
+    fresh_conn.is_closed = False
+    fresh_conn.channel.return_value = fresh_channel
 
     with patch("ai.usage_publisher.pika") as mock_pika:
         mock_pika.URLParameters.return_value = "params"
-        mock_pika.BlockingConnection.side_effect = [closed_connection, fresh_connection]
+        mock_pika.BlockingConnection.side_effect = [closed_conn, fresh_conn]
 
-        publisher = UsagePublisher("amqp://localhost")
-        publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100)
-        time.sleep(0.3)
-        publisher.publish_agent_run_finished("org-1", "c-2", "test", 10, 20, 200)
-        time.sleep(0.3)
-        publisher.close()
+        conn = _Connection()
+        conn.ensure("amqp://localhost")
+        conn.ensure("amqp://localhost")
 
     assert mock_pika.BlockingConnection.call_count == 2
-    assert fresh_channel.basic_publish.call_count >= 1
 
 
 def test_publish_does_not_block_caller() -> None:
-    """publish_agent_run_finished returns immediately; work happens on publisher thread."""
-    caller_thread_id = threading.current_thread().ident
     publish_thread_ids: list[int] = []
+    caller_thread_id = threading.current_thread().ident
 
-    def slow_connect(self: UsagePublisher) -> tuple[MagicMock, MagicMock]:
+    def tracking_publish(self: UsagePublisher, conn: _Connection, body: bytes) -> None:
         publish_thread_ids.append(threading.current_thread().ident)  # type: ignore[arg-type]
-        conn = MagicMock()
-        conn.is_open = True
-        ch = MagicMock()
-        return conn, ch
 
-    with patch.object(UsagePublisher, "_connect", slow_connect):
+    with patch.object(UsagePublisher, "_publish", tracking_publish):
         publisher = UsagePublisher("amqp://localhost")
         publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100)
         time.sleep(0.3)
@@ -144,3 +139,24 @@ def test_close_shuts_down_publisher_thread() -> None:
         assert publisher._thread.is_alive()
         publisher.close()
         assert not publisher._thread.is_alive()
+
+
+def test_connection_close_cleans_up() -> None:
+    mock_connection = MagicMock()
+    mock_connection.is_open = True
+    mock_connection.is_closed = False
+    mock_channel = MagicMock()
+    mock_channel.is_open = True
+    mock_connection.channel.return_value = mock_channel
+
+    with patch("ai.usage_publisher.pika") as mock_pika:
+        mock_pika.URLParameters.return_value = "params"
+        mock_pika.BlockingConnection.return_value = mock_connection
+
+        conn = _Connection()
+        conn.ensure("amqp://localhost")
+        assert conn.is_open
+        conn.close()
+
+    mock_connection.close.assert_called_once()
+    assert not conn.is_open

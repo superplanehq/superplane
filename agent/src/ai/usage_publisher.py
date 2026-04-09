@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import queue
 import threading
+from typing import Protocol
 
 import pika  # type: ignore[import-untyped]
 import pika.exceptions  # type: ignore[import-untyped]
@@ -12,6 +13,56 @@ from private import agents_pb2
 
 AGENT_EXCHANGE = "superplane.agent-exchange"
 AGENT_RUN_FINISHED_ROUTING_KEY = "agent-run-finished"
+
+
+class AgentUsagePublisher(Protocol):
+    def publish_agent_run_finished(
+        self,
+        organization_id: str,
+        chat_id: str,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        total_tokens: int,
+    ) -> None: ...
+
+    def close(self) -> None: ...
+
+
+class _Connection:
+    """Manages a single pika connection and channel, owned by one thread."""
+
+    def __init__(self) -> None:
+        self._conn: pika.BlockingConnection | None = None
+        self._chan: pika.adapters.blocking_connection.BlockingChannel | None = None
+
+    @property
+    def is_open(self) -> bool:
+        return self._conn is not None and self._conn.is_open
+
+    def ensure(self, rabbitmq_url: str) -> pika.adapters.blocking_connection.BlockingChannel:
+        if self.is_open and self._chan is not None and self._chan.is_open:
+            return self._chan
+
+        self.close()
+        params = pika.URLParameters(rabbitmq_url)
+        self._conn = pika.BlockingConnection(params)
+        self._chan = self._conn.channel()
+        self._chan.exchange_declare(exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True)
+        return self._chan
+
+    def heartbeat(self) -> None:
+        if self._conn is not None and self._conn.is_open:
+            self._conn.process_data_events(time_limit=0)
+
+    def close(self) -> None:
+        try:
+            if self._conn is not None and not self._conn.is_closed:
+                self._conn.close()
+        except Exception:
+            pass
+        self._conn = None
+        self._chan = None
 
 
 class UsagePublisher:
@@ -58,50 +109,39 @@ class UsagePublisher:
 
     def _run(self) -> None:
         """Dedicated publisher thread — owns the pika connection."""
-        connection: pika.BlockingConnection | None = None
-        channel: pika.adapters.blocking_connection.BlockingChannel | None = None
+        conn = _Connection()
 
         while not self._stopped.is_set() or not self._queue.empty():
-            try:
-                body = self._queue.get(timeout=1.0)
-            except queue.Empty:
-                if connection is not None and connection.is_open:
-                    try:
-                        connection.process_data_events(time_limit=0)
-                    except Exception:
-                        connection = None
-                        channel = None
-                continue
+            body = self._dequeue(conn)
+            if body is not None:
+                self._publish(conn, body)
 
-            try:
-                if connection is None or not connection.is_open:
-                    connection, channel = self._connect()
+        conn.close()
 
-                assert channel is not None
-                channel.basic_publish(
-                    exchange=AGENT_EXCHANGE,
-                    routing_key=AGENT_RUN_FINISHED_ROUTING_KEY,
-                    body=body,
-                )
-            except Exception as error:
-                print(f"[web] failed to publish agent run finished: {error}", flush=True)
-                connection = None
-                channel = None
+    def _dequeue(self, conn: _Connection) -> bytes | None:
+        try:
+            return self._queue.get(timeout=1.0)
+        except queue.Empty:
+            self._process_heartbeat(conn)
+            return None
 
-        if connection is not None and connection.is_open:
-            try:
-                connection.close()
-            except Exception:
-                pass
+    def _process_heartbeat(self, conn: _Connection) -> None:
+        try:
+            conn.heartbeat()
+        except Exception:
+            conn.close()
 
-    def _connect(
-        self,
-    ) -> tuple[pika.BlockingConnection, pika.adapters.blocking_connection.BlockingChannel]:
-        params = pika.URLParameters(self._rabbitmq_url)
-        connection = pika.BlockingConnection(params)
-        channel = connection.channel()
-        channel.exchange_declare(exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True)
-        return connection, channel
+    def _publish(self, conn: _Connection, body: bytes) -> None:
+        try:
+            channel = conn.ensure(self._rabbitmq_url)
+            channel.basic_publish(
+                exchange=AGENT_EXCHANGE,
+                routing_key=AGENT_RUN_FINISHED_ROUTING_KEY,
+                body=body,
+            )
+        except Exception as error:
+            print(f"[web] failed to publish agent run finished: {error}", flush=True)
+            conn.close()
 
 
 class NoopUsagePublisher:
