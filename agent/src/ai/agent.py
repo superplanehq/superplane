@@ -8,6 +8,7 @@ from pydantic_ai.models.test import TestModel
 from ai.config import config
 from ai.models import (
     CanvasAnswer,
+    CanvasProposal,
     CanvasQuestionRequest,
     CanvasShape,
     CanvasSummary,
@@ -132,6 +133,24 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     def _tool_debug(message: str) -> None:
         if config.debug:
             print(f"[web][agent] {message}", flush=True)
+
+    @agent.tool
+    def validate_proposal(
+        _ctx: RunContext[AgentDeps],
+        proposal: CanvasProposal,
+    ) -> dict[str, Any]:
+        """Validate and normalize a draft canvas proposal against live catalog schemas.
+
+        Call this with the same structured proposal you plan to include in your final
+        answer when the user asked for canvas edits. The server applies the same
+        coercion and type checks as the workflow UI. On success, copy the returned
+        ``proposal`` into your final ``CanvasAnswer``. On failure, read ``errors``,
+        fix configurations (use describe_component / describe_trigger), and call again.
+        """
+        return {
+            "ok": True,
+            "proposal": proposal.model_dump(mode="json", by_alias=True),
+        }
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:
