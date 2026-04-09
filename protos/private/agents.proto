@@ -16,6 +16,7 @@ service Agents {
   rpc ListAgentChats(ListAgentChatsRequest) returns (ListAgentChatsResponse);
   rpc DescribeAgentChat(DescribeAgentChatRequest) returns (DescribeAgentChatResponse);
   rpc ListAgentChatMessages(ListAgentChatMessagesRequest) returns (ListAgentChatMessagesResponse);
+  rpc DescribeOrganizationAgentUsage(DescribeOrganizationAgentUsageRequest) returns (DescribeOrganizationAgentUsageResponse);
 }
 
 message ListAgentChatsRequest {
@@ -73,4 +74,18 @@ message ChatInfo {
   string id = 1;
   string initial_message = 2;
   google.protobuf.Timestamp created_at = 3;
+}
+
+message ChatUsage {
+  int64 total_input_tokens = 1;
+  int64 total_output_tokens = 2;
+  int64 total_tokens = 3;
+}
+
+message DescribeOrganizationAgentUsageRequest {
+  string org_id = 1;
+}
+
+message DescribeOrganizationAgentUsageResponse {
+  ChatUsage usage = 1;
 }
