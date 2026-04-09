@@ -1,0 +1,17 @@
+{
+  "data": {
+    "knowledgeBaseUUID": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "knowledgeBaseName": "product-catalog-v2",
+    "jobUUID": "b2c3d4e5-0000-0000-0000-000000000001",
+    "status": "INDEX_JOB_STATUS_COMPLETED",
+    "phase": "BATCH_JOB_PHASE_SUCCEEDED",
+    "totalTokens": "1500",
+    "completedDataSources": 2,
+    "totalDataSources": 2,
+    "startedAt": "2025-06-01T00:00:00Z",
+    "finishedAt": "2025-06-01T00:05:32Z",
+    "isReportAvailable": true
+  },
+  "timestamp": "2025-06-01T00:05:32Z",
+  "type": "digitalocean.knowledge_base.indexed"
+}
