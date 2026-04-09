@@ -151,8 +151,8 @@ def test_web_server_start_raises_when_port_is_already_in_use() -> None:
     sock.bind(("127.0.0.1", port))
     sock.listen()
 
+    server = WebServer(WebServerConfig(host="127.0.0.1", port=port))
     try:
-        server = WebServer(WebServerConfig(host="127.0.0.1", port=port))
         with pytest.raises(RuntimeError, match="Failed to start REPL web server"):
             server.start()
     finally:
