@@ -51,7 +51,6 @@ CREATE TABLE public.agent_chat_runs (
     cache_read_tokens bigint DEFAULT 0 NOT NULL,
     cache_write_tokens bigint DEFAULT 0 NOT NULL,
     total_tokens bigint DEFAULT 0 NOT NULL,
-    estimated_cost_usd double precision,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -70,8 +69,7 @@ CREATE TABLE public.agent_chats (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     total_input_tokens bigint DEFAULT 0 NOT NULL,
     total_output_tokens bigint DEFAULT 0 NOT NULL,
-    total_tokens bigint DEFAULT 0 NOT NULL,
-    total_estimated_cost_usd double precision DEFAULT 0 NOT NULL
+    total_tokens bigint DEFAULT 0 NOT NULL
 );
 
 

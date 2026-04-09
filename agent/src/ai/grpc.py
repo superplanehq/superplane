@@ -34,7 +34,6 @@ def _serialize_chat_usage(chat: StoredAgentChat) -> Any:
         total_input_tokens=chat.total_input_tokens,
         total_output_tokens=chat.total_output_tokens,
         total_tokens=chat.total_tokens,
-        total_estimated_cost_usd=chat.total_estimated_cost_usd,
     )
 
 
@@ -121,7 +120,6 @@ class AgentsServicer:
                 total_input_tokens=usage.total_input_tokens,
                 total_output_tokens=usage.total_output_tokens,
                 total_tokens=usage.total_tokens,
-                total_estimated_cost_usd=usage.total_estimated_cost_usd,
             )
         )
 

@@ -137,7 +137,6 @@ class StoredAgentChat:
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_tokens: int = 0
-    total_estimated_cost_usd: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -145,7 +144,6 @@ class StoredAgentChatUsage:
     total_input_tokens: int
     total_output_tokens: int
     total_tokens: int
-    total_estimated_cost_usd: float
 
 
 @dataclass(frozen=True)
@@ -276,7 +274,6 @@ class SessionStore:
             total_input_tokens=0,
             total_output_tokens=0,
             total_tokens=0,
-            total_estimated_cost_usd=0.0,
         )
 
         with self._cursor() as cur:
@@ -546,7 +543,6 @@ class SessionStore:
         cache_read_tokens: int,
         cache_write_tokens: int,
         total_tokens: int,
-        estimated_cost_usd: float | None,
     ) -> None:
         now = _utcnow()
 
@@ -558,8 +554,7 @@ class SessionStore:
                     output_tokens = %s,
                     cache_read_tokens = %s,
                     cache_write_tokens = %s,
-                    total_tokens = %s,
-                    estimated_cost_usd = %s
+                    total_tokens = %s
                 WHERE id = %s
                 RETURNING chat_id
                 """,
@@ -569,7 +564,6 @@ class SessionStore:
                     cache_read_tokens,
                     cache_write_tokens,
                     total_tokens,
-                    estimated_cost_usd,
                     run_id,
                 ),
             )
@@ -588,13 +582,11 @@ class SessionStore:
                 SET total_input_tokens = sub.input_tokens,
                     total_output_tokens = sub.output_tokens,
                     total_tokens = sub.total_tokens,
-                    total_estimated_cost_usd = sub.estimated_cost_usd,
                     updated_at = %s
                 FROM (
                     SELECT COALESCE(SUM(r.input_tokens), 0) AS input_tokens,
                            COALESCE(SUM(r.output_tokens), 0) AS output_tokens,
-                           COALESCE(SUM(r.total_tokens), 0) AS total_tokens,
-                           COALESCE(SUM(r.estimated_cost_usd), 0) AS estimated_cost_usd
+                           COALESCE(SUM(r.total_tokens), 0) AS total_tokens
                     FROM agent_chat_runs r
                     WHERE r.chat_id = %s
                 ) sub
@@ -610,8 +602,7 @@ class SessionStore:
                 SELECT
                     COALESCE(SUM(total_input_tokens), 0) AS total_input_tokens,
                     COALESCE(SUM(total_output_tokens), 0) AS total_output_tokens,
-                    COALESCE(SUM(total_tokens), 0) AS total_tokens,
-                    COALESCE(SUM(total_estimated_cost_usd), 0) AS total_estimated_cost_usd
+                    COALESCE(SUM(total_tokens), 0) AS total_tokens
                 FROM agent_chats
                 WHERE org_id = %s
                 """,
@@ -624,14 +615,12 @@ class SessionStore:
                 total_input_tokens=0,
                 total_output_tokens=0,
                 total_tokens=0,
-                total_estimated_cost_usd=0.0,
             )
 
         return StoredAgentChatUsage(
             total_input_tokens=int(row["total_input_tokens"]),
             total_output_tokens=int(row["total_output_tokens"]),
             total_tokens=int(row["total_tokens"]),
-            total_estimated_cost_usd=float(row["total_estimated_cost_usd"]),
         )
 
     def _flatten_message_record(
@@ -730,7 +719,6 @@ class SessionStore:
             total_input_tokens=int(row.get("total_input_tokens") or 0),
             total_output_tokens=int(row.get("total_output_tokens") or 0),
             total_tokens=int(row.get("total_tokens") or 0),
-            total_estimated_cost_usd=float(row.get("total_estimated_cost_usd") or 0.0),
         )
 
     def _row_to_message_record(self, row: dict[str, Any]) -> StoredAgentChatMessageRecord:

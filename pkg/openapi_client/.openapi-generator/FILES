@@ -28,11 +28,9 @@ docs/ActOnCanvasChangeRequestRequestAction.md
 docs/AgentAPI.md
 docs/AgentsAgentChatInfo.md
 docs/AgentsAgentChatMessage.md
-docs/AgentsAgentChatUsage.md
 docs/AgentsCreateAgentChatRequest.md
 docs/AgentsCreateAgentChatResponse.md
 docs/AgentsDescribeAgentChatResponse.md
-docs/AgentsDescribeAgentUsageResponse.md
 docs/AgentsListAgentChatMessagesResponse.md
 docs/AgentsListAgentChatsResponse.md
 docs/AgentsResumeAgentChatBody.md
@@ -275,11 +273,9 @@ git_push.sh
 model_act_on_canvas_change_request_request_action.go
 model_agents_agent_chat_info.go
 model_agents_agent_chat_message.go
-model_agents_agent_chat_usage.go
 model_agents_create_agent_chat_request.go
 model_agents_create_agent_chat_response.go
 model_agents_describe_agent_chat_response.go
-model_agents_describe_agent_usage_response.go
 model_agents_list_agent_chat_messages_response.go
 model_agents_list_agent_chats_response.go
 model_agents_resume_agent_chat_body.go

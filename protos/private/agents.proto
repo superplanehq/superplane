@@ -81,7 +81,6 @@ message ChatUsage {
   int64 total_input_tokens = 1;
   int64 total_output_tokens = 2;
   int64 total_tokens = 3;
-  double total_estimated_cost_usd = 4;
 }
 
 message DescribeOrganizationAgentUsageRequest {

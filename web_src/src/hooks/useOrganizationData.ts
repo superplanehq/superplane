@@ -27,7 +27,6 @@ import {
   organizationsUpdateAgentSettings,
   organizationsSetAgentOpenAiKey,
   organizationsDeleteAgentOpenAiKey,
-  agentsDescribeAgentUsage,
 } from "../api-client/sdk.gen";
 import type { RolesCreateRoleRequest, AuthorizationDomainType, OrganizationsRemoveUserData } from "@/api-client";
 import { canvasKeys } from "./useCanvasData";
@@ -47,7 +46,6 @@ export const organizationKeys = {
   inviteLink: (orgId: string) => [...organizationKeys.all, "inviteLink", orgId] as const,
   agentSettings: (orgId: string) => [...organizationKeys.all, "agentSettings", orgId] as const,
   usage: (orgId: string) => [...organizationKeys.all, "usage", orgId] as const,
-  agentUsage: (orgId: string) => [...organizationKeys.all, "agentUsage", orgId] as const,
 };
 
 // Hooks for fetching data
@@ -224,19 +222,6 @@ export const useOrganizationUsage = (organizationId: string, enabled = true) => 
           path: { id: organizationId },
         }),
       );
-      return response.data || null;
-    },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
-    enabled: !!organizationId && enabled,
-  });
-};
-
-export const useAgentUsage = (organizationId: string, enabled = true) => {
-  return useQuery({
-    queryKey: organizationKeys.agentUsage(organizationId),
-    queryFn: async () => {
-      const response = await agentsDescribeAgentUsage(withOrganizationHeader({ organizationId }));
       return response.data || null;
     },
     staleTime: 30 * 1000,

@@ -1,13 +1,9 @@
 import { useMemo } from "react";
 import { Navigate } from "react-router-dom";
-import { Activity, Database, Gauge, Layers3, Sparkles, Users } from "lucide-react";
-import type {
-  AgentsDescribeAgentUsageResponse,
-  OrganizationsDescribeUsageResponse,
-  OrganizationsOrganizationLimits,
-} from "@/api-client/types.gen";
+import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
+import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useOrganizationUsage, useAgentUsage } from "@/hooks/useOrganizationData";
+import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -29,21 +25,12 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
-  const {
-    data: agentUsageData,
-    isLoading: isAgentUsageLoading,
-    error: agentUsageError,
-  } = useAgentUsage(organizationId);
   const forceUsagePage = isUsagePageForced();
   const isPreviewMode = forceUsagePage && data?.enabled !== true;
 
   const usageCards = useMemo(() => buildLimitCards(data?.limits), [data?.limits]);
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
   const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
-  const agentUsage = useMemo(
-    () => buildAgentUsage(agentUsageData, isAgentUsageLoading, agentUsageError),
-    [agentUsageData, isAgentUsageLoading, agentUsageError],
-  );
 
   if (isLoading) {
     return (
@@ -111,13 +98,6 @@ export function Usage({ organizationId }: UsageProps) {
           subtitle={eventUsage.subtitle}
           progress={eventUsage.progress}
           icon={Activity}
-        />
-        <UsageMetricCard
-          title="AI Agent Tokens"
-          value={agentUsage.value}
-          subtitle={agentUsage.subtitle}
-          progress={null}
-          icon={Sparkles}
         />
       </div>
 
@@ -310,33 +290,4 @@ function formatDaysLimit(value: number | undefined) {
 
 function isUnlimitedNumber(value: number | undefined) {
   return value === -1;
-}
-
-function buildAgentUsage(
-  data: AgentsDescribeAgentUsageResponse | null | undefined,
-  isLoading: boolean,
-  error: unknown,
-) {
-  if (isLoading) {
-    return { value: "—", subtitle: "Loading agent usage…" };
-  }
-
-  if (error) {
-    return { value: "Unavailable", subtitle: "Could not load agent usage data." };
-  }
-
-  const totalTokens = data?.usage?.totalTokens ? Number(data.usage.totalTokens) : 0;
-  const totalCost = data?.usage?.totalEstimatedCostUsd ?? 0;
-
-  const formattedTokens = totalTokens > 0 ? formatNumber(totalTokens) : "0";
-
-  const subtitle =
-    totalCost > 0
-      ? `~$${totalCost.toFixed(2)} estimated cost (Claude models only).`
-      : "Total tokens consumed across all agent chats.";
-
-  return {
-    value: `${formattedTokens} tokens`,
-    subtitle,
-  };
 }

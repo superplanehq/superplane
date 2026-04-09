@@ -8,7 +8,6 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import {
-  formatTokenCount,
   type AiBuilderMessage,
   type AiBuilderProposal,
   type AiChatSession,
@@ -269,11 +268,6 @@ function ConversationList({
                     <TimeAgo date={session.createdAt} className="shrink-0 text-[11px] tabular-nums text-slate-500" />
                   ) : null}
                 </div>
-                {session.totalTokens ? (
-                  <div className="mt-0.5 text-[11px] tabular-nums text-slate-400">
-                    {formatTokenCount(session.totalTokens)}
-                  </div>
-                ) : null}
               </button>
             );
           })}

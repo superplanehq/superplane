@@ -32,7 +32,6 @@ from ai.agent import AgentDeps, build_agent
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
-from ai.llm_cost_estimate import estimate_cost_usd_for_model
 from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
@@ -126,7 +125,7 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _record_usage(store: SessionStore, run_id: str, model: str, usage: RunUsage) -> None:
+def _record_usage(store: SessionStore, run_id: str, usage: RunUsage) -> None:
     try:
         store.update_run_usage(
             run_id=run_id,
@@ -135,7 +134,6 @@ def _record_usage(store: SessionStore, run_id: str, model: str, usage: RunUsage)
             cache_read_tokens=usage.cache_read_tokens or 0,
             cache_write_tokens=usage.cache_write_tokens or 0,
             total_tokens=usage.total_tokens or 0,
-            estimated_cost_usd=estimate_cost_usd_for_model(model, usage),
         )
     except Exception as error:
         print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
@@ -263,7 +261,7 @@ async def _stream_agent_run(
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
                 usage = result.usage()
-                _record_usage(store, run_id, payload.model, usage)
+                _record_usage(store, run_id, usage)
                 yield {
                     "type": "final_answer",
                     "output": output,
@@ -428,7 +426,7 @@ async def _stream_agent_run(
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
             usage = result.usage()
-            _record_usage(store, run_id, payload.model, usage)
+            _record_usage(store, run_id, usage)
             yield {
                 "type": "final_answer",
                 "output": output,

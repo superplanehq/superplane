@@ -21,10 +21,9 @@ var _ MappedNullable = &AgentsAgentChatInfo{}
 
 // AgentsAgentChatInfo struct for AgentsAgentChatInfo
 type AgentsAgentChatInfo struct {
-	Id             *string               `json:"id,omitempty"`
-	InitialMessage *string               `json:"initialMessage,omitempty"`
-	CreatedAt      *time.Time            `json:"createdAt,omitempty"`
-	Usage          *AgentsAgentChatUsage `json:"usage,omitempty"`
+	Id             *string    `json:"id,omitempty"`
+	InitialMessage *string    `json:"initialMessage,omitempty"`
+	CreatedAt      *time.Time `json:"createdAt,omitempty"`
 }
 
 // NewAgentsAgentChatInfo instantiates a new AgentsAgentChatInfo object
@@ -140,38 +139,6 @@ func (o *AgentsAgentChatInfo) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
-// GetUsage returns the Usage field value if set, zero value otherwise.
-func (o *AgentsAgentChatInfo) GetUsage() AgentsAgentChatUsage {
-	if o == nil || IsNil(o.Usage) {
-		var ret AgentsAgentChatUsage
-		return ret
-	}
-	return *o.Usage
-}
-
-// GetUsageOk returns a tuple with the Usage field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *AgentsAgentChatInfo) GetUsageOk() (*AgentsAgentChatUsage, bool) {
-	if o == nil || IsNil(o.Usage) {
-		return nil, false
-	}
-	return o.Usage, true
-}
-
-// HasUsage returns a boolean if a field has been set.
-func (o *AgentsAgentChatInfo) HasUsage() bool {
-	if o != nil && !IsNil(o.Usage) {
-		return true
-	}
-
-	return false
-}
-
-// SetUsage gets a reference to the given AgentsAgentChatUsage and assigns it to the Usage field.
-func (o *AgentsAgentChatInfo) SetUsage(v AgentsAgentChatUsage) {
-	o.Usage = &v
-}
-
 func (o AgentsAgentChatInfo) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -190,9 +157,6 @@ func (o AgentsAgentChatInfo) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt
-	}
-	if !IsNil(o.Usage) {
-		toSerialize["usage"] = o.Usage
 	}
 	return toSerialize, nil
 }

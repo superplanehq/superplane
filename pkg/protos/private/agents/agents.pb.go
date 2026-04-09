@@ -607,13 +607,12 @@ func (x *ChatInfo) GetUsage() *ChatUsage {
 }
 
 type ChatUsage struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	TotalInputTokens      int64                  `protobuf:"varint,1,opt,name=total_input_tokens,json=totalInputTokens,proto3" json:"total_input_tokens,omitempty"`
-	TotalOutputTokens     int64                  `protobuf:"varint,2,opt,name=total_output_tokens,json=totalOutputTokens,proto3" json:"total_output_tokens,omitempty"`
-	TotalTokens           int64                  `protobuf:"varint,3,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
-	TotalEstimatedCostUsd float64                `protobuf:"fixed64,4,opt,name=total_estimated_cost_usd,json=totalEstimatedCostUsd,proto3" json:"total_estimated_cost_usd,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TotalInputTokens  int64                  `protobuf:"varint,1,opt,name=total_input_tokens,json=totalInputTokens,proto3" json:"total_input_tokens,omitempty"`
+	TotalOutputTokens int64                  `protobuf:"varint,2,opt,name=total_output_tokens,json=totalOutputTokens,proto3" json:"total_output_tokens,omitempty"`
+	TotalTokens       int64                  `protobuf:"varint,3,opt,name=total_tokens,json=totalTokens,proto3" json:"total_tokens,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ChatUsage) Reset() {
@@ -663,13 +662,6 @@ func (x *ChatUsage) GetTotalOutputTokens() int64 {
 func (x *ChatUsage) GetTotalTokens() int64 {
 	if x != nil {
 		return x.TotalTokens
-	}
-	return 0
-}
-
-func (x *ChatUsage) GetTotalEstimatedCostUsd() float64 {
-	if x != nil {
-		return x.TotalEstimatedCostUsd
 	}
 	return 0
 }
@@ -808,12 +800,11 @@ const file_private_agents_proto_rawDesc = "" +
 	"\x0finitial_message\x18\x02 \x01(\tR\x0einitialMessage\x129\n" +
 	"\n" +
 	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
-	"\x05usage\x18\x04 \x01(\v2%.Superplane.Internal.Agents.ChatUsageR\x05usage\"\xc5\x01\n" +
+	"\x05usage\x18\x04 \x01(\v2%.Superplane.Internal.Agents.ChatUsageR\x05usage\"\x8c\x01\n" +
 	"\tChatUsage\x12,\n" +
 	"\x12total_input_tokens\x18\x01 \x01(\x03R\x10totalInputTokens\x12.\n" +
 	"\x13total_output_tokens\x18\x02 \x01(\x03R\x11totalOutputTokens\x12!\n" +
-	"\ftotal_tokens\x18\x03 \x01(\x03R\vtotalTokens\x127\n" +
-	"\x18total_estimated_cost_usd\x18\x04 \x01(\x01R\x15totalEstimatedCostUsd\">\n" +
+	"\ftotal_tokens\x18\x03 \x01(\x03R\vtotalTokens\">\n" +
 	"%DescribeOrganizationAgentUsageRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\tR\x05orgId\"e\n" +
 	"&DescribeOrganizationAgentUsageResponse\x12;\n" +

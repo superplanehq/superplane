@@ -9,7 +9,6 @@ CREATE TABLE agent_chat_runs (
     cache_read_tokens bigint NOT NULL DEFAULT 0,
     cache_write_tokens bigint NOT NULL DEFAULT 0,
     total_tokens bigint NOT NULL DEFAULT 0,
-    estimated_cost_usd double precision,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -21,7 +20,6 @@ ALTER TABLE agent_chat_messages
 ALTER TABLE agent_chats
     ADD COLUMN total_input_tokens bigint NOT NULL DEFAULT 0,
     ADD COLUMN total_output_tokens bigint NOT NULL DEFAULT 0,
-    ADD COLUMN total_tokens bigint NOT NULL DEFAULT 0,
-    ADD COLUMN total_estimated_cost_usd double precision NOT NULL DEFAULT 0;
+    ADD COLUMN total_tokens bigint NOT NULL DEFAULT 0;
 
 COMMIT;

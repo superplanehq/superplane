@@ -48,7 +48,6 @@ func serializeAgentChats(in []*internalpb.ChatInfo) []*pb.AgentChatInfo {
 		chat := &pb.AgentChatInfo{
 			Id:             c.Id,
 			InitialMessage: c.InitialMessage,
-			Usage:          serializeChatUsage(c.Usage),
 		}
 
 		if c.CreatedAt != nil {
@@ -59,17 +58,4 @@ func serializeAgentChats(in []*internalpb.ChatInfo) []*pb.AgentChatInfo {
 	}
 
 	return out
-}
-
-func serializeChatUsage(in *internalpb.ChatUsage) *pb.AgentChatUsage {
-	if in == nil {
-		return nil
-	}
-
-	return &pb.AgentChatUsage{
-		TotalInputTokens:      in.TotalInputTokens,
-		TotalOutputTokens:     in.TotalOutputTokens,
-		TotalTokens:           in.TotalTokens,
-		TotalEstimatedCostUsd: in.TotalEstimatedCostUsd,
-	}
 }

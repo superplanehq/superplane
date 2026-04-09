@@ -39,27 +39,6 @@ func Test__ListAgentChats(t *testing.T) {
 	})
 }
 
-func Test__SerializeChatUsage(t *testing.T) {
-	t.Run("returns nil for nil input", func(t *testing.T) {
-		assert.Nil(t, serializeChatUsage(nil))
-	})
-
-	t.Run("maps all fields", func(t *testing.T) {
-		in := &internalpb.ChatUsage{
-			TotalInputTokens:      10,
-			TotalOutputTokens:     20,
-			TotalTokens:           30,
-			TotalEstimatedCostUsd: 0.01,
-		}
-		out := serializeChatUsage(in)
-		require.NotNil(t, out)
-		assert.Equal(t, int64(10), out.TotalInputTokens)
-		assert.Equal(t, int64(20), out.TotalOutputTokens)
-		assert.Equal(t, int64(30), out.TotalTokens)
-		assert.InDelta(t, 0.01, out.TotalEstimatedCostUsd, 0.001)
-	})
-}
-
 func Test__SerializeAgentChats(t *testing.T) {
 	t.Run("skips nil entries", func(t *testing.T) {
 		result := serializeAgentChats([]*internalpb.ChatInfo{nil, {Id: "chat-1"}})
