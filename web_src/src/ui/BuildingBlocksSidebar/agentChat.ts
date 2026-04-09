@@ -89,8 +89,12 @@ function insertAiMessageBefore(
 function formatToolLabel(toolName: string): string {
   const normalized = toolName.trim().toLowerCase();
   const labelByTool: Record<string, string> = {
+    get_canvas: "Reading canvas",
     get_canvas_shape: "Reading canvas structure",
     get_canvas_details: "Reading canvas details",
+    get_node_details: "Reading node details",
+    list_node_events: "Listing node events",
+    list_node_executions: "Listing node executions",
     list_available_blocks: "Listing available components",
   };
   if (labelByTool[normalized]) {
