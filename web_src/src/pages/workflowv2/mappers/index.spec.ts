@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasNodeExecution, ComponentsNode } from "@/api-client";
+import { makeComponentsNode } from "@/test/factories";
 import { getExecutionDetails } from "./index";
 
 function makeNode(name: string): ComponentsNode {
-  return {
+  return makeComponentsNode({
     id: "node-1",
     component: { name },
-  } as ComponentsNode;
+  });
 }
 
 function makeExecution(): CanvasesCanvasNodeExecution {
