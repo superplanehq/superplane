@@ -285,6 +285,7 @@ function createAssistantStreamController({
         const hasExplicitCallId = typeof event.tool_call_id === "string" && event.tool_call_id.trim().length > 0;
 
         let effectiveEvent = event;
+        let wasCollapsed = false;
         if (event.type === "tool_started") {
           const finishedIdx = pendingToolEvents.findIndex((e) => {
             if (e.type !== "tool_finished") {
@@ -302,12 +303,13 @@ function createAssistantStreamController({
           });
           if (finishedIdx >= 0) {
             effectiveEvent = pendingToolEvents.splice(finishedIdx, 1)[0];
+            wasCollapsed = true;
           }
         }
 
         const isNewInsertion = applyToolEvent(effectiveEvent);
 
-        if (isNewInsertion) {
+        if (isNewInsertion || wasCollapsed) {
           await sleep(150);
         }
       }
