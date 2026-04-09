@@ -244,3 +244,24 @@
   color: transparent;
   animation: sp-ai-thinking-shimmer 1.4s linear infinite;
 }
+
+@keyframes sp-tool-enter {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+.sp-tool-enter {
+  display: grid;
+  animation: sp-tool-enter 0.2s ease-out both;
+}
+
+.sp-tool-enter > * {
+  overflow: hidden;
+  min-height: 0;
+}
