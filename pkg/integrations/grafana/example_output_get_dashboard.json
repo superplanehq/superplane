@@ -3,7 +3,7 @@
     "uid": "cIBgcSjkk",
     "title": "Production Overview",
     "slug": "production-overview",
-    "url": "/d/cIBgcSjkk/production-overview",
+    "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview",
     "folderTitle": "Platform",
     "folderUid": "fdg4m1rt63hj8q",
     "tags": ["production", "platform"],
