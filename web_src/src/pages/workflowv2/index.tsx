@@ -84,7 +84,7 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
+import { DefaultLayoutEngine } from "@/lib/layout";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import {
   buildRunEntryFromEvent,
@@ -1453,10 +1453,11 @@ export function WorkflowPageV2() {
         return workflow;
       }
 
-      return applyHorizontalAutoLayout(workflow, {
+      return DefaultLayoutEngine.apply(workflow, {
         scope: "connected-component",
         nodeIds: [nodeID],
-        channelsByNodeId: buildChannelsByNodeId(workflow, components, blueprints),
+        components,
+        blueprints,
       });
     },
     [isAutoLayoutOnUpdateEnabled, components, blueprints],
@@ -3215,20 +3216,19 @@ export function WorkflowPageV2() {
       }
 
       saveWorkflowSnapshot(latestWorkflow);
-      const builder = new CanvasBuilder(latestWorkflow, buildingBlocks, integrations);
-      const updatedWorkflow = builder.apply(operations);
+      const builder = new CanvasBuilder({
+        canvas: latestWorkflow,
+        buildingBlocks,
+        integrations,
+        components,
+        blueprints,
+      });
+      const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
 
       const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
-      const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])
+      const aiAddedNodeIds = (finalWorkflow.spec?.nodes || [])
         .map((node) => node.id)
         .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
-
-      let finalWorkflow = updatedWorkflow;
-      if (aiAddedNodeIds.length > 0) {
-        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow, {
-          channelsByNodeId: buildChannelsByNodeId(updatedWorkflow, components, blueprints),
-        });
-      }
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
@@ -3244,9 +3244,9 @@ export function WorkflowPageV2() {
       canAutoSave,
       canvas,
       canvasId,
+      handleSaveWorkflow,
       components,
       blueprints,
-      handleSaveWorkflow,
       markUnsavedChange,
       integrations,
       organizationId,
@@ -3582,10 +3582,11 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(canvas);
 
-      const updatedWorkflow = await applyHorizontalAutoLayout(canvas, {
+      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
         nodeIds,
         scope: "connected-component",
-        channelsByNodeId: buildChannelsByNodeId(canvas, components, blueprints),
+        components,
+        blueprints,
       });
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
