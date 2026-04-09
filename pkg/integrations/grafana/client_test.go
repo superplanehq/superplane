@@ -237,6 +237,102 @@ func Test__Client__ListDataSources(t *testing.T) {
 	require.Equal(t, "Prometheus", dataSources[0].Name)
 }
 
+func Test__dashboardURLPathSlug(t *testing.T) {
+	require.Equal(t, "my-slug", dashboardURLPathSlug(&DashboardDetails{Slug: "my-slug", UID: "abc"}))
+	require.Equal(t, "abc", dashboardURLPathSlug(&DashboardDetails{Slug: "", UID: "abc"}))
+	require.Equal(t, "abc", dashboardURLPathSlug(&DashboardDetails{Slug: "   ", UID: "abc"}))
+	require.Equal(t, "dashboard", dashboardURLPathSlug(&DashboardDetails{Slug: "", UID: ""}))
+	require.Equal(t, "dashboard", dashboardURLPathSlug(nil))
+}
+
+func Test__Client__RenderPanelURL(t *testing.T) {
+	client := &Client{BaseURL: "https://grafana.example.com/"}
+
+	got := client.RenderPanelURL("cIBgcSjkk", "production-overview", 2, 1000, 500, "now-1h", "now")
+
+	require.Equal(
+		t,
+		"https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?from=now-1h&height=500&panelId=2&to=now&tz=UTC&width=1000",
+		got,
+	)
+}
+
+func Test__Client__GetDashboard__BuildsAbsoluteDashboardURL(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"dashboard": {
+						"uid": "abc123",
+						"title": "Production Overview",
+						"tags": ["prod"],
+						"panels": [{"id": 1, "title": "CPU", "type": "timeseries"}]
+					},
+					"meta": {
+						"slug": "production-overview",
+						"url": "/d/abc123/production-overview",
+						"folderTitle": "Operations",
+						"folderUid": "ops"
+					}
+				}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	dashboard, err := client.GetDashboard("abc123")
+	require.NoError(t, err)
+	require.Equal(t, "https://grafana.example.com/d/abc123/production-overview", dashboard.URL)
+	require.Equal(t, "Production Overview", dashboard.Title)
+	require.Len(t, dashboard.Panels, 1)
+}
+
+func Test__Client__SearchDashboards__ResolvesRelativeURLs(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"uid":"a","title":"A","url":"/d/a/slug-a","type":"dash-db"},
+					{"uid":"b","title":"B","url":"https://other.example/d/b/slug","type":"dash-db"}
+				]`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	hits, err := client.SearchDashboards("", "", "", 0)
+	require.NoError(t, err)
+	require.Len(t, hits, 2)
+	require.Equal(t, "https://grafana.example.com/d/a/slug-a", hits[0].URL)
+	require.Equal(t, "https://other.example/d/b/slug", hits[1].URL)
+}
+
+func Test__collectDashboardPanelSummaries__nestedUnderRows(t *testing.T) {
+	raw := []json.RawMessage{
+		json.RawMessage(`{"id":10,"title":"Resources","type":"row","panels":[{"id":1,"title":"CPU","type":"timeseries"},{"id":2,"title":"Memory","type":"timeseries"}]}`),
+		json.RawMessage(`{"id":3,"title":"Standalone","type":"gauge"}`),
+	}
+	got := collectDashboardPanelSummaries(raw)
+	require.Len(t, got, 3)
+	require.Equal(t, 1, got[0].ID)
+	require.Equal(t, "CPU", got[0].Title)
+	require.Equal(t, "timeseries", got[0].Type)
+	require.Equal(t, 2, got[1].ID)
+	require.Equal(t, 3, got[2].ID)
+}
+
 func Test__Grafana__ListResources(t *testing.T) {
 	g := &Grafana{}
 
@@ -281,6 +377,48 @@ func Test__Grafana__ListResources(t *testing.T) {
 		require.Equal(t, "Prometheus", resources[0].Name)
 		require.Equal(t, "prom", resources[0].ID)
 		require.Equal(t, resourceTypeDataSource, resources[0].Type)
+	})
+
+	t.Run("panel returns dashboard panels for selected dashboard", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"dashboard": {
+							"uid": "abc123",
+							"title": "Production Overview",
+							"panels": [
+								{"id": 1, "title": "CPU", "type": "timeseries"},
+								{"id": 2, "title": "", "type": "stat"}
+							]
+						},
+						"meta": {
+							"slug": "production-overview",
+							"url": "/d/abc123/production-overview"
+						}
+					}`)),
+				},
+			},
+		}
+
+		resources, err := g.ListResources(resourceTypePanel, core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"baseURL":  "https://grafana.example.com",
+					"apiToken": "token",
+				},
+			},
+			Parameters: map[string]string{"dashboardUid": "abc123"},
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		require.Equal(t, "CPU (Panel 1)", resources[0].Name)
+		require.Equal(t, "1", resources[0].ID)
+		require.Equal(t, resourceTypePanel, resources[0].Type)
+		require.Equal(t, "Panel 2", resources[1].Name)
+		require.Equal(t, "2", resources[1].ID)
 	})
 }
 

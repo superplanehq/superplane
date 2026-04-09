@@ -2,7 +2,7 @@
 title: "Grafana"
 ---
 
-Connect Grafana alerts and data queries to SuperPlane workflows
+Connect Grafana alerts, dashboards, and data queries to SuperPlane workflows
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -15,7 +15,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Dashboard Share Link" href="#create-dashboard-share-link" description="Construct a shareable URL for a Grafana dashboard or panel" />
+  <LinkCard title="Get Dashboard" href="#get-dashboard" description="Retrieve a Grafana dashboard by UID" />
   <LinkCard title="Query Data Source" href="#query-data-source" description="Execute a query against a Grafana data source and return the result" />
+  <LinkCard title="Render Panel" href="#render-panel" description="Construct a Grafana image render URL for a dashboard panel" />
+  <LinkCard title="Search Dashboards" href="#search-dashboards" description="Search Grafana dashboards by title, folder, or tag" />
 </CardGrid>
 
 ## Instructions
@@ -85,6 +89,101 @@ The trigger emits the full Grafana webhook payload, including:
 }
 ```
 
+<a id="create-dashboard-share-link"></a>
+
+## Create Dashboard Share Link
+
+The Create Dashboard Share Link component constructs a shareable URL for a Grafana dashboard or panel.
+
+### Use Cases
+
+- **Incident response**: include a direct link to the relevant dashboard in notifications or tickets
+- **Workflow enrichment**: embed dashboard links in Slack messages, Jira issues, or approval steps
+- **Panel deep links**: link directly to a specific panel with a preset time range
+
+### Configuration
+
+- **Dashboard**: The Grafana dashboard UID for the share link
+- **Panel**: If set, link opens the dashboard at this specific panel
+- **From**: Optional expression for the start of the time range (e.g. `now() - duration("1h")`)
+- **To**: Optional expression for the end of the time range (e.g. `now()`)
+
+### Output
+
+Returns the constructed shareable URL along with the dashboard title and UID.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dashboardTitle": "Production Overview",
+    "dashboardUid": "cIBgcSjkk",
+    "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview?viewPanel=2"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.dashboard.shareLink"
+}
+```
+
+<a id="get-dashboard"></a>
+
+## Get Dashboard
+
+The Get Dashboard component fetches a Grafana dashboard using the Grafana Dashboards HTTP API.
+
+### Use Cases
+
+- **Dashboard inspection**: retrieve current dashboard configuration for review or downstream use
+- **Workflow enrichment**: include dashboard details in notifications, tickets, or approvals
+- **Panel discovery**: list panels available in a dashboard for subsequent rendering or linking
+
+### Configuration
+
+- **Dashboard**: The Grafana dashboard UID to retrieve
+
+### Output
+
+Returns the Grafana dashboard object, including title, slug, URL, folder, tags, and panel summaries.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "folderTitle": "Platform",
+    "folderUid": "fdg4m1rt63hj8q",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "timeseries"
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "timeseries"
+      },
+      {
+        "id": 3,
+        "title": "P99 Latency",
+        "type": "gauge"
+      }
+    ],
+    "slug": "production-overview",
+    "tags": [
+      "production",
+      "platform"
+    ],
+    "title": "Production Overview",
+    "uid": "cIBgcSjkk",
+    "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.dashboard"
+}
+```
+
 <a id="query-data-source"></a>
 
 ## Query Data Source
@@ -101,8 +200,8 @@ The Query Data Source component executes a query against a Grafana data source u
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional expressions for the query range (for example `now() - duration("5m")` and `now()`)
+- **Timezone**: Interprets datetime-local expression results using the selected timezone offset
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -150,6 +249,102 @@ Returns the Grafana query API response JSON.
   },
   "timestamp": "2026-02-12T16:18:03.362582388Z",
   "type": "grafana.query.result"
+}
+```
+
+<a id="render-panel"></a>
+
+## Render Panel
+
+The Render Panel component constructs a Grafana image render URL for a dashboard panel using the Grafana Image Renderer.
+
+### Use Cases
+
+- **Incident snapshots**: attach or link a rendered panel image in tickets or notifications
+- **Scheduled reports**: generate a reusable render URL for panel snapshots
+- **Workflow enrichment**: pass a compact panel image URL through workflow steps
+
+### Configuration
+
+- **Dashboard**: The Grafana dashboard containing the panel to render
+- **Panel**: The panel to render
+- **Width**: Image width in pixels (default 1000)
+- **Height**: Image height in pixels (default 500)
+- **From**: Optional expression for the start of the time range (e.g. `now() - duration("1h")`)
+- **To**: Optional expression for the end of the time range (e.g. `now()`)
+
+### Output
+
+Returns the Grafana render URL along with the dashboard UID and panel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dashboardUid": "cIBgcSjkk",
+    "panelId": 2,
+    "url": "https://grafana.example.com/render/d-solo/cIBgcSjkk/production-overview?panelId=2\u0026width=1000\u0026height=500\u0026tz=UTC"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.panel.image"
+}
+```
+
+<a id="search-dashboards"></a>
+
+## Search Dashboards
+
+The Search Dashboards component searches Grafana dashboards using the Grafana Search HTTP API.
+
+### Use Cases
+
+- **Dashboard discovery**: find dashboards by title, folder, or tag for downstream automation
+- **Workflow enrichment**: include dashboard lists in notifications, tickets, or approval steps
+- **Audit and inventory**: enumerate dashboards matching specific criteria for review or cleanup
+
+### Configuration
+
+- **Query**: Optional title filter for dashboards
+- **Folder**: Optional folder to filter dashboards by
+- **Tag**: Optional tag to filter dashboards by
+- **Limit**: Optional maximum number of dashboards to return
+
+### Output
+
+Returns an object containing the list of matching Grafana dashboard summaries, including each dashboard UID, title, URL, folder, and tags.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "dashboards": [
+      {
+        "folderTitle": "Platform",
+        "folderUid": "fdg4m1rt63hj8q",
+        "tags": [
+          "production",
+          "platform"
+        ],
+        "title": "Production Overview",
+        "uid": "cIBgcSjkk",
+        "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview"
+      },
+      {
+        "folderTitle": "Platform",
+        "folderUid": "fdg4m1rt63hj8q",
+        "tags": [
+          "latency"
+        ],
+        "title": "Service Latency",
+        "uid": "dJChfTmkk",
+        "url": "https://grafana.example.com/d/dJChfTmkk/service-latency"
+      }
+    ]
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.dashboards"
 }
 ```
 
