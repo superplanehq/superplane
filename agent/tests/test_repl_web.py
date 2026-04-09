@@ -20,6 +20,7 @@ import ai.repl_web as repl_web
 import repl.main as repl_main
 from ai.models import CanvasQuestionRequest
 from ai.session_store import AgentChatNotFoundError
+from ai.usage_publisher import NoopUsagePublisher
 from ai.web import WebServer, WebServerConfig, create_app
 from repl.main import _parse_stream_event, _resolve_stream_url, _stream_repl_answer
 
@@ -193,7 +194,12 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
     monkeypatch.setattr(repl_web, "_run_stream_events", fake_run_stream_events)
 
     request = SimpleNamespace(
-        app=SimpleNamespace(state=SimpleNamespace(session_store=store)),
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                session_store=store,
+                publisher=NoopUsagePublisher(),
+            )
+        ),
         headers={},
     )
 
