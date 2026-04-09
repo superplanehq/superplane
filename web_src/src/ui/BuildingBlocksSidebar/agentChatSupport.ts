@@ -163,11 +163,12 @@ function formatElapsedMs(ms: number): string {
     return "< 1ms";
   }
 
-  if (ms >= 1000) {
+  const rounded = Math.round(ms);
+  if (rounded >= 1000) {
     return `${(ms / 1000).toFixed(1)}s`;
   }
 
-  return `${Math.round(ms)}ms`;
+  return `${rounded}ms`;
 }
 
 function createToolCallId(toolName: string, toolCallId?: string): string {
@@ -239,7 +240,11 @@ function createAssistantStreamController({
           : toolLabel;
     const toolStatus = event.type === "tool_started" ? "running" : "completed";
 
-    let didInsertNew = false;
+    const isAlreadyTracked = flushedToolCallIds.has(toolCallId);
+    const isNameBasedUpdate = !isAlreadyTracked && event.type === "tool_finished" && !hasExplicitCallId;
+    const isNewInsertion = !isAlreadyTracked && !isNameBasedUpdate;
+
+    flushedToolCallIds.add(toolCallId);
 
     setAiMessages((previous) => {
       let existingIndex = previous.findIndex((message) => message.role === "tool" && message.toolCallId === toolCallId);
@@ -257,8 +262,6 @@ function createAssistantStreamController({
         return trimAiMessages(updated);
       }
 
-      didInsertNew = true;
-      flushedToolCallIds.add(toolCallId);
       return insertAiMessageBefore(
         previous,
         { id: `tool-${toolCallId}`, role: "tool", content, toolCallId, toolStatus },
@@ -266,7 +269,7 @@ function createAssistantStreamController({
       );
     });
 
-    return didInsertNew;
+    return isNewInsertion;
   };
 
   const flushPendingToolEvents = async () => {
