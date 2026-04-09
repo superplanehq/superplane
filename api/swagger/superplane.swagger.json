@@ -6391,6 +6391,10 @@
         "maxIntegrations": {
           "type": "integer",
           "format": "int32"
+        },
+        "maxAgentTokensPerMonth": {
+          "type": "string",
+          "format": "int64"
         }
       }
     },
@@ -6439,6 +6443,22 @@
           "format": "date-time"
         },
         "nextEventBucketDecreaseAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "agentTokenBucketLevel": {
+          "type": "number",
+          "format": "double"
+        },
+        "agentTokenBucketCapacity": {
+          "type": "number",
+          "format": "double"
+        },
+        "agentTokenBucketLastUpdatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "nextAgentTokenBucketDecreaseAt": {
           "type": "string",
           "format": "date-time"
         }
