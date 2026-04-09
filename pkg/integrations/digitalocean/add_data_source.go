@@ -265,7 +265,7 @@ func (a *AddDataSource) HandleAction(ctx core.ActionContext) error {
 
 	job := kb.LastIndexingJob
 	switch indexingJobState(job.Status) {
-	case "completed", "successful", "no_changes", "partial":
+	case "completed", "successful", "no_changes":
 		meta.Output["indexingJob"] = map[string]any{
 			"status":               job.Status,
 			"totalTokens":          job.TotalTokens,
@@ -281,7 +281,7 @@ func (a *AddDataSource) HandleAction(ctx core.ActionContext) error {
 		)
 	case "running", "pending":
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
-	case "failed", "cancelled":
+	case "failed", "cancelled", "partial":
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("indexing job %s for knowledge base %s: %s", job.UUID, meta.KBUUID, job.Status))
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, addDSPollInterval)
