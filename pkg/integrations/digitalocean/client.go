@@ -2840,6 +2840,7 @@ func (c *Client) GetEvaluationRunResults(runUUID string) (*EvaluationRunResults,
 
 	return &response, nil
 }
+
 // AppNodeMetadata stores metadata about an app for display in the UI
 type AppNodeMetadata struct {
 	AppID   string `json:"appId" mapstructure:"appId"`
