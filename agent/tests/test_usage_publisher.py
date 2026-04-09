@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai.usage_publisher import publish_agent_tokens_used
+from ai.usage_publisher import publish_agent_run_finished
 from private import agents_pb2
 
 
@@ -20,19 +20,24 @@ def test_publish_serializes_protobuf_correctly() -> None:
         mock_pika.URLParameters.return_value = "params"
         mock_pika.BlockingConnection.return_value = mock_connection
         mock_connection.channel.return_value = mock_channel
+        mock_connection.is_closed = False
 
         def capture_publish(**kwargs: object) -> None:
             published_bodies.append(kwargs["body"])  # type: ignore[arg-type]
 
         mock_channel.basic_publish.side_effect = capture_publish
 
-        publish_agent_tokens_used("org-123", 500)
+        publish_agent_run_finished("org-123", "chat-456", "claude-sonnet-4-6", 100, 300, 500)
 
     assert len(published_bodies) == 1
-    parsed = agents_pb2.AgentTokensUsedMessage()  # type: ignore[attr-defined]
+    parsed = agents_pb2.AgentRunFinishedMessage()  # type: ignore[attr-defined]
     parsed.ParseFromString(published_bodies[0])
     assert parsed.organization_id == "org-123"
-    assert parsed.tokens == 500
+    assert parsed.chat_id == "chat-456"
+    assert parsed.model == "claude-sonnet-4-6"
+    assert parsed.input_tokens == 100
+    assert parsed.output_tokens == 300
+    assert parsed.total_tokens == 500
 
 
 def test_publish_uses_correct_exchange_and_routing_key() -> None:
@@ -46,8 +51,9 @@ def test_publish_uses_correct_exchange_and_routing_key() -> None:
         mock_pika.URLParameters.return_value = "params"
         mock_pika.BlockingConnection.return_value = mock_connection
         mock_connection.channel.return_value = mock_channel
+        mock_connection.is_closed = False
 
-        publish_agent_tokens_used("org-456", 100)
+        publish_agent_run_finished("org-456", "chat-1", "test", 10, 20, 100)
 
     mock_channel.exchange_declare.assert_called_once_with(
         exchange="superplane.agent-exchange", exchange_type="topic", durable=True
@@ -55,7 +61,7 @@ def test_publish_uses_correct_exchange_and_routing_key() -> None:
     mock_channel.basic_publish.assert_called_once()
     call_kwargs = mock_channel.basic_publish.call_args[1]
     assert call_kwargs["exchange"] == "superplane.agent-exchange"
-    assert call_kwargs["routing_key"] == "agent-tokens-used"
+    assert call_kwargs["routing_key"] == "agent-run-finished"
 
 
 def test_publish_skips_when_no_rabbitmq_url() -> None:
@@ -65,20 +71,20 @@ def test_publish_skips_when_no_rabbitmq_url() -> None:
     ):
         mock_config.rabbitmq_url = ""
 
-        publish_agent_tokens_used("org-123", 500)
+        publish_agent_run_finished("org-123", "chat-1", "test", 10, 20, 500)
 
     mock_pika.BlockingConnection.assert_not_called()
 
 
-def test_publish_skips_when_tokens_zero_or_negative() -> None:
+def test_publish_skips_when_total_tokens_zero_or_negative() -> None:
     with (
         patch("ai.usage_publisher.config") as mock_config,
         patch("ai.usage_publisher.pika") as mock_pika,
     ):
         mock_config.rabbitmq_url = "amqp://guest:guest@localhost:5672"
 
-        publish_agent_tokens_used("org-123", 0)
-        publish_agent_tokens_used("org-123", -10)
+        publish_agent_run_finished("org-123", "chat-1", "test", 0, 0, 0)
+        publish_agent_run_finished("org-123", "chat-1", "test", 0, 0, -10)
 
     mock_pika.BlockingConnection.assert_not_called()
 
@@ -92,7 +98,7 @@ def test_publish_fails_silently_on_connection_error(capsys: pytest.CaptureFixtur
         mock_pika.URLParameters.return_value = "params"
         mock_pika.BlockingConnection.side_effect = ConnectionError("refused")
 
-        publish_agent_tokens_used("org-123", 500)
+        publish_agent_run_finished("org-123", "chat-1", "test", 10, 20, 500)
 
     captured = capsys.readouterr()
-    assert "failed to publish agent token usage" in captured.out
+    assert "failed to publish agent run finished" in captured.out
