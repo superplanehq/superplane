@@ -39,8 +39,8 @@ from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentCh
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
-from ai.usage_publisher import publish_agent_tokens_used
 from ai.text import normalize_optional
+from ai.usage_publisher import publish_agent_tokens_used
 
 
 @dataclass(frozen=True)
@@ -433,7 +433,7 @@ async def _stream_agent_run(
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
             usage = result.usage()
-            _record_usage(store, run_id, usage)
+            _record_usage(store, run_id, usage, chat.org_id)
             record_agent_run_tokens(usage)
             yield {
                 "type": "final_answer",

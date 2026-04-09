@@ -28,7 +28,7 @@ def test_publish_serializes_protobuf_correctly() -> None:
         publish_agent_tokens_used("org-123", 500)
 
     assert len(published_bodies) == 1
-    parsed = agents_pb2.AgentTokensUsedMessage()
+    parsed = agents_pb2.AgentTokensUsedMessage()  # type: ignore[attr-defined]
     parsed.ParseFromString(published_bodies[0])
     assert parsed.organization_id == "org-123"
     assert parsed.tokens == 500

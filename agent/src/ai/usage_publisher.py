@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import pika
-import pika.exceptions
+import pika  # type: ignore[import-untyped]
+import pika.exceptions  # type: ignore[import-untyped]
 
 from ai.config import config
 from private import agents_pb2
@@ -25,7 +25,7 @@ def publish_agent_tokens_used(organization_id: str, tokens: int) -> None:
         return
 
     try:
-        message = agents_pb2.AgentTokensUsedMessage(
+        message = agents_pb2.AgentTokensUsedMessage(  # type: ignore[attr-defined]
             organization_id=organization_id,
             tokens=tokens,
         )
