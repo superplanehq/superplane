@@ -26,8 +26,12 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
-  const { data: users } = useOrganizationUsers(organizationId);
-  const { data: integrations } = useConnectedIntegrations(organizationId);
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useOrganizationUsers(organizationId);
+  const {
+    data: integrations,
+    isLoading: isLoadingIntegrations,
+    error: integrationsError,
+  } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
   const isPreviewMode = forceUsagePage && data?.enabled !== true;
 
@@ -40,7 +44,7 @@ export function Usage({ organizationId }: UsageProps) {
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
   const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
-  if (isLoading) {
+  if (isLoading || isLoadingUsers || isLoadingIntegrations) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -50,13 +54,14 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  if (error) {
+  if (error || usersError || integrationsError) {
+    const displayError = error || usersError || integrationsError;
     return (
       <div className="pt-6">
         <Alert variant="destructive">
           <Gauge className="h-4 w-4" />
           <AlertTitle>Unable to load usage</AlertTitle>
-          <AlertDescription>{error instanceof Error ? error.message : "Unknown error"}</AlertDescription>
+          <AlertDescription>{displayError instanceof Error ? displayError.message : "Unknown error"}</AlertDescription>
         </Alert>
       </div>
     );
