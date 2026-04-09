@@ -131,9 +131,9 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         system_prompt=load_system_prompt(),
         model_settings=ModelSettings(
             parallel_tool_calls=True,
-            anthropic_cache_instructions=True,
+            anthropic_cache_instructions="1h",
             anthropic_cache_tool_definitions="1h",
-            anthropic_cache_messages=True,
+            anthropic_cache_messages=True
         )
     )
 

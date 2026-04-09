@@ -5,6 +5,9 @@ Rates for **Claude 4.6 / 4.5** family models only (Opus, Sonnet, Haiku) from the
 Source: https://platform.claude.com/docs/en/about-claude/pricing
 
 This is an **approximation**:
+- Assumes ``cache_write_tokens`` are billed at the 5-minute cache write multiplier (1.25× base
+  input) when non-zero; 1-hour writes cost more in reality.
+- ``cache_read_tokens`` use the cache hit rate (0.1× base input), per Anthropic's table.
 - Other providers and OpenRouter-style model strings are not priced here (returns ``None``).
 - Batch, long-context premiums, fast mode, server-side tools, etc. are not modeled.
 """
@@ -80,14 +83,20 @@ def estimate_claude_cost_usd(usage: RunUsage, rates: ClaudeUsdPerMillion) -> flo
     m = 1_000_000.0
     cache_read = int(getattr(usage, "cache_read_tokens", 0) or 0)
     cache_write = int(getattr(usage, "cache_write_tokens", 0) or 0)
-    input_total = int(usage.input_tokens)
-    output_tokens = int(usage.output_tokens)
+    input_total = int(getattr(usage, "input_tokens", 0) or 0)
+    output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
 
-    cost = input_total * rates.input_base / m
+    # Avoid double billing when input_tokens already equals uncached + cache_read + cache_write.
+    remainder = input_total - cache_read - cache_write
+    if cache_read or cache_write:
+        uncached_input = remainder if remainder >= 0 else input_total
+    else:
+        uncached_input = input_total
+
+    cost = uncached_input * rates.input_base / m
     cost += output_tokens * rates.output / m
     cost += cache_read * (0.1 * rates.input_base) / m
     cost += cache_write * (1.25 * rates.input_base) / m
-
     return cost
 
 
