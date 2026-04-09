@@ -3,7 +3,8 @@ import { Navigate } from "react-router-dom";
 import { Activity, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -25,10 +26,17 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  const { data: users } = useOrganizationUsers(organizationId);
+  const { data: integrations } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
   const isPreviewMode = forceUsagePage && data?.enabled !== true;
 
-  const usageCards = useMemo(() => buildLimitCards(data?.limits), [data?.limits]);
+  const memberCount = users?.length ?? 0;
+  const integrationCount = integrations?.length ?? 0;
+  const usageCards = useMemo(
+    () => buildLimitCards(data?.limits, memberCount, integrationCount),
+    [data?.limits, memberCount, integrationCount],
+  );
   const eventUsage = useMemo(() => buildEventUsage(data), [data]);
   const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
@@ -180,7 +188,8 @@ function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undef
   const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
   const nextDecreaseAt = data?.usage?.nextEventBucketDecreaseAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited ? "∞" : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
+  const capacityLabel = isUnlimited ? "∞" : formatNumber(capacity ?? 0);
+  const value = `${formatNumber(displayedLevel)} / ${capacityLabel}`;
 
   return {
     value,
@@ -201,7 +210,15 @@ function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: strin
   return "Rolling event usage for the current 30-day window.";
 }
 
-function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
+function formatCountWithLimit(count: number, limit: number | undefined) {
+  return `${formatNumber(count)} / ${formatNumericLimit(limit)}`;
+}
+
+function buildLimitCards(
+  limits: OrganizationsOrganizationLimits | undefined,
+  memberCount: number,
+  integrationCount: number,
+): LimitCard[] {
   return [
     {
       label: "Nodes per canvas",
@@ -211,13 +228,13 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
     },
     {
       label: "Members",
-      value: formatNumericLimit(limits?.maxUsers),
+      value: formatCountWithLimit(memberCount, limits?.maxUsers),
       icon: Users,
       description: "Maximum users allowed in the organization.",
     },
     {
       label: "Integrations",
-      value: formatNumericLimit(limits?.maxIntegrations),
+      value: formatCountWithLimit(integrationCount, limits?.maxIntegrations),
       icon: Database,
       description: "Maximum connected integrations for the organization.",
     },
