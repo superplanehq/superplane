@@ -3,7 +3,8 @@ import { Navigate } from "react-router-dom";
 import { Activity, Cpu, Database, Gauge, Layers3, Users } from "lucide-react";
 import type { OrganizationsDescribeUsageResponse, OrganizationsOrganizationLimits } from "@/api-client/types.gen";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { useOrganizationUsage, useOrganizationUsers } from "@/hooks/useOrganizationData";
+import { useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { isUsagePageForced } from "@/lib/env";
 import { EmptyState } from "@/ui/emptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
@@ -25,15 +26,17 @@ export function Usage({ organizationId }: UsageProps) {
   usePageTitle(["Usage"]);
 
   const { data, isLoading, error } = useOrganizationUsage(organizationId);
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useOrganizationUsers(organizationId);
+  const {
+    data: integrations,
+    isLoading: isLoadingIntegrations,
+    error: integrationsError,
+  } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
-  const isPreviewMode = forceUsagePage && data?.enabled !== true;
+  const anyLoading = [isLoading, isLoadingUsers, isLoadingIntegrations].some(Boolean);
+  const anyError = [error, usersError, integrationsError].find(Boolean);
 
-  const usageCards = useMemo(() => buildLimitCards(data?.limits), [data?.limits]);
-  const eventUsage = useMemo(() => buildEventUsage(data), [data]);
-  const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
-  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
-
-  if (isLoading) {
+  if (anyLoading) {
     return (
       <div className="pt-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-800 p-6">
@@ -43,13 +46,13 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  if (error) {
+  if (anyError) {
     return (
       <div className="pt-6">
         <Alert variant="destructive">
           <Gauge className="h-4 w-4" />
           <AlertTitle>Unable to load usage</AlertTitle>
-          <AlertDescription>{error instanceof Error ? error.message : "Unknown error"}</AlertDescription>
+          <AlertDescription>{anyError instanceof Error ? anyError.message : "Unknown error"}</AlertDescription>
         </Alert>
       </div>
     );
@@ -72,6 +75,38 @@ export function Usage({ organizationId }: UsageProps) {
   if (!data.enabled && !forceUsagePage) {
     return <Navigate to={`/${organizationId}/settings/general`} replace />;
   }
+
+  const memberCount = users ? users.length : 0;
+  const integrationCount = integrations ? integrations.length : 0;
+
+  return (
+    <UsageContent
+      data={data}
+      isPreviewMode={forceUsagePage && data.enabled !== true}
+      memberCount={memberCount}
+      integrationCount={integrationCount}
+    />
+  );
+}
+
+function UsageContent({
+  data,
+  isPreviewMode,
+  memberCount,
+  integrationCount,
+}: {
+  data: OrganizationsDescribeUsageResponse;
+  isPreviewMode: boolean;
+  memberCount: number;
+  integrationCount: number;
+}) {
+  const usageCards = useMemo(
+    () => buildLimitCards(data.limits, memberCount, integrationCount),
+    [data.limits, memberCount, integrationCount],
+  );
+  const eventUsage = useMemo(() => buildEventUsage(data), [data]);
+  const agentTokenUsage = useMemo(() => buildAgentTokenUsage(data), [data]);
+  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
   return (
     <div className="pt-6 space-y-6">
@@ -241,7 +276,15 @@ function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: strin
   return "Rolling event usage for the current 30-day window.";
 }
 
-function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): LimitCard[] {
+function formatCountWithLimit(count: number, limit: number | undefined) {
+  return `${formatNumber(count)} / ${formatNumericLimit(limit)}`;
+}
+
+function buildLimitCards(
+  limits: OrganizationsOrganizationLimits | undefined,
+  memberCount: number,
+  integrationCount: number,
+): LimitCard[] {
   return [
     {
       label: "Nodes per canvas",
@@ -251,13 +294,13 @@ function buildLimitCards(limits: OrganizationsOrganizationLimits | undefined): L
     },
     {
       label: "Members",
-      value: formatNumericLimit(limits?.maxUsers),
+      value: formatCountWithLimit(memberCount, limits?.maxUsers),
       icon: Users,
       description: "Maximum users allowed in the organization.",
     },
     {
       label: "Integrations",
-      value: formatNumericLimit(limits?.maxIntegrations),
+      value: formatCountWithLimit(integrationCount, limits?.maxIntegrations),
       icon: Database,
       description: "Maximum connected integrations for the organization.",
     },

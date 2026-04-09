@@ -63,7 +63,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import type { AiCanvasOperation, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -83,6 +83,7 @@ import { IntegrationStatusIndicator, type MissingIntegration } from "../Integrat
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { Sentry } from "@/sentry";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import type { CanvasOperation } from "@/lib/ai";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -281,7 +282,7 @@ export interface CanvasPageProps {
   buildingBlocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
