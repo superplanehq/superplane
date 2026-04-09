@@ -512,8 +512,9 @@ class SessionStore:
                         WHERE updated_at < NOW() - make_interval(days => %s)
                         LIMIT %s
                     )
+                    AND updated_at < NOW() - make_interval(days => %s)
                     """,
-                    (retention_days, batch_size),
+                    (retention_days, batch_size, retention_days),
                 )
                 deleted = int(cur.rowcount)
                 total += deleted

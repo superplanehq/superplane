@@ -246,7 +246,7 @@ def test_delete_expired_chats_uses_batched_query(monkeypatch: pytest.MonkeyPatch
     sql, params = mock_cursor.execute.call_args.args
     assert "DELETE FROM agent_chats" in sql
     assert "LIMIT" in sql
-    assert params == (14, 500)
+    assert params == (14, 500, 14)
 
 
 def test_delete_expired_chats_loops_until_batch_underflows(
