@@ -10,9 +10,10 @@ def test_publish_serializes_protobuf_correctly() -> None:
     """Verify the published body can be deserialized back into the proto message."""
     published_bodies: list[bytes] = []
 
-    with patch("ai.usage_publisher.config") as mock_config, patch(
-        "ai.usage_publisher.pika"
-    ) as mock_pika:
+    with (
+        patch("ai.usage_publisher.config") as mock_config,
+        patch("ai.usage_publisher.pika") as mock_pika,
+    ):
         mock_config.rabbitmq_url = "amqp://guest:guest@localhost:5672"
         mock_connection = MagicMock()
         mock_channel = MagicMock()
@@ -35,9 +36,10 @@ def test_publish_serializes_protobuf_correctly() -> None:
 
 
 def test_publish_uses_correct_exchange_and_routing_key() -> None:
-    with patch("ai.usage_publisher.config") as mock_config, patch(
-        "ai.usage_publisher.pika"
-    ) as mock_pika:
+    with (
+        patch("ai.usage_publisher.config") as mock_config,
+        patch("ai.usage_publisher.pika") as mock_pika,
+    ):
         mock_config.rabbitmq_url = "amqp://guest:guest@localhost:5672"
         mock_connection = MagicMock()
         mock_channel = MagicMock()
@@ -57,9 +59,10 @@ def test_publish_uses_correct_exchange_and_routing_key() -> None:
 
 
 def test_publish_skips_when_no_rabbitmq_url() -> None:
-    with patch("ai.usage_publisher.config") as mock_config, patch(
-        "ai.usage_publisher.pika"
-    ) as mock_pika:
+    with (
+        patch("ai.usage_publisher.config") as mock_config,
+        patch("ai.usage_publisher.pika") as mock_pika,
+    ):
         mock_config.rabbitmq_url = ""
 
         publish_agent_tokens_used("org-123", 500)
@@ -68,9 +71,10 @@ def test_publish_skips_when_no_rabbitmq_url() -> None:
 
 
 def test_publish_skips_when_tokens_zero_or_negative() -> None:
-    with patch("ai.usage_publisher.config") as mock_config, patch(
-        "ai.usage_publisher.pika"
-    ) as mock_pika:
+    with (
+        patch("ai.usage_publisher.config") as mock_config,
+        patch("ai.usage_publisher.pika") as mock_pika,
+    ):
         mock_config.rabbitmq_url = "amqp://guest:guest@localhost:5672"
 
         publish_agent_tokens_used("org-123", 0)
@@ -80,9 +84,10 @@ def test_publish_skips_when_tokens_zero_or_negative() -> None:
 
 
 def test_publish_fails_silently_on_connection_error(capsys: pytest.CaptureFixture[str]) -> None:
-    with patch("ai.usage_publisher.config") as mock_config, patch(
-        "ai.usage_publisher.pika"
-    ) as mock_pika:
+    with (
+        patch("ai.usage_publisher.config") as mock_config,
+        patch("ai.usage_publisher.pika") as mock_pika,
+    ):
         mock_config.rabbitmq_url = "amqp://guest:guest@localhost:5672"
         mock_pika.URLParameters.return_value = "params"
         mock_pika.BlockingConnection.side_effect = ConnectionError("refused")
