@@ -32,6 +32,93 @@ type contactPoint struct {
 type DataSource struct {
 	UID  string `json:"uid"`
 	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type Folder struct {
+	UID   string `json:"uid"`
+	Title string `json:"title"`
+}
+
+type DashboardSummary struct {
+	UID         string   `json:"uid"`
+	Title       string   `json:"title"`
+	URL         string   `json:"url"`
+	FolderTitle string   `json:"folderTitle"`
+	FolderUID   string   `json:"folderUid"`
+	Tags        []string `json:"tags"`
+}
+
+type PanelSummary struct {
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
+}
+
+type DashboardDetails struct {
+	UID         string         `json:"uid"`
+	Title       string         `json:"title"`
+	Slug        string         `json:"slug"`
+	URL         string         `json:"url"`
+	FolderTitle string         `json:"folderTitle"`
+	FolderUID   string         `json:"folderUid"`
+	Tags        []string       `json:"tags"`
+	Panels      []PanelSummary `json:"panels"`
+}
+
+type dashboardGetResponse struct {
+	Dashboard json.RawMessage `json:"dashboard"`
+	Meta      struct {
+		Slug        string `json:"slug"`
+		URL         string `json:"url"`
+		FolderTitle string `json:"folderTitle"`
+		FolderUID   string `json:"folderUid"`
+	} `json:"meta"`
+}
+
+// dashboardURLPathSlug is the path segment after /d/{uid}/ for viewer and image-renderer URLs.
+// When meta.slug is empty, repeating the dashboard UID is a widely accepted Grafana fallback.
+func dashboardURLPathSlug(details *DashboardDetails) string {
+	if details == nil {
+		return "dashboard"
+	}
+	if s := strings.TrimSpace(details.Slug); s != "" {
+		return s
+	}
+	if uid := strings.TrimSpace(details.UID); uid != "" {
+		return uid
+	}
+
+	return "dashboard"
+}
+
+// collectDashboardPanelSummaries walks Grafana dashboard.panel JSON, including panels nested under row panels.
+func collectDashboardPanelSummaries(rawPanels []json.RawMessage) []PanelSummary {
+	out := make([]PanelSummary, 0, len(rawPanels)*2)
+	var walk func([]json.RawMessage)
+	walk = func(list []json.RawMessage) {
+		for _, raw := range list {
+			var node struct {
+				ID     int               `json:"id"`
+				Title  string            `json:"title"`
+				Type   string            `json:"type"`
+				Panels []json.RawMessage `json:"panels"`
+			}
+			if err := json.Unmarshal(raw, &node); err != nil {
+				continue
+			}
+			isRow := strings.EqualFold(strings.TrimSpace(node.Type), "row")
+			if node.ID != 0 && !isRow {
+				out = append(out, PanelSummary{ID: node.ID, Title: node.Title, Type: node.Type})
+			}
+			if len(node.Panels) > 0 {
+				walk(node.Panels)
+				continue
+			}
+		}
+	}
+	walk(rawPanels)
+	return out
 }
 
 type apiStatusError struct {
@@ -136,6 +223,20 @@ func readAPIToken(ctx core.IntegrationContext) (string, error) {
 
 func (c *Client) buildURL(path string) string {
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.BaseURL, "/"), strings.TrimPrefix(path, "/"))
+}
+
+func (c *Client) resolveURL(value string) string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		return ""
+	}
+
+	parsed, err := url.Parse(raw)
+	if err == nil && parsed.IsAbs() {
+		return raw
+	}
+
+	return c.buildURL(raw)
 }
 
 func (c *Client) execRequest(method, path string, body io.Reader, contentType string) ([]byte, int, error) {
@@ -562,4 +663,138 @@ func (c *Client) ListDataSources() ([]DataSource, error) {
 	}
 
 	return sources, nil
+}
+
+func (c *Client) ListFolders() ([]Folder, error) {
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/folders", nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error listing folders: %v", err)
+	}
+
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana folder list", status, responseBody)
+	}
+
+	var folders []Folder
+	if err := json.Unmarshal(responseBody, &folders); err != nil {
+		return nil, fmt.Errorf("error parsing folders response: %v", err)
+	}
+
+	return folders, nil
+}
+
+func (c *Client) SearchDashboards(query, folderUID, tag string, limit int) ([]DashboardSummary, error) {
+	params := url.Values{}
+	params.Set("type", "dash-db")
+	if q := strings.TrimSpace(query); q != "" {
+		params.Set("query", q)
+	}
+	if f := strings.TrimSpace(folderUID); f != "" {
+		params.Set("folderUIDs", f)
+	}
+	if t := strings.TrimSpace(tag); t != "" {
+		params.Set("tag", t)
+	}
+	if limit > 0 {
+		params.Set("limit", fmt.Sprintf("%d", limit))
+	}
+
+	responseBody, status, err := c.execRequest(http.MethodGet, "/api/search?"+params.Encode(), nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("error searching dashboards: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard search", status, responseBody)
+	}
+
+	var results []DashboardSummary
+	if err := json.Unmarshal(responseBody, &results); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard search response: %v", err)
+	}
+
+	for i := range results {
+		results[i].URL = c.resolveURL(results[i].URL)
+	}
+
+	return results, nil
+}
+
+func (c *Client) getDashboardResponse(uid string) (*dashboardGetResponse, error) {
+	trimmedUID := strings.TrimSpace(uid)
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/dashboards/uid/%s", url.PathEscape(trimmedUID)),
+		nil,
+		"",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting dashboard: %v", err)
+	}
+	if status < 200 || status >= 300 {
+		return nil, newAPIStatusError("grafana dashboard get", status, responseBody)
+	}
+
+	var response dashboardGetResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	return &response, nil
+}
+
+func (c *Client) buildDashboardDetails(response *dashboardGetResponse) (*DashboardDetails, error) {
+	var dashboard struct {
+		UID    string            `json:"uid"`
+		Title  string            `json:"title"`
+		Tags   []string          `json:"tags"`
+		Panels []json.RawMessage `json:"panels"`
+	}
+	if err := json.Unmarshal(response.Dashboard, &dashboard); err != nil {
+		return nil, fmt.Errorf("error parsing dashboard response: %v", err)
+	}
+
+	panels := collectDashboardPanelSummaries(dashboard.Panels)
+	return &DashboardDetails{
+		UID:         strings.TrimSpace(dashboard.UID),
+		Title:       strings.TrimSpace(dashboard.Title),
+		Slug:        strings.TrimSpace(response.Meta.Slug),
+		URL:         c.resolveURL(response.Meta.URL),
+		FolderTitle: strings.TrimSpace(response.Meta.FolderTitle),
+		FolderUID:   strings.TrimSpace(response.Meta.FolderUID),
+		Tags:        dashboard.Tags,
+		Panels:      panels,
+	}, nil
+}
+
+func (c *Client) GetDashboard(uid string) (*DashboardDetails, error) {
+	response, err := c.getDashboardResponse(uid)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.buildDashboardDetails(response)
+}
+
+func (c *Client) RenderPanelURL(uid, slug string, panelID, width, height int, from, to string) string {
+	escapedUID := url.PathEscape(strings.TrimSpace(uid))
+	escapedSlug := url.PathEscape(strings.TrimSpace(slug))
+	params := url.Values{}
+	params.Set("panelId", fmt.Sprintf("%d", panelID))
+	params.Set("width", fmt.Sprintf("%d", width))
+	params.Set("height", fmt.Sprintf("%d", height))
+	params.Set("tz", "UTC")
+	if from != "" {
+		params.Set("from", from)
+	}
+	if to != "" {
+		params.Set("to", to)
+	}
+
+	return fmt.Sprintf(
+		"%s/render/d-solo/%s/%s?%s",
+		strings.TrimSuffix(c.BaseURL, "/"),
+		escapedUID,
+		escapedSlug,
+		params.Encode(),
+	)
 }
