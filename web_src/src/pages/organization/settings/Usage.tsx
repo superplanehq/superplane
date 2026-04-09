@@ -216,64 +216,51 @@ function buildCanvasUsage(data: OrganizationsDescribeUsageResponse | null | unde
   };
 }
 
-function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
-  const level = data?.usage?.eventBucketLevel ?? 0;
+function buildBucketUsage(
+  level: number,
+  capacity: number | undefined,
+  lastUpdatedAt: string | undefined,
+  nextDecreaseAt: string | undefined,
+  defaultSubtitle: string,
+) {
   const displayedLevel = Math.max(0, Math.ceil(level));
-  const capacity = data?.usage?.eventBucketCapacity;
-  const lastUpdatedAt = data?.usage?.eventBucketLastUpdatedAt;
-  const nextDecreaseAt = data?.usage?.nextEventBucketDecreaseAt;
   const isUnlimited = typeof capacity === "number" && capacity === -1;
   const value = isUnlimited
     ? `${formatNumber(displayedLevel)} consumed`
     : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
 
+  let subtitle = defaultSubtitle;
+  if (nextDecreaseAt) {
+    subtitle = `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
+  } else if (lastUpdatedAt) {
+    subtitle = `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
+  }
+
   return {
     value,
-    subtitle: formatEventUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
+    subtitle,
     progress: isUnlimited ? null : percentage(displayedLevel, capacity),
   };
+}
+
+function buildEventUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
+  return buildBucketUsage(
+    data?.usage?.eventBucketLevel ?? 0,
+    data?.usage?.eventBucketCapacity,
+    data?.usage?.eventBucketLastUpdatedAt,
+    data?.usage?.nextEventBucketDecreaseAt,
+    "Rolling event usage for the current 30-day window.",
+  );
 }
 
 function buildAgentTokenUsage(data: OrganizationsDescribeUsageResponse | null | undefined) {
-  const level = data?.usage?.agentTokenBucketLevel ?? 0;
-  const displayedLevel = Math.max(0, Math.ceil(level));
-  const capacity = data?.usage?.agentTokenBucketCapacity;
-  const lastUpdatedAt = data?.usage?.agentTokenBucketLastUpdatedAt;
-  const nextDecreaseAt = data?.usage?.nextAgentTokenBucketDecreaseAt;
-  const isUnlimited = typeof capacity === "number" && capacity === -1;
-  const value = isUnlimited
-    ? `${formatNumber(displayedLevel)} consumed`
-    : `${formatNumber(displayedLevel)} / ${formatNumber(capacity ?? 0)}`;
-
-  return {
-    value,
-    subtitle: formatAgentTokenUsageSubtitle(nextDecreaseAt, lastUpdatedAt),
-    progress: isUnlimited ? null : percentage(displayedLevel, capacity),
-  };
-}
-
-function formatAgentTokenUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
-  if (nextDecreaseAt) {
-    return `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
-  }
-
-  if (lastUpdatedAt) {
-    return `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
-  }
-
-  return "Rolling agent token usage for the current 30-day window.";
-}
-
-function formatEventUsageSubtitle(nextDecreaseAt?: string, lastUpdatedAt?: string) {
-  if (nextDecreaseAt) {
-    return `Next usage decrease ${new Date(nextDecreaseAt).toLocaleString()}.`;
-  }
-
-  if (lastUpdatedAt) {
-    return `Last updated ${new Date(lastUpdatedAt).toLocaleString()}.`;
-  }
-
-  return "Rolling event usage for the current 30-day window.";
+  return buildBucketUsage(
+    data?.usage?.agentTokenBucketLevel ?? 0,
+    data?.usage?.agentTokenBucketCapacity,
+    data?.usage?.agentTokenBucketLastUpdatedAt,
+    data?.usage?.nextAgentTokenBucketDecreaseAt,
+    "Rolling agent token usage for the current 30-day window.",
+  );
 }
 
 function formatCountWithLimit(count: number, limit: number | undefined) {
