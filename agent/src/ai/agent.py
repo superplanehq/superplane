@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -46,6 +47,16 @@ def _clone_catalog_list_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
     return out
 
 
+def _catalog_rows_to_sorted_names(rows: list[dict[str, Any]]) -> list[str]:
+    """Block names only for model-facing list tools; rows come from SuperplaneClient lists."""
+    names: set[str] = set()
+    for row in rows:
+        name = row.get("name")
+        if name:
+            names.add(str(name))
+    return sorted(names)
+
+
 @dataclass
 class AgentDeps:
     client: SuperplaneClient
@@ -82,6 +93,52 @@ def _put_cached_catalog_list(
 
 def load_system_prompt() -> str:
     return (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
+
+
+AnthropicCacheTTL = bool | Literal["5m", "1h"]
+
+
+def _parse_anthropic_cache_ttl() -> AnthropicCacheTTL:
+    """TTL for Anthropic cache breakpoints (instructions + tool definitions)."""
+    raw = os.getenv("AI_ANTHROPIC_CACHE_TTL", "1h").strip().lower()
+    if raw in ("5m", "1h"):
+        return raw  # type: ignore[return-value]
+    return True
+
+
+def prompt_cache_model_settings(model: str) -> Any:
+    """Pydantic AI ``ModelSettings`` for Anthropic: parallel tool calls + optional prompt cache.
+
+    Always sets ``parallel_tool_calls=True`` for Anthropic / Claude model strings so independent
+    tools (e.g. ``describe_component`` + ``describe_trigger``) may run in one model step.
+
+    When ``config.ai_prompt_cache`` is true, also sets Anthropic cache breakpoints (up to **3** of
+    **4** allowed: instructions, tools, messages); see
+    https://pydantic.dev/docs/ai/models/anthropic/#cache-point-limits
+
+    Respects ``config.ai_anthropic_cache_messages`` and ``AI_ANTHROPIC_CACHE_TTL``. Returns
+    ``None`` for ``test``, OpenAI-style ids, and non-Anthropic models.
+    """
+    if model == "test":
+        return None
+    m = model.strip().lower()
+    if m.startswith("openai:") or m.startswith("gpt-"):
+        return None
+    if not (m.startswith("anthropic:") or m.startswith("claude-")):
+        return None
+    try:
+        from pydantic_ai.settings import ModelSettings
+    except ImportError:
+        return None
+
+    settings_map: dict[str, Any] = {"parallel_tool_calls": True}
+    if config.ai_prompt_cache:
+        ttl = _parse_anthropic_cache_ttl()
+        settings_map["anthropic_cache_instructions"] = ttl
+        settings_map["anthropic_cache_tool_definitions"] = ttl
+        if config.ai_anthropic_cache_messages:
+            settings_map["anthropic_cache_messages"] = ttl
+    return ModelSettings(**settings_map)
 
 
 def build_prompt(payload: CanvasQuestionRequest) -> str:
@@ -124,11 +181,16 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
     else:
         resolved_model = model
 
-    agent: Agent[AgentDeps, CanvasAnswer] = Agent(
-        model=resolved_model,
-        output_type=CanvasAnswer,
-        system_prompt=load_system_prompt(),
-    )
+    agent_kwargs: dict[str, Any] = {
+        "model": resolved_model,
+        "output_type": CanvasAnswer,
+        "system_prompt": load_system_prompt(),
+    }
+    llm_model_settings = prompt_cache_model_settings(model)
+    if llm_model_settings is not None:
+        agent_kwargs["model_settings"] = llm_model_settings
+
+    agent: Agent[AgentDeps, CanvasAnswer] = Agent(**agent_kwargs)
 
     def _tool_debug(message: str) -> None:
         if config.debug:
@@ -208,22 +270,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         ctx: RunContext[AgentDeps],
         provider: str | None = None,
         query: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """List components (compact catalog rows).
+    ) -> list[str] | list[dict[str, Any]]:
+        """List component block names from the catalog (sorted, unique).
 
-        Returns name, label, description, provider, output_channel_names.
-        For configuration fields and types needed in proposals,
+        Names only. For labels, descriptions, configuration fields, and output channels,
         call describe_component on the chosen name.
-        Prefer a single list call per request with provider/query;
-        reuse prior results when possible.
+        Prefer a single list call per request with provider/query when it helps narrow results;
+        reuse prior list results from the conversation when possible.
         """
         try:
             cached = _get_cached_catalog_list(ctx.deps, "components", provider, query)
             if cached is not None:
-                return cached
+                return _catalog_rows_to_sorted_names(cached)
             rows = ctx.deps.client.list_components(provider=provider, query=query)
             _put_cached_catalog_list(ctx.deps, "components", provider, query, rows)
-            return _clone_catalog_list_rows(rows)
+            return _catalog_rows_to_sorted_names(_clone_catalog_list_rows(rows))
         except Exception as error:
             _tool_debug(f"list_components failed: {error}")
             return [_tool_error_entry("list_components", error)]
@@ -242,22 +303,21 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         ctx: RunContext[AgentDeps],
         provider: str | None = None,
         query: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """List triggers (compact catalog rows).
+    ) -> list[str] | list[dict[str, Any]]:
+        """List trigger block names from the catalog (sorted, unique).
 
-        Returns name, label, description, provider.
-        For configuration fields and types needed in proposals,
+        Names only. For labels, descriptions, and configuration fields for proposals,
         call describe_trigger on the chosen name.
-        Prefer a single list call per request with provider/query;
-        reuse prior results when possible.
+        Prefer a single list call per request with provider/query when it helps narrow results;
+        reuse prior list results from the conversation when possible.
         """
         try:
             cached = _get_cached_catalog_list(ctx.deps, "triggers", provider, query)
             if cached is not None:
-                return cached
+                return _catalog_rows_to_sorted_names(cached)
             rows = ctx.deps.client.list_triggers(provider=provider, query=query)
             _put_cached_catalog_list(ctx.deps, "triggers", provider, query, rows)
-            return _clone_catalog_list_rows(rows)
+            return _catalog_rows_to_sorted_names(_clone_catalog_list_rows(rows))
         except Exception as error:
             _tool_debug(f"list_triggers failed: {error}")
             return [_tool_error_entry("list_triggers", error)]

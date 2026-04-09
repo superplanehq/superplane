@@ -1,6 +1,7 @@
 from ai.agent import (
     AgentDeps,
     _catalog_list_cache_key,
+    _catalog_rows_to_sorted_names,
     _get_cached_catalog_list,
     _put_cached_catalog_list,
     _tool_error_entry,
@@ -8,7 +9,10 @@ from ai.agent import (
     build_agent,
     build_prompt,
     load_system_prompt,
+    prompt_cache_model_settings,
 )
+from typing import Any
+
 from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasProposal, CanvasQuestionRequest
 
@@ -29,6 +33,23 @@ def test_load_system_prompt_documents_canvas_node_tools() -> None:
     assert "list_node_events" in text
     assert "list_node_executions" in text
     assert "get_canvas_shape" in text
+
+
+def test_load_system_prompt_documents_catalog_lists_names_only() -> None:
+    text = load_system_prompt()
+    assert "block names only" in text
+    assert "sorted lists of strings" in text
+
+
+def test_catalog_rows_to_sorted_names_dedupes_and_sorts() -> None:
+    rows = [
+        {"name": "z.last"},
+        {"name": "a.first"},
+        {"name": "a.first"},
+        {"foo": "bar"},
+        {"name": ""},
+    ]
+    assert _catalog_rows_to_sorted_names(rows) == ["a.first", "z.last"]
 
 
 def test_tool_failure_uniform_shape() -> None:
@@ -65,6 +86,47 @@ def test_build_prompt_contains_question() -> None:
 def test_build_agent_returns_agent_instance() -> None:
     agent = build_agent()
     assert agent is not None
+
+
+def test_prompt_cache_model_settings_skips_openai_model_string() -> None:
+    assert prompt_cache_model_settings("openai:gpt-4.1") is None
+
+
+def test_prompt_cache_model_settings_enables_for_anthropic_prefix() -> None:
+    try:
+        import pydantic_ai.settings  # noqa: F401
+    except ImportError:
+        return
+    settings = prompt_cache_model_settings("anthropic:claude-sonnet-4-6")
+    assert isinstance(settings, dict)
+    assert settings.get("parallel_tool_calls") is True
+    assert settings.get("anthropic_cache_instructions")
+    assert settings.get("anthropic_cache_tool_definitions")
+    assert settings.get("anthropic_cache_messages")
+
+
+def test_prompt_cache_model_settings_omits_message_cache_when_disabled(monkeypatch: Any) -> None:
+    try:
+        import pydantic_ai.settings  # noqa: F401
+    except ImportError:
+        return
+    monkeypatch.setattr("ai.agent.config.ai_anthropic_cache_messages", False)
+    settings = prompt_cache_model_settings("anthropic:claude-sonnet-4-6")
+    assert isinstance(settings, dict)
+    assert settings.get("parallel_tool_calls") is True
+    assert not settings.get("anthropic_cache_messages")
+
+
+def test_prompt_cache_off_still_enables_parallel_tool_calls(monkeypatch: Any) -> None:
+    try:
+        import pydantic_ai.settings  # noqa: F401
+    except ImportError:
+        return
+    monkeypatch.setattr("ai.agent.config.ai_prompt_cache", False)
+    settings = prompt_cache_model_settings("anthropic:claude-sonnet-4-6")
+    assert isinstance(settings, dict)
+    assert settings.get("parallel_tool_calls") is True
+    assert not settings.get("anthropic_cache_instructions")
 
 
 def test_canvas_answer_serializes_proposal_with_aliases() -> None:

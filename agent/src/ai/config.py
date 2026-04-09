@@ -4,6 +4,11 @@ import os
 class Config:
     def __init__(self) -> None:
         self.ai_model: str = self._parse_str("AI_MODEL", default="test")
+        self.ai_prompt_cache: bool = self._parse_bool("AI_PROMPT_CACHE", default=True)
+        self.ai_anthropic_cache_messages: bool = self._parse_bool(
+            "AI_ANTHROPIC_CACHE_MESSAGES",
+            default=True,
+        )
         self.debug: bool = self._parse_bool("REPL_WEB_DEBUG")
         self.cors_origins: str = self._parse_str("REPL_WEB_CORS_ORIGINS", default="*")
 

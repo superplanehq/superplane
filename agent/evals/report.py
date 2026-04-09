@@ -104,6 +104,16 @@ class ReportBuilder:
             print(f"  toolCalls:    {run_usage.tool_calls}")
             print(f"  inputTokens:  {run_usage.input_tokens}")
             print(f"  outputTokens: {run_usage.output_tokens}")
+            cache_read = int(getattr(run_usage, "cache_read_tokens", 0) or 0)
+            cache_write = int(getattr(run_usage, "cache_write_tokens", 0) or 0)
+            if cache_read or cache_write:
+                print(f"  cacheRead:    {cache_read}")
+                print(f"  cacheWrite:   {cache_write}")
+                print(
+                    "  note:         inputTokens is total processed input (often includes cache "
+                    "segments); lower $/run vs no cache comes from cache pricing, not a smaller "
+                    "inputTokens number."
+                )
             print(f"  cost:         {self._format_cost(case_cost)}")
 
             print("  assertions:")
