@@ -1263,6 +1263,7 @@ export function buildEventInfo(event: CanvasesCanvasEvent): EventInfo | undefine
   return {
     id: event.id!,
     createdAt: event.createdAt!,
+    customName: event.customName,
     data: event.data?.data || {},
     nodeId: event.nodeId!,
     type: (event.data?.type as string) || "",

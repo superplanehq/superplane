@@ -76,28 +76,25 @@ func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string
 		return nil, nil
 	}
 
-	template, ok := rawTemplate.(string)
+	tmpl, ok := rawTemplate.(string)
 	if !ok {
 		return nil, nil
 	}
 
-	template = strings.TrimSpace(template)
-	if template == "" {
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
 		return nil, nil
 	}
 
-	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
-		WithNodeID(node.NodeID).
-		WithInput(map[string]any{node.NodeID: payload})
-	resolved, err := builder.ResolveTemplateExpressions(template)
+	resolved, err := contexts.ResolveCustomNameTemplate(tmpl, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
+	resolved = strings.TrimSpace(resolved)
+	if resolved == "" {
 		return nil, nil
 	}
 
-	return &resolvedName, nil
+	return &resolved, nil
 }

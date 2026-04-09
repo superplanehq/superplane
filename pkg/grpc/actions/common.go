@@ -1148,8 +1148,8 @@ func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Fie
 		Label:       "Run title (optional)",
 		Type:        configuration.FieldTypeString,
 		Togglable:   true,
-		Description: "Optional run title template. Supports expressions like {{ $.data }}.",
-		Placeholder: "Deploy {{ $.repository.name }} @ {{ $.head_commit.id }}",
+		Description: "Optional run title template. Use root() to access event data, e.g. {{ root().field }}.",
+		Placeholder: "Deploy {{ root().repository.name }} @ {{ root().head_commit.id }}",
 	})
 
 	return fields

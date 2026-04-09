@@ -210,6 +210,53 @@ func asAnyMap(value any) (map[string]any, bool) {
 	}
 }
 
+func ResolveCustomNameTemplate(template string, payload any) (string, error) {
+	if !expressionRegex.MatchString(template) {
+		return template, nil
+	}
+
+	env := map[string]any{}
+
+	exprOptions := []expr.Option{
+		expr.Env(env),
+		expr.AsAny(),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+			return payload, nil
+		}),
+	}
+
+	var resolveErr error
+	result := expressionRegex.ReplaceAllStringFunc(template, func(match string) string {
+		matches := expressionRegex.FindStringSubmatch(match)
+		if len(matches) != 2 {
+			return match
+		}
+
+		vm, err := expr.Compile(matches[1], exprOptions...)
+		if err != nil {
+			resolveErr = fmt.Errorf("failed to compile expression: %w", err)
+			return ""
+		}
+
+		output, err := expr.Run(vm, env)
+		if err != nil {
+			resolveErr = fmt.Errorf("expression evaluation failed: %w", err)
+			return ""
+		}
+
+		return fmt.Sprintf("%v", output)
+	})
+
+	if resolveErr != nil {
+		return "", resolveErr
+	}
+
+	return result, nil
+}
+
 func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil

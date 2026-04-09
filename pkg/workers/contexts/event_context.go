@@ -81,28 +81,25 @@ func (s *EventContext) resolveCustomName(payload any) (*string, error) {
 		return nil, nil
 	}
 
-	template, ok := rawTemplate.(string)
+	tmpl, ok := rawTemplate.(string)
 	if !ok {
 		return nil, nil
 	}
 
-	template = strings.TrimSpace(template)
-	if template == "" {
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
 		return nil, nil
 	}
 
-	builder := NewNodeConfigurationBuilder(s.tx, s.node.WorkflowID).
-		WithNodeID(s.node.NodeID).
-		WithInput(map[string]any{s.node.NodeID: payload})
-	resolved, err := builder.ResolveTemplateExpressions(template)
+	resolved, err := ResolveCustomNameTemplate(tmpl, payload)
 	if err != nil {
 		return nil, err
 	}
 
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
+	resolved = strings.TrimSpace(resolved)
+	if resolved == "" {
 		return nil, nil
 	}
 
-	return &resolvedName, nil
+	return &resolved, nil
 }
