@@ -108,6 +108,8 @@ func (d *DigitalOcean) Components() []core.Component {
 		&UpdateAlertPolicy{},
 		&DeleteAlertPolicy{},
 		&GetDropletMetrics{},
+		&GetDatabase{},
+		&GetClusterConfiguration{},
 		&GetObject{},
 		&PutObject{},
 		&CopyObject{},
