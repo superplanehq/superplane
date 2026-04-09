@@ -15,7 +15,7 @@ import type {
   AiUpdateNodeConfigOperation,
   BuildingBlockCategory,
 } from "@/ui/BuildingBlocksSidebar";
-import { generateNodeId, generateUniqueNodeName } from "./utils";
+import { generateNodeId, generateUniqueNodeName } from "@/pages/workflowv2/utils";
 
 function normalizeIntegrationName(name?: string): string {
   return (name || "")
@@ -59,7 +59,7 @@ type ScoredChannel = {
   description: string;
 };
 
-export class CanvasUpdater {
+export class CanvasBuilder {
   private readonly workflow: CanvasesCanvas;
   private readonly integrations: OrganizationsIntegration[];
   private readonly blockLookup: Map<string, BuildingBlockCategory["blocks"][number]>;
