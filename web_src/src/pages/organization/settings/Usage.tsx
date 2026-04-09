@@ -33,16 +33,6 @@ export function Usage({ organizationId }: UsageProps) {
     error: integrationsError,
   } = useConnectedIntegrations(organizationId);
   const forceUsagePage = isUsagePageForced();
-  const isPreviewMode = forceUsagePage && data?.enabled !== true;
-
-  const memberCount = users?.length ?? 0;
-  const integrationCount = integrations?.length ?? 0;
-  const usageCards = useMemo(
-    () => buildLimitCards(data?.limits, memberCount, integrationCount),
-    [data?.limits, memberCount, integrationCount],
-  );
-  const eventUsage = useMemo(() => buildEventUsage(data), [data]);
-  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
   if (isLoading || isLoadingUsers || isLoadingIntegrations) {
     return (
@@ -54,14 +44,14 @@ export function Usage({ organizationId }: UsageProps) {
     );
   }
 
-  if (error || usersError || integrationsError) {
-    const displayError = error || usersError || integrationsError;
+  const anyError = error || usersError || integrationsError;
+  if (anyError) {
     return (
       <div className="pt-6">
         <Alert variant="destructive">
           <Gauge className="h-4 w-4" />
           <AlertTitle>Unable to load usage</AlertTitle>
-          <AlertDescription>{displayError instanceof Error ? displayError.message : "Unknown error"}</AlertDescription>
+          <AlertDescription>{anyError instanceof Error ? anyError.message : "Unknown error"}</AlertDescription>
         </Alert>
       </div>
     );
@@ -84,6 +74,34 @@ export function Usage({ organizationId }: UsageProps) {
   if (!data.enabled && !forceUsagePage) {
     return <Navigate to={`/${organizationId}/settings/general`} replace />;
   }
+
+  return (
+    <UsageContent
+      data={data}
+      isPreviewMode={forceUsagePage && data.enabled !== true}
+      memberCount={users?.length ?? 0}
+      integrationCount={integrations?.length ?? 0}
+    />
+  );
+}
+
+function UsageContent({
+  data,
+  isPreviewMode,
+  memberCount,
+  integrationCount,
+}: {
+  data: OrganizationsDescribeUsageResponse;
+  isPreviewMode: boolean;
+  memberCount: number;
+  integrationCount: number;
+}) {
+  const usageCards = useMemo(
+    () => buildLimitCards(data.limits, memberCount, integrationCount),
+    [data.limits, memberCount, integrationCount],
+  );
+  const eventUsage = useMemo(() => buildEventUsage(data), [data]);
+  const canvasUsage = useMemo(() => buildCanvasUsage(data), [data]);
 
   return (
     <div className="pt-6 space-y-6">
