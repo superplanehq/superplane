@@ -246,6 +246,24 @@ func validateCreateAlertRuleSpec(spec CreateAlertRuleSpec) error {
 	if isRangeConditionType(spec.ConditionType) && spec.Threshold2 == nil {
 		return errors.New("threshold2 is required for range conditions")
 	}
+	if spec.For == "" {
+		return errors.New("for is required")
+	}
+	if !isValidDuration(spec.For) {
+		return fmt.Errorf("invalid for %q: must be a valid duration (e.g. 5m, 1h, 0s)", spec.For)
+	}
+	if spec.NoDataState == "" {
+		return errors.New("noDataState is required")
+	}
+	if !isValidNoDataState(spec.NoDataState) {
+		return fmt.Errorf("invalid noDataState %q: must be one of NoData, Alerting, OK, KeepLast", spec.NoDataState)
+	}
+	if spec.ExecErrState == "" {
+		return errors.New("execErrState is required")
+	}
+	if !isValidExecErrState(spec.ExecErrState) {
+		return fmt.Errorf("invalid execErrState %q: must be one of Error, Alerting, OK, KeepLast", spec.ExecErrState)
+	}
 
 	return nil
 }
@@ -273,6 +291,15 @@ func validateUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) error {
 	}
 	if spec.ConditionType != nil && !isValidConditionType(*spec.ConditionType) {
 		return fmt.Errorf("invalid conditionType %q: must be one of gt, lt, gte, lte, within_range, outside_range", *spec.ConditionType)
+	}
+	if spec.For != nil && !isValidDuration(*spec.For) {
+		return fmt.Errorf("invalid for %q: must be a valid duration (e.g. 5m, 1h, 0s)", *spec.For)
+	}
+	if spec.NoDataState != nil && !isValidNoDataState(*spec.NoDataState) {
+		return fmt.Errorf("invalid noDataState %q: must be one of NoData, Alerting, OK, KeepLast", *spec.NoDataState)
+	}
+	if spec.ExecErrState != nil && !isValidExecErrState(*spec.ExecErrState) {
+		return fmt.Errorf("invalid execErrState %q: must be one of Error, Alerting, OK, KeepLast", *spec.ExecErrState)
 	}
 
 	return nil
@@ -309,6 +336,52 @@ func isValidReducer(r string) bool {
 func isValidConditionType(ct string) bool {
 	switch ct {
 	case "gt", "lt", "gte", "lte", "within_range", "outside_range":
+		return true
+	}
+	return false
+}
+
+func isValidDuration(d string) bool {
+	// Grafana accepts Go-style durations (e.g. "5m", "1h30m", "0s").
+	// We only allow a subset: digits followed by a unit, repeated.
+	if d == "" {
+		return false
+	}
+	i := 0
+	for i < len(d) {
+		// consume digits
+		start := i
+		for i < len(d) && d[i] >= '0' && d[i] <= '9' {
+			i++
+		}
+		if i == start {
+			return false // no digits before unit
+		}
+		// consume unit
+		if i >= len(d) {
+			return false // digits without unit
+		}
+		switch d[i] {
+		case 's', 'm', 'h', 'd':
+			i++
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func isValidNoDataState(s string) bool {
+	switch s {
+	case "NoData", "Alerting", "OK", "KeepLast":
+		return true
+	}
+	return false
+}
+
+func isValidExecErrState(s string) bool {
+	switch s {
+	case "Error", "Alerting", "OK", "KeepLast":
 		return true
 	}
 	return false

@@ -228,6 +228,112 @@ func Test__alertRuleFieldConfiguration__noDataAndExecErrStateSelectOptions(t *te
 	assert.NotContains(t, execErrVals, "NoData")
 }
 
+func Test__validateCreateAlertRuleSpec__rejectsEmptyAndInvalidForNoDataExecErr(t *testing.T) {
+	base := CreateAlertRuleSpec{
+		Title:           "test",
+		FolderUID:       "f1",
+		RuleGroup:       "g1",
+		DataSourceUID:   "ds1",
+		Query:           "up",
+		LookbackSeconds: 60,
+		Reducer:         "last",
+		ConditionType:   "gt",
+		Threshold:       float64Ptr(1),
+		For:             "5m",
+		NoDataState:     "NoData",
+		ExecErrState:    "Error",
+	}
+
+	// Valid spec passes
+	require.NoError(t, validateCreateAlertRuleSpec(base))
+
+	// Empty for
+	s := base
+	s.For = ""
+	err := validateCreateAlertRuleSpec(s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "for is required")
+
+	// Invalid for
+	s = base
+	s.For = "abc"
+	err = validateCreateAlertRuleSpec(s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid for")
+
+	// Empty noDataState
+	s = base
+	s.NoDataState = ""
+	err = validateCreateAlertRuleSpec(s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "noDataState is required")
+
+	// Invalid noDataState
+	s = base
+	s.NoDataState = "BadValue"
+	err = validateCreateAlertRuleSpec(s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid noDataState")
+
+	// Empty execErrState
+	s = base
+	s.ExecErrState = ""
+	err = validateCreateAlertRuleSpec(s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "execErrState is required")
+
+	// Invalid execErrState
+	s = base
+	s.ExecErrState = "BadValue"
+	err = validateCreateAlertRuleSpec(s)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid execErrState")
+}
+
+func Test__validateUpdateAlertRuleSpec__rejectsInvalidForNoDataExecErr(t *testing.T) {
+	err := validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
+		AlertRuleUID: "rule-1",
+		For:          strPtr("not-a-duration"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid for")
+
+	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
+		AlertRuleUID: "rule-1",
+		NoDataState:  strPtr("Invalid"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid noDataState")
+
+	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
+		AlertRuleUID: "rule-1",
+		ExecErrState: strPtr("Invalid"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid execErrState")
+
+	// Valid values pass
+	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
+		AlertRuleUID: "rule-1",
+		For:          strPtr("10m"),
+		NoDataState:  strPtr("OK"),
+		ExecErrState: strPtr("KeepLast"),
+	})
+	require.NoError(t, err)
+}
+
+func Test__isValidDuration(t *testing.T) {
+	valid := []string{"0s", "5m", "1h", "1h30m", "2d", "30s"}
+	for _, d := range valid {
+		assert.True(t, isValidDuration(d), "expected %q to be valid", d)
+	}
+
+	invalid := []string{"", "abc", "5", "5x", "m5", " 5m"}
+	for _, d := range invalid {
+		assert.False(t, isValidDuration(d), "expected %q to be invalid", d)
+	}
+}
+
 func alertRuleSelectOptionValues(t *testing.T, fields []configuration.Field, name string) []string {
 	t.Helper()
 	for _, f := range fields {
