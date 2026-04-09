@@ -20,12 +20,13 @@ var _ MappedNullable = &OrganizationsOrganizationLimits{}
 
 // OrganizationsOrganizationLimits struct for OrganizationsOrganizationLimits
 type OrganizationsOrganizationLimits struct {
-	MaxCanvases         *int32  `json:"maxCanvases,omitempty"`
-	MaxNodesPerCanvas   *int32  `json:"maxNodesPerCanvas,omitempty"`
-	MaxUsers            *int32  `json:"maxUsers,omitempty"`
-	RetentionWindowDays *int32  `json:"retentionWindowDays,omitempty"`
-	MaxEventsPerMonth   *string `json:"maxEventsPerMonth,omitempty"`
-	MaxIntegrations     *int32  `json:"maxIntegrations,omitempty"`
+	MaxCanvases            *int32  `json:"maxCanvases,omitempty"`
+	MaxNodesPerCanvas      *int32  `json:"maxNodesPerCanvas,omitempty"`
+	MaxUsers               *int32  `json:"maxUsers,omitempty"`
+	RetentionWindowDays    *int32  `json:"retentionWindowDays,omitempty"`
+	MaxEventsPerMonth      *string `json:"maxEventsPerMonth,omitempty"`
+	MaxIntegrations        *int32  `json:"maxIntegrations,omitempty"`
+	MaxAgentTokensPerMonth *string `json:"maxAgentTokensPerMonth,omitempty"`
 }
 
 // NewOrganizationsOrganizationLimits instantiates a new OrganizationsOrganizationLimits object
@@ -237,6 +238,38 @@ func (o *OrganizationsOrganizationLimits) SetMaxIntegrations(v int32) {
 	o.MaxIntegrations = &v
 }
 
+// GetMaxAgentTokensPerMonth returns the MaxAgentTokensPerMonth field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationLimits) GetMaxAgentTokensPerMonth() string {
+	if o == nil || IsNil(o.MaxAgentTokensPerMonth) {
+		var ret string
+		return ret
+	}
+	return *o.MaxAgentTokensPerMonth
+}
+
+// GetMaxAgentTokensPerMonthOk returns a tuple with the MaxAgentTokensPerMonth field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationLimits) GetMaxAgentTokensPerMonthOk() (*string, bool) {
+	if o == nil || IsNil(o.MaxAgentTokensPerMonth) {
+		return nil, false
+	}
+	return o.MaxAgentTokensPerMonth, true
+}
+
+// HasMaxAgentTokensPerMonth returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationLimits) HasMaxAgentTokensPerMonth() bool {
+	if o != nil && !IsNil(o.MaxAgentTokensPerMonth) {
+		return true
+	}
+
+	return false
+}
+
+// SetMaxAgentTokensPerMonth gets a reference to the given string and assigns it to the MaxAgentTokensPerMonth field.
+func (o *OrganizationsOrganizationLimits) SetMaxAgentTokensPerMonth(v string) {
+	o.MaxAgentTokensPerMonth = &v
+}
+
 func (o OrganizationsOrganizationLimits) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -264,6 +297,9 @@ func (o OrganizationsOrganizationLimits) ToMap() (map[string]interface{}, error)
 	}
 	if !IsNil(o.MaxIntegrations) {
 		toSerialize["maxIntegrations"] = o.MaxIntegrations
+	}
+	if !IsNil(o.MaxAgentTokensPerMonth) {
+		toSerialize["maxAgentTokensPerMonth"] = o.MaxAgentTokensPerMonth
 	}
 	return toSerialize, nil
 }
