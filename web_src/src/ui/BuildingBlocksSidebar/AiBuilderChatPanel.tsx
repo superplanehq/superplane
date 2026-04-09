@@ -74,7 +74,9 @@ export function AiBuilderChatPanel({
       return;
     }
 
-    container.scrollTop = container.scrollHeight;
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
   }, [aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
   useEffect(() => {
@@ -367,6 +369,7 @@ function AiMessage({ message }: { message: AiBuilderMessage }) {
     wrapperClassName = "w-full py-1";
   } else if (isToolMessage) {
     messageClassName = `flex items-start gap-2 px-2 text-xs leading-relaxed text-gray-500 ${isRunningToolMessage ? "sp-ai-thinking" : ""}`;
+    wrapperClassName = "w-full sp-tool-enter";
   } else {
     messageClassName = "px-2 text-sm text-gray-800";
   }
