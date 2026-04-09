@@ -1,7 +1,6 @@
 import type {
   ComponentBaseMapper,
   TriggerRenderer,
-  ComponentAdditionalDataBuilder,
   EventStateRegistry,
   CustomFieldRenderer,
   TriggerRendererContext,
@@ -235,18 +234,13 @@ import {
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
-import { approvalMapper, approvalDataBuilder, APPROVAL_STATE_REGISTRY } from "./approval";
-import { mergeDataBuilder, mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
+import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
+import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
 import { startTriggerRenderer } from "./start";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
-import {
-  createSafeAdditionalDataBuilder,
-  createSafeComponentMapper,
-  createSafeCustomFieldRenderer,
-  createSafeTriggerRenderer,
-} from "./safeMappers";
+import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -407,11 +401,6 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   elastic: elasticEventStateRegistry,
 };
 
-const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
-  approval: approvalDataBuilder,
-  merge: mergeDataBuilder,
-};
-
 const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
@@ -475,15 +464,6 @@ export function getTriggerRenderer(name: string): TriggerRenderer {
  */
 export function getComponentBaseMapper(name: string): ComponentBaseMapper {
   return createSafeComponentMapper(findRegisteredComponentMapper(name) || noopMapper, name || "noop");
-}
-
-/**
- * Get the appropriate additional data builder for a component type.
- * Returns undefined if no specific builder is registered.
- */
-export function getComponentAdditionalDataBuilder(componentName: string): ComponentAdditionalDataBuilder | undefined {
-  const builder = componentAdditionalDataBuilders[componentName];
-  return builder ? createSafeAdditionalDataBuilder(builder, componentName) : undefined;
 }
 
 /**

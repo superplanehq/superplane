@@ -89,7 +89,7 @@ func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string
 	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithInput(map[string]any{node.NodeID: payload})
-	resolved, err := builder.ResolveExpression(template)
+	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
 	}

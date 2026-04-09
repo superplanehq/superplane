@@ -1,6 +1,6 @@
 import React from "react";
 import { resolveIcon } from "@/lib/utils";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 
 export interface CollapsedComponentProps extends ComponentActionsProps {
   iconSrc?: string;
@@ -27,7 +27,6 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   runDisabledTooltip: _runDisabledTooltip,
   onDuplicate: _onDuplicate,
   onEdit: _onEdit,
-  onConfigure: _onConfigure,
   onDeactivate: _onDeactivate,
   onToggleView: _onToggleView,
   onDelete: _onDelete,

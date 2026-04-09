@@ -1,18 +1,16 @@
 {
-  "maxAllowedTotalIssues": 1226,
+  "maxAllowedTotalIssues": 765,
   "maxAllowedByRule": {
-    "@typescript-eslint/no-explicit-any": 344,
-    "complexity": 270,
-    "@typescript-eslint/consistent-type-imports": 194,
-    "max-statements": 102,
-    "max-lines-per-function": 96,
-    "@typescript-eslint/no-non-null-asserted-optional-chain": 87,
-    "react-hooks/exhaustive-deps": 59,
-    "max-lines": 26,
+    "complexity": 243,
+    "@typescript-eslint/no-explicit-any": 171,
+    "max-statements": 84,
+    "max-lines-per-function": 83,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 83,
+    "react-hooks/exhaustive-deps": 40,
     "react-refresh/only-export-components": 25,
-    "max-depth": 11,
-    "jsx-a11y/label-has-associated-control": 6,
+    "max-lines": 21,
+    "max-depth": 9,
     "max-params": 6
   },
-  "updatedAt": "2026-04-02T19:07:06.575Z"
+  "updatedAt": "2026-04-07T23:39:02.561Z"
 }

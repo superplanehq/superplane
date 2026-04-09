@@ -134,8 +134,14 @@ export function CreateCanvasModal({
             </Alert>
           ) : null}
           <Field>
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Canvas name *</Label>
+            <Label
+              htmlFor="create-canvas-modal-name-input"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Canvas name *
+            </Label>
             <Input
+              id="create-canvas-modal-name-input"
               data-testid="canvas-name-input"
               type="text"
               autoComplete="off"
@@ -163,8 +169,14 @@ export function CreateCanvasModal({
           </Field>
 
           <Field>
-            <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</Label>
+            <Label
+              htmlFor="create-canvas-modal-description-input"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Description
+            </Label>
             <Textarea
+              id="create-canvas-modal-description-input"
               value={description}
               onChange={(e) => {
                 if (e.target.value.length <= MAX_CANVAS_DESCRIPTION_LENGTH) {

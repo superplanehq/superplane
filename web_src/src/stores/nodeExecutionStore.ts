@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { QueryClient } from "@tanstack/react-query";
-import {
+import type { QueryClient } from "@tanstack/react-query";
+import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasEvent,

@@ -8,6 +8,7 @@ import type {
   ComponentsComponent,
   ComponentsEdge,
   ComponentsNode,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
@@ -17,7 +18,7 @@ import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEven
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
+import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
 
 export function collectGroupChildIds(node: ComponentsNode): string[] {
   if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
@@ -136,7 +137,6 @@ export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],
   limit?: number,
-  additionalData?: unknown,
 ): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
 
@@ -152,7 +152,6 @@ export function mapExecutionsToSidebarEvents(
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
       execution: buildExecutionInfo(execution),
-      additionalData,
     });
 
     const { title, subtitle } = execution.rootEvent
@@ -1242,7 +1241,6 @@ export function buildExecutionInfo(execution: CanvasesCanvasNodeExecution): Exec
     resultMessage: execution.resultMessage!,
     metadata: execution.metadata!,
     configuration: execution.configuration!,
-    input: execution.input!,
     outputs: execution.outputs!,
     rootEvent: buildEventInfo(execution.rootEvent!),
   };
@@ -1286,5 +1284,17 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,
+  };
+}
+
+export function buildUserInfo(user?: SuperplaneMeUser | null): User | undefined {
+  if (!user) return undefined;
+
+  return {
+    id: user.id!,
+    name: user.name || "",
+    email: user.email || "",
+    roles: user.roles || [],
+    groups: user.groups || [],
   };
 }

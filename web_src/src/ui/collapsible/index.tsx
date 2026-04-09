@@ -2,7 +2,7 @@
 
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import React from "react";
-import { ComponentActionsProps } from "../types/componentActions";
+import type { ComponentActionsProps } from "../types/componentActions";
 
 const Collapsible = CollapsiblePrimitive.Root;
 

@@ -2,11 +2,10 @@ import type {
   CanvasNodeExecutionResult,
   CanvasNodeExecutionResultReason,
   CanvasesCanvasNodeExecutionState,
-  ComponentsEdge,
+  OrganizationsIntegration,
 } from "@/api-client";
 import type { ComponentBaseProps, EventState, EventStateMap } from "@/ui/componentBase";
 import type { TriggerProps } from "@/ui/trigger";
-import type { QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 /**
@@ -77,12 +76,9 @@ export type ExecutionInfo = {
   result: CanvasNodeExecutionResult;
   resultReason: CanvasNodeExecutionResultReason;
   resultMessage: string;
-  metadata: any;
-  configuration: any;
+  metadata: unknown;
+  configuration: unknown;
   rootEvent: EventInfo;
-  input?: {
-    [key: string]: unknown;
-  };
   outputs?: {
     [key: string]: unknown;
   };
@@ -123,13 +119,17 @@ export type ComponentBaseContext = {
   componentDefinition: ComponentDefinition;
   lastExecutions: ExecutionInfo[];
   nodeQueueItems?: QueueItemInfo[];
-  additionalData?: unknown;
+  currentUser: User | undefined;
+  actions: ActionContext;
+};
+
+export type ActionContext = {
+  invokeNodeExecutionAction: (executionId: string, action: string, parameters: unknown) => Promise<void>;
 };
 
 export type SubtitleContext = {
   node: NodeInfo;
   execution: ExecutionInfo;
-  additionalData?: unknown;
 };
 
 export type ExecutionDetailsContext = {
@@ -138,29 +138,22 @@ export type ExecutionDetailsContext = {
   execution: ExecutionInfo;
 };
 
-/**
- * A component additional data builder creates component-specific data
- * that cannot be derived from the standard parameters alone.
- */
-export interface ComponentAdditionalDataBuilder {
-  buildAdditionalData(context: AdditionalDataBuilderContext): unknown;
-}
-
-export type AdditionalDataBuilderContext = {
-  nodes: NodeInfo[];
-  node: NodeInfo;
-  edges?: ComponentsEdge[];
-  componentDefinition: ComponentDefinition;
-  lastExecutions: ExecutionInfo[];
-  canvasId: string;
-  queryClient: QueryClient;
-  organizationId?: string;
-  currentUser?: User;
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  roles: string[];
+  groups: string[];
 };
 
-export type User = {
-  id?: string;
-  email?: string;
+export type RoleRef = {
+  name: string;
+  displayName: string;
+};
+
+export type GroupRef = {
+  name: string;
+  displayName: string;
 };
 
 /**
@@ -184,7 +177,7 @@ export interface EventStateRegistry {
 export interface CustomFieldRendererContext {
   onRun?: (initialData?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
-  integration?: import("@/api-client").OrganizationsIntegration;
+  integration?: OrganizationsIntegration;
 }
 
 export interface CustomFieldRenderer {
