@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mitchellh/mapstructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -87,6 +88,25 @@ func Test__GetDatabase__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, `database "app_db" was not found in cluster "cluster-2"`)
+	})
+
+	t.Run("cluster expression skips database API validation", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{}
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"databaseCluster": "{{ $.trigger.data.clusterId }}",
+				"database":        "app_db",
+			},
+			Metadata: metadata,
+		})
+
+		require.NoError(t, err)
+
+		var nodeMetadata DatabaseNodeMetadata
+		require.NoError(t, mapstructure.Decode(metadata.Get(), &nodeMetadata))
+		assert.Equal(t, "{{ $.trigger.data.clusterId }}", nodeMetadata.DatabaseClusterID)
+		assert.Equal(t, "{{ $.trigger.data.clusterId }}", nodeMetadata.DatabaseClusterName)
+		assert.Equal(t, "app_db", nodeMetadata.DatabaseName)
 	})
 }
 

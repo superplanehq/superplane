@@ -75,18 +75,18 @@ func resolveDatabaseMetadata(ctx core.SetupContext, clusterID, databaseName stri
 		return err
 	}
 
-	if strings.Contains(databaseName, "{{") {
-		var existing DatabaseNodeMetadata
-		_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+	var existing DatabaseNodeMetadata
+	_ = mapstructure.Decode(ctx.Metadata.Get(), &existing)
+
+	isClusterExpr := strings.Contains(clusterID, "{{")
+	isDatabaseExpr := strings.Contains(databaseName, "{{")
+	if isClusterExpr || isDatabaseExpr {
 		existing.DatabaseName = databaseName
 		return ctx.Metadata.Set(existing)
 	}
 
-	var existing DatabaseNodeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil {
-		if existing.DatabaseClusterID == clusterID && existing.DatabaseName == databaseName {
-			return nil
-		}
+	if existing.DatabaseClusterID == clusterID && existing.DatabaseName == databaseName {
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
