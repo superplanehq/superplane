@@ -193,7 +193,10 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
     monkeypatch.setattr(repl_web, "_run_stream_events", fake_run_stream_events)
 
     request = SimpleNamespace(
-        app=SimpleNamespace(state=SimpleNamespace(session_store=store)),
+        app=SimpleNamespace(state=SimpleNamespace(
+            session_store=store,
+            publisher=MagicMock(),
+        )),
         headers={},
     )
 
