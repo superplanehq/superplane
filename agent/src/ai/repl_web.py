@@ -148,14 +148,17 @@ def _record_usage(
     except Exception as error:
         print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
 
-    publisher.publish_agent_run_finished(
-        organization_id=org_id,
-        chat_id=chat_id,
-        model=model,
-        input_tokens=usage.input_tokens or 0,
-        output_tokens=usage.output_tokens or 0,
-        total_tokens=usage.total_tokens or 0,
-    )
+    try:
+        publisher.publish_agent_run_finished(
+            organization_id=org_id,
+            chat_id=chat_id,
+            model=model,
+            input_tokens=usage.input_tokens or 0,
+            output_tokens=usage.output_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+        )
+    except Exception as error:
+        print(f"[web] failed to publish usage for run {run_id}: {error}", flush=True)
 
 
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
