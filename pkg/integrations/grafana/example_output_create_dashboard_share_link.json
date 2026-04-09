@@ -1,0 +1,9 @@
+{
+  "data": {
+    "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview?viewPanel=2",
+    "dashboardTitle": "Production Overview",
+    "dashboardUid": "cIBgcSjkk"
+  },
+  "timestamp": "2026-03-31T10:24:30Z",
+  "type": "grafana.dashboard.shareLink"
+}
