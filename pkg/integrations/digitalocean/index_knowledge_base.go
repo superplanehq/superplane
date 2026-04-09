@@ -206,7 +206,7 @@ func (i *IndexKnowledgeBase) HandleAction(ctx core.ActionContext) error {
 	case "running", "pending":
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, indexPollInterval)
 	case "failed", "cancelled", "partial":
-		return fmt.Errorf("indexing job %s for knowledge base %s: %s", job.UUID, meta.KBUUID, job.Status)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("indexing job %s for knowledge base %s: %s", job.UUID, meta.KBUUID, job.Status))
 	default:
 		return ctx.Requests.ScheduleActionCall("poll", map[string]any{}, indexPollInterval)
 	}
