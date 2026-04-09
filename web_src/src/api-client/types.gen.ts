@@ -237,6 +237,7 @@ export type CanvasesCanvasEventWithExecutions = {
   createdAt?: string;
   executions?: Array<CanvasesCanvasNodeExecutionRef>;
   customName?: string;
+  reportEntry?: string;
 };
 
 export type CanvasesCanvasMemory = {
@@ -286,6 +287,7 @@ export type CanvasesCanvasNodeExecution = {
   childExecutions?: Array<CanvasesCanvasNodeExecution>;
   rootEvent?: CanvasesCanvasEvent;
   cancelledBy?: SuperplaneCanvasesUserRef;
+  reportEntry?: string;
 };
 
 /**

@@ -53,9 +53,14 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	}
 
 	wrappedPayload := map[string]any{"data": payload}
-	customName, err := s.resolveCustomName(wrappedPayload)
+	customName, err := s.resolveConfigTemplate("customName", wrappedPayload)
 	if err == nil && customName != nil {
 		event.CustomName = customName
+	}
+
+	reportEntry, err := s.resolveConfigTemplate("reportTemplate", wrappedPayload)
+	if err == nil && reportEntry != nil {
+		event.ReportEntry = reportEntry
 	}
 
 	err = s.tx.Create(&event).Error
@@ -70,13 +75,13 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	return nil
 }
 
-func (s *EventContext) resolveCustomName(payload any) (*string, error) {
+func (s *EventContext) resolveConfigTemplate(fieldName string, payload any) (*string, error) {
 	config := s.node.Configuration.Data()
 	if config == nil {
 		return nil, nil
 	}
 
-	rawTemplate, ok := config["customName"]
+	rawTemplate, ok := config[fieldName]
 	if !ok || rawTemplate == nil {
 		return nil, nil
 	}

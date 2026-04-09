@@ -44,9 +44,14 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	customName, err := resolveCustomName(node, data)
+	customName, err := resolveConfigTemplate(node, "customName", data)
 	if err == nil && customName != nil {
 		event.CustomName = customName
+	}
+
+	reportEntry, err := resolveConfigTemplate(node, "reportTemplate", data)
+	if err == nil && reportEntry != nil {
+		event.ReportEntry = reportEntry
 	}
 
 	if err := database.Conn().Create(&event).Error; err != nil {
@@ -65,13 +70,13 @@ func EmitNodeEvent(
 	}, nil
 }
 
-func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string, error) {
+func resolveConfigTemplate(node *models.CanvasNode, fieldName string, payload map[string]any) (*string, error) {
 	config := node.Configuration.Data()
 	if config == nil {
 		return nil, nil
 	}
 
-	rawTemplate, ok := config["customName"]
+	rawTemplate, ok := config[fieldName]
 	if !ok || rawTemplate == nil {
 		return nil, nil
 	}

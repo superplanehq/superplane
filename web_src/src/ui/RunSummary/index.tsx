@@ -1,4 +1,6 @@
 import React from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
@@ -30,6 +32,7 @@ interface Step {
   startOffsetMs: number;
   durationMs: number;
   error?: string;
+  reportEntry?: string;
   isTrigger: boolean;
 }
 
@@ -156,6 +159,7 @@ function buildSteps(
       status: "success",
       startOffsetMs: 0,
       durationMs: 0,
+      reportEntry: rootEvent.reportEntry || undefined,
       isTrigger: true,
     });
   }
@@ -179,6 +183,7 @@ function buildSteps(
       startOffsetMs: Math.max(0, startMs - runStartMs),
       durationMs: dur,
       error: exec.result === "RESULT_FAILED" && exec.resultMessage ? exec.resultMessage : undefined,
+      reportEntry: exec.reportEntry || undefined,
       isTrigger: false,
     });
   }
@@ -356,6 +361,11 @@ export function RunSummary({ runData, workflowNodes, componentIconMap }: RunSumm
                           </>
                         )}
                       </div>
+                      {step.reportEntry && (
+                        <div className="mt-1.5 prose prose-xs prose-gray max-w-none text-xs text-gray-700 [&_a]:text-blue-600 [&_a]:underline [&_p]:my-0.5 [&_ul]:my-0.5 [&_ol]:my-0.5 [&_li]:my-0 [&_code]:rounded [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[10px]">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.reportEntry}</ReactMarkdown>
+                        </div>
+                      )}
                       {step.error && (
                         <div className="mt-1 rounded bg-red-50 px-2 py-1 text-xs text-red-600">{step.error}</div>
                       )}

@@ -206,6 +206,7 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 			Outputs:             outputs,
 			RootEvent:           rootEvent,
 			CancelledBy:         cancelledByRef(execution.CancelledBy, cancelledByUsersByID),
+			ReportEntry:         execution.ReportEntry,
 		}
 
 		if len(childExecutions) == 0 {

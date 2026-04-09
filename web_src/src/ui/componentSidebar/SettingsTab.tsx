@@ -658,6 +658,7 @@ export function SettingsTab({
           <div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
             {configurationFields.map((field) => {
               if (!field.name) return null;
+              if (field.name === "reportTemplate") return null;
               const fieldName = field.name;
               return (
                 <ConfigurationFieldRenderer

@@ -21,14 +21,15 @@ var _ MappedNullable = &CanvasesCanvasEventWithExecutions{}
 
 // CanvasesCanvasEventWithExecutions struct for CanvasesCanvasEventWithExecutions
 type CanvasesCanvasEventWithExecutions struct {
-	Id         *string                          `json:"id,omitempty"`
-	CanvasId   *string                          `json:"canvasId,omitempty"`
-	NodeId     *string                          `json:"nodeId,omitempty"`
-	Channel    *string                          `json:"channel,omitempty"`
-	Data       map[string]interface{}           `json:"data,omitempty"`
-	CreatedAt  *time.Time                       `json:"createdAt,omitempty"`
-	Executions []CanvasesCanvasNodeExecutionRef `json:"executions,omitempty"`
-	CustomName *string                          `json:"customName,omitempty"`
+	Id          *string                          `json:"id,omitempty"`
+	CanvasId    *string                          `json:"canvasId,omitempty"`
+	NodeId      *string                          `json:"nodeId,omitempty"`
+	Channel     *string                          `json:"channel,omitempty"`
+	Data        map[string]interface{}           `json:"data,omitempty"`
+	CreatedAt   *time.Time                       `json:"createdAt,omitempty"`
+	Executions  []CanvasesCanvasNodeExecutionRef `json:"executions,omitempty"`
+	CustomName  *string                          `json:"customName,omitempty"`
+	ReportEntry *string                          `json:"reportEntry,omitempty"`
 }
 
 // NewCanvasesCanvasEventWithExecutions instantiates a new CanvasesCanvasEventWithExecutions object
@@ -304,6 +305,38 @@ func (o *CanvasesCanvasEventWithExecutions) SetCustomName(v string) {
 	o.CustomName = &v
 }
 
+// GetReportEntry returns the ReportEntry field value if set, zero value otherwise.
+func (o *CanvasesCanvasEventWithExecutions) GetReportEntry() string {
+	if o == nil || IsNil(o.ReportEntry) {
+		var ret string
+		return ret
+	}
+	return *o.ReportEntry
+}
+
+// GetReportEntryOk returns a tuple with the ReportEntry field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasEventWithExecutions) GetReportEntryOk() (*string, bool) {
+	if o == nil || IsNil(o.ReportEntry) {
+		return nil, false
+	}
+	return o.ReportEntry, true
+}
+
+// HasReportEntry returns a boolean if a field has been set.
+func (o *CanvasesCanvasEventWithExecutions) HasReportEntry() bool {
+	if o != nil && !IsNil(o.ReportEntry) {
+		return true
+	}
+
+	return false
+}
+
+// SetReportEntry gets a reference to the given string and assigns it to the ReportEntry field.
+func (o *CanvasesCanvasEventWithExecutions) SetReportEntry(v string) {
+	o.ReportEntry = &v
+}
+
 func (o CanvasesCanvasEventWithExecutions) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -337,6 +370,9 @@ func (o CanvasesCanvasEventWithExecutions) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.CustomName) {
 		toSerialize["customName"] = o.CustomName
+	}
+	if !IsNil(o.ReportEntry) {
+		toSerialize["reportEntry"] = o.ReportEntry
 	}
 	return toSerialize, nil
 }

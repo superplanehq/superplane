@@ -4598,6 +4598,9 @@
         },
         "customName": {
           "type": "string"
+        },
+        "reportEntry": {
+          "type": "string"
         }
       }
     },
@@ -4709,6 +4712,9 @@
         },
         "cancelledBy": {
           "$ref": "#/definitions/SuperplaneCanvasesUserRef"
+        },
+        "reportEntry": {
+          "type": "string"
         }
       },
       "description": "Full description of a canvas node execution.\nShould only be used for endpoints specific to executions."

@@ -3,6 +3,7 @@ package contexts
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,6 +15,7 @@ type ExecutionStateContext struct {
 	tx             *gorm.DB
 	maxPayloadSize int
 	onNewEvents    func([]models.CanvasEvent)
+	configBuilder  *NodeConfigurationBuilder
 }
 
 func NewExecutionStateContext(
@@ -29,11 +31,17 @@ func NewExecutionStateContext(
 	}
 }
 
+func (s *ExecutionStateContext) SetConfigBuilder(builder *NodeConfigurationBuilder) {
+	s.configBuilder = builder
+}
+
 func (s *ExecutionStateContext) IsFinished() bool {
 	return s.execution.State == models.CanvasNodeExecutionStateFinished
 }
 
 func (s *ExecutionStateContext) Pass() error {
+	s.resolveReportEntry()
+
 	newEvents, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
 	if err != nil {
 		return err
@@ -70,6 +78,8 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))
 	}
 
+	s.resolveReportEntry()
+
 	newEvents, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {
 		return err
@@ -80,6 +90,42 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	}
 
 	return nil
+}
+
+func (s *ExecutionStateContext) resolveReportEntry() {
+	if s.configBuilder == nil {
+		return
+	}
+
+	config := s.execution.Configuration.Data()
+	if config == nil {
+		return
+	}
+
+	rawTemplate, ok := config["reportTemplate"]
+	if !ok || rawTemplate == nil {
+		return
+	}
+
+	tmpl, ok := rawTemplate.(string)
+	if !ok {
+		return
+	}
+
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
+		return
+	}
+
+	resolved, err := s.configBuilder.ResolveTemplateExpressions(tmpl)
+	if err != nil {
+		return
+	}
+
+	resolvedStr := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedStr != "" {
+		s.execution.ReportEntry = resolvedStr
+	}
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {

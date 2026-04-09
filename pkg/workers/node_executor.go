@@ -366,6 +366,9 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
 	}
 
+	executionState := contexts.NewExecutionStateContext(tx, execution, onNewEvents)
+	executionState.SetConfigBuilder(builder)
+
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -380,7 +383,7 @@ func (w *NodeExecutor) executeComponentNode(tx *gorm.DB, execution *models.Canva
 		HTTP:           w.registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
-		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+		ExecutionState: executionState,
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
 		Notifications:  contexts.NewNotificationContext(tx, workflow.OrganizationID, execution.WorkflowID),

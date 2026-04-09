@@ -88,6 +88,9 @@ type CanvasNodeExecution struct {
 	// Reference to the canvas version that was live when this execution was created.
 	// Used to reconstruct the graph snapshot for run view.
 	CanvasVersionID *uuid.UUID
+
+	// Resolved report template markdown, populated at execution completion time.
+	ReportEntry string
 }
 
 func (e *CanvasNodeExecution) TableName() string {

@@ -25,6 +25,7 @@ import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
+import { ReportTab } from "./ReportTab";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import type {
@@ -112,8 +113,8 @@ interface ComponentSidebarProps {
   hideRunsTab?: boolean; // Hide the "Runs" tab when showing only settings
   hideDocsTab?: boolean; // Hide the "Info" tab (e.g. for annotation nodes)
   hideNodeId?: boolean; // Hide the node ID with copy functionality
-  currentTab?: "latest" | "settings" | "docs";
-  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  currentTab?: "latest" | "settings" | "docs" | "report";
+  onTabChange?: (tab: "latest" | "settings" | "docs" | "report") => void;
 
   // Docs tab props
   componentDescription?: string;
@@ -656,7 +657,7 @@ export const ComponentSidebar = ({
         >
           <Tabs
             value={activeTab}
-            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs")}
+            onValueChange={(value) => onTabChange?.(value as "latest" | "settings" | "docs" | "report")}
             className="flex-1"
           >
             {showSettingsTab && (
@@ -699,6 +700,16 @@ export const ComponentSidebar = ({
                       Info
                     </button>
                   )}
+                  <button
+                    onClick={() => onTabChange?.("report")}
+                    className={`py-2 mr-4 text-sm mb-[-1px] font-medium border-b transition-colors ${
+                      activeTab === "report"
+                        ? "border-gray-700 text-gray-800 dark:text-blue-400 dark:border-blue-600"
+                        : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    Report
+                  </button>
                 </div>
               </div>
             )}
@@ -770,6 +781,25 @@ export const ComponentSidebar = ({
                   payloadLabel={componentPayloadLabel}
                   documentationUrl={componentDocumentationUrl}
                   configurationFields={nodeConfigurationFields}
+                />
+              </TabsContent>
+            )}
+
+            {showSettingsTab && (
+              <TabsContent
+                value="report"
+                forceMount
+                className="mt-0 overflow-y-auto"
+                style={{ maxHeight: "calc(100vh - 160px)", display: activeTab === "report" ? undefined : "none" }}
+              >
+                <ReportTab
+                  configuration={nodeConfiguration || {}}
+                  onSave={onNodeConfigSave || (() => {})}
+                  nodeName={nodeName || ""}
+                  readOnly={readOnly}
+                  configurationSaveMode={configurationSaveMode}
+                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  integrationRef={integrationRef}
                 />
               </TabsContent>
             )}

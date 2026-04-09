@@ -3448,6 +3448,7 @@ type CanvasNodeExecution struct {
 	ChildExecutions     []*CanvasNodeExecution           `protobuf:"bytes,15,rep,name=child_executions,json=childExecutions,proto3" json:"child_executions,omitempty"`
 	RootEvent           *CanvasEvent                     `protobuf:"bytes,16,opt,name=root_event,json=rootEvent,proto3" json:"root_event,omitempty"`
 	CancelledBy         *UserRef                         `protobuf:"bytes,17,opt,name=cancelled_by,json=cancelledBy,proto3" json:"cancelled_by,omitempty"`
+	ReportEntry         string                           `protobuf:"bytes,18,opt,name=report_entry,json=reportEntry,proto3" json:"report_entry,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -3599,6 +3600,13 @@ func (x *CanvasNodeExecution) GetCancelledBy() *UserRef {
 		return x.CancelledBy
 	}
 	return nil
+}
+
+func (x *CanvasNodeExecution) GetReportEntry() string {
+	if x != nil {
+		return x.ReportEntry
+	}
+	return ""
 }
 
 type CanvasNodeQueueItem struct {
@@ -4375,6 +4383,7 @@ type CanvasEventWithExecutions struct {
 	CreatedAt     *timestamp.Timestamp      `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Executions    []*CanvasNodeExecutionRef `protobuf:"bytes,7,rep,name=executions,proto3" json:"executions,omitempty"`
 	CustomName    string                    `protobuf:"bytes,8,opt,name=custom_name,json=customName,proto3" json:"custom_name,omitempty"`
+	ReportEntry   string                    `protobuf:"bytes,9,opt,name=report_entry,json=reportEntry,proto3" json:"report_entry,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4461,6 +4470,13 @@ func (x *CanvasEventWithExecutions) GetExecutions() []*CanvasNodeExecutionRef {
 func (x *CanvasEventWithExecutions) GetCustomName() string {
 	if x != nil {
 		return x.CustomName
+	}
+	return ""
+}
+
+func (x *CanvasEventWithExecutions) GetReportEntry() string {
+	if x != nil {
+		return x.ReportEntry
 	}
 	return ""
 }
@@ -5923,7 +5939,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xd6\t\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xf9\t\n" +
 	"\x13CanvasNodeExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
@@ -5945,7 +5961,8 @@ const file_canvases_proto_rawDesc = "" +
 	"\x10child_executions\x18\x0f \x03(\v2(.Superplane.Canvases.CanvasNodeExecutionR\x0fchildExecutions\x12?\n" +
 	"\n" +
 	"root_event\x18\x10 \x01(\v2 .Superplane.Canvases.CanvasEventR\trootEvent\x12?\n" +
-	"\fcancelled_by\x18\x11 \x01(\v2\x1c.Superplane.Canvases.UserRefR\vcancelledBy\"T\n" +
+	"\fcancelled_by\x18\x11 \x01(\v2\x1c.Superplane.Canvases.UserRefR\vcancelledBy\x12!\n" +
+	"\freport_entry\x18\x12 \x01(\tR\vreportEntry\"T\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
@@ -6020,7 +6037,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x04data\x18\x06 \x01(\v2\x17.google.protobuf.StructR\x04data\x129\n" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x12\n" +
-	"\x04root\x18\b \x01(\bR\x04root\"\xd1\x02\n" +
+	"\x04root\x18\b \x01(\bR\x04root\"\xf4\x02\n" +
 	"\x19CanvasEventWithExecutions\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tcanvas_id\x18\x02 \x01(\tR\bcanvasId\x12\x17\n" +
@@ -6033,7 +6050,8 @@ const file_canvases_proto_rawDesc = "" +
 	"executions\x18\a \x03(\v2+.Superplane.Canvases.CanvasNodeExecutionRefR\n" +
 	"executions\x12\x1f\n" +
 	"\vcustom_name\x18\b \x01(\tR\n" +
-	"customName\"T\n" +
+	"customName\x12!\n" +
+	"\freport_entry\x18\t \x01(\tR\vreportEntry\"T\n" +
 	"\x1aListEventExecutionsRequest\x12\x1b\n" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x19\n" +
 	"\bevent_id\x18\x02 \x01(\tR\aeventId\"g\n" +

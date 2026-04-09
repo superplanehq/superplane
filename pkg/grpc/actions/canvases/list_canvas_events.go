@@ -120,14 +120,15 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 	}
 
 	return &pb.CanvasEventWithExecutions{
-		Id:         event.ID.String(),
-		CanvasId:   event.WorkflowID.String(),
-		NodeId:     event.NodeID,
-		Channel:    event.Channel,
-		CustomName: valueOrEmpty(event.CustomName),
-		Data:       s,
-		CreatedAt:  timestamppb.New(*event.CreatedAt),
-		Executions: executionInfos,
+		Id:          event.ID.String(),
+		CanvasId:    event.WorkflowID.String(),
+		NodeId:      event.NodeID,
+		Channel:     event.Channel,
+		CustomName:  valueOrEmpty(event.CustomName),
+		ReportEntry: valueOrEmpty(event.ReportEntry),
+		Data:        s,
+		CreatedAt:   timestamppb.New(*event.CreatedAt),
+		Executions:  executionInfos,
 	}, nil
 }
 

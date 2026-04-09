@@ -749,7 +749,7 @@ function CanvasPage(props: CanvasPageProps) {
   cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
-  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
+  const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs" | "report">("latest");
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -1632,8 +1632,8 @@ function Sidebar({
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
-  currentTab?: "latest" | "settings" | "docs";
-  onTabChange?: (tab: "latest" | "settings" | "docs") => void;
+  currentTab?: "latest" | "settings" | "docs" | "report";
+  onTabChange?: (tab: "latest" | "settings" | "docs" | "report") => void;
   organizationId?: string;
   getCustomField?: (
     nodeId: string,
@@ -2141,7 +2141,7 @@ function CanvasContent({
   onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
-  setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
+  setCurrentTab?: (tab: "latest" | "settings" | "docs" | "report") => void;
   onUndo?: () => void;
   canUndo?: boolean;
   organizationId?: string;

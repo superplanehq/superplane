@@ -25,6 +25,7 @@ func DescribeComponent(ctx context.Context, registry *registry.Registry, name st
 	}
 
 	configFields := component.Configuration()
+	configFields = actions.AppendGlobalComponentFields(configFields)
 	configuration := make([]*configpb.Field, len(configFields))
 	for i, field := range configFields {
 		configuration[i] = actions.ConfigurationFieldToProto(field)

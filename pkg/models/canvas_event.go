@@ -21,6 +21,7 @@ type CanvasEvent struct {
 	NodeID      string
 	Channel     string
 	CustomName  *string
+	ReportEntry *string
 	Data        datatypes.JSONType[any]
 	ExecutionID *uuid.UUID
 	State       string

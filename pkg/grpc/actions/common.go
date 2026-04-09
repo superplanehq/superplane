@@ -1091,6 +1091,7 @@ func SerializeComponents(in []core.Component) []*componentpb.Component {
 		}
 
 		configFields := component.Configuration()
+		configFields = AppendGlobalComponentFields(configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1150,6 +1151,31 @@ func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Fie
 		Togglable:   true,
 		Description: "Optional run title template. Use root() to access event data, e.g. {{ root().field }}.",
 		Placeholder: "Deploy {{ root().repository.name }} @ {{ root().head_commit.id }}",
+	})
+
+	fields = appendReportTemplateField(fields)
+	return fields
+}
+
+func AppendGlobalComponentFields(fields []configuration.Field) []configuration.Field {
+	fields = appendReportTemplateField(fields)
+	return fields
+}
+
+func appendReportTemplateField(fields []configuration.Field) []configuration.Field {
+	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
+		return field.Name == "reportTemplate"
+	}) {
+		return fields
+	}
+
+	fields = append(fields, configuration.Field{
+		Name:        "reportTemplate",
+		Label:       "Report template (optional)",
+		Type:        configuration.FieldTypeText,
+		Togglable:   true,
+		Description: "Markdown template appended to the run report. Use root() for trigger data, or the full expression syntax for component data.",
+		Placeholder: "[View workflow]({{ root().data.workflow.url }})",
 	})
 
 	return fields

@@ -38,6 +38,7 @@ type CanvasesCanvasNodeExecution struct {
 	ChildExecutions     []CanvasesCanvasNodeExecution     `json:"childExecutions,omitempty"`
 	RootEvent           *CanvasesCanvasEvent              `json:"rootEvent,omitempty"`
 	CancelledBy         *SuperplaneCanvasesUserRef        `json:"cancelledBy,omitempty"`
+	ReportEntry         *string                           `json:"reportEntry,omitempty"`
 }
 
 // NewCanvasesCanvasNodeExecution instantiates a new CanvasesCanvasNodeExecution object
@@ -613,6 +614,38 @@ func (o *CanvasesCanvasNodeExecution) SetCancelledBy(v SuperplaneCanvasesUserRef
 	o.CancelledBy = &v
 }
 
+// GetReportEntry returns the ReportEntry field value if set, zero value otherwise.
+func (o *CanvasesCanvasNodeExecution) GetReportEntry() string {
+	if o == nil || IsNil(o.ReportEntry) {
+		var ret string
+		return ret
+	}
+	return *o.ReportEntry
+}
+
+// GetReportEntryOk returns a tuple with the ReportEntry field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *CanvasesCanvasNodeExecution) GetReportEntryOk() (*string, bool) {
+	if o == nil || IsNil(o.ReportEntry) {
+		return nil, false
+	}
+	return o.ReportEntry, true
+}
+
+// HasReportEntry returns a boolean if a field has been set.
+func (o *CanvasesCanvasNodeExecution) HasReportEntry() bool {
+	if o != nil && !IsNil(o.ReportEntry) {
+		return true
+	}
+
+	return false
+}
+
+// SetReportEntry gets a reference to the given string and assigns it to the ReportEntry field.
+func (o *CanvasesCanvasNodeExecution) SetReportEntry(v string) {
+	o.ReportEntry = &v
+}
+
 func (o CanvasesCanvasNodeExecution) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -673,6 +706,9 @@ func (o CanvasesCanvasNodeExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CancelledBy) {
 		toSerialize["cancelledBy"] = o.CancelledBy
+	}
+	if !IsNil(o.ReportEntry) {
+		toSerialize["reportEntry"] = o.ReportEntry
 	}
 	return toSerialize, nil
 }

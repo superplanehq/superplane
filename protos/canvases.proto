@@ -800,6 +800,7 @@ message CanvasNodeExecution {
   repeated CanvasNodeExecution child_executions = 15;
   CanvasEvent root_event = 16;
   UserRef cancelled_by = 17;
+  string report_entry = 18;
 }
 
 message CanvasNodeQueueItem {
@@ -885,6 +886,7 @@ message CanvasEventWithExecutions {
   google.protobuf.Timestamp created_at = 6;
   repeated CanvasNodeExecutionRef executions = 7;
   string custom_name = 8;
+  string report_entry = 9;
 }
 
 message ListEventExecutionsRequest {
