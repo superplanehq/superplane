@@ -75,7 +75,7 @@ export function AiBuilderChatPanel({
     }
 
     requestAnimationFrame(() => {
-      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      container.scrollTop = container.scrollHeight;
     });
   }, [aiMessages, pendingProposal, isGeneratingResponse, aiError]);
 
