@@ -2,7 +2,7 @@ import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { MetadataItem } from "@/ui/metadataList";
-import { getBackgroundColorClass } from "@/utils/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
 import doIcon from "@/assets/icons/integrations/digitalocean.svg";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import type {
