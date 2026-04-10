@@ -334,25 +334,6 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	orgIDs := make([]string, 0, len(organizations))
-	for _, org := range organizations {
-		orgIDs = append(orgIDs, org.ID.String())
-	}
-
-	canvasCounts, err := models.CountCanvasesByOrganizationIDs(orgIDs)
-	if err != nil {
-		log.Errorf("admin: failed to count canvases: %v", err)
-		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
-		return
-	}
-
-	memberCounts, err := models.CountActiveUsersByOrganizationIDs(orgIDs)
-	if err != nil {
-		log.Errorf("admin: failed to count members: %v", err)
-		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
-		return
-	}
-
 	type orgItem struct {
 		ID          string  `json:"id"`
 		Name        string  `json:"name"`
@@ -364,13 +345,12 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 
 	items := make([]orgItem, 0, len(organizations))
 	for _, org := range organizations {
-		id := org.ID.String()
 		item := orgItem{
-			ID:          id,
+			ID:          org.ID.String(),
 			Name:        org.Name,
 			Description: org.Description,
-			CanvasCount: canvasCounts[id],
-			MemberCount: memberCounts[id],
+			CanvasCount: org.CanvasCount,
+			MemberCount: org.MemberCount,
 		}
 
 		if org.CreatedAt != nil {

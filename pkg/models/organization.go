@@ -30,7 +30,13 @@ func (o *Organization) IsProviderAllowed(provider string) bool {
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
-func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]Organization, int64, error) {
+type OrganizationWithCounts struct {
+	Organization
+	CanvasCount int64 `gorm:"column:canvas_count"`
+	MemberCount int64 `gorm:"column:member_count"`
+}
+
+func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
 	query := database.Conn().
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
@@ -75,7 +81,7 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 
 	orderClause := resolveOrganizationOrderClause(sortBy, sortDirection)
 
-	var organizations []Organization
+	var organizations []OrganizationWithCounts
 	if err := query.Order(orderClause).Find(&organizations).Error; err != nil {
 		return nil, 0, err
 	}
