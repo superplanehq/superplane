@@ -59,13 +59,13 @@ func TestListAllOrganizations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	t.Run("returns empty list when no organizations exist", func(t *testing.T) {
-		orgs, total, err := ListAllOrganizations("", 50, 0)
+		orgs, total, err := ListAllOrganizations("", 50, 0, "", "")
 		require.NoError(t, err)
 		assert.Empty(t, orgs)
 		assert.Equal(t, int64(0), total)
 	})
 
-	t.Run("returns all organizations ordered by name", func(t *testing.T) {
+	t.Run("returns all organizations sorted by name", func(t *testing.T) {
 		_, err := CreateOrganization("Zebra Org", "")
 		require.NoError(t, err)
 		_, err = CreateOrganization("Alpha Org", "")
@@ -73,7 +73,7 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Middle Org", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 50, 0)
+		orgs, total, err := ListAllOrganizations("", 50, 0, "name", "asc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -93,7 +93,7 @@ func TestListAllOrganizations(t *testing.T) {
 		err = SoftDeleteOrganization(toDelete.ID.String())
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 50, 0)
+		orgs, total, err := ListAllOrganizations("", 50, 0, "", "")
 		require.NoError(t, err)
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
@@ -108,7 +108,7 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Beta Inc", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("alpha", 50, 0)
+		orgs, total, err := ListAllOrganizations("alpha", 50, 0, "", "")
 		require.NoError(t, err)
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
@@ -125,12 +125,12 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Ccc", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 2, 0)
+		orgs, total, err := ListAllOrganizations("", 2, 0, "", "")
 		require.NoError(t, err)
 		assert.Len(t, orgs, 2)
 		assert.Equal(t, int64(3), total)
 
-		orgs2, _, err := ListAllOrganizations("", 2, 2)
+		orgs2, _, err := ListAllOrganizations("", 2, 2, "", "")
 		require.NoError(t, err)
 		assert.Len(t, orgs2, 1)
 	})

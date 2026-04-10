@@ -2,7 +2,7 @@ import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast } from "@/lib/toast";
-import { Eye } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
@@ -15,9 +15,42 @@ interface AdminAccount {
   name: string;
   email: string;
   installation_admin: boolean;
+  created_at?: string;
 }
 
+type SortField = "created_at" | "name" | "email";
+type SortDirection = "asc" | "desc";
+
 const PAGE_SIZE = 50;
+
+function SortableHeader({
+  label,
+  field,
+  currentSort,
+  currentDirection,
+  onSort,
+  className = "",
+}: {
+  label: string;
+  field: SortField;
+  currentSort: SortField;
+  currentDirection: SortDirection;
+  onSort: (field: SortField) => void;
+  className?: string;
+}) {
+  const isActive = currentSort === field;
+  return (
+    <th
+      className={`text-left px-4 py-2.5 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-700 transition-colors ${className}`}
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {isActive && (currentDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+      </span>
+    </th>
+  );
+}
 
 const AccountsList: React.FC = () => {
   const { account: currentAccount } = useAccount();
@@ -28,12 +61,16 @@ const AccountsList: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<AdminAccount | null>(null);
+  const [sortBy, setSortBy] = useState<SortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  const fetchAccounts = useCallback(async (s: string, o: number) => {
+  const fetchAccounts = useCallback(async (s: string, o: number, sort: SortField, direction: SortDirection) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(o) });
       if (s) params.set("search", s);
+      params.set("sort_by", sort);
+      params.set("sort_direction", direction);
       const res = await fetch(`/admin/api/accounts?${params}`, { credentials: "include" });
       if (res.ok) {
         const d = await res.json();
@@ -50,16 +87,25 @@ const AccountsList: React.FC = () => {
   useEffect(() => {
     const t = setTimeout(() => {
       setOffset(0);
-      fetchAccounts(search, 0);
+      fetchAccounts(search, 0, sortBy, sortDirection);
     }, 200);
     return () => clearTimeout(t);
-  }, [search, fetchAccounts]);
+  }, [search, sortBy, sortDirection, fetchAccounts]);
 
   const onToggle = async (acc: AdminAccount) => {
     setConfirmTarget(null);
     setToggling(acc.id);
-    await toggleAdmin(acc, () => fetchAccounts(search, offset));
+    await toggleAdmin(acc, () => fetchAccounts(search, offset, sortBy, sortDirection));
     setToggling(null);
+  };
+
+  const handleSort = (field: SortField) => {
+    if (field === sortBy) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(field);
+      setSortDirection(field === "name" || field === "email" ? "asc" : "desc");
+    }
   };
 
   if (loading && accounts.length === 0)
@@ -97,9 +143,28 @@ const AccountsList: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Name</th>
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Email</th>
+                  <SortableHeader
+                    label="Name"
+                    field="name"
+                    currentSort={sortBy}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
+                  <SortableHeader
+                    label="Email"
+                    field="email"
+                    currentSort={sortBy}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                   <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Access</th>
+                  <SortableHeader
+                    label="Created"
+                    field="created_at"
+                    currentSort={sortBy}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  />
                   <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -128,9 +193,9 @@ const AccountsList: React.FC = () => {
             offset={offset}
             total={total}
             pageSize={PAGE_SIZE}
-            onPageChange={(o) => {
+            onPageChange={(o: number) => {
               setOffset(o);
-              fetchAccounts(search, o);
+              fetchAccounts(search, o, sortBy, sortDirection);
             }}
           />
         </>

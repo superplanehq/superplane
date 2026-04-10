@@ -74,6 +74,10 @@ func parsePagination(r *http.Request) (search string, limit, offset int) {
 	return search, limit, offset
 }
 
+func parseSorting(r *http.Request) (sortBy, sortDirection string) {
+	return r.URL.Query().Get("sort_by"), r.URL.Query().Get("sort_direction")
+}
+
 func (s *Server) adminGetInstallationNetworkSettings(w http.ResponseWriter, r *http.Request) {
 	response, err := s.buildInstallationSettingsResponse()
 	if err != nil {
@@ -276,8 +280,9 @@ func resolveBoolField(value *bool, fallback bool) bool {
 // adminListAccounts returns paginated accounts in the installation.
 func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 	search, limit, offset := parsePagination(r)
+	sortBy, sortDirection := parseSorting(r)
 
-	accounts, total, err := models.ListAccounts(search, limit, offset)
+	accounts, total, err := models.ListAccounts(search, limit, offset, sortBy, sortDirection)
 	if err != nil {
 		log.Errorf("admin: failed to list accounts: %v", err)
 		http.Error(w, "Failed to list accounts", http.StatusInternalServerError)
@@ -285,20 +290,28 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type accountItem struct {
-		ID                string `json:"id"`
-		Name              string `json:"name"`
-		Email             string `json:"email"`
-		InstallationAdmin bool   `json:"installation_admin"`
+		ID                string  `json:"id"`
+		Name              string  `json:"name"`
+		Email             string  `json:"email"`
+		InstallationAdmin bool    `json:"installation_admin"`
+		CreatedAt         *string `json:"created_at,omitempty"`
 	}
 
 	items := make([]accountItem, 0, len(accounts))
 	for _, a := range accounts {
-		items = append(items, accountItem{
+		item := accountItem{
 			ID:                a.ID.String(),
 			Name:              a.Name,
 			Email:             a.Email,
 			InstallationAdmin: a.IsInstallationAdmin(),
-		})
+		}
+
+		if a.CreatedAt != nil {
+			formatted := a.CreatedAt.Format(time.RFC3339)
+			item.CreatedAt = &formatted
+		}
+
+		items = append(items, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -312,8 +325,9 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
 	search, limit, offset := parsePagination(r)
+	sortBy, sortDirection := parseSorting(r)
 
-	organizations, total, err := models.ListAllOrganizations(search, limit, offset)
+	organizations, total, err := models.ListAllOrganizations(search, limit, offset, sortBy, sortDirection)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
@@ -340,23 +354,31 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 	}
 
 	type orgItem struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		CanvasCount int64  `json:"canvas_count"`
-		MemberCount int64  `json:"member_count"`
+		ID          string  `json:"id"`
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		CanvasCount int64   `json:"canvas_count"`
+		MemberCount int64   `json:"member_count"`
+		CreatedAt   *string `json:"created_at,omitempty"`
 	}
 
 	items := make([]orgItem, 0, len(organizations))
 	for _, org := range organizations {
 		id := org.ID.String()
-		items = append(items, orgItem{
+		item := orgItem{
 			ID:          id,
 			Name:        org.Name,
 			Description: org.Description,
 			CanvasCount: canvasCounts[id],
 			MemberCount: memberCounts[id],
-		})
+		}
+
+		if org.CreatedAt != nil {
+			formatted := org.CreatedAt.Format(time.RFC3339)
+			item.CreatedAt = &formatted
+		}
+
+		items = append(items, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

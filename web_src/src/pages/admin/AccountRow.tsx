@@ -8,6 +8,7 @@ interface AdminAccount {
   name: string;
   email: string;
   installation_admin: boolean;
+  created_at?: string;
 }
 
 interface AccountRowProps {
@@ -18,11 +19,24 @@ interface AccountRowProps {
   impersonateButton: React.ReactNode;
 }
 
+function formatDate(dateString?: string): string {
+  if (!dateString) return "—";
+  return new Date(dateString).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function AccountRow({ acc, isSelf, toggling, onPromoteDemote, impersonateButton }: AccountRowProps) {
   return (
     <tr className="border-b border-slate-50 last:border-0">
       <td className="px-4 py-2.5 text-gray-800">
-        {acc.name}
+        {acc.name || (
+          <span className="text-gray-400 italic" title={acc.id}>
+            {acc.id.slice(0, 8)}...
+          </span>
+        )}
         {isSelf && <span className="ml-1.5 text-xs text-gray-400">(you)</span>}
       </td>
       <td className="px-4 py-2.5 text-gray-500">{acc.email}</td>
@@ -36,6 +50,7 @@ export function AccountRow({ acc, isSelf, toggling, onPromoteDemote, impersonate
           <span className="text-xs text-gray-400">User</span>
         )}
       </td>
+      <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">{formatDate(acc.created_at)}</td>
       <td className="px-4 py-2.5 text-right">
         <div className="flex items-center justify-end gap-2">
           {!isSelf && impersonateButton}

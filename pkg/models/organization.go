@@ -30,7 +30,7 @@ func (o *Organization) IsProviderAllowed(provider string) bool {
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
-func ListAllOrganizations(search string, limit, offset int) ([]Organization, int64, error) {
+func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]Organization, int64, error) {
 	query := database.Conn().Where("deleted_at IS NULL")
 
 	if search != "" {
@@ -50,8 +50,10 @@ func ListAllOrganizations(search string, limit, offset int) ([]Organization, int
 		query = query.Offset(offset)
 	}
 
+	orderClause := resolveOrderClause(sortBy, sortDirection, []string{"created_at", "name"}, "created_at DESC")
+
 	var organizations []Organization
-	if err := query.Order("name ASC").Find(&organizations).Error; err != nil {
+	if err := query.Order(orderClause).Find(&organizations).Error; err != nil {
 		return nil, 0, err
 	}
 
