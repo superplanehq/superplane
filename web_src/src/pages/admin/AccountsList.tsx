@@ -2,12 +2,13 @@ import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast } from "@/lib/toast";
-import { ArrowDown, ArrowUp, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { AccountRow } from "./AccountRow";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import ConfirmAdminDialog from "./ConfirmAdminDialog";
+import { SortableHeader, type SortDirection } from "./SortableHeader";
 import { startImpersonation, toggleAdmin } from "./useAccountActions";
 
 interface AdminAccount {
@@ -19,36 +20,79 @@ interface AdminAccount {
 }
 
 type SortField = "created_at" | "name" | "email";
-type SortDirection = "asc" | "desc";
 
 const PAGE_SIZE = 50;
 
-function SortableHeader({
-  label,
-  field,
-  currentSort,
-  currentDirection,
-  onSort,
-  className = "",
-}: {
-  label: string;
-  field: SortField;
-  currentSort: SortField;
-  currentDirection: SortDirection;
+interface AccountsTableProps {
+  accounts: AdminAccount[];
+  currentAccountId?: string;
+  togglingAccountId: string | null;
+  sortBy: SortField;
+  sortDirection: SortDirection;
   onSort: (field: SortField) => void;
-  className?: string;
-}) {
-  const isActive = currentSort === field;
+  onPromoteDemote: (account: AdminAccount) => void;
+}
+
+function AccountsTable({
+  accounts,
+  currentAccountId,
+  togglingAccountId,
+  sortBy,
+  sortDirection,
+  onSort,
+  onPromoteDemote,
+}: AccountsTableProps) {
   return (
-    <th
-      className={`text-left px-4 py-2.5 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-700 transition-colors ${className}`}
-      onClick={() => onSort(field)}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {isActive && (currentDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
-      </span>
-    </th>
+    <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-100">
+            <SortableHeader
+              label="Name"
+              field="name"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Email"
+              field="email"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Access</th>
+            <SortableHeader
+              label="Created"
+              field="created_at"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {accounts.map((acc) => (
+            <AccountRow
+              key={acc.id}
+              acc={acc}
+              isSelf={acc.id === currentAccountId}
+              toggling={togglingAccountId === acc.id}
+              onPromoteDemote={() => onPromoteDemote(acc)}
+              impersonateButton={
+                <Button variant="outline" size="sm" onClick={() => startImpersonation(acc.id)}>
+                  <span className="flex items-center gap-1">
+                    <Eye size={14} />
+                    Impersonate
+                  </span>
+                </Button>
+              }
+            />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -139,56 +183,15 @@ const AccountsList: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  <SortableHeader
-                    label="Name"
-                    field="name"
-                    currentSort={sortBy}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Email"
-                    field="email"
-                    currentSort={sortBy}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Access</th>
-                  <SortableHeader
-                    label="Created"
-                    field="created_at"
-                    currentSort={sortBy}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  />
-                  <th className="text-right px-4 py-2.5 text-gray-500 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {accounts.map((acc) => (
-                  <AccountRow
-                    key={acc.id}
-                    acc={acc}
-                    isSelf={acc.id === currentAccount?.id}
-                    toggling={toggling === acc.id}
-                    onPromoteDemote={() => setConfirmTarget(acc)}
-                    impersonateButton={
-                      <Button variant="outline" size="sm" onClick={() => startImpersonation(acc.id)}>
-                        <span className="flex items-center gap-1">
-                          <Eye size={14} />
-                          Impersonate
-                        </span>
-                      </Button>
-                    }
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <AccountsTable
+            accounts={accounts}
+            currentAccountId={currentAccount?.id}
+            togglingAccountId={toggling}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            onPromoteDemote={setConfirmTarget}
+          />
           <AdminPagination
             offset={offset}
             total={total}

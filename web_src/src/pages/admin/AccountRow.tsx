@@ -2,6 +2,7 @@ import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Shield, ShieldOff } from "lucide-react";
 import React from "react";
+import { formatDate } from "./formatDate";
 
 interface AdminAccount {
   id: string;
@@ -17,15 +18,6 @@ interface AccountRowProps {
   toggling: boolean;
   onPromoteDemote: () => void;
   impersonateButton: React.ReactNode;
-}
-
-function formatDate(dateString?: string): string {
-  if (!dateString) return "—";
-  return new Date(dateString).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
 }
 
 export function AccountRow({ acc, isSelf, toggling, onPromoteDemote, impersonateButton }: AccountRowProps) {
