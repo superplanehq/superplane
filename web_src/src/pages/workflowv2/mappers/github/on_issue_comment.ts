@@ -1,4 +1,5 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
+import { truncate } from "../safeMappers";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { TriggerProps } from "@/ui/trigger";
@@ -36,7 +37,7 @@ export const onIssueCommentTriggerRenderer: TriggerRenderer = {
       "Issue Title": eventData?.issue?.title || "",
       "Comment Action": eventData?.action || "",
       By: eventData?.comment?.user?.login || "",
-      "Comment Body": eventData?.comment?.body?.substring(0, 100) || "",
+      "Comment Body": truncate(eventData?.comment?.body, 100),
     };
   },
 

@@ -5,7 +5,6 @@ import type { CanvasPageProps } from ".";
 import type { BreadcrumbItem } from "../../components/Breadcrumbs";
 
 export interface CanvasPageState {
-  title: string;
   breadcrumbs: BreadcrumbItem[];
 
   nodes: Node[];
@@ -27,8 +26,6 @@ export interface CanvasPageState {
     close: () => void;
     open: (nodeId: string) => void;
   };
-
-  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
 }
 
 export function useCanvasState(props: CanvasPageProps): CanvasPageState {
@@ -263,7 +260,6 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
   const componentSidebar = useComponentSidebarState(props.initialSidebar, props.onSidebarChange);
 
   return {
-    title: props.title || "Untitled Workflow",
     breadcrumbs: props.breadcrumbs || [{ label: "Workflows" }, { label: props.title || "Untitled Workflow" }],
     nodes,
     componentSidebar,
@@ -272,7 +268,6 @@ export function useCanvasState(props: CanvasPageProps): CanvasPageState {
     setEdges,
     onNodesChange,
     onEdgesChange,
-    onNodeExpand: props.onNodeExpand,
     isCollapsed,
     toggleCollapse,
     toggleNodeCollapse,

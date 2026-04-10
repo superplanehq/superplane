@@ -25,6 +25,7 @@ docker buildx build \
   --progress=plain \
   --provenance=false \
   --push \
+  --cache-from ghcr.io/superplanehq/superplane-dev-base:agent-latest \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
   -f agent/Dockerfile \
   agent

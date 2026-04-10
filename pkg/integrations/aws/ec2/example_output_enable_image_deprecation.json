@@ -7,5 +7,5 @@
     "deprecationEnabled": true
   },
   "timestamp": "2026-02-19T09:40:00Z",
-  "type": "aws.ec2.image.deprecation.enabled"
+  "type": "aws.ec2.image.deprecationEnabled"
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -240,12 +241,21 @@ func upsertNode(tx *gorm.DB, existingNodes []models.CanvasNode, node models.Node
 	return &canvasNode, nodeLevelErrorMessage, nil
 }
 
-func setupNode(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupNode(
+	ctx context.Context,
+	tx *gorm.DB,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	node *models.CanvasNode,
+	orgID uuid.UUID,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+) error {
 	switch node.Type {
 	case models.NodeTypeTrigger:
 		return setupTrigger(ctx, tx, encryptor, registry, node, webhookBaseURL)
 	case models.NodeTypeComponent:
-		return setupComponent(ctx, tx, encryptor, registry, node, webhookBaseURL)
+		return setupComponent(ctx, tx, encryptor, registry, node, orgID, authService, webhookBaseURL)
 	case models.NodeTypeWidget:
 		return nil
 	}
@@ -295,7 +305,16 @@ func setupTrigger(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, 
 	return tx.Save(node).Error
 }
 
-func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, registry *registry.Registry, node *models.CanvasNode, webhookBaseURL string) error {
+func setupComponent(
+	ctx context.Context,
+	tx *gorm.DB,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	node *models.CanvasNode,
+	orgID uuid.UUID,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+) error {
 	ref := node.Ref.Data()
 	component, err := registry.GetComponent(ref.Component.Name)
 	if err != nil {
@@ -309,6 +328,7 @@ func setupComponent(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
+		Auth:          contexts.NewAuthContext(tx, orgID, authService, nil),
 	}
 
 	if node.AppInstallationID != nil {

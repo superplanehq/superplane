@@ -84,6 +84,7 @@ func TestUpdateLiveCanvasWithoutVersioningRemapsSoftDeletedNodeIDConflicts(t *te
 		},
 		nil,
 		testWebhookBaseURL,
+		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -156,6 +157,7 @@ func TestUpdateLiveCanvasWithoutVersioningReaddAfterDeletingReaddedNodeDoesNot50
 		},
 		nil,
 		testWebhookBaseURL,
+		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, first)
@@ -199,6 +201,7 @@ func TestUpdateLiveCanvasWithoutVersioningReaddAfterDeletingReaddedNodeDoesNot50
 		},
 		nil,
 		testWebhookBaseURL,
+		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, second)
@@ -253,6 +256,7 @@ func TestUpdateLiveCanvasWithoutVersioningRejectsMissingAppInstallationID(t *tes
 		},
 		nil,
 		testWebhookBaseURL,
+		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -319,6 +323,7 @@ func TestUpdateLiveCanvasWithoutVersioningPersistsLongSetupErrors(t *testing.T) 
 		},
 		nil,
 		testWebhookBaseURL,
+		r.AuthService,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)

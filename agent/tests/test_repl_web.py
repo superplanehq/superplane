@@ -14,12 +14,14 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
+from starlette.testclient import TestClient
 
 import ai.repl_web as repl_web
 import repl.main as repl_main
 from ai.models import CanvasQuestionRequest
 from ai.session_store import AgentChatNotFoundError
-from ai.web import WebServer, WebServerConfig
+from ai.usage_publisher import NoopUsagePublisher
+from ai.web import WebServer, WebServerConfig, create_app
 from repl.main import _parse_stream_event, _resolve_stream_url, _stream_repl_answer
 
 
@@ -44,10 +46,9 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_store.count_chat_model_messages.return_value = 0
     fake_store.load_agent_chat_message_history.return_value = []
     fake_store.set_initial_chat_message_if_missing.return_value = None
-    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message: (
-        SimpleNamespace(
-            id="message-123",
-        )
+    fake_store.create_agent_chat_run.side_effect = lambda chat_id, model: "run-123"
+    fake_store.create_agent_chat_model_message.side_effect = lambda chat_id, message, run_id=None: (
+        SimpleNamespace(id="message-123")
     )
     fake_store.update_agent_chat_model_message.return_value = None
     fake_store.replace_agent_chat_messages_after.return_value = None
@@ -60,6 +61,13 @@ def _stub_agent_persistence(monkeypatch: pytest.MonkeyPatch) -> None:
         "from_env",
         MagicMock(return_value=fake_grpc_server),
     )
+
+
+def test_health_returns_200_with_empty_body() -> None:
+    with TestClient(create_app()) as client:
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.content == b""
 
 
 def test_parse_stream_event_accepts_valid_sse_line() -> None:
@@ -145,11 +153,12 @@ def test_web_server_start_raises_when_port_is_already_in_use() -> None:
     sock.listen()
 
     server = WebServer(WebServerConfig(host="127.0.0.1", port=port))
-    with pytest.raises(RuntimeError, match="Failed to start REPL web server") as exc_info:
-        server.start()
-
-    sock.close()
-    assert isinstance(exc_info.value.__cause__, SystemExit)
+    try:
+        with pytest.raises(RuntimeError, match="Failed to start REPL web server"):
+            server.start()
+    finally:
+        server.stop()
+        sock.close()
 
 
 def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
@@ -170,7 +179,7 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
     store.set_initial_chat_message_if_missing.return_value = None
 
     def fake_create_agent_chat_model_message(
-        chat_id: str, message: ModelRequest
+        chat_id: str, message: ModelRequest, run_id: str | None = None
     ) -> SimpleNamespace:
         persisted_messages.append(message)
         return SimpleNamespace(id=f"message-{len(persisted_messages)}")
@@ -180,11 +189,17 @@ def test_stream_agent_run_excludes_current_prompt_from_loaded_message_history(
         if False:
             yield None
 
+    store.create_agent_chat_run.side_effect = lambda chat_id, model: "run-456"
     store.create_agent_chat_model_message.side_effect = fake_create_agent_chat_model_message
     monkeypatch.setattr(repl_web, "_run_stream_events", fake_run_stream_events)
 
     request = SimpleNamespace(
-        app=SimpleNamespace(state=SimpleNamespace(session_store=store)),
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                session_store=store,
+                publisher=NoopUsagePublisher(),
+            )
+        ),
         headers={},
     )
 
@@ -221,7 +236,7 @@ def test_persisted_run_recorder_does_not_duplicate_final_assistant_message() -> 
         SimpleNamespace(id="tool-message-1"),
     ]
 
-    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "Current question")  # type: ignore[attr-defined]
+    recorder = repl_web.PersistedRunRecorder(store, "chat-123", "run-789", "Current question")  # type: ignore[attr-defined]
     recorder.tool_finished(
         SimpleNamespace(  # type: ignore[arg-type]
             result=ToolReturnPart(

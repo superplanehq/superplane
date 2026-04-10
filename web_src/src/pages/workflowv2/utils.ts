@@ -8,6 +8,7 @@ import type {
   ComponentsComponent,
   ComponentsEdge,
   ComponentsNode,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
@@ -17,23 +18,7 @@ import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEven
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
 import { getComponentBaseMapper, getState, getTriggerRenderer } from "./mappers";
-import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo } from "./mappers/types";
-
-export function collectGroupChildIds(node: ComponentsNode): string[] {
-  if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group") return [];
-  return ((node.configuration?.childNodeIds as string[]) || []).filter(Boolean);
-}
-
-export function buildChildToGroupMap(nodes: ComponentsNode[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const node of nodes) {
-    if (node.type !== "TYPE_WIDGET" || node.widget?.name !== "group" || !node.id) continue;
-    for (const childId of collectGroupChildIds(node)) {
-      map.set(childId, node.id);
-    }
-  }
-  return map;
-}
+import type { ComponentDefinition, EventInfo, ExecutionInfo, NodeInfo, QueueItemInfo, User } from "./mappers/types";
 
 export function generateNodeId(blockName: string, nodeName: string): string {
   const randomChars = Math.random().toString(36).substring(2, 8);
@@ -136,7 +121,6 @@ export function mapExecutionsToSidebarEvents(
   executions: CanvasesCanvasNodeExecution[],
   nodes: ComponentsNode[],
   limit?: number,
-  additionalData?: unknown,
 ): SidebarEvent[] {
   const executionsToMap = limit ? executions.slice(0, limit) : executions;
 
@@ -152,7 +136,6 @@ export function mapExecutionsToSidebarEvents(
     const componentSubtitle = componentMapper.subtitle?.({
       node: buildNodeInfo(currentComponentNode as ComponentsNode),
       execution: buildExecutionInfo(execution),
-      additionalData,
     });
 
     const { title, subtitle } = execution.rootEvent
@@ -1285,5 +1268,17 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
     isCollapsed: node.isCollapsed || false,
     configuration: node.configuration,
     metadata: node.metadata,
+  };
+}
+
+export function buildUserInfo(user?: SuperplaneMeUser | null): User | undefined {
+  if (!user) return undefined;
+
+  return {
+    id: user.id!,
+    name: user.name || "",
+    email: user.email || "",
+    roles: user.roles || [],
+    groups: user.groups || [],
   };
 }

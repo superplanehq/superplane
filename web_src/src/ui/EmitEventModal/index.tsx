@@ -3,6 +3,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import Editor from "@monaco-editor/react";
 import { Play } from "lucide-react";
@@ -93,8 +94,7 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
       showSuccessToast("Event emitted successfully");
       handleClose();
     } catch (error) {
-      console.error("Failed to emit event", error);
-      showErrorToast("Failed to emit event");
+      showErrorToast(getApiErrorMessage(error, "Failed to emit event"));
       setIsSubmitting(false);
     }
   };

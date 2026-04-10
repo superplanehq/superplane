@@ -73,7 +73,8 @@ export function ecsSubtitle(context: SubtitleContext): string | React.ReactNode 
   return renderTimeAgo(new Date(context.execution.createdAt));
 }
 
-export function truncateForDisplay(value: string, maxLen = 40): string {
-  if (!value || value.length <= maxLen) return value;
-  return value.substring(0, maxLen) + "...";
+export function truncateForDisplay(value: unknown, maxLen = 40): string {
+  const str = typeof value === "string" ? value : value == null ? "" : String(value);
+  if (!str || str.length <= maxLen) return str;
+  return str.substring(0, maxLen) + "...";
 }

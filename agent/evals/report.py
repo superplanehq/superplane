@@ -24,12 +24,14 @@ class ReportBuilder:
         model: str,
         run_usages: dict[str, RunUsage],
         evaluate_wall_seconds: float,
+        case_names: list[str],
         interaction_log_paths_by_case_name: dict[str, str] | None = None,
     ) -> None:
         self.report = report
         self.model = model
         self.run_usages = run_usages
         self.evaluate_wall_seconds = evaluate_wall_seconds
+        self.case_names = case_names
         self.interaction_log_paths_by_case_name = interaction_log_paths_by_case_name or {}
 
     def render(self) -> None:
@@ -37,6 +39,11 @@ class ReportBuilder:
         output_dir = Path("/app/tmp/agent/evals")
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        if len(self.case_names) != len(self.report.cases):
+            raise RuntimeError(
+                f"case_names/report mismatch: {len(self.case_names)} names vs "
+                f"{len(self.report.cases)} report cases"
+            )
         if len(self.run_usages) != len(self.report.cases):
             raise RuntimeError(
                 f"usage/case count mismatch: {len(self.run_usages)} usage keys vs "
@@ -56,7 +63,7 @@ class ReportBuilder:
         print()
 
         for i, case_result in enumerate(self.report.cases):
-            case_name = getattr(case_result, "name", None) or f"case_{i}"
+            case_name = self.case_names[i]
             safe_case_name = re.sub(r"[^A-Za-z0-9_.-]", "_", case_name)
 
             serialized_output = self._serialize_output(case_result.output)
@@ -91,12 +98,12 @@ class ReportBuilder:
             print(f"{case_name} {self._format_duration(case_result)}")
             print(f"  input:        {case_input}")
             print(f"  output:       {display_filename}")
-            interaction_log_for_case = self.interaction_log_paths_by_case_name.get(case_name)
-            if interaction_log_for_case:
-                print(f"  log:          {interaction_log_for_case}")
+            print(f"  log:          {self.interaction_log_paths_by_case_name.get(case_name)}")
             print(f"  toolCalls:    {run_usage.tool_calls}")
             print(f"  inputTokens:  {run_usage.input_tokens}")
             print(f"  outputTokens: {run_usage.output_tokens}")
+            print(f"  cacheRead:    {run_usage.cache_read_tokens}")
+            print(f"  cacheWrite:   {run_usage.cache_write_tokens}")
             print(f"  cost:         {self._format_cost(case_cost)}")
 
             print("  assertions:")

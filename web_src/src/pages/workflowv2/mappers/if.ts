@@ -123,19 +123,6 @@ export const ifMapper: ComponentBaseMapper = {
       Expression: configuration.expression,
     };
 
-    // Error (if present) - placed at the end, after Evaluation
-    if (
-      context.execution.resultMessage &&
-      (context.execution.resultReason === "RESULT_REASON_ERROR" ||
-        (context.execution.result === "RESULT_FAILED" &&
-          context.execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-    ) {
-      details["Error"] = {
-        __type: "error",
-        message: context.execution.resultMessage,
-      };
-    }
-
     return details;
   },
 };

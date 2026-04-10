@@ -1,11 +1,14 @@
 {
+  "type": "memory.added",
   "data": {
-    "namespace": "machines",
-    "values": {
-      "id": "1",
-      "pull_request": "123",
-      "creator": "alex"
+    "data": {
+      "namespace": "machines",
+      "values": {
+        "id": "1",
+        "pull_request": "123",
+        "creator": "alex"
+      }
     }
-  }
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
 }
-

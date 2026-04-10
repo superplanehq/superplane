@@ -63,14 +63,6 @@ func (c *CreateLoadBalancer) Color() string {
 	return "gray"
 }
 
-func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":     "12345",
-		"name":   "my-load-balancer",
-		"status": "running",
-	}
-}
-
 func (c *CreateLoadBalancer) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }

@@ -31,7 +31,13 @@ func Test_OnVMInstance_Configuration(t *testing.T) {
 
 func Test_OnVMInstance_ExampleData(t *testing.T) {
 	trigger := &OnVMInstance{}
-	data := trigger.ExampleData()
+	example := trigger.ExampleData()
+	assert.Contains(t, example, "type")
+	assert.Contains(t, example, "timestamp")
+	assert.Contains(t, example, "data")
+
+	data, ok := example["data"].(map[string]any)
+	require.True(t, ok)
 	assert.Equal(t, computeServiceName, data["serviceName"])
 	assert.Equal(t, instancesInsertMethod, data["methodName"])
 	assert.Equal(t, "projects/my-project/zones/us-central1-a/instances/my-vm", data["resourceName"])

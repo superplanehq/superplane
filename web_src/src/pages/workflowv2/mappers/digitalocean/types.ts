@@ -229,3 +229,59 @@ export interface UpdateAppConfiguration {
   envVars?: string[];
   gitHubBranch?: string;
 }
+
+export interface KBNodeMetadata {
+  agentId?: string;
+  agentName?: string;
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface CreateKnowledgeBaseConfiguration {
+  name: string;
+  embeddingModel: string;
+  region: string;
+  project: string;
+  tags?: string[];
+  databaseOption?: string;
+  database?: string;
+  dataSources?: KnowledgeBaseDataSource[];
+}
+
+export interface DeleteKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface DeleteKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+  deleteOpenSearchDatabase?: boolean;
+}
+
+export interface EvalNodeMetadata {
+  testCaseId?: string;
+  testCaseName?: string;
+  agentId?: string;
+  agentName?: string;
+}
+
+export interface RunEvaluationConfiguration {
+  testCase: string;
+  agent: string;
+  runName: string;
+}
+
+export interface KnowledgeBaseDataSource {
+  type: "spaces" | "web";
+  spacesBucket?: string;
+  spacesRegion?: string;
+  webURL?: string;
+  crawlType?: string;
+  crawlingOption?: string;
+  webEmbedMedia?: boolean;
+  chunkingAlgorithm?: string;
+  maxChunkSize?: number;
+  semanticThreshold?: number;
+  parentChunkSize?: number;
+  childChunkSize?: number;
+}

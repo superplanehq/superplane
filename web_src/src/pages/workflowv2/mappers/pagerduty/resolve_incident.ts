@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import { buildIncidentExecutionDetails } from "./base";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const resolveIncidentMapper: ComponentBaseMapper = {
@@ -54,11 +55,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (configuration.resolution) {
-    const truncatedResolution =
-      configuration.resolution.length > 50
-        ? configuration.resolution.substring(0, 50) + "..."
-        : configuration.resolution;
-    metadata.push({ icon: "message-square", label: `Resolution: ${truncatedResolution}` });
+    metadata.push({ icon: "message-square", label: `Resolution: ${truncate(configuration.resolution, 50)}` });
   }
 
   return metadata;

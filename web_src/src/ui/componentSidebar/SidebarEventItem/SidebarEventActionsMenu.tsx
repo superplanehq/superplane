@@ -8,9 +8,7 @@ interface SidebarEventActionsMenuProps {
   eventId: string;
   executionId?: string;
   onCancelQueueItem?: (id: string) => void;
-  onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  supportsPushThrough?: boolean;
   eventState: ChildEventsState;
   onReEmit?: () => void;
   kind: "queue" | "execution" | "trigger";
@@ -21,9 +19,7 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   eventId,
   executionId,
   onCancelQueueItem,
-  onPushThrough,
   onCancelExecution,
-  supportsPushThrough,
   eventState,
   onReEmit,
   kind,
@@ -33,10 +29,9 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
   const isQueued = eventState === "queued";
   const isRunning = eventState === "running";
 
-  const showPushThrough = supportsPushThrough && !!executionId && (isRunning || isWaiting);
   const showCancel = (kind === "queue" && isQueued) || (kind === "execution" && (isRunning || isWaiting));
   const showReEmit = kind === "trigger" && !!onReEmit;
-  const showDropdown = showPushThrough || showCancel || showReEmit;
+  const showDropdown = showCancel || showReEmit;
 
   const handleReEmit = React.useCallback(
     (e: React.MouseEvent) => {
@@ -60,22 +55,6 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
       }
     },
     [onCancelExecution, executionId, eventId],
-  );
-
-  const handlePushThrough = React.useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-
-      if (!executionId) {
-        console.warn("No executionId provided for push-through action");
-        return;
-      }
-
-      if (onPushThrough) {
-        onPushThrough(executionId);
-      }
-    },
-    [onPushThrough, executionId, eventId],
   );
 
   const handleCancelQueueItem = React.useCallback(
@@ -112,13 +91,6 @@ export const SidebarEventActionsMenu: React.FC<SidebarEventActionsMenuProps> = (
           >
             {React.createElement(resolveIcon("x-circle"), { size: 16 })}
             Cancel
-          </DropdownMenuItem>
-        )}
-
-        {showPushThrough && (
-          <DropdownMenuItem onClick={handlePushThrough} className="gap-2" data-testid="push-through-item">
-            {React.createElement(resolveIcon("fast-forward"), { size: 16 })}
-            Push Through
           </DropdownMenuItem>
         )}
 

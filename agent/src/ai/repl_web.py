@@ -10,7 +10,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
@@ -26,6 +26,7 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.run import AgentRunResultEvent
+from pydantic_ai.usage import RunUsage
 
 from ai.agent import AgentDeps, build_agent
 from ai.config import config
@@ -37,7 +38,9 @@ from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
 from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
+from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
 from ai.text import normalize_optional
+from ai.usage_publisher import AgentUsagePublisher, NoopUsagePublisher, UsagePublisher
 
 
 @dataclass(frozen=True)
@@ -124,6 +127,42 @@ def _to_jsonable(value: Any) -> Any:
     return str(value)
 
 
+def _record_usage(
+    store: SessionStore,
+    publisher: AgentUsagePublisher,
+    run_id: str,
+    usage: RunUsage,
+    org_id: str,
+    chat_id: str,
+    model: str,
+) -> None:
+    try:
+        store.update_run_usage(
+            run_id=run_id,
+            input_tokens=usage.input_tokens or 0,
+            output_tokens=usage.output_tokens or 0,
+            cache_read_tokens=usage.cache_read_tokens or 0,
+            cache_write_tokens=usage.cache_write_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+        )
+    except Exception as error:
+        print(f"[web] failed to record usage for run {run_id}: {error}", flush=True)
+
+    # DB write and RabbitMQ publish are independent
+    # a DB failure won't prevent publishing, and each has its own error logging
+    try:
+        publisher.publish_agent_run_finished(
+            organization_id=org_id,
+            chat_id=chat_id,
+            model=model,
+            input_tokens=usage.input_tokens or 0,
+            output_tokens=usage.output_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+        )
+    except Exception as error:
+        print(f"[web] failed to publish usage for run {run_id}: {error}", flush=True)
+
+
 def _load_message_history(store: SessionStore, chat_id: str) -> Any:
     history = store.load_agent_chat_message_history(chat_id)
     if not history:
@@ -181,6 +220,7 @@ async def _stream_agent_run(
 ) -> AsyncIterator[dict[str, Any]]:
     started_at = time.perf_counter()
     store: SessionStore = request.app.state.session_store
+    publisher: AgentUsagePublisher = request.app.state.publisher
     claims: JwtClaims | None = None
     if payload.model == "test" and _resolve_bearer_token(request) is None:
         try:
@@ -196,13 +236,15 @@ async def _stream_agent_run(
         claims, chat = _resolve_agent_context(chat_id, request)
 
     message_history = _load_message_history(store, chat.id)
-    recorder = PersistedRunRecorder(store, chat.id, payload.question)
     resolved_canvas_id = chat.canvas_id
     deps: AgentDeps | None = None
     if payload.model != "test":
         if claims is None:
             raise ValueError("Agent claims are missing.")
         deps = _build_deps(payload, request, claims, resolved_canvas_id)
+
+    run_id = store.create_agent_chat_run(chat.id, payload.model)
+    recorder = PersistedRunRecorder(store, chat.id, run_id, payload.question)
 
     _debug_log(
         "starting agent run",
@@ -243,10 +285,13 @@ async def _stream_agent_run(
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
+                usage = result.usage()
+                _record_usage(store, publisher, run_id, usage, chat.org_id, chat.id, payload.model)
+                record_agent_run_tokens(usage)
                 yield {
                     "type": "final_answer",
                     "output": output,
-                    "usage": _to_jsonable(result.usage()),
+                    "usage": _to_jsonable(usage),
                 }
 
         yield {
@@ -406,10 +451,13 @@ async def _stream_agent_run(
                         await asyncio.sleep(0.01)
             elif isinstance(output, str) and output:
                 recorder.set_assistant_content(output)
+            usage = result.usage()
+            _record_usage(store, publisher, run_id, usage, chat.org_id, chat.id, payload.model)
+            record_agent_run_tokens(usage)
             yield {
                 "type": "final_answer",
                 "output": output,
-                "usage": _to_jsonable(result.usage()),
+                "usage": _to_jsonable(usage),
             }
 
     yield {
@@ -422,10 +470,16 @@ async def _stream_agent_run(
 def _create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        init_metrics()
         store = SessionStore()
         tracker = ActiveStreamTracker()
+        rabbitmq_url = config.rabbitmq_url
+        publisher: AgentUsagePublisher = (
+            UsagePublisher(rabbitmq_url) if rabbitmq_url else NoopUsagePublisher()
+        )
         app.state.session_store = store
         app.state.stream_tracker = tracker
+        app.state.publisher = publisher
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
@@ -435,7 +489,9 @@ def _create_app() -> FastAPI:
             tracker.begin_shutdown()
             await tracker.wait_for_drain()
             grpc_server.stop()
+            publisher.close()
             store.close()
+            shutdown_metrics()
 
     app = FastAPI(lifespan=lifespan)
     cors_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
@@ -448,6 +504,11 @@ def _create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.get("/health")
+    async def health() -> Response:
+        # Match pkg/public Server.HealthCheck: 200 with empty body for load balancers / probes.
+        return Response(status_code=200)
 
     @app.post("/agents/chats/{chat_id}/stream")
     async def stream_repl(

@@ -170,6 +170,21 @@ func FindMaybeDeletedUserByID(orgID, id string) (*User, error) {
 	return &user, err
 }
 
+func ListAllActiveUsersInOrganization(orgID string) ([]User, error) {
+	var users []User
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("type = ?", UserTypeHuman).
+		Find(&users).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
 func ListActiveUsersByOrganization(orgID, search string, limit, offset int) ([]User, int64, error) {
 	query := database.Conn().
 		Where("organization_id = ?", orgID).
@@ -416,4 +431,32 @@ func FindFirstHumanUserByOrganizationInTransaction(tx *gorm.DB, orgID string) (*
 	}
 
 	return &user, nil
+}
+
+type UserAccountProvider struct {
+	AccountProvider
+	UserID string
+}
+
+func FindUserAccountProviders(users []User) ([]UserAccountProvider, error) {
+	userIDs := make([]string, len(users))
+	for i, user := range users {
+		userIDs[i] = user.ID.String()
+	}
+
+	var accountProviders []UserAccountProvider
+	err := database.Conn().
+		Table("users").
+		Select("users.id as user_id, account_providers.*").
+		Joins("inner join accounts on accounts.id = users.account_id").
+		Joins("inner join account_providers on account_providers.account_id = accounts.id").
+		Where("users.id IN (?)", userIDs).
+		Find(&accountProviders).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return accountProviders, nil
 }

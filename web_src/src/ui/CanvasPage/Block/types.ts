@@ -59,7 +59,6 @@ export type ComponentActionKeys =
   | "runDisabledTooltip"
   | "onTogglePause"
   | "onEdit"
-  | "onConfigure"
   | "onDuplicate"
   | "onDeactivate"
   | "onToggleCollapse"
@@ -76,6 +75,5 @@ export interface BlockProps extends ComponentActionsProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  onExpand?: (nodeId: string, nodeData: BlockData) => void;
   onClick?: (e: MouseEvent) => void;
 }

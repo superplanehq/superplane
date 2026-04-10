@@ -1354,19 +1354,6 @@ func (c *CreateVM) Color() string {
 	return "gray"
 }
 
-func (c *CreateVM) ExampleOutput() map[string]any {
-	return map[string]any{
-		"instanceId":  "1234567890123456789",
-		"selfLink":    "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
-		"internalIP":  "10.0.0.2",
-		"externalIP":  "34.1.2.3",
-		"status":      "RUNNING",
-		"zone":        "us-central1-a",
-		"name":        "my-vm",
-		"machineType": "e2-medium",
-	}
-}
-
 func (c *CreateVM) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: createVMOutputChannel, Label: "Default"},

@@ -1,0 +1,14 @@
+{
+  "data": {
+    "uuid": "20cd8434-6ea1-11f0-bf8f-4e013e2ddde4",
+    "name": "my-knowledge-base",
+    "region": "tor1",
+    "embeddingModelUUID": "05700391-7aa8-11ef-bf8f-4e013e2ddde4",
+    "projectId": "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
+    "databaseId": "abf1055a-745d-4c24-a1db-1959ea819264",
+    "tags": ["docs", "production"],
+    "createdAt": "2025-01-01T00:00:00Z"
+  },
+  "timestamp": "2025-01-01T00:00:00Z",
+  "type": "digitalocean.knowledge_base.created"
+}

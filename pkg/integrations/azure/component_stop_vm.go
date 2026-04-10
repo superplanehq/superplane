@@ -77,14 +77,6 @@ func (c *StopVMComponent) Color() string {
 	return "blue"
 }
 
-func (c *StopVMComponent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":            "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-		"name":          "my-vm",
-		"resourceGroup": "my-rg",
-	}
-}
-
 func (c *StopVMComponent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }

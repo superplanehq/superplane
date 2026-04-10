@@ -97,16 +97,6 @@ func (c *CreateVMComponent) Color() string {
 	return "blue"
 }
 
-func (c *CreateVMComponent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":                "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-		"name":              "my-vm",
-		"provisioningState": "Succeeded",
-		"location":          "eastus",
-		"size":              "Standard_B1s",
-	}
-}
-
 func (c *CreateVMComponent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }

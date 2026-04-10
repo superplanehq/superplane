@@ -66,10 +66,10 @@ export const useOrganization = (organizationId: string, enabled = true) => {
   });
 };
 
-export const useOrganizationUsers = (organizationId: string, includeServiceAccounts = false) => {
+export const useOrganizationUsers = (organizationId: string, includeRoles = false) => {
   return useQuery({
-    queryKey: includeServiceAccounts
-      ? [...organizationKeys.users(organizationId), includeServiceAccounts]
+    queryKey: includeRoles
+      ? [...organizationKeys.users(organizationId), includeRoles]
       : organizationKeys.users(organizationId),
     queryFn: async () => {
       const response = await usersListUsers(
@@ -77,7 +77,7 @@ export const useOrganizationUsers = (organizationId: string, includeServiceAccou
           query: {
             domainType: "DOMAIN_TYPE_ORGANIZATION",
             domainId: organizationId,
-            includeServiceAccounts,
+            includeRoles,
           },
         }),
       );
@@ -226,6 +226,7 @@ export const useOrganizationUsage = (organizationId: string, enabled = true) => 
     },
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     enabled: !!organizationId && enabled,
   });
 };

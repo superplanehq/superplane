@@ -43,12 +43,12 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if !me.HasOrganizationId() {
+	if !me.User.HasOrganizationId() {
 		return fmt.Errorf("organization id not found for authenticated user")
 	}
 
 	integrationResponse, _, err := ctx.API.OrganizationAPI.
-		OrganizationsDescribeIntegration(ctx.Context, me.GetOrganizationId(), *c.integrationID).
+		OrganizationsDescribeIntegration(ctx.Context, me.User.GetOrganizationId(), *c.integrationID).
 		Execute()
 	if err != nil {
 		return err
@@ -60,7 +60,7 @@ func (c *listResourcesCommand) Execute(ctx core.CommandContext) error {
 
 	response, err := listIntegrationResourcesRequest(
 		ctx,
-		me.GetOrganizationId(),
+		me.User.GetOrganizationId(),
 		metadata.GetId(),
 		extraParameters,
 	)

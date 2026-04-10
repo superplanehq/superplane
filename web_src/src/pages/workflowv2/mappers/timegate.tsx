@@ -1,5 +1,4 @@
 import React from "react";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -22,6 +21,18 @@ import { getColorClass } from "@/lib/colors";
 import { getTriggerRenderer, getState, getStateMap } from ".";
 import { calcRelativeTimeFromDiff } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
+
+interface Configuration {
+  days?: string[];
+  excludeDates?: string[];
+  timeRange?: string;
+  timezone?: string;
+}
+
+interface Metadata {
+  nextValidTime?: string;
+}
 
 export const timeGateMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -43,6 +54,7 @@ export const timeGateMapper: ComponentBaseMapper = {
       includeEmptyState: !context.lastExecutions[0],
       specs: getTimeGateSpecs(context.node),
       eventStateMap: getStateMap(componentName),
+      customField: getTimeGateCustomField(context),
     };
   },
   subtitle(context: SubtitleContext): React.ReactNode {
@@ -79,6 +91,24 @@ export const timeGateMapper: ComponentBaseMapper = {
     return details;
   },
 };
+
+function getTimeGateCustomField(context: ComponentBaseContext): React.ReactNode {
+  const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+  if (!lastExecution) {
+    return null;
+  }
+
+  if (lastExecution.state === "STATE_FINISHED") {
+    return null;
+  }
+
+  return React.createElement(PushThroughHandler, {
+    onPushThrough: async () => {
+      if (!lastExecution?.id) return;
+      return context.actions.invokeNodeExecutionAction(lastExecution.id, "pushThrough", null);
+    },
+  });
+}
 
 export const TIME_GATE_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
@@ -171,12 +201,12 @@ const daysOfWeekLabels = {
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function getTimeGateSpecs(node: NodeInfo): ComponentBaseSpec[] {
-  const configuration = node.configuration as Record<string, unknown>;
-  const days = (configuration?.days as string[]) || [];
-  const excludeDates = (configuration?.excludeDates as string[]) || [];
-  const timeRange = (configuration?.timeRange as string) || "00:00-23:59";
+  const configuration = node.configuration as Configuration;
+  const days = configuration?.days || [];
+  const excludeDates = configuration?.excludeDates || [];
+  const timeRange = configuration?.timeRange || "00:00-23:59";
   const timeRangeLabel = formatTimeRangeLabel(timeRange);
-  const timezoneLabel = getTimezoneDisplay((configuration?.timezone as string) || "0");
+  const timezoneLabel = getTimezoneDisplay(configuration?.timezone || "0");
 
   const formattedExcludeDates = excludeDates
     .map((date) => formatDayInYearLabel(date))
@@ -250,7 +280,7 @@ function getTimeGateEventSubtitle(execution: ExecutionInfo, componentName: strin
       : "";
 
   if (executionState === "waiting") {
-    const executionMetadata = execution.metadata as { nextValidTime?: string };
+    const executionMetadata = execution.metadata as Metadata;
     if (executionMetadata?.nextValidTime) {
       return <TimeGateCountdown nextValidTime={executionMetadata.nextValidTime} timeAgo={timeAgo} />;
     }
@@ -300,12 +330,12 @@ const TimeGateCountdown: React.FC<{ nextValidTime: string; timeAgo?: string | Re
   );
 };
 
-function isTimeGatePushedThrough(execution: CanvasesCanvasNodeExecution): boolean {
+function isTimeGatePushedThrough(execution: ExecutionInfo): boolean {
   if (!execution.updatedAt) {
     return false;
   }
 
-  const metadata = execution.metadata as { nextValidTime?: string } | undefined;
+  const metadata = execution.metadata as Metadata | undefined;
   if (!metadata?.nextValidTime) {
     return false;
   }

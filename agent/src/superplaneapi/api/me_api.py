@@ -17,8 +17,10 @@ from pydantic import validate_call, Field, StrictFloat, StrictStr, StrictInt
 from typing import Any, Dict, List, Optional, Tuple, Union
 from typing_extensions import Annotated
 
+from pydantic import StrictBool
+from typing import Optional
+from superplaneapi.models.me_me_response import MeMeResponse
 from superplaneapi.models.me_regenerate_token_response import MeRegenerateTokenResponse
-from superplaneapi.models.superplane_me_user import SuperplaneMeUser
 
 from superplaneapi.api_client import ApiClient, RequestSerialized
 from superplaneapi.api_response import ApiResponse
@@ -41,6 +43,7 @@ class MeApi:
     @validate_call
     def me_me(
         self,
+        include_permissions: Optional[StrictBool] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -53,11 +56,13 @@ class MeApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> SuperplaneMeUser:
+    ) -> MeMeResponse:
         """Get current user
 
         Returns the currently authenticated user
 
+        :param include_permissions:
+        :type include_permissions: bool
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -81,6 +86,7 @@ class MeApi:
         """ # noqa: E501
 
         _param = self._me_me_serialize(
+            include_permissions=include_permissions,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -88,7 +94,7 @@ class MeApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "SuperplaneMeUser",
+            '200': "MeMeResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -104,6 +110,7 @@ class MeApi:
     @validate_call
     def me_me_with_http_info(
         self,
+        include_permissions: Optional[StrictBool] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -116,11 +123,13 @@ class MeApi:
         _content_type: Optional[StrictStr] = None,
         _headers: Optional[Dict[StrictStr, Any]] = None,
         _host_index: Annotated[StrictInt, Field(ge=0, le=0)] = 0,
-    ) -> ApiResponse[SuperplaneMeUser]:
+    ) -> ApiResponse[MeMeResponse]:
         """Get current user
 
         Returns the currently authenticated user
 
+        :param include_permissions:
+        :type include_permissions: bool
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -144,6 +153,7 @@ class MeApi:
         """ # noqa: E501
 
         _param = self._me_me_serialize(
+            include_permissions=include_permissions,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -151,7 +161,7 @@ class MeApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "SuperplaneMeUser",
+            '200': "MeMeResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -167,6 +177,7 @@ class MeApi:
     @validate_call
     def me_me_without_preload_content(
         self,
+        include_permissions: Optional[StrictBool] = None,
         _request_timeout: Union[
             None,
             Annotated[StrictFloat, Field(gt=0)],
@@ -184,6 +195,8 @@ class MeApi:
 
         Returns the currently authenticated user
 
+        :param include_permissions:
+        :type include_permissions: bool
         :param _request_timeout: timeout setting for this request. If one
                                  number provided, it will be total request
                                  timeout. It can also be a pair (tuple) of
@@ -207,6 +220,7 @@ class MeApi:
         """ # noqa: E501
 
         _param = self._me_me_serialize(
+            include_permissions=include_permissions,
             _request_auth=_request_auth,
             _content_type=_content_type,
             _headers=_headers,
@@ -214,7 +228,7 @@ class MeApi:
         )
 
         _response_types_map: Dict[str, Optional[str]] = {
-            '200': "SuperplaneMeUser",
+            '200': "MeMeResponse",
         }
         response_data = self.api_client.call_api(
             *_param,
@@ -225,6 +239,7 @@ class MeApi:
 
     def _me_me_serialize(
         self,
+        include_permissions,
         _request_auth,
         _content_type,
         _headers,
@@ -247,6 +262,10 @@ class MeApi:
 
         # process the path parameters
         # process the query parameters
+        if include_permissions is not None:
+            
+            _query_params.append(('includePermissions', include_permissions))
+            
         # process the header parameters
         # process the form parameters
         # process the body parameter

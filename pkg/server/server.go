@@ -113,7 +113,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Executor")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL)
+		w := workers.NewNodeExecutor(encryptor, registry, baseURL, webhookBaseURL, rabbitMQURL, authService)
 		go w.Start(context.Background())
 	}
 
@@ -121,7 +121,7 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		log.Println("Starting Node Request Worker")
 
 		webhookBaseURL := getWebhookBaseURL(baseURL)
-		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL)
+		w := workers.NewNodeRequestWorker(encryptor, registry, webhookBaseURL, authService)
 		go w.Start(context.Background())
 	}
 

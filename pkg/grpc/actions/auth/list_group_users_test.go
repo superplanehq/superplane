@@ -9,6 +9,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func Test_ListGroupUsers(t *testing.T) {
@@ -28,7 +30,7 @@ func Test_ListGroupUsers(t *testing.T) {
 		assert.Equal(t, r.User.String(), resp.Users[0].Metadata.Id)
 		assert.NotEmpty(t, resp.Users[0].Spec.DisplayName)
 		assert.NotEmpty(t, resp.Users[0].Metadata.Email)
-		assert.NotEmpty(t, resp.Users[0].Status.RoleAssignments)
+		assert.Empty(t, resp.Users[0].Status.Roles)
 
 		assert.NotNil(t, resp.Group)
 		assert.Equal(t, "test-group", resp.Group.Metadata.Name)
@@ -55,5 +57,11 @@ func Test_ListGroupUsers(t *testing.T) {
 		assert.Equal(t, "empty-group", resp.Group.Metadata.Name)
 		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.Metadata.DomainType)
 		assert.Equal(t, orgID, resp.Group.Metadata.DomainId)
+	})
+
+	t.Run("missing group returns not found instead of internal", func(t *testing.T) {
+		_, err := ListGroupUsers(ctx, models.DomainTypeOrganization, orgID, "missing-group", r.AuthService)
+		require.Error(t, err)
+		assert.Equal(t, codes.NotFound, status.Code(err))
 	})
 }

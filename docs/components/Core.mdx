@@ -85,16 +85,20 @@ Each scheduled execution includes calendar information:
 
 ```json
 {
-  "calendar": {
-    "day": "1",
-    "hour": "09",
-    "minute": "00",
-    "month": "January",
-    "second": "00",
-    "week_day": "Monday",
-    "year": "2024"
+  "data": {
+    "calendar": {
+      "day": "1",
+      "hour": "09",
+      "minute": "00",
+      "month": "January",
+      "second": "00",
+      "week_day": "Monday",
+      "year": "2024"
+    },
+    "timezone": "+00:00"
   },
-  "timezone": "+00:00"
+  "timestamp": "2024-01-01T09:00:00Z",
+  "type": "scheduler.tick"
 }
 ```
 
@@ -180,15 +184,19 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 ```json
 {
-  "body": {
-    "event": "push",
-    "repository": "superplanehq/superplane"
+  "data": {
+    "body": {
+      "event": "push",
+      "repository": "superplanehq/superplane"
+    },
+    "headers": {
+      "X-Event": [
+        "push"
+      ]
+    }
   },
-  "headers": {
-    "X-Event": [
-      "push"
-    ]
-  }
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "webhook"
 }
 ```
 
@@ -215,13 +223,17 @@ The Add Memory component appends a new item to canvas-level memory storage.
 ```json
 {
   "data": {
-    "namespace": "machines",
-    "values": {
-      "creator": "alex",
-      "id": "1",
-      "pull_request": "123"
+    "data": {
+      "namespace": "machines",
+      "values": {
+        "creator": "alex",
+        "id": "1",
+        "pull_request": "123"
+      }
     }
-  }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "memory.added"
 }
 ```
 
@@ -320,19 +332,21 @@ The Delete Memory component removes memory rows from canvas-level memory storage
 ```json
 {
   "data": {
-    "count": 1,
-    "deleted": [
-      {
+    "data": {
+      "count": 1,
+      "deleted": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001"
+        }
+      ],
+      "matches": {
         "creator": "igor",
-        "pull_request": 123,
-        "sandbox_id": "sbx-001"
-      }
-    ],
-    "matches": {
-      "creator": "igor",
-      "pull_request": 123
-    },
-    "namespace": "machines"
+        "pull_request": 123
+      },
+      "namespace": "machines"
+    }
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.deleted"
@@ -597,21 +611,23 @@ The Read Memory component looks up values from canvas-level memory storage.
 ```json
 {
   "data": {
-    "count": 1,
-    "emitMode": "allAtOnce",
-    "matches": {
-      "creator": "igor",
-      "pull_request": 123
-    },
-    "namespace": "machines",
-    "resultMode": "latest",
-    "values": [
-      {
+    "data": {
+      "count": 1,
+      "emitMode": "allAtOnce",
+      "matches": {
         "creator": "igor",
-        "pull_request": 123,
-        "sandbox_id": "sbx-001"
-      }
-    ]
+        "pull_request": 123
+      },
+      "namespace": "machines",
+      "resultMode": "latest",
+      "values": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001"
+        }
+      ]
+    }
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
@@ -694,11 +710,13 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 
 ```json
 {
-  "result": {
+  "data": {
     "exitCode": 0,
     "stderr": "",
     "stdout": "Hello, World!\n"
-  }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "ssh.command.executed"
 }
 ```
 
@@ -767,24 +785,26 @@ The Update Memory component updates matching rows in canvas-level memory storage
 ```json
 {
   "data": {
-    "count": 1,
-    "matches": {
-      "creator": "igor",
-      "pull_request": 123
-    },
-    "namespace": "machines",
-    "updated": [
-      {
+    "data": {
+      "count": 1,
+      "matches": {
         "creator": "igor",
-        "pull_request": 123,
-        "sandbox_id": "sbx-001",
+        "pull_request": 123
+      },
+      "namespace": "machines",
+      "updated": [
+        {
+          "creator": "igor",
+          "pull_request": 123,
+          "sandbox_id": "sbx-001",
+          "status": "running",
+          "updated_by": "workflow"
+        }
+      ],
+      "values": {
         "status": "running",
         "updated_by": "workflow"
       }
-    ],
-    "values": {
-      "status": "running",
-      "updated_by": "workflow"
     }
   },
   "timestamp": "2026-02-28T00:00:00Z",
@@ -825,24 +845,26 @@ Always emits to the default channel. Check `data.operation` to know whether the 
 ```json
 {
   "data": {
-    "count": 1,
-    "matches": {
-      "environment": "production",
-      "latest_deployment_source": "manual_run"
-    },
-    "namespace": "deployments",
-    "operation": "updated",
-    "records": [
-      {
+    "data": {
+      "count": 1,
+      "matches": {
+        "environment": "production",
+        "latest_deployment_source": "manual_run"
+      },
+      "namespace": "deployments",
+      "operation": "updated",
+      "records": [
+        {
+          "environment": "production",
+          "latest_deployment": "v1.0.1",
+          "latest_deployment_source": "manual_run"
+        }
+      ],
+      "values": {
         "environment": "production",
         "latest_deployment": "v1.0.1",
         "latest_deployment_source": "manual_run"
       }
-    ],
-    "values": {
-      "environment": "production",
-      "latest_deployment": "v1.0.1",
-      "latest_deployment_source": "manual_run"
     }
   },
   "timestamp": "2026-02-28T00:00:00Z",

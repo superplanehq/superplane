@@ -43,9 +43,13 @@ The Create Load Balancer component creates a load balancer in Hetzner Cloud.
 
 ```json
 {
-  "id": "12345",
-  "name": "my-load-balancer",
-  "status": "running"
+  "data": {
+    "id": "12345",
+    "name": "my-load-balancer",
+    "status": "running"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.load_balancer.created"
 }
 ```
 
@@ -75,11 +79,15 @@ The Create Server component creates a new server in Hetzner Cloud and waits for 
 
 ```json
 {
-  "created": "2024-01-15T10:30:00+00:00",
-  "id": 42,
-  "name": "my-server",
-  "publicIp": "1.2.3.4",
-  "status": "running"
+  "data": {
+    "created": "2024-01-15T10:30:00+00:00",
+    "id": 42,
+    "name": "my-server",
+    "publicIp": "1.2.3.4",
+    "status": "running"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.server.created"
 }
 ```
 
@@ -104,11 +112,15 @@ The Create Snapshot component creates a snapshot image from an existing Hetzner 
 
 ```json
 {
-  "actionId": "12345",
-  "imageId": 67890,
-  "imageType": "snapshot",
-  "serverId": "42",
-  "snapshotName": "workflow-snapshot"
+  "data": {
+    "actionId": "12345",
+    "imageId": 67890,
+    "imageType": "snapshot",
+    "serverId": "42",
+    "snapshotName": "workflow-snapshot"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.snapshot.created"
 }
 ```
 
@@ -127,7 +139,11 @@ The Delete Load Balancer component deletes a load balancer in Hetzner Cloud.
 
 ```json
 {
-  "loadBalancerId": "12345"
+  "data": {
+    "loadBalancerId": "12345"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.load_balancer.deleted"
 }
 ```
 
@@ -147,8 +163,12 @@ The Delete Server component deletes a server in Hetzner Cloud and waits for the 
 
 ```json
 {
-  "actionId": 123,
-  "serverId": 42
+  "data": {
+    "actionId": 123,
+    "serverId": 42
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.server.deleted"
 }
 ```
 
@@ -167,7 +187,11 @@ The Delete Snapshot component deletes a snapshot image in Hetzner Cloud.
 
 ```json
 {
-  "imageId": "67890"
+  "data": {
+    "imageId": "67890"
+  },
+  "timestamp": "2024-01-15T10:30:00Z",
+  "type": "hetzner.snapshot.deleted"
 }
 ```
 

@@ -231,8 +231,6 @@ export function CategorySection({
     CategoryIcon = resolveIcon("zap");
   } else if (category.name === "Memory") {
     CategoryIcon = resolveIcon("database");
-  } else if (category.name === "Bundles") {
-    CategoryIcon = resolveIcon("package");
   } else if (integrationName === "smtp") {
     CategoryIcon = resolveIcon("mail");
   } else if (categoryIconSrc) {

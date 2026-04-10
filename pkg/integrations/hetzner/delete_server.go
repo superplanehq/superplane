@@ -62,13 +62,6 @@ func (c *DeleteServer) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *DeleteServer) ExampleOutput() map[string]any {
-	return map[string]any{
-		"actionId": 123,
-		"serverId": 42,
-	}
-}
-
 func (c *DeleteServer) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

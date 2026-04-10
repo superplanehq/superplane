@@ -56,12 +56,6 @@ func (c *DeleteSnapshot) OutputChannels(configuration any) []core.OutputChannel 
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *DeleteSnapshot) ExampleOutput() map[string]any {
-	return map[string]any{
-		"imageId": "67890",
-	}
-}
-
 func (c *DeleteSnapshot) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

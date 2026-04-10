@@ -29,7 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MeClient interface {
 	// Endpoint for getting the currently authenticated user.
-	Me(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*User, error)
+	Me(ctx context.Context, in *MeRequest, opts ...grpc.CallOption) (*MeResponse, error)
 	// Endpoint for regenerating the currently authenticated user's API token.
 	RegenerateToken(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*RegenerateTokenResponse, error)
 }
@@ -42,9 +42,9 @@ func NewMeClient(cc grpc.ClientConnInterface) MeClient {
 	return &meClient{cc}
 }
 
-func (c *meClient) Me(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*User, error) {
+func (c *meClient) Me(ctx context.Context, in *MeRequest, opts ...grpc.CallOption) (*MeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(User)
+	out := new(MeResponse)
 	err := c.cc.Invoke(ctx, Me_Me_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (c *meClient) RegenerateToken(ctx context.Context, in *empty.Empty, opts ..
 // for forward compatibility.
 type MeServer interface {
 	// Endpoint for getting the currently authenticated user.
-	Me(context.Context, *empty.Empty) (*User, error)
+	Me(context.Context, *MeRequest) (*MeResponse, error)
 	// Endpoint for regenerating the currently authenticated user's API token.
 	RegenerateToken(context.Context, *empty.Empty) (*RegenerateTokenResponse, error)
 }
@@ -79,7 +79,7 @@ type MeServer interface {
 // pointer dereference when methods are called.
 type UnimplementedMeServer struct{}
 
-func (UnimplementedMeServer) Me(context.Context, *empty.Empty) (*User, error) {
+func (UnimplementedMeServer) Me(context.Context, *MeRequest) (*MeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Me not implemented")
 }
 func (UnimplementedMeServer) RegenerateToken(context.Context, *empty.Empty) (*RegenerateTokenResponse, error) {
@@ -106,7 +106,7 @@ func RegisterMeServer(s grpc.ServiceRegistrar, srv MeServer) {
 }
 
 func _Me_Me_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(empty.Empty)
+	in := new(MeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func _Me_Me_Handler(srv interface{}, ctx context.Context, dec func(interface{}) 
 		FullMethod: Me_Me_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MeServer).Me(ctx, req.(*empty.Empty))
+		return srv.(MeServer).Me(ctx, req.(*MeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

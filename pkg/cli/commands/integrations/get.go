@@ -14,12 +14,12 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	if err != nil {
 		return err
 	}
-	if !me.HasOrganizationId() {
+	if !me.User.HasOrganizationId() {
 		return fmt.Errorf("organization id not found for authenticated user")
 	}
 
 	response, _, err := ctx.API.OrganizationAPI.
-		OrganizationsDescribeIntegration(ctx.Context, me.GetOrganizationId(), ctx.Args[0]).
+		OrganizationsDescribeIntegration(ctx.Context, me.User.GetOrganizationId(), ctx.Args[0]).
 		Execute()
 	if err != nil {
 		return err

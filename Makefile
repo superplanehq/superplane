@@ -32,20 +32,21 @@ lint:
 tidy:
 	$(COMPOSE) exec app go mod tidy
 
-test.setup:
+test.setup.build:
 	@touch agent/.env
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
-	$(COMPOSE) build
+	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
+
+test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 	$(MAKE) -C agent db.create DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 	$(MAKE) -C agent db.migrate DB_NAME=agents_test DB_PASSWORD=$(DB_PASSWORD)
 
 test.start:
-	$(COMPOSE) up -d
-	sleep 5
+	$(COMPOSE) up -d --wait
 
 test.down:
 	$(COMPOSE) down --remove-orphans
@@ -70,14 +71,23 @@ test.coverage:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" -- -p 1 -coverprofile=coverage-go.out -covermode=atomic
 	$(COMPOSE) run --rm app go tool cover -func=coverage-go.out | grep '^total:'
 
+test.coverage.check:
+	$(MAKE) test.coverage
+	$(MAKE) check.coverage.go
+
+test.coverage.baseline.update:
+	$(MAKE) test.coverage
+	$(MAKE) check.coverage.go.baseline.update
+
 test.license.check:
 	bash ./scripts/license-check.sh
 
 test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
+# Subset: CASES=comma-separated names from agent/evals/cases.py (optional).
 test.agent.evals:
-	$(COMPOSE) exec agent uv run python -m evals.runner
+	$(COMPOSE) exec $(if $(CASES),-e CASES=$(CASES),) agent uv run python -m evals.runner $(AGENT_EVAL_RUNNER_ARGS)
 
 test.agent.setup:
 	@touch agent/.env
@@ -92,10 +102,6 @@ test.agent.unit:
 
 test.shell:
 	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
-
-setup.playwright:
-	$(COMPOSE) exec app bash -c "bash scripts/docker/retry.sh 6 2s go install github.com/playwright-community/playwright-go/cmd/playwright@v0.5200.1"
-	$(COMPOSE) exec app bash -c "if [ -d /app/tmp/ms-playwright ] && [ \"$(ls -A /app/tmp/ms-playwright 2>/dev/null)\" ]; then echo \"Playwright browsers cache present, skipping install\"; else bash scripts/docker/retry.sh 6 2s playwright install chromium-headless-shell --with-deps; fi"
 
 #
 # Code formatting
@@ -206,6 +212,12 @@ check.lint.ui.baseline.update:
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
+
+check.coverage.go:
+	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out
+
+check.coverage.go.baseline.update:
+	go run ./scripts/check_go_coverage_budget.go --profile coverage-go.out --update-baseline
 
 
 storybook:

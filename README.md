@@ -1,8 +1,8 @@
 # SuperPlane
 
-SuperPlane is an **open source DevOps control plane** for defining and running
-event-based workflows. It works across the tools you already use such as
-Git, CI/CD, observability, incident response, infra, and notifications.
+SuperPlane is an **open source control plane for platform engineering**.
+It lets you define and run event-based workflows across the tools you already
+use such as Git, CI/CD, observability, incident response, infra, and notifications.
 
 ![SuperPlane screenshot](./screenshot.png)
 
@@ -22,8 +22,9 @@ Early feedback is extremely valuable.
 ## What it does
 
 - **Workflow orchestration**: Model multi-step operational workflows that span multiple systems.
-- **Event-driven automation**: Trigger workflows from pushes, deploy events, alerts, schedules, and webhooks.
-- **Control plane UI**: Design and manage DevOps processes; inspect runs, status, and history in a single place.
+- **Event-driven automation**: Trigger workflows from alerts, infrastructure events, code changes, issue updates, schedules, and webhooks.
+- **Control plane UI & CLI**: Design and manage platform engineering processes; inspect runs, manage secrets, and view history in a single place or via the CLI.
+- **Memory**: Persist and retrieve runtime data across different paths and executions of the same canvas using built-in data storage components.
 - **Shared operational context**: Keep workflow definitions and operational intent in one system instead of scattered scripts.
 
 ## How it works
@@ -31,7 +32,8 @@ Early feedback is extremely valuable.
 - **Canvases**: You model a workflow as a directed graph (a “Canvas”) of steps and dependencies.
 - **Components**: Each step is a reusable component (built-in or integration-backed) that performs an action (for example: call CI/CD, open an incident, post a notification, wait for a condition, require approval).
 - **Events & triggers**: Incoming events (webhooks, schedules, tool events) match triggers and start executions with the event payload as input.
-- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI (and via the CLI).
+- **Execution + visibility**: SuperPlane executes the graph, tracks state, and exposes runs/history/debugging in the UI and via the CLI.
+- **Agent-friendly**: Equip your coding agents with SuperPlane's CLI and skills to autonomously trigger workflows, manage resources, and investigate executions.
 
 ### Example use cases
 
@@ -178,7 +180,6 @@ You can deploy SuperPlane on a single host or on Kubernetes:
 - **[Kubernetes Installation](https://docs.superplane.com/installation/overview/#kubernetes)** - Deploy on GKE, EKS, or any Kubernetes cluster
 
 Installation admins can enable private network access during owner setup or later in `/admin/settings` when SuperPlane needs to reach tools inside a VPC, private Kubernetes cluster, or another closed network. Environment variables still take precedence: set `BLOCKED_HTTP_HOSTS` or `BLOCKED_PRIVATE_IP_RANGES` to override the UI-controlled policy, and set either variable to an empty value to disable that specific block list entirely.
-
 
 ## Contributing
 

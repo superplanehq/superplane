@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { SendLogEventConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const sendLogEventMapper: ComponentBaseMapper = {
@@ -96,8 +97,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.body) {
     // Show a preview of the log body (first 50 chars)
-    const bodyPreview =
-      configuration.body.length > 50 ? configuration.body.substring(0, 50) + "..." : configuration.body;
+    const bodyPreview = truncate(configuration.body, 50);
     metadata.push({ icon: "file-text", label: bodyPreview });
   }
 

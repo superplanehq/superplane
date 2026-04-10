@@ -1195,17 +1195,17 @@ CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USIN
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_casbin_rule_ptype ON public.casbin_rule USING btree (ptype);
-
-
---
--- Name: idx_casbin_rule_unique; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule_unique ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -1988,7 +1988,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260402003713	f
+20260408122133	f
 \.
 
 

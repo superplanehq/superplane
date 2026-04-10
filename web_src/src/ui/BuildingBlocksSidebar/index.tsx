@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { isCustomComponentsEnabled } from "@/lib/env";
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { Plus, Search, Settings2, StickyNote, X } from "lucide-react";
@@ -16,6 +15,7 @@ import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt 
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
+import type { CanvasOperation } from "@/lib/ai";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
@@ -40,7 +40,7 @@ export interface BuildingBlocksSidebarProps {
     edges?: ComponentsEdge[];
   };
   selectedNodeIds?: string[];
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   integrations?: OrganizationsIntegration[];
   canvasZoom?: number;
   disabled?: boolean;
@@ -48,42 +48,6 @@ export interface BuildingBlocksSidebarProps {
   onBlockClick?: (block: BuildingBlock) => void;
   onAddNote?: () => void;
 }
-
-export type AiCanvasOperation =
-  | {
-      type: "add_node";
-      nodeKey?: string;
-      blockName: string;
-      nodeName?: string;
-      configuration?: Record<string, unknown>;
-      position?: { x: number; y: number };
-      source?: {
-        nodeKey?: string;
-        nodeId?: string;
-        nodeName?: string;
-        handleId?: string | null;
-      };
-    }
-  | {
-      type: "connect_nodes";
-      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-    }
-  | {
-      type: "disconnect_nodes";
-      source: { nodeKey?: string; nodeId?: string; nodeName?: string; handleId?: string | null };
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-    }
-  | {
-      type: "update_node_config";
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-      configuration: Record<string, unknown>;
-      nodeName?: string;
-    }
-  | {
-      type: "delete_node";
-      target: { nodeKey?: string; nodeId?: string; nodeName?: string };
-    };
 
 export function BuildingBlocksSidebar({
   isOpen,
@@ -206,7 +170,7 @@ interface OpenBuildingBlocksSidebarProps {
   showAiBuilderTab: boolean;
   canvasId?: string;
   organizationId?: string;
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   integrations: OrganizationsIntegration[];
   canvasZoom: number;
   disabled: boolean;
@@ -308,7 +272,7 @@ function OpenBuildingBlocksSidebar({
     setPendingProposal(null);
   }, []);
 
-  const formatOperation = useCallback((operation: AiCanvasOperation, proposal?: AiBuilderProposal) => {
+  const formatOperation = useCallback((operation: CanvasOperation, proposal?: AiBuilderProposal) => {
     const operationNodeLabels = new Map<string, string>();
     if (proposal) {
       for (const op of proposal.operations) {
@@ -596,17 +560,9 @@ function OpenBuildingBlocksSidebar({
     const categoryOrder: Record<string, number> = {
       Core: 0,
       Memory: 1,
-      Bundles: 2,
     };
 
-    const filteredCategories = (blocks || []).filter((category) => {
-      if (category.name === "Bundles" && !isCustomComponentsEnabled()) {
-        return false;
-      }
-      return true;
-    });
-
-    return [...filteredCategories].sort((a, b) => {
+    return [...blocks].sort((a, b) => {
       const aOrder = categoryOrder[a.name] ?? Infinity;
       const bOrder = categoryOrder[b.name] ?? Infinity;
 
@@ -769,7 +725,8 @@ function OpenBuildingBlocksSidebar({
             </div>
             <div
               onClick={() => onToggle(false)}
-              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              data-testid="close-sidebar-button"
+              className="absolute top-4 right-4 z-40 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
             >
               <X size={16} />
             </div>
@@ -801,7 +758,8 @@ function OpenBuildingBlocksSidebar({
             </TabsList>
             <div
               onClick={() => onToggle(false)}
-              className="absolute top-4 right-4 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
+              data-testid="close-sidebar-button"
+              className="absolute top-4 right-4 z-40 w-6 h-6 hover:bg-slate-950/5 rounded flex items-center justify-center cursor-pointer leading-none"
             >
               <X size={16} />
             </div>

@@ -81,18 +81,6 @@ func (c *DeleteVMComponent) Color() string {
 	return "blue"
 }
 
-func (c *DeleteVMComponent) ExampleOutput() map[string]any {
-	return map[string]any{
-		"data": map[string]any{
-			"id":            "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
-			"name":          "my-vm",
-			"resourceGroup": "my-rg",
-		},
-		"timestamp": "2026-02-12T12:10:00Z",
-		"type":      "azure.vm",
-	}
-}
-
 func (c *DeleteVMComponent) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }

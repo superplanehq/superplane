@@ -1,0 +1,7 @@
+{
+  "type": "hetzner.snapshot.deleted",
+  "data": {
+    "imageId": "67890"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

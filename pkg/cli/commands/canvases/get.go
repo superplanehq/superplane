@@ -40,7 +40,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		if err != nil {
 			return err
 		}
-		currentUserID := strings.TrimSpace(me.GetId())
+		currentUserID := strings.TrimSpace(me.User.GetId())
 		if currentUserID == "" {
 			return fmt.Errorf("current user id not found")
 		}

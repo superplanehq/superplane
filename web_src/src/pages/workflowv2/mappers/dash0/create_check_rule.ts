@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { CheckRuleConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
 export const createCheckRuleMapper: ComponentBaseMapper = {
@@ -83,10 +84,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as CheckRuleConfiguration;
 
   if (configuration?.expression) {
-    const exprPreview =
-      configuration.expression.length > 50
-        ? configuration.expression.substring(0, 50) + "..."
-        : configuration.expression;
+    const exprPreview = truncate(configuration.expression, 50);
     metadata.push({ icon: "code", label: exprPreview });
   }
 

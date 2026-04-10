@@ -20,7 +20,6 @@ import json
 
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.users_account_provider import UsersAccountProvider
 from typing import Optional, Set
 from typing_extensions import Self
 
@@ -29,8 +28,7 @@ class UsersUserSpec(BaseModel):
     UsersUserSpec
     """ # noqa: E501
     display_name: Optional[StrictStr] = Field(default=None, alias="displayName")
-    account_providers: Optional[List[UsersAccountProvider]] = Field(default=None, alias="accountProviders")
-    __properties: ClassVar[List[str]] = ["displayName", "accountProviders"]
+    __properties: ClassVar[List[str]] = ["displayName"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -71,13 +69,6 @@ class UsersUserSpec(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in account_providers (list)
-        _items = []
-        if self.account_providers:
-            for _item_account_providers in self.account_providers:
-                if _item_account_providers:
-                    _items.append(_item_account_providers.to_dict())
-            _dict['accountProviders'] = _items
         return _dict
 
     @classmethod
@@ -90,8 +81,7 @@ class UsersUserSpec(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "displayName": obj.get("displayName"),
-            "accountProviders": [UsersAccountProvider.from_dict(_item) for _item in obj["accountProviders"]] if obj.get("accountProviders") is not None else None
+            "displayName": obj.get("displayName")
         })
         return _obj
 

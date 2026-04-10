@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Checkbox } from "@/ui/checkbox";
 import { showErrorToast } from "@/lib/toast";
-import { isCustomComponentsEnabled } from "@/lib/env";
 
 interface Permission {
   id: string;
@@ -207,48 +206,6 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
       },
     ],
   },
-  ...(isCustomComponentsEnabled()
-    ? [
-        {
-          category: "Custom Components",
-          icon: "view_module",
-          permissions: [
-            {
-              id: "blueprint.read",
-              name: "View Custom Components",
-              description: "View organization custom components",
-              category: "Custom Components",
-              resource: "blueprints",
-              action: "read",
-            },
-            {
-              id: "blueprint.create",
-              name: "Create Custom Components",
-              description: "Create new custom components",
-              category: "Custom Components",
-              resource: "blueprints",
-              action: "create",
-            },
-            {
-              id: "blueprint.update",
-              name: "Manage Custom Components",
-              description: "Update custom components settings and configuration",
-              category: "Custom Components",
-              resource: "blueprints",
-              action: "update",
-            },
-            {
-              id: "blueprint.delete",
-              name: "Delete Custom Components",
-              description: "Delete custom components from the organization",
-              category: "Custom Components",
-              resource: "blueprints",
-              action: "delete",
-            },
-          ],
-        },
-      ]
-    : []),
   {
     category: "Integrations",
     icon: "integration_instructions",

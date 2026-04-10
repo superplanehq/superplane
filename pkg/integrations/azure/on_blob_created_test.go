@@ -44,9 +44,14 @@ func TestOnBlobCreated_ExampleData(t *testing.T) {
 	example := trigger.ExampleData()
 
 	require.NotNil(t, example)
-	assert.Equal(t, "Microsoft.Storage.BlobCreated", example["eventType"])
-	assert.Contains(t, example, "subject")
+	assert.Contains(t, example, "type")
+	assert.Contains(t, example, "timestamp")
 	assert.Contains(t, example, "data")
+
+	envelope, ok := example["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Microsoft.Storage.BlobCreated", envelope["eventType"])
+	assert.Contains(t, envelope, "subject")
 }
 
 func TestOnBlobCreated_Setup(t *testing.T) {

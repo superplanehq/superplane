@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -28,14 +29,16 @@ type NodeRequestWorker struct {
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	webhookBaseURL string
+	authService    authorization.Authorization
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
 	return &NodeRequestWorker{
 		encryptor:      encryptor,
 		registry:       registry,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
+		authService:    authService,
 	}
 }
 
@@ -323,7 +326,7 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Notifications:  contexts.NewNotificationContext(tx, uuid.Nil, node.WorkflowID),
-		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, nil, nil),
+		Auth:           contexts.NewAuthContext(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, workflow.OrganizationID, w.encryptor),
 	}
 

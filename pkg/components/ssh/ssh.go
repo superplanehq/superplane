@@ -113,16 +113,6 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 func (c *SSHCommand) Icon() string  { return "terminal" }
 func (c *SSHCommand) Color() string { return "blue" }
 
-func (c *SSHCommand) ExampleOutput() map[string]any {
-	return map[string]any{
-		"result": map[string]any{
-			"stdout":   "Hello, World!\n",
-			"stderr":   "",
-			"exitCode": 0,
-		},
-	}
-}
-
 func (c *SSHCommand) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: channelSuccess, Label: "Success"},

@@ -37,8 +37,8 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		users, err = r.AuthService.GetGroupUsers(orgID, models.DomainTypeOrganization, "test-group")
-		require.NoError(t, err)
-		assert.Empty(t, users)
+		require.Error(t, err)
+		assert.Nil(t, users)
 
 		// Verify the group no longer exists in the groups list
 		groups, err = r.AuthService.GetGroups(orgID, models.DomainTypeOrganization)

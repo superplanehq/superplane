@@ -1,14 +1,12 @@
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../card";
 import { Button } from "../button";
 import { Badge } from "../badge";
 import { EventItem, type EventItemProps } from "../eventItem";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../hoverCard";
-import type { LucideIcon } from "lucide-react";
-import * as LucideIcons from "lucide-react";
 import { BookMarked, Funnel } from "lucide-react";
 
 export interface EventSourceProps {
@@ -61,32 +59,13 @@ export const EventSource: React.FC<EventSourceProps> = ({
   selected = false,
   collapsed = false,
 }) => {
-  const resolveIcon = React.useCallback((slug?: string): LucideIcon => {
-    if (!slug) {
-      return BookMarked;
-    }
-
-    const pascalCase = slug
-      .split("-")
-      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-      .join("");
-
-    const candidate = (LucideIcons as Record<string, unknown>)[pascalCase];
-
-    if (candidate && (typeof candidate === "function" || (typeof candidate === "object" && "render" in candidate))) {
-      return candidate as LucideIcon;
-    }
-
-    return BookMarked;
-  }, []);
-
   const ResourceIcon = React.useMemo(() => {
     if (!resource.icon) {
       return BookMarked;
     }
 
-    return resolveIcon(resource.icon);
-  }, [resource.icon, resolveIcon]);
+    return resolveIcon(resource.icon, "book-marked");
+  }, [resource.icon]);
 
   if (collapsed) {
     return (
@@ -174,7 +153,7 @@ export const EventSource: React.FC<EventSourceProps> = ({
             {meta && meta.length > 0 ? (
               <div className="mt-2 flex w-full flex-col gap-2 text-sm">
                 {meta.map(({ icon, label: metaLabel, value }, index) => {
-                  const MetaIcon = resolveIcon(icon);
+                  const MetaIcon = resolveIcon(icon, "book-marked");
 
                   return (
                     <div key={`${metaLabel}-${index}`} className="flex items-center gap-2 text-muted-foreground">

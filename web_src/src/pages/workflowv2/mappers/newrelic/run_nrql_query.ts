@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import newrelicIcon from "@/assets/icons/integrations/newrelic.svg";
 import type { NewRelicNRQLResultPayload, RunNRQLQueryConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./utils";
 
@@ -66,9 +67,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as RunNRQLQueryConfiguration | undefined;
 
   if (configuration?.query) {
-    const truncated =
-      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
-    metadata.push({ icon: "search", label: `Query: ${truncated}` });
+    metadata.push({ icon: "search", label: `Query: ${truncate(configuration.query, 50)}` });
   }
 
   return metadata;

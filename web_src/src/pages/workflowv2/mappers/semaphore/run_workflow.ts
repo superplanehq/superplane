@@ -23,7 +23,6 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { getTriggerRenderer } from "..";
 import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import type { CanvasesCanvasNodeExecution } from "@/api-client";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { stringOrDash } from "../utils";
 
@@ -162,7 +161,7 @@ export const RUN_WORKFLOW_STATE_MAP: EventStateMap = {
 /**
  * Semaphore-specific state logic function
  */
-export const runWorkflowStateFunction: StateFunction = (execution: CanvasesCanvasNodeExecution): EventState => {
+export const runWorkflowStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
   if (

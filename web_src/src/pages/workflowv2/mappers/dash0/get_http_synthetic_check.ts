@@ -17,6 +17,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import dash0Icon from "@/assets/icons/integrations/dash0.svg";
 import type { GetHttpSyntheticCheckConfiguration, GetHttpSyntheticCheckNodeMetadata } from "./types";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
+import { truncate } from "../safeMappers";
 
 // Output channel names matching the backend constants
 const CHANNEL_HEALTHY = "healthy";
@@ -144,8 +145,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "activity", label: nodeMetadata.checkName });
   } else if (configuration?.checkId) {
     // Fallback to check ID if name is not yet available (e.g., before first setup)
-    const idPreview =
-      configuration.checkId.length > 24 ? configuration.checkId.substring(0, 24) + "…" : configuration.checkId;
+    const idPreview = truncate(configuration.checkId, 24, "…");
     metadata.push({ icon: "fingerprint", label: idPreview });
   }
 

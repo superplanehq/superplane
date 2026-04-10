@@ -67,17 +67,6 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 };
 ```
 
-### 3. Component Additional Data Builders (`componentAdditionalDataBuilders`)
-**Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 56-58
-**Purpose:** Builds component-specific data that requires external API calls or complex logic.
-**Current registrations:** approval
-
-```typescript
-const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
-  approval: approvalDataBuilder, // from ./approval.ts
-};
-```
-
 ### 4. Event State Registries (`eventStateRegistries`)
 **Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 60-62
 **Purpose:** Custom state logic and visual styling for different component states.
@@ -266,74 +255,6 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 };
 ```
 
-### Example 3: Creating an Additional Data Builder (Approval Component)
-
-**Primary file:** `web_src/src/pages/workflowv2/mappers/approval.ts`
-**Data builder definition:** Lines 257-398
-**Registration location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 56-58
-**Import statement location:** `web_src/src/pages/workflowv2/mappers/index.ts` line 23
-**Usage in component:** Lines 119 and 123 (passed as `additionalData` parameter)
-
-For components that need to fetch external data:
-
-#### 1. Implement ComponentAdditionalDataBuilder
-
-```typescript
-export const approvalDataBuilder: ComponentAdditionalDataBuilder = {
-  buildAdditionalData(context: AdditionalDataBuilderContext) {
-    const execution = context.lastExecutions[0];
-    const usersById: Record<string, { email?: string; name?: string }> = {};
-    const rolesByName: Record<string, string> = {};
-
-    // Fetch user data from cache
-    if (context.organizationId) {
-      const usersResp = context.queryClient.getQueryData(organizationKeys.users(context.organizationId));
-      if (Array.isArray(usersResp)) {
-        usersResp.forEach((user) => {
-          const id = user.metadata?.id;
-          if (id) usersById[id] = { email: user.metadata?.email, name: user.spec?.displayName };
-        });
-      }
-    }
-
-    // Map execution records to approval items with interactive handlers
-    const approvals = ((execution?.metadata?.records as any[]) || []).map((record) => ({
-      id: `${record.index}`,
-      title: record.user?.name || record.user?.email || "Unknown",
-      approved: record.state === "approved",
-      rejected: record.state === "rejected",
-      interactive: record.state === "pending" && execution?.state === "STATE_STARTED",
-      onApprove: async (artifacts?: Record<string, string>) => {
-        await workflowsInvokeNodeExecutionAction({
-          path: { workflowId: context.canvasId, executionId: execution.id, actionName: "approve" },
-          body: { parameters: { index: record.index, comment: artifacts?.comment } },
-        });
-        context.queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(context.canvasId, context.node.id!) });
-      },
-      onReject: async (comment?: string) => {
-        await workflowsInvokeNodeExecutionAction({
-          path: { workflowId: context.canvasId, executionId: execution.id, actionName: "reject" },
-          body: { parameters: { index: record.index, reason: comment } },
-        });
-        context.queryClient.invalidateQueries({ queryKey: workflowKeys.nodeExecution(context.canvasId, context.node.id!) });
-      },
-    }));
-
-    return { approvals, usersById, rolesByName };
-  },
-};
-```
-
-#### 2. Register in Main Registry
-
-In `web_src/src/pages/workflowv2/mappers/index.ts:56-58`:
-
-```typescript
-const componentAdditionalDataBuilders: Record<string, ComponentAdditionalDataBuilder> = {
-  approval: approvalDataBuilder,
-};
-```
-
 ## Creating a New Custom Component
 
 To create a new component with custom behaviors:
@@ -466,7 +387,6 @@ The registry provides several helper functions in `web_src/src/pages/workflowv2/
 Available helper functions:
 - `getTriggerRenderer(name)`: Lines 73-87 - Get trigger renderer with app support
 - `getComponentBaseMapper(name)`: Lines 93-107 - Get component mapper with app support
-- `getComponentAdditionalDataBuilder(name)`: Lines 113-115 - Get data builder
 - `getEventStateRegistry(name)`: Lines 121-123 - Get state registry with fallback
 - `getStateMap(name)`: Lines 129-131 - Get state map
 - `getState(name)`: Lines 137-139 - Get state function

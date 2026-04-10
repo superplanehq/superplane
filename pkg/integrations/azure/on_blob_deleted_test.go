@@ -44,9 +44,14 @@ func TestOnBlobDeleted_ExampleData(t *testing.T) {
 	example := trigger.ExampleData()
 
 	require.NotNil(t, example)
-	assert.Equal(t, "Microsoft.Storage.BlobDeleted", example["eventType"])
-	assert.Contains(t, example, "subject")
+	assert.Contains(t, example, "type")
+	assert.Contains(t, example, "timestamp")
 	assert.Contains(t, example, "data")
+
+	envelope, ok := example["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Microsoft.Storage.BlobDeleted", envelope["eventType"])
+	assert.Contains(t, envelope, "subject")
 }
 
 func TestOnBlobDeleted_Setup(t *testing.T) {

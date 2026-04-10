@@ -13,6 +13,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { QueryDataSourceConfiguration } from "./types";
+import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
 
@@ -90,8 +91,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (configuration?.query) {
-    const preview =
-      configuration.query.length > 50 ? configuration.query.substring(0, 50) + "..." : configuration.query;
+    const preview = truncate(configuration.query, 50);
     metadata.push({ icon: "code", label: preview });
   }
 

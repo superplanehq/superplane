@@ -256,3 +256,53 @@ var exampleOutputUpdateApp map[string]any
 func (u *UpdateApp) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateAppOnce, exampleOutputUpdateAppBytes, &exampleOutputUpdateApp)
 }
+
+//go:embed example_output_create_knowledge_base.json
+var exampleOutputCreateKnowledgeBaseBytes []byte
+
+var exampleOutputCreateKnowledgeBaseOnce sync.Once
+var exampleOutputCreateKnowledgeBase map[string]any
+
+func (c *CreateKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateKnowledgeBaseOnce, exampleOutputCreateKnowledgeBaseBytes, &exampleOutputCreateKnowledgeBase)
+}
+
+//go:embed example_output_attach_knowledge_base.json
+var exampleOutputAttachKnowledgeBaseBytes []byte
+
+var exampleOutputAttachKnowledgeBaseOnce sync.Once
+var exampleOutputAttachKnowledgeBase map[string]any
+
+func (a *AttachKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAttachKnowledgeBaseOnce, exampleOutputAttachKnowledgeBaseBytes, &exampleOutputAttachKnowledgeBase)
+}
+
+//go:embed example_output_detach_knowledge_base.json
+var exampleOutputDetachKnowledgeBaseBytes []byte
+
+var exampleOutputDetachKnowledgeBaseOnce sync.Once
+var exampleOutputDetachKnowledgeBase map[string]any
+
+func (d *DetachKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDetachKnowledgeBaseOnce, exampleOutputDetachKnowledgeBaseBytes, &exampleOutputDetachKnowledgeBase)
+}
+
+//go:embed example_output_delete_knowledge_base.json
+var exampleOutputDeleteKnowledgeBaseBytes []byte
+
+var exampleOutputDeleteKnowledgeBaseOnce sync.Once
+var exampleOutputDeleteKnowledgeBase map[string]any
+
+func (d *DeleteKnowledgeBase) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteKnowledgeBaseOnce, exampleOutputDeleteKnowledgeBaseBytes, &exampleOutputDeleteKnowledgeBase)
+}
+
+//go:embed example_output_run_evaluation.json
+var exampleOutputRunEvaluationBytes []byte
+
+var exampleOutputRunEvaluationOnce sync.Once
+var exampleOutputRunEvaluation map[string]any
+
+func (r *RunEvaluation) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRunEvaluationOnce, exampleOutputRunEvaluationBytes, &exampleOutputRunEvaluation)
+}

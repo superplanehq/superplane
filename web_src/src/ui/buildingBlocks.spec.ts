@@ -4,7 +4,7 @@ import { buildBuildingBlockCategories } from "./buildingBlocks";
 
 describe("buildBuildingBlockCategories", () => {
   it("does not merge storybook mock blocks into live categories", () => {
-    const categories = buildBuildingBlockCategories([], [], [], []);
+    const categories = buildBuildingBlockCategories([], [], []);
 
     expect(categories).toEqual([]);
   });
@@ -16,7 +16,7 @@ describe("buildBuildingBlockCategories", () => {
       description: "Deploy the current release",
     };
 
-    const categories = buildBuildingBlockCategories([], [component], [], []);
+    const categories = buildBuildingBlockCategories([], [component], []);
 
     expect(categories).toHaveLength(1);
     expect(categories[0]?.name).toBe("Core");

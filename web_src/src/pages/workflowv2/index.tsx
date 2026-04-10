@@ -1,7 +1,7 @@
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { isAgentReplEnabled } from "@/lib/env";
+import { isAgentEnabled } from "@/lib/env";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import debounce from "lodash.debounce";
@@ -28,14 +28,10 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   OrganizationsIntegration,
+  SuperplaneMeUser,
 } from "@/api-client";
 import { canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
-import {
-  useOrganization,
-  useOrganizationGroups,
-  useOrganizationRoles,
-  useOrganizationUsers,
-} from "@/hooks/useOrganizationData";
+import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { useBlueprints, useComponents } from "@/hooks/useBlueprintData";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
@@ -66,7 +62,6 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { AiCanvasOperation } from "@/ui/BuildingBlocksSidebar";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
@@ -78,7 +73,7 @@ import { filterVisibleConfiguration } from "@/lib/components";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { Button } from "@/components/ui/button";
-import { getComponentAdditionalDataBuilder, getCustomFieldRenderer, getState, getStateMap } from "./mappers";
+import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import { CanvasMemoryView } from "./CanvasMemoryView";
 import { CanvasYamlView } from "./CanvasYamlView";
@@ -87,13 +82,10 @@ import { useCanvasYaml } from "./useCanvasYaml";
 import { useMinSavingDisplayHold } from "./useMinSavingDisplayHold";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { usePushThroughHandler } from "./usePushThroughHandler";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
-import { applyAiOperationsToWorkflow } from "./applyAiOperationsToWorkflow";
-import { applyHorizontalAutoLayout, buildChannelsByNodeId } from "./autoLayout";
-import { useAccount } from "@/contexts/AccountContext";
+import { type CanvasOperation, CanvasBuilder } from "@/lib/ai";
+import { DefaultLayoutEngine } from "@/lib/layout";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { useApprovalGroupUsersPrefetch } from "@/hooks/useApprovalGroupUsersPrefetch";
 import {
   buildRunEntryFromEvent,
   buildRunItemFromExecution,
@@ -107,10 +99,8 @@ import {
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
   summarizeWorkflowChanges,
-  buildNodeInfo,
-  buildComponentDefinition,
   buildExecutionInfo,
-  buildChildToGroupMap,
+  buildUserInfo,
 } from "./utils";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
@@ -135,6 +125,8 @@ import {
   ungroupCanvasNode,
   wireGroupParentChildRelationships,
 } from "./lib/canvas-groups";
+import type { User } from "./mappers/types";
+import { buildChildToGroupMap } from "@/lib/canvas/groups";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -187,7 +179,6 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { account } = useAccount();
   const { data: me } = useMe();
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
@@ -357,7 +348,7 @@ export function WorkflowPageV2() {
 
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
-        avatarUrl: user.spec?.accountProviders?.[0]?.avatarUrl || undefined,
+        avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
       });
     });
     return profilesByID;
@@ -521,7 +512,7 @@ export function WorkflowPageV2() {
   const isOrgVersioningEnabled = organization?.metadata?.versioningEnabled;
   const canUpdateCanvas = canAct("canvases", "update");
   const updateCanvasMutation = useUpdateCanvas(organizationId || "", canvasId || "");
-  const showAiBuilderTab = isAgentReplEnabled();
+  const showAiBuilderTab = isAgentEnabled();
 
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
@@ -571,7 +562,6 @@ export function WorkflowPageV2() {
   // We don't use the values directly here; loading them populates the
   // react-query cache which prepareApprovalNode reads from.
   const { data: organizationRoles = [], isLoading: rolesLoading } = useOrganizationRoles(organizationId!);
-  const { isLoading: groupsLoading } = useOrganizationGroups(organizationId!);
 
   /**
    * Track if we've already done the initial fit to view.
@@ -1032,32 +1022,6 @@ export function WorkflowPageV2() {
   const visibleNodeQueueItemsMap = isViewingLiveVersion ? nodeQueueItemsMap : {};
   const visibleNodeEventsMap = isViewingLiveVersion ? nodeEventsMap : {};
 
-  const approvalGroupNames = useMemo(() => {
-    if (!organizationId) return [];
-
-    const groupNames = new Set<string>();
-    Object.values(visibleNodeExecutionsMap).forEach((executions) => {
-      executions.forEach((execution) => {
-        const metadata = execution.metadata as { records?: Array<{ type?: string; group?: string }> } | undefined;
-        const records = metadata?.records;
-        if (!Array.isArray(records)) return;
-
-        records.forEach((record) => {
-          if (record.type === "group" && record.group) {
-            groupNames.add(record.group);
-          }
-        });
-      });
-    });
-
-    return Array.from(groupNames);
-  }, [organizationId, visibleNodeExecutionsMap]);
-
-  const groupUsersUpdatedAt = useApprovalGroupUsersPrefetch({
-    organizationId,
-    groupNames: approvalGroupNames,
-  }).updatedAt;
-
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(canvasId!, queryClient, canvas);
 
@@ -1489,10 +1453,11 @@ export function WorkflowPageV2() {
         return workflow;
       }
 
-      return applyHorizontalAutoLayout(workflow, {
+      return DefaultLayoutEngine.apply(workflow, {
         scope: "connected-component",
         nodeIds: [nodeID],
-        channelsByNodeId: buildChannelsByNodeId(workflow, components, blueprints),
+        components,
+        blueprints,
       });
     },
     [isAutoLayoutOnUpdateEnabled, components, blueprints],
@@ -1740,8 +1705,8 @@ export function WorkflowPageV2() {
   }, [components, availableIntegrations]);
 
   const buildingBlocks = useMemo(
-    () => buildBuildingBlockCategories(triggers, components, blueprints, availableIntegrations),
-    [triggers, components, blueprints, availableIntegrations],
+    () => buildBuildingBlockCategories(triggers, components, availableIntegrations),
+    [triggers, components, availableIntegrations],
   );
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
@@ -1759,8 +1724,7 @@ export function WorkflowPageV2() {
       visibleNodeQueueItemsMap,
       canvasId!,
       queryClient,
-      organizationId!,
-      account ? { id: account.id, email: account.email } : undefined,
+      me,
     );
   }, [
     canvas,
@@ -1770,7 +1734,6 @@ export function WorkflowPageV2() {
     visibleNodeEventsMap,
     visibleNodeExecutionsMap,
     visibleNodeQueueItemsMap,
-    groupUsersUpdatedAt,
     canvasId,
     queryClient,
     canvasLoading,
@@ -1779,7 +1742,7 @@ export function WorkflowPageV2() {
     componentsLoading,
     integrationsLoading,
     organizationId,
-    account,
+    me,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -1820,10 +1783,6 @@ export function WorkflowPageV2() {
         eventsMapForSidebar,
         totalHistoryCount,
         totalQueueCount,
-        canvasId,
-        queryClient,
-        organizationId,
-        account ? { id: account.id, email: account.email } : undefined,
       );
 
       // Add loading state to sidebar data
@@ -1832,19 +1791,7 @@ export function WorkflowPageV2() {
         isLoading: nodeData.isLoading,
       };
     },
-    [
-      canvas,
-      canvasId,
-      blueprints,
-      allComponents,
-      allTriggers,
-      visibleNodeEventsMap,
-      isViewingLiveVersion,
-      getNodeData,
-      queryClient,
-      organizationId,
-      account,
-    ],
+    [canvas, blueprints, allComponents, allTriggers, visibleNodeEventsMap, isViewingLiveVersion, getNodeData],
   );
 
   // Trigger data loading when sidebar opens for a node
@@ -2172,9 +2119,6 @@ export function WorkflowPageV2() {
     nodeType: currentHistoryNode?.nodeType || "TYPE_ACTION",
     allNodes: canvas?.spec?.nodes || [],
     enabled: !!currentHistoryNode && !!canvasId && isViewingLiveVersion,
-    components,
-    organizationId: organizationId || "",
-    queryClient,
   });
 
   const queueHistoryQuery = useQueueHistory({
@@ -2605,7 +2549,6 @@ export function WorkflowPageV2() {
 
         return result;
       } catch (error: any) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         const displayMessage = getUsageLimitToastMessage(error, errorMessage);
         setLastCanvasSaveError(displayMessage);
@@ -2987,7 +2930,9 @@ export function WorkflowPageV2() {
     if (!canAutoSave) {
       return;
     }
-  }, [canAutoSave]);
+
+    debouncedAnnotationAutoSave.flush();
+  }, [canAutoSave, debouncedAnnotationAutoSave]);
 
   const clearPendingAutoSaveWork = useCallback(() => {
     debouncedAutoSave.cancel();
@@ -3015,47 +2960,41 @@ export function WorkflowPageV2() {
       const { x, y, ...configurationUpdates } = updates;
       const hasPositionUpdate = x !== undefined || y !== undefined;
       const hasConfigurationUpdate = Object.keys(configurationUpdates).length > 0;
-      const hasOnlyTextUpdate =
-        !hasPositionUpdate && Object.keys(configurationUpdates).length === 1 && configurationUpdates.text !== undefined;
+      const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
+        if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
+          return node;
+        }
 
-      const shouldUpdateCache = !canAutoSave || !hasOnlyTextUpdate;
-      if (shouldUpdateCache) {
-        const updatedNodes = latestWorkflow?.spec?.nodes?.map((node) => {
-          if (node.id !== nodeId || node.type !== "TYPE_WIDGET") {
-            return node;
-          }
+        const updatedNode = { ...node };
 
-          const updatedNode = { ...node };
+        // Update position if provided
+        if (hasPositionUpdate) {
+          updatedNode.position = {
+            x: x !== undefined ? x : node.position?.x || 0,
+            y: y !== undefined ? y : node.position?.y || 0,
+          };
+        }
 
-          // Update position if provided
-          if (hasPositionUpdate) {
-            updatedNode.position = {
-              x: x !== undefined ? x : node.position?.x || 0,
-              y: y !== undefined ? y : node.position?.y || 0,
-            };
-          }
+        // Update configuration if provided
+        if (hasConfigurationUpdate) {
+          updatedNode.configuration = {
+            ...node.configuration,
+            ...configurationUpdates,
+          };
+        }
 
-          // Update configuration if provided
-          if (hasConfigurationUpdate) {
-            updatedNode.configuration = {
-              ...node.configuration,
-              ...configurationUpdates,
-            };
-          }
+        return updatedNode;
+      });
 
-          return updatedNode;
-        });
+      const updatedWorkflow = {
+        ...latestWorkflow,
+        spec: {
+          ...latestWorkflow.spec,
+          nodes: updatedNodes,
+        },
+      };
 
-        const updatedWorkflow = {
-          ...latestWorkflow,
-          spec: {
-            ...latestWorkflow.spec,
-            nodes: updatedNodes,
-          },
-        };
-
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
-      }
+      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
 
       if (hasConfigurationUpdate) {
         if (canAutoSave) {
@@ -3170,7 +3109,8 @@ export function WorkflowPageV2() {
       const existingNodeNames = (latestWorkflow.spec?.nodes || []).map((n) => n.name || "").filter(Boolean);
 
       // Generate unique node name based on component name + ordinal
-      const uniqueNodeName = generateUniqueNodeName(buildingBlock.name || "node", existingNodeNames);
+      const nameBase = newNodeData.nodeName || buildingBlock.name || "node";
+      const uniqueNodeName = generateUniqueNodeName(nameBase, existingNodeNames);
 
       // Generate a unique node ID
       const newNodeId = generateNodeId(buildingBlock.name || "node", uniqueNodeName);
@@ -3264,7 +3204,7 @@ export function WorkflowPageV2() {
   );
 
   const handleApplyAiOperations = useCallback(
-    async (operations: AiCanvasOperation[]) => {
+    async (operations: CanvasOperation[]) => {
       if (!operations.length || !organizationId || !canvasId) {
         return;
       }
@@ -3276,24 +3216,19 @@ export function WorkflowPageV2() {
       }
 
       saveWorkflowSnapshot(latestWorkflow);
-      const updatedWorkflow = applyAiOperationsToWorkflow({
-        workflow: latestWorkflow,
-        operations,
+      const builder = new CanvasBuilder({
+        canvas: latestWorkflow,
         buildingBlocks,
         integrations,
+        components,
+        blueprints,
       });
+      const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
 
       const previousNodeIds = new Set((latestWorkflow.spec?.nodes || []).map((node) => node.id));
-      const aiAddedNodeIds = (updatedWorkflow.spec?.nodes || [])
+      const aiAddedNodeIds = (finalWorkflow.spec?.nodes || [])
         .map((node) => node.id)
         .filter((nodeId): nodeId is string => typeof nodeId === "string" && !previousNodeIds.has(nodeId));
-
-      let finalWorkflow = updatedWorkflow;
-      if (aiAddedNodeIds.length > 0) {
-        finalWorkflow = await applyHorizontalAutoLayout(updatedWorkflow, {
-          channelsByNodeId: buildChannelsByNodeId(updatedWorkflow, components, blueprints),
-        });
-      }
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), finalWorkflow);
 
@@ -3309,9 +3244,9 @@ export function WorkflowPageV2() {
       canAutoSave,
       canvas,
       canvasId,
+      handleSaveWorkflow,
       components,
       blueprints,
-      handleSaveWorkflow,
       markUnsavedChange,
       integrations,
       organizationId,
@@ -3647,10 +3582,11 @@ export function WorkflowPageV2() {
 
       saveWorkflowSnapshot(canvas);
 
-      const updatedWorkflow = await applyHorizontalAutoLayout(canvas, {
+      const updatedWorkflow = await DefaultLayoutEngine.apply(canvas, {
         nodeIds,
         scope: "connected-component",
-        channelsByNodeId: buildChannelsByNodeId(canvas, components, blueprints),
+        components,
+        blueprints,
       });
 
       queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
@@ -4070,22 +4006,6 @@ export function WorkflowPageV2() {
     ],
   );
 
-  const handleConfigure = useCallback(
-    (nodeId: string) => {
-      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
-      if (!node) return;
-      if (node.type === "TYPE_BLUEPRINT" && node.blueprint?.id && organizationId && canvas) {
-        // Pass workflow info as URL parameters
-        const params = new URLSearchParams({
-          fromWorkflow: canvasId!,
-          workflowName: canvas.metadata?.name || "Canvas",
-        });
-        navigate(`/${organizationId}/custom-components/${node.blueprint.id}?${params.toString()}`);
-      }
-    },
-    [canvas, organizationId, canvasId, navigate],
-  );
-
   const handleRun = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!canvasId) return;
@@ -4338,7 +4258,6 @@ export function WorkflowPageV2() {
           setInitialWorkflowSnapshot(null);
         }
       } catch (error) {
-        console.error("Failed to save canvas", error);
         const errorMessage = getApiErrorMessage(error, "Failed to save changes to the canvas");
         showErrorToast(errorMessage);
       }
@@ -5041,13 +4960,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, createWorkflowMutation, navigate, queryClient, canvasId],
   );
 
-  // Provide pass-through handlers regardless of workflow being loaded to keep hook order stable
-  const { onPushThrough, supportsPushThrough } = usePushThroughHandler({
-    canvasId: canvasId!,
-    organizationId,
-    canvas,
-  });
-
   const { onCancelExecution } = useCancelExecutionHandler({
     canvasId: canvasId!,
     canvas,
@@ -5300,8 +5212,7 @@ export function WorkflowPageV2() {
       componentsLoading ||
       widgetsLoading ||
       usersLoading ||
-      rolesLoading ||
-      groupsLoading);
+      rolesLoading);
 
   // Keep full-screen loading only for initial bootstrap.
   // Version switches should not unmount the page.
@@ -5623,17 +5534,6 @@ export function WorkflowPageV2() {
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
-          onNodeExpand={(nodeId) => {
-            if (isViewingDraftVersion) {
-              return;
-            }
-
-            const latestExecution = visibleNodeExecutionsMap[nodeId]?.[0];
-            const executionId = latestExecution?.id;
-            if (executionId) {
-              navigate(`/${organizationId}/canvases/${canvasId}/nodes/${nodeId}/${executionId}`);
-            }
-          }}
           title={canvas?.metadata?.name || "Canvas"}
           headerBanner={headerBanner}
           topViewMode={topViewMode}
@@ -5660,7 +5560,6 @@ export function WorkflowPageV2() {
           edges={edges}
           organizationId={organizationId}
           canvasId={canvasId}
-          onDirty={!isReadOnly ? () => markUnsavedChange("structural") : undefined}
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           getTabData={getTabData}
@@ -5690,7 +5589,6 @@ export function WorkflowPageV2() {
           onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
-          onConfigure={!isReadOnly ? handleConfigure : undefined}
           buildingBlocks={buildingBlocks}
           showAiBuilderTab={showAiBuilderTab}
           onNodeAdd={!isReadOnly ? handleNodeAdd : undefined}
@@ -5740,8 +5638,6 @@ export function WorkflowPageV2() {
           runDisabled={runDisabled}
           runDisabledTooltip={runDisabledTooltip}
           onCancelQueueItem={onCancelQueueItem}
-          onPushThrough={isViewingLiveVersion ? onPushThrough : undefined}
-          supportsPushThrough={isViewingLiveVersion ? supportsPushThrough : undefined}
           onCancelExecution={isViewingLiveVersion ? onCancelExecution : undefined}
           getAllHistoryEvents={getAllHistoryEvents}
           onLoadMoreHistory={handleLoadMoreHistory}
@@ -6011,12 +5907,12 @@ function prepareData(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
-  organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  user?: SuperplaneMeUser | null,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
 } {
+  const currentUser = buildUserInfo(user);
   const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
   const workflowEdges = workflow?.spec?.edges || [];
   const workflowNodes = workflow?.spec?.nodes || [];
@@ -6034,7 +5930,6 @@ function prepareData(
           nodeQueueItemsMap,
           workflowId,
           queryClient,
-          organizationId,
           currentUser,
           workflowEdges,
         );
@@ -6059,8 +5954,7 @@ function prepareNode(
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
   workflowId: string,
   queryClient: QueryClient,
-  organizationId: string,
-  currentUser?: { id?: string; email?: string },
+  currentUser?: User,
   edges?: ComponentsEdge[],
 ): CanvasNode {
   switch (node.type) {
@@ -6098,7 +5992,6 @@ function prepareNode(
         nodeQueueItemsMap,
         canvasId: workflowId,
         queryClient,
-        organizationId,
         currentUser,
         edges,
       });
@@ -6127,10 +6020,6 @@ function prepareSidebarData(
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   totalHistoryCount?: number,
   totalQueueCount?: number,
-  workflowId?: string,
-  queryClient?: QueryClient,
-  organizationId?: string,
-  currentUser?: { id?: string; email?: string },
 ): SidebarData {
   const executions = nodeExecutionsMap[node.id!] || [];
   const queueItems = nodeQueueItemsMap[node.id!] || [];
@@ -6160,21 +6049,10 @@ function prepareSidebarData(
     color = triggerMetadata.color || color;
   }
 
-  const additionalData = getComponentAdditionalDataBuilder(node.component?.name || "")?.buildAdditionalData({
-    nodes: nodes.map((n) => buildNodeInfo(n)),
-    node: buildNodeInfo(node),
-    componentDefinition: buildComponentDefinition(componentMetadata!),
-    lastExecutions: executions.map((e) => buildExecutionInfo(e)),
-    canvasId: workflowId || "",
-    queryClient: queryClient as QueryClient,
-    organizationId: organizationId || "",
-    currentUser: currentUser,
-  });
-
   const latestEvents =
     node.type === "TYPE_TRIGGER"
       ? mapTriggerEventsToSidebarEvents(events, node, 5)
-      : mapExecutionsToSidebarEvents(executions, nodes, 5, additionalData);
+      : mapExecutionsToSidebarEvents(executions, nodes, 5);
 
   // Convert queue items to sidebar events (next in queue)
   const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);

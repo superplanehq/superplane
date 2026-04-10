@@ -101,26 +101,6 @@ func (t *OnVMDeleted) Color() string {
 	return "blue"
 }
 
-func (t *OnVMDeleted) ExampleData() map[string]any {
-	return map[string]any{
-		"id":              "96257b6d-17d3-49e2-8369-fb185b29e1b5",
-		"topic":           "/subscriptions/12345678-1234-1234-1234-123456789abc",
-		"subject":         "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-		"eventType":       "Microsoft.Resources.ResourceDeleteSuccess",
-		"eventTime":       "2026-02-11T10:30:00Z",
-		"dataVersion":     "2",
-		"metadataVersion": "1",
-		"data": map[string]any{
-			"operationName":    "Microsoft.Compute/virtualMachines/delete",
-			"status":           "Succeeded",
-			"resourceProvider": "Microsoft.Compute",
-			"resourceUri":      "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-			"subscriptionId":   "12345678-1234-1234-1234-123456789abc",
-			"tenantId":         "12345678-1234-1234-1234-123456789abc",
-		},
-	}
-}
-
 func (t *OnVMDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

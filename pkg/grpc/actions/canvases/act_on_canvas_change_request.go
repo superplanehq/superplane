@@ -52,6 +52,7 @@ func ActOnCanvasChangeRequest(
 			canvasID,
 			changeRequestID,
 			webhookBaseURL,
+			authService,
 		)
 		if err != nil {
 			return nil, err

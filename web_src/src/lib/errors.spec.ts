@@ -26,6 +26,18 @@ describe("errors", () => {
     ).toBe("Failed to save changes to the canvas");
   });
 
+  it("falls back when the api error message is a generic browser network failure", () => {
+    expect(getApiErrorMessage(new Error("Failed to fetch"), "Failed to save changes to the canvas")).toBe(
+      "Failed to save changes to the canvas",
+    );
+    expect(
+      getApiErrorMessage(
+        { response: { data: { message: "NetworkError when attempting to fetch resource." } } },
+        "Failed to emit event",
+      ),
+    ).toBe("Failed to emit event");
+  });
+
   it("extracts a message from a JSON error response", async () => {
     const response = new Response(JSON.stringify({ message: "account organization limit exceeded" }), {
       status: 429,

@@ -63,7 +63,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 
-import type { AiCanvasOperation, BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
+import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -75,7 +75,6 @@ import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { clampGroupChildNodePositionChanges, resizeGroupsAfterChildChanges } from "./groupLayout";
 import { Header, type BreadcrumbItem } from "./Header";
-import type { Simulation } from "./storybooks/useSimulation";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 import type { SidebarEvent } from "../componentSidebar/types";
@@ -84,6 +83,7 @@ import { IntegrationStatusIndicator, type MissingIntegration } from "../Integrat
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { Sentry } from "@/sentry";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import type { CanvasOperation } from "@/lib/ai";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -99,9 +99,10 @@ export interface SidebarData {
   isComposite?: boolean;
 }
 
-export interface CanvasNode extends ReactFlowNode {
-  __simulation?: Simulation;
-}
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type --
+   Having a specific type allows us to extend it with additional properties without breaking consumers.
+ */
+export interface CanvasNode extends ReactFlowNode {}
 
 export interface CanvasEdge extends ReactFlowEdge {
   sourceHandle?: string | null;
@@ -162,12 +163,8 @@ export interface CanvasPageProps {
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
-  versionLabel?: string;
-  onCreateVersion?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
-  createVersionDisabled?: boolean;
-  createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -199,7 +196,6 @@ export interface CanvasPageProps {
   versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
-  versionControlButtonLabel?: string;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
@@ -217,7 +213,6 @@ export interface CanvasPageProps {
   runDisabled?: boolean;
   runDisabledTooltip?: string;
 
-  onNodeExpand?: (nodeId: string, nodeData: unknown) => void;
   getSidebarData?: (nodeId: string) => SidebarData | null;
   loadSidebarData?: (nodeId: string) => void;
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
@@ -272,16 +267,11 @@ export interface CanvasPageProps {
   onNodePositionChange?: (nodeId: string, position: { x: number; y: number }) => void;
   onNodesPositionChange?: (updates: Array<{ nodeId: string; position: { x: number; y: number } }>) => void;
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
-  onPushThrough?: (nodeId: string, executionId: string) => void;
   onCancelExecution?: (nodeId: string, executionId: string) => void;
-  supportsPushThrough?: (nodeId: string) => boolean;
-  onDirty?: () => void;
 
   onRun?: (nodeId: string, channel: string, data: unknown) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
-  onDocs?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
@@ -292,7 +282,7 @@ export interface CanvasPageProps {
   buildingBlocks: BuildingBlockCategory[];
   showAiBuilderTab?: boolean;
   onNodeAdd?: (newNodeData: NewNodeData) => Promise<string>;
-  onApplyAiOperations?: (operations: AiCanvasOperation[]) => Promise<void>;
+  onApplyAiOperations?: (operations: CanvasOperation[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
     sourceNodeId: string;
@@ -411,13 +401,11 @@ type PendingRunData = {
 };
 
 type CanvasNodeRendererCallbacks = {
-  handleNodeExpand: NonNullable<BlockProps["onExpand"]>;
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
   onRun: React.MutableRefObject<((nodeId?: string, initialData?: string) => void) | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
-  onConfigure: React.MutableRefObject<CanvasPageProps["onConfigure"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<CanvasPageProps["onToggleView"] | undefined>;
@@ -533,13 +521,11 @@ function buildInteractiveNodeBlockProps(
 
   return {
     showHeader: callbacks.showHeader && !callbacks.hasMultiSelection,
-    onExpand: (expandedNodeId, nodeData) => callbacks.handleNodeExpand(expandedNodeId, nodeData),
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
     onRun: getNodeAction(callbacks.onRun, nodeId),
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
-    onConfigure: getNodeAction(callbacks.onConfigure, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
@@ -693,8 +679,6 @@ const nodeTypes = {
 };
 
 function CanvasPage(props: CanvasPageProps) {
-  const cancelQueueItemRef = useRef<CanvasPageProps["onCancelQueueItem"]>(props.onCancelQueueItem);
-  cancelQueueItemRef.current = props.onCancelQueueItem;
   const state = useCanvasState(props);
   const readOnly = props.readOnly ?? false;
   const [currentTab, setCurrentTab] = useState<"latest" | "settings" | "docs">("latest");
@@ -1126,12 +1110,6 @@ function CanvasPage(props: CanvasPageProps) {
     [state.toggleNodeCollapse, props.onToggleView],
   );
 
-  const handlePushThrough = (executionId: string) => {
-    if (state.componentSidebar.selectedNodeId && props.onPushThrough) {
-      props.onPushThrough(state.componentSidebar.selectedNodeId, executionId);
-    }
-  };
-
   const handleCancelQueueItem = (queueId: string) => {
     if (state.componentSidebar.selectedNodeId && props.onCancelQueueItem) {
       props.onCancelQueueItem!(state.componentSidebar.selectedNodeId!, queueId);
@@ -1194,12 +1172,8 @@ function CanvasPage(props: CanvasPageProps) {
           saveButtonHidden={props.saveButtonHidden}
           saveDisabled={props.saveDisabled}
           saveDisabledTooltip={props.saveDisabledTooltip}
-          versionLabel={props.versionLabel}
-          onCreateVersion={props.onCreateVersion}
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
-          createVersionDisabled={props.createVersionDisabled}
-          createVersionDisabledTooltip={props.createVersionDisabledTooltip}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
@@ -1332,19 +1306,16 @@ function CanvasPage(props: CanvasPageProps) {
             <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
               <CanvasContent
                 state={state}
-                onSave={props.onSave}
                 onNodeEdit={handleNodeEdit}
                 onNodeDelete={handleNodeDelete}
                 onNodesDelete={props.onNodesDelete}
                 onDuplicateNodes={props.onDuplicateNodes}
                 onAutoLayoutNodes={props.onAutoLayoutNodes}
                 onEdgeCreate={props.onEdgeCreate}
-                hideHeader={true}
                 onToggleView={handleToggleView}
                 onToggleCollapse={props.onToggleCollapse}
                 onRun={(nodeId) => handleNodeRun(nodeId)}
                 onDuplicate={props.onDuplicate}
-                onConfigure={props.onConfigure}
                 onDeactivate={props.onDeactivate}
                 onAnnotationUpdate={props.onAnnotationUpdate}
                 onAnnotationBlur={props.onAnnotationBlur}
@@ -1364,32 +1335,6 @@ function CanvasPage(props: CanvasPageProps) {
                 highlightedNodeIds={highlightedNodeIds}
                 workflowNodes={props.workflowNodes}
                 setCurrentTab={setCurrentTab}
-                onUndo={props.onUndo}
-                canUndo={props.canUndo}
-                organizationId={props.organizationId}
-                unsavedMessage={props.unsavedMessage}
-                saveIsPrimary={props.saveIsPrimary}
-                saveButtonHidden={props.saveButtonHidden}
-                saveDisabled={props.saveDisabled}
-                saveDisabledTooltip={props.saveDisabledTooltip}
-                versionLabel={props.versionLabel}
-                onCreateVersion={props.onCreateVersion}
-                onPublishVersion={props.onPublishVersion}
-                onDiscardVersion={props.onDiscardVersion}
-                createVersionDisabled={props.createVersionDisabled}
-                createVersionDisabledTooltip={props.createVersionDisabledTooltip}
-                publishVersionDisabled={props.publishVersionDisabled}
-                publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
-                discardVersionDisabled={props.discardVersionDisabled}
-                discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
-                headerMode={props.headerMode}
-                saveState={props.saveState}
-                lastSavedAt={props.lastSavedAt}
-                saveErrorMessage={props.saveErrorMessage}
-                onEnterEditMode={props.onEnterEditMode}
-                enterEditModeDisabled={props.enterEditModeDisabled}
-                enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
-                unpublishedDraftChangeCount={props.unpublishedDraftChangeCount}
                 isVersionControlOpen={props.isVersionControlOpen}
                 onOpenVersionControl={props.onOpenVersionControl}
                 versionControlButtonTooltip={props.versionControlButtonTooltip}
@@ -1402,7 +1347,6 @@ function CanvasPage(props: CanvasPageProps) {
                 readOnly={props.readOnly}
                 logEntries={props.logEntries}
                 focusRequest={props.focusRequest}
-                onExecutionChainHandled={props.onExecutionChainHandled}
                 initialFocusNodeId={props.initialFocusNodeId}
                 runsEvents={props.runsEvents}
                 runsTotalCount={props.runsTotalCount}
@@ -1428,18 +1372,7 @@ function CanvasPage(props: CanvasPageProps) {
               getTabData={props.getTabData}
               getAutocompleteExampleObj={props.getAutocompleteExampleObj}
               onCancelQueueItem={handleCancelQueueItem}
-              onPushThrough={handlePushThrough}
               onCancelExecution={handleCancelExecution}
-              supportsPushThrough={props.supportsPushThrough}
-              onRun={handleNodeRun}
-              onDuplicate={props.onDuplicate}
-              onDocs={props.onDocs}
-              onConfigure={props.onConfigure}
-              onDeactivate={props.onDeactivate}
-              onToggleView={handleToggleView}
-              onDelete={handleNodeDelete}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
               getAllHistoryEvents={props.getAllHistoryEvents}
               onLoadMoreHistory={props.onLoadMoreHistory}
               getHasMoreHistory={props.getHasMoreHistory}
@@ -1455,7 +1388,6 @@ function CanvasPage(props: CanvasPageProps) {
               editingNodeData={editingNodeData}
               onSaveConfiguration={handleSaveConfiguration}
               configurationSaveMode={props.configurationSaveMode}
-              onEdit={handleNodeEdit}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
               organizationId={props.organizationId}
@@ -1504,19 +1436,8 @@ function Sidebar({
   getTabData,
   getAutocompleteExampleObj,
   onCancelQueueItem,
-  onPushThrough,
   onCancelExecution,
-  supportsPushThrough,
-  onRun,
-  onDuplicate,
-  onDocs,
-  onConfigure,
-  onDeactivate,
-  onToggleView,
-  onDelete,
   onReEmit,
-  runDisabled,
-  runDisabledTooltip,
   getAllHistoryEvents,
   onLoadMoreHistory,
   getHasMoreHistory,
@@ -1531,7 +1452,6 @@ function Sidebar({
   editingNodeData,
   onSaveConfiguration,
   configurationSaveMode = "manual",
-  onEdit,
   currentTab,
   onTabChange,
   organizationId,
@@ -1555,19 +1475,8 @@ function Sidebar({
   getTabData?: (nodeId: string, event: SidebarEvent) => TabData | undefined;
   getAutocompleteExampleObj?: (nodeId: string) => Record<string, unknown> | null;
   onCancelQueueItem?: (id: string) => void;
-  onPushThrough?: (executionId: string) => void;
   onCancelExecution?: (executionId: string) => void;
-  supportsPushThrough?: (nodeId: string) => boolean;
-  onRun?: (nodeId: string) => void;
-  onDuplicate?: (nodeId: string) => void;
-  onDocs?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
-  onDeactivate?: (nodeId: string) => void;
-  onToggleView?: (nodeId: string) => void;
-  onDelete?: (nodeId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  runDisabled?: boolean;
-  runDisabledTooltip?: string;
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
   onLoadMoreHistory?: (nodeId: string) => void;
   getHasMoreHistory?: (nodeId: string) => boolean;
@@ -1589,7 +1498,6 @@ function Sidebar({
     integrationRef?: ComponentsIntegrationRef,
   ) => void | Promise<void>;
   configurationSaveMode?: "manual" | "auto";
-  onEdit?: (nodeId: string) => void;
   currentTab?: "latest" | "settings" | "docs";
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   organizationId?: string;
@@ -1720,7 +1628,6 @@ function Sidebar({
       nodeId={state.componentSidebar.selectedNodeId || undefined}
       iconSrc={sidebarData.iconSrc}
       iconSlug={isAnnotationNode ? "sticky-note" : sidebarData.iconSlug}
-      iconColor={isAnnotationNode ? "text-yellow-600" : sidebarData.iconColor}
       totalInQueueCount={sidebarData.totalInQueueCount}
       totalInHistoryCount={sidebarData.totalInHistoryCount}
       hideQueueEvents={sidebarData.hideQueueEvents}
@@ -1728,20 +1635,7 @@ function Sidebar({
         getTabData && state.componentSidebar.selectedNodeId ? (event) => getTabData(event.nodeId!, event) : undefined
       }
       onCancelQueueItem={onCancelQueueItem}
-      onPushThrough={onPushThrough}
       onCancelExecution={onCancelExecution}
-      supportsPushThrough={supportsPushThrough?.(state.componentSidebar.selectedNodeId!)}
-      onRun={onRun ? () => onRun(state.componentSidebar.selectedNodeId!) : undefined}
-      runDisabled={runDisabled}
-      runDisabledTooltip={runDisabledTooltip}
-      onDuplicate={onDuplicate ? () => onDuplicate(state.componentSidebar.selectedNodeId!) : undefined}
-      onDocs={onDocs ? () => onDocs(state.componentSidebar.selectedNodeId!) : undefined}
-      onConfigure={
-        onConfigure && sidebarData?.isComposite ? () => onConfigure(state.componentSidebar.selectedNodeId!) : undefined
-      }
-      onDeactivate={onDeactivate ? () => onDeactivate(state.componentSidebar.selectedNodeId!) : undefined}
-      onToggleView={onToggleView ? () => onToggleView(state.componentSidebar.selectedNodeId!) : undefined}
-      onDelete={onDelete ? () => onDelete(state.componentSidebar.selectedNodeId!) : undefined}
       getAllHistoryEvents={() => getAllHistoryEvents?.(state.componentSidebar.selectedNodeId!) || []}
       onLoadMoreHistory={() => onLoadMoreHistory?.(state.componentSidebar.selectedNodeId!)}
       getHasMoreHistory={() => getHasMoreHistory?.(state.componentSidebar.selectedNodeId!) || false}
@@ -1763,7 +1657,6 @@ function Sidebar({
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       configurationSaveMode={configurationSaveMode}
-      onEdit={onEdit ? () => onEdit(state.componentSidebar.selectedNodeId!) : undefined}
       domainId={organizationId}
       domainType="DOMAIN_TYPE_ORGANIZATION"
       customField={
@@ -1817,12 +1710,8 @@ function CanvasContentHeader({
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
-  versionLabel,
-  onCreateVersion,
   onPublishVersion,
   onDiscardVersion,
-  createVersionDisabled,
-  createVersionDisabledTooltip,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   discardVersionDisabled,
@@ -1851,12 +1740,8 @@ function CanvasContentHeader({
   saveButtonHidden?: boolean;
   saveDisabled?: boolean;
   saveDisabledTooltip?: string;
-  versionLabel?: string;
-  onCreateVersion?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
-  createVersionDisabled?: boolean;
-  createVersionDisabledTooltip?: string;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1915,12 +1800,8 @@ function CanvasContentHeader({
       saveButtonHidden={saveButtonHidden}
       saveDisabled={saveDisabled}
       saveDisabledTooltip={saveDisabledTooltip}
-      versionLabel={versionLabel}
-      onCreateVersion={onCreateVersion}
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
-      createVersionDisabled={createVersionDisabled}
-      createVersionDisabledTooltip={createVersionDisabledTooltip}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
@@ -1978,17 +1859,14 @@ function resolveAbsoluteNodeRect(
 
 function CanvasContent({
   state,
-  onSave,
   onNodeEdit,
   onNodeDelete,
   onNodesDelete,
   onDuplicateNodes,
   onAutoLayoutNodes,
   onEdgeCreate,
-  hideHeader,
   onRun,
   onDuplicate,
-  onConfigure,
   onDeactivate,
   onTogglePause,
   onToggleView,
@@ -2004,40 +1882,12 @@ function CanvasContent({
   onZoomChange,
   hasFitToViewRef,
   viewportRefProp,
-  templateNodeId,
   runDisabled,
   runDisabledTooltip,
   onPendingConnectionNodeClick,
-  onTemplateNodeClick,
   highlightedNodeIds,
   workflowNodes,
   setCurrentTab,
-  onUndo,
-  canUndo,
-  organizationId,
-  unsavedMessage,
-  saveIsPrimary,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
-  versionLabel,
-  onCreateVersion,
-  onPublishVersion,
-  onDiscardVersion,
-  createVersionDisabled,
-  createVersionDisabledTooltip,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  headerMode,
-  saveState,
-  lastSavedAt,
-  saveErrorMessage,
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
-  unpublishedDraftChangeCount,
   isVersionControlOpen,
   onOpenVersionControl,
   versionControlButtonTooltip,
@@ -2067,22 +1917,18 @@ function CanvasContent({
   canCreateIntegrations,
 }: {
   state: CanvasPageState;
-  onSave?: (nodes: CanvasNode[]) => void;
   onNodeEdit: (nodeId: string) => void;
   onNodeDelete?: (nodeId: string) => void;
   onNodesDelete?: (nodeIds: string[]) => void;
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
-  hideHeader?: boolean;
   onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
-  onConfigure?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
   onToggleCollapse?: () => void;
-  onDelete?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -2103,40 +1949,12 @@ function CanvasContent({
   onZoomChange?: (zoom: number) => void;
   hasFitToViewRef: React.MutableRefObject<boolean>;
   viewportRefProp?: React.MutableRefObject<{ x: number; y: number; zoom: number } | undefined>;
-  templateNodeId?: string | null;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   onPendingConnectionNodeClick?: (nodeId: string) => void;
-  onTemplateNodeClick?: (nodeId: string) => void;
   highlightedNodeIds: Set<string>;
   workflowNodes?: ComponentsNode[];
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
-  onUndo?: () => void;
-  canUndo?: boolean;
-  organizationId?: string;
-  unsavedMessage?: string;
-  saveIsPrimary?: boolean;
-  saveButtonHidden?: boolean;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
-  versionLabel?: string;
-  onCreateVersion?: () => void;
-  onPublishVersion?: () => void;
-  onDiscardVersion?: () => void;
-  createVersionDisabled?: boolean;
-  createVersionDisabledTooltip?: string;
-  publishVersionDisabled?: boolean;
-  publishVersionDisabledTooltip?: string;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "versioning-disabled";
-  saveState?: "saved" | "saving" | "unsaved" | "error";
-  lastSavedAt?: Date | string | null;
-  saveErrorMessage?: string | null;
-  onEnterEditMode?: () => void;
-  enterEditModeDisabled?: boolean;
-  enterEditModeDisabledTooltip?: string;
-  unpublishedDraftChangeCount?: number;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
@@ -2149,7 +1967,6 @@ function CanvasContent({
   readOnly?: boolean;
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
-  onExecutionChainHandled?: () => void;
   initialFocusNodeId?: string | null;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
@@ -2319,14 +2136,6 @@ function CanvasContent({
     restoreActiveNoteFocus();
   }, [state.nodes]);
 
-  const handleNodeExpand = useCallback<NonNullable<BlockProps["onExpand"]>>((nodeId: string, nodeData: BlockData) => {
-    const node = stateRef.current.nodes?.find((n) => n.id === nodeId);
-    const expandedNodeData = (node?.data as BlockData | undefined) ?? nodeData;
-    if (stateRef.current.onNodeExpand) {
-      stateRef.current.onNodeExpand(nodeId, expandedNodeData);
-    }
-  }, []);
-
   const handleNodeClick = useCallback(
     (nodeId: string, e?: React.MouseEvent) => {
       const isMultiSelectClick = e && (e.ctrlKey || e.metaKey);
@@ -2340,22 +2149,6 @@ function CanvasContent({
       const workflowNode = workflowNodes?.find((n) => n.id === nodeId);
       const isPlaceholder = workflowNode?.name === "New Component" && !workflowNode.component?.name;
 
-      const isTemplateNode = clickedNode?.data?.isTemplate && !clickedNode?.data?.isPendingConnection;
-
-      const currentTemplateNode = templateNodeId ? stateRef.current.nodes?.find((n) => n.id === templateNodeId) : null;
-      const isCurrentTemplateConfigured =
-        currentTemplateNode?.data?.isTemplate && !currentTemplateNode?.data?.isPendingConnection;
-
-      if (
-        isCurrentTemplateConfigured &&
-        nodeId !== templateNodeId &&
-        !isPendingConnection &&
-        !isTemplateNode &&
-        !isPlaceholder
-      ) {
-        return;
-      }
-
       if (isAnnotationNode || isGroupNode) {
         return;
       }
@@ -2365,27 +2158,23 @@ function CanvasContent({
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
       } else {
-        if (isTemplateNode && onTemplateNodeClick) {
-          onTemplateNodeClick(nodeId);
-        } else {
-          stateRef.current.componentSidebar.open(nodeId);
+        stateRef.current.componentSidebar.open(nodeId);
 
-          const nodeData = clickedNode?.data as {
-            component?: { error?: string };
-            composite?: { error?: string };
-            trigger?: { error?: string };
-          } | null;
-          const hasConfigurationWarning = Boolean(
-            nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
-          );
+        const nodeData = clickedNode?.data as {
+          component?: { error?: string };
+          composite?: { error?: string };
+          trigger?: { error?: string };
+        } | null;
+        const hasConfigurationWarning = Boolean(
+          nodeData?.component?.error || nodeData?.composite?.error || nodeData?.trigger?.error,
+        );
 
-          if (setCurrentTab) {
-            setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
-          }
+        if (setCurrentTab) {
+          setCurrentTab(hasConfigurationWarning ? "settings" : "latest");
+        }
 
-          if (onBuildingBlocksSidebarToggle) {
-            onBuildingBlocksSidebarToggle(false);
-          }
+        if (onBuildingBlocksSidebarToggle) {
+          onBuildingBlocksSidebarToggle(false);
         }
       }
 
@@ -2396,14 +2185,7 @@ function CanvasContent({
         })),
       );
     },
-    [
-      templateNodeId,
-      workflowNodes,
-      onBuildingBlocksSidebarToggle,
-      onPendingConnectionNodeClick,
-      onTemplateNodeClick,
-      setCurrentTab,
-    ],
+    [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab],
   );
 
   const onRunRef = useRef(onRun);
@@ -2417,9 +2199,6 @@ function CanvasContent({
 
   const onDuplicateRef = useRef(onDuplicate);
   onDuplicateRef.current = onDuplicate;
-
-  const onConfigureRef = useRef(onConfigure);
-  onConfigureRef.current = onConfigure;
 
   const onDeactivateRef = useRef(onDeactivate);
   onDeactivateRef.current = onDeactivate;
@@ -2440,12 +2219,6 @@ function CanvasContent({
   onGroupUpdateRef.current = onGroupUpdate;
   const onUngroupNodesRef = useRef(onUngroupNodes);
   onUngroupNodesRef.current = onUngroupNodes;
-
-  const handleSave = useCallback(() => {
-    if (onSave) {
-      onSave(stateRef.current.nodes);
-    }
-  }, [onSave]);
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -2564,9 +2337,6 @@ function CanvasContent({
   }, [handleToggleCollapse]);
 
   const handlePaneClick = useCallback(() => {
-    // Do not close sidebar or reset state while creating a new component
-    if (templateNodeId) return;
-
     previouslySelectedRef.current = new Set();
 
     // Clear ReactFlow's selection state and close both sidebars
@@ -2584,7 +2354,7 @@ function CanvasContent({
     if (onBuildingBlocksSidebarToggle) {
       onBuildingBlocksSidebarToggle(false);
     }
-  }, [templateNodeId, onBuildingBlocksSidebarToggle]);
+  }, [onBuildingBlocksSidebarToggle]);
 
   // Handle fit to view on ReactFlow initialization
   const handleInit = useCallback(
@@ -2633,13 +2403,11 @@ function CanvasContent({
 
   // Store callback handlers in a ref so they can be accessed without being in node data
   const callbacksRef = useRef({
-    handleNodeExpand,
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
     onDuplicate: onDuplicateRef,
-    onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
@@ -2654,13 +2422,11 @@ function CanvasContent({
     hasMultiSelection,
   });
   callbacksRef.current = {
-    handleNodeExpand,
     handleNodeClick,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
     onRun: onRunRef,
     onDuplicate: onDuplicateRef,
-    onConfigure: onConfigureRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
@@ -2876,41 +2642,7 @@ function CanvasContent({
 
   return (
     <div className="h-full w-full relative">
-      {/* Header */}
-      {!hideHeader && (
-        <Header
-          breadcrumbs={state.breadcrumbs}
-          onSave={onSave ? handleSave : undefined}
-          onUndo={onUndo}
-          canUndo={canUndo}
-          organizationId={organizationId}
-          unsavedMessage={unsavedMessage}
-          saveIsPrimary={saveIsPrimary}
-          saveButtonHidden={saveButtonHidden}
-          saveDisabled={saveDisabled}
-          saveDisabledTooltip={saveDisabledTooltip}
-          versionLabel={versionLabel}
-          onCreateVersion={onCreateVersion}
-          onPublishVersion={onPublishVersion}
-          onDiscardVersion={onDiscardVersion}
-          createVersionDisabled={createVersionDisabled}
-          createVersionDisabledTooltip={createVersionDisabledTooltip}
-          publishVersionDisabled={publishVersionDisabled}
-          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-          discardVersionDisabled={discardVersionDisabled}
-          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-          mode={headerMode}
-          saveState={saveState}
-          lastSavedAt={lastSavedAt}
-          saveErrorMessage={saveErrorMessage}
-          onEnterEditMode={onEnterEditMode}
-          enterEditModeDisabled={enterEditModeDisabled}
-          enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          unpublishedDraftChangeCount={unpublishedDraftChangeCount}
-        />
-      )}
-
-      <div className={hideHeader ? "h-full" : "pt-12 h-full"}>
+      <div className="h-full">
         <div className="h-full w-full">
           <ReactFlow
             nodes={nodesWithCallbacks}

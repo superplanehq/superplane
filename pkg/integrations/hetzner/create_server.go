@@ -78,16 +78,6 @@ func (c *CreateServer) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
-func (c *CreateServer) ExampleOutput() map[string]any {
-	return map[string]any{
-		"id":       42,
-		"name":     "my-server",
-		"status":   "running",
-		"created":  "2024-01-15T10:30:00+00:00",
-		"publicIp": "1.2.3.4",
-	}
-}
-
 func (c *CreateServer) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

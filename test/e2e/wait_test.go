@@ -3,6 +3,7 @@ package e2e
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,8 +45,7 @@ func TestWaitComponent(t *testing.T) {
 		steps.start()
 		steps.givenACanvasWithManualTriggerWaitAndOutput()
 		steps.runManualTrigger()
-		steps.openSidebarForNode("Wait")
-		steps.pushThroughFirstItemFromSidebar()
+		steps.pushThroughFromNode("Wait")
 		steps.assertWaitExecutionFinishedAndOutputNodeProcessed()
 	})
 }
@@ -156,19 +156,13 @@ func (s *WaitSteps) runManualTrigger() {
 	)
 }
 
-func (s *WaitSteps) openSidebarForNode(node string) {
-	header := q.TestID("node", node, "header")
-	s.session.AssertVisible(header)
-	s.session.Click(header)
-}
-
-func (s *WaitSteps) pushThroughFirstItemFromSidebar() {
-	eventItem := q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"]`)
-	s.session.HoverOver(eventItem)
-	s.session.Sleep(300) // Wait for hover to register and actions button to appear
-	s.session.Click(q.Locator(`[data-testid="sidebar-event-item"][data-event-state="running"] button[aria-label="Open actions"]`))
-	s.session.Sleep(300) // Wait for actions menu to open
-	s.session.Click(q.TestID("push-through-item"))
+func (s *WaitSteps) pushThroughFromNode(node string) {
+	s.canvas.StartEditingNode(node)
+	pushThroughButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + strings.ToLower(node) + `-header"]) button:has-text("Push through")`,
+	)
+	s.session.AssertVisible(pushThroughButton)
+	s.session.Click(pushThroughButton)
 	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 }
 

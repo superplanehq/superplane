@@ -90,23 +90,6 @@ func (t *OnVMInstance) Configuration() []configuration.Field {
 	return nil
 }
 
-func (t *OnVMInstance) ExampleData() map[string]any {
-	return map[string]any{
-		"serviceName":  computeServiceName,
-		"methodName":   instancesInsertMethod,
-		"resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-		"logName":      "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
-		"timestamp":    "2025-02-14T12:00:00Z",
-		"data": map[string]any{
-			"protoPayload": map[string]any{
-				"methodName":   instancesInsertMethod,
-				"resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-				"serviceName":  computeServiceName,
-			},
-		},
-	}
-}
-
 func (t *OnVMInstance) Setup(ctx core.TriggerContext) error {
 	if ctx.Integration == nil {
 		return fmt.Errorf("connect the GCP integration to this trigger to enable automatic event routing")
