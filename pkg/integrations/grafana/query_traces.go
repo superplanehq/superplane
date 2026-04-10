@@ -48,7 +48,7 @@ func (q *QueryTraces) Documentation() string {
 
 		- **Data Source**: The Tempo data source to query (required)
 		- **Query**: A TraceQL query expression (required), e.g. ` + "`{ .http.status_code = 500 }`" + `
-		- **Time From / Time To**: Optional trace search range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `. Datetime values without an explicit offset are interpreted as UTC.
+		- **Time From / Time To**: Optional trace search range. Supports expr-golang values like ` + "`{{ now() + duration(\"1m\") }}`" + `, absolute values like ` + "`2026-04-08T15:30Z`" + `, and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `. Datetime values without an explicit offset are interpreted as UTC.
 
 	## Output
 
@@ -96,7 +96,7 @@ func (q *QueryTraces) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional start of the trace search time range",
-			Placeholder: "now-15m or 2026-04-08T15:30",
+			Placeholder: `{{ now() - duration("15m") }} or now-15m`,
 		},
 		{
 			Name:        "timeTo",
@@ -104,7 +104,7 @@ func (q *QueryTraces) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional end of the trace search time range",
-			Placeholder: "now or now+2h",
+			Placeholder: `{{ now() + duration("1m") }} or now`,
 		},
 	}
 }

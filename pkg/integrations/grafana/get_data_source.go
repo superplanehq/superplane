@@ -18,6 +18,12 @@ type GetDataSourceSpec struct {
 	DataSourceUID string `json:"dataSourceUid" mapstructure:"dataSourceUid"`
 }
 
+type GetDataSourceNodeMetadata struct {
+	DataSourceUID  string `json:"dataSourceUid" mapstructure:"dataSourceUid"`
+	DataSourceName string `json:"dataSourceName" mapstructure:"dataSourceName"`
+	DataSourceType string `json:"dataSourceType" mapstructure:"dataSourceType"`
+}
+
 func (g *GetDataSource) Name() string {
 	return "grafana.getDataSource"
 }
@@ -83,7 +89,25 @@ func (g *GetDataSource) Setup(ctx core.SetupContext) error {
 	if err != nil {
 		return err
 	}
-	return validateGetDataSourceSpec(spec)
+	if err := validateGetDataSourceSpec(spec); err != nil {
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration, true)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	source, err := client.GetDataSource(strings.TrimSpace(spec.DataSourceUID))
+	if err != nil {
+		return fmt.Errorf("error getting data source: %w", err)
+	}
+
+	return ctx.Metadata.Set(GetDataSourceNodeMetadata{
+		DataSourceUID:  source.UID,
+		DataSourceName: source.Name,
+		DataSourceType: source.Type,
+	})
 }
 
 func (g *GetDataSource) Execute(ctx core.ExecutionContext) error {

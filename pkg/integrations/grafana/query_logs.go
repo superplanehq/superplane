@@ -49,7 +49,7 @@ func (q *QueryLogs) Documentation() string {
 
 		- **Data Source**: The Loki data source to query (required)
 		- **Query**: A LogQL query expression (required), e.g. ` + "`{app=\"myservice\"} |= \"error\"`" + `
-		- **Time From / Time To**: Optional log query range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `. Datetime values without an explicit offset are interpreted as UTC.
+		- **Time From / Time To**: Optional log query range. Supports expr-golang values like ` + "`{{ now() + duration(\"1m\") }}`" + `, absolute values like ` + "`2026-04-08T15:30Z`" + `, and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `. Datetime values without an explicit offset are interpreted as UTC.
 		- **Limit**: Maximum number of log lines to return (optional)
 
 ## Output
@@ -98,7 +98,7 @@ func (q *QueryLogs) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional start of the query time range",
-			Placeholder: "now-15m or 2026-04-08T15:30",
+			Placeholder: `{{ now() - duration("15m") }} or now-15m`,
 		},
 		{
 			Name:        "timeTo",
@@ -106,7 +106,7 @@ func (q *QueryLogs) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional end of the query time range",
-			Placeholder: "now or now+2h",
+			Placeholder: `{{ now() + duration("1m") }} or now`,
 		},
 		{
 			Name:        "limit",

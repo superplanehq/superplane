@@ -21,6 +21,38 @@ func Test__GrafanaQueryComponents__Configuration__DoNotExposeTimezoneField(t *te
 	})
 }
 
+func Test__GrafanaQueryComponents__Configuration__UsesExpressionPlaceholdersForFlexibleTimeRanges(t *testing.T) {
+	t.Run("query logs", func(t *testing.T) {
+		assertTimeFieldPlaceholder(
+			t,
+			(&QueryLogs{}).Configuration(),
+			"timeFrom",
+			`{{ now() - duration("15m") }} or now-15m`,
+		)
+		assertTimeFieldPlaceholder(
+			t,
+			(&QueryLogs{}).Configuration(),
+			"timeTo",
+			`{{ now() + duration("1m") }} or now`,
+		)
+	})
+
+	t.Run("query traces", func(t *testing.T) {
+		assertTimeFieldPlaceholder(
+			t,
+			(&QueryTraces{}).Configuration(),
+			"timeFrom",
+			`{{ now() - duration("15m") }} or now-15m`,
+		)
+		assertTimeFieldPlaceholder(
+			t,
+			(&QueryTraces{}).Configuration(),
+			"timeTo",
+			`{{ now() + duration("1m") }} or now`,
+		)
+	})
+}
+
 func assertNoTimezoneField(t *testing.T, fields []configuration.Field) {
 	t.Helper()
 
@@ -28,4 +60,20 @@ func assertNoTimezoneField(t *testing.T, fields []configuration.Field) {
 		field := fields[i]
 		require.NotEqual(t, "timezone", field.Name)
 	}
+}
+
+func assertTimeFieldPlaceholder(t *testing.T, fields []configuration.Field, name, placeholder string) {
+	t.Helper()
+
+	for i := range fields {
+		field := fields[i]
+		if field.Name != name {
+			continue
+		}
+
+		require.Equal(t, placeholder, field.Placeholder)
+		return
+	}
+
+	t.Fatalf("field %q not found", name)
 }

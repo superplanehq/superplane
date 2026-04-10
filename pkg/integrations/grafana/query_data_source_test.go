@@ -247,6 +247,41 @@ func Test__QueryDataSource__Execute(t *testing.T) {
 		assert.Equal(t, "1775025900000", body["to"])
 	})
 
+	t.Run("go style timestamps are converted to unix millis", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"results": {}}`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"dataSourceUid": "logs",
+				"query":         "{}",
+				"timeFrom":      "2026-04-01 10:15:00 +0000 UTC",
+				"timeTo":        "2026-04-01 11:45:00 +0000 UTC",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "token123",
+					"baseURL":  "https://grafana.example.com",
+				},
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+
+		body := decodeJSONBody(t, httpContext.Requests[0].Body)
+		assert.Equal(t, "1775038500000", body["from"])
+		assert.Equal(t, "1775043900000", body["to"])
+	})
+
 	t.Run("datetime picker values do not require timezone", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

@@ -285,6 +285,8 @@ func parseGrafanaQueryTime(value string) (time.Time, bool, error) {
 		time.RFC3339Nano,
 		time.RFC3339,
 		"2006-01-02T15:04Z07:00",
+		"2006-01-02 15:04:05.999999999 -0700 MST",
+		"2006-01-02 15:04:05 -0700 MST",
 	} {
 		if parsed, err := time.Parse(format, value); err == nil {
 			return parsed, true, nil

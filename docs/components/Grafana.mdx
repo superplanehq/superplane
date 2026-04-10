@@ -262,7 +262,7 @@ The Query Logs component executes a LogQL query against a Loki-backed Grafana da
 
 		- **Data Source**: The Loki data source to query (required)
 		- **Query**: A LogQL query expression (required), e.g. `{app="myservice"} |= "error"`
-		- **Time From / Time To**: Optional log query range. Supports absolute values like `2026-04-08T15:30Z` and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
+		- **Time From / Time To**: Optional log query range. Supports expr-golang values like `{{ now() + duration("1m") }}`, absolute values like `2026-04-08T15:30Z`, and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
 		- **Limit**: Maximum number of log lines to return (optional)
 
 ### Output
@@ -342,7 +342,7 @@ The Query Traces component executes a TraceQL query against a Tempo-backed Grafa
 
 		- **Data Source**: The Tempo data source to query (required)
 		- **Query**: A TraceQL query expression (required), e.g. `{ .http.status_code = 500 }`
-		- **Time From / Time To**: Optional trace search range. Supports absolute values like `2026-04-08T15:30Z` and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
+		- **Time From / Time To**: Optional trace search range. Supports expr-golang values like `{{ now() + duration("1m") }}`, absolute values like `2026-04-08T15:30Z`, and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
 
 ### Output
 

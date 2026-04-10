@@ -43,6 +43,12 @@ export interface DataSource {
   isDefault?: boolean;
 }
 
+export interface GetDataSourceNodeMetadata {
+  dataSourceUid?: string;
+  dataSourceName?: string;
+  dataSourceType?: string;
+}
+
 export interface ListDataSourcesOutput {
   dataSources: DataSource[];
 }
