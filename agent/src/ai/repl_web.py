@@ -40,6 +40,11 @@ from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
 from ai.text import normalize_optional
+from ai.usage_limit_checker import (
+    AgentUsageLimitChecker,
+    NoopUsageLimitChecker,
+    UsageLimitChecker,
+)
 from ai.usage_publisher import AgentUsagePublisher, NoopUsagePublisher, UsagePublisher
 
 
@@ -221,6 +226,7 @@ async def _stream_agent_run(
     started_at = time.perf_counter()
     store: SessionStore = request.app.state.session_store
     publisher: AgentUsagePublisher = request.app.state.publisher
+    limit_checker: AgentUsageLimitChecker = request.app.state.limit_checker
     claims: JwtClaims | None = None
     if payload.model == "test" and _resolve_bearer_token(request) is None:
         try:
@@ -234,6 +240,8 @@ async def _stream_agent_run(
             )
     else:
         claims, chat = _resolve_agent_context(chat_id, request)
+
+    await limit_checker.check_agent_token_limit(chat.org_id)
 
     message_history = _load_message_history(store, chat.id)
     resolved_canvas_id = chat.canvas_id
@@ -477,9 +485,14 @@ def _create_app() -> FastAPI:
         publisher: AgentUsagePublisher = (
             UsagePublisher(rabbitmq_url) if rabbitmq_url else NoopUsagePublisher()
         )
+        usage_grpc_url = config.usage_grpc_url
+        limit_checker: AgentUsageLimitChecker = (
+            UsageLimitChecker(usage_grpc_url) if usage_grpc_url else NoopUsageLimitChecker()
+        )
         app.state.session_store = store
         app.state.stream_tracker = tracker
         app.state.publisher = publisher
+        app.state.limit_checker = limit_checker
         grpc_server = InternalAgentServer.from_env(store)
         grpc_server.start()
         app.state.internal_agent_server = grpc_server
@@ -490,6 +503,7 @@ def _create_app() -> FastAPI:
             await tracker.wait_for_drain()
             grpc_server.stop()
             publisher.close()
+            await limit_checker.close()
             store.close()
             shutdown_metrics()
 
