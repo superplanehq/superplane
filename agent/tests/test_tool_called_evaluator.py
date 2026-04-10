@@ -25,13 +25,13 @@ def test_tool_called_passes_when_tool_invoked() -> None:
     try:
         q = "Build a workflow"
         record_tool_call(q, "get_canvas")
-        record_tool_call(q, "validate_proposal")
+        record_tool_call(q, "describe_component")
         answer = CanvasAnswer(
             answer="ok",
             confidence=0.5,
             proposal=CanvasProposal(summary="s", operations=[]),
         )
-        result = ToolCalled("validate_proposal").evaluate(_ctx(q, answer))
+        result = ToolCalled("describe_component").evaluate(_ctx(q, answer))
         assert result.value is True
     finally:
         clear_tool_call_registry()
@@ -43,7 +43,7 @@ def test_tool_called_fails_when_tool_missing() -> None:
         q = "Build a workflow"
         record_tool_call(q, "get_canvas")
         answer = CanvasAnswer(answer="ok", confidence=0.5, proposal=None)
-        result = ToolCalled("validate_proposal").evaluate(_ctx(q, answer))
+        result = ToolCalled("describe_component").evaluate(_ctx(q, answer))
         assert result.value is False
     finally:
         clear_tool_call_registry()
@@ -53,12 +53,12 @@ def test_tool_called_min_calls_two() -> None:
     clear_tool_call_registry()
     try:
         q = "Build a workflow"
-        record_tool_call(q, "validate_proposal")
+        record_tool_call(q, "describe_component")
         answer = CanvasAnswer(answer="ok", confidence=0.5, proposal=None)
-        result = ToolCalled("validate_proposal", min_calls=2).evaluate(_ctx(q, answer))
+        result = ToolCalled("describe_component", min_calls=2).evaluate(_ctx(q, answer))
         assert result.value is False
-        record_tool_call(q, "validate_proposal")
-        result = ToolCalled("validate_proposal", min_calls=2).evaluate(_ctx(q, answer))
+        record_tool_call(q, "describe_component")
+        result = ToolCalled("describe_component", min_calls=2).evaluate(_ctx(q, answer))
         assert result.value is True
     finally:
         clear_tool_call_registry()
