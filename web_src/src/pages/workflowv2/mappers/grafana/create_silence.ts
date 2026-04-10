@@ -17,55 +17,16 @@ export const createSilenceMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const details: Record<string, string> = {
-      "Created At": formatTimestamp(context.execution.createdAt),
-    };
-
     const configuration = context.node.configuration as CreateSilenceConfiguration | undefined;
-    if (configuration) {
-      const matchersPreview = formatMatchersPreview(configuration.matchers, { maxItems: 10 });
-      if (matchersPreview) {
-        details.Matchers = matchersPreview;
-      }
-      if (configuration.startsAt) {
-        details["Starts At"] = configuration.startsAt;
-      }
-      if (configuration.endsAt) {
-        details["Ends At"] = configuration.endsAt;
-      }
-      if (configuration.comment) {
-        details.Comment = configuration.comment;
-      }
-    }
-
-    if (!outputs || !outputs.default || outputs.default.length === 0) {
+    const details = buildCreateSilenceDetails(context.execution.createdAt, configuration);
+    const payload = outputs?.default?.[0];
+    if (!payload) {
       return details;
     }
 
-    const payload = outputs.default[0];
-    const payloadTimestamp = formatTimestamp(payload?.timestamp);
-    if (payloadTimestamp !== "-") {
-      details["Created At"] = payloadTimestamp;
-    }
-
+    applyCreateSilenceTimestamp(details, payload.timestamp);
     const output = payload?.data as CreateSilenceOutput | undefined;
-
-    if (output?.startsAt) {
-      details["Starts At"] = formatTimestamp(output.startsAt);
-    } else if (configuration?.startsAt) {
-      details["Starts At"] = configuration.startsAt;
-    }
-
-    if (output?.endsAt) {
-      details["Ends At"] = formatTimestamp(output.endsAt);
-    } else if (configuration?.endsAt) {
-      details["Ends At"] = configuration.endsAt;
-    }
-
-    if (output?.silenceUrl) {
-      details["Silence URL"] = output.silenceUrl;
-    }
-
+    applyCreateSilenceOutput(details, output, configuration);
     return details;
   },
 
@@ -118,6 +79,70 @@ function buildCommentMetadata(configuration: CreateSilenceConfiguration | undefi
       : configuration.comment;
 
   return { icon: "sticky-note", label: preview };
+}
+
+function buildCreateSilenceDetails(
+  executionCreatedAt: string | undefined,
+  configuration: CreateSilenceConfiguration | undefined,
+): Record<string, string> {
+  const details: Record<string, string> = {
+    "Created At": formatTimestamp(executionCreatedAt),
+  };
+
+  const matchersPreview = formatMatchersPreview(configuration?.matchers, { maxItems: 10 });
+  if (matchersPreview) {
+    details.Matchers = matchersPreview;
+  }
+
+  if (configuration?.startsAt) {
+    details["Starts At"] = configuration.startsAt;
+  }
+
+  if (configuration?.endsAt) {
+    details["Ends At"] = configuration.endsAt;
+  }
+
+  if (configuration?.comment) {
+    details.Comment = configuration.comment;
+  }
+
+  return details;
+}
+
+function applyCreateSilenceTimestamp(details: Record<string, string>, payloadTimestamp: string | undefined): void {
+  const formattedTimestamp = formatTimestamp(payloadTimestamp);
+  if (formattedTimestamp !== "-") {
+    details["Created At"] = formattedTimestamp;
+  }
+}
+
+function applyCreateSilenceOutput(
+  details: Record<string, string>,
+  output: CreateSilenceOutput | undefined,
+  configuration: CreateSilenceConfiguration | undefined,
+): void {
+  assignFormattedOrConfiguredValue(details, "Starts At", output?.startsAt, configuration?.startsAt);
+  assignFormattedOrConfiguredValue(details, "Ends At", output?.endsAt, configuration?.endsAt);
+
+  if (output?.silenceUrl) {
+    details["Silence URL"] = output.silenceUrl;
+  }
+}
+
+function assignFormattedOrConfiguredValue(
+  details: Record<string, string>,
+  key: string,
+  outputValue: string | undefined,
+  configuredValue: string | undefined,
+): void {
+  if (outputValue) {
+    details[key] = formatTimestamp(outputValue);
+    return;
+  }
+
+  if (configuredValue) {
+    details[key] = configuredValue;
+  }
 }
 
 function formatMatchersPreview(
