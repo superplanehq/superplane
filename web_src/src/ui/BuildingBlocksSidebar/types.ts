@@ -5,16 +5,12 @@ export interface BuildingBlock {
   label?: string;
   description?: string;
   type: "trigger" | "component" | "blueprint";
-  componentSubtype?: "trigger" | "action" | "flow";
   outputChannels?: Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel>;
   configuration?: any[];
   icon?: string;
   color?: string;
   id?: string;
   integrationName?: string;
-  deprecated?: boolean;
-  exampleOutput?: Record<string, unknown>;
-  exampleData?: Record<string, unknown>;
 }
 
 export type BuildingBlockCategory = {
