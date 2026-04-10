@@ -1,24 +1,46 @@
 import { describe, expect, it, vi } from "vitest";
-import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent } from "@/api-client";
+import type {
+  BlueprintsBlueprint,
+  CanvasesCanvas,
+  ComponentsComponent,
+  IntegrationsIntegrationDefinition,
+} from "@/api-client";
 import type { LayoutEngine } from "@/lib/layout";
-import type { BuildingBlock, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
-import { makeBuildingBlock, makeCanvas, makeComponentsNode, makeEdge, makeIntegration } from "@/test/factories";
+import { makeCanvas, makeComponentsNode, makeEdge, makeIntegration, makeRegistry } from "@/test/factories";
 import { CanvasBuilder } from "./canvas-builder";
 
-function makeCategories(...blocks: BuildingBlock[]): BuildingBlockCategory[] {
-  return [{ name: "all", blocks }];
+function makeComponent(overrides: Partial<ComponentsComponent> = {}): ComponentsComponent {
+  return {
+    name: "http.request",
+    ...overrides,
+  } as ComponentsComponent;
+}
+
+function makeAvailableIntegration(
+  overrides: Partial<IntegrationsIntegrationDefinition> = {},
+): IntegrationsIntegrationDefinition {
+  return {
+    name: "github",
+    label: "GitHub",
+    components: [],
+    triggers: [],
+    ...overrides,
+  };
 }
 
 describe("CanvasBuilder", () => {
   it("adds component nodes with rounded position and resolves ready integration refs", async () => {
     const result = await new CanvasBuilder({
       canvas: makeCanvas(),
-      buildingBlocks: makeCategories(
-        makeBuildingBlock({
-          name: "github.runWorkflow",
-          integrationName: "Git Hub",
-        }),
-      ),
+      registry: makeRegistry({
+        availableIntegrations: [
+          makeAvailableIntegration({
+            name: "Git Hub",
+            label: "Git Hub",
+            components: [makeComponent({ name: "github.runWorkflow" })],
+          }),
+        ],
+      }),
       integrations: [
         makeIntegration({
           metadata: { id: "pending-id", name: "Pending Integration" },
@@ -56,7 +78,9 @@ describe("CanvasBuilder", () => {
   it("creates annotation widgets with default annotation configuration", async () => {
     const result = await new CanvasBuilder({
       canvas: makeCanvas(),
-      buildingBlocks: makeCategories(makeBuildingBlock({ name: "annotation" })),
+      registry: makeRegistry({
+        components: [makeComponent({ name: "annotation" })],
+      }),
     }).apply([
       {
         type: "add_node",
@@ -85,10 +109,9 @@ describe("CanvasBuilder", () => {
       canvas: makeCanvas({
         spec: { nodes: [source], edges: [] },
       }),
-      buildingBlocks: makeCategories(
-        makeBuildingBlock({ name: "source.block" }),
-        makeBuildingBlock({ name: "target.block" }),
-      ),
+      registry: makeRegistry({
+        components: [makeComponent({ name: "source.block" }), makeComponent({ name: "target.block" })],
+      }),
     }).apply([
       {
         type: "add_node",
@@ -113,21 +136,22 @@ describe("CanvasBuilder", () => {
   it("picks a success-oriented channel when source output has no default", async () => {
     const result = await new CanvasBuilder({
       canvas: makeCanvas(),
-      buildingBlocks: makeCategories(
-        makeBuildingBlock({
-          name: "source.trigger",
-          type: "trigger",
-          outputChannels: [
-            { name: "on_error", label: "On error" },
-            { name: "on_success", label: "When successful" },
-          ],
-        }),
-        makeBuildingBlock({ name: "target.component" }),
-      ),
+      registry: makeRegistry({
+        components: [
+          makeComponent({
+            name: "source.component",
+            outputChannels: [
+              { name: "on_error", label: "On error" },
+              { name: "on_success", label: "When successful" },
+            ],
+          }),
+          makeComponent({ name: "target.component" }),
+        ],
+      }),
     }).apply([
       {
         type: "add_node",
-        blockName: "source.trigger",
+        blockName: "source.component",
         nodeName: "Source Trigger",
         nodeKey: "source",
       },
@@ -164,16 +188,18 @@ describe("CanvasBuilder", () => {
           edges: [],
         },
       }),
-      buildingBlocks: makeCategories(
-        makeBuildingBlock({
-          name: "source.block",
-          outputChannels: [
-            { name: "default", label: "Default" },
-            { name: "error", label: "On error" },
-          ],
-        }),
-        makeBuildingBlock({ name: "target.block" }),
-      ),
+      registry: makeRegistry({
+        components: [
+          makeComponent({
+            name: "source.block",
+            outputChannels: [
+              { name: "default", label: "Default" },
+              { name: "error", label: "On error" },
+            ],
+          }),
+          makeComponent({ name: "target.block" }),
+        ],
+      }),
     }).apply([
       {
         type: "connect_nodes",
@@ -220,7 +246,9 @@ describe("CanvasBuilder", () => {
           edges: [],
         },
       }),
-      buildingBlocks: makeCategories(makeBuildingBlock({ name: "http.request" })),
+      registry: makeRegistry({
+        components: [makeComponent({ name: "http.request" })],
+      }),
     }).apply([
       {
         type: "update_node_config",
@@ -253,7 +281,9 @@ describe("CanvasBuilder", () => {
           ],
         },
       }),
-      buildingBlocks: makeCategories(makeBuildingBlock({ name: "http.request" })),
+      registry: makeRegistry({
+        components: [makeComponent({ name: "http.request" })],
+      }),
     }).apply([
       {
         type: "delete_node",
@@ -288,7 +318,9 @@ describe("CanvasBuilder", () => {
 
     const result = await new CanvasBuilder({
       canvas: makeCanvas(),
-      buildingBlocks: makeCategories(makeBuildingBlock({ name: "github.runWorkflow" })),
+      registry: makeRegistry({
+        components: [makeComponent({ name: "github.runWorkflow" })],
+      }),
     }).apply(
       [
         {
@@ -303,10 +335,8 @@ describe("CanvasBuilder", () => {
     expect(layoutApply).toHaveBeenCalledTimes(1);
     const [layoutCanvas, options] = layoutApply.mock.calls[0];
     expect(layoutCanvas.spec?.nodes).toHaveLength(1);
-    expect(options).toEqual({
-      components: [],
-      blueprints: [],
-    });
+    expect(options?.components?.map((component) => component.name)).toEqual(["github.runWorkflow"]);
+    expect(options?.blueprints).toEqual([]);
     expect(result.spec?.nodes).toHaveLength(1);
   });
 
@@ -319,7 +349,9 @@ describe("CanvasBuilder", () => {
 
     await new CanvasBuilder({
       canvas: makeCanvas(),
-      buildingBlocks: makeCategories(makeBuildingBlock({ name: "github.runWorkflow" })),
+      registry: makeRegistry({
+        components: [makeComponent({ name: "github.runWorkflow" })],
+      }),
     }).apply(
       [
         {

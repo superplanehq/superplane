@@ -14,9 +14,9 @@ import type { AiChatSession, AiBuilderMessage, AiBuilderProposal } from "./agent
 import { loadChatConversation, loadChatSessions, pushAiMessages, sendChatPrompt } from "./agentChat";
 import { AiBuilderChatPanel } from "./AiBuilderChatPanel";
 import { CategorySection } from "./CategorySection";
-import type { BuildingBlock, BuildingBlockCategory } from "./types";
+import type { BuildingBlock, BuildingBlockCategory } from "@/lib/index/types";
 import type { CanvasOperation } from "@/lib/ai";
-export type { BuildingBlock, BuildingBlockCategory } from "./types";
+export type { BuildingBlock, BuildingBlockCategory } from "@/lib/index/types";
 
 const AI_BUILDER_STORAGE_KEY_PREFIX = "sp:canvas-ai-builder:";
 
@@ -806,7 +806,7 @@ function OpenBuildingBlocksSidebar({
       >
         {hoveredBlock && (
           <ComponentBase
-            title={hoveredBlock.label || hoveredBlock.name || "New Component"}
+            title={hoveredBlock.type === "TYPE_BLUEPRINT" ? hoveredBlock.name : hoveredBlock.label || hoveredBlock.name}
             iconSlug={hoveredBlock.name?.split(".")[0] === "smtp" ? "mail" : (hoveredBlock.icon ?? "zap")}
             iconColor="text-gray-800"
             collapsedBackground={getBackgroundColorClass("white")}

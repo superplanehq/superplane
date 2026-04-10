@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CategorySection } from "./CategorySection";
-import type { BuildingBlockCategory } from "./types";
+import type { BuildingBlockCategory } from "@/lib/index/types";
 
 function createCategory(name: string): BuildingBlockCategory {
   return {
@@ -10,7 +10,7 @@ function createCategory(name: string): BuildingBlockCategory {
       {
         name: "smtp.send",
         label: "Send Email",
-        type: "component",
+        type: "TYPE_COMPONENT",
         componentSubtype: "action",
         integrationName: "smtp",
       },

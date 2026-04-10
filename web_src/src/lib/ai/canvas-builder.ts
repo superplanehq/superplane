@@ -1,15 +1,15 @@
 import type {
-  BlueprintsBlueprint,
   CanvasesCanvas,
-  ComponentsComponent,
   ComponentsEdge,
   ComponentsIntegrationRef,
   ComponentsNode,
-  ComponentsNodeType,
   OrganizationsIntegration,
+  SuperplaneBlueprintsOutputChannel,
+  SuperplaneComponentsOutputChannel,
 } from "@/api-client";
+import type { Registry } from "@/lib/index/registry";
+import type { BuildingBlock } from "@/lib/index/types";
 import type { LayoutEngine } from "@/lib/layout";
-import type { BuildingBlock, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { generateNodeId, generateUniqueNodeName } from "@/pages/workflowv2/utils";
 import type {
   CanvasOperation,
@@ -29,10 +29,8 @@ type ScoredChannel = {
 
 export type CanvasBuilderOptions = {
   canvas: CanvasesCanvas;
-  buildingBlocks: BuildingBlockCategory[];
+  registry: Registry;
   integrations?: OrganizationsIntegration[];
-  components?: ComponentsComponent[];
-  blueprints?: BlueprintsBlueprint[];
 };
 
 /*
@@ -44,7 +42,7 @@ export type CanvasBuilderOptions = {
  */
 export class CanvasBuilder {
   private readonly options: CanvasBuilderOptions;
-  private readonly blockLookup: Map<string, BuildingBlockCategory["blocks"][number]>;
+  private readonly blockLookup: Map<string, BuildingBlock>;
   private createdNodeIdsByKey: Map<string, string>;
   private addedNodeBlockNameByKey: Map<string, string>;
   private addedNodeIds: Set<string>;
@@ -53,8 +51,10 @@ export class CanvasBuilder {
 
   constructor(options: CanvasBuilderOptions) {
     this.options = options;
-    this.blockLookup = new Map(
-      options.buildingBlocks.flatMap((category) => category.blocks.map((block) => [block.name, block])),
+    this.blockLookup = new Map<string, BuildingBlock>(
+      options.registry.buildingBlocks.flatMap((category) =>
+        category.blocks.flatMap((block) => (block.name ? [[block.name, block]] : [])),
+      ),
     );
     this.createdNodeIdsByKey = new Map();
     this.addedNodeBlockNameByKey = new Map();
@@ -105,8 +105,8 @@ export class CanvasBuilder {
     // so new nodes are positioned correctly.
     //
     return layout.apply(updatedCanvas, {
-      components: this.options.components || [],
-      blueprints: this.options.blueprints || [],
+      components: this.options.registry.components,
+      blueprints: this.options.registry.blueprints,
     });
   }
 
@@ -182,17 +182,32 @@ export class CanvasBuilder {
     }
 
     const block = this.blockLookup.get(blockName);
-    if (!block?.outputChannels) {
+    const outputChannels = this.getOutputChannels(block);
+    if (outputChannels.length === 0) {
       return [];
     }
 
-    return block.outputChannels
-      .map((channel) => ({
+    return outputChannels
+      .map((channel: { name?: string; label?: string; description?: string }) => ({
         name: channel?.name || "",
         label: "label" in channel ? channel.label || "" : "",
         description: "description" in channel ? channel.description || "" : "",
       }))
       .filter((channel): channel is ScoredChannel => channel.name.length > 0);
+  }
+
+  private getOutputChannels(
+    block: BuildingBlock | undefined,
+  ): Array<SuperplaneComponentsOutputChannel | SuperplaneBlueprintsOutputChannel> {
+    if (!block) {
+      return [];
+    }
+
+    if (block.type === "TYPE_COMPONENT" || block.type === "TYPE_BLUEPRINT") {
+      return block.outputChannels || [];
+    }
+
+    return [];
   }
 
   private normalizedTokens(value: string): string[] {
@@ -292,17 +307,6 @@ export class CanvasBuilder {
     return "default";
   }
 
-  private blockTypeFromBlock(block: BuildingBlock): ComponentsNodeType {
-    switch (block.type) {
-      case "trigger":
-        return "TYPE_TRIGGER";
-      case "blueprint":
-        return "TYPE_BLUEPRINT";
-      default:
-        return block.name === "annotation" ? "TYPE_WIDGET" : "TYPE_COMPONENT";
-    }
-  }
-
   private positionFromOperation(operation: AddNodeOperation): { x: number; y: number } {
     return operation.position
       ? {
@@ -325,7 +329,7 @@ export class CanvasBuilder {
     const newNode: ComponentsNode = {
       id: newNodeId,
       name: uniqueNodeName,
-      type: this.blockTypeFromBlock(block),
+      type: block.type,
       configuration: operation.configuration || {},
       position: this.positionFromOperation(operation),
     };
@@ -335,14 +339,16 @@ export class CanvasBuilder {
       newNode.integration = integrationRef;
     }
 
-    if (block.name === "annotation") {
-      newNode.widget = { name: "annotation" };
-      newNode.configuration = { text: "", color: "yellow" };
-    } else if (block.type === "component") {
+    if (block.type === "TYPE_WIDGET") {
+      newNode.widget = { name: block.name };
+      if (block.name === "annotation") {
+        newNode.configuration = { text: "", color: "yellow" };
+      }
+    } else if (block.type === "TYPE_COMPONENT") {
       newNode.component = { name: block.name };
-    } else if (block.type === "trigger") {
+    } else if (block.type === "TYPE_TRIGGER") {
       newNode.trigger = { name: block.name };
-    } else if (block.type === "blueprint") {
+    } else if (block.type === "TYPE_BLUEPRINT") {
       newNode.blueprint = { id: block.id };
     }
 

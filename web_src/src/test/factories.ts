@@ -1,5 +1,16 @@
-import type { CanvasesCanvas, ComponentsEdge, ComponentsNode, OrganizationsIntegration } from "@/api-client";
-import type { BuildingBlock } from "@/ui/BuildingBlocksSidebar";
+import type {
+  BlueprintsBlueprint,
+  CanvasesCanvas,
+  ComponentsComponent,
+  ComponentsEdge,
+  ComponentsNode,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+  TriggersTrigger,
+  WidgetsWidget,
+} from "@/api-client";
+import { Registry } from "@/lib/index/registry";
+import type { BuildingBlock } from "@/lib/index/types";
 
 export function makeCanvas(overrides: Partial<CanvasesCanvas> = {}): CanvasesCanvas {
   return {
@@ -45,7 +56,29 @@ export function makeComponentsNode(overrides: Partial<ComponentsNode> = {}): Com
 export function makeBuildingBlock(overrides: Partial<BuildingBlock> = {}): BuildingBlock {
   return {
     name: "http.request",
-    type: "component",
+    type: "TYPE_COMPONENT",
     ...overrides,
-  };
+  } as BuildingBlock;
+}
+
+export function makeRegistry({
+  triggers = [],
+  components = [],
+  blueprints = [],
+  widgets = [],
+  availableIntegrations = [],
+}: {
+  triggers?: TriggersTrigger[];
+  components?: ComponentsComponent[];
+  blueprints?: BlueprintsBlueprint[];
+  widgets?: WidgetsWidget[];
+  availableIntegrations?: IntegrationsIntegrationDefinition[];
+} = {}): Registry {
+  return new Registry({
+    triggers,
+    components,
+    blueprints,
+    widgets,
+    availableIntegrations,
+  });
 }

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toTestId } from "../../lib/testID";
 import { getComponentSubtype } from "../buildingBlocks";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
-import type { BuildingBlock, BuildingBlockCategory } from "./types";
+import type { BuildingBlock, BuildingBlockCategory } from "@/lib/index/types";
 
 const SUBTYPE_HOVER_BG: Record<string, string> = {
   trigger: "hover:bg-sky-100 dark:hover:bg-sky-900/20",
@@ -27,10 +27,18 @@ const SUBTYPE_LABEL: Record<string, string> = {
 };
 
 function resolveIconSlug(block: BuildingBlock): string {
-  if (block.type === "blueprint") return "component";
+  if (block.type === "TYPE_BLUEPRINT") return "component";
   const firstPart = block.name?.split(".")[0];
   if (firstPart === "smtp") return "mail";
   return block.icon || "zap";
+}
+
+function getBlockLabel(block: BuildingBlock): string {
+  if (block.type === "TYPE_BLUEPRINT") {
+    return block.name;
+  }
+
+  return block.label || block.name;
 }
 
 function setupDragPreview(
@@ -108,7 +116,7 @@ function BlockItem({
     >
       <ItemMedia>
         {appIconSrc ? (
-          <img src={appIconSrc} alt={block.label || block.name} className="size-4" />
+          <img src={appIconSrc} alt={getBlockLabel(block)} className="size-4" />
         ) : (
           <IconComponent size={14} className="text-gray-500" />
         )}
@@ -117,7 +125,7 @@ function BlockItem({
       <ItemContent>
         <div className="flex items-center gap-2 w-full min-w-0">
           <ItemTitle className="text-sm font-normal min-w-0 flex-1 w-0 overflow-hidden">
-            <span className="block min-w-0 truncate">{block.label || block.name}</span>
+            <span className="block min-w-0 truncate">{getBlockLabel(block)}</span>
           </ItemTitle>
           <span
             className={`inline-block text-left px-1.5 py-0.5 text-[11px] font-medium ${badgeColor} rounded whitespace-nowrap flex-shrink-0 ml-auto`}
@@ -171,7 +179,7 @@ export function CategorySection({
     ? category.blocks || []
     : (category.blocks || []).filter((block) => {
         const name = (block.name || "").toLowerCase();
-        const label = (block.label || "").toLowerCase();
+        const label = getBlockLabel(block).toLowerCase();
         return name.includes(query) || label.includes(query);
       });
 
@@ -255,8 +263,8 @@ export function CategorySection({
         return subtypeComparison;
       }
 
-      const aName = (a.label || a.name || "").toLowerCase();
-      const bName = (b.label || b.name || "").toLowerCase();
+      const aName = getBlockLabel(a).toLowerCase();
+      const bName = getBlockLabel(b).toLowerCase();
       return aName.localeCompare(bName);
     });
   }

@@ -1024,7 +1024,7 @@ function CanvasPage(props: CanvasPageProps) {
     const annotationBlock: BuildingBlock = {
       name: "annotation",
       label: "Annotation",
-      type: "component",
+      type: "TYPE_WIDGET",
     };
 
     await props.onNodeAdd({

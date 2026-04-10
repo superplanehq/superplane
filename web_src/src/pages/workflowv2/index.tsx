@@ -66,6 +66,7 @@ import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import { getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
+import type { BuildingBlock } from "@/lib/index/types";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
@@ -3063,14 +3064,7 @@ export function WorkflowPageV2() {
       const newNode: ComponentsNode = {
         id: newNodeId,
         name: uniqueNodeName,
-        type:
-          buildingBlock.type === "trigger"
-            ? "TYPE_TRIGGER"
-            : buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : buildingBlock.name === "annotation"
-                ? "TYPE_WIDGET"
-                : "TYPE_COMPONENT",
+        type: buildingBlock.type,
         configuration: filteredConfiguration,
         integration: integrationRef,
         position: position
@@ -3085,15 +3079,16 @@ export function WorkflowPageV2() {
       };
 
       // Add type-specific reference
-      if (buildingBlock.name === "annotation") {
-        // Annotation nodes are now widgets
-        newNode.widget = { name: "annotation" };
-        newNode.configuration = { text: "", color: "yellow" };
-      } else if (buildingBlock.type === "component") {
+      if (buildingBlock.type === "TYPE_WIDGET") {
+        newNode.widget = { name: buildingBlock.name };
+        if (buildingBlock.name === "annotation") {
+          newNode.configuration = { text: "", color: "yellow" };
+        }
+      } else if (buildingBlock.type === "TYPE_COMPONENT") {
         newNode.component = { name: buildingBlock.name };
-      } else if (buildingBlock.type === "trigger") {
+      } else if (buildingBlock.type === "TYPE_TRIGGER") {
         newNode.trigger = { name: buildingBlock.name };
-      } else if (buildingBlock.type === "blueprint") {
+      } else if (buildingBlock.type === "TYPE_BLUEPRINT") {
         newNode.blueprint = { id: buildingBlock.id };
       }
 
@@ -3162,10 +3157,8 @@ export function WorkflowPageV2() {
       saveWorkflowSnapshot(latestWorkflow);
       const builder = new CanvasBuilder({
         canvas: latestWorkflow,
-        buildingBlocks: registry.buildingBlocks,
+        registry,
         integrations,
-        components: registry.components,
-        blueprints: registry.blueprints,
       });
       const finalWorkflow = await builder.apply(operations, DefaultLayoutEngine);
 
@@ -3271,9 +3264,9 @@ export function WorkflowPageV2() {
   const handlePlaceholderConfigure = useCallback(
     async (data: {
       placeholderId: string;
-      buildingBlock: any;
+      buildingBlock: BuildingBlock;
       nodeName: string;
-      configuration: Record<string, any>;
+      configuration: Record<string, unknown>;
       appName?: string;
     }): Promise<void> => {
       if (!canvas || !organizationId || !canvasId) {
@@ -3305,22 +3298,22 @@ export function WorkflowPageV2() {
       const updatedNode: ComponentsNode = {
         ...canvas.spec!.nodes![nodeIndex],
         name: uniqueNodeName,
-        type:
-          data.buildingBlock.type === "trigger"
-            ? "TYPE_TRIGGER"
-            : data.buildingBlock.type === "blueprint"
-              ? "TYPE_BLUEPRINT"
-              : "TYPE_COMPONENT",
+        type: data.buildingBlock.type,
         configuration: filteredConfiguration,
       };
 
       // Add the reference that was missing
-      if (data.buildingBlock.type === "component") {
+      if (data.buildingBlock.type === "TYPE_COMPONENT") {
         updatedNode.component = { name: data.buildingBlock.name };
-      } else if (data.buildingBlock.type === "trigger") {
+      } else if (data.buildingBlock.type === "TYPE_TRIGGER") {
         updatedNode.trigger = { name: data.buildingBlock.name };
-      } else if (data.buildingBlock.type === "blueprint") {
+      } else if (data.buildingBlock.type === "TYPE_BLUEPRINT") {
         updatedNode.blueprint = { id: data.buildingBlock.id };
+      } else if (data.buildingBlock.type === "TYPE_WIDGET") {
+        updatedNode.widget = { name: data.buildingBlock.name };
+        if (data.buildingBlock.name === "annotation") {
+          updatedNode.configuration = { text: "", color: "yellow" };
+        }
       }
 
       const updatedNodes = [...(canvas.spec?.nodes || [])];
@@ -3333,10 +3326,10 @@ export function WorkflowPageV2() {
       let updatedEdges = [...(canvas.spec?.edges || [])];
 
       if (outgoingEdges.length > 0) {
-        // Get the valid output channels for the new component
-        const validChannels = data.buildingBlock.outputChannels?.map((ch: any) => ch.name).filter(Boolean) || [
-          "default",
-        ];
+        const validChannels =
+          data.buildingBlock.type === "TYPE_COMPONENT" || data.buildingBlock.type === "TYPE_BLUEPRINT"
+            ? data.buildingBlock.outputChannels?.map((channel) => channel.name).filter(Boolean) || ["default"]
+            : ["default"];
 
         // Update each outgoing edge to use a valid channel
         updatedEdges = updatedEdges.map((edge) => {

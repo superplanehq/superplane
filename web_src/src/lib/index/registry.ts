@@ -6,7 +6,7 @@ import type {
   TriggersTrigger,
   WidgetsWidget,
 } from "@/api-client";
-import type { BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
+import type { BuildingBlockCategory } from "@/lib/index/types";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 
 type RegistryOptions = {
@@ -103,7 +103,12 @@ export class Registry {
 
     this.allTriggers = mergeTriggers(this.triggers, this.availableIntegrations);
     this.allComponents = mergeComponents(this.components, this.availableIntegrations);
-    this.buildingBlocks = buildBuildingBlockCategories(this.triggers, this.components, this.availableIntegrations);
+    this.buildingBlocks = buildBuildingBlockCategories(
+      this.triggers,
+      this.components,
+      this.availableIntegrations,
+      this.widgets,
+    );
 
     this.triggerByName = mapByKeyFirstWins(this.allTriggers, (trigger) => trigger.name || undefined);
     this.componentByName = mapByKeyFirstWins(this.allComponents, (component) => component.name || undefined);
