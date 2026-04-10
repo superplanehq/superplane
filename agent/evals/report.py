@@ -98,12 +98,12 @@ class ReportBuilder:
             print(f"{case_name} {self._format_duration(case_result)}")
             print(f"  input:        {case_input}")
             print(f"  output:       {display_filename}")
-            interaction_log_for_case = self.interaction_log_paths_by_case_name.get(case_name)
-            if interaction_log_for_case:
-                print(f"  log:          {interaction_log_for_case}")
+            print(f"  log:          {self.interaction_log_paths_by_case_name.get(case_name)}")
             print(f"  toolCalls:    {run_usage.tool_calls}")
             print(f"  inputTokens:  {run_usage.input_tokens}")
             print(f"  outputTokens: {run_usage.output_tokens}")
+            print(f"  cacheRead:    {run_usage.cache_read_tokens}")
+            print(f"  cacheWrite:   {run_usage.cache_write_tokens}")
             print(f"  cost:         {self._format_cost(case_cost)}")
 
             print("  assertions:")

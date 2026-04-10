@@ -81,14 +81,22 @@ def claude_rates_for_model(model: str) -> ClaudeUsdPerMillion | None:
 def estimate_claude_cost_usd(usage: RunUsage, rates: ClaudeUsdPerMillion) -> float:
     """Estimate USD for one run using base input/output and Anthropic cache multipliers."""
     m = 1_000_000.0
-    # Base input and output (standard tiers from pricing table).
-    cost = (usage.input_tokens or 0) * rates.input_base / m
-    cost += (usage.output_tokens or 0) * rates.output / m
-    # Prompt caching: cache read ≈ 0.1× base input; 5m cache write ≈ 1.25× base input per MTok.
-    if usage.cache_read_tokens:
-        cost += usage.cache_read_tokens * (0.1 * rates.input_base) / m
-    if usage.cache_write_tokens:
-        cost += usage.cache_write_tokens * (1.25 * rates.input_base) / m
+    cache_read = int(getattr(usage, "cache_read_tokens", 0) or 0)
+    cache_write = int(getattr(usage, "cache_write_tokens", 0) or 0)
+    input_total = int(getattr(usage, "input_tokens", 0) or 0)
+    output_tokens = int(getattr(usage, "output_tokens", 0) or 0)
+
+    # Avoid double billing when input_tokens already equals uncached + cache_read + cache_write.
+    remainder = input_total - cache_read - cache_write
+    if cache_read or cache_write:
+        uncached_input = remainder if remainder >= 0 else input_total
+    else:
+        uncached_input = input_total
+
+    cost = uncached_input * rates.input_base / m
+    cost += output_tokens * rates.output / m
+    cost += cache_read * (0.1 * rates.input_base) / m
+    cost += cache_write * (1.25 * rates.input_base) / m
     return cost
 
 
