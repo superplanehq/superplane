@@ -48,7 +48,7 @@ class _Connection:
         params = pika.URLParameters(rabbitmq_url)
         self._conn = pika.BlockingConnection(params)
         self._chan = self._conn.channel()
-        self._chan.exchange_declare(exchange=AGENT_EXCHANGE, exchange_type="topic", durable=True)
+        self._chan.exchange_declare(exchange=AGENT_EXCHANGE, exchange_type="direct", durable=True)
         return self._chan
 
     def heartbeat(self) -> None:
