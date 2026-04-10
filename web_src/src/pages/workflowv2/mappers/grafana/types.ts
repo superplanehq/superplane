@@ -34,3 +34,54 @@ export interface QueryDataSourceConfiguration {
   timezone?: string;
   format?: string;
 }
+
+export interface SilenceMatcher {
+  name?: string;
+  value?: string;
+  /**
+   * Used by Create Silence configuration. Mirrors Grafana Alertmanager matcher operators:
+   * "=", "!=", "=~", "!~".
+   */
+  operator?: string;
+  isRegex?: boolean;
+  isEqual?: boolean;
+}
+
+export interface SilenceStatus {
+  state?: string;
+}
+
+export interface Silence {
+  id?: string;
+  status?: SilenceStatus;
+  comment?: string;
+  createdBy?: string;
+  startsAt?: string;
+  endsAt?: string;
+  updatedAt?: string;
+  matchers?: SilenceMatcher[];
+  url?: string;
+}
+
+export interface ListSilencesOutput {
+  silences?: Silence[];
+}
+
+export interface CreateSilenceOutput {
+  silenceId?: string;
+  silenceUrl?: string;
+  startsAt?: string;
+  endsAt?: string;
+}
+
+export interface CreateSilenceConfiguration {
+  matchers?: SilenceMatcher[];
+  startsAt?: string;
+  endsAt?: string;
+  comment?: string;
+}
+
+export interface DeleteSilenceOutput {
+  silenceId?: string;
+  deleted?: boolean;
+}

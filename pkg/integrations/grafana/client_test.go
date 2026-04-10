@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
@@ -235,6 +236,59 @@ func Test__Client__ListDataSources(t *testing.T) {
 	require.Len(t, dataSources, 2)
 	require.Equal(t, "prom", dataSources[0].UID)
 	require.Equal(t, "Prometheus", dataSources[0].Name)
+}
+
+func Test__Client__GetSilence__usesSingularSilencePath(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"s1","status":{"state":"active"},"comment":"","createdBy":"","startsAt":"","endsAt":"","updatedAt":"","matchers":[]}`)),
+			},
+		},
+	}
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	_, err := client.GetSilence("s1")
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Equal(t, "/api/alertmanager/grafana/api/v2/silence/s1", httpContext.Requests[0].URL.Path)
+}
+
+func Test__Client__DeleteSilence__usesSingularSilencePath(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(""))},
+		},
+	}
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	require.NoError(t, client.DeleteSilence("s1"))
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	assert.Equal(t, "/api/alertmanager/grafana/api/v2/silence/s1", httpContext.Requests[0].URL.Path)
+}
+
+func Test__parseCreateSilenceResponseBody(t *testing.T) {
+	id, err := parseCreateSilenceResponseBody([]byte(`{"silenceID":"abc-def"}`))
+	require.NoError(t, err)
+	require.Equal(t, "abc-def", id)
+
+	id, err = parseCreateSilenceResponseBody([]byte(`{"silenceId":"ghi-jkl"}`))
+	require.NoError(t, err)
+	require.Equal(t, "ghi-jkl", id)
+
+	_, err = parseCreateSilenceResponseBody([]byte(`{}`))
+	require.ErrorContains(t, err, "missing silence id")
 }
 
 func Test__Grafana__ListResources(t *testing.T) {
