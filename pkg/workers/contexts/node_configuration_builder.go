@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -84,6 +85,11 @@ func (b *NodeConfigurationBuilder) resolve(configuration map[string]any) (map[st
 	result := make(map[string]any, len(configuration))
 
 	for k, v := range configuration {
+		if k == "reportTemplate" {
+			result[k] = v
+			continue
+		}
+
 		resolved, err := b.resolveValue(v)
 		if err != nil {
 			return nil, fmt.Errorf("error resolving field %s: %w", k, err)
@@ -102,6 +108,11 @@ func (b *NodeConfigurationBuilder) resolveWithSchema(config map[string]any, fiel
 	}
 
 	for key, value := range config {
+		if key == "reportTemplate" {
+			result[key] = value
+			continue
+		}
+
 		field, ok := fieldsByName[key]
 		if !ok {
 			resolved, err := b.resolveValue(value)
@@ -257,6 +268,52 @@ func ResolveCustomNameTemplate(template string, payload any) (string, error) {
 	return result, nil
 }
 
+// ResolveReportTemplateFromPayload resolves expressions in a report template
+// against a trigger payload, replacing failed expressions with inline error
+// markers instead of failing the entire template.
+func ResolveReportTemplateFromPayload(template string, payload any) (string, []error) {
+	if !expressionRegex.MatchString(template) {
+		return template, nil
+	}
+
+	env := map[string]any{}
+
+	exprOptions := []expr.Option{
+		expr.Env(env),
+		expr.AsAny(),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+			return payload, nil
+		}),
+	}
+
+	var errors []error
+	result := expressionRegex.ReplaceAllStringFunc(template, func(match string) string {
+		matches := expressionRegex.FindStringSubmatch(match)
+		if len(matches) != 2 {
+			return match
+		}
+
+		vm, err := expr.Compile(matches[1], exprOptions...)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("%s: failed to compile: %w", strings.TrimSpace(matches[1]), err))
+			return fmt.Sprintf("`error: %s`", err.Error())
+		}
+
+		output, err := expr.Run(vm, env)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("%s: %w", strings.TrimSpace(matches[1]), err))
+			return fmt.Sprintf("`error: %s`", err.Error())
+		}
+
+		return fmt.Sprintf("%v", output)
+	})
+
+	return result, errors
+}
+
 func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string) (any, error) {
 	if !expressionRegex.MatchString(expression) {
 		return expression, nil
@@ -284,6 +341,130 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 	}
 
 	return result, nil
+}
+
+// ResolveReportTemplate resolves expressions in a report template,
+// replacing failed expressions with inline error markers instead of
+// failing the entire template. outputEvents contains the node's output
+// and is exposed via the current() function.
+func (b *NodeConfigurationBuilder) ResolveReportTemplate(template string, outputEvents []any) (string, []error) {
+	if !expressionRegex.MatchString(template) {
+		return template, nil
+	}
+
+	var errors []error
+
+	result := expressionRegex.ReplaceAllStringFunc(template, func(match string) string {
+		matches := expressionRegex.FindStringSubmatch(match)
+		if len(matches) != 2 {
+			return match
+		}
+
+		value, err := b.resolveReportExpression(matches[1], outputEvents)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("%s: %w", strings.TrimSpace(matches[1]), err))
+			return fmt.Sprintf("`error: %s`", err.Error())
+		}
+
+		return fmt.Sprintf("%v", value)
+	})
+
+	return result, errors
+}
+
+// toMapViaJSON converts a value (potentially a typed struct) to map[string]any
+// via JSON round-trip, so that expression evaluation uses json field names.
+func toMapViaJSON(v any) any {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return v
+	}
+
+	var result any
+	if err := json.Unmarshal(data, &result); err != nil {
+		return v
+	}
+
+	return result
+}
+
+func (b *NodeConfigurationBuilder) resolveReportExpression(expression string, outputEvents []any) (any, error) {
+	referencedNodes, err := parseReferencedNodes(expression)
+	if err != nil {
+		return "", err
+	}
+
+	messageChain, err := b.buildMessageChain(referencedNodes)
+	if err != nil {
+		return "", err
+	}
+
+	env := map[string]any{
+		"$":      messageChain,
+		"memory": b.buildMemoryExpressionNamespace(),
+	}
+
+	if b.parentBlueprintNode != nil {
+		env["config"] = b.parentBlueprintNode.Configuration.Data()
+	}
+
+	// Convert output events from typed structs to plain maps for expression access
+	normalizedOutputs := make([]any, len(outputEvents))
+	for i, ev := range outputEvents {
+		normalizedOutputs[i] = toMapViaJSON(ev)
+	}
+
+	exprOptions := []expr.Option{
+		expr.Env(env),
+		expr.AsAny(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+		exprruntime.DateFunctionOption(),
+		expr.Function("root", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("root() takes no arguments")
+			}
+			return b.resolveRootPayload()
+		}),
+		expr.Function("current", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("current() takes no arguments")
+			}
+			if len(normalizedOutputs) == 0 {
+				return nil, fmt.Errorf("current() has no output — node did not emit data")
+			}
+			if len(normalizedOutputs) == 1 {
+				return normalizedOutputs[0], nil
+			}
+			return normalizedOutputs, nil
+		}),
+		expr.Function("previous", func(params ...any) (any, error) {
+			depth := 1
+			if len(params) > 1 {
+				return nil, fmt.Errorf("previous() accepts zero or one argument")
+			}
+			if len(params) == 1 {
+				parsedDepth, err := parseDepth(params[0])
+				if err != nil {
+					return nil, err
+				}
+				depth = parsedDepth
+			}
+			return b.resolvePreviousPayload(depth)
+		}),
+	}
+
+	vm, err := expr.Compile(expression, exprOptions...)
+	if err != nil {
+		return "", err
+	}
+
+	output, err := expr.Run(vm, env)
+	if err != nil {
+		return "", fmt.Errorf("expression evaluation failed: %w", err)
+	}
+
+	return output, nil
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {

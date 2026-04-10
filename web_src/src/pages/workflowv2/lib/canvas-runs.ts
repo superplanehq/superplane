@@ -105,8 +105,12 @@ const STATUS_LABELS: Record<string, string> = {
   error: "Error",
 };
 
+export function getStatusEventState(status: string): EventState {
+  return STATUS_TO_EVENT_STATE[status] || "neutral";
+}
+
 export function getStatusBadgeProps(status: string) {
-  const eventState = STATUS_TO_EVENT_STATE[status] || "neutral";
+  const eventState = getStatusEventState(status);
   const style = DEFAULT_EVENT_STATE_MAP[eventState];
   const label = STATUS_LABELS[status] || status || "Unknown";
   return { badgeColor: style.badgeColor, label };

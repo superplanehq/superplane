@@ -49,12 +49,7 @@ func EmitNodeEvent(
 		event.CustomName = customName
 	}
 
-	reportEntry, err := resolveConfigTemplate(node, "reportTemplate", data)
-	if err != nil {
-		log.Errorf("failed to resolve reportTemplate for node %s: %v", node.NodeID, err)
-	} else if reportEntry != nil {
-		event.ReportEntry = reportEntry
-	}
+	event.ReportEntry = resolveReportTemplate(node, data)
 
 	if err := database.Conn().Create(&event).Error; err != nil {
 		log.Errorf("failed to publish workflow event: %v", err)
@@ -104,4 +99,44 @@ func resolveConfigTemplate(node *models.CanvasNode, fieldName string, payload ma
 	}
 
 	return &resolved, nil
+}
+
+func resolveReportTemplate(node *models.CanvasNode, payload map[string]any) *string {
+	config := node.Configuration.Data()
+	if config == nil {
+		return nil
+	}
+
+	rawTemplate, ok := config["reportTemplate"]
+	if !ok || rawTemplate == nil {
+		return nil
+	}
+
+	tmpl, ok := rawTemplate.(string)
+	if !ok {
+		return nil
+	}
+
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
+		return nil
+	}
+
+	resolved, errs := contexts.ResolveReportTemplateFromPayload(tmpl, payload)
+	resolved = strings.TrimSpace(resolved)
+
+	if len(errs) > 0 {
+		var lines []string
+		for _, err := range errs {
+			lines = append(lines, fmt.Sprintf("> `%s`", err.Error()))
+		}
+
+		resolved += fmt.Sprintf("\n\n> [!CAUTION]\n> Expression errors:\n%s", strings.Join(lines, "\n"))
+	}
+
+	if resolved == "" {
+		return nil
+	}
+
+	return &resolved
 }

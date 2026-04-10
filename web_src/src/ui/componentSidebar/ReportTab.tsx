@@ -45,12 +45,22 @@ export function ReportTab({
   const autosaveTimerRef = useRef<number | null>(null);
   const baselineRef = useRef(serverValue);
   const savingRef = useRef(false);
+  const lastSavedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!savingRef.current) {
-      baselineRef.current = serverValue;
-      setValue(serverValue);
+    if (savingRef.current) return;
+
+    if (lastSavedRef.current !== null) {
+      if (serverValue === lastSavedRef.current) {
+        lastSavedRef.current = null;
+      } else {
+        return;
+      }
     }
+
+    if (serverValue === baselineRef.current) return;
+    baselineRef.current = serverValue;
+    setValue(serverValue);
   }, [serverValue]);
 
   const doSave = useCallback(() => {
@@ -61,11 +71,21 @@ export function ReportTab({
     savingRef.current = true;
     setSaving(true);
 
-    const mergedConfig = { ...configRef.current, reportTemplate: current || undefined };
+    // Always read the latest configuration prop to avoid overwriting
+    // fields managed by other tabs (e.g. SettingsTab).
+    const latestConfig = configRef.current;
+    const mergedConfig = { ...latestConfig };
+    if (current) {
+      mergedConfig.reportTemplate = current;
+    } else {
+      delete mergedConfig.reportTemplate;
+    }
+
     const result = onSaveRef.current(mergedConfig, nodeNameRef.current, integrationRefRef.current);
 
     const finish = () => {
       baselineRef.current = current;
+      lastSavedRef.current = current;
       savingRef.current = false;
       setSaving(false);
     };

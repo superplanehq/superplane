@@ -5799,8 +5799,12 @@ export function WorkflowPageV2() {
             isRunViewActive && runSubView === "summary" && describeRunQuery.data ? (
               <RunSummary
                 runData={describeRunQuery.data}
+                canvasId={canvasId}
                 workflowNodes={describeRunQuery.data.snapshotVersion?.spec?.nodes}
                 componentIconMap={componentIconMap}
+                onPushThrough={onPushThrough}
+                onCancelExecution={onCancelExecution}
+                supportsPushThrough={supportsPushThrough}
               />
             ) : undefined
           }

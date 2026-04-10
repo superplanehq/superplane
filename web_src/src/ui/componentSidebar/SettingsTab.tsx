@@ -111,6 +111,8 @@ export function SettingsTab({
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
+  const configurationPropRef = useRef(configuration);
+  configurationPropRef.current = configuration;
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
 
@@ -358,7 +360,16 @@ export function SettingsTab({
       return;
     }
 
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    // Preserve reportTemplate from the latest prop — SettingsTab doesn't
+    // manage this field, so we must carry it through to avoid overwriting
+    // changes made by the ReportTab.
+    const configToSave = { ...nodeConfiguration };
+    const propReportTemplate = configurationPropRef.current?.reportTemplate;
+    if (propReportTemplate !== undefined) {
+      configToSave.reportTemplate = propReportTemplate;
+    }
+
+    const result = onSave(configToSave, currentNodeName, selectedIntegration);
     if (!(result instanceof Promise)) {
       updateAutosaveBaseline(snapshot);
       return;

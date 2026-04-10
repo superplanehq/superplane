@@ -40,7 +40,7 @@ func (s *ExecutionStateContext) IsFinished() bool {
 }
 
 func (s *ExecutionStateContext) Pass() error {
-	s.resolveReportEntry()
+	s.resolveReportEntry(nil)
 
 	newEvents, err := s.execution.PassInTransaction(s.tx, map[string][]any{})
 	if err != nil {
@@ -59,12 +59,15 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		channel: {},
 	}
 
+	var outputEvents []any
 	for _, payload := range payloads {
 		event := map[string]any{
 			"type":      payloadType,
 			"timestamp": time.Now(),
 			"data":      payload,
 		}
+
+		outputEvents = append(outputEvents, event)
 
 		data, err := json.Marshal(event)
 		if err != nil {
@@ -78,7 +81,7 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))
 	}
 
-	s.resolveReportEntry()
+	s.resolveReportEntry(outputEvents)
 
 	newEvents, err := s.execution.PassInTransaction(s.tx, outputs)
 	if err != nil {
@@ -92,7 +95,7 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	return nil
 }
 
-func (s *ExecutionStateContext) resolveReportEntry() {
+func (s *ExecutionStateContext) resolveReportEntry(outputEvents []any) {
 	config := s.execution.Configuration.Data()
 	if config == nil {
 		return
@@ -114,9 +117,15 @@ func (s *ExecutionStateContext) resolveReportEntry() {
 	}
 
 	if s.configBuilder != nil {
-		resolved, err := s.configBuilder.ResolveTemplateExpressions(tmpl)
-		if err == nil {
-			tmpl = strings.TrimSpace(fmt.Sprintf("%v", resolved))
+		resolved, errs := s.configBuilder.ResolveReportTemplate(tmpl, outputEvents)
+		tmpl = strings.TrimSpace(resolved)
+		if len(errs) > 0 {
+			var lines []string
+			for _, err := range errs {
+				lines = append(lines, fmt.Sprintf("> `%s`", err.Error()))
+			}
+
+			tmpl += fmt.Sprintf("\n\n> [!CAUTION]\n> Expression errors:\n%s", strings.Join(lines, "\n"))
 		}
 	}
 

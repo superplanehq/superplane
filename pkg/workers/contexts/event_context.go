@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -59,12 +58,7 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 		event.CustomName = customName
 	}
 
-	reportEntry, err := s.resolveConfigTemplate("reportTemplate", wrappedPayload)
-	if err != nil {
-		log.Errorf("failed to resolve reportTemplate for node %s: %v", s.node.NodeID, err)
-	} else if reportEntry != nil {
-		event.ReportEntry = reportEntry
-	}
+	event.ReportEntry = s.resolveReportTemplate(wrappedPayload)
 
 	err = s.tx.Create(&event).Error
 	if err != nil {
@@ -110,4 +104,44 @@ func (s *EventContext) resolveConfigTemplate(fieldName string, payload any) (*st
 	}
 
 	return &resolved, nil
+}
+
+func (s *EventContext) resolveReportTemplate(payload any) *string {
+	config := s.node.Configuration.Data()
+	if config == nil {
+		return nil
+	}
+
+	rawTemplate, ok := config["reportTemplate"]
+	if !ok || rawTemplate == nil {
+		return nil
+	}
+
+	tmpl, ok := rawTemplate.(string)
+	if !ok {
+		return nil
+	}
+
+	tmpl = strings.TrimSpace(tmpl)
+	if tmpl == "" {
+		return nil
+	}
+
+	resolved, errs := ResolveReportTemplateFromPayload(tmpl, payload)
+	resolved = strings.TrimSpace(resolved)
+
+	if len(errs) > 0 {
+		var lines []string
+		for _, err := range errs {
+			lines = append(lines, fmt.Sprintf("> `%s`", err.Error()))
+		}
+
+		resolved += fmt.Sprintf("\n\n> [!CAUTION]\n> Expression errors:\n%s", strings.Join(lines, "\n"))
+	}
+
+	if resolved == "" {
+		return nil
+	}
+
+	return &resolved
 }
