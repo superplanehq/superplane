@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.test import TestModel
 
 from ai.config import config
@@ -128,6 +129,12 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         model=resolved_model,
         output_type=CanvasAnswer,
         system_prompt=load_system_prompt(),
+        model_settings=AnthropicModelSettings(
+            parallel_tool_calls=True,
+            anthropic_cache_instructions="1h",
+            anthropic_cache_tool_definitions="1h",
+            anthropic_cache_messages=True,
+        ),
     )
 
     def _tool_debug(message: str) -> None:
