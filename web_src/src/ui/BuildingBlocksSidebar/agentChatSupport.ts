@@ -192,8 +192,8 @@ function collapseWithFinishedEvent(
     }
     const eName = typeof e.tool_name === "string" ? e.tool_name : "unknown";
     const eHasId = typeof e.tool_call_id === "string" && e.tool_call_id.trim().length > 0;
-    if (hasExplicitCallId && eHasId) {
-      return e.tool_call_id === event.tool_call_id;
+    if (hasExplicitCallId || eHasId) {
+      return hasExplicitCallId && eHasId && e.tool_call_id === event.tool_call_id;
     }
     return eName === toolName;
   });
