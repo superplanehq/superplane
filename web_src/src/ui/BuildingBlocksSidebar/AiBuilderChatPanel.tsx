@@ -312,7 +312,7 @@ function ConversationContent({
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
       {aiMessages.map((message) => (
-        <AiMessage key={message.id} message={message} />
+        <AiMessage key={message.id} message={message} animate={isGeneratingResponse} />
       ))}
 
       {isGeneratingResponse ? (
@@ -351,7 +351,7 @@ function formatSessionDate(value: string): string {
   });
 }
 
-function AiMessage({ message }: { message: AiBuilderMessage }) {
+function AiMessage({ message, animate }: { message: AiBuilderMessage; animate?: boolean }) {
   const isEmptyAssistantPlaceholder = message.role === "assistant" && message.content.trim().length === 0;
   if (isEmptyAssistantPlaceholder) {
     return null;
@@ -369,7 +369,7 @@ function AiMessage({ message }: { message: AiBuilderMessage }) {
     wrapperClassName = "w-full py-1";
   } else if (isToolMessage) {
     messageClassName = "flex items-start gap-2 px-2 text-xs leading-relaxed text-gray-500";
-    wrapperClassName = "w-full sp-tool-enter";
+    wrapperClassName = animate ? "w-full sp-tool-enter" : "w-full";
   } else {
     messageClassName = "px-2 text-sm text-gray-800";
   }
