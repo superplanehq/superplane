@@ -1,0 +1,12 @@
+{
+  "type": "grafana.data-source",
+  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "data": {
+    "id": 2,
+    "uid": "loki-uid",
+    "name": "Loki",
+    "type": "loki",
+    "url": "http://loki:3100",
+    "isDefault": false
+  }
+}
