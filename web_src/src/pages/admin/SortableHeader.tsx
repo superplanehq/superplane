@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 export type SortDirection = "asc" | "desc";
 
@@ -20,16 +20,26 @@ export function SortableHeader<TField extends string>({
   className = "",
 }: SortableHeaderProps<TField>) {
   const isActive = currentSort === field;
+  const ariaSort = isActive ? (currentDirection === "asc" ? "ascending" : "descending") : "none";
 
   return (
-    <th
-      className={`text-left px-4 py-2.5 text-gray-500 font-medium cursor-pointer select-none hover:text-gray-700 transition-colors ${className}`}
-      onClick={() => onSort(field)}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {isActive && (currentDirection === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
-      </span>
+    <th className={`px-4 py-2.5 ${className}`} aria-sort={ariaSort}>
+      <button
+        type="button"
+        className="inline-flex w-full items-center gap-1 text-left text-gray-500 font-medium select-none hover:text-gray-700 transition-colors"
+        onClick={() => onSort(field)}
+      >
+        <span>{label}</span>
+        {isActive ? (
+          currentDirection === "asc" ? (
+            <ArrowUp size={12} />
+          ) : (
+            <ArrowDown size={12} />
+          )
+        ) : (
+          <ArrowUpDown size={12} className="text-gray-300" />
+        )}
+      </button>
     </th>
   );
 }

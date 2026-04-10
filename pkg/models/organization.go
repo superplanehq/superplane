@@ -31,16 +31,39 @@ func (o *Organization) IsProviderAllowed(provider string) bool {
 }
 
 func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirection string) ([]Organization, int64, error) {
-	query := database.Conn().Where("deleted_at IS NULL")
+	query := database.Conn().
+		Model(&Organization{}).
+		Where("organizations.deleted_at IS NULL")
 
 	if search != "" {
-		query = query.Where("name ILIKE ?", "%"+search+"%")
+		query = query.Where("organizations.name ILIKE ?", "%"+search+"%")
 	}
 
 	var total int64
-	if err := query.Model(&Organization{}).Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+
+	canvasCountsQuery := database.Conn().
+		Table("workflows").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	memberCountsQuery := database.Conn().
+		Table("users").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	query = query.
+		Select(`
+			organizations.*,
+			COALESCE(canvas_counts.count, 0) AS canvas_count,
+			COALESCE(member_counts.count, 0) AS member_count
+		`).
+		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
+		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
 
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -50,7 +73,7 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 		query = query.Offset(offset)
 	}
 
-	orderClause := resolveOrderClause(sortBy, sortDirection, []string{"created_at", "name"}, "created_at DESC")
+	orderClause := resolveOrganizationOrderClause(sortBy, sortDirection)
 
 	var organizations []Organization
 	if err := query.Order(orderClause).Find(&organizations).Error; err != nil {
@@ -58,6 +81,26 @@ func ListAllOrganizations(search string, limit, offset int, sortBy, sortDirectio
 	}
 
 	return organizations, total, nil
+}
+
+func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
+	direction := "DESC"
+	if sortDirection == "asc" {
+		direction = "ASC"
+	}
+
+	switch sortBy {
+	case "name":
+		return "organizations.name " + direction
+	case "created_at":
+		return "organizations.created_at " + direction
+	case "canvas_count":
+		return "COALESCE(canvas_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "member_count":
+		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
+	default:
+		return "organizations.created_at DESC"
+	}
 }
 
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {

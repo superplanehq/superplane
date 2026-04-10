@@ -16,7 +16,7 @@ interface AdminOrganization {
   created_at?: string;
 }
 
-type SortField = "created_at" | "name";
+type SortField = "canvas_count" | "created_at" | "member_count" | "name";
 
 const PAGE_SIZE = 50;
 
@@ -41,8 +41,20 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
               onSort={onSort}
             />
             <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Description</th>
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Canvases</th>
-            <th className="text-left px-4 py-2.5 text-gray-500 font-medium">Members</th>
+            <SortableHeader
+              label="Canvases"
+              field="canvas_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Members"
+              field="member_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
             <SortableHeader
               label="Created"
               field="created_at"

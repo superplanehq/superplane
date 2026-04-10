@@ -2,10 +2,14 @@ package models
 
 import (
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestInstallationAdmin(t *testing.T) {
@@ -82,6 +86,58 @@ func TestListAllOrganizations(t *testing.T) {
 		assert.Equal(t, "Zebra Org", orgs[2].Name)
 	})
 
+	t.Run("sorts organizations by canvas count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		lowCount, err := CreateOrganization("Low Count", "")
+		require.NoError(t, err)
+		highCount, err := CreateOrganization("High Count", "")
+		require.NoError(t, err)
+		midCount, err := CreateOrganization("Mid Count", "")
+		require.NoError(t, err)
+
+		createTestCanvas(t, lowCount.ID, "Low Canvas 1")
+		createTestCanvas(t, highCount.ID, "High Canvas 1")
+		createTestCanvas(t, highCount.ID, "High Canvas 2")
+		createTestCanvas(t, highCount.ID, "High Canvas 3")
+		createTestCanvas(t, midCount.ID, "Mid Canvas 1")
+		createTestCanvas(t, midCount.ID, "Mid Canvas 2")
+
+		orgs, total, err := ListAllOrganizations("", 50, 0, "canvas_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "High Count", orgs[0].Name)
+		assert.Equal(t, "Mid Count", orgs[1].Name)
+		assert.Equal(t, "Low Count", orgs[2].Name)
+	})
+
+	t.Run("sorts organizations by member count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		lowCount, err := CreateOrganization("Low Members", "")
+		require.NoError(t, err)
+		highCount, err := CreateOrganization("High Members", "")
+		require.NoError(t, err)
+		midCount, err := CreateOrganization("Mid Members", "")
+		require.NoError(t, err)
+
+		createTestUser(t, lowCount.ID, "low-1@example.com", "Low 1")
+		createTestUser(t, highCount.ID, "high-1@example.com", "High 1")
+		createTestUser(t, highCount.ID, "high-2@example.com", "High 2")
+		createTestUser(t, highCount.ID, "high-3@example.com", "High 3")
+		createTestUser(t, midCount.ID, "mid-1@example.com", "Mid 1")
+		createTestUser(t, midCount.ID, "mid-2@example.com", "Mid 2")
+
+		orgs, total, err := ListAllOrganizations("", 50, 0, "member_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "High Members", orgs[0].Name)
+		assert.Equal(t, "Mid Members", orgs[1].Name)
+		assert.Equal(t, "Low Members", orgs[2].Name)
+	})
+
 	t.Run("excludes soft-deleted organizations", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
 
@@ -134,6 +190,48 @@ func TestListAllOrganizations(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, orgs2, 1)
 	})
+}
+
+func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
+	t.Helper()
+
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &Canvas{
+		ID:             uuid.New(),
+		OrganizationID: organizationID,
+		LiveVersionID:  &liveVersionID,
+		Name:           name,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		return tx.Create(&CanvasVersion{
+			ID:          liveVersionID,
+			WorkflowID:  canvas.ID,
+			IsPublished: true,
+			PublishedAt: &now,
+			Nodes:       datatypes.NewJSONSlice([]Node{}),
+			Edges:       datatypes.NewJSONSlice([]Edge{}),
+			CreatedAt:   &now,
+			UpdatedAt:   &now,
+		}).Error
+	}))
+}
+
+func createTestUser(t *testing.T, organizationID uuid.UUID, email, name string) {
+	t.Helper()
+
+	account, err := CreateAccount(name, email)
+	require.NoError(t, err)
+
+	_, err = CreateUser(organizationID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
 }
 
 func TestListActiveUsersByOrganization(t *testing.T) {
