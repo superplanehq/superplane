@@ -49,7 +49,7 @@ export const createDatabaseClusterMapper: ComponentBaseMapper = {
     details["Version"] = String(cluster.version || "-");
     details["Region"] = String(cluster.region || "-");
     details["Size"] = String(cluster.size || "-");
-    details["Node Count"] = String(cluster.num_nodes || "-");
+    details["Node Count"] = String(cluster.num_nodes ?? "-");
     details["Status"] = String(cluster.status || "-");
 
     const connection = cluster.connection as Record<string, unknown> | undefined;
