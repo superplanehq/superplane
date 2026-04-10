@@ -117,15 +117,14 @@ def test_catalog_list_cache_returns_detached_rows() -> None:
         "components",
         "slack",
         None,
-        [{"name": "slack.sendTextMessage", "output_channel_names": ["default"]}],
+        ["slack.sendTextMessage"],
     )
     first = _get_cached_catalog_list(deps, "components", "slack", None)
     assert first is not None
-    first[0]["name"] = "mutated"
+    first[0] = "mutated"
     second = _get_cached_catalog_list(deps, "components", "slack", None)
     assert second is not None
-    assert second[0]["name"] == "slack.sendTextMessage"
-    assert second[0]["output_channel_names"] == ["default"]
+    assert second[0] == "slack.sendTextMessage"
 
 
 def test_catalog_list_cache_same_key_after_case_normalization() -> None:

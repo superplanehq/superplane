@@ -332,11 +332,7 @@ def test_list_components_includes_integration_scoped_components() -> None:
 
     components = client.list_components(provider="slack")
 
-    assert len(components) == 1
-    assert components[0]["name"] == "slack.sendTextMessage"
-    assert components[0]["provider"] == "slack"
-    assert "configuration_fields" not in components[0]
-    assert components[0].get("output_channel_names") == []
+    assert components == ["slack.sendTextMessage"]
 
 
 def test_list_triggers_includes_integration_scoped_triggers() -> None:

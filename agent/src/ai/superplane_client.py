@@ -367,24 +367,6 @@ class SuperplaneClient:
         return serialized
 
     @staticmethod
-    def _serialize_component_list_item(component: ComponentsComponent) -> dict[str, Any]:
-        """Compact shape for list_components only; use describe_component for full schema."""
-        output_channels = component.output_channels or []
-        names: list[str] = []
-        for channel in output_channels:
-            if channel is not None and isinstance(channel.name, str) and channel.name:
-                names.append(channel.name)
-        return {
-            "name": component.name,
-            "provider": SuperplaneClient._provider_from_name(component.name),
-            "label": component.label,
-            "description": component.description,
-            "icon": component.icon,
-            "color": component.color,
-            "output_channel_names": names,
-        }
-
-    @staticmethod
     def _serialize_trigger_list_item(trigger: TriggersTrigger) -> dict[str, Any]:
         """Compact shape for list_triggers only; use describe_trigger for full schema."""
         return {
@@ -489,7 +471,7 @@ class SuperplaneClient:
         self,
         provider: str | None = None,
         query: str | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[str]:
         response = self._api_request(
             lambda: self._component_api.components_list_components(
                 _request_timeout=self._config.timeout_seconds,
@@ -534,10 +516,13 @@ class SuperplaneClient:
                 query=query,
             )
         ]
-        return [
-            self._serialize_component_list_item(component)
-            for component in sorted(matches, key=lambda item: item.name or "")
-        ]
+        ordered = sorted(matches, key=lambda item: item.name or "")
+        out: list[str] = []
+        for component in ordered:
+            n = component.name
+            if isinstance(n, str) and n:
+                out.append(n)
+        return out
 
     def describe_component(self, name: str) -> dict[str, Any]:
         response = self._api_request(

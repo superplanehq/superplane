@@ -17,6 +17,7 @@ from ai.jsonutil import to_jsonable
 from ai.models import CanvasAnswer, CanvasQuestionRequest
 from evals.case_logger import CaseLogger
 from evals.case_names import eval_case_name
+from evals.otel_case_log import current_eval_case_name
 from evals.run_tool_registry import record_tool_call
 
 
@@ -68,48 +69,52 @@ def build_case_task(
 ) -> Any:
     async def task(question: str) -> CanvasAnswer:
         case_name = question_to_case_name.get(question, "unknown_case")
-        if system_prompt_text:
-            wrapped_system_prompt = _wrap_text(system_prompt_text, indent=10)
-            if wrapped_system_prompt:
-                await case_logger.log_case(case_name, f"SYSTEM_PROMPT\n{wrapped_system_prompt}")
-        await case_logger.log_case(case_name, f"CASE_STARTED question={question}")
-        payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
-        result: Any | None = None
+        case_token = current_eval_case_name.set(case_name)
         try:
-            async for event in agent.run_stream_events(
-                user_prompt=build_prompt(payload),
-                deps=deps,
-            ):
-                if isinstance(event, FunctionToolCallEvent):
-                    record_tool_call(question, event.part.tool_name)
-                for event_line in _event_lines(event):
-                    await case_logger.log_case(case_name, event_line)
-                if isinstance(event, AgentRunResultEvent):
-                    result = event.result
-        except Exception as error:
-            await case_logger.log_case(case_name, f"CASE_FAILED error={error}")
-            raise
-        if result is None:
-            raise RuntimeError(f"Eval case {case_name!r} did not produce a final result event.")
+            if system_prompt_text:
+                wrapped_system_prompt = _wrap_text(system_prompt_text, indent=10)
+                if wrapped_system_prompt:
+                    await case_logger.log_case(case_name, f"SYSTEM_PROMPT\n{wrapped_system_prompt}")
+            await case_logger.log_case(case_name, f"CASE_STARTED question={question}")
+            payload = CanvasQuestionRequest(question=question, canvas_id=deps.canvas_id)
+            result: Any | None = None
+            try:
+                async for event in agent.run_stream_events(
+                    user_prompt=build_prompt(payload),
+                    deps=deps,
+                ):
+                    if isinstance(event, FunctionToolCallEvent):
+                        record_tool_call(question, event.part.tool_name)
+                    for event_line in _event_lines(event):
+                        await case_logger.log_case(case_name, event_line)
+                    if isinstance(event, AgentRunResultEvent):
+                        result = event.result
+            except Exception as error:
+                await case_logger.log_case(case_name, f"CASE_FAILED error={error}")
+                raise
+            if result is None:
+                raise RuntimeError(f"Eval case {case_name!r} did not produce a final result event.")
 
-        run_usage = result.usage()
-        async with usage_lock:
-            if question in run_usages:
-                raise RuntimeError(
-                    "Duplicate eval case inputs are not supported for usage correlation "
-                    f"(collision on {question[:120]!r}…)"
-                )
-            run_usages[question] = run_usage
-        await case_logger.log_case(
-            case_name,
-            (
-                "CASE_COMPLETED "
-                f"tool_calls={run_usage.tool_calls} "
-                f"input_tokens={run_usage.input_tokens} "
-                f"output_tokens={run_usage.output_tokens}"
-            ),
-        )
-        return cast(CanvasAnswer, result.output)
+            run_usage = result.usage()
+            async with usage_lock:
+                if question in run_usages:
+                    raise RuntimeError(
+                        "Duplicate eval case inputs are not supported for usage correlation "
+                        f"(collision on {question[:120]!r}…)"
+                    )
+                run_usages[question] = run_usage
+            await case_logger.log_case(
+                case_name,
+                (
+                    "CASE_COMPLETED "
+                    f"tool_calls={run_usage.tool_calls} "
+                    f"input_tokens={run_usage.input_tokens} "
+                    f"output_tokens={run_usage.output_tokens}"
+                ),
+            )
+            return cast(CanvasAnswer, result.output)
+        finally:
+            current_eval_case_name.reset(case_token)
 
     return task
 

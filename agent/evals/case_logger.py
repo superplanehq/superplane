@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import threading
 import time
 from pathlib import Path
 from typing import TextIO
@@ -8,7 +8,8 @@ from typing import TextIO
 
 class CaseLogger:
     def __init__(self, run_id: str, case_names: list[str]) -> None:
-        self._lock = asyncio.Lock()
+        # Threading lock: OTEL span export (sync) shares log files with async log_case.
+        self._lock = threading.Lock()
         self._case_started_at_monotonic: dict[str, float] = {}
         output_dir = Path("/app/tmp/agent/evals")
         display_output_dir = Path("tmp/agent/evals")
@@ -31,12 +32,12 @@ class CaseLogger:
     def display_paths_by_case_name(self) -> dict[str, str]:
         return dict(self._display_path_by_case_name)
 
-    async def log_case(self, case_name: str, line: str) -> None:
+    def log_case_sync(self, case_name: str, line: str) -> None:
         file = self._files_by_case_name.get(case_name)
         if file is None:
             raise RuntimeError(f"No log file configured for case {case_name!r}")
         lines = line.splitlines() or [line]
-        async with self._lock:
+        with self._lock:
             now = time.perf_counter()
             started_at = self._case_started_at_monotonic.get(case_name)
             if started_at is None:
@@ -50,6 +51,9 @@ class CaseLogger:
             for continuation in lines[1:]:
                 file.write(f"{continuation}\n")
             file.flush()
+
+    async def log_case(self, case_name: str, line: str) -> None:
+        self.log_case_sync(case_name, line)
 
     def close(self) -> None:
         for file in self._files_by_case_name.values():

@@ -14,8 +14,15 @@ from evals.case_filter import case_filter, select_cases
 from evals.case_logger import CaseLogger
 from evals.case_task import build_case_name_index, build_case_task, read_agent_system_prompt
 from evals.cases import dataset
+from evals.llm_raw_http_log import install_llm_raw_http_logging
+from evals.otel_case_log import build_eval_instrumentation
 from evals.report import ReportBuilder
 from evals.run_tool_registry import clear_tool_call_registry
+
+
+def _eval_otel_case_log_enabled() -> bool:
+    value = os.getenv("EVAL_OTEL_CASE_LOG", "1").strip().lower()
+    return value not in ("0", "false", "no")
 
 
 def load_env() -> dict[str, str]:
@@ -48,7 +55,6 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
         ),
         canvas_id=env["canvas_id"],
     )
-    agent = build_agent(env["model"])
     # Keyed by case ``inputs`` string so usage matches when cases run concurrently.
     # Duplicate prompts across cases are not supported (detected under a lock).
     run_usages: dict[str, RunUsage] = {}
@@ -59,6 +65,13 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
         run_id=datetime.now(UTC).strftime("%Y%m%dT%H%M%S_%fZ"),
         case_names=case_names,
     )
+
+    install_llm_raw_http_logging(case_logger)
+
+    eval_instrument = (
+        build_eval_instrumentation(case_logger) if _eval_otel_case_log_enabled() else None
+    )
+    agent = build_agent(env["model"], instrument=eval_instrument)
 
     task = build_case_task(
         agent=agent,
