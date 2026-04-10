@@ -129,7 +129,7 @@ Returns the created Grafana alert rule object, including identifiers and evaluat
     "annotations": {
       "summary": "High error rate detected"
     },
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "datasourceUid": "prometheus-main",
@@ -138,12 +138,69 @@ Returns the created Grafana alert rule object, including identifiers and evaluat
           "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "intervalMs": 1000,
           "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "refId": "A"
         },
         "queryType": "",
         "refId": "A",
         "relativeTimeRange": {
           "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
           "to": 0
         }
       }
@@ -231,7 +288,7 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
     "annotations": {
       "summary": "High error rate detected"
     },
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "datasourceUid": "prometheus-main",
@@ -240,12 +297,69 @@ Returns the full Grafana alert rule object, including title, folder, group, cond
           "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "intervalMs": 1000,
           "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "refId": "A"
         },
         "queryType": "",
         "refId": "A",
         "relativeTimeRange": {
           "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
           "to": 0
         }
       }
@@ -423,7 +537,7 @@ Returns the updated Grafana alert rule object after the provisioning API applies
     "annotations": {
       "summary": "High error rate detected"
     },
-    "condition": "A",
+    "condition": "C",
     "data": [
       {
         "datasourceUid": "prometheus-main",
@@ -432,12 +546,69 @@ Returns the updated Grafana alert rule object after the provisioning API applies
           "expr": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "intervalMs": 1000,
           "maxDataPoints": 43200,
+          "query": "sum(rate(http_requests_total{status=~\"5..\"}[5m]))",
           "refId": "A"
         },
         "queryType": "",
         "refId": "A",
         "relativeTimeRange": {
           "from": 300,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "expression": "A",
+          "id": "reduce",
+          "reducer": "last",
+          "refId": "B",
+          "settings": {
+            "mode": "dropNN"
+          },
+          "type": "reduce"
+        },
+        "queryType": "",
+        "refId": "B",
+        "relativeTimeRange": {
+          "from": 0,
+          "to": 0
+        }
+      },
+      {
+        "datasourceUid": "__expr__",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [
+                  1
+                ],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": [
+                  "C"
+                ]
+              },
+              "reducer": {
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "expression": "B",
+          "id": "threshold",
+          "refId": "C",
+          "type": "threshold"
+        },
+        "queryType": "",
+        "refId": "C",
+        "relativeTimeRange": {
+          "from": 0,
           "to": 0
         }
       }
