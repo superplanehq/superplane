@@ -3,12 +3,12 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.test import TestModel
 
 from ai.config import config
 from ai.models import (
     CanvasAnswer,
-    CanvasProposal,
     CanvasQuestionRequest,
     CanvasShape,
     CanvasSummary,
@@ -128,29 +128,28 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         model=resolved_model,
         output_type=CanvasAnswer,
         system_prompt=load_system_prompt(),
+        output_retries=5,
+        model_settings=AnthropicModelSettings(
+            parallel_tool_calls=True,
+            anthropic_cache_instructions="1h",
+            anthropic_cache_tool_definitions="1h",
+            anthropic_cache_messages=True,
+        ),
     )
 
     def _tool_debug(message: str) -> None:
         if config.debug:
             print(f"[web][agent] {message}", flush=True)
 
-    @agent.tool
-    def validate_proposal(
-        _ctx: RunContext[AgentDeps],
-        proposal: CanvasProposal,
-    ) -> dict[str, Any]:
-        """Validate and normalize a draft canvas proposal against live catalog schemas.
+    @agent.output_validator
+    def validate_answer_proposal(
+        ctx: RunContext[AgentDeps],
+        answer: CanvasAnswer,
+    ) -> CanvasAnswer:
+        # Placeholder for proposal validation.
+        #   raise ModelRetry("... explain why the proposal is invalid and what to do about it.")
 
-        Call this with the same structured proposal you plan to include in your final
-        answer when the user asked for canvas edits. The server applies the same
-        coercion and type checks as the workflow UI. On success, copy the returned
-        ``proposal`` into your final ``CanvasAnswer``. On failure, read ``errors``,
-        fix configurations (use describe_component / describe_trigger), and call again.
-        """
-        return {
-            "ok": True,
-            "proposal": proposal.model_dump(mode="json", by_alias=True),
-        }
+        return answer
 
     @agent.tool
     def get_canvas(ctx: RunContext[AgentDeps]) -> CanvasSummary:
