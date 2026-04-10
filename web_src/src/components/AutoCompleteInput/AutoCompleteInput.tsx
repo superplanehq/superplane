@@ -1,4 +1,13 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useCallback,
+  useMemo,
+} from "react";
 import { createPortal } from "react-dom";
 import { twMerge } from "tailwind-merge";
 import type { Suggestion } from "./core";
@@ -17,6 +26,7 @@ export interface AutoCompleteInputProps extends Omit<React.ComponentPropsWithout
   suffix?: string;
   startWord?: string;
   inputSize?: "xs" | "sm" | "md" | "lg";
+  minRows?: number;
   noExampleObjectText?: string;
   showValuePreview?: boolean;
   quickTip?: string;
@@ -44,6 +54,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       suffix = "",
       startWord,
       inputSize = "md",
+      minRows = 1,
       noExampleObjectText = "No suggestions found",
       showValuePreview = false,
       quickTip,
@@ -111,19 +122,20 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const suppressSuggestionsRef = useRef(false);
     useImperativeHandle(forwardedRef, () => inputRef.current as HTMLTextAreaElement);
 
-    // Auto-resize textarea based on content (and backdrop in preview mode)
     const adjustTextareaHeight = useCallback(() => {
       const textarea = inputRef.current;
       const backdrop = backdropRef.current;
       if (!textarea) return;
       textarea.style.height = "auto";
-      // In preview mode, backdrop content may be longer than textarea content
-      // Use the larger of the two heights
+      const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 20;
+      const paddingTop = parseFloat(getComputedStyle(textarea).paddingTop) || 0;
+      const paddingBottom = parseFloat(getComputedStyle(textarea).paddingBottom) || 0;
+      const minHeight = lineHeight * minRows + paddingTop + paddingBottom;
       const textareaHeight = textarea.scrollHeight;
       const backdropHeight = backdrop?.scrollHeight ?? 0;
-      const finalHeight = Math.max(textareaHeight, backdropHeight);
+      const finalHeight = Math.max(textareaHeight, backdropHeight, minHeight);
       textarea.style.height = `${finalHeight}px`;
-    }, []);
+    }, [minRows]);
 
     // Tokenize expression content for syntax highlighting
     const tokenizeExpression = (expr: string): React.ReactNode[] => {
@@ -875,12 +887,11 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       measureCursorPixelPosition();
     }, [measureCursorPixelPosition]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       setInputValue(value);
     }, [value]);
 
-    // Adjust textarea height when value or preview mode changes
-    useEffect(() => {
+    useLayoutEffect(() => {
       adjustTextareaHeight();
     }, [inputValue, previewMode, adjustTextareaHeight]);
 

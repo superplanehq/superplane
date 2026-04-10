@@ -89,7 +89,8 @@ const ADMONITION_CONFIG: Record<
   },
 };
 
-const ADMONITION_RE = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/;
+const ADMONITION_DETECT_RE = /\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/;
+const ADMONITION_STRIP_RE = /\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/;
 
 function extractTextFromChildren(children: React.ReactNode): string {
   let text = "";
@@ -105,28 +106,36 @@ function extractTextFromChildren(children: React.ReactNode): string {
 
 function stripAdmonitionTag(children: React.ReactNode): React.ReactNode {
   let stripped = false;
-  return Children.map(children, (child) => {
-    if (stripped) return child;
 
-    if (typeof child === "string") {
-      const replaced = child.replace(ADMONITION_RE, "");
-      if (replaced !== child) stripped = true;
-      return replaced || null;
+  function processNode(node: React.ReactNode): React.ReactNode {
+    if (stripped) return node;
+
+    if (typeof node === "string") {
+      const replaced = node.replace(ADMONITION_STRIP_RE, "");
+      if (replaced !== node) {
+        stripped = true;
+        const trimmed = replaced.replace(/^\n+/, "");
+        return trimmed || null;
+      }
+      return node;
     }
 
-    if (isValidElement<{ children?: React.ReactNode }>(child) && child.props.children) {
-      const newChildren = stripAdmonitionTag(child.props.children);
-      stripped = true;
-      return React.cloneElement(child as React.ReactElement<{ children?: React.ReactNode }>, {}, newChildren);
+    if (isValidElement<{ children?: React.ReactNode }>(node) && node.props.children != null) {
+      const newChildren = Children.map(node.props.children, (c) => processNode(c));
+      if (stripped) {
+        return React.cloneElement(node as React.ReactElement<{ children?: React.ReactNode }>, {}, newChildren);
+      }
     }
 
-    return child;
-  });
+    return node;
+  }
+
+  return Children.map(children, (child) => processNode(child));
 }
 
 function Blockquote({ children }: { children?: React.ReactNode }) {
   const rawText = extractTextFromChildren(children);
-  const match = rawText.match(ADMONITION_RE);
+  const match = rawText.match(ADMONITION_DETECT_RE);
 
   if (match) {
     const type = match[1] as AdmonitionType;
@@ -195,18 +204,29 @@ function Hr() {
 }
 
 function Details({ children }: { children?: React.ReactNode }) {
+  const childArray = Children.toArray(children);
+  const summary = childArray.find((c) => isValidElement(c) && (c.type === Summary || c.type === "summary"));
+  const body = childArray.filter((c) => c !== summary);
+
   return (
-    <details className="my-2 rounded-md border border-slate-200 bg-white text-sm [&[open]>summary]:mb-1">
-      {children}
+    <details className="my-2 rounded-md border border-slate-200 bg-white text-sm [&[open]>summary]:border-b [&[open]>summary]:border-slate-200">
+      {summary}
+      {body.length > 0 && <DetailsContent>{body}</DetailsContent>}
     </details>
   );
 }
 
 function Summary({ children }: { children?: React.ReactNode }) {
   return (
-    <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-600 hover:bg-slate-50">
+    <summary className="cursor-pointer select-none rounded-md px-3 py-2 text-xs font-medium text-gray-600 hover:bg-slate-50">
       {children}
     </summary>
+  );
+}
+
+function DetailsContent({ children }: { children?: React.ReactNode }) {
+  return (
+    <div className="whitespace-pre-wrap px-3 py-1.5 text-sm text-gray-700 [&_p]:my-1 [&_pre]:my-2">{children}</div>
   );
 }
 

@@ -131,6 +131,7 @@ export function ReportTab({
           prefix="{{ "
           suffix=" }}"
           inputSize="md"
+          minRows={6}
           showValuePreview
           quickTip="Tip: type `{{` to start an expression."
           disabled={readOnly}
