@@ -195,8 +195,7 @@ The Query Data Source component executes a query against a Grafana data source u
 
 - **Data Source**: The Grafana data source to query
 - **Query**: The datasource query (PromQL, InfluxQL, etc.)
-- **Time From / Time To**: Optional datetime picker values for the query range
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+- **Time From / Time To**: Optional datetime picker values for the query range. Datetime values without an explicit offset are interpreted as UTC.
 - If omitted, SuperPlane defaults the query to the last 5 minutes
 - **Format**: Optional query format (depends on the datasource)
 
@@ -261,11 +260,10 @@ The Query Logs component executes a LogQL query against a Loki-backed Grafana da
 
 ### Configuration
 
-- **Data Source**: The Loki data source to query (required)
-- **Query**: A LogQL query expression (required), e.g. `{app="myservice"} |= "error"`
-- **Time From / Time To**: Optional datetime range for the log query window
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
-- **Limit**: Maximum number of log lines to return (optional)
+		- **Data Source**: The Loki data source to query (required)
+		- **Query**: A LogQL query expression (required), e.g. `{app="myservice"} |= "error"`
+		- **Time From / Time To**: Optional log query range. Supports absolute values like `2026-04-08T15:30Z` and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
+		- **Limit**: Maximum number of log lines to return (optional)
 
 ### Output
 
@@ -342,10 +340,9 @@ The Query Traces component executes a TraceQL query against a Tempo-backed Grafa
 
 ### Configuration
 
-- **Data Source**: The Tempo data source to query (required)
-- **Query**: A TraceQL query expression (required), e.g. `{ .http.status_code = 500 }`
-- **Time From / Time To**: Optional datetime range for the trace search window
-- **Timezone**: Interprets datetime picker values using the selected timezone offset
+		- **Data Source**: The Tempo data source to query (required)
+		- **Query**: A TraceQL query expression (required), e.g. `{ .http.status_code = 500 }`
+		- **Time From / Time To**: Optional trace search range. Supports absolute values like `2026-04-08T15:30Z` and relative Grafana values like `now-15m` or `now+2h`. Datetime values without an explicit offset are interpreted as UTC.
 
 ### Output
 

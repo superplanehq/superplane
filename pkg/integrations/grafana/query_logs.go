@@ -21,7 +21,6 @@ type QueryLogsSpec struct {
 	Query         string  `json:"query" mapstructure:"query"`
 	TimeFrom      *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
 	TimeTo        *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
-	Timezone      *string `json:"timezone,omitempty" mapstructure:"timezone"`
 	Limit         *int    `json:"limit,omitempty" mapstructure:"limit"`
 }
 
@@ -46,12 +45,12 @@ func (q *QueryLogs) Documentation() string {
 - **Deploy validation**: Confirm absence of error patterns following a deployment
 - **Log enrichment**: Pull relevant log lines into a workflow for summarization or downstream notification
 
-## Configuration
+	## Configuration
 
-	- **Data Source**: The Loki data source to query (required)
-	- **Query**: A LogQL query expression (required), e.g. ` + "`{app=\"myservice\"} |= \"error\"`" + `
-	- **Time From / Time To**: Optional log query range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `
-	- **Limit**: Maximum number of log lines to return (optional)
+		- **Data Source**: The Loki data source to query (required)
+		- **Query**: A LogQL query expression (required), e.g. ` + "`{app=\"myservice\"} |= \"error\"`" + `
+		- **Time From / Time To**: Optional log query range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `. Datetime values without an explicit offset are interpreted as UTC.
+		- **Limit**: Maximum number of log lines to return (optional)
 
 ## Output
 
@@ -158,14 +157,14 @@ func (q *QueryLogs) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		request.From, err = resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		request.From, err = resolveQueryTimeValue(*spec.TimeFrom)
 		if err != nil {
 			return fmt.Errorf("invalid timeFrom value %q: %w", strings.TrimSpace(*spec.TimeFrom), err)
 		}
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		request.To, err = resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		request.To, err = resolveQueryTimeValue(*spec.TimeTo)
 		if err != nil {
 			return fmt.Errorf("invalid timeTo value %q: %w", strings.TrimSpace(*spec.TimeTo), err)
 		}
@@ -254,10 +253,10 @@ func validateQueryLogsSpec(spec QueryLogsSpec) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")
 	}
-	if err := validateQueryTimeValue(spec.TimeFrom, spec.Timezone); err != nil {
+	if err := validateQueryTimeValue(spec.TimeFrom); err != nil {
 		return fmt.Errorf("timeFrom: %w", err)
 	}
-	if err := validateQueryTimeValue(spec.TimeTo, spec.Timezone); err != nil {
+	if err := validateQueryTimeValue(spec.TimeTo); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
 	return nil

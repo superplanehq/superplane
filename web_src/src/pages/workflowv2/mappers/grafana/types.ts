@@ -31,7 +31,6 @@ export interface QueryDataSourceConfiguration {
   query: string;
   timeFrom?: string;
   timeTo?: string;
-  timezone?: string;
   format?: string;
 }
 
@@ -53,7 +52,6 @@ export interface QueryLogsConfiguration {
   query: string;
   timeFrom?: string;
   timeTo?: string;
-  timezone?: string;
   limit?: number;
 }
 
@@ -62,5 +60,4 @@ export interface QueryTracesConfiguration {
   query: string;
   timeFrom?: string;
   timeTo?: string;
-  timezone?: string;
 }

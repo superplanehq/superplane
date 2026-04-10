@@ -21,7 +21,6 @@ type QueryTracesSpec struct {
 	Query         string  `json:"query" mapstructure:"query"`
 	TimeFrom      *string `json:"timeFrom,omitempty" mapstructure:"timeFrom"`
 	TimeTo        *string `json:"timeTo,omitempty" mapstructure:"timeTo"`
-	Timezone      *string `json:"timezone,omitempty" mapstructure:"timezone"`
 }
 
 func (q *QueryTraces) Name() string {
@@ -45,13 +44,13 @@ func (q *QueryTraces) Documentation() string {
 - **Deploy validation**: Confirm trace patterns look healthy after a deployment
 - **Latency investigation**: Search for high-latency traces matching a specific service or operation
 
-## Configuration
+	## Configuration
 
-	- **Data Source**: The Tempo data source to query (required)
-	- **Query**: A TraceQL query expression (required), e.g. ` + "`{ .http.status_code = 500 }`" + `
-	- **Time From / Time To**: Optional trace search range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `
+		- **Data Source**: The Tempo data source to query (required)
+		- **Query**: A TraceQL query expression (required), e.g. ` + "`{ .http.status_code = 500 }`" + `
+		- **Time From / Time To**: Optional trace search range. Supports absolute values like ` + "`2026-04-08T15:30Z`" + ` and relative Grafana values like ` + "`now-15m`" + ` or ` + "`now+2h`" + `. Datetime values without an explicit offset are interpreted as UTC.
 
-## Output
+	## Output
 
 Returns the Grafana query API response containing matching trace frames.
 `
@@ -158,7 +157,7 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeFrom != nil && strings.TrimSpace(*spec.TimeFrom) != "" {
-		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom, spec.Timezone)
+		timeFrom, resolveErr := resolveQueryTimeValue(*spec.TimeFrom)
 		request["from"] = timeFrom
 		err = resolveErr
 		if err != nil {
@@ -167,7 +166,7 @@ func (q *QueryTraces) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if spec.TimeTo != nil && strings.TrimSpace(*spec.TimeTo) != "" {
-		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo, spec.Timezone)
+		timeTo, resolveErr := resolveQueryTimeValue(*spec.TimeTo)
 		request["to"] = timeTo
 		err = resolveErr
 		if err != nil {
@@ -260,10 +259,10 @@ func validateQueryTracesSpec(spec QueryTracesSpec) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return errors.New("query is required")
 	}
-	if err := validateQueryTimeValue(spec.TimeFrom, spec.Timezone); err != nil {
+	if err := validateQueryTimeValue(spec.TimeFrom); err != nil {
 		return fmt.Errorf("timeFrom: %w", err)
 	}
-	if err := validateQueryTimeValue(spec.TimeTo, spec.Timezone); err != nil {
+	if err := validateQueryTimeValue(spec.TimeTo); err != nil {
 		return fmt.Errorf("timeTo: %w", err)
 	}
 	return nil
