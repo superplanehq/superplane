@@ -1,6 +1,8 @@
 package models
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/utils"
@@ -12,6 +14,8 @@ type Account struct {
 	Email             string
 	Name              string
 	InstallationAdmin bool `gorm:"default:false"`
+	CreatedAt         *time.Time
+	UpdatedAt         *time.Time
 }
 
 func (a *Account) IsInstallationAdmin() bool {
@@ -48,7 +52,7 @@ func CreateAccountInTransaction(tx *gorm.DB, name, email string) (*Account, erro
 	return account, nil
 }
 
-func ListAccounts(search string, limit, offset int) ([]Account, int64, error) {
+func ListAccounts(search string, limit, offset int, sortBy, sortDirection string) ([]Account, int64, error) {
 	query := database.Conn().Model(&Account{})
 
 	if search != "" {
@@ -68,8 +72,10 @@ func ListAccounts(search string, limit, offset int) ([]Account, int64, error) {
 		query = query.Offset(offset)
 	}
 
+	orderClause := resolveOrderClause(sortBy, sortDirection, []string{"created_at", "name", "email"}, "created_at DESC")
+
 	var accounts []Account
-	if err := query.Order("name ASC").Find(&accounts).Error; err != nil {
+	if err := query.Order(orderClause).Find(&accounts).Error; err != nil {
 		return nil, 0, err
 	}
 
