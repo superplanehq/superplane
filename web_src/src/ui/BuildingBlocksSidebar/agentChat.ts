@@ -90,6 +90,7 @@ function formatToolLabel(toolName: string): string {
   const normalized = toolName.trim().toLowerCase();
   const labelByTool: Record<string, string> = {
     get_canvas: "Reading canvas",
+    get_canvas_memory: "Loading canvas notes",
     get_canvas_shape: "Reading canvas structure",
     get_canvas_details: "Reading canvas details",
     get_node_details: "Reading node details",
