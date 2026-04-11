@@ -29,7 +29,7 @@ def test_publisher_serializes_protobuf_correctly() -> None:
 
         publisher = UsagePublisher("amqp://localhost")
         publisher.publish_agent_run_finished(
-            "org-123", "chat-456", "claude-sonnet-4-6", 100, 300, 500
+            "org-123", "chat-456", "claude-sonnet-4-6", 100, 300, 500, 50, 25
         )
         time.sleep(0.3)
         publisher.close()
@@ -43,6 +43,8 @@ def test_publisher_serializes_protobuf_correctly() -> None:
     assert parsed.input_tokens == 100
     assert parsed.output_tokens == 300
     assert parsed.total_tokens == 500
+    assert parsed.cache_read_tokens == 50
+    assert parsed.cache_write_tokens == 25
 
 
 def test_publisher_reuses_connection() -> None:
@@ -96,7 +98,7 @@ def test_publish_does_not_block_caller() -> None:
 
     with patch.object(UsagePublisher, "_publish", tracking_publish):
         publisher = UsagePublisher("amqp://localhost")
-        publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100)
+        publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100, 5, 3)
         time.sleep(0.3)
         publisher.close()
 
@@ -107,8 +109,8 @@ def test_publish_does_not_block_caller() -> None:
 def test_publish_skips_when_total_tokens_zero_or_negative() -> None:
     with patch("ai.usage_publisher.pika"):
         publisher = UsagePublisher("amqp://localhost")
-        publisher.publish_agent_run_finished("org-123", "c-1", "test", 0, 0, 0)
-        publisher.publish_agent_run_finished("org-123", "c-1", "test", 0, 0, -10)
+        publisher.publish_agent_run_finished("org-123", "c-1", "test", 0, 0, 0, 0, 0)
+        publisher.publish_agent_run_finished("org-123", "c-1", "test", 0, 0, -10, 0, 0)
         assert publisher._queue.empty()
         publisher.close()
 
@@ -119,7 +121,7 @@ def test_publish_fails_silently_on_connection_error(capsys: pytest.CaptureFixtur
         mock_pika.BlockingConnection.side_effect = ConnectionError("refused")
 
         publisher = UsagePublisher("amqp://localhost")
-        publisher.publish_agent_run_finished("org-123", "c-1", "test", 10, 20, 500)
+        publisher.publish_agent_run_finished("org-123", "c-1", "test", 10, 20, 500, 5, 3)
         time.sleep(0.3)
         publisher.close()
 
@@ -129,7 +131,7 @@ def test_publish_fails_silently_on_connection_error(capsys: pytest.CaptureFixtur
 
 def test_noop_publisher_does_nothing() -> None:
     publisher = NoopUsagePublisher()
-    publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100)
+    publisher.publish_agent_run_finished("org-1", "c-1", "test", 10, 20, 100, 5, 3)
     publisher.close()
 
 
