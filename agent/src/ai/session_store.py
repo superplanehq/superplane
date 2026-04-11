@@ -38,6 +38,7 @@ def _format_tool_label(tool_name: str) -> str:
     normalized = tool_name.strip().lower()
     label_by_tool = {
         "get_canvas": "Reading canvas",
+        "get_canvas_memory": "Loading canvas notes",
         "get_canvas_shape": "Reading canvas structure",
         "get_canvas_details": "Reading canvas details",
         "get_node_details": "Reading node details",
@@ -258,6 +259,46 @@ class SessionStore:
             connection.close()
 
         self._thread_local.connection = None
+
+    def get_canvas_memory_markdown(self, canvas_id: str) -> str:
+        with self._cursor() as cur:
+            cur.execute(
+                """
+                SELECT markdown_body
+                FROM agent_canvas_markdown_memory
+                WHERE canvas_id = %s::uuid
+                LIMIT 1
+                """,
+                (canvas_id,),
+            )
+            row = cur.fetchone()
+        if row is None:
+            return ""
+        body = row.get("markdown_body")
+        return body if isinstance(body, str) else ""
+
+    def set_canvas_memory_markdown(self, canvas_id: str, body: str) -> None:
+        text = body.strip()
+        with self._cursor() as cur:
+            if not text:
+                cur.execute(
+                    """
+                    DELETE FROM agent_canvas_markdown_memory
+                    WHERE canvas_id = %s::uuid
+                    """,
+                    (canvas_id,),
+                )
+                return
+            cur.execute(
+                """
+                INSERT INTO agent_canvas_markdown_memory (canvas_id, markdown_body, updated_at)
+                VALUES (%s::uuid, %s, NOW())
+                ON CONFLICT (canvas_id) DO UPDATE SET
+                    markdown_body = EXCLUDED.markdown_body,
+                    updated_at = NOW()
+                """,
+                (canvas_id, text),
+            )
 
     def create_agent_chat(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str | None = None
