@@ -230,6 +230,47 @@ export interface UpdateAppConfiguration {
   gitHubBranch?: string;
 }
 
+export interface GetKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface GetKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
+export interface IndexKBNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface IndexKnowledgeBaseConfiguration {
+  knowledgeBase: string;
+}
+
+export interface AddDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+}
+
+export interface AddDataSourceConfiguration {
+  knowledgeBase: string;
+  type?: string;
+  indexAfterAdding?: boolean;
+}
+
+export interface DeleteDSNodeMetadata {
+  knowledgeBaseId?: string;
+  knowledgeBaseName?: string;
+  dataSourceId?: string;
+  dataSourceName?: string;
+}
+
+export interface DeleteDataSourceConfiguration {
+  knowledgeBase: string;
+  dataSource: string;
+}
+
 export interface KBNodeMetadata {
   agentId?: string;
   agentName?: string;
