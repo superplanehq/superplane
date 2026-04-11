@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef, ComponentsNode } from "@/api-client";
+import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef } from "@/api-client";
+import { makeComponentsNode } from "@/test/factories";
 import { filterRunEvents, getAggregateStatus } from "./canvas-runs";
 
 function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {}): CanvasesCanvasNodeExecutionRef {
@@ -10,18 +11,6 @@ function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {
     result: "RESULT_PASSED",
     ...overrides,
   } as CanvasesCanvasNodeExecutionRef;
-}
-
-function makeNode(overrides: Partial<ComponentsNode> = {}): ComponentsNode {
-  return {
-    id: "node-1",
-    name: "Node 1",
-    type: "TYPE_COMPONENT",
-    component: {
-      name: "noop",
-    },
-    ...overrides,
-  } as ComponentsNode;
 }
 
 function makeEvent(overrides: Partial<CanvasesCanvasEventWithExecutions> = {}): CanvasesCanvasEventWithExecutions {
@@ -102,7 +91,7 @@ describe("getAggregateStatus", () => {
 
 describe("filterRunEvents", () => {
   const nodes = [
-    makeNode({
+    makeComponentsNode({
       id: "trigger-1",
       name: "Deploy Trigger",
       type: "TYPE_TRIGGER",
@@ -111,15 +100,15 @@ describe("filterRunEvents", () => {
       },
       component: undefined,
     }),
-    makeNode({
+    makeComponentsNode({
       id: "node-success",
       name: "Ship Build",
     }),
-    makeNode({
+    makeComponentsNode({
       id: "node-failed",
       name: "Run Checks",
     }),
-    makeNode({
+    makeComponentsNode({
       id: "node-running",
       name: "Wait for Deploy",
     }),

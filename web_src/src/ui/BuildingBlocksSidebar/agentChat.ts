@@ -22,7 +22,7 @@ import {
   clearChatPrompt,
   prependChatSession,
 } from "./agentChatUi";
-import type { AiCanvasOperation } from "./index";
+import type { CanvasOperation } from "@/lib/ai";
 
 export type AiBuilderMessage = {
   id: string;
@@ -35,7 +35,7 @@ export type AiBuilderMessage = {
 export type AiBuilderProposal = {
   id: string;
   summary: string;
-  operations: AiCanvasOperation[];
+  operations: CanvasOperation[];
 };
 
 export type AiChatSession = {
@@ -96,6 +96,7 @@ function formatToolLabel(toolName: string): string {
     list_node_events: "Listing node events",
     list_node_executions: "Listing node executions",
     list_available_blocks: "Listing available components",
+    validate_proposal: "Validating proposal",
   };
   if (labelByTool[normalized]) {
     return labelByTool[normalized];
@@ -338,6 +339,25 @@ async function fetchChatStreamResponse({
   return response;
 }
 
+function refreshChatSessions({
+  canvasId,
+  organizationId,
+  setChatSessions,
+}: {
+  canvasId: string;
+  organizationId: string;
+  setChatSessions?: Dispatch<SetStateAction<AiChatSession[]>>;
+}) {
+  if (!setChatSessions) {
+    return;
+  }
+
+  loadChatSessions({ canvasId, organizationId }).then(
+    (sessions) => setChatSessions(sessions),
+    () => {},
+  );
+}
+
 export async function sendChatPrompt({
   value,
   aiInput,
@@ -427,6 +447,8 @@ export async function sendChatPrompt({
       testModeHint: TEST_MODE_HINT,
       testModelSentinel: TEST_MODEL_SENTINEL,
     });
+
+    refreshChatSessions({ canvasId, organizationId, setChatSessions });
   } catch (error) {
     applyChatPromptFailure({
       assistantMessageId,

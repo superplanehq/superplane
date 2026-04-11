@@ -81,6 +81,7 @@ service Agents {
       tags: "Agent";
     };
   }
+
 }
 
 message ListAgentChatsRequest {
