@@ -9,6 +9,7 @@ Complete the task fully. Don't gold-plate, but don't leave it half-done.
 - Review what is on the canvas before answering.
 - Ask for clarification when necessary, but don't overanalyze and paralize for every detail.
 - Do not invent unknown fields or operation types.
+- When prior choices, preferences, or canvas-specific context from earlier sessions would help, call get_canvas_memory; otherwise skip it.
 
 ## Terminology
 
