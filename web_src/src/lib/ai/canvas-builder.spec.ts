@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { BlueprintsBlueprint, CanvasesCanvas, ComponentsComponent } from "@/api-client";
+import type { LayoutEngine } from "@/lib/layout";
 import type { BuildingBlock, BuildingBlockCategory } from "@/ui/BuildingBlocksSidebar";
 import { makeBuildingBlock, makeCanvas, makeComponentsNode, makeEdge, makeIntegration } from "@/test/factories";
 import { CanvasBuilder } from "./canvas-builder";
@@ -8,16 +10,16 @@ function makeCategories(...blocks: BuildingBlock[]): BuildingBlockCategory[] {
 }
 
 describe("CanvasBuilder", () => {
-  it("adds component nodes with rounded position and resolves ready integration refs", () => {
-    const result = new CanvasBuilder(
-      makeCanvas(),
-      makeCategories(
+  it("adds component nodes with rounded position and resolves ready integration refs", async () => {
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas(),
+      buildingBlocks: makeCategories(
         makeBuildingBlock({
           name: "github.runWorkflow",
           integrationName: "Git Hub",
         }),
       ),
-      [
+      integrations: [
         makeIntegration({
           metadata: { id: "pending-id", name: "Pending Integration" },
           spec: { integrationName: "git_hub" },
@@ -29,7 +31,7 @@ describe("CanvasBuilder", () => {
           status: { state: "ready" },
         }),
       ],
-    ).apply([
+    }).apply([
       {
         type: "add_node",
         blockName: "github.runWorkflow",
@@ -51,8 +53,11 @@ describe("CanvasBuilder", () => {
     });
   });
 
-  it("creates annotation widgets with default annotation configuration", () => {
-    const result = new CanvasBuilder(makeCanvas(), makeCategories(makeBuildingBlock({ name: "annotation" }))).apply([
+  it("creates annotation widgets with default annotation configuration", async () => {
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas(),
+      buildingBlocks: makeCategories(makeBuildingBlock({ name: "annotation" })),
+    }).apply([
       {
         type: "add_node",
         blockName: "annotation",
@@ -70,18 +75,21 @@ describe("CanvasBuilder", () => {
     });
   });
 
-  it("adds an edge for add_node source refs using explicit handle channels", () => {
+  it("adds an edge for add_node source refs using explicit handle channels", async () => {
     const source = makeComponentsNode({
       id: "source-node",
       name: "Source",
       component: { name: "source.block" },
     });
-    const result = new CanvasBuilder(
-      makeCanvas({
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas({
         spec: { nodes: [source], edges: [] },
       }),
-      makeCategories(makeBuildingBlock({ name: "source.block" }), makeBuildingBlock({ name: "target.block" })),
-    ).apply([
+      buildingBlocks: makeCategories(
+        makeBuildingBlock({ name: "source.block" }),
+        makeBuildingBlock({ name: "target.block" }),
+      ),
+    }).apply([
       {
         type: "add_node",
         blockName: "target.block",
@@ -102,10 +110,10 @@ describe("CanvasBuilder", () => {
     });
   });
 
-  it("picks a success-oriented channel when source output has no default", () => {
-    const result = new CanvasBuilder(
-      makeCanvas(),
-      makeCategories(
+  it("picks a success-oriented channel when source output has no default", async () => {
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas(),
+      buildingBlocks: makeCategories(
         makeBuildingBlock({
           name: "source.trigger",
           type: "trigger",
@@ -116,7 +124,7 @@ describe("CanvasBuilder", () => {
         }),
         makeBuildingBlock({ name: "target.component" }),
       ),
-    ).apply([
+    }).apply([
       {
         type: "add_node",
         blockName: "source.trigger",
@@ -137,9 +145,9 @@ describe("CanvasBuilder", () => {
     expect(result.spec?.edges?.[0]?.channel).toBe("on_success");
   });
 
-  it("deduplicates connect operations and disconnects only the explicit channel", () => {
-    const result = new CanvasBuilder(
-      makeCanvas({
+  it("deduplicates connect operations and disconnects only the explicit channel", async () => {
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas({
         spec: {
           nodes: [
             makeComponentsNode({
@@ -156,7 +164,7 @@ describe("CanvasBuilder", () => {
           edges: [],
         },
       }),
-      makeCategories(
+      buildingBlocks: makeCategories(
         makeBuildingBlock({
           name: "source.block",
           outputChannels: [
@@ -166,7 +174,7 @@ describe("CanvasBuilder", () => {
         }),
         makeBuildingBlock({ name: "target.block" }),
       ),
-    ).apply([
+    }).apply([
       {
         type: "connect_nodes",
         source: { nodeId: "source" },
@@ -198,9 +206,9 @@ describe("CanvasBuilder", () => {
     ]);
   });
 
-  it("merges node config updates and allows renaming by node name refs", () => {
-    const result = new CanvasBuilder(
-      makeCanvas({
+  it("merges node config updates and allows renaming by node name refs", async () => {
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas({
         spec: {
           nodes: [
             makeComponentsNode({
@@ -212,8 +220,8 @@ describe("CanvasBuilder", () => {
           edges: [],
         },
       }),
-      makeCategories(makeBuildingBlock({ name: "http.request" })),
-    ).apply([
+      buildingBlocks: makeCategories(makeBuildingBlock({ name: "http.request" })),
+    }).apply([
       {
         type: "update_node_config",
         target: { nodeName: "Worker" },
@@ -229,9 +237,9 @@ describe("CanvasBuilder", () => {
     });
   });
 
-  it("deletes target nodes and all connected edges", () => {
-    const result = new CanvasBuilder(
-      makeCanvas({
+  it("deletes target nodes and all connected edges", async () => {
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas({
         spec: {
           nodes: [
             makeComponentsNode({ id: "a", name: "A" }),
@@ -245,8 +253,8 @@ describe("CanvasBuilder", () => {
           ],
         },
       }),
-      makeCategories(makeBuildingBlock({ name: "http.request" })),
-    ).apply([
+      buildingBlocks: makeCategories(makeBuildingBlock({ name: "http.request" })),
+    }).apply([
       {
         type: "delete_node",
         target: { nodeId: "b" },
@@ -261,5 +269,73 @@ describe("CanvasBuilder", () => {
         channel: "default",
       },
     ]);
+  });
+
+  it("calls layout engine when passed to apply and new nodes are added", async () => {
+    const layoutApply = vi.fn(
+      async (
+        workflow: CanvasesCanvas,
+        _options?: {
+          components?: ComponentsComponent[];
+          blueprints?: BlueprintsBlueprint[];
+        },
+      ) => workflow,
+    );
+    const layoutEngine: LayoutEngine = {
+      estimateNodeSize: vi.fn(() => ({ width: 420, height: 180 })),
+      apply: layoutApply,
+    };
+
+    const result = await new CanvasBuilder({
+      canvas: makeCanvas(),
+      buildingBlocks: makeCategories(makeBuildingBlock({ name: "github.runWorkflow" })),
+    }).apply(
+      [
+        {
+          type: "add_node",
+          blockName: "github.runWorkflow",
+          nodeName: "Deploy Workflow",
+        },
+      ],
+      layoutEngine,
+    );
+
+    expect(layoutApply).toHaveBeenCalledTimes(1);
+    const [layoutCanvas, options] = layoutApply.mock.calls[0];
+    expect(layoutCanvas.spec?.nodes).toHaveLength(1);
+    expect(options).toEqual({
+      components: [],
+      blueprints: [],
+    });
+    expect(result.spec?.nodes).toHaveLength(1);
+  });
+
+  it("does not call layout engine when no net new nodes were added", async () => {
+    const layoutApply = vi.fn(async (workflow: CanvasesCanvas) => workflow);
+    const layoutEngine: LayoutEngine = {
+      estimateNodeSize: vi.fn(() => ({ width: 420, height: 180 })),
+      apply: layoutApply,
+    };
+
+    await new CanvasBuilder({
+      canvas: makeCanvas(),
+      buildingBlocks: makeCategories(makeBuildingBlock({ name: "github.runWorkflow" })),
+    }).apply(
+      [
+        {
+          type: "add_node",
+          blockName: "github.runWorkflow",
+          nodeName: "Deploy Workflow",
+          nodeKey: "temporary",
+        },
+        {
+          type: "delete_node",
+          target: { nodeKey: "temporary" },
+        },
+      ],
+      layoutEngine,
+    );
+
+    expect(layoutApply).not.toHaveBeenCalled();
   });
 });
