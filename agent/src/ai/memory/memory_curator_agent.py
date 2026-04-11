@@ -1,4 +1,4 @@
-"""Second-pass agent: merge a completed run into the canvas markdown memory document."""
+"""Memory curator agent: refresh the canvas markdown memory from a completed run."""
 
 from __future__ import annotations
 
@@ -28,11 +28,11 @@ _SYSTEM_PROMPT = (
 )
 
 
-def build_memory_merge_agent(model: str) -> Agent[None, str]:
+def build_memory_curator_agent(model: str) -> Agent[None, str]:
     return Agent(model=model, system_prompt=_SYSTEM_PROMPT, output_type=str)
 
 
-async def merge_canvas_memory_markdown(
+async def curate_canvas_memory_markdown(
     *,
     store: SessionStore,
     canvas_id: str,
@@ -41,7 +41,7 @@ async def merge_canvas_memory_markdown(
     assistant_reply: str,
 ) -> None:
     previous = get_canvas_memory_markdown(store, canvas_id)
-    agent = build_memory_merge_agent(model)
+    agent = build_memory_curator_agent(model)
     user_prompt = (
         "## Previous notes\n\n"
         f"{previous or '(none)'}\n\n"
@@ -54,7 +54,7 @@ async def merge_canvas_memory_markdown(
         result = await agent.run(user_prompt)
     except Exception as error:
         if config.debug:
-            print(f"[web] canvas memory merge model run failed: {error}", flush=True)
+            print(f"[web] canvas memory curator model run failed: {error}", flush=True)
         return
     output = result.output
     if isinstance(output, str) and output.strip():

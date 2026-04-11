@@ -33,7 +33,7 @@ from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
 from ai.memory import (
-    merge_canvas_memory_markdown,
+    curate_canvas_memory_markdown,
     register_background_task,
     snippet_from_run_output,
 )
@@ -483,7 +483,7 @@ async def _stream_agent_run(
     if last_assistant_snippet.strip():
         register_background_task(
             asyncio.create_task(
-                merge_canvas_memory_markdown(
+                curate_canvas_memory_markdown(
                     store=store,
                     canvas_id=resolved_canvas_id,
                     model=payload.model,

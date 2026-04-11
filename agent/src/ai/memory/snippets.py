@@ -1,4 +1,4 @@
-"""Derive text from a completed agent run for memory merge input."""
+"""Derive text from a completed agent run for memory curator input."""
 
 from __future__ import annotations
 

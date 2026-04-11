@@ -1,4 +1,4 @@
-"""Retain references to fire-and-forget asyncio tasks (e.g. post-run memory merge)."""
+"""Retain references to fire-and-forget asyncio tasks (e.g. post-run memory curation)."""
 
 from __future__ import annotations
 
