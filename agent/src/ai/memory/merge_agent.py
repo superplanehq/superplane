@@ -10,16 +10,21 @@ from ai.session_store import SessionStore
 from .store import get_canvas_memory_markdown, set_canvas_memory_markdown
 
 _SYSTEM_PROMPT = (
-    "You maintain one Markdown document of durable notes for a SuperPlane canvas "
-    "(user preferences, decisions, naming, integrations, things to remember across chats).\n"
+    "You maintain a single Markdown executive summary for a SuperPlane canvas: what matters "
+    "for future work on that canvas.\n"
+    "Prioritize: infrastructure and systems tied to this canvas (integrations, services, "
+    "environments, credentials or endpoints only when they are stable facts), important "
+    "constraints or context, and explicit decisions or commitments from the conversation.\n"
+    "Write like a short exec summary—tight, scannable, no chat transcript. Drop small talk, "
+    "step-by-step narration, and anything that will not help later turns.\n"
     "You will receive the previous document (possibly empty), the user's latest message, "
     "and the assistant's reply from that turn.\n"
-    "Output ONLY the full updated Markdown document. No preamble or markdown code fences "
+    "Output ONLY the full updated Markdown document. No preamble and no markdown code fences "
     "around the whole doc.\n"
-    "Merge in new useful facts; keep prior content when still relevant; drop noise and "
-    "duplication.\n"
-    "Use ## headings for sections when helpful. Prefer staying under about 4000 characters; "
-    "summarize if needed."
+    "Merge in new durable facts; keep prior content only while it stays relevant; remove "
+    "noise and merge duplicates into one line.\n"
+    "Use ## headings sparingly when they clarify structure. Stay under about 4000 characters; "
+    "compress and summarize rather than growing long."
 )
 
 
