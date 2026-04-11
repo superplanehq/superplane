@@ -7,6 +7,7 @@ from pydantic_ai.models.anthropic import AnthropicModelSettings
 from pydantic_ai.models.test import TestModel
 
 from ai.config import config
+from ai.memory.store import get_canvas_memory_markdown
 from ai.models import (
     CanvasAnswer,
     CanvasQuestionRequest,
@@ -19,6 +20,7 @@ from ai.models import (
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
 from ai.patterns import search_decision_patterns as search_markdown_patterns
+from ai.session_store import SessionStore
 from ai.superplane_client import SuperplaneClient
 
 CatalogListKind = Literal["components", "triggers"]
@@ -50,6 +52,7 @@ def _clone_catalog_list_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]
 class AgentDeps:
     client: SuperplaneClient
     canvas_id: str
+    session_store: SessionStore | None = None
     canvas_cache: dict[str, CanvasSummary] = field(default_factory=dict)
     catalog_list_cache: dict[tuple[str, str, str], list[dict[str, Any]]] = field(
         default_factory=dict
@@ -162,6 +165,18 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         summary = ctx.deps.client.describe_canvas(resolved_canvas_id)
         ctx.deps.canvas_cache[resolved_canvas_id] = summary
         return summary
+
+    @agent.tool
+    def get_canvas_memory(ctx: RunContext[AgentDeps]) -> str:
+        """Load saved Markdown notes for this canvas.
+
+        Call when prior decisions, preferences, or context from earlier sessions may matter.
+        Returns empty string if none are stored. Skip when not relevant to avoid extra work.
+        """
+        store = ctx.deps.session_store
+        if store is None:
+            return ""
+        return get_canvas_memory_markdown(store, ctx.deps.canvas_id)
 
     @agent.tool
     def list_decision_patterns(_ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
