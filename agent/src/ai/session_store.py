@@ -280,15 +280,6 @@ class SessionStore:
     def set_canvas_memory_markdown(self, canvas_id: str, body: str) -> None:
         text = body.strip()
         with self._cursor() as cur:
-            if not text:
-                cur.execute(
-                    """
-                    DELETE FROM agent_canvas_markdown_memory
-                    WHERE canvas_id = %s::uuid
-                    """,
-                    (canvas_id,),
-                )
-                return
             cur.execute(
                 """
                 INSERT INTO agent_canvas_markdown_memory (canvas_id, markdown_body, updated_at)
