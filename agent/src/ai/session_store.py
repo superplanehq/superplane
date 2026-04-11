@@ -22,6 +22,7 @@ from pydantic_ai.messages import (
 )
 
 from ai.config import config
+from ai.tool_labels import format_tool_display_label
 
 
 def _utcnow() -> datetime:
@@ -32,27 +33,6 @@ def _from_db_time(value: datetime | str) -> datetime:
     if isinstance(value, datetime):
         return value.astimezone(UTC)
     return datetime.fromisoformat(value).astimezone(UTC)
-
-
-def _format_tool_label(tool_name: str) -> str:
-    normalized = tool_name.strip().lower()
-    label_by_tool = {
-        "get_canvas": "Reading canvas",
-        "get_canvas_memory": "Loading canvas notes",
-        "get_canvas_shape": "Reading canvas structure",
-        "get_canvas_details": "Reading canvas details",
-        "get_node_details": "Reading node details",
-        "list_node_events": "Listing node events",
-        "list_node_executions": "Listing node executions",
-        "list_available_blocks": "Listing available components",
-    }
-    if normalized in label_by_tool:
-        return label_by_tool[normalized]
-
-    words = normalized.replace("_", " ").replace("-", " ").strip()
-    if not words:
-        return "Running tool"
-    return words[:1].upper() + words[1:]
 
 
 def _likely_output_tool_name(tool_name: str | None) -> bool:
@@ -688,7 +668,7 @@ class SessionStore:
                             id=f"{record.id}:{index}",
                             chat_id=record.chat_id,
                             role="tool",
-                            content=_format_tool_label(part.tool_name),
+                            content=format_tool_display_label(part.tool_name),
                             tool_call_id=part.tool_call_id,
                             tool_status="completed",
                             created_at=record.created_at,
@@ -704,7 +684,7 @@ class SessionStore:
                             id=f"{record.id}:{index}",
                             chat_id=record.chat_id,
                             role="tool",
-                            content=_format_tool_label(part.tool_name),
+                            content=format_tool_display_label(part.tool_name),
                             tool_call_id=part.tool_call_id,
                             tool_status="completed",
                             created_at=record.created_at,

@@ -44,6 +44,7 @@ from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentCh
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
+from ai.tool_labels import format_tool_display_label
 from ai.text import normalize_optional
 from ai.usage_limit_checker import (
     AgentUsageLimitChecker,
@@ -364,6 +365,7 @@ async def _stream_agent_run(
         return normalized in output_tool_name_hints
 
     tool_started_at_by_call_id: dict[str, float] = {}
+    tool_args_by_call_id: dict[str, Any] = {}
     async for event in _run_stream_events(agent, **run_kwargs):
         if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
             tool_call_id = event.part.tool_call_id
@@ -413,11 +415,13 @@ async def _stream_agent_run(
         if isinstance(event, FunctionToolCallEvent):
             tool_call_id = event.part.tool_call_id or event.part.tool_name
             tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
+            tool_args_by_call_id[tool_call_id] = event.part.args
             yield {
                 "type": "tool_started",
                 "tool_name": event.part.tool_name,
                 "tool_call_id": tool_call_id,
                 "args": _to_jsonable(event.part.args),
+                "tool_display_label": format_tool_display_label(event.part.tool_name, event.part.args),
             }
             continue
 
@@ -427,12 +431,14 @@ async def _stream_agent_run(
             tool_call_id = _raw_tool_call_id
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
+            finished_args = tool_args_by_call_id.pop(tool_call_id, None)
             recorder.tool_finished(event)
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
                 "tool_call_id": tool_call_id,
                 "elapsed_ms": elapsed_ms,
+                "tool_display_label": format_tool_display_label(event.result.tool_name, finished_args),
             }
             continue
 

@@ -185,28 +185,32 @@ def _stream_repl_answer(
                     )
                     continue
                 if event_type == "tool_started":
-                    tool_name = event.get("tool_name", "unknown")
+                    label = event.get("tool_display_label")
+                    if not isinstance(label, str) or not label.strip():
+                        label = str(event.get("tool_name", "unknown"))
                     print(
                         f"{color(elapsed_since(started_at), '90')} "
-                        f"{color('[tool]', '36')} {tool_name} started",
+                        f"{color('[tool]', '36')} {label} started",
                         flush=True,
                     )
                     continue
                 if event_type == "tool_finished":
-                    tool_name = event.get("tool_name", "unknown")
+                    label = event.get("tool_display_label")
+                    if not isinstance(label, str) or not label.strip():
+                        label = str(event.get("tool_name", "unknown"))
                     elapsed_ms = event.get("elapsed_ms")
                     if isinstance(elapsed_ms, int | float):
                         tool_elapsed_total_ms += float(elapsed_ms)
                         print(
                             f"{color(elapsed_since(started_at), '90')} "
                             f"{color('[tool]', '36')} "
-                            f"{tool_name} completed ({elapsed_ms:.1f}ms)",
+                            f"{label} completed ({elapsed_ms:.1f}ms)",
                             flush=True,
                         )
                     else:
                         print(
                             f"{color(elapsed_since(started_at), '90')} "
-                            f"{color('[tool]', '36')} {tool_name} completed",
+                            f"{color('[tool]', '36')} {label} completed",
                             flush=True,
                         )
                     continue
