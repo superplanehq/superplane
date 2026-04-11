@@ -97,4 +97,6 @@ message AgentRunFinishedMessage {
   int64 input_tokens = 4;
   int64 output_tokens = 5;
   int64 total_tokens = 6;
+  int64 cache_read_tokens = 7;
+  int64 cache_write_tokens = 8;
 }

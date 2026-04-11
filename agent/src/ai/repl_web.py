@@ -163,6 +163,8 @@ def _record_usage(
             input_tokens=usage.input_tokens or 0,
             output_tokens=usage.output_tokens or 0,
             total_tokens=usage.total_tokens or 0,
+            cache_read_tokens=usage.cache_read_tokens or 0,
+            cache_write_tokens=usage.cache_write_tokens or 0,
         )
     except Exception as error:
         print(f"[web] failed to publish usage for run {run_id}: {error}", flush=True)

@@ -24,6 +24,8 @@ class AgentUsagePublisher(Protocol):
         input_tokens: int,
         output_tokens: int,
         total_tokens: int,
+        cache_read_tokens: int,
+        cache_write_tokens: int,
     ) -> None: ...
 
     def close(self) -> None: ...
@@ -88,6 +90,8 @@ class UsagePublisher:
         input_tokens: int,
         output_tokens: int,
         total_tokens: int,
+        cache_read_tokens: int,
+        cache_write_tokens: int,
     ) -> None:
         """Enqueue a publish. Non-blocking, returns immediately."""
         if total_tokens <= 0:
@@ -100,6 +104,8 @@ class UsagePublisher:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
         )
         self._queue.put(message.SerializeToString())
 
@@ -155,6 +161,8 @@ class NoopUsagePublisher:
         input_tokens: int,
         output_tokens: int,
         total_tokens: int,
+        cache_read_tokens: int,
+        cache_write_tokens: int,
     ) -> None:
         pass
 
