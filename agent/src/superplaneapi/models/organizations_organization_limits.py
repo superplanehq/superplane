@@ -33,7 +33,8 @@ class OrganizationsOrganizationLimits(BaseModel):
     retention_window_days: Optional[StrictInt] = Field(default=None, alias="retentionWindowDays")
     max_events_per_month: Optional[StrictStr] = Field(default=None, alias="maxEventsPerMonth")
     max_integrations: Optional[StrictInt] = Field(default=None, alias="maxIntegrations")
-    __properties: ClassVar[List[str]] = ["maxCanvases", "maxNodesPerCanvas", "maxUsers", "retentionWindowDays", "maxEventsPerMonth", "maxIntegrations"]
+    max_agent_tokens_per_month: Optional[StrictStr] = Field(default=None, alias="maxAgentTokensPerMonth")
+    __properties: ClassVar[List[str]] = ["maxCanvases", "maxNodesPerCanvas", "maxUsers", "retentionWindowDays", "maxEventsPerMonth", "maxIntegrations", "maxAgentTokensPerMonth"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -91,7 +92,8 @@ class OrganizationsOrganizationLimits(BaseModel):
             "maxUsers": obj.get("maxUsers"),
             "retentionWindowDays": obj.get("retentionWindowDays"),
             "maxEventsPerMonth": obj.get("maxEventsPerMonth"),
-            "maxIntegrations": obj.get("maxIntegrations")
+            "maxIntegrations": obj.get("maxIntegrations"),
+            "maxAgentTokensPerMonth": obj.get("maxAgentTokensPerMonth")
         })
         return _obj
 

@@ -192,7 +192,7 @@ function OpenBuildingBlocksSidebar({
   onBlockClick,
 }: OpenBuildingBlocksSidebarProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "action" | "flow">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "trigger" | "component">("all");
   const sidebarRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
@@ -621,8 +621,7 @@ function OpenBuildingBlocksSidebar({
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="trigger">Trigger</SelectItem>
-              <SelectItem value="action">Action</SelectItem>
-              <SelectItem value="flow">Flow</SelectItem>
+              <SelectItem value="component">Action</SelectItem>
             </SelectContent>
           </Select>
           <DropdownMenu>
