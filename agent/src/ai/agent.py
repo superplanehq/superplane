@@ -19,6 +19,7 @@ from ai.models import (
 from ai.patterns import get_decision_pattern as get_markdown_pattern
 from ai.patterns import list_decision_patterns as list_markdown_patterns
 from ai.patterns import search_decision_patterns as search_markdown_patterns
+from ai.skills import get_agent_skill, skill_index_markdown
 from ai.superplane_client import SuperplaneClient
 
 CatalogListKind = Literal["components", "triggers"]
@@ -81,7 +82,8 @@ def _put_cached_catalog_list(
 
 
 def load_system_prompt() -> str:
-    return (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
+    base = (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
+    return base + skill_index_markdown()
 
 
 def build_prompt(payload: CanvasQuestionRequest) -> str:
@@ -201,6 +203,22 @@ def build_agent(model: str | Literal["test"] = "test") -> Agent[AgentDeps, Canva
         except Exception as error:
             _tool_debug(f"get_decision_pattern failed for {pattern_id}: {error}")
             return _tool_failure("get_decision_pattern", str(error), pattern_id=pattern_id)
+
+    @agent.tool
+    def load_agent_skill(_ctx: RunContext[AgentDeps], skill_name: str) -> dict[str, Any]:
+        try:
+            skill = get_agent_skill(skill_name=skill_name)
+            if skill is None:
+                return _tool_failure(
+                    "load_agent_skill",
+                    "skill not found",
+                    code="skill_not_found",
+                    skill_name=skill_name,
+                )
+            return skill
+        except Exception as error:
+            _tool_debug(f"load_agent_skill failed for {skill_name}: {error}")
+            return _tool_failure("load_agent_skill", str(error), skill_name=skill_name)
 
     @agent.tool
     def list_components(
