@@ -4,14 +4,11 @@ import os
 class Config:
     def __init__(self) -> None:
         self.ai_model: str = self._parse_str("AI_MODEL", default="test")
-        self.debug: bool = self._parse_bool("REPL_WEB_DEBUG")
-        self.cors_origins: str = self._parse_str("REPL_WEB_CORS_ORIGINS", default="*")
+        self.debug: bool = self._parse_bool("AGENT_HTTP_DEBUG")
+        self.cors_origins: str = self._parse_str("AGENT_HTTP_CORS_ORIGINS", default="*")
 
         self.superplane_base_url: str = self._parse_str("SUPERPLANE_BASE_URL")
-        self.superplane_user_agent: str = self._parse_str(
-            "SUPERPLANE_USER_AGENT", default="curl/8.7.1"
-        )
-
+        self.superplane_user_agent: str = self._parse_str("SUPERPLANE_USER_AGENT", default="curl/8.7.1")
         self.drain_timeout: float = self._parse_float(
             "DRAIN_TIMEOUT",
             lower=0,
