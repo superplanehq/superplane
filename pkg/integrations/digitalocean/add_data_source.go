@@ -110,19 +110,7 @@ func (a *AddDataSource) Configuration() []configuration.Field {
 		},
 	}
 
-	dsFields := dataSourceItemSchema()
-	for i, field := range dsFields {
-		switch field.Name {
-		case "maxChunkSize":
-			dsFields[i].Description = "Tokens per chunk. Range: 100–256 (All MiniLM), 100–512 (Multi QA), 100–8192 (GTE Large / Qwen3)."
-		case "parentChunkSize":
-			dsFields[i].Description = "Context chunk tokens. Range: 100–256 (All MiniLM), 100–512 (Multi QA), 100–8192 (GTE Large / Qwen3). Must be larger than child chunk size."
-		case "childChunkSize":
-			dsFields[i].Description = "Retrieval chunk tokens. Range: 100–256 (All MiniLM), 100–512 (Multi QA), 100–8192 (GTE Large / Qwen3). Must be smaller than parent chunk size."
-		}
-	}
-
-	fields = append(fields, dsFields...)
+	fields = append(fields, dataSourceItemSchema()...)
 	return fields
 }
 
