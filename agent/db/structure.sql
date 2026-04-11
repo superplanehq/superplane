@@ -24,6 +24,17 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: agent_canvas_markdown_memory; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_canvas_markdown_memory (
+    canvas_id uuid NOT NULL,
+    markdown_body text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: agent_chat_messages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -81,6 +92,14 @@ CREATE TABLE public.schema_migrations (
     version bigint NOT NULL,
     dirty boolean NOT NULL
 );
+
+
+--
+-- Name: agent_canvas_markdown_memory agent_canvas_markdown_memory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_canvas_markdown_memory
+    ADD CONSTRAINT agent_canvas_markdown_memory_pkey PRIMARY KEY (canvas_id);
 
 
 --
@@ -192,7 +211,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260403134227	f
+20260411141954	f
 \.
 
 

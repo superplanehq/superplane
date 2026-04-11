@@ -32,6 +32,11 @@ from ai.agent import AgentDeps, build_agent
 from ai.config import config
 from ai.grpc import InternalAgentServer
 from ai.jwt import JwtClaims, JwtValidator
+from ai.memory import (
+    merge_canvas_memory_markdown,
+    register_background_task,
+    snippet_from_run_output,
+)
 from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
@@ -188,7 +193,11 @@ def _resolve_agent_context(chat_id: str, request: Request) -> tuple[JwtClaims, S
 
 
 def _build_deps(
-    payload: ReplStreamRequest, request: Request, claims: JwtClaims, canvas_id: str
+    payload: ReplStreamRequest,
+    request: Request,
+    claims: JwtClaims,
+    canvas_id: str,
+    session_store: SessionStore,
 ) -> AgentDeps:
     base_url = _resolve_required(
         payload.base_url, config.superplane_base_url, "SUPERPLANE_BASE_URL"
@@ -212,6 +221,7 @@ def _build_deps(
     return AgentDeps(
         client=client,
         canvas_id=canvas_id,
+        session_store=session_store,
     )
 
 
@@ -249,7 +259,7 @@ async def _stream_agent_run(
     if payload.model != "test":
         if claims is None:
             raise ValueError("Agent claims are missing.")
-        deps = _build_deps(payload, request, claims, resolved_canvas_id)
+        deps = _build_deps(payload, request, claims, resolved_canvas_id, store)
 
     run_id = store.create_agent_chat_run(chat.id, payload.model)
     recorder = PersistedRunRecorder(store, chat.id, run_id, payload.question)
@@ -321,6 +331,7 @@ async def _stream_agent_run(
         canvas_id=resolved_canvas_id,
     )
 
+    last_assistant_snippet = ""
     output_tool_call_id: str | None = None
     output_tool_name_hints = {"final_result", "return_canvasanswer", "canvasanswer"}
     output_args_buffer_by_call_id: dict[str, str] = {}
@@ -467,6 +478,20 @@ async def _stream_agent_run(
                 "output": output,
                 "usage": _to_jsonable(usage),
             }
+            last_assistant_snippet = snippet_from_run_output(resolved_output)
+
+    if last_assistant_snippet.strip():
+        register_background_task(
+            asyncio.create_task(
+                merge_canvas_memory_markdown(
+                    store=store,
+                    canvas_id=resolved_canvas_id,
+                    model=payload.model,
+                    user_question=payload.question,
+                    assistant_reply=last_assistant_snippet,
+                )
+            )
+        )
 
     yield {
         "type": "run_completed",

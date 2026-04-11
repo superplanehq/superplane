@@ -9,6 +9,7 @@ from pydantic_ai.usage import RunUsage
 from pydantic_evals import Dataset
 
 from ai.agent import AgentDeps, build_agent
+from ai.session_store import SessionStore
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from evals.case_filter import case_filter, select_cases
 from evals.case_logger import CaseLogger
@@ -47,6 +48,7 @@ async def runner(*, selected_case_names: list[str] | None) -> None:
             )
         ),
         canvas_id=env["canvas_id"],
+        session_store=SessionStore(),
     )
     agent = build_agent(env["model"])
     # Keyed by case ``inputs`` string so usage matches when cases run concurrently.
