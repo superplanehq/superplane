@@ -16,8 +16,13 @@ class ListNodeExecutions:
     )
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "Listing node executions"
+    def label(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        limit: int = 10,
+        results: list[str] | None = None,
+    ) -> str:
+        return f"Looking up recent runs on {node_id}"
 
     @staticmethod
     def run(

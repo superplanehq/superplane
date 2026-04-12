@@ -11,8 +11,8 @@ class ListAvailableIntegrations:
     description = "List available provider integrations from catalog metadata."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "List available integrations"
+    def label(ctx: RunContext[AgentDeps]) -> str:
+        return "Listing available integrations"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:

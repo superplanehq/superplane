@@ -9,8 +9,8 @@ class GetCanvas:
     description = "Fetch the current request canvas summary (nodes/edges)."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "Reading canvas"
+    def label(ctx: RunContext[AgentDeps]) -> str:
+        return "Loading canvas details"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> CanvasSummary:
