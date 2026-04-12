@@ -13,7 +13,7 @@ class ListDecisionPatterns:
 
     @staticmethod
     def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "List decision patterns"
+        return "Looking up existing patterns"
 
     @staticmethod
     def run(_ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
