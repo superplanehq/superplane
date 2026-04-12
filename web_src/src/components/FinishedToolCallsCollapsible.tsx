@@ -10,7 +10,7 @@ export function FinishedToolCallsCollapsible({ tools }: FinishedToolCallsCollaps
   const label = "Thinking process";
 
   return (
-    <div className="w-full py-0.5">
+    <div className="w-full -mt-1">
       <Collapsible defaultOpen={false} className="w-full px-2">
         <CollapsibleTrigger asChild>
           <button
@@ -19,9 +19,13 @@ export function FinishedToolCallsCollapsible({ tools }: FinishedToolCallsCollaps
             aria-label={`${label}. Expand for more detail.`}
           >
             <span className="min-w-0 shrink">{label}</span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform" aria-hidden={true} />
+            <ChevronRight
+              className="h-3.5 w-3.5 mt-px shrink-0 text-gray-400 transition-transform"
+              aria-hidden={true}
+            />
           </button>
         </CollapsibleTrigger>
+
         <CollapsibleContent>
           <ul className="list-none space-y-0.5 py-0.5 pl-0">
             {tools.map((tool) => (

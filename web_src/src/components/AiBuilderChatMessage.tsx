@@ -1,52 +1,65 @@
 import type { AiBuilderMessage } from "@/ui/BuildingBlocksSidebar/agentChat";
-import { Activity, User } from "lucide-react";
+import { Activity } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { cn } from "../lib/utils";
 
 export type AiMessageProps = {
   message: AiBuilderMessage;
 };
 
 export function AiMessage({ message }: AiMessageProps) {
-  const isEmptyAssistantPlaceholder = message.role === "assistant" && message.content.trim().length === 0;
-  if (isEmptyAssistantPlaceholder) {
+  if (message.role === "assistant" && message.content.trim().length === 0) {
     return null;
   }
 
-  const isToolMessage = message.role === "tool";
-  const isRunningToolMessage = isToolMessage && message.toolStatus === "running";
-
-  let messageClassName = "";
-  let wrapperClassName = "w-full";
-
-  if (message.role === "user") {
-    messageClassName =
-      "flex w-full items-start gap-2 rounded-md border border-slate-200/90 bg-slate-100 px-3 py-2.5 text-sm text-slate-800";
-    wrapperClassName = "w-full py-1";
-  } else if (isToolMessage) {
-    messageClassName = `flex items-start gap-2 px-2 text-xs leading-relaxed text-gray-500 ${isRunningToolMessage ? "sp-ai-thinking" : ""}`;
-  } else {
-    messageClassName = "px-2 text-sm text-gray-800";
+  switch (message.role) {
+    case "user":
+      return <UserMessage content={message.content} />;
+    case "tool":
+      return <ToolMessage message={message} />;
+    case "assistant":
+      return <AssistantMessage content={message.content} />;
+    default:
+      return null;
   }
+}
+
+function ToolMessage({ message }: { message: AiBuilderMessage }) {
+  const isRunning = message.toolStatus === "running";
+
+  const className = cn(
+    "flex items-center gap-2 px-2 text-xs leading-relaxed text-gray-500",
+    isRunning ? "sp-ai-thinking" : "",
+  );
 
   return (
-    <div key={message.id} className={wrapperClassName}>
-      {message.role === "user" ? (
-        <div className={messageClassName}>
-          <User className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden="true" />
-          <span className="min-w-0 whitespace-pre-wrap break-words">{message.content}</span>
-        </div>
-      ) : isToolMessage ? (
-        <div className={messageClassName}>
-          <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden="true" />
-          <span className="min-w-0 whitespace-pre-wrap break-words">{message.content}</span>
-        </div>
-      ) : (
-        <div className={messageClassName}>
-          {message.role === "assistant" ? <AiMessageMarkdown content={message.content} /> : message.content}
-        </div>
-      )}
+    <div className="w-full">
+      <div className={className}>
+        <Activity className="h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
+        <span className="min-w-0 whitespace-pre-wrap break-words">{message.content}</span>
+      </div>
+    </div>
+  );
+}
+
+function UserMessage({ content }: { content: string }) {
+  return (
+    <div className="w-full py-1">
+      <div className="flex w-full items-start gap-2 rounded-sm border border-slate-200/90 bg-slate-100 px-2 py-1.5 text-sm text-slate-800">
+        <span className="min-w-0 whitespace-pre-wrap break-words">{content}</span>
+      </div>
+    </div>
+  );
+}
+
+function AssistantMessage({ content }: { content: string }) {
+  return (
+    <div className="w-full">
+      <div className="px-2 text-sm text-gray-800">
+        <AiMessageMarkdown content={content} />
+      </div>
     </div>
   );
 }
