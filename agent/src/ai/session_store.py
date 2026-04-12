@@ -3,7 +3,7 @@ import threading
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
@@ -74,13 +74,13 @@ def apply_tool_display_labels_to_messages(
                 if isinstance(label, str) and label.strip():
                     existing_meta = part.metadata if isinstance(part.metadata, dict) else {}
                     merged_meta = {**existing_meta, _SUPERPLANE_TOOL_DISPLAY_LABEL_KEY: label.strip()}
-                    new_parts.append(part.model_copy(update={"metadata": merged_meta}))
+                    new_parts.append(replace(part, metadata=merged_meta))
                     changed = True
                     continue
             new_parts.append(part)
 
         if changed:
-            out.append(message.model_copy(update={"parts": new_parts}))
+            out.append(replace(message, parts=new_parts))
         else:
             out.append(message)
 

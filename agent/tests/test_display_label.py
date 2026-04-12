@@ -14,7 +14,7 @@ def test_describe_component_label_includes_name() -> None:
         {"name": "slack_send_message"},
         _replay_deps("canvas-1"),
     )
-    assert label == "Reading how the slack_send_message component works"
+    assert label == "Looking up slack_send_message details"
 
 
 def test_unknown_tool_uses_event_name() -> None:

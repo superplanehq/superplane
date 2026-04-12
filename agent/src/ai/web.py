@@ -119,6 +119,15 @@ def _iter_text_chunks(text: str, chunk_size: int = 28) -> list[str]:
     return [text[index : index + chunk_size] for index in range(0, len(text), chunk_size)]
 
 
+def _stable_tool_call_id(raw_call_id: str | None, tool_name: str | None) -> str:
+    if isinstance(raw_call_id, str):
+        stripped = raw_call_id.strip()
+        if stripped:
+            return stripped
+    name = (tool_name or "").strip()
+    return name if name else "tool"
+
+
 def _to_jsonable(value: Any) -> Any:
     if value is None:
         return None
@@ -415,7 +424,7 @@ async def _stream_agent_run(
             continue
 
         if isinstance(event, FunctionToolCallEvent):
-            tool_call_id = event.part.tool_call_id or event.part.tool_name
+            tool_call_id = _stable_tool_call_id(event.part.tool_call_id, event.part.tool_name)
             tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
             tool_label = format_tool_display_label(
                 event.part.tool_name or "",
@@ -433,9 +442,7 @@ async def _stream_agent_run(
             continue
 
         if isinstance(event, FunctionToolResultEvent):
-            _raw_tool_call_id = event.result.tool_call_id or event.result.tool_name
-            assert _raw_tool_call_id is not None
-            tool_call_id = _raw_tool_call_id
+            tool_call_id = _stable_tool_call_id(event.result.tool_call_id, event.result.tool_name)
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
             tool_label = tool_display_label_by_call_id.pop(
