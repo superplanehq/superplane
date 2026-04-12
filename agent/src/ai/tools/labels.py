@@ -36,7 +36,7 @@ def format_tool_display_label(tool_name: str, args: Any, deps: AgentDeps) -> str
     sig = inspect.signature(cls.run)
     params = sig.parameters
     if not params:
-        return cls.name
+        return cast(str, cls.name)
 
     first_name = next(iter(params))
     filtered = {k: v for k, v in parsed.items() if k in params and k != first_name}
@@ -44,6 +44,6 @@ def format_tool_display_label(tool_name: str, args: Any, deps: AgentDeps) -> str
     try:
         bound = sig.bind_partial(ctx, **filtered)
         bound.apply_defaults()
-        return cls.label(*bound.args, **bound.kwargs)
+        return cast(str, cls.label(*bound.args, **bound.kwargs))
     except Exception:
-        return cls.name
+        return cast(str, cls.name)

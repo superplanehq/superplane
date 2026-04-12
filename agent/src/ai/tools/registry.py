@@ -20,6 +20,29 @@ from ai.tools.list_triggers import ListTriggers
 from ai.tools.load_agent_skill import LoadAgentSkill
 from ai.tools.search_decision_patterns import SearchDecisionPatterns
 
+__all__ = [
+    "CANVAS_TOOL_CLASSES",
+    "DescribeComponent",
+    "DescribeTrigger",
+    "GetCanvas",
+    "GetCanvasMemory",
+    "GetCanvasShape",
+    "GetDecisionPattern",
+    "GetNodeDetails",
+    "ListAvailableIntegrations",
+    "ListComponents",
+    "ListDecisionPatterns",
+    "ListIntegrationResources",
+    "ListNodeEvents",
+    "ListNodeExecutions",
+    "ListOrgIntegrations",
+    "ListTriggers",
+    "LoadAgentSkill",
+    "SearchDecisionPatterns",
+    "TOOLS_BY_NAME",
+    "default_tools",
+]
+
 CANVAS_TOOL_CLASSES: tuple[type[Any], ...] = (
     GetCanvas,
     GetCanvasMemory,
