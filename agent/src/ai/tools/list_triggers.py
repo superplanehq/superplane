@@ -23,8 +23,20 @@ class ListTriggers:
     )
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "List triggers"
+    def label(
+        ctx: RunContext[AgentDeps],
+        provider: str | None = None,
+        query: str | None = None,
+    ) -> str:
+        if isinstance(query, str) and query.strip():
+            preview = query.strip()
+            if len(preview) > 40:
+                preview = f"{preview[:37]}…"
+            return f"Looking for triggers related to {preview}"
+        if isinstance(provider, str) and provider.strip():
+            p = provider.strip()
+            return f"Listing triggers from {p}"
+        return "Listing available triggers"
 
     @staticmethod
     def run(
