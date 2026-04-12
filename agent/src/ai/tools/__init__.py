@@ -18,6 +18,7 @@ from ai.tools.list_node_events import ListNodeEvents
 from ai.tools.list_node_executions import ListNodeExecutions
 from ai.tools.list_org_integrations import ListOrgIntegrations
 from ai.tools.list_triggers import ListTriggers
+from ai.tools.load_agent_skill import LoadAgentSkill
 from ai.tools.search_decision_patterns import SearchDecisionPatterns
 
 
@@ -55,6 +56,7 @@ __all__ = [
     "ListNodeExecutions",
     "ListOrgIntegrations",
     "ListTriggers",
+    "LoadAgentSkill",
     "SearchDecisionPatterns",
     "default_tools",
     "format_tool_display_label",

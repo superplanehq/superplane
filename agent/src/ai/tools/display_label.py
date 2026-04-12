@@ -15,6 +15,7 @@ from ai.tools.get_canvas_memory import GetCanvasMemory
 from ai.tools.get_canvas_shape import GetCanvasShape
 from ai.tools.get_decision_pattern import GetDecisionPattern
 from ai.tools.get_node_details import GetNodeDetails
+from ai.tools.load_agent_skill import LoadAgentSkill
 from ai.tools.list_available_integrations import ListAvailableIntegrations
 from ai.tools.list_components import ListComponents
 from ai.tools.list_decision_patterns import ListDecisionPatterns
@@ -31,6 +32,7 @@ CANVAS_TOOL_CLASSES: tuple[type[Any], ...] = (
     ListDecisionPatterns,
     SearchDecisionPatterns,
     GetDecisionPattern,
+    LoadAgentSkill,
     ListComponents,
     DescribeComponent,
     ListTriggers,
