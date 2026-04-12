@@ -91,13 +91,6 @@ def format_tool_display_label(tool_name: str, args: Any, deps: AgentDeps) -> str
         return _fallback_tool_label(tool_name)
 
 
-def format_tool_display_label_without_deps(tool_name: str, args: Any, canvas_id: str) -> str:
-    """For persisted chat replay: labels must not rely on a live Superplane client."""
-    placeholder_client = cast(Any, object())
-    deps = AgentDeps(client=placeholder_client, canvas_id=canvas_id, session_store=None)
-    return format_tool_display_label(tool_name, args, deps)
-
-
 class _CanvasTool(Protocol):
     name: str
     description: str
@@ -135,8 +128,6 @@ __all__ = [
     "LoadAgentSkill",
     "SearchDecisionPatterns",
     "default_tools",
-    "format_tool_display_label",
-    "format_tool_display_label_without_deps",
     "normalize_tool_args",
     "TOOLS_BY_NAME",
 ]

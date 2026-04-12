@@ -17,7 +17,6 @@ from pydantic_ai.messages import (
     ModelResponse,
     RetryPromptPart,
     TextPart,
-    ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
 )
@@ -33,47 +32,6 @@ def _from_db_time(value: datetime | str) -> datetime:
     if isinstance(value, datetime):
         return value.astimezone(UTC)
     return datetime.fromisoformat(value).astimezone(UTC)
-
-
-def _tool_call_args_dict(raw: Any) -> dict[str, Any]:
-    if isinstance(raw, dict):
-        return dict(raw)
-    if isinstance(raw, str):
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            return {}
-        return dict(parsed) if isinstance(parsed, dict) else {}
-    return {}
-
-
-def _index_tool_call_args_by_id(message: ModelMessage) -> dict[str, dict[str, Any]]:
-    indexed: dict[str, dict[str, Any]] = {}
-    if isinstance(message, ModelResponse):
-        for part in message.parts:
-            if isinstance(part, ToolCallPart) and part.tool_call_id:
-                indexed[str(part.tool_call_id)] = _tool_call_args_dict(part.args)
-    return indexed
-
-
-def _persisted_tool_display_label(tool_name: str, args: dict[str, Any], canvas_id: str) -> str:
-    from ai.tools import format_tool_display_label_without_deps
-
-    return format_tool_display_label_without_deps(tool_name, args, canvas_id)
-
-
-_TOOL_DISPLAY_LABEL_META_KEY = "superplane_display_label"
-
-
-def _tool_return_metadata_display_label(part: ToolReturnPart) -> str | None:
-    """Set by DB migration `backfill-agent-chat-tool-labels` on stored tool-return parts."""
-    meta = part.metadata
-    if not isinstance(meta, dict):
-        return None
-    value = meta.get(_TOOL_DISPLAY_LABEL_META_KEY)
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    return None
 
 
 def _likely_output_tool_name(tool_name: str | None) -> bool:
@@ -418,21 +376,13 @@ class SessionStore:
     def list_agent_chat_messages(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str
     ) -> list[StoredAgentChatMessage]:
-        chat = self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
+        self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
         records = self.list_agent_chat_message_records(chat_id)
 
-        tool_args_by_call_id: dict[str, dict[str, Any]] = {}
         flattened: list[StoredAgentChatMessage] = []
         for record in records:
             try:
-                model_message = _deserialize_model_message(record.message)
-                tool_args_by_call_id.update(_index_tool_call_args_by_id(model_message))
-            except Exception:
-                pass
-            try:
-                flattened.extend(
-                    self._flatten_message_record(record, tool_args_by_call_id, chat.canvas_id)
-                )
+                flattened.extend(self._flatten_message_record(record))
             except Exception as error:
                 print(
                     f"[agent] failed to flatten chat message record "
@@ -685,10 +635,7 @@ class SessionStore:
         )
 
     def _flatten_message_record(
-        self,
-        record: StoredAgentChatMessageRecord,
-        tool_args_by_call_id: dict[str, dict[str, Any]],
-        canvas_id: str,
+        self, record: StoredAgentChatMessageRecord
     ) -> list[StoredAgentChatMessage]:
         model_message = _deserialize_model_message(record.message)
         flattened: list[StoredAgentChatMessage] = []
@@ -715,17 +662,7 @@ class SessionStore:
                 if isinstance(part, ToolReturnPart):
                     if _likely_output_tool_name(part.tool_name):
                         continue
-                    migrated = _tool_return_metadata_display_label(part)
-                    if migrated is not None:
-                        tool_label = migrated
-                    else:
-                        call_id = str(part.tool_call_id) if part.tool_call_id else ""
-                        tool_args = tool_args_by_call_id.get(call_id, {})
-                        tool_label = _persisted_tool_display_label(
-                            part.tool_name or "",
-                            tool_args,
-                            canvas_id,
-                        )
+                    tool_label = (part.tool_name or "").strip() or "tool"
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
@@ -742,13 +679,7 @@ class SessionStore:
                 if isinstance(part, RetryPromptPart) and part.tool_name:
                     if _likely_output_tool_name(part.tool_name):
                         continue
-                    call_id = str(part.tool_call_id) if part.tool_call_id else ""
-                    tool_args = tool_args_by_call_id.get(call_id, {})
-                    tool_label = _persisted_tool_display_label(
-                        part.tool_name or "",
-                        tool_args,
-                        canvas_id,
-                    )
+                    tool_label = (part.tool_name or "").strip() or "tool"
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",

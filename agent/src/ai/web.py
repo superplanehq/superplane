@@ -314,9 +314,8 @@ async def _stream_agent_run(
     agent = build_agent(model=payload.model)
     if deps is None:
         raise ValueError("Agent dependencies are missing.")
-    agent_deps = deps
 
-    run_kwargs["deps"] = agent_deps
+    run_kwargs["deps"] = deps
     _debug_log(
         "running non-test agent",
         chat_id=chat.id,
@@ -410,7 +409,7 @@ async def _stream_agent_run(
             tool_label = format_tool_display_label(
                 event.part.tool_name or "",
                 event.part.args,
-                agent_deps,
+                deps,
             )
             tool_display_label_by_call_id[tool_call_id] = tool_label
             yield {
@@ -431,11 +430,7 @@ async def _stream_agent_run(
             recorder.tool_finished(event)
             tool_label = tool_display_label_by_call_id.pop(
                 tool_call_id,
-                format_tool_display_label(
-                    event.result.tool_name or "",
-                    {},
-                    agent_deps,
-                ),
+                (event.result.tool_name or "").strip() or "tool",
             )
             yield {
                 "type": "tool_finished",
@@ -461,9 +456,9 @@ async def _stream_agent_run(
             recorder.save_authoritative_messages(result.new_messages())
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
-                canvas_summary = agent_deps.canvas_cache.get(agent_deps.canvas_id)
+                canvas_summary = deps.canvas_cache.get(deps.canvas_id)
                 resolved_output = coerce_canvas_answer_proposal(
-                    agent_deps.client,
+                    deps.client,
                     resolved_output,
                     canvas_summary,
                 )

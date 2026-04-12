@@ -78,7 +78,7 @@ def test_flatten_message_record_exposes_output_tool_answer_as_assistant() -> Non
         updated_at=now,
     )
 
-    messages = store._flatten_message_record(record, {}, "canvas-123")
+    messages = store._flatten_message_record(record)
 
     assert len(messages) == 1
     assert messages[0].id == "119c8cab-e93f-42d1-a96d-d2d77f2d4d6f"
@@ -126,47 +126,13 @@ def test_flatten_message_record_ignores_output_tool_returns() -> None:
         updated_at=now,
     )
 
-    messages = store._flatten_message_record(record, {}, "canvas-123")
+    messages = store._flatten_message_record(record)
 
     assert len(messages) == 1
     assert messages[0].role == "tool"
-    assert messages[0].content == "Reading canvas"
+    assert messages[0].content == "get_canvas"
     assert messages[0].tool_call_id == "toolu_012wJyWVffYDcQqR3Ne9W6FN"
     assert messages[0].tool_status == "completed"
-
-
-def test_flatten_message_record_prefers_superplane_display_label_metadata() -> None:
-    now = datetime.now(UTC)
-    store = _build_store()
-    record = StoredAgentChatMessageRecord(
-        id="c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1",
-        chat_id="chat-123",
-        message_index=0,
-        message={
-            "kind": "request",
-            "parts": [
-                {
-                    "content": {"ok": True},
-                    "outcome": "success",
-                    "metadata": {"superplane_display_label": "Migrated tool label"},
-                    "part_kind": "tool-return",
-                    "tool_name": "get_canvas",
-                    "tool_call_id": "toolu_012wJyWVffYDcQqR3Ne9W6FN",
-                }
-            ],
-            "run_id": "run-1",
-            "metadata": None,
-            "timestamp": "2026-03-27T00:01:19.265172Z",
-            "instructions": None,
-        },
-        created_at=now,
-        updated_at=now,
-    )
-
-    messages = store._flatten_message_record(record, {}, "canvas-123")
-
-    assert len(messages) == 1
-    assert messages[0].content == "Migrated tool label"
 
 
 def test_list_agent_chat_messages_skips_unflattenable_records(
