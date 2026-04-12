@@ -12,7 +12,7 @@ class ListAvailableIntegrations:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps]) -> str:
-        return "List available integrations"
+        return "Listing available integrations"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:

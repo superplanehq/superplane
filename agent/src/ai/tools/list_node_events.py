@@ -21,7 +21,7 @@ class ListNodeEvents:
         node_id: str,
         limit: int = 10,
     ) -> str:
-        return "Listing node events"
+        return f"Looking up recent events on {node_id}"
 
     @staticmethod
     def run(

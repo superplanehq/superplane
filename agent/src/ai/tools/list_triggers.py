@@ -32,10 +32,10 @@ class ListTriggers:
             preview = query.strip()
             if len(preview) > 40:
                 preview = f"{preview[:37]}…"
-            return f'List triggers matching "{preview}"'
+            return f'Looking up triggers for {preview}'
         if isinstance(provider, str) and provider.strip():
-            return f"List triggers ({provider.strip()})"
-        return "List triggers"
+            return f"Looking up triggers for {provider.strip()}"
+        return "Looking up triggers"
 
     @staticmethod
     def run(

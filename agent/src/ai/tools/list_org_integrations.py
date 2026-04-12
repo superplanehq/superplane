@@ -12,7 +12,7 @@ class ListOrgIntegrations:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps]) -> str:
-        return "List org integrations"
+        return "Looking up org integrations"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:

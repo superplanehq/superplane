@@ -12,7 +12,7 @@ class DescribeTrigger:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps], name: str) -> str:
-        return f'Describe trigger "{name}"'
+        return "Looking up config for {name}"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:

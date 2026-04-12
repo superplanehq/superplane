@@ -12,7 +12,7 @@ class DescribeComponent:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps], name: str) -> str:
-        return f'Describe component "{name}"'
+        return f"Looking up config for {name}"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:

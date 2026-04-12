@@ -14,7 +14,7 @@ class GetCanvasMemory:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps]) -> str:
-        return "Loading canvas notes"
+        return "Reading canvas notes"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> str:
