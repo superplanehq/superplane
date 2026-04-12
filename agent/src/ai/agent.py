@@ -14,6 +14,7 @@ from ai.agent_deps import (
     _put_cached_catalog_list,
 )
 from ai.models import CanvasAnswer, CanvasQuestionRequest
+from ai.skills import skill_index_markdown
 from ai.tools import default_tools
 
 __all__ = [
@@ -30,7 +31,8 @@ __all__ = [
 
 
 def load_system_prompt() -> str:
-    return (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
+    base = (Path(__file__).with_name("system_prompt.txt")).read_text(encoding="utf-8").strip()
+    return base + skill_index_markdown()
 
 
 def build_prompt(payload: CanvasQuestionRequest) -> str:
