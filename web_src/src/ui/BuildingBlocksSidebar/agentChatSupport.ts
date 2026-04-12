@@ -13,7 +13,6 @@ export type ChatStreamEvent =
       tool_name?: string;
       tool_call_id?: string;
       tool_label?: string;
-      elapsed_ms?: number;
     }
   | { type: "final_answer"; output?: unknown }
   | { type: "run_failed"; error?: string }
@@ -80,7 +79,6 @@ function normalizeToolFinishedEvent(value: JsonObject): ChatStreamEvent {
     tool_name: typeof value.tool_name === "string" ? value.tool_name : undefined,
     tool_call_id: typeof value.tool_call_id === "string" ? value.tool_call_id : undefined,
     tool_label: typeof value.tool_label === "string" ? value.tool_label : undefined,
-    elapsed_ms: typeof value.elapsed_ms === "number" ? value.elapsed_ms : undefined,
   };
 }
 
@@ -220,12 +218,7 @@ function createAssistantStreamController({
     const toolName = typeof event.tool_name === "string" ? event.tool_name : "unknown";
     const toolCallId = createToolCallId(toolName, event.tool_call_id);
     const toolLabel = typeof event.tool_label === "string" ? event.tool_label.trim() : "";
-    const content =
-      event.type === "tool_started"
-        ? `${toolLabel}...`
-        : typeof event.elapsed_ms === "number"
-          ? `${toolLabel} (${event.elapsed_ms.toFixed(1)}ms)`
-          : toolLabel;
+    const content = event.type === "tool_started" ? `${toolLabel}...` : toolLabel;
     const toolStatus = event.type === "tool_started" ? "running" : "completed";
 
     setAiMessages((previous) => {
