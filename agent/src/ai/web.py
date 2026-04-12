@@ -42,7 +42,7 @@ from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
 from ai.text import normalize_optional
-from ai.tools.display_label import format_tool_display_label
+from ai.tools import format_tool_display_label
 from ai.usage_limit_checker import (
     AgentUsageLimitChecker,
     NoopUsageLimitChecker,

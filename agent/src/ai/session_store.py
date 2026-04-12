@@ -57,7 +57,7 @@ def _index_tool_call_args_by_id(message: ModelMessage) -> dict[str, dict[str, An
 
 
 def _persisted_tool_display_label(tool_name: str, args: dict[str, Any], canvas_id: str) -> str:
-    from ai.tools.display_label import format_tool_display_label_without_deps
+    from ai.tools import format_tool_display_label_without_deps
 
     return format_tool_display_label_without_deps(tool_name, args, canvas_id)
 

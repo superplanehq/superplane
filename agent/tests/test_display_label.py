@@ -1,4 +1,4 @@
-from ai.tools.display_label import format_tool_display_label_without_deps
+from ai.tools import format_tool_display_label_without_deps
 
 
 def test_describe_component_label_includes_name() -> None:
