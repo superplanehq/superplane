@@ -11,8 +11,8 @@ class ListOrgIntegrations:
     description = "List integrations connected to the current organization."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "List org integrations"
+    def label(ctx: RunContext[AgentDeps]) -> str:
+        return "Looking up existing integrations"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> list[dict[str, Any]]:
