@@ -12,7 +12,7 @@ class LoadAgentSkill:
     description = "Load full markdown content for an agent skill by name."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
+    def label(_ctx: RunContext[AgentDeps], skill_name: str) -> str:
         return "Load agent skill"
 
     @staticmethod
