@@ -37,7 +37,12 @@ from ai.memory import (
 from ai.models import CanvasAnswer
 from ai.persisted_run_recorder import PersistedRunRecorder
 from ai.proposal_configuration_coerce import coerce_canvas_answer_proposal
-from ai.session_store import AgentChatNotFoundError, SessionStore, StoredAgentChat
+from ai.session_store import (
+    AgentChatNotFoundError,
+    SessionStore,
+    StoredAgentChat,
+    apply_tool_display_labels_to_messages,
+)
 from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
@@ -275,6 +280,8 @@ async def _stream_agent_run(
     if message_history is not None:
         run_kwargs["message_history"] = message_history
 
+    persisted_tool_display_labels: dict[str, str] = {}
+
     if payload.model == "test":
         _debug_log("using test model run path", canvas_id=resolved_canvas_id, chat_id=chat.id)
         test_agent: Agent[None, str] = Agent(model=TestModel(), output_type=str)
@@ -291,7 +298,11 @@ async def _stream_agent_run(
 
             if isinstance(event, AgentRunResultEvent):
                 result = event.result
-                recorder.save_authoritative_messages(result.new_messages())
+                messages = apply_tool_display_labels_to_messages(
+                    list(result.new_messages()),
+                    persisted_tool_display_labels,
+                )
+                recorder.save_authoritative_messages(messages)
                 output = _to_jsonable(result.output)
                 if isinstance(output, str) and output:
                     recorder.set_assistant_content(output)
@@ -427,11 +438,12 @@ async def _stream_agent_run(
             tool_call_id = _raw_tool_call_id
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
-            recorder.tool_finished(event)
             tool_label = tool_display_label_by_call_id.pop(
                 tool_call_id,
                 (event.result.tool_name or "").strip() or "tool",
             )
+            persisted_tool_display_labels[tool_call_id] = tool_label
+            recorder.tool_finished(event)
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
@@ -453,7 +465,11 @@ async def _stream_agent_run(
 
         if isinstance(event, AgentRunResultEvent):
             result = event.result
-            recorder.save_authoritative_messages(result.new_messages())
+            messages = apply_tool_display_labels_to_messages(
+                list(result.new_messages()),
+                persisted_tool_display_labels,
+            )
+            recorder.save_authoritative_messages(messages)
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
                 canvas_summary = deps.canvas_cache.get(deps.canvas_id)

@@ -21,6 +21,8 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
+_SUPERPLANE_TOOL_DISPLAY_LABEL_KEY = "superplane_display_label"
+
 from ai.config import config
 
 
@@ -39,6 +41,50 @@ def _likely_output_tool_name(tool_name: str | None) -> bool:
         return False
 
     return tool_name.strip().lower() in {"final_result", "return_canvasanswer", "canvasanswer"}
+
+
+def _flatten_tool_message_label(tool_name: str | None, metadata: Any) -> str:
+    if isinstance(metadata, dict):
+        label = metadata.get(_SUPERPLANE_TOOL_DISPLAY_LABEL_KEY)
+        if isinstance(label, str) and label.strip():
+            return label.strip()
+    cleaned = (tool_name or "").strip()
+    return cleaned or "tool"
+
+
+def apply_tool_display_labels_to_messages(
+    messages: list[ModelMessage],
+    labels_by_call_id: dict[str, str],
+) -> list[ModelMessage]:
+    """Attach UI labels to tool return parts before persisting (replay uses metadata on read)."""
+    if not labels_by_call_id:
+        return messages
+
+    out: list[ModelMessage] = []
+    for message in messages:
+        if not isinstance(message, ModelRequest):
+            out.append(message)
+            continue
+
+        new_parts: list[Any] = []
+        changed = False
+        for part in message.parts:
+            if isinstance(part, ToolReturnPart) and not _likely_output_tool_name(part.tool_name):
+                label = labels_by_call_id.get(part.tool_call_id)
+                if isinstance(label, str) and label.strip():
+                    existing_meta = part.metadata if isinstance(part.metadata, dict) else {}
+                    merged_meta = {**existing_meta, _SUPERPLANE_TOOL_DISPLAY_LABEL_KEY: label.strip()}
+                    new_parts.append(part.model_copy(update={"metadata": merged_meta}))
+                    changed = True
+                    continue
+            new_parts.append(part)
+
+        if changed:
+            out.append(message.model_copy(update={"parts": new_parts}))
+        else:
+            out.append(message)
+
+    return out
 
 
 def _user_content_to_text(content: Any) -> str:
@@ -662,7 +708,7 @@ class SessionStore:
                 if isinstance(part, ToolReturnPart):
                     if _likely_output_tool_name(part.tool_name):
                         continue
-                    tool_label = (part.tool_name or "").strip() or "tool"
+                    tool_label = _flatten_tool_message_label(part.tool_name, part.metadata)
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
@@ -679,7 +725,9 @@ class SessionStore:
                 if isinstance(part, RetryPromptPart) and part.tool_name:
                     if _likely_output_tool_name(part.tool_name):
                         continue
-                    tool_label = (part.tool_name or "").strip() or "tool"
+                    tool_label = _flatten_tool_message_label(
+                        part.tool_name, getattr(part, "metadata", None)
+                    )
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
