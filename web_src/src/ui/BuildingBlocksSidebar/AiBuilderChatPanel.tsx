@@ -2,8 +2,8 @@ import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import { TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Activity, ArrowLeft, ArrowUp, User } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Activity, ArrowLeft, ArrowUp, ChevronRight, User } from "lucide-react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -12,6 +12,7 @@ import {
   type AiBuilderProposal,
   type AiChatSession,
 } from "@/ui/BuildingBlocksSidebar/agentChat";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { cn } from "../../lib/utils";
 
 type AiBuilderChatPanelProps = {
@@ -306,12 +307,35 @@ function ConversationContent({
   aiError,
   disabled,
 }: ConversationContentProps) {
+  const activeToolTurnBounds = useMemo(() => {
+    let lastUserIndex = -1;
+    let lastAssistantIndex = -1;
+    for (let i = 0; i < aiMessages.length; i++) {
+      if (aiMessages[i].role === "user") {
+        lastUserIndex = i;
+      }
+      if (aiMessages[i].role === "assistant") {
+        lastAssistantIndex = i;
+      }
+    }
+    return { lastUserIndex, lastAssistantIndex };
+  }, [aiMessages]);
+
+  const conversationItems = useMemo(
+    () =>
+      buildAiConversationItems({
+        messages: aiMessages,
+        isGeneratingResponse,
+        lastUserIndex: activeToolTurnBounds.lastUserIndex,
+        lastAssistantIndex: activeToolTurnBounds.lastAssistantIndex,
+      }),
+    [aiMessages, isGeneratingResponse, activeToolTurnBounds.lastUserIndex, activeToolTurnBounds.lastAssistantIndex],
+  );
+
   return (
     <div ref={aiMessagesContainerRef} className="flex-1 overflow-y-auto space-y-1 px-2 py-3">
       {isLoadingChatMessages ? <div className="text-xs text-gray-500 px-1 py-1">Loading conversation...</div> : null}
-      {aiMessages.map((message) => (
-        <AiMessage key={message.id} message={message} />
-      ))}
+      {conversationItems}
 
       {isGeneratingResponse ? (
         <div className="sp-ai-thinking text-xs text-gray-500 px-1 py-1 rounded-sm">Planning next steps...</div>
@@ -331,6 +355,110 @@ function ConversationContent({
       ) : null}
 
       {!pendingProposal && aiError ? <p className="text-xs text-red-700 px-1">{aiError}</p> : null}
+    </div>
+  );
+}
+
+function shouldShowToolCallForActiveTurn({
+  messageIndex,
+  isGeneratingResponse,
+  lastUserIndex,
+  lastAssistantIndex,
+}: {
+  messageIndex: number;
+  isGeneratingResponse: boolean;
+  lastUserIndex: number;
+  lastAssistantIndex: number;
+}): boolean {
+  if (!isGeneratingResponse) {
+    return false;
+  }
+  if (lastUserIndex < 0 || lastAssistantIndex <= lastUserIndex) {
+    return false;
+  }
+  return messageIndex > lastUserIndex && messageIndex < lastAssistantIndex;
+}
+
+function buildAiConversationItems({
+  messages,
+  isGeneratingResponse,
+  lastUserIndex,
+  lastAssistantIndex,
+}: {
+  messages: AiBuilderMessage[];
+  isGeneratingResponse: boolean;
+  lastUserIndex: number;
+  lastAssistantIndex: number;
+}): ReactNode[] {
+  const items: ReactNode[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const message = messages[i];
+    if (message.role === "tool") {
+      if (isGeneratingResponse) {
+        if (
+          shouldShowToolCallForActiveTurn({
+            messageIndex: i,
+            isGeneratingResponse,
+            lastUserIndex,
+            lastAssistantIndex,
+          })
+        ) {
+          items.push(<AiMessage key={message.id} message={message} />);
+        }
+        i += 1;
+        continue;
+      }
+      const groupStart = i;
+      const toolGroup: AiBuilderMessage[] = [];
+      while (i < messages.length && messages[i].role === "tool") {
+        toolGroup.push(messages[i]);
+        i += 1;
+      }
+      const groupKey = toolGroup.map((m) => m.id).join(":") || `tools-${groupStart}`;
+      items.push(<FinishedToolCallsCollapsible key={groupKey} tools={toolGroup} />);
+      continue;
+    }
+    items.push(<AiMessage key={message.id} message={message} />);
+    i += 1;
+  }
+  return items;
+}
+
+function FinishedToolCallsCollapsible({ tools }: { tools: AiBuilderMessage[] }) {
+  const count = tools.length;
+  const summary = count === 1 ? "1 tool call" : `${count} tool calls`;
+
+  return (
+    <div className="w-full py-0.5">
+      <Collapsible defaultOpen={false} className="w-full px-2">
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-auto min-h-0 w-full justify-start gap-2 py-1 px-1.5 font-normal text-xs text-gray-500 hover:text-gray-600 data-[state=open]:[&>svg:first-of-type]:rotate-90"
+            aria-label={`${summary}. Show details.`}
+          >
+            <ChevronRight
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform"
+              aria-hidden={true}
+            />
+            <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden={true} />
+            <span className="min-w-0 truncate text-left">{summary}</span>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="list-none space-y-0.5 border-l border-slate-200/80 pl-4 pr-2 pb-1 pt-0.5">
+            {tools.map((tool) => (
+              <li key={tool.id} className="flex items-start gap-2 text-xs leading-relaxed text-gray-500">
+                <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden={true} />
+                <span className="min-w-0 whitespace-pre-wrap break-words">{tool.content}</span>
+              </li>
+            ))}
+          </ul>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
