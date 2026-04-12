@@ -12,8 +12,8 @@ class GetDecisionPattern:
     description = "Fetch full markdown content for one decision pattern by id."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps], _pattern_id: str) -> str:
-        return "Looking up decision pattern"
+    def label(_ctx: RunContext[AgentDeps], pattern_id: str) -> str:
+        return "Reviewing decision pattern"
 
     @staticmethod
     def run(_ctx: RunContext[AgentDeps], pattern_id: str) -> dict[str, Any]:

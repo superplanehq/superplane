@@ -22,7 +22,7 @@ class ListNodeExecutions:
         limit: int = 10,
         results: list[str] | None = None,
     ) -> str:
-        return "Listing node executions"
+        return f"Looking up recent runs on {node_id}"
 
     @staticmethod
     def run(

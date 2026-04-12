@@ -16,7 +16,7 @@ class SearchDecisionPatterns:
         preview = query.strip()
         if len(preview) > 48:
             preview = f"{preview[:45]}…"
-        return f'Searching for patterns about {preview}'
+        return f"Searching for patterns that match {preview}"
 
     @staticmethod
     def run(

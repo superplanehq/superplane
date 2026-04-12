@@ -24,8 +24,9 @@ class ListIntegrationResources:
         parameters: dict[str, str] | None = None,
     ) -> str:
         resource_type = type.strip() if isinstance(type, str) else ""
-        suffix = f" ({resource_type})" if resource_type else ""
-        return f"List integration resources{suffix}"
+        if resource_type:
+            return f"Getting {resource_type} choices from this integration"
+        return "Getting choices from this integration"
 
     @staticmethod
     def run(

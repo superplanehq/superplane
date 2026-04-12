@@ -19,7 +19,7 @@ class GetCanvasShape:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps]) -> str:
-        return "Understanding canvas structure"
+        return "Loading canvas structure"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> CanvasShape | dict[str, Any]:

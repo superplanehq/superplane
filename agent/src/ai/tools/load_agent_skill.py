@@ -13,7 +13,7 @@ class LoadAgentSkill:
 
     @staticmethod
     def label(_ctx: RunContext[AgentDeps], skill_name: str) -> str:
-        return f"Understanding {skill_name}"
+        return f"Reading the {skill_name} skill"
 
     @staticmethod
     def run(_ctx: RunContext[AgentDeps], skill_name: str) -> dict[str, Any]:

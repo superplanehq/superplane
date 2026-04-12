@@ -32,10 +32,11 @@ class ListComponents:
             preview = query.strip()
             if len(preview) > 40:
                 preview = f"{preview[:37]}…"
-            return f'Looking up components for {preview}'
+            return f"Looking for components related to {preview}"
         if isinstance(provider, str) and provider.strip():
-            return f"Looking up components for {provider.strip()}"
-        return "Looking up components"
+            p = provider.strip()
+            return f"Listing components from {p}"
+        return "Listing available components"
 
     @staticmethod
     def run(

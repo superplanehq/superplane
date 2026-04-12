@@ -10,7 +10,7 @@ class GetCanvas:
 
     @staticmethod
     def label(ctx: RunContext[AgentDeps]) -> str:
-        return "Understanding canvas structure"
+        return "Loading canvas details"
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps]) -> CanvasSummary:
