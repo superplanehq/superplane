@@ -17,6 +17,7 @@ from pydantic_ai.messages import (
     ModelResponse,
     RetryPromptPart,
     TextPart,
+    ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
 )
@@ -34,25 +35,31 @@ def _from_db_time(value: datetime | str) -> datetime:
     return datetime.fromisoformat(value).astimezone(UTC)
 
 
-def _format_tool_label(tool_name: str) -> str:
-    normalized = tool_name.strip().lower()
-    label_by_tool = {
-        "get_canvas": "Reading canvas",
-        "get_canvas_memory": "Loading canvas notes",
-        "get_canvas_shape": "Reading canvas structure",
-        "get_canvas_details": "Reading canvas details",
-        "get_node_details": "Reading node details",
-        "list_node_events": "Listing node events",
-        "list_node_executions": "Listing node executions",
-        "list_available_blocks": "Listing available components",
-    }
-    if normalized in label_by_tool:
-        return label_by_tool[normalized]
+def _tool_call_args_dict(raw: Any) -> dict[str, Any]:
+    if isinstance(raw, dict):
+        return dict(raw)
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return dict(parsed) if isinstance(parsed, dict) else {}
+    return {}
 
-    words = normalized.replace("_", " ").replace("-", " ").strip()
-    if not words:
-        return "Running tool"
-    return words[:1].upper() + words[1:]
+
+def _index_tool_call_args_by_id(message: ModelMessage) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    if isinstance(message, ModelResponse):
+        for part in message.parts:
+            if isinstance(part, ToolCallPart) and part.tool_call_id:
+                indexed[str(part.tool_call_id)] = _tool_call_args_dict(part.args)
+    return indexed
+
+
+def _persisted_tool_display_label(tool_name: str, args: dict[str, Any], canvas_id: str) -> str:
+    from ai.tools.display_label import format_tool_display_label_without_deps
+
+    return format_tool_display_label_without_deps(tool_name, args, canvas_id)
 
 
 def _likely_output_tool_name(tool_name: str | None) -> bool:
@@ -397,13 +404,21 @@ class SessionStore:
     def list_agent_chat_messages(
         self, org_id: str, user_id: str, canvas_id: str, chat_id: str
     ) -> list[StoredAgentChatMessage]:
-        self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
+        chat = self.describe_agent_chat(org_id, user_id, canvas_id, chat_id)
         records = self.list_agent_chat_message_records(chat_id)
 
+        tool_args_by_call_id: dict[str, dict[str, Any]] = {}
         flattened: list[StoredAgentChatMessage] = []
         for record in records:
             try:
-                flattened.extend(self._flatten_message_record(record))
+                model_message = _deserialize_model_message(record.message)
+                tool_args_by_call_id.update(_index_tool_call_args_by_id(model_message))
+            except Exception:
+                pass
+            try:
+                flattened.extend(
+                    self._flatten_message_record(record, tool_args_by_call_id, chat.canvas_id)
+                )
             except Exception as error:
                 print(
                     f"[agent] failed to flatten chat message record "
@@ -656,7 +671,10 @@ class SessionStore:
         )
 
     def _flatten_message_record(
-        self, record: StoredAgentChatMessageRecord
+        self,
+        record: StoredAgentChatMessageRecord,
+        tool_args_by_call_id: dict[str, dict[str, Any]],
+        canvas_id: str,
     ) -> list[StoredAgentChatMessage]:
         model_message = _deserialize_model_message(record.message)
         flattened: list[StoredAgentChatMessage] = []
@@ -683,12 +701,19 @@ class SessionStore:
                 if isinstance(part, ToolReturnPart):
                     if _likely_output_tool_name(part.tool_name):
                         continue
+                    call_id = str(part.tool_call_id) if part.tool_call_id else ""
+                    tool_args = tool_args_by_call_id.get(call_id, {})
+                    tool_label = _persisted_tool_display_label(
+                        part.tool_name or "",
+                        tool_args,
+                        canvas_id,
+                    )
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
                             chat_id=record.chat_id,
                             role="tool",
-                            content=_format_tool_label(part.tool_name),
+                            content=tool_label,
                             tool_call_id=part.tool_call_id,
                             tool_status="completed",
                             created_at=record.created_at,
@@ -699,12 +724,19 @@ class SessionStore:
                 if isinstance(part, RetryPromptPart) and part.tool_name:
                     if _likely_output_tool_name(part.tool_name):
                         continue
+                    call_id = str(part.tool_call_id) if part.tool_call_id else ""
+                    tool_args = tool_args_by_call_id.get(call_id, {})
+                    tool_label = _persisted_tool_display_label(
+                        part.tool_name or "",
+                        tool_args,
+                        canvas_id,
+                    )
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
                             chat_id=record.chat_id,
                             role="tool",
-                            content=_format_tool_label(part.tool_name),
+                            content=tool_label,
                             tool_call_id=part.tool_call_id,
                             tool_status="completed",
                             created_at=record.created_at,

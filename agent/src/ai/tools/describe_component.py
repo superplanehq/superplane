@@ -11,8 +11,8 @@ class DescribeComponent:
     description = "Describe one component including configuration fields and output channels."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "Describe component"
+    def label(ctx: RunContext[AgentDeps], name: str) -> str:
+        return f'Describe component "{name}"'
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:

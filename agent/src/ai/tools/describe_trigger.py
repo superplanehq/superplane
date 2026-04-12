@@ -11,8 +11,8 @@ class DescribeTrigger:
     description = "Describe one trigger including configuration fields and required flags."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "Describe trigger"
+    def label(ctx: RunContext[AgentDeps], name: str) -> str:
+        return f'Describe trigger "{name}"'
 
     @staticmethod
     def run(ctx: RunContext[AgentDeps], name: str) -> dict[str, Any]:

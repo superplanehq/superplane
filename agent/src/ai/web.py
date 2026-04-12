@@ -42,6 +42,7 @@ from ai.stream_tracker import ActiveStreamTracker
 from ai.superplane_client import SuperplaneClient, SuperplaneClientConfig
 from ai.telemetry import init_metrics, record_agent_run_tokens, shutdown_metrics
 from ai.text import normalize_optional
+from ai.tools.display_label import format_tool_display_label
 from ai.usage_limit_checker import (
     AgentUsageLimitChecker,
     NoopUsageLimitChecker,
@@ -313,8 +314,9 @@ async def _stream_agent_run(
     agent = build_agent(model=payload.model)
     if deps is None:
         raise ValueError("Agent dependencies are missing.")
+    agent_deps = deps
 
-    run_kwargs["deps"] = deps
+    run_kwargs["deps"] = agent_deps
     _debug_log(
         "running non-test agent",
         chat_id=chat.id,
@@ -355,6 +357,7 @@ async def _stream_agent_run(
         return normalized in output_tool_name_hints
 
     tool_started_at_by_call_id: dict[str, float] = {}
+    tool_display_label_by_call_id: dict[str, str] = {}
     async for event in _run_stream_events(agent, **run_kwargs):
         if isinstance(event, PartStartEvent) and isinstance(event.part, ToolCallPart):
             tool_call_id = event.part.tool_call_id
@@ -404,10 +407,17 @@ async def _stream_agent_run(
         if isinstance(event, FunctionToolCallEvent):
             tool_call_id = event.part.tool_call_id or event.part.tool_name
             tool_started_at_by_call_id[tool_call_id] = time.perf_counter()
+            tool_label = format_tool_display_label(
+                event.part.tool_name or "",
+                event.part.args,
+                agent_deps,
+            )
+            tool_display_label_by_call_id[tool_call_id] = tool_label
             yield {
                 "type": "tool_started",
                 "tool_name": event.part.tool_name,
                 "tool_call_id": tool_call_id,
+                "tool_label": tool_label,
                 "args": _to_jsonable(event.part.args),
             }
             continue
@@ -419,10 +429,19 @@ async def _stream_agent_run(
             tool_started_at = tool_started_at_by_call_id.pop(tool_call_id, started_at)
             elapsed_ms = (time.perf_counter() - tool_started_at) * 1000
             recorder.tool_finished(event)
+            tool_label = tool_display_label_by_call_id.pop(
+                tool_call_id,
+                format_tool_display_label(
+                    event.result.tool_name or "",
+                    {},
+                    agent_deps,
+                ),
+            )
             yield {
                 "type": "tool_finished",
                 "tool_name": event.result.tool_name,
                 "tool_call_id": tool_call_id,
+                "tool_label": tool_label,
                 "elapsed_ms": elapsed_ms,
             }
             continue
@@ -442,9 +461,9 @@ async def _stream_agent_run(
             recorder.save_authoritative_messages(result.new_messages())
             resolved_output = result.output
             if isinstance(resolved_output, CanvasAnswer):
-                canvas_summary = deps.canvas_cache.get(deps.canvas_id)
+                canvas_summary = agent_deps.canvas_cache.get(agent_deps.canvas_id)
                 resolved_output = coerce_canvas_answer_proposal(
-                    deps.client,
+                    agent_deps.client,
                     resolved_output,
                     canvas_summary,
                 )

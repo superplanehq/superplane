@@ -18,7 +18,11 @@ class GetNodeDetails:
     )
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
+    def label(
+        ctx: RunContext[AgentDeps],
+        node_id: str,
+        include_recent_events: bool = True,
+    ) -> str:
         return "Reading node details"
 
     @staticmethod

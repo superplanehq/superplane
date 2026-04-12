@@ -17,8 +17,15 @@ class ListIntegrationResources:
     )
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "List integration resources"
+    def label(
+        ctx: RunContext[AgentDeps],
+        integration_id: str,
+        type: str,
+        parameters: dict[str, str] | None = None,
+    ) -> str:
+        resource_type = type.strip() if isinstance(type, str) else ""
+        suffix = f" ({resource_type})" if resource_type else ""
+        return f"List integration resources{suffix}"
 
     @staticmethod
     def run(

@@ -5,7 +5,12 @@ import psycopg
 import pytest
 from pydantic_ai.messages import UserPromptPart
 
-from ai.session_store import SessionStore, SessionStoreConfig, StoredAgentChatMessageRecord
+from ai.session_store import (
+    SessionStore,
+    SessionStoreConfig,
+    StoredAgentChat,
+    StoredAgentChatMessageRecord,
+)
 
 
 def _build_store() -> SessionStore:
@@ -73,7 +78,7 @@ def test_flatten_message_record_exposes_output_tool_answer_as_assistant() -> Non
         updated_at=now,
     )
 
-    messages = store._flatten_message_record(record)
+    messages = store._flatten_message_record(record, {}, "canvas-123")
 
     assert len(messages) == 1
     assert messages[0].id == "119c8cab-e93f-42d1-a96d-d2d77f2d4d6f"
@@ -121,7 +126,7 @@ def test_flatten_message_record_ignores_output_tool_returns() -> None:
         updated_at=now,
     )
 
-    messages = store._flatten_message_record(record)
+    messages = store._flatten_message_record(record, {}, "canvas-123")
 
     assert len(messages) == 1
     assert messages[0].role == "tool"
@@ -167,9 +172,18 @@ def test_list_agent_chat_messages_skips_unflattenable_records(
         ),
     ]
 
-    monkeypatch.setattr(
-        store, "describe_agent_chat", lambda org_id, user_id, canvas_id, chat_id: None
-    )
+    def fake_describe(org_id: str, user_id: str, canvas_id: str, chat_id: str) -> StoredAgentChat:
+        return StoredAgentChat(
+            id=chat_id,
+            org_id=org_id,
+            user_id=user_id,
+            canvas_id=canvas_id,
+            initial_message=None,
+            created_at=now,
+            updated_at=now,
+        )
+
+    monkeypatch.setattr(store, "describe_agent_chat", fake_describe)
     monkeypatch.setattr(store, "list_agent_chat_message_records", lambda chat_id: records)
 
     messages = store.list_agent_chat_messages("org-123", "user-123", "canvas-123", "chat-123")

@@ -12,8 +12,11 @@ class SearchDecisionPatterns:
     description = "Search markdown decision patterns relevant to a workflow request."
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
-        return "Search decision patterns"
+    def label(_ctx: RunContext[AgentDeps], query: str, limit: int = 3) -> str:
+        preview = query.strip()
+        if len(preview) > 48:
+            preview = f"{preview[:45]}…"
+        return f'Search decision patterns: "{preview}"' if preview else "Search decision patterns"
 
     @staticmethod
     def run(

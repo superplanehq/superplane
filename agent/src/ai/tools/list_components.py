@@ -23,7 +23,18 @@ class ListComponents:
     )
 
     @staticmethod
-    def label(_ctx: RunContext[AgentDeps]) -> str:
+    def label(
+        ctx: RunContext[AgentDeps],
+        provider: str | None = None,
+        query: str | None = None,
+    ) -> str:
+        if isinstance(query, str) and query.strip():
+            preview = query.strip()
+            if len(preview) > 40:
+                preview = f"{preview[:37]}…"
+            return f'List components matching "{preview}"'
+        if isinstance(provider, str) and provider.strip():
+            return f"List components ({provider.strip()})"
         return "List components"
 
     @staticmethod
