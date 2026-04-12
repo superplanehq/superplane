@@ -3,9 +3,7 @@ from typing import Any
 
 import psycopg
 import pytest
-from pydantic_ai.messages import UserPromptPart
-
-from pydantic_ai.messages import ModelRequest, ToolReturnPart
+from pydantic_ai.messages import ModelRequest, ToolReturnPart, UserPromptPart
 
 from ai.session_store import (
     SessionStore,

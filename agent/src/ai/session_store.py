@@ -21,9 +21,9 @@ from pydantic_ai.messages import (
     UserPromptPart,
 )
 
-_SUPERPLANE_TOOL_DISPLAY_LABEL_KEY = "superplane_display_label"
-
 from ai.config import config
+
+_SUPERPLANE_TOOL_DISPLAY_LABEL_KEY = "superplane_display_label"
 
 
 def _utcnow() -> datetime:
@@ -73,7 +73,10 @@ def apply_tool_display_labels_to_messages(
                 label = labels_by_call_id.get(part.tool_call_id)
                 if isinstance(label, str) and label.strip():
                     existing_meta = part.metadata if isinstance(part.metadata, dict) else {}
-                    merged_meta = {**existing_meta, _SUPERPLANE_TOOL_DISPLAY_LABEL_KEY: label.strip()}
+                    merged_meta = {
+                        **existing_meta,
+                        _SUPERPLANE_TOOL_DISPLAY_LABEL_KEY: label.strip(),
+                    }
                     new_parts.append(replace(part, metadata=merged_meta))
                     changed = True
                     continue
