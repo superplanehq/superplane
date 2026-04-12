@@ -53,14 +53,13 @@ blocks:
             - make check.db.migrations
         - name: "Check: Components Docs"
           commands:
-            - make gen.components.docs
-            - git diff --exit-code docs/components
+            - make check.components.docs
         - name: "Check: Go Format"
           commands:
-            - make format.go.check
+            - make check.format.go
         - name: "Check: Example Payloads"
           commands:
-            - go run ./scripts/check_example_payloads.go
+            - make check.example.payloads
       epilogue:
         always:
           commands:
