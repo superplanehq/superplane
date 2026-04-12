@@ -426,34 +426,26 @@ function buildAiConversationItems({
 }
 
 function FinishedToolCallsCollapsible({ tools }: { tools: AiBuilderMessage[] }) {
-  const count = tools.length;
-  const summary = count === 1 ? "1 tool call" : `${count} tool calls`;
+  const label = "Thinking process";
 
   return (
     <div className="w-full py-0.5">
       <Collapsible defaultOpen={false} className="w-full px-2">
         <CollapsibleTrigger asChild>
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-auto min-h-0 w-full justify-start gap-2 py-1 px-1.5 font-normal text-xs text-gray-500 hover:text-gray-600 data-[state=open]:[&>svg:first-of-type]:rotate-90"
-            aria-label={`${summary}. Show details.`}
+            className="flex w-full max-w-full items-center gap-1 py-1 px-0 text-left text-xs font-normal text-gray-500 hover:text-gray-600 focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30 data-[state=open]:[&>svg]:rotate-90"
+            aria-label={`${label}. Expand for more detail.`}
           >
-            <ChevronRight
-              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform"
-              aria-hidden={true}
-            />
-            <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden={true} />
-            <span className="min-w-0 truncate text-left">{summary}</span>
-          </Button>
+            <span className="min-w-0 shrink">{label}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform" aria-hidden={true} />
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <ul className="list-none space-y-0.5 border-l border-slate-200/80 pl-4 pr-2 pb-1 pt-0.5">
+          <ul className="list-none space-y-0.5 py-0.5 pl-0">
             {tools.map((tool) => (
-              <li key={tool.id} className="flex items-start gap-2 text-xs leading-relaxed text-gray-500">
-                <Activity className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden={true} />
-                <span className="min-w-0 whitespace-pre-wrap break-words">{tool.content}</span>
+              <li key={tool.id} className="text-xs leading-relaxed text-gray-500 whitespace-pre-wrap break-words">
+                {tool.content}
               </li>
             ))}
           </ul>
