@@ -62,6 +62,20 @@ def _persisted_tool_display_label(tool_name: str, args: dict[str, Any], canvas_i
     return format_tool_display_label_without_deps(tool_name, args, canvas_id)
 
 
+_TOOL_DISPLAY_LABEL_META_KEY = "superplane_display_label"
+
+
+def _tool_return_metadata_display_label(part: ToolReturnPart) -> str | None:
+    """Set by DB migration `backfill-agent-chat-tool-labels` on stored tool-return parts."""
+    meta = part.metadata
+    if not isinstance(meta, dict):
+        return None
+    value = meta.get(_TOOL_DISPLAY_LABEL_META_KEY)
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
 def _likely_output_tool_name(tool_name: str | None) -> bool:
     if not isinstance(tool_name, str):
         return False
@@ -701,13 +715,17 @@ class SessionStore:
                 if isinstance(part, ToolReturnPart):
                     if _likely_output_tool_name(part.tool_name):
                         continue
-                    call_id = str(part.tool_call_id) if part.tool_call_id else ""
-                    tool_args = tool_args_by_call_id.get(call_id, {})
-                    tool_label = _persisted_tool_display_label(
-                        part.tool_name or "",
-                        tool_args,
-                        canvas_id,
-                    )
+                    migrated = _tool_return_metadata_display_label(part)
+                    if migrated is not None:
+                        tool_label = migrated
+                    else:
+                        call_id = str(part.tool_call_id) if part.tool_call_id else ""
+                        tool_args = tool_args_by_call_id.get(call_id, {})
+                        tool_label = _persisted_tool_display_label(
+                            part.tool_name or "",
+                            tool_args,
+                            canvas_id,
+                        )
                     flattened.append(
                         StoredAgentChatMessage(
                             id=f"{record.id}:{index}",
