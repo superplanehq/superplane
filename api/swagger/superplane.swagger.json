@@ -4211,7 +4211,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
+            "$ref": "#/definitions/SuperplaneComponentsEdge"
           }
         },
         "configuration": {
@@ -4799,7 +4799,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ComponentsEdge"
+            "$ref": "#/definitions/SuperplaneComponentsEdge"
           }
         }
       }
@@ -4822,51 +4822,6 @@
           }
         }
       }
-    },
-    "CanvasesCanvasUpdateOperation": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/CanvasesCanvasUpdateOperationType"
-        },
-        "target": {
-          "$ref": "#/definitions/CanvasesCanvasUpdateOperationNode"
-        },
-        "source": {
-          "$ref": "#/definitions/CanvasesCanvasUpdateOperationNode"
-        }
-      }
-    },
-    "CanvasesCanvasUpdateOperationNode": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "block": {
-          "type": "string"
-        },
-        "configuration": {
-          "type": "object"
-        },
-        "channel": {
-          "type": "string"
-        }
-      }
-    },
-    "CanvasesCanvasUpdateOperationType": {
-      "type": "string",
-      "enum": [
-        "ADD_NODE",
-        "DELETE_NODE",
-        "UPDATE_NODE",
-        "CONNECT_NODES",
-        "DISCONNECT_NODES"
-      ],
-      "default": "ADD_NODE"
     },
     "CanvasesCanvasVersion": {
       "type": "object",
@@ -5228,6 +5183,67 @@
         }
       }
     },
+    "CanvasesPatchOperation": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/CanvasesPatchOperationType"
+        },
+        "node": {
+          "$ref": "#/definitions/CanvasesPatchOperationNode",
+          "title": "Required for ADD_NODE, UPDATE_NODE, DELETE_NODE"
+        },
+        "edge": {
+          "$ref": "#/definitions/CanvasesPatchOperationEdge",
+          "title": "Required for DISCONNECT_NODES and CONNECT_NODES"
+        }
+      }
+    },
+    "CanvasesPatchOperationEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesPatchOperationNode": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "block": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        },
+        "channel": {
+          "type": "string"
+        }
+      }
+    },
+    "CanvasesPatchOperationType": {
+      "type": "string",
+      "enum": [
+        "ADD_NODE",
+        "DELETE_NODE",
+        "UPDATE_NODE",
+        "CONNECT_NODES",
+        "DISCONNECT_NODES"
+      ],
+      "default": "ADD_NODE"
+    },
     "CanvasesResolveCanvasChangeRequestBody": {
       "type": "object",
       "properties": {
@@ -5318,7 +5334,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/CanvasesCanvasUpdateOperation"
+            "$ref": "#/definitions/CanvasesPatchOperation"
           }
         },
         "dryRun": {
@@ -5410,20 +5426,6 @@
       "properties": {
         "component": {
           "$ref": "#/definitions/ComponentsComponent"
-        }
-      }
-    },
-    "ComponentsEdge": {
-      "type": "object",
-      "properties": {
-        "sourceId": {
-          "type": "string"
-        },
-        "targetId": {
-          "type": "string"
-        },
-        "channel": {
-          "type": "string"
         }
       }
     },
@@ -7090,6 +7092,20 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneComponentsEdge": {
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "channel": {
           "type": "string"
         }
       }

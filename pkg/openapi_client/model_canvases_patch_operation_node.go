@@ -15,11 +15,11 @@ import (
 	"encoding/json"
 )
 
-// checks if the CanvasesCanvasUpdateOperationNode type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &CanvasesCanvasUpdateOperationNode{}
+// checks if the CanvasesPatchOperationNode type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &CanvasesPatchOperationNode{}
 
-// CanvasesCanvasUpdateOperationNode struct for CanvasesCanvasUpdateOperationNode
-type CanvasesCanvasUpdateOperationNode struct {
+// CanvasesPatchOperationNode struct for CanvasesPatchOperationNode
+type CanvasesPatchOperationNode struct {
 	Id            *string                `json:"id,omitempty"`
 	Name          *string                `json:"name,omitempty"`
 	Block         *string                `json:"block,omitempty"`
@@ -27,25 +27,25 @@ type CanvasesCanvasUpdateOperationNode struct {
 	Channel       *string                `json:"channel,omitempty"`
 }
 
-// NewCanvasesCanvasUpdateOperationNode instantiates a new CanvasesCanvasUpdateOperationNode object
+// NewCanvasesPatchOperationNode instantiates a new CanvasesPatchOperationNode object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewCanvasesCanvasUpdateOperationNode() *CanvasesCanvasUpdateOperationNode {
-	this := CanvasesCanvasUpdateOperationNode{}
+func NewCanvasesPatchOperationNode() *CanvasesPatchOperationNode {
+	this := CanvasesPatchOperationNode{}
 	return &this
 }
 
-// NewCanvasesCanvasUpdateOperationNodeWithDefaults instantiates a new CanvasesCanvasUpdateOperationNode object
+// NewCanvasesPatchOperationNodeWithDefaults instantiates a new CanvasesPatchOperationNode object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewCanvasesCanvasUpdateOperationNodeWithDefaults() *CanvasesCanvasUpdateOperationNode {
-	this := CanvasesCanvasUpdateOperationNode{}
+func NewCanvasesPatchOperationNodeWithDefaults() *CanvasesPatchOperationNode {
+	this := CanvasesPatchOperationNode{}
 	return &this
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
-func (o *CanvasesCanvasUpdateOperationNode) GetId() string {
+func (o *CanvasesPatchOperationNode) GetId() string {
 	if o == nil || IsNil(o.Id) {
 		var ret string
 		return ret
@@ -55,7 +55,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetId() string {
 
 // GetIdOk returns a tuple with the Id field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasUpdateOperationNode) GetIdOk() (*string, bool) {
+func (o *CanvasesPatchOperationNode) GetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.Id) {
 		return nil, false
 	}
@@ -63,7 +63,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetIdOk() (*string, bool) {
 }
 
 // HasId returns a boolean if a field has been set.
-func (o *CanvasesCanvasUpdateOperationNode) HasId() bool {
+func (o *CanvasesPatchOperationNode) HasId() bool {
 	if o != nil && !IsNil(o.Id) {
 		return true
 	}
@@ -72,12 +72,12 @@ func (o *CanvasesCanvasUpdateOperationNode) HasId() bool {
 }
 
 // SetId gets a reference to the given string and assigns it to the Id field.
-func (o *CanvasesCanvasUpdateOperationNode) SetId(v string) {
+func (o *CanvasesPatchOperationNode) SetId(v string) {
 	o.Id = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *CanvasesCanvasUpdateOperationNode) GetName() string {
+func (o *CanvasesPatchOperationNode) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -87,7 +87,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasUpdateOperationNode) GetNameOk() (*string, bool) {
+func (o *CanvasesPatchOperationNode) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -95,7 +95,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *CanvasesCanvasUpdateOperationNode) HasName() bool {
+func (o *CanvasesPatchOperationNode) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -104,12 +104,12 @@ func (o *CanvasesCanvasUpdateOperationNode) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *CanvasesCanvasUpdateOperationNode) SetName(v string) {
+func (o *CanvasesPatchOperationNode) SetName(v string) {
 	o.Name = &v
 }
 
 // GetBlock returns the Block field value if set, zero value otherwise.
-func (o *CanvasesCanvasUpdateOperationNode) GetBlock() string {
+func (o *CanvasesPatchOperationNode) GetBlock() string {
 	if o == nil || IsNil(o.Block) {
 		var ret string
 		return ret
@@ -119,7 +119,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetBlock() string {
 
 // GetBlockOk returns a tuple with the Block field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasUpdateOperationNode) GetBlockOk() (*string, bool) {
+func (o *CanvasesPatchOperationNode) GetBlockOk() (*string, bool) {
 	if o == nil || IsNil(o.Block) {
 		return nil, false
 	}
@@ -127,7 +127,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetBlockOk() (*string, bool) {
 }
 
 // HasBlock returns a boolean if a field has been set.
-func (o *CanvasesCanvasUpdateOperationNode) HasBlock() bool {
+func (o *CanvasesPatchOperationNode) HasBlock() bool {
 	if o != nil && !IsNil(o.Block) {
 		return true
 	}
@@ -136,12 +136,12 @@ func (o *CanvasesCanvasUpdateOperationNode) HasBlock() bool {
 }
 
 // SetBlock gets a reference to the given string and assigns it to the Block field.
-func (o *CanvasesCanvasUpdateOperationNode) SetBlock(v string) {
+func (o *CanvasesPatchOperationNode) SetBlock(v string) {
 	o.Block = &v
 }
 
 // GetConfiguration returns the Configuration field value if set, zero value otherwise.
-func (o *CanvasesCanvasUpdateOperationNode) GetConfiguration() map[string]interface{} {
+func (o *CanvasesPatchOperationNode) GetConfiguration() map[string]interface{} {
 	if o == nil || IsNil(o.Configuration) {
 		var ret map[string]interface{}
 		return ret
@@ -151,7 +151,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetConfiguration() map[string]interf
 
 // GetConfigurationOk returns a tuple with the Configuration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasUpdateOperationNode) GetConfigurationOk() (map[string]interface{}, bool) {
+func (o *CanvasesPatchOperationNode) GetConfigurationOk() (map[string]interface{}, bool) {
 	if o == nil || IsNil(o.Configuration) {
 		return map[string]interface{}{}, false
 	}
@@ -159,7 +159,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetConfigurationOk() (map[string]int
 }
 
 // HasConfiguration returns a boolean if a field has been set.
-func (o *CanvasesCanvasUpdateOperationNode) HasConfiguration() bool {
+func (o *CanvasesPatchOperationNode) HasConfiguration() bool {
 	if o != nil && !IsNil(o.Configuration) {
 		return true
 	}
@@ -168,12 +168,12 @@ func (o *CanvasesCanvasUpdateOperationNode) HasConfiguration() bool {
 }
 
 // SetConfiguration gets a reference to the given map[string]interface{} and assigns it to the Configuration field.
-func (o *CanvasesCanvasUpdateOperationNode) SetConfiguration(v map[string]interface{}) {
+func (o *CanvasesPatchOperationNode) SetConfiguration(v map[string]interface{}) {
 	o.Configuration = v
 }
 
 // GetChannel returns the Channel field value if set, zero value otherwise.
-func (o *CanvasesCanvasUpdateOperationNode) GetChannel() string {
+func (o *CanvasesPatchOperationNode) GetChannel() string {
 	if o == nil || IsNil(o.Channel) {
 		var ret string
 		return ret
@@ -183,7 +183,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetChannel() string {
 
 // GetChannelOk returns a tuple with the Channel field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesCanvasUpdateOperationNode) GetChannelOk() (*string, bool) {
+func (o *CanvasesPatchOperationNode) GetChannelOk() (*string, bool) {
 	if o == nil || IsNil(o.Channel) {
 		return nil, false
 	}
@@ -191,7 +191,7 @@ func (o *CanvasesCanvasUpdateOperationNode) GetChannelOk() (*string, bool) {
 }
 
 // HasChannel returns a boolean if a field has been set.
-func (o *CanvasesCanvasUpdateOperationNode) HasChannel() bool {
+func (o *CanvasesPatchOperationNode) HasChannel() bool {
 	if o != nil && !IsNil(o.Channel) {
 		return true
 	}
@@ -200,11 +200,11 @@ func (o *CanvasesCanvasUpdateOperationNode) HasChannel() bool {
 }
 
 // SetChannel gets a reference to the given string and assigns it to the Channel field.
-func (o *CanvasesCanvasUpdateOperationNode) SetChannel(v string) {
+func (o *CanvasesPatchOperationNode) SetChannel(v string) {
 	o.Channel = &v
 }
 
-func (o CanvasesCanvasUpdateOperationNode) MarshalJSON() ([]byte, error) {
+func (o CanvasesPatchOperationNode) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -212,7 +212,7 @@ func (o CanvasesCanvasUpdateOperationNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o CanvasesCanvasUpdateOperationNode) ToMap() (map[string]interface{}, error) {
+func (o CanvasesPatchOperationNode) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
@@ -232,38 +232,38 @@ func (o CanvasesCanvasUpdateOperationNode) ToMap() (map[string]interface{}, erro
 	return toSerialize, nil
 }
 
-type NullableCanvasesCanvasUpdateOperationNode struct {
-	value *CanvasesCanvasUpdateOperationNode
+type NullableCanvasesPatchOperationNode struct {
+	value *CanvasesPatchOperationNode
 	isSet bool
 }
 
-func (v NullableCanvasesCanvasUpdateOperationNode) Get() *CanvasesCanvasUpdateOperationNode {
+func (v NullableCanvasesPatchOperationNode) Get() *CanvasesPatchOperationNode {
 	return v.value
 }
 
-func (v *NullableCanvasesCanvasUpdateOperationNode) Set(val *CanvasesCanvasUpdateOperationNode) {
+func (v *NullableCanvasesPatchOperationNode) Set(val *CanvasesPatchOperationNode) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableCanvasesCanvasUpdateOperationNode) IsSet() bool {
+func (v NullableCanvasesPatchOperationNode) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableCanvasesCanvasUpdateOperationNode) Unset() {
+func (v *NullableCanvasesPatchOperationNode) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableCanvasesCanvasUpdateOperationNode(val *CanvasesCanvasUpdateOperationNode) *NullableCanvasesCanvasUpdateOperationNode {
-	return &NullableCanvasesCanvasUpdateOperationNode{value: val, isSet: true}
+func NewNullableCanvasesPatchOperationNode(val *CanvasesPatchOperationNode) *NullableCanvasesPatchOperationNode {
+	return &NullableCanvasesPatchOperationNode{value: val, isSet: true}
 }
 
-func (v NullableCanvasesCanvasUpdateOperationNode) MarshalJSON() ([]byte, error) {
+func (v NullableCanvasesPatchOperationNode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableCanvasesCanvasUpdateOperationNode) UnmarshalJSON(src []byte) error {
+func (v *NullableCanvasesPatchOperationNode) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

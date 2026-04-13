@@ -78,9 +78,6 @@ docs/CanvasesCanvasNodeExecutionState.md
 docs/CanvasesCanvasNodeQueueItem.md
 docs/CanvasesCanvasSpec.md
 docs/CanvasesCanvasStatus.md
-docs/CanvasesCanvasUpdateOperation.md
-docs/CanvasesCanvasUpdateOperationNode.md
-docs/CanvasesCanvasUpdateOperationType.md
 docs/CanvasesCanvasVersion.md
 docs/CanvasesCanvasVersionMetadata.md
 docs/CanvasesCreateCanvasChangeRequestBody.md
@@ -106,6 +103,10 @@ docs/CanvasesListEventExecutionsResponse.md
 docs/CanvasesListNodeEventsResponse.md
 docs/CanvasesListNodeExecutionsResponse.md
 docs/CanvasesListNodeQueueItemsResponse.md
+docs/CanvasesPatchOperation.md
+docs/CanvasesPatchOperationEdge.md
+docs/CanvasesPatchOperationNode.md
+docs/CanvasesPatchOperationType.md
 docs/CanvasesResolveCanvasChangeRequestBody.md
 docs/CanvasesResolveCanvasChangeRequestResponse.md
 docs/CanvasesResolveExecutionErrorsBody.md
@@ -121,7 +122,6 @@ docs/ComponentAPI.md
 docs/ComponentsComponent.md
 docs/ComponentsComponentAction.md
 docs/ComponentsDescribeComponentResponse.md
-docs/ComponentsEdge.md
 docs/ComponentsIntegrationRef.md
 docs/ComponentsListComponentActionsResponse.md
 docs/ComponentsListComponentsResponse.md
@@ -253,6 +253,7 @@ docs/ServiceAccountsUpdateServiceAccountResponse.md
 docs/SuperplaneBlueprintsOutputChannel.md
 docs/SuperplaneBlueprintsUserRef.md
 docs/SuperplaneCanvasesUserRef.md
+docs/SuperplaneComponentsEdge.md
 docs/SuperplaneComponentsNode.md
 docs/SuperplaneComponentsOutputChannel.md
 docs/SuperplaneIntegrationsListIntegrationsResponse.md
@@ -321,9 +322,6 @@ model_canvases_canvas_node_execution_state.go
 model_canvases_canvas_node_queue_item.go
 model_canvases_canvas_spec.go
 model_canvases_canvas_status.go
-model_canvases_canvas_update_operation.go
-model_canvases_canvas_update_operation_node.go
-model_canvases_canvas_update_operation_type.go
 model_canvases_canvas_version.go
 model_canvases_canvas_version_metadata.go
 model_canvases_create_canvas_change_request_body.go
@@ -349,6 +347,10 @@ model_canvases_list_event_executions_response.go
 model_canvases_list_node_events_response.go
 model_canvases_list_node_executions_response.go
 model_canvases_list_node_queue_items_response.go
+model_canvases_patch_operation.go
+model_canvases_patch_operation_edge.go
+model_canvases_patch_operation_node.go
+model_canvases_patch_operation_type.go
 model_canvases_resolve_canvas_change_request_body.go
 model_canvases_resolve_canvas_change_request_response.go
 model_canvases_resolve_execution_errors_body.go
@@ -363,7 +365,6 @@ model_canvases_update_node_pause_response.go
 model_components_component.go
 model_components_component_action.go
 model_components_describe_component_response.go
-model_components_edge.go
 model_components_integration_ref.go
 model_components_list_component_actions_response.go
 model_components_list_components_response.go
@@ -488,6 +489,7 @@ model_service_accounts_update_service_account_response.go
 model_superplane_blueprints_output_channel.go
 model_superplane_blueprints_user_ref.go
 model_superplane_canvases_user_ref.go
+model_superplane_components_edge.go
 model_superplane_components_node.go
 model_superplane_components_output_channel.go
 model_superplane_integrations_list_integrations_response.go

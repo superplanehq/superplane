@@ -21,10 +21,10 @@ import json
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.components_edge import ComponentsEdge
 from superplaneapi.models.configuration_field import ConfigurationField
 from superplaneapi.models.superplane_blueprints_output_channel import SuperplaneBlueprintsOutputChannel
 from superplaneapi.models.superplane_blueprints_user_ref import SuperplaneBlueprintsUserRef
+from superplaneapi.models.superplane_components_edge import SuperplaneComponentsEdge
 from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode
 from typing import Optional, Set
 from typing_extensions import Self
@@ -40,7 +40,7 @@ class BlueprintsBlueprint(BaseModel):
     created_at: Optional[datetime] = Field(default=None, alias="createdAt")
     updated_at: Optional[datetime] = Field(default=None, alias="updatedAt")
     nodes: Optional[List[SuperplaneComponentsNode]] = None
-    edges: Optional[List[ComponentsEdge]] = None
+    edges: Optional[List[SuperplaneComponentsEdge]] = None
     configuration: Optional[List[ConfigurationField]] = None
     output_channels: Optional[List[SuperplaneBlueprintsOutputChannel]] = Field(default=None, alias="outputChannels")
     icon: Optional[StrictStr] = None
@@ -137,7 +137,7 @@ class BlueprintsBlueprint(BaseModel):
             "createdAt": obj.get("createdAt"),
             "updatedAt": obj.get("updatedAt"),
             "nodes": [SuperplaneComponentsNode.from_dict(_item) for _item in obj["nodes"]] if obj.get("nodes") is not None else None,
-            "edges": [ComponentsEdge.from_dict(_item) for _item in obj["edges"]] if obj.get("edges") is not None else None,
+            "edges": [SuperplaneComponentsEdge.from_dict(_item) for _item in obj["edges"]] if obj.get("edges") is not None else None,
             "configuration": [ConfigurationField.from_dict(_item) for _item in obj["configuration"]] if obj.get("configuration") is not None else None,
             "outputChannels": [SuperplaneBlueprintsOutputChannel.from_dict(_item) for _item in obj["outputChannels"]] if obj.get("outputChannels") is not None else None,
             "icon": obj.get("icon"),

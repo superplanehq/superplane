@@ -20,8 +20,8 @@ var _ MappedNullable = &CanvasesUpdateCanvasVersionThroughOpsBody{}
 
 // CanvasesUpdateCanvasVersionThroughOpsBody struct for CanvasesUpdateCanvasVersionThroughOpsBody
 type CanvasesUpdateCanvasVersionThroughOpsBody struct {
-	Operations []CanvasesCanvasUpdateOperation `json:"operations,omitempty"`
-	DryRun     *bool                           `json:"dryRun,omitempty"`
+	Operations []CanvasesPatchOperation `json:"operations,omitempty"`
+	DryRun     *bool                    `json:"dryRun,omitempty"`
 }
 
 // NewCanvasesUpdateCanvasVersionThroughOpsBody instantiates a new CanvasesUpdateCanvasVersionThroughOpsBody object
@@ -42,9 +42,9 @@ func NewCanvasesUpdateCanvasVersionThroughOpsBodyWithDefaults() *CanvasesUpdateC
 }
 
 // GetOperations returns the Operations field value if set, zero value otherwise.
-func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetOperations() []CanvasesCanvasUpdateOperation {
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetOperations() []CanvasesPatchOperation {
 	if o == nil || IsNil(o.Operations) {
-		var ret []CanvasesCanvasUpdateOperation
+		var ret []CanvasesPatchOperation
 		return ret
 	}
 	return o.Operations
@@ -52,7 +52,7 @@ func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetOperations() []CanvasesCa
 
 // GetOperationsOk returns a tuple with the Operations field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetOperationsOk() ([]CanvasesCanvasUpdateOperation, bool) {
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) GetOperationsOk() ([]CanvasesPatchOperation, bool) {
 	if o == nil || IsNil(o.Operations) {
 		return nil, false
 	}
@@ -68,8 +68,8 @@ func (o *CanvasesUpdateCanvasVersionThroughOpsBody) HasOperations() bool {
 	return false
 }
 
-// SetOperations gets a reference to the given []CanvasesCanvasUpdateOperation and assigns it to the Operations field.
-func (o *CanvasesUpdateCanvasVersionThroughOpsBody) SetOperations(v []CanvasesCanvasUpdateOperation) {
+// SetOperations gets a reference to the given []CanvasesPatchOperation and assigns it to the Operations field.
+func (o *CanvasesUpdateCanvasVersionThroughOpsBody) SetOperations(v []CanvasesPatchOperation) {
 	o.Operations = v
 }
 

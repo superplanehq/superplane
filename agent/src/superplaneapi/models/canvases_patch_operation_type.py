@@ -19,9 +19,9 @@ from enum import Enum
 from typing_extensions import Self
 
 
-class CanvasesCanvasUpdateOperationType(str, Enum):
+class CanvasesPatchOperationType(str, Enum):
     """
-    CanvasesCanvasUpdateOperationType
+    CanvasesPatchOperationType
     """
 
     """
@@ -35,7 +35,7 @@ class CanvasesCanvasUpdateOperationType(str, Enum):
 
     @classmethod
     def from_json(cls, json_str: str) -> Self:
-        """Create an instance of CanvasesCanvasUpdateOperationType from a JSON string"""
+        """Create an instance of CanvasesPatchOperationType from a JSON string"""
         return cls(json.loads(json_str))
 
 

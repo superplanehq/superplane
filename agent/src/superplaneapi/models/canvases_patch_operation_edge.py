@@ -18,21 +18,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesCanvasUpdateOperationNode(BaseModel):
+class CanvasesPatchOperationEdge(BaseModel):
     """
-    CanvasesCanvasUpdateOperationNode
+    CanvasesPatchOperationEdge
     """ # noqa: E501
-    id: Optional[StrictStr] = None
-    name: Optional[StrictStr] = None
-    block: Optional[StrictStr] = None
-    configuration: Optional[Dict[str, Any]] = None
+    source_id: Optional[StrictStr] = Field(default=None, alias="sourceId")
+    target_id: Optional[StrictStr] = Field(default=None, alias="targetId")
     channel: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["id", "name", "block", "configuration", "channel"]
+    __properties: ClassVar[List[str]] = ["sourceId", "targetId", "channel"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -52,7 +50,7 @@ class CanvasesCanvasUpdateOperationNode(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasUpdateOperationNode from a JSON string"""
+        """Create an instance of CanvasesPatchOperationEdge from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -77,7 +75,7 @@ class CanvasesCanvasUpdateOperationNode(BaseModel):
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasUpdateOperationNode from a dict"""
+        """Create an instance of CanvasesPatchOperationEdge from a dict"""
         if obj is None:
             return None
 
@@ -85,10 +83,8 @@ class CanvasesCanvasUpdateOperationNode(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "id": obj.get("id"),
-            "name": obj.get("name"),
-            "block": obj.get("block"),
-            "configuration": obj.get("configuration"),
+            "sourceId": obj.get("sourceId"),
+            "targetId": obj.get("targetId"),
             "channel": obj.get("channel")
         })
         return _obj

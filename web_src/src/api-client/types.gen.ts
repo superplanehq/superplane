@@ -79,7 +79,7 @@ export type BlueprintsBlueprint = {
   createdAt?: string;
   updatedAt?: string;
   nodes?: Array<SuperplaneComponentsNode>;
-  edges?: Array<ComponentsEdge>;
+  edges?: Array<SuperplaneComponentsEdge>;
   configuration?: Array<ConfigurationField>;
   outputChannels?: Array<SuperplaneBlueprintsOutputChannel>;
   icon?: string;
@@ -319,36 +319,13 @@ export type CanvasesCanvasNodeQueueItem = {
 
 export type CanvasesCanvasSpec = {
   nodes?: Array<SuperplaneComponentsNode>;
-  edges?: Array<ComponentsEdge>;
+  edges?: Array<SuperplaneComponentsEdge>;
 };
 
 export type CanvasesCanvasStatus = {
   lastExecutions?: Array<CanvasesCanvasNodeExecution>;
   lastEvents?: Array<CanvasesCanvasEvent>;
 };
-
-export type CanvasesCanvasUpdateOperation = {
-  type?: CanvasesCanvasUpdateOperationType;
-  target?: CanvasesCanvasUpdateOperationNode;
-  source?: CanvasesCanvasUpdateOperationNode;
-};
-
-export type CanvasesCanvasUpdateOperationNode = {
-  id?: string;
-  name?: string;
-  block?: string;
-  configuration?: {
-    [key: string]: unknown;
-  };
-  channel?: string;
-};
-
-export type CanvasesCanvasUpdateOperationType =
-  | "ADD_NODE"
-  | "DELETE_NODE"
-  | "UPDATE_NODE"
-  | "CONNECT_NODES"
-  | "DISCONNECT_NODES";
 
 export type CanvasesCanvasVersion = {
   metadata?: CanvasesCanvasVersionMetadata;
@@ -511,6 +488,35 @@ export type CanvasesListNodeQueueItemsResponse = {
   lastTimestamp?: string;
 };
 
+export type CanvasesPatchOperation = {
+  type?: CanvasesPatchOperationType;
+  node?: CanvasesPatchOperationNode;
+  edge?: CanvasesPatchOperationEdge;
+};
+
+export type CanvasesPatchOperationEdge = {
+  sourceId?: string;
+  targetId?: string;
+  channel?: string;
+};
+
+export type CanvasesPatchOperationNode = {
+  id?: string;
+  name?: string;
+  block?: string;
+  configuration?: {
+    [key: string]: unknown;
+  };
+  channel?: string;
+};
+
+export type CanvasesPatchOperationType =
+  | "ADD_NODE"
+  | "DELETE_NODE"
+  | "UPDATE_NODE"
+  | "CONNECT_NODES"
+  | "DISCONNECT_NODES";
+
 export type CanvasesResolveCanvasChangeRequestBody = {
   canvas?: CanvasesCanvas;
   autoLayout?: CanvasesCanvasAutoLayout;
@@ -551,7 +557,7 @@ export type CanvasesUpdateCanvasVersionResponse = {
 };
 
 export type CanvasesUpdateCanvasVersionThroughOpsBody = {
-  operations?: Array<CanvasesCanvasUpdateOperation>;
+  operations?: Array<CanvasesPatchOperation>;
   dryRun?: boolean;
 };
 
@@ -588,12 +594,6 @@ export type ComponentsComponentAction = {
 
 export type ComponentsDescribeComponentResponse = {
   component?: ComponentsComponent;
-};
-
-export type ComponentsEdge = {
-  sourceId?: string;
-  targetId?: string;
-  channel?: string;
 };
 
 export type ComponentsIntegrationRef = {
@@ -1309,6 +1309,12 @@ export type SuperplaneBlueprintsUserRef = {
 export type SuperplaneCanvasesUserRef = {
   id?: string;
   name?: string;
+};
+
+export type SuperplaneComponentsEdge = {
+  sourceId?: string;
+  targetId?: string;
+  channel?: string;
 };
 
 export type SuperplaneComponentsNode = {

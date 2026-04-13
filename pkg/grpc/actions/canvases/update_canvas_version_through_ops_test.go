@@ -95,10 +95,10 @@ func Test__UpdateCanvasVersionThroughOps(t *testing.T) {
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
-			[]*pb.CanvasUpdateOperation{
+			[]*pb.PatchOperation{
 				{
-					Type: pb.CanvasUpdateOperation_ADD_NODE,
-					Target: &pb.CanvasUpdateOperation_Node{
+					Type: pb.PatchOperation_ADD_NODE,
+					Node: &pb.PatchOperation_Node{
 						Id:            "node-c",
 						Name:          "Node C",
 						Block:         "noop",
@@ -106,26 +106,24 @@ func Test__UpdateCanvasVersionThroughOps(t *testing.T) {
 					},
 				},
 				{
-					Type: pb.CanvasUpdateOperation_UPDATE_NODE,
-					Target: &pb.CanvasUpdateOperation_Node{
+					Type: pb.PatchOperation_UPDATE_NODE,
+					Node: &pb.PatchOperation_Node{
 						Id:            "node-a",
 						Name:          "Node A Updated",
 						Configuration: structFromAnyMap(t, map[string]any{"foo": "after"}),
 					},
 				},
 				{
-					Type:   pb.CanvasUpdateOperation_DISCONNECT_NODES,
-					Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-b", Channel: "default"},
+					Type: pb.PatchOperation_DISCONNECT_NODES,
+					Edge: &pb.PatchOperation_Edge{SourceId: "node-a", TargetId: "node-b", Channel: "default"},
 				},
 				{
-					Type:   pb.CanvasUpdateOperation_CONNECT_NODES,
-					Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-c", Channel: "default"},
+					Type: pb.PatchOperation_CONNECT_NODES,
+					Edge: &pb.PatchOperation_Edge{SourceId: "node-a", TargetId: "node-c", Channel: "default"},
 				},
 				{
-					Type:   pb.CanvasUpdateOperation_DELETE_NODE,
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-b"},
+					Type: pb.PatchOperation_DELETE_NODE,
+					Node: &pb.PatchOperation_Node{Id: "node-b"},
 				},
 			},
 			false,
@@ -185,10 +183,10 @@ func Test__UpdateCanvasVersionThroughOps(t *testing.T) {
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
-			[]*pb.CanvasUpdateOperation{
+			[]*pb.PatchOperation{
 				{
-					Type: pb.CanvasUpdateOperation_ADD_NODE,
-					Target: &pb.CanvasUpdateOperation_Node{
+					Type: pb.PatchOperation_ADD_NODE,
+					Node: &pb.PatchOperation_Node{
 						Id:            "node-c",
 						Name:          "Node C",
 						Block:         "noop",
@@ -196,26 +194,24 @@ func Test__UpdateCanvasVersionThroughOps(t *testing.T) {
 					},
 				},
 				{
-					Type: pb.CanvasUpdateOperation_UPDATE_NODE,
-					Target: &pb.CanvasUpdateOperation_Node{
+					Type: pb.PatchOperation_UPDATE_NODE,
+					Node: &pb.PatchOperation_Node{
 						Id:            "node-a",
 						Name:          "Node A Updated",
 						Configuration: structFromAnyMap(t, map[string]any{"foo": "after"}),
 					},
 				},
 				{
-					Type:   pb.CanvasUpdateOperation_DISCONNECT_NODES,
-					Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-b", Channel: "default"},
+					Type: pb.PatchOperation_DISCONNECT_NODES,
+					Edge: &pb.PatchOperation_Edge{SourceId: "node-a", TargetId: "node-b", Channel: "default"},
 				},
 				{
-					Type:   pb.CanvasUpdateOperation_CONNECT_NODES,
-					Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-c", Channel: "default"},
+					Type: pb.PatchOperation_CONNECT_NODES,
+					Edge: &pb.PatchOperation_Edge{SourceId: "node-a", TargetId: "node-c", Channel: "default"},
 				},
 				{
-					Type:   pb.CanvasUpdateOperation_DELETE_NODE,
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-b"},
+					Type: pb.PatchOperation_DELETE_NODE,
+					Node: &pb.PatchOperation_Node{Id: "node-b"},
 				},
 			},
 			true,
@@ -286,11 +282,10 @@ func Test__UpdateCanvasVersionThroughOps(t *testing.T) {
 			r.Organization.ID,
 			canvas.ID,
 			*canvas.LiveVersionID,
-			[]*pb.CanvasUpdateOperation{
+			[]*pb.PatchOperation{
 				{
-					Type:   pb.CanvasUpdateOperation_CONNECT_NODES,
-					Source: &pb.CanvasUpdateOperation_Node{Id: "node-b", Channel: "default"},
-					Target: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
+					Type: pb.PatchOperation_CONNECT_NODES,
+					Edge: &pb.PatchOperation_Edge{SourceId: "node-b", TargetId: "node-a", Channel: "default"},
 				},
 			},
 			false,

@@ -23,7 +23,7 @@ func UpdateCanvasVersionThroughOps(
 	organizationID uuid.UUID,
 	canvasID uuid.UUID,
 	versionID uuid.UUID,
-	ops []*pb.CanvasUpdateOperation,
+	ops []*pb.PatchOperation,
 	dryRun bool,
 ) (*pb.UpdateCanvasVersionThroughOpsResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)

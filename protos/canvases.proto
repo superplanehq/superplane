@@ -476,7 +476,7 @@ message UpdateCanvasVersionResponse {
 message UpdateCanvasVersionThroughOpsRequest {
   string canvas_id = 1;
   string version_id = 2;
-  repeated CanvasUpdateOperation operations = 3;
+  repeated PatchOperation operations = 3;
   bool dry_run = 4;
 }
 
@@ -922,7 +922,7 @@ message ResolveExecutionErrorsRequest {
 
 message ResolveExecutionErrorsResponse {}
 
-message CanvasUpdateOperation {
+message PatchOperation {
   enum Type {
     ADD_NODE = 0;
     DELETE_NODE = 1;
@@ -939,9 +939,23 @@ message CanvasUpdateOperation {
     string channel = 5;
   }
 
+  message Edge {
+    string source_id = 1;
+    string target_id = 2;
+    string channel = 3;
+  }
+
   Type type = 1;
-  Node target = 2;
-  Node source = 3;
+
+  //
+  // Required for ADD_NODE, UPDATE_NODE, DELETE_NODE
+  //
+  Node node = 2;
+
+  //
+  // Required for DISCONNECT_NODES and CONNECT_NODES
+  //
+  Edge edge = 3;
 }
 
 //

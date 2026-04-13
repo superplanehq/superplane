@@ -28,7 +28,7 @@ type BlueprintsBlueprint struct {
 	CreatedAt      *time.Time                          `json:"createdAt,omitempty"`
 	UpdatedAt      *time.Time                          `json:"updatedAt,omitempty"`
 	Nodes          []SuperplaneComponentsNode          `json:"nodes,omitempty"`
-	Edges          []ComponentsEdge                    `json:"edges,omitempty"`
+	Edges          []SuperplaneComponentsEdge          `json:"edges,omitempty"`
 	Configuration  []ConfigurationField                `json:"configuration,omitempty"`
 	OutputChannels []SuperplaneBlueprintsOutputChannel `json:"outputChannels,omitempty"`
 	Icon           *string                             `json:"icon,omitempty"`
@@ -278,9 +278,9 @@ func (o *BlueprintsBlueprint) SetNodes(v []SuperplaneComponentsNode) {
 }
 
 // GetEdges returns the Edges field value if set, zero value otherwise.
-func (o *BlueprintsBlueprint) GetEdges() []ComponentsEdge {
+func (o *BlueprintsBlueprint) GetEdges() []SuperplaneComponentsEdge {
 	if o == nil || IsNil(o.Edges) {
-		var ret []ComponentsEdge
+		var ret []SuperplaneComponentsEdge
 		return ret
 	}
 	return o.Edges
@@ -288,7 +288,7 @@ func (o *BlueprintsBlueprint) GetEdges() []ComponentsEdge {
 
 // GetEdgesOk returns a tuple with the Edges field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *BlueprintsBlueprint) GetEdgesOk() ([]ComponentsEdge, bool) {
+func (o *BlueprintsBlueprint) GetEdgesOk() ([]SuperplaneComponentsEdge, bool) {
 	if o == nil || IsNil(o.Edges) {
 		return nil, false
 	}
@@ -304,8 +304,8 @@ func (o *BlueprintsBlueprint) HasEdges() bool {
 	return false
 }
 
-// SetEdges gets a reference to the given []ComponentsEdge and assigns it to the Edges field.
-func (o *BlueprintsBlueprint) SetEdges(v []ComponentsEdge) {
+// SetEdges gets a reference to the given []SuperplaneComponentsEdge and assigns it to the Edges field.
+func (o *BlueprintsBlueprint) SetEdges(v []SuperplaneComponentsEdge) {
 	o.Edges = v
 }
 

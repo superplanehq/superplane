@@ -18,19 +18,22 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictStr
+from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
+from superplaneapi.models.canvases_patch_operation_edge import CanvasesPatchOperationEdge
+from superplaneapi.models.canvases_patch_operation_node import CanvasesPatchOperationNode
+from superplaneapi.models.canvases_patch_operation_type import CanvasesPatchOperationType
 from typing import Optional, Set
 from typing_extensions import Self
 
-class ComponentsEdge(BaseModel):
+class CanvasesPatchOperation(BaseModel):
     """
-    ComponentsEdge
+    CanvasesPatchOperation
     """ # noqa: E501
-    source_id: Optional[StrictStr] = Field(default=None, alias="sourceId")
-    target_id: Optional[StrictStr] = Field(default=None, alias="targetId")
-    channel: Optional[StrictStr] = None
-    __properties: ClassVar[List[str]] = ["sourceId", "targetId", "channel"]
+    type: Optional[CanvasesPatchOperationType] = CanvasesPatchOperationType.ADD_NODE
+    node: Optional[CanvasesPatchOperationNode] = None
+    edge: Optional[CanvasesPatchOperationEdge] = None
+    __properties: ClassVar[List[str]] = ["type", "node", "edge"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -50,7 +53,7 @@ class ComponentsEdge(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of ComponentsEdge from a JSON string"""
+        """Create an instance of CanvasesPatchOperation from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,11 +74,17 @@ class ComponentsEdge(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
+        # override the default output from pydantic by calling `to_dict()` of node
+        if self.node:
+            _dict['node'] = self.node.to_dict()
+        # override the default output from pydantic by calling `to_dict()` of edge
+        if self.edge:
+            _dict['edge'] = self.edge.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of ComponentsEdge from a dict"""
+        """Create an instance of CanvasesPatchOperation from a dict"""
         if obj is None:
             return None
 
@@ -83,9 +92,9 @@ class ComponentsEdge(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "sourceId": obj.get("sourceId"),
-            "targetId": obj.get("targetId"),
-            "channel": obj.get("channel")
+            "type": obj.get("type") if obj.get("type") is not None else CanvasesPatchOperationType.ADD_NODE,
+            "node": CanvasesPatchOperationNode.from_dict(obj["node"]) if obj.get("node") is not None else None,
+            "edge": CanvasesPatchOperationEdge.from_dict(obj["edge"]) if obj.get("edge") is not None else None
         })
         return _obj
 

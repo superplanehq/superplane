@@ -26,10 +26,10 @@ func Test__CanvasPatcher(t *testing.T) {
 			[]models.Edge{{SourceID: "node-a", TargetID: "node-b", Channel: "default"}},
 		)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{
+		steps.whenHandling([]*pb.PatchOperation{
 			{
-				Type: pb.CanvasUpdateOperation_ADD_NODE,
-				Target: &pb.CanvasUpdateOperation_Node{
+				Type: pb.PatchOperation_ADD_NODE,
+				Node: &pb.PatchOperation_Node{
 					Id:            "node-c",
 					Name:          "Node C",
 					Block:         "noop",
@@ -37,26 +37,34 @@ func Test__CanvasPatcher(t *testing.T) {
 				},
 			},
 			{
-				Type: pb.CanvasUpdateOperation_UPDATE_NODE,
-				Target: &pb.CanvasUpdateOperation_Node{
+				Type: pb.PatchOperation_UPDATE_NODE,
+				Node: &pb.PatchOperation_Node{
 					Id:            "node-a",
 					Name:          "Node A Updated",
 					Configuration: structFromMap(t, map[string]any{"foo": "after"}),
 				},
 			},
 			{
-				Type:   pb.CanvasUpdateOperation_DISCONNECT_NODES,
-				Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-				Target: &pb.CanvasUpdateOperation_Node{Id: "node-b", Channel: "default"},
+				Type: pb.PatchOperation_DISCONNECT_NODES,
+				Edge: &pb.PatchOperation_Edge{
+					SourceId: "node-a",
+					TargetId: "node-b",
+					Channel:  "default",
+				},
 			},
 			{
-				Type:   pb.CanvasUpdateOperation_CONNECT_NODES,
-				Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-				Target: &pb.CanvasUpdateOperation_Node{Id: "node-c", Channel: "default"},
+				Type: pb.PatchOperation_CONNECT_NODES,
+				Edge: &pb.PatchOperation_Edge{
+					SourceId: "node-a",
+					TargetId: "node-c",
+					Channel:  "default",
+				},
 			},
 			{
-				Type:   pb.CanvasUpdateOperation_DELETE_NODE,
-				Target: &pb.CanvasUpdateOperation_Node{Id: "node-b"},
+				Type: pb.PatchOperation_DELETE_NODE,
+				Node: &pb.PatchOperation_Node{
+					Id: "node-b",
+				},
 			},
 		})
 		steps.assertNoError()
@@ -77,11 +85,14 @@ func Test__CanvasPatcher(t *testing.T) {
 			nil,
 		)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{
+		steps.whenHandling([]*pb.PatchOperation{
 			{
-				Type:   pb.CanvasUpdateOperation_CONNECT_NODES,
-				Source: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
-				Target: &pb.CanvasUpdateOperation_Node{Id: "node-a", Channel: "default"},
+				Type: pb.PatchOperation_CONNECT_NODES,
+				Edge: &pb.PatchOperation_Edge{
+					SourceId: "node-a",
+					TargetId: "node-a",
+					Channel:  "default",
+				},
 			},
 		})
 		steps.assertHasError()
@@ -91,9 +102,9 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{
+		steps.whenHandling([]*pb.PatchOperation{
 			{
-				Type: pb.CanvasUpdateOperation_Type(999),
+				Type: pb.PatchOperation_Type(999),
 			},
 		})
 
@@ -113,7 +124,7 @@ func Test__CanvasPatcher(t *testing.T) {
 			},
 		)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{})
+		steps.whenHandling([]*pb.PatchOperation{})
 		steps.assertHasError()
 	})
 
@@ -121,10 +132,10 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{
+		steps.whenHandling([]*pb.PatchOperation{
 			{
-				Type: pb.CanvasUpdateOperation_ADD_NODE,
-				Target: &pb.CanvasUpdateOperation_Node{
+				Type: pb.PatchOperation_ADD_NODE,
+				Node: &pb.PatchOperation_Node{
 					Id:    "node-a",
 					Name:  "Node A",
 					Block: "if",
@@ -141,10 +152,10 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{
+		steps.whenHandling([]*pb.PatchOperation{
 			{
-				Type: pb.CanvasUpdateOperation_ADD_NODE,
-				Target: &pb.CanvasUpdateOperation_Node{
+				Type: pb.PatchOperation_ADD_NODE,
+				Node: &pb.PatchOperation_Node{
 					Id:    "node-a",
 					Name:  "Node A",
 					Block: "schedule",
@@ -161,10 +172,10 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
 		steps.givenCanvasVersion(nil, nil)
 
-		steps.whenHandling([]*pb.CanvasUpdateOperation{
+		steps.whenHandling([]*pb.PatchOperation{
 			{
-				Type: pb.CanvasUpdateOperation_ADD_NODE,
-				Target: &pb.CanvasUpdateOperation_Node{
+				Type: pb.PatchOperation_ADD_NODE,
+				Node: &pb.PatchOperation_Node{
 					Id:    "node-a",
 					Name:  "Node A",
 					Block: "annotation",
@@ -194,7 +205,7 @@ func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []mod
 	}, s.registry)
 }
 
-func (s *CanvasPatcherSteps) whenHandling(operations []*pb.CanvasUpdateOperation) {
+func (s *CanvasPatcherSteps) whenHandling(operations []*pb.PatchOperation) {
 	s.err = s.patcher.Patch(operations)
 }
 
@@ -230,7 +241,7 @@ func (s *CanvasPatcherSteps) assertHasNodeBlock(nodeID string, block string) {
 }
 
 func (s *CanvasPatcherSteps) assertHasEdge(sourceID string, targetID string, channel string) {
-	_, found := s.patcher.findEdge(models.Edge{SourceID: sourceID, TargetID: targetID, Channel: channel})
+	_, found := s.patcher.findEdge(sourceID, targetID, channel)
 	require.True(s.t, found, "expected edge %s -> %s on channel %s", sourceID, targetID, channel)
 }
 

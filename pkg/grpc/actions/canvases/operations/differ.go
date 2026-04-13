@@ -34,8 +34,8 @@ func NewDiffer(currentNodes []models.Node, currentEdges []models.Edge, proposedN
 	}
 }
 
-func (d *Differ) Diff() ([]*pb.CanvasUpdateOperation, error) {
-	operations := []*pb.CanvasUpdateOperation{}
+func (d *Differ) Diff() ([]*pb.PatchOperation, error) {
+	operations := []*pb.PatchOperation{}
 	operations = append(operations, d.computeDeleteNodeOperations()...)
 	addNodeOperations, err := d.computeAddNodeOperations()
 	if err != nil {
@@ -55,8 +55,8 @@ func (d *Differ) Diff() ([]*pb.CanvasUpdateOperation, error) {
 	return operations, nil
 }
 
-func (d *Differ) computeAddNodeOperations() ([]*pb.CanvasUpdateOperation, error) {
-	operations := []*pb.CanvasUpdateOperation{}
+func (d *Differ) computeAddNodeOperations() ([]*pb.PatchOperation, error) {
+	operations := []*pb.PatchOperation{}
 
 	//
 	// If a node exists in the proposed, but not in the current,
@@ -67,26 +67,22 @@ func (d *Differ) computeAddNodeOperations() ([]*pb.CanvasUpdateOperation, error)
 			continue
 		}
 
-		target, err := nodeToOperationNode(node)
+		node, err := nodeToOperationNode(node)
 		if err != nil {
 			return nil, err
 		}
 
-		operations = append(operations, &pb.CanvasUpdateOperation{
-			Type:   pb.CanvasUpdateOperation_ADD_NODE,
-			Target: target,
+		operations = append(operations, &pb.PatchOperation{
+			Type: pb.PatchOperation_ADD_NODE,
+			Node: node,
 		})
-
-		//
-		// TODO: do we need to add it to the currentNodes map here too?
-		//
 	}
 
 	return operations, nil
 }
 
-func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasUpdateOperation {
-	operations := []*pb.CanvasUpdateOperation{}
+func (d *Differ) computeDeleteNodeOperations() []*pb.PatchOperation {
+	operations := []*pb.PatchOperation{}
 
 	//
 	// If a node exists in the current, but not in the proposed,
@@ -97,9 +93,9 @@ func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasUpdateOperation {
 			continue
 		}
 
-		operations = append(operations, &pb.CanvasUpdateOperation{
-			Type: pb.CanvasUpdateOperation_DELETE_NODE,
-			Target: &pb.CanvasUpdateOperation_Node{
+		operations = append(operations, &pb.PatchOperation{
+			Type: pb.PatchOperation_DELETE_NODE,
+			Node: &pb.PatchOperation_Node{
 				Id: nodeID,
 			},
 		})
@@ -108,8 +104,8 @@ func (d *Differ) computeDeleteNodeOperations() []*pb.CanvasUpdateOperation {
 	return operations
 }
 
-func (d *Differ) computeUpdateNodeOperations() ([]*pb.CanvasUpdateOperation, error) {
-	operations := []*pb.CanvasUpdateOperation{}
+func (d *Differ) computeUpdateNodeOperations() ([]*pb.PatchOperation, error) {
+	operations := []*pb.PatchOperation{}
 
 	//
 	// If a node exists in both the current and the proposed,
@@ -125,22 +121,22 @@ func (d *Differ) computeUpdateNodeOperations() ([]*pb.CanvasUpdateOperation, err
 			continue
 		}
 
-		target, err := nodeToOperationNode(node)
+		n, err := nodeToOperationNode(node)
 		if err != nil {
 			return nil, err
 		}
 
-		operations = append(operations, &pb.CanvasUpdateOperation{
-			Type:   pb.CanvasUpdateOperation_UPDATE_NODE,
-			Target: target,
+		operations = append(operations, &pb.PatchOperation{
+			Type: pb.PatchOperation_UPDATE_NODE,
+			Node: n,
 		})
 	}
 
 	return operations, nil
 }
 
-func (d *Differ) computeDisconnectNodeOperations() []*pb.CanvasUpdateOperation {
-	operations := []*pb.CanvasUpdateOperation{}
+func (d *Differ) computeDisconnectNodeOperations() []*pb.PatchOperation {
+	operations := []*pb.PatchOperation{}
 
 	//
 	// If an edge exists in the current, but not in the proposed,
@@ -151,28 +147,21 @@ func (d *Differ) computeDisconnectNodeOperations() []*pb.CanvasUpdateOperation {
 			continue
 		}
 
-		operations = append(operations, &pb.CanvasUpdateOperation{
-			Type: pb.CanvasUpdateOperation_DISCONNECT_NODES,
-			Source: &pb.CanvasUpdateOperation_Node{
-				Id:      edge.SourceID,
-				Channel: edge.Channel,
-			},
-			Target: &pb.CanvasUpdateOperation_Node{
-				Id:      edge.TargetID,
-				Channel: edge.Channel,
+		operations = append(operations, &pb.PatchOperation{
+			Type: pb.PatchOperation_DISCONNECT_NODES,
+			Edge: &pb.PatchOperation_Edge{
+				SourceId: edge.SourceID,
+				TargetId: edge.TargetID,
+				Channel:  edge.Channel,
 			},
 		})
-
-		//
-		// TODO: do we need to remove it from the currentEdges map here too?
-		//
 	}
 
 	return operations
 }
 
-func (d *Differ) computeConnectNodeOperations() []*pb.CanvasUpdateOperation {
-	operations := []*pb.CanvasUpdateOperation{}
+func (d *Differ) computeConnectNodeOperations() []*pb.PatchOperation {
+	operations := []*pb.PatchOperation{}
 
 	//
 	// If an edge exists in the proposed but not in the current,
@@ -183,21 +172,14 @@ func (d *Differ) computeConnectNodeOperations() []*pb.CanvasUpdateOperation {
 			continue
 		}
 
-		operations = append(operations, &pb.CanvasUpdateOperation{
-			Type: pb.CanvasUpdateOperation_CONNECT_NODES,
-			Source: &pb.CanvasUpdateOperation_Node{
-				Id:      edge.SourceID,
-				Channel: edge.Channel,
-			},
-			Target: &pb.CanvasUpdateOperation_Node{
-				Id:      edge.TargetID,
-				Channel: edge.Channel,
+		operations = append(operations, &pb.PatchOperation{
+			Type: pb.PatchOperation_CONNECT_NODES,
+			Edge: &pb.PatchOperation_Edge{
+				SourceId: edge.SourceID,
+				TargetId: edge.TargetID,
+				Channel:  edge.Channel,
 			},
 		})
-
-		//
-		// TODO: do we need to add it to the currentEdges map here too?
-		//
 	}
 
 	return operations
@@ -231,8 +213,8 @@ func blockNameFromNode(node models.Node) string {
 	return ""
 }
 
-func nodeToOperationNode(node models.Node) (*pb.CanvasUpdateOperation_Node, error) {
-	n := &pb.CanvasUpdateOperation_Node{
+func nodeToOperationNode(node models.Node) (*pb.PatchOperation_Node, error) {
+	n := &pb.PatchOperation_Node{
 		Id:   node.ID,
 		Name: node.Name,
 	}

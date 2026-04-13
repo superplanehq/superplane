@@ -20,7 +20,7 @@ import json
 
 from pydantic import BaseModel, ConfigDict
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.components_edge import ComponentsEdge
+from superplaneapi.models.superplane_components_edge import SuperplaneComponentsEdge
 from superplaneapi.models.superplane_components_node import SuperplaneComponentsNode
 from typing import Optional, Set
 from typing_extensions import Self
@@ -30,7 +30,7 @@ class CanvasesCanvasSpec(BaseModel):
     CanvasesCanvasSpec
     """ # noqa: E501
     nodes: Optional[List[SuperplaneComponentsNode]] = None
-    edges: Optional[List[ComponentsEdge]] = None
+    edges: Optional[List[SuperplaneComponentsEdge]] = None
     __properties: ClassVar[List[str]] = ["nodes", "edges"]
 
     model_config = ConfigDict(
@@ -99,7 +99,7 @@ class CanvasesCanvasSpec(BaseModel):
 
         _obj = cls.model_validate({
             "nodes": [SuperplaneComponentsNode.from_dict(_item) for _item in obj["nodes"]] if obj.get("nodes") is not None else None,
-            "edges": [ComponentsEdge.from_dict(_item) for _item in obj["edges"]] if obj.get("edges") is not None else None
+            "edges": [SuperplaneComponentsEdge.from_dict(_item) for _item in obj["edges"]] if obj.get("edges") is not None else None
         })
         return _obj
 

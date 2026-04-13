@@ -182,7 +182,7 @@ func Test__Differ(t *testing.T) {
 
 type DifferSteps struct {
 	t          *testing.T
-	operations []*pb.CanvasUpdateOperation
+	operations []*pb.PatchOperation
 	err        error
 }
 
@@ -207,48 +207,48 @@ func (s *DifferSteps) assertOperationCount(count int) {
 }
 
 func (s *DifferSteps) assertHasDeleteNode(nodeID string) {
-	op := s.findNodeOperation(pb.CanvasUpdateOperation_DELETE_NODE, nodeID)
+	op := s.findNodeOperation(pb.PatchOperation_DELETE_NODE, nodeID)
 	require.NotNil(s.t, op, "expected DELETE_NODE operation for %s", nodeID)
 }
 
 func (s *DifferSteps) assertHasAddNode(nodeID string, name string, block string, configuration map[string]any) {
-	op := s.findNodeOperation(pb.CanvasUpdateOperation_ADD_NODE, nodeID)
+	op := s.findNodeOperation(pb.PatchOperation_ADD_NODE, nodeID)
 	require.NotNil(s.t, op, "expected ADD_NODE operation for %s", nodeID)
-	require.Equal(s.t, name, op.GetTarget().GetName())
-	require.Equal(s.t, block, op.GetTarget().GetBlock())
-	require.Equal(s.t, configuration, op.GetTarget().GetConfiguration().AsMap())
+	require.Equal(s.t, name, op.GetNode().GetName())
+	require.Equal(s.t, block, op.GetNode().GetBlock())
+	require.Equal(s.t, configuration, op.GetNode().GetConfiguration().AsMap())
 }
 
 func (s *DifferSteps) assertHasUpdateNode(nodeID string, name string, block string, configuration map[string]any) {
-	op := s.findNodeOperation(pb.CanvasUpdateOperation_UPDATE_NODE, nodeID)
+	op := s.findNodeOperation(pb.PatchOperation_UPDATE_NODE, nodeID)
 	require.NotNil(s.t, op, "expected UPDATE_NODE operation for %s", nodeID)
-	require.Equal(s.t, name, op.GetTarget().GetName())
-	require.Equal(s.t, block, op.GetTarget().GetBlock())
-	require.Equal(s.t, configuration, op.GetTarget().GetConfiguration().AsMap())
+	require.Equal(s.t, name, op.GetNode().GetName())
+	require.Equal(s.t, block, op.GetNode().GetBlock())
+	require.Equal(s.t, configuration, op.GetNode().GetConfiguration().AsMap())
 }
 
 func (s *DifferSteps) assertHasDisconnect(sourceID string, targetID string, channel string) {
-	op := s.findEdgeOperation(pb.CanvasUpdateOperation_DISCONNECT_NODES, sourceID, targetID, channel)
+	op := s.findEdgeOperation(pb.PatchOperation_DISCONNECT_NODES, sourceID, targetID, channel)
 	require.NotNil(s.t, op, "expected DISCONNECT_NODES from %s to %s on channel %s", sourceID, targetID, channel)
 }
 
 func (s *DifferSteps) assertHasConnect(sourceID string, targetID string, channel string) {
-	op := s.findEdgeOperation(pb.CanvasUpdateOperation_CONNECT_NODES, sourceID, targetID, channel)
+	op := s.findEdgeOperation(pb.PatchOperation_CONNECT_NODES, sourceID, targetID, channel)
 	require.NotNil(s.t, op, "expected CONNECT_NODES from %s to %s on channel %s", sourceID, targetID, channel)
 }
 
-func (s *DifferSteps) findNodeOperation(operationType pb.CanvasUpdateOperation_Type, nodeID string) *pb.CanvasUpdateOperation {
+func (s *DifferSteps) findNodeOperation(operationType pb.PatchOperation_Type, nodeID string) *pb.PatchOperation {
 	for _, operation := range s.operations {
 		if operation.GetType() != operationType {
 			continue
 		}
 
-		target := operation.GetTarget()
-		if target == nil {
+		node := operation.GetNode()
+		if node == nil {
 			continue
 		}
 
-		if target.GetId() == nodeID {
+		if node.GetId() == nodeID {
 			return operation
 		}
 	}
@@ -256,27 +256,26 @@ func (s *DifferSteps) findNodeOperation(operationType pb.CanvasUpdateOperation_T
 	return nil
 }
 
-func (s *DifferSteps) findEdgeOperation(operationType pb.CanvasUpdateOperation_Type, sourceID string, targetID string, channel string) *pb.CanvasUpdateOperation {
+func (s *DifferSteps) findEdgeOperation(operationType pb.PatchOperation_Type, sourceID string, targetID string, channel string) *pb.PatchOperation {
 	for _, operation := range s.operations {
 		if operation.GetType() != operationType {
 			continue
 		}
 
-		source := operation.GetSource()
-		target := operation.GetTarget()
-		if source == nil || target == nil {
+		edge := operation.GetEdge()
+		if edge == nil {
 			continue
 		}
 
-		if source.GetId() != sourceID {
+		if edge.GetSourceId() != sourceID {
 			continue
 		}
 
-		if target.GetId() != targetID {
+		if edge.GetTargetId() != targetID {
 			continue
 		}
 
-		if source.GetChannel() != channel || target.GetChannel() != channel {
+		if edge.GetChannel() != channel {
 			continue
 		}
 

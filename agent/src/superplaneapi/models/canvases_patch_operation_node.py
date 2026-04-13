@@ -18,19 +18,21 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_patch_operation import CanvasesPatchOperation
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesUpdateCanvasVersionThroughOpsBody(BaseModel):
+class CanvasesPatchOperationNode(BaseModel):
     """
-    CanvasesUpdateCanvasVersionThroughOpsBody
+    CanvasesPatchOperationNode
     """ # noqa: E501
-    operations: Optional[List[CanvasesPatchOperation]] = None
-    dry_run: Optional[StrictBool] = Field(default=None, alias="dryRun")
-    __properties: ClassVar[List[str]] = ["operations", "dryRun"]
+    id: Optional[StrictStr] = None
+    name: Optional[StrictStr] = None
+    block: Optional[StrictStr] = None
+    configuration: Optional[Dict[str, Any]] = None
+    channel: Optional[StrictStr] = None
+    __properties: ClassVar[List[str]] = ["id", "name", "block", "configuration", "channel"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -50,7 +52,7 @@ class CanvasesUpdateCanvasVersionThroughOpsBody(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesUpdateCanvasVersionThroughOpsBody from a JSON string"""
+        """Create an instance of CanvasesPatchOperationNode from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,18 +73,11 @@ class CanvasesUpdateCanvasVersionThroughOpsBody(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of each item in operations (list)
-        _items = []
-        if self.operations:
-            for _item_operations in self.operations:
-                if _item_operations:
-                    _items.append(_item_operations.to_dict())
-            _dict['operations'] = _items
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesUpdateCanvasVersionThroughOpsBody from a dict"""
+        """Create an instance of CanvasesPatchOperationNode from a dict"""
         if obj is None:
             return None
 
@@ -90,8 +85,11 @@ class CanvasesUpdateCanvasVersionThroughOpsBody(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "operations": [CanvasesPatchOperation.from_dict(_item) for _item in obj["operations"]] if obj.get("operations") is not None else None,
-            "dryRun": obj.get("dryRun")
+            "id": obj.get("id"),
+            "name": obj.get("name"),
+            "block": obj.get("block"),
+            "configuration": obj.get("configuration"),
+            "channel": obj.get("channel")
         })
         return _obj
 

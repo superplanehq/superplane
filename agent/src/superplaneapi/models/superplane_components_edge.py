@@ -18,21 +18,19 @@ import pprint
 import re  # noqa: F401
 import json
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional
-from superplaneapi.models.canvases_canvas_update_operation_node import CanvasesCanvasUpdateOperationNode
-from superplaneapi.models.canvases_canvas_update_operation_type import CanvasesCanvasUpdateOperationType
 from typing import Optional, Set
 from typing_extensions import Self
 
-class CanvasesCanvasUpdateOperation(BaseModel):
+class SuperplaneComponentsEdge(BaseModel):
     """
-    CanvasesCanvasUpdateOperation
+    SuperplaneComponentsEdge
     """ # noqa: E501
-    type: Optional[CanvasesCanvasUpdateOperationType] = CanvasesCanvasUpdateOperationType.ADD_NODE
-    target: Optional[CanvasesCanvasUpdateOperationNode] = None
-    source: Optional[CanvasesCanvasUpdateOperationNode] = None
-    __properties: ClassVar[List[str]] = ["type", "target", "source"]
+    source_id: Optional[StrictStr] = Field(default=None, alias="sourceId")
+    target_id: Optional[StrictStr] = Field(default=None, alias="targetId")
+    channel: Optional[StrictStr] = None
+    __properties: ClassVar[List[str]] = ["sourceId", "targetId", "channel"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -52,7 +50,7 @@ class CanvasesCanvasUpdateOperation(BaseModel):
 
     @classmethod
     def from_json(cls, json_str: str) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasUpdateOperation from a JSON string"""
+        """Create an instance of SuperplaneComponentsEdge from a JSON string"""
         return cls.from_dict(json.loads(json_str))
 
     def to_dict(self) -> Dict[str, Any]:
@@ -73,17 +71,11 @@ class CanvasesCanvasUpdateOperation(BaseModel):
             exclude=excluded_fields,
             exclude_none=True,
         )
-        # override the default output from pydantic by calling `to_dict()` of target
-        if self.target:
-            _dict['target'] = self.target.to_dict()
-        # override the default output from pydantic by calling `to_dict()` of source
-        if self.source:
-            _dict['source'] = self.source.to_dict()
         return _dict
 
     @classmethod
     def from_dict(cls, obj: Optional[Dict[str, Any]]) -> Optional[Self]:
-        """Create an instance of CanvasesCanvasUpdateOperation from a dict"""
+        """Create an instance of SuperplaneComponentsEdge from a dict"""
         if obj is None:
             return None
 
@@ -91,9 +83,9 @@ class CanvasesCanvasUpdateOperation(BaseModel):
             return cls.model_validate(obj)
 
         _obj = cls.model_validate({
-            "type": obj.get("type") if obj.get("type") is not None else CanvasesCanvasUpdateOperationType.ADD_NODE,
-            "target": CanvasesCanvasUpdateOperationNode.from_dict(obj["target"]) if obj.get("target") is not None else None,
-            "source": CanvasesCanvasUpdateOperationNode.from_dict(obj["source"]) if obj.get("source") is not None else None
+            "sourceId": obj.get("sourceId"),
+            "targetId": obj.get("targetId"),
+            "channel": obj.get("channel")
         })
         return _obj
 
