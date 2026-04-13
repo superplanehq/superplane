@@ -217,6 +217,7 @@ Class | Method | HTTP request | Description
  - [CanvasesCanvasStatus](superplaneapi/docs/CanvasesCanvasStatus.md)
  - [CanvasesCanvasVersion](superplaneapi/docs/CanvasesCanvasVersion.md)
  - [CanvasesCanvasVersionMetadata](superplaneapi/docs/CanvasesCanvasVersionMetadata.md)
+ - [CanvasesCanvasVersionState](superplaneapi/docs/CanvasesCanvasVersionState.md)
  - [CanvasesCreateCanvasChangeRequestBody](superplaneapi/docs/CanvasesCreateCanvasChangeRequestBody.md)
  - [CanvasesCreateCanvasChangeRequestResponse](superplaneapi/docs/CanvasesCreateCanvasChangeRequestResponse.md)
  - [CanvasesCreateCanvasRequest](superplaneapi/docs/CanvasesCreateCanvasRequest.md)

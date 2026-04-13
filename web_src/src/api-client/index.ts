@@ -214,6 +214,7 @@ export type {
   CanvasesCanvasStatus,
   CanvasesCanvasVersion,
   CanvasesCanvasVersionMetadata,
+  CanvasesCanvasVersionState,
   CanvasesCreateCanvasChangeRequestBody,
   CanvasesCreateCanvasChangeRequestData,
   CanvasesCreateCanvasChangeRequestError,

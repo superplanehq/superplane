@@ -113,7 +113,14 @@ import { CanvasPageModals } from "./CanvasPageModals";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { CANVAS_BUNDLE_COLOR, CANVAS_BUNDLE_ICON_SLUG } from "./lib/canvas-node-preparation";
-import { formatVersionLabelWithTimestamp, versionSortValue } from "./lib/canvas-versions";
+import {
+  formatVersionLabelWithTimestamp,
+  isDraftVersion,
+  isPublishedVersion,
+  sortDraftVersionsDesc,
+  sortPublishedVersionsDesc,
+  versionSortValue,
+} from "./lib/canvas-versions";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { prepareComponentNode, prepareCompositeNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
@@ -221,13 +228,12 @@ export function WorkflowPageV2() {
     [paginatedVersionPages],
   );
   const liveCanvasVersion = useMemo(() => {
-    const publishedVersions = paginatedVersions.filter((version) => version.metadata?.isPublished);
+    const publishedVersions = paginatedVersions.filter(isPublishedVersion);
     if (publishedVersions.length > 0) {
       return publishedVersions[0];
     }
 
-    const fallbackPublishedVersions = canvasVersions.filter((version) => version.metadata?.isPublished);
-    return fallbackPublishedVersions[0];
+    return canvasVersions.filter(isPublishedVersion)[0];
   }, [paginatedVersions, canvasVersions]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
@@ -243,25 +249,14 @@ export function WorkflowPageV2() {
     paginatedVersions.forEach(addVersion);
 
     return Array.from(versionMap.values()).filter((version) => {
-      if (version.metadata?.isPublished) {
+      if (isPublishedVersion(version)) {
         return true;
       }
 
-      const isOwner = version.metadata?.owner?.id === currentUserId;
-      return isOwner;
+      return version.metadata?.owner?.id === currentUserId;
     });
   }, [canvasVersions, paginatedVersions, currentUserId]);
-  const liveVersions = useMemo(
-    () =>
-      visibleCanvasVersions
-        .filter((version) => version.metadata?.isPublished)
-        .sort(
-          (a, b) =>
-            versionSortValue(b.metadata?.publishedAt || b.metadata?.updatedAt) -
-            versionSortValue(a.metadata?.publishedAt || a.metadata?.updatedAt),
-        ),
-    [visibleCanvasVersions],
-  );
+  const liveVersions = useMemo(() => sortPublishedVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const liveVersionChangeRequestsByVersionId = useMemo(() => {
     const publishedChangeRequests = canvasChangeRequests.filter(
       (changeRequest) => changeRequest.metadata?.status === "STATUS_PUBLISHED",
@@ -306,7 +301,7 @@ export function WorkflowPageV2() {
         return;
       }
 
-      const versionPublishedAt = versionSortValue(version.metadata?.publishedAt || version.metadata?.updatedAt);
+      const versionPublishedAt = versionSortValue(version.metadata?.publishedAt);
       if (!versionPublishedAt) {
         return;
       }
@@ -388,17 +383,7 @@ export function WorkflowPageV2() {
     });
     return indexedVersions;
   }, [visibleCanvasVersions, pendingApprovalVersions]);
-  const draftVersions = useMemo(
-    () =>
-      visibleCanvasVersions
-        .filter((version) => !version.metadata?.isPublished)
-        .sort(
-          (a, b) =>
-            versionSortValue(b.metadata?.updatedAt || b.metadata?.createdAt) -
-            versionSortValue(a.metadata?.updatedAt || a.metadata?.createdAt),
-        ),
-    [visibleCanvasVersions],
-  );
+  const draftVersions = useMemo(() => sortDraftVersionsDesc(visibleCanvasVersions), [visibleCanvasVersions]);
   const hasMoreLiveVersions = canvasLiveVersionsQuery.hasNextPage || false;
   const isLoadingMoreLiveVersions = canvasLiveVersionsQuery.isFetchingNextPage;
   const liveCanvasVersionId = liveCanvasVersion?.metadata?.id;
@@ -416,7 +401,7 @@ export function WorkflowPageV2() {
     if (
       activeCanvasVersionId &&
       selectedCanvasVersion &&
-      !selectedCanvasVersion.metadata?.isPublished &&
+      isDraftVersion(selectedCanvasVersion) &&
       !isPendingApprovalVersion
     ) {
       return selectedCanvasVersion;
@@ -445,7 +430,7 @@ export function WorkflowPageV2() {
   const isViewingPendingApprovalVersion =
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
-    !!selectedCanvasVersion && !selectedCanvasVersion.metadata?.isPublished && !isViewingPendingApprovalVersion;
+    !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
@@ -838,11 +823,11 @@ export function WorkflowPageV2() {
       return;
     }
 
-    const isPublishedVersion = !!requestedVersion.metadata?.isPublished;
-    const isOwnedDraft = !isPublishedVersion && requestedVersion.metadata?.owner?.id === currentUserId;
+    const isPublished = isPublishedVersion(requestedVersion);
+    const isOwnedDraft = !isPublished && requestedVersion.metadata?.owner?.id === currentUserId;
     const isPendingApprovalVersion = pendingApprovalVersionIds.has(requestedVersion.metadata?.id || "");
     const isCurrentLive = requestedVersion.metadata?.id === liveCanvasVersionId;
-    if (!isOwnedDraft && !isPublishedVersion && !isPendingApprovalVersion) {
+    if (!isOwnedDraft && !isPublished && !isPendingApprovalVersion) {
       hasSyncedVersionFromURLRef.current = true;
       return;
     }
@@ -4379,11 +4364,11 @@ export function WorkflowPageV2() {
 
       setIsCreateChangeRequestMode(false);
 
-      const isPublishedVersion = !!version.metadata?.isPublished;
-      const isOwnedDraft = !isPublishedVersion && version.metadata?.owner?.id === currentUserId;
+      const isPublished = isPublishedVersion(version);
+      const isOwnedDraft = !isPublished && version.metadata?.owner?.id === currentUserId;
       const isPendingApprovalVersion = pendingApprovalVersionIds.has(version.metadata?.id || "");
       const isCurrentLive = version.metadata?.id === liveCanvasVersionId;
-      if (!isOwnedDraft && !isPublishedVersion && !isPendingApprovalVersion) {
+      if (!isOwnedDraft && !isPublished && !isPendingApprovalVersion) {
         showErrorToast("You can only use your edit version, open change requests, or published live history");
         return;
       }
