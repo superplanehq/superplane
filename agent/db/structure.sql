@@ -156,10 +156,10 @@ CREATE INDEX idx_agent_chats_owner_canvas_created ON public.agent_chats USING bt
 
 
 --
--- Name: idx_agent_chats_updated_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_agent_chats_org_updated_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_agent_chats_updated_at ON public.agent_chats USING btree (updated_at);
+CREATE INDEX idx_agent_chats_org_updated_at ON public.agent_chats USING btree (org_id, updated_at);
 
 
 --
