@@ -68,9 +68,9 @@ export interface AlertRuleNodeMetadata {
 
 export interface CreateAlertRuleConfiguration {
   title?: string;
-  folderUID?: string;
+  folder?: string;
   ruleGroup?: string;
-  dataSourceUid?: string;
+  dataSource?: string;
   query?: string;
   lookbackSeconds?: number;
   reducer?: string;
@@ -87,15 +87,15 @@ export interface CreateAlertRuleConfiguration {
 }
 
 export interface GetAlertRuleConfiguration {
-  alertRuleUid: string;
+  alertRule: string;
 }
 
 export interface UpdateAlertRuleConfiguration extends CreateAlertRuleConfiguration {
-  alertRuleUid: string;
+  alertRule: string;
 }
 
 export interface DeleteAlertRuleConfiguration {
-  alertRuleUid: string;
+  alertRule: string;
 }
 
 export interface DeleteAlertRuleOutput {

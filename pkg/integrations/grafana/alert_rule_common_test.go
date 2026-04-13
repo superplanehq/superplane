@@ -29,9 +29,9 @@ func Test__mergeAlertRulePayload__clearsLabelsWhenUpdateSendsEmptyList(t *testin
 
 	emptyLabels := []AlertRuleKeyValuePair{}
 	spec := UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
-		Title:        strPtr("New title"),
-		Labels:       &emptyLabels,
+		AlertRule: "rule-1",
+		Title:     strPtr("New title"),
+		Labels:    &emptyLabels,
 	}
 
 	merged, err := mergeAlertRulePayload(existing, spec)
@@ -49,7 +49,7 @@ func strPtr(s string) *string {
 func Test__decodeUpdateAlertRuleSpec__whitespaceOnlyReducerConditionBecomeNil__notificationClearsContact(t *testing.T) {
 	ws := "   "
 	spec, err := decodeUpdateAlertRuleSpec(map[string]any{
-		"alertRuleUid":         "rule-1",
+		"alertRule":            "rule-1",
 		"title":                "Updated",
 		"reducer":              ws,
 		"conditionType":        ws,
@@ -77,8 +77,8 @@ func Test__mergeAlertRulePayload__preservesConditionWhenOnlyQueryFieldsUpdate(t 
 	}
 
 	spec := UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
-		Query:        strPtr("sum(rate(http_requests_total[5m]))"),
+		AlertRule: "rule-1",
+		Query:     strPtr("sum(rate(http_requests_total[5m]))"),
 	}
 
 	merged, err := mergeAlertRulePayload(existing, spec)
@@ -115,8 +115,8 @@ func Test__mergeAlertRulePayload__setsConditionCWhenConditionFieldsUpdate(t *tes
 	}
 
 	spec := UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
-		Threshold:    float64Ptr(99),
+		AlertRule: "rule-1",
+		Threshold: float64Ptr(99),
 	}
 
 	merged, err := mergeAlertRulePayload(existing, spec)
@@ -137,7 +137,7 @@ func Test__mergeAlertRulePayload__clearsNotificationSettingsWhenReceiverEmpty(t 
 	}
 
 	spec, err := decodeUpdateAlertRuleSpec(map[string]any{
-		"alertRuleUid":         "rule-1",
+		"alertRule":            "rule-1",
 		"notificationReceiver": "",
 	})
 	require.NoError(t, err)
@@ -150,7 +150,7 @@ func Test__mergeAlertRulePayload__clearsNotificationSettingsWhenReceiverEmpty(t 
 
 func Test__validateUpdateAlertRuleSpec__rejectsInvalidReducerAndConditionType(t *testing.T) {
 	err := validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
-		AlertRuleUID:    "rule-1",
+		AlertRule:       "rule-1",
 		Reducer:         strPtr("foobar"),
 		ConditionType:   strPtr("gt"),
 		Threshold:       float64Ptr(1),
@@ -160,7 +160,7 @@ func Test__validateUpdateAlertRuleSpec__rejectsInvalidReducerAndConditionType(t 
 	assert.Contains(t, err.Error(), "invalid reducer")
 
 	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
-		AlertRuleUID:    "rule-1",
+		AlertRule:       "rule-1",
 		Reducer:         strPtr("last"),
 		ConditionType:   strPtr("not_a_condition"),
 		Threshold:       float64Ptr(1),
@@ -199,7 +199,7 @@ func Test__mergeAlertRulePayload__rejectsRangeConditionWithoutThreshold2(t *test
 	}
 
 	spec := UpdateAlertRuleSpec{
-		AlertRuleUID:  "rule-1",
+		AlertRule:     "rule-1",
 		ConditionType: strPtr("within_range"),
 	}
 
@@ -231,9 +231,9 @@ func Test__alertRuleFieldConfiguration__noDataAndExecErrStateSelectOptions(t *te
 func Test__validateCreateAlertRuleSpec__rejectsEmptyAndInvalidForNoDataExecErr(t *testing.T) {
 	base := CreateAlertRuleSpec{
 		Title:           "test",
-		FolderUID:       "f1",
+		Folder:          "f1",
 		RuleGroup:       "g1",
-		DataSourceUID:   "ds1",
+		DataSource:      "ds1",
 		Query:           "up",
 		LookbackSeconds: 60,
 		Reducer:         "last",
@@ -292,21 +292,21 @@ func Test__validateCreateAlertRuleSpec__rejectsEmptyAndInvalidForNoDataExecErr(t
 
 func Test__validateUpdateAlertRuleSpec__rejectsInvalidForNoDataExecErr(t *testing.T) {
 	err := validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
-		For:          strPtr("not-a-duration"),
+		AlertRule: "rule-1",
+		For:       strPtr("not-a-duration"),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid for")
 
 	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
-		NoDataState:  strPtr("Invalid"),
+		AlertRule:   "rule-1",
+		NoDataState: strPtr("Invalid"),
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid noDataState")
 
 	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
+		AlertRule:    "rule-1",
 		ExecErrState: strPtr("Invalid"),
 	})
 	require.Error(t, err)
@@ -314,7 +314,7 @@ func Test__validateUpdateAlertRuleSpec__rejectsInvalidForNoDataExecErr(t *testin
 
 	// Valid values pass
 	err = validateUpdateAlertRuleSpec(UpdateAlertRuleSpec{
-		AlertRuleUID: "rule-1",
+		AlertRule:    "rule-1",
 		For:          strPtr("10m"),
 		NoDataState:  strPtr("OK"),
 		ExecErrState: strPtr("KeepLast"),

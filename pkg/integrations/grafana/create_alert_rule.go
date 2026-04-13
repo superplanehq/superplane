@@ -78,7 +78,7 @@ func (c *CreateAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	storeAlertRuleNodeMetadata(ctx, "", spec.FolderUID)
+	storeAlertRuleNodeMetadata(ctx, "", spec.Folder)
 	return nil
 }
 

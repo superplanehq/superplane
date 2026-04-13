@@ -31,7 +31,7 @@ func Test__CreateAlertRule__Setup(t *testing.T) {
 			},
 		})
 
-		require.ErrorContains(t, err, "folderUID is required")
+		require.ErrorContains(t, err, "folder is required")
 	})
 
 	t.Run("valid configuration passes", func(t *testing.T) {
@@ -66,8 +66,8 @@ func Test__CreateAlertRule__Configuration__UsesIntegrationResources(t *testing.T
 	component := CreateAlertRule{}
 	fields := component.Configuration()
 
-	assertIntegrationResourceField(t, fields, "folderUID", resourceTypeFolder)
-	assertIntegrationResourceField(t, fields, "dataSourceUid", resourceTypeDataSource)
+	assertIntegrationResourceField(t, fields, "folder", resourceTypeFolder)
+	assertIntegrationResourceField(t, fields, "dataSource", resourceTypeDataSource)
 }
 
 func Test__CreateAlertRule__Configuration__DoesNotPrefillUserFields(t *testing.T) {
@@ -204,7 +204,7 @@ func Test__GetAlertRule__Configuration__UsesIntegrationResource(t *testing.T) {
 	component := GetAlertRule{}
 	fields := component.Configuration()
 
-	assertIntegrationResourceField(t, fields, "alertRuleUid", resourceTypeAlertRule)
+	assertIntegrationResourceField(t, fields, "alertRule", resourceTypeAlertRule)
 }
 
 func Test__GetAlertRule__Execute(t *testing.T) {
@@ -222,7 +222,7 @@ func Test__GetAlertRule__Execute(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
+			"alertRule": "rule-1",
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -348,20 +348,20 @@ func Test__UpdateAlertRule__Configuration__UsesIntegrationResources(t *testing.T
 	component := UpdateAlertRule{}
 	fields := component.Configuration()
 
-	assertIntegrationResourceField(t, fields, "alertRuleUid", resourceTypeAlertRule)
-	assertIntegrationResourceField(t, fields, "folderUID", resourceTypeFolder)
-	assertIntegrationResourceField(t, fields, "dataSourceUid", resourceTypeDataSource)
+	assertIntegrationResourceField(t, fields, "alertRule", resourceTypeAlertRule)
+	assertIntegrationResourceField(t, fields, "folder", resourceTypeFolder)
+	assertIntegrationResourceField(t, fields, "dataSource", resourceTypeDataSource)
 }
 
 func Test__UpdateAlertRule__Configuration__AllowsPartialUpdates(t *testing.T) {
 	component := UpdateAlertRule{}
 	fields := component.Configuration()
 
-	assertFieldRequired(t, fields, "alertRuleUid", true)
+	assertFieldRequired(t, fields, "alertRule", true)
 	assertFieldRequired(t, fields, "title", false)
-	assertFieldRequired(t, fields, "folderUID", false)
+	assertFieldRequired(t, fields, "folder", false)
 	assertFieldRequired(t, fields, "ruleGroup", false)
-	assertFieldRequired(t, fields, "dataSourceUid", false)
+	assertFieldRequired(t, fields, "dataSource", false)
 	assertFieldRequired(t, fields, "query", false)
 	assertFieldRequired(t, fields, "lookbackSeconds", false)
 	assertFieldRequired(t, fields, "reducer", false)
@@ -391,8 +391,8 @@ func Test__UpdateAlertRule__Setup__StoresAlertRuleTitleMetadata(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
-			"isPaused":     true,
+			"alertRule": "rule-1",
+			"isPaused":  true,
 		},
 		HTTP:     httpContext,
 		Metadata: metadataCtx,
@@ -458,9 +458,9 @@ func Test__UpdateAlertRule__Execute(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
-			"title":        "High error rate",
-			"isPaused":     true,
+			"alertRule": "rule-1",
+			"title":     "High error rate",
+			"isPaused":  true,
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -537,8 +537,8 @@ func Test__UpdateAlertRule__Execute__RejectsFileProvisionedRules(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
-			"title":        "High error rate",
+			"alertRule": "rule-1",
+			"title":     "High error rate",
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -592,8 +592,8 @@ func Test__UpdateAlertRule__Execute__OmitsDisableProvenanceHeaderForApiProvision
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
-			"title":        "New title",
+			"alertRule": "rule-1",
+			"title":     "New title",
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -650,8 +650,8 @@ func Test__UpdateAlertRule__Execute__MergesProvidedQueryFields(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid":    "rule-1",
-			"dataSourceUid":   "datasource-1",
+			"alertRule":       "rule-1",
+			"dataSource":      "datasource-1",
 			"query":           `sum(rate(http_requests_total{status=~"5.."}[5m]))`,
 			"lookbackSeconds": 300,
 		},
@@ -735,8 +735,8 @@ func Test__UpdateAlertRule__Execute__UpdatesExpressionQueryModels(t *testing.T) 
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
-			"query":        "2 == 2",
+			"alertRule": "rule-1",
+			"query":     "2 == 2",
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -768,7 +768,7 @@ func Test__DeleteAlertRule__Configuration__UsesIntegrationResource(t *testing.T)
 	component := DeleteAlertRule{}
 	fields := component.Configuration()
 
-	assertIntegrationResourceField(t, fields, "alertRuleUid", resourceTypeAlertRule)
+	assertIntegrationResourceField(t, fields, "alertRule", resourceTypeAlertRule)
 }
 
 func Test__DeleteAlertRule__Setup__StoresAlertRuleTitleMetadata(t *testing.T) {
@@ -786,7 +786,7 @@ func Test__DeleteAlertRule__Setup__StoresAlertRuleTitleMetadata(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
+			"alertRule": "rule-1",
 		},
 		HTTP:     httpContext,
 		Metadata: metadataCtx,
@@ -821,7 +821,7 @@ func Test__DeleteAlertRule__Execute(t *testing.T) {
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"alertRuleUid": "rule-1",
+			"alertRule": "rule-1",
 		},
 		HTTP: httpContext,
 		Integration: &contexts.IntegrationContext{
@@ -863,9 +863,9 @@ func Test__DeleteAlertRule__Execute(t *testing.T) {
 func validCreateAlertRuleConfiguration() map[string]any {
 	return map[string]any{
 		"title":           "High error rate",
-		"folderUID":       "folder-1",
+		"folder":          "folder-1",
 		"ruleGroup":       "service-health",
-		"dataSourceUid":   "datasource-1",
+		"dataSource":      "datasource-1",
 		"query":           `sum(rate(http_requests_total{status=~"5.."}[5m]))`,
 		"lookbackSeconds": 300,
 		"reducer":         "last",

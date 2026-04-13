@@ -20,7 +20,7 @@ func (c *GetAlertRule) Label() string {
 }
 
 func (c *GetAlertRule) Description() string {
-	return "Retrieve a Grafana-managed alert rule by UID"
+	return "Retrieve a Grafana-managed alert rule"
 }
 
 func (c *GetAlertRule) Documentation() string {
@@ -34,7 +34,7 @@ func (c *GetAlertRule) Documentation() string {
 
 ## Configuration
 
-- **Alert Rule**: The Grafana alert rule UID to retrieve
+- **Alert Rule**: The Grafana alert rule to retrieve
 
 ## Output
 
@@ -56,7 +56,7 @@ func (c *GetAlertRule) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetAlertRule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "alertRuleUid",
+			Name:        "alertRule",
 			Label:       "Alert Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -80,7 +80,7 @@ func (c *GetAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	storeAlertRuleNodeMetadata(ctx, spec.AlertRuleUID, "")
+	storeAlertRuleNodeMetadata(ctx, spec.AlertRule, "")
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (c *GetAlertRule) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	rule, err := client.GetAlertRule(spec.AlertRuleUID)
+	rule, err := client.GetAlertRule(spec.AlertRule)
 	if err != nil {
 		return fmt.Errorf("error getting alert rule: %w", err)
 	}

@@ -20,16 +20,15 @@ export function buildAlertRuleMetadata(
   },
 ): MetadataItem[] {
   const configuration = node.configuration as
-    | (CreateAlertRuleConfiguration & { alertRuleUid?: string })
+    | (CreateAlertRuleConfiguration & { alertRule?: string })
     | UpdateAlertRuleConfiguration
     | undefined;
   const nodeMetadata = node.metadata as AlertRuleNodeMetadata | undefined;
 
   const primaryItem =
-    configuration?.title != null
-      ? { icon: "bell", label: configuration.title }
-      : buildAlertRuleTitleItem(nodeMetadata?.alertRuleTitle) ||
-        buildAlertRuleUidItem(configuration?.alertRuleUid, options?.includeUid);
+    buildAlertRuleTitleItem(configuration?.title) ||
+    buildAlertRuleTitleItem(nodeMetadata?.alertRuleTitle) ||
+    buildAlertRuleUidItem(configuration?.alertRule, options?.includeUid);
 
   return [
     primaryItem,
@@ -148,11 +147,12 @@ function addOptionalDetail(details: Record<string, string>, key: string, value: 
 }
 
 function buildAlertRuleTitleItem(title: string | undefined): MetadataItem | undefined {
-  if (!title) {
+  const trimmedTitle = title?.trim();
+  if (!trimmedTitle) {
     return undefined;
   }
 
-  return { icon: "bell", label: title };
+  return { icon: "bell", label: trimmedTitle };
 }
 
 function buildAlertRuleUidItem(uid: string | undefined, includeUid?: boolean): MetadataItem | undefined {

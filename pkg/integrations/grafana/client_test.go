@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -310,6 +311,31 @@ func Test__Client__GetAlertRule(t *testing.T) {
 	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/rule-1"))
 }
 
+func Test__Client__GetAlertRule__EscapesUIDInPath(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"folder/../rule","title":"High error rate"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	_, err := client.GetAlertRule("folder/../rule")
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	require.True(
+		t,
+		strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/"+url.PathEscape("folder/../rule")),
+	)
+}
+
 func Test__Client__CreateAlertRule(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -396,6 +422,34 @@ func Test__Client__UpdateAlertRule__OmitsDisableProvenanceHeader(t *testing.T) {
 	require.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
 }
 
+func Test__Client__UpdateAlertRule__EscapesUIDInPath(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"uid":"folder/../rule","title":"High error rate"}`)),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	_, err := client.UpdateAlertRule("folder/../rule", map[string]any{
+		"uid":   "folder/../rule",
+		"title": "High error rate",
+	}, false)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	require.True(
+		t,
+		strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/"+url.PathEscape("folder/../rule")),
+	)
+}
+
 func Test__Client__DeleteAlertRule(t *testing.T) {
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -417,6 +471,31 @@ func Test__Client__DeleteAlertRule(t *testing.T) {
 	require.Len(t, httpContext.Requests, 1)
 	require.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
 	require.True(t, strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/rule-1"))
+}
+
+func Test__Client__DeleteAlertRule__EscapesUIDInPath(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNoContent,
+				Body:       io.NopCloser(strings.NewReader("")),
+			},
+		},
+	}
+
+	client := &Client{
+		BaseURL:  "https://grafana.example.com",
+		APIToken: "token",
+		http:     httpContext,
+	}
+
+	err := client.DeleteAlertRule("folder/../rule")
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	require.True(
+		t,
+		strings.HasSuffix(httpContext.Requests[0].URL.String(), "/api/v1/provisioning/alert-rules/"+url.PathEscape("folder/../rule")),
+	)
 }
 
 func Test__Grafana__ListResources(t *testing.T) {

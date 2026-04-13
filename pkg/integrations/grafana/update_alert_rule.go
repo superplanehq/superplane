@@ -34,7 +34,7 @@ func (c *UpdateAlertRule) Documentation() string {
 
 ## Configuration
 
-- **Alert Rule**: The Grafana alert rule UID to update
+- **Alert Rule**: The Grafana alert rule to update
 - **All other fields are optional**: only the values you provide will be changed
 - **Folder / Rule Group**: Optional location changes for the rule in Grafana
 - **Data Source / Query**: Optional query details Grafana evaluates
@@ -73,12 +73,12 @@ func (c *UpdateAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	folderUID := ""
-	if spec.FolderUID != nil {
-		folderUID = *spec.FolderUID
+	folder := ""
+	if spec.Folder != nil {
+		folder = *spec.Folder
 	}
 
-	storeAlertRuleNodeMetadata(ctx, spec.AlertRuleUID, folderUID)
+	storeAlertRuleNodeMetadata(ctx, spec.AlertRule, folder)
 	return nil
 }
 
@@ -96,7 +96,7 @@ func (c *UpdateAlertRule) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	existingRule, err := client.GetAlertRule(spec.AlertRuleUID)
+	existingRule, err := client.GetAlertRule(spec.AlertRule)
 	if err != nil {
 		return fmt.Errorf("error getting existing alert rule: %w", err)
 	}
@@ -110,7 +110,7 @@ func (c *UpdateAlertRule) Execute(ctx core.ExecutionContext) error {
 	}
 
 	existingProvenance, _ := existingRule["provenance"].(string)
-	rule, err := client.UpdateAlertRule(spec.AlertRuleUID, payload, existingProvenance == "")
+	rule, err := client.UpdateAlertRule(spec.AlertRule, payload, existingProvenance == "")
 	if err != nil {
 		return fmt.Errorf("error updating alert rule: %w", err)
 	}

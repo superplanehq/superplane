@@ -26,9 +26,9 @@ type AlertRuleKeyValuePair struct {
 
 type CreateAlertRuleSpec struct {
 	Title                string                   `json:"title" mapstructure:"title"`
-	FolderUID            string                   `json:"folderUID" mapstructure:"folderUID"`
+	Folder               string                   `json:"folder" mapstructure:"folder"`
 	RuleGroup            string                   `json:"ruleGroup" mapstructure:"ruleGroup"`
-	DataSourceUID        string                   `json:"dataSourceUid" mapstructure:"dataSourceUid"`
+	DataSource           string                   `json:"dataSource" mapstructure:"dataSource"`
 	Query                string                   `json:"query" mapstructure:"query"`
 	LookbackSeconds      int                      `json:"lookbackSeconds" mapstructure:"lookbackSeconds"`
 	Reducer              string                   `json:"reducer" mapstructure:"reducer"`
@@ -45,15 +45,15 @@ type CreateAlertRuleSpec struct {
 }
 
 type GetAlertRuleSpec struct {
-	AlertRuleUID string `json:"alertRuleUid" mapstructure:"alertRuleUid"`
+	AlertRule string `json:"alertRule" mapstructure:"alertRule"`
 }
 
 type UpdateAlertRuleSpec struct {
-	AlertRuleUID         string                   `json:"alertRuleUid" mapstructure:"alertRuleUid"`
+	AlertRule            string                   `json:"alertRule" mapstructure:"alertRule"`
 	Title                *string                  `json:"title,omitempty" mapstructure:"title"`
-	FolderUID            *string                  `json:"folderUID,omitempty" mapstructure:"folderUID"`
+	Folder               *string                  `json:"folder,omitempty" mapstructure:"folder"`
 	RuleGroup            *string                  `json:"ruleGroup,omitempty" mapstructure:"ruleGroup"`
-	DataSourceUID        *string                  `json:"dataSourceUid,omitempty" mapstructure:"dataSourceUid"`
+	DataSource           *string                  `json:"dataSource,omitempty" mapstructure:"dataSource"`
 	Query                *string                  `json:"query,omitempty" mapstructure:"query"`
 	LookbackSeconds      *int                     `json:"lookbackSeconds,omitempty" mapstructure:"lookbackSeconds"`
 	Reducer              *string                  `json:"reducer,omitempty" mapstructure:"reducer"`
@@ -84,7 +84,7 @@ func decodeGetAlertRuleSpec(input any) (GetAlertRuleSpec, error) {
 		return GetAlertRuleSpec{}, fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	spec.AlertRuleUID = strings.TrimSpace(spec.AlertRuleUID)
+	spec.AlertRule = strings.TrimSpace(spec.AlertRule)
 	return spec, nil
 }
 
@@ -112,9 +112,9 @@ func decodeAlertRuleSpec(input any, result any) error {
 
 func sanitizeCreateAlertRuleSpec(spec CreateAlertRuleSpec) CreateAlertRuleSpec {
 	spec.Title = strings.TrimSpace(spec.Title)
-	spec.FolderUID = strings.TrimSpace(spec.FolderUID)
+	spec.Folder = strings.TrimSpace(spec.Folder)
 	spec.RuleGroup = strings.TrimSpace(spec.RuleGroup)
-	spec.DataSourceUID = strings.TrimSpace(spec.DataSourceUID)
+	spec.DataSource = strings.TrimSpace(spec.DataSource)
 	spec.Query = strings.TrimSpace(spec.Query)
 	spec.Reducer = strings.TrimSpace(spec.Reducer)
 	spec.ConditionType = strings.TrimSpace(spec.ConditionType)
@@ -137,11 +137,11 @@ func sanitizeCreateAlertRuleSpec(spec CreateAlertRuleSpec) CreateAlertRuleSpec {
 }
 
 func sanitizeUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) UpdateAlertRuleSpec {
-	spec.AlertRuleUID = strings.TrimSpace(spec.AlertRuleUID)
+	spec.AlertRule = strings.TrimSpace(spec.AlertRule)
 	spec.Title = sanitizeOptionalAlertRuleString(spec.Title)
-	spec.FolderUID = sanitizeOptionalAlertRuleString(spec.FolderUID)
+	spec.Folder = sanitizeOptionalAlertRuleString(spec.Folder)
 	spec.RuleGroup = sanitizeOptionalAlertRuleString(spec.RuleGroup)
-	spec.DataSourceUID = sanitizeOptionalAlertRuleString(spec.DataSourceUID)
+	spec.DataSource = sanitizeOptionalAlertRuleString(spec.DataSource)
 	spec.Query = sanitizeOptionalAlertRuleString(spec.Query)
 	spec.Reducer = sanitizeOptionalAlertRuleString(spec.Reducer)
 	spec.ConditionType = sanitizeOptionalAlertRuleString(spec.ConditionType)
@@ -213,14 +213,14 @@ func validateCreateAlertRuleSpec(spec CreateAlertRuleSpec) error {
 	if spec.Title == "" {
 		return errors.New("title is required")
 	}
-	if spec.FolderUID == "" {
-		return errors.New("folderUID is required")
+	if spec.Folder == "" {
+		return errors.New("folder is required")
 	}
 	if spec.RuleGroup == "" {
 		return errors.New("ruleGroup is required")
 	}
-	if spec.DataSourceUID == "" {
-		return errors.New("dataSourceUid is required")
+	if spec.DataSource == "" {
+		return errors.New("dataSource is required")
 	}
 	if spec.Query == "" {
 		return errors.New("query is required")
@@ -269,16 +269,16 @@ func validateCreateAlertRuleSpec(spec CreateAlertRuleSpec) error {
 }
 
 func validateGetAlertRuleSpec(spec GetAlertRuleSpec) error {
-	if spec.AlertRuleUID == "" {
-		return errors.New("alertRuleUid is required")
+	if spec.AlertRule == "" {
+		return errors.New("alertRule is required")
 	}
 
 	return nil
 }
 
 func validateUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) error {
-	if spec.AlertRuleUID == "" {
-		return errors.New("alertRuleUid is required")
+	if spec.AlertRule == "" {
+		return errors.New("alertRule is required")
 	}
 	if !spec.HasUpdates() {
 		return errors.New("at least one field to update must be provided")
@@ -307,9 +307,9 @@ func validateUpdateAlertRuleSpec(spec UpdateAlertRuleSpec) error {
 
 func (spec UpdateAlertRuleSpec) HasUpdates() bool {
 	return spec.Title != nil ||
-		spec.FolderUID != nil ||
+		spec.Folder != nil ||
 		spec.RuleGroup != nil ||
-		spec.DataSourceUID != nil ||
+		spec.DataSource != nil ||
 		spec.Query != nil ||
 		spec.LookbackSeconds != nil ||
 		spec.Reducer != nil ||
@@ -454,7 +454,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 	fields := make([]configuration.Field, 0, 12)
 	if includeAlertRuleSelector {
 		fields = append(fields, configuration.Field{
-			Name:        "alertRuleUid",
+			Name:        "alertRule",
 			Label:       "Alert Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -476,7 +476,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 			Description: "Human-readable alert rule title shown in Grafana",
 		},
 		configuration.Field{
-			Name:        "folderUID",
+			Name:        "folder",
 			Label:       "Folder",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    fieldRequired,
@@ -495,7 +495,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 			Description: "The Grafana rule group to create or update",
 		},
 		configuration.Field{
-			Name:        "dataSourceUid",
+			Name:        "dataSource",
 			Label:       "Data Source",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    fieldRequired,
@@ -655,7 +655,7 @@ func alertRuleFieldConfiguration(includeAlertRuleSelector bool, partialUpdate bo
 func buildAlertRulePayload(spec CreateAlertRuleSpec) map[string]any {
 	payload := map[string]any{
 		"title":        spec.Title,
-		"folderUID":    spec.FolderUID,
+		"folderUID":    spec.Folder,
 		"ruleGroup":    spec.RuleGroup,
 		"condition":    alertRuleConditionRefID,
 		"data":         buildAlertRuleQueryData(spec),
@@ -680,8 +680,8 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 	if spec.Title != nil {
 		updated["title"] = *spec.Title
 	}
-	if spec.FolderUID != nil {
-		updated["folderUID"] = *spec.FolderUID
+	if spec.Folder != nil {
+		updated["folderUID"] = *spec.Folder
 	}
 	if spec.RuleGroup != nil {
 		updated["ruleGroup"] = *spec.RuleGroup
@@ -704,7 +704,7 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 	if spec.IsPaused != nil {
 		updated["isPaused"] = *spec.IsPaused
 	}
-	if spec.DataSourceUID != nil || spec.Query != nil || spec.LookbackSeconds != nil ||
+	if spec.DataSource != nil || spec.Query != nil || spec.LookbackSeconds != nil ||
 		spec.Reducer != nil || spec.ConditionType != nil || spec.Threshold != nil || spec.Threshold2 != nil {
 		queryData, err := mergeAlertRuleQueryData(existing["data"], spec)
 		if err != nil {
@@ -726,7 +726,7 @@ func mergeAlertRulePayload(existing map[string]any, spec UpdateAlertRuleSpec) (m
 		}
 	}
 
-	updated["uid"] = spec.AlertRuleUID
+	updated["uid"] = spec.AlertRule
 	return updated, nil
 }
 
@@ -756,7 +756,7 @@ func copyAlertRuleOrganizationFields(destination map[string]any, source map[stri
 func buildAlertRuleQueryData(spec CreateAlertRuleSpec) []map[string]any {
 	params := thresholdParamsForConditionType(spec.ConditionType, spec.Threshold, spec.Threshold2)
 	return []map[string]any{
-		buildDataQuery(spec.DataSourceUID, spec.Query, spec.LookbackSeconds),
+		buildDataQuery(spec.DataSource, spec.Query, spec.LookbackSeconds),
 		buildReduceExpression(alertRuleReduceRefID, alertRuleDataRefID, spec.Reducer),
 		buildThresholdExpression(alertRuleConditionRefID, alertRuleReduceRefID, spec.ConditionType, params),
 	}
@@ -908,12 +908,12 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 	updatedQuery := cloneAlertRuleMap(firstQuery)
 	model := cloneAlertRuleMapFromValue(updatedQuery["model"])
 
-	if spec.DataSourceUID != nil {
-		updatedQuery["datasourceUid"] = *spec.DataSourceUID
+	if spec.DataSource != nil {
+		updatedQuery["datasourceUid"] = *spec.DataSource
 
 		datasource := cloneAlertRuleMapFromValue(model["datasource"])
 		if len(datasource) > 0 {
-			datasource["uid"] = *spec.DataSourceUID
+			datasource["uid"] = *spec.DataSource
 			model["datasource"] = datasource
 		}
 	}
@@ -951,7 +951,7 @@ func mergeAlertRuleQueryData(existingData any, spec UpdateAlertRuleSpec) ([]any,
 		updatedQuery["model"] = model
 	}
 
-	if spec.DataSourceUID != nil && spec.Query == nil {
+	if spec.DataSource != nil && spec.Query == nil {
 		updatedQuery["model"] = model
 	}
 

@@ -40,7 +40,7 @@ func (c *DeleteAlertRule) Documentation() string {
 
 ## Configuration
 
-- **Alert Rule**: The Grafana alert rule UID to delete
+- **Alert Rule**: The Grafana alert rule to delete
 
 ## Output
 
@@ -62,7 +62,7 @@ func (c *DeleteAlertRule) OutputChannels(configuration any) []core.OutputChannel
 func (c *DeleteAlertRule) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "alertRuleUid",
+			Name:        "alertRule",
 			Label:       "Alert Rule",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -86,7 +86,7 @@ func (c *DeleteAlertRule) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	storeAlertRuleNodeMetadata(ctx, spec.AlertRuleUID, "")
+	storeAlertRuleNodeMetadata(ctx, spec.AlertRule, "")
 	return nil
 }
 
@@ -104,12 +104,12 @@ func (c *DeleteAlertRule) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %w", err)
 	}
 
-	rule, err := client.GetAlertRule(spec.AlertRuleUID)
+	rule, err := client.GetAlertRule(spec.AlertRule)
 	if err != nil {
 		return fmt.Errorf("error getting alert rule: %w", err)
 	}
 
-	if err := client.DeleteAlertRule(spec.AlertRuleUID); err != nil {
+	if err := client.DeleteAlertRule(spec.AlertRule); err != nil {
 		return fmt.Errorf("error deleting alert rule: %w", err)
 	}
 
@@ -118,7 +118,7 @@ func (c *DeleteAlertRule) Execute(ctx core.ExecutionContext) error {
 		core.DefaultOutputChannel.Name,
 		"grafana.alertRuleDeleted",
 		[]any{DeleteAlertRuleOutput{
-			UID:     spec.AlertRuleUID,
+			UID:     spec.AlertRule,
 			Title:   title,
 			Deleted: true,
 		}},

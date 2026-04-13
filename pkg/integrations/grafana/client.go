@@ -551,7 +551,12 @@ func (c *Client) ListRuleGroups() ([]string, error) {
 }
 
 func (c *Client) GetAlertRule(uid string) (map[string]any, error) {
-	responseBody, status, err := c.execRequest(http.MethodGet, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	responseBody, status, err := c.execRequest(
+		http.MethodGet,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", url.PathEscape(uid)),
+		nil,
+		"",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting alert rule: %v", err)
 	}
@@ -612,7 +617,7 @@ func (c *Client) UpdateAlertRule(uid string, rule map[string]any, disableProvena
 
 	responseBody, status, err := c.execRequestWithHeaders(
 		http.MethodPut,
-		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid),
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", url.PathEscape(uid)),
 		bytes.NewReader(body),
 		"application/json",
 		headers,
@@ -634,7 +639,12 @@ func (c *Client) UpdateAlertRule(uid string, rule map[string]any, disableProvena
 }
 
 func (c *Client) DeleteAlertRule(uid string) error {
-	responseBody, status, err := c.execRequest(http.MethodDelete, fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", uid), nil, "")
+	responseBody, status, err := c.execRequest(
+		http.MethodDelete,
+		fmt.Sprintf("/api/v1/provisioning/alert-rules/%s", url.PathEscape(uid)),
+		nil,
+		"",
+	)
 	if err != nil {
 		return fmt.Errorf("error deleting alert rule: %v", err)
 	}
