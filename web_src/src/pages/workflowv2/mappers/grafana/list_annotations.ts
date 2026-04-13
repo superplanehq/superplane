@@ -39,20 +39,10 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
       "Listed At": formatTimestamp(context.execution.createdAt),
     };
 
-    if (configuration?.tags && configuration.tags.length > 0) {
-      details["Tags Filter"] = configuration.tags.join(", ");
-    }
-    if (configuration?.text) {
-      details["Text Filter"] =
-        configuration.text.length > 80 ? configuration.text.substring(0, 80) + "..." : configuration.text;
-    }
+    addConfiguredFilters(details, configuration);
+
     if (!outputs || !outputs.default || outputs.default.length === 0) {
-      if (configuration?.from) {
-        details["From"] = configuration.from;
-      }
-      if (configuration?.to) {
-        details["To"] = configuration.to;
-      }
+      addConfiguredRange(details, configuration);
       details["Count"] = "0";
       return details;
     }
@@ -68,24 +58,9 @@ export const listAnnotationsMapper: ComponentBaseMapper = {
     const outputFrom = formatTimestamp(output?.from);
     const outputTo = formatTimestamp(output?.to);
 
-    if (outputFrom !== "-") {
-      details["From"] = outputFrom;
-    } else if (configuration?.from) {
-      details["From"] = configuration.from;
-    }
-
-    if (outputTo !== "-") {
-      details["To"] = outputTo;
-    } else if (configuration?.to) {
-      details["To"] = configuration.to;
-    }
-
+    addResolvedRange(details, configuration, outputFrom, outputTo);
     details["Count"] = String(annotations.length);
-
-    if (annotations.length > 0 && annotations[0].text) {
-      details["Latest"] =
-        annotations[0].text.length > 60 ? annotations[0].text.substring(0, 60) + "..." : annotations[0].text;
-    }
+    addLatestAnnotation(details, annotations);
 
     return details;
   },
@@ -116,4 +91,61 @@ function metadataList(context: ComponentBaseContext): MetadataItem[] {
   }
 
   return metadata;
+}
+
+function addConfiguredFilters(
+  details: Record<string, string>,
+  configuration: ListAnnotationsConfiguration | undefined,
+) {
+  if (configuration?.tags && configuration.tags.length > 0) {
+    details["Tags Filter"] = configuration.tags.join(", ");
+  }
+
+  if (configuration?.text) {
+    details["Text Filter"] = truncateText(configuration.text, 80);
+  }
+}
+
+function addConfiguredRange(details: Record<string, string>, configuration: ListAnnotationsConfiguration | undefined) {
+  if (configuration?.from) {
+    details["From"] = configuration.from;
+  }
+
+  if (configuration?.to) {
+    details["To"] = configuration.to;
+  }
+}
+
+function addResolvedRange(
+  details: Record<string, string>,
+  configuration: ListAnnotationsConfiguration | undefined,
+  outputFrom: string,
+  outputTo: string,
+) {
+  details["From"] = outputFrom !== "-" ? outputFrom : configuration?.from || "";
+  details["To"] = outputTo !== "-" ? outputTo : configuration?.to || "";
+
+  if (details["From"] === "") {
+    delete details["From"];
+  }
+
+  if (details["To"] === "") {
+    delete details["To"];
+  }
+}
+
+function addLatestAnnotation(
+  details: Record<string, string>,
+  annotations: ListAnnotationsOutput["annotations"] | undefined,
+) {
+  const latestText = annotations?.[0]?.text;
+  if (!latestText) {
+    return;
+  }
+
+  details["Latest"] = truncateText(latestText, 60);
+}
+
+function truncateText(value: string, maxLength: number) {
+  return value.length > maxLength ? `${value.substring(0, maxLength)}...` : value;
 }
