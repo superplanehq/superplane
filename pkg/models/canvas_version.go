@@ -250,60 +250,6 @@ func SaveCanvasDraftInTransaction(
 	return &version, nil
 }
 
-func CreateOrResetCanvasDraftInTransaction(
-	tx *gorm.DB,
-	workflowID uuid.UUID,
-	userID uuid.UUID,
-	nodes []Node,
-	edges []Edge,
-) (*CanvasVersion, error) {
-	canvas, err := lockCanvasForVersioningInTransaction(tx, workflowID)
-	if err != nil {
-		return nil, err
-	}
-
-	if canvas.LiveVersionID == nil {
-		return nil, gorm.ErrRecordNotFound
-	}
-
-	now := time.Now()
-	existing, draftErr := FindCanvasDraftInTransaction(tx, workflowID, userID)
-	if draftErr == nil {
-		existing.OwnerID = &userID
-		existing.Nodes = datatypes.NewJSONSlice(nodes)
-		existing.Edges = datatypes.NewJSONSlice(edges)
-		existing.IsPublished = false
-		existing.PublishedAt = nil
-		existing.UpdatedAt = &now
-
-		if err := tx.Save(existing).Error; err != nil {
-			return nil, err
-		}
-
-		return existing, nil
-	}
-	if !errors.Is(draftErr, gorm.ErrRecordNotFound) {
-		return nil, draftErr
-	}
-
-	version := CanvasVersion{
-		ID:          uuid.New(),
-		WorkflowID:  workflowID,
-		OwnerID:     &userID,
-		State:       CanvasVersionStateDraft,
-		IsPublished: false,
-		Nodes:       datatypes.NewJSONSlice(nodes),
-		Edges:       datatypes.NewJSONSlice(edges),
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
-	}
-	if err := tx.Create(&version).Error; err != nil {
-		return nil, err
-	}
-
-	return &version, nil
-}
-
 func CreateCanvasSnapshotVersionInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,

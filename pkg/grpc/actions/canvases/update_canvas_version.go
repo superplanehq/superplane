@@ -170,11 +170,7 @@ func UpdateCanvasVersionWithUsage(
 		version.Edges = datatypes.NewJSONSlice(edges)
 		version.UpdatedAt = &now
 
-		if err := tx.Save(version).Error; err != nil {
-			return err
-		}
-
-		return nil
+		return tx.Save(version).Error
 	})
 	if err != nil {
 		if status.Code(err) != codes.Unknown {

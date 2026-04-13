@@ -616,7 +616,7 @@ CREATE TABLE public.workflow_versions (
     edges jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    state character varying(32) DEFAULT 'published'::character varying NOT NULL
+    state character varying(32) DEFAULT 'draft'::character varying NOT NULL
 );
 
 
