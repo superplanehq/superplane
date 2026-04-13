@@ -56,7 +56,7 @@ func Test__DeleteAnnotation__Setup__AllowsExpression(t *testing.T) {
 	metadata := &contexts.MetadataContext{}
 	err := d.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"annotationId": "{{ $['Create Annotation'].data.id }}",
+			"annotation": "{{ $['Create Annotation'].data.id }}",
 		},
 		Metadata: metadata,
 	})
@@ -92,7 +92,7 @@ func Test__DeleteAnnotation__Setup__StoresAnnotationLabelMetadata(t *testing.T) 
 
 	err := d.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"annotationId": "42",
+			"annotation": "42",
 		},
 		Metadata: metadata,
 		HTTP:     httpContext,

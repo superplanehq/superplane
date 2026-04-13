@@ -16,14 +16,14 @@ import (
 type ListAnnotations struct{}
 
 type ListAnnotationsSpec struct {
-	DashboardUID string   `json:"dashboardUID" mapstructure:"dashboardUID"`
-	Panel        string   `json:"panel,omitempty" mapstructure:"panel"`
-	PanelID      *int64   `json:"panelId,omitempty" mapstructure:"panelId"`
-	Text         string   `json:"text" mapstructure:"text"`
-	Tags         []string `json:"tags" mapstructure:"tags"`
-	From         string   `json:"from" mapstructure:"from"`
-	To           string   `json:"to" mapstructure:"to"`
-	Limit        int64    `json:"limit" mapstructure:"limit"`
+	Dashboard string   `json:"dashboard" mapstructure:"dashboard"`
+	Panel     string   `json:"panel,omitempty" mapstructure:"panel"`
+	PanelID   *int64   `json:"panelId,omitempty" mapstructure:"panelId"`
+	Text      string   `json:"text" mapstructure:"text"`
+	Tags      []string `json:"tags" mapstructure:"tags"`
+	From      string   `json:"from" mapstructure:"from"`
+	To        string   `json:"to" mapstructure:"to"`
+	Limit     int64    `json:"limit" mapstructure:"limit"`
 }
 
 type ListAnnotationsOutput struct {
@@ -83,7 +83,7 @@ func (l *ListAnnotations) OutputChannels(_ any) []core.OutputChannel {
 func (l *ListAnnotations) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dashboardUID",
+			Name:        "dashboard",
 			Label:       "Dashboard",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -105,9 +105,9 @@ func (l *ListAnnotations) Configuration() []configuration.Field {
 					Type: resourceTypePanel,
 					Parameters: []configuration.ParameterRef{
 						{
-							Name: "dashboardUID",
+							Name: "dashboard",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "dashboardUID",
+								Field: "dashboard",
 							},
 						},
 					},
@@ -172,7 +172,7 @@ func (l *ListAnnotations) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return setDashboardNodeMetadata(ctx, spec.DashboardUID)
+	return setDashboardNodeMetadata(ctx, spec.Dashboard)
 }
 
 func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
@@ -222,7 +222,7 @@ func (l *ListAnnotations) Execute(ctx core.ExecutionContext) error {
 
 	annotations, err := client.ListAnnotations(
 		spec.Tags,
-		strings.TrimSpace(spec.DashboardUID),
+		strings.TrimSpace(spec.Dashboard),
 		panelID,
 		fromMS,
 		toMS,
@@ -298,6 +298,13 @@ func decodeListAnnotationsSpec(config any) (ListAnnotationsSpec, error) {
 	}
 	if err := decoder.Decode(config); err != nil {
 		return ListAnnotationsSpec{}, fmt.Errorf("error decoding configuration: %v", err)
+	}
+	if strings.TrimSpace(spec.Dashboard) == "" {
+		if m, ok := config.(map[string]any); ok {
+			if v, ok := m["dashboardUID"]; ok && v != nil {
+				spec.Dashboard = strings.TrimSpace(fmt.Sprint(v))
+			}
+		}
 	}
 	return spec, nil
 }

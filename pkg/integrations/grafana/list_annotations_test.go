@@ -63,7 +63,7 @@ func Test__ListAnnotations__Setup__StoresDashboardTitleMetadata(t *testing.T) {
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"dashboardUID": "dash-1",
+			"dashboard": "dash-1",
 		},
 		Metadata: metadata,
 		HTTP:     httpContext,
@@ -98,7 +98,7 @@ func Test__ListAnnotations__Setup__FallsBackToSearchWhenDashboardResponseIsTooLa
 
 	err := component.Setup(core.SetupContext{
 		Configuration: map[string]any{
-			"dashboardUID": "dash-1",
+			"dashboard": "dash-1",
 		},
 		Metadata: metadata,
 		HTTP:     httpContext,
@@ -187,9 +187,9 @@ func Test__ListAnnotations__Execute__PassesPanelIDToGrafanaAndKeepsLimit(t *test
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"dashboardUID": "dash-1",
-			"panel":        "7",
-			"limit":        100,
+			"dashboard": "dash-1",
+			"panel":     "7",
+			"limit":     100,
 		},
 		HTTP:           httpCtx,
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},

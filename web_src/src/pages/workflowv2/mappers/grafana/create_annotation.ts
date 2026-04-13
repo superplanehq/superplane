@@ -86,7 +86,7 @@ function metadataList(context: ComponentBaseContext): MetadataItem[] {
     metadata.push({ icon: "tag", label: configuration.tags.join(", ") });
   }
 
-  const dashboardTitle = nodeMetadata?.dashboardTitle || configuration?.dashboardUID;
+  const dashboardTitle = nodeMetadata?.dashboardTitle || configuration?.dashboard;
   if (dashboardTitle) {
     metadata.push({ icon: "layout-dashboard", label: `Dashboard: ${dashboardTitle}` });
   }

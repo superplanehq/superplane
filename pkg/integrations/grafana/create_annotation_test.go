@@ -209,10 +209,10 @@ func Test__CreateAnnotation__Execute__createsAnnotationForSelectedPanel(t *testi
 
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"dashboardUID": "dash-1",
-			"panel":        "7",
-			"text":         "deploy",
-			"time":         "now",
+			"dashboard": "dash-1",
+			"panel":     "7",
+			"text":      "deploy",
+			"time":      "now",
 		},
 		HTTP:           httpCtx,
 		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"baseURL": "https://grafana.example.com", "apiToken": "token"}},

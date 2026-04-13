@@ -65,7 +65,7 @@ export const deleteAnnotationMapper: ComponentBaseMapper = {
 function metadataList(context: ComponentBaseContext): MetadataItem[] {
   const nodeMetadata = context.node.metadata as AnnotationNodeMetadata | undefined;
   const configuration = context.node.configuration as DeleteAnnotationConfiguration | undefined;
-  const annotationLabel = nodeMetadata?.annotationLabel || configuration?.annotationId?.trim();
+  const annotationLabel = nodeMetadata?.annotationLabel || configuration?.annotation?.trim();
   if (!annotationLabel) {
     return [];
   }

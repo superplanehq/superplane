@@ -342,7 +342,7 @@ func Test__Grafana__ListResources(t *testing.T) {
 				},
 			},
 			Parameters: map[string]string{
-				"dashboardUID": "dash-1",
+				"dashboard": "dash-1",
 			},
 		})
 		require.NoError(t, err)

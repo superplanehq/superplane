@@ -47,7 +47,7 @@ export interface Annotation {
 }
 
 export interface CreateAnnotationConfiguration {
-  dashboardUID?: string;
+  dashboard?: string;
   panel?: string;
   text: string;
   tags?: string[];
@@ -61,7 +61,7 @@ export interface CreateAnnotationOutput {
 }
 
 export interface ListAnnotationsConfiguration {
-  dashboardUID?: string;
+  dashboard?: string;
   panel?: string;
   text?: string;
   tags?: string[];
@@ -77,7 +77,7 @@ export interface ListAnnotationsOutput {
 }
 
 export interface DeleteAnnotationConfiguration {
-  annotationId?: string;
+  annotation?: string;
 }
 
 export interface DeleteAnnotationOutput {

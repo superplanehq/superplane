@@ -18,13 +18,13 @@ import (
 type CreateAnnotation struct{}
 
 type CreateAnnotationSpec struct {
-	DashboardUID string   `json:"dashboardUID" mapstructure:"dashboardUID"`
-	Panel        string   `json:"panel" mapstructure:"panel"`
-	PanelID      *int64   `json:"panelId,omitempty" mapstructure:"panelId"`
-	Text         string   `json:"text" mapstructure:"text"`
-	Tags         []string `json:"tags" mapstructure:"tags"`
-	Time         string   `json:"time" mapstructure:"time"`
-	TimeEnd      string   `json:"timeEnd" mapstructure:"timeEnd"`
+	Dashboard string   `json:"dashboard" mapstructure:"dashboard"`
+	Panel     string   `json:"panel" mapstructure:"panel"`
+	PanelID   *int64   `json:"panelId,omitempty" mapstructure:"panelId"`
+	Text      string   `json:"text" mapstructure:"text"`
+	Tags      []string `json:"tags" mapstructure:"tags"`
+	Time      string   `json:"time" mapstructure:"time"`
+	TimeEnd   string   `json:"timeEnd" mapstructure:"timeEnd"`
 }
 
 type CreateAnnotationOutput struct {
@@ -84,7 +84,7 @@ func (c *CreateAnnotation) OutputChannels(_ any) []core.OutputChannel {
 func (c *CreateAnnotation) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "dashboardUID",
+			Name:        "dashboard",
 			Label:       "Dashboard",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
@@ -106,9 +106,9 @@ func (c *CreateAnnotation) Configuration() []configuration.Field {
 					Type: resourceTypePanel,
 					Parameters: []configuration.ParameterRef{
 						{
-							Name: "dashboardUID",
+							Name: "dashboard",
 							ValueFrom: &configuration.ParameterValueFrom{
-								Field: "dashboardUID",
+								Field: "dashboard",
 							},
 						},
 					},
@@ -167,7 +167,7 @@ func (c *CreateAnnotation) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return setDashboardNodeMetadata(ctx, spec.DashboardUID)
+	return setDashboardNodeMetadata(ctx, spec.Dashboard)
 }
 
 func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
@@ -217,7 +217,7 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 	id, err := client.CreateAnnotation(
 		strings.TrimSpace(spec.Text),
 		spec.Tags,
-		strings.TrimSpace(spec.DashboardUID),
+		strings.TrimSpace(spec.Dashboard),
 		panelID,
 		timeMS,
 		timeEndMS,
@@ -232,9 +232,9 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 	output := CreateAnnotationOutput{
 		ID: id,
 	}
-	if strings.TrimSpace(spec.DashboardUID) != "" {
+	if strings.TrimSpace(spec.Dashboard) != "" {
 		output.URL = buildAnnotationURL(
-			client.buildURL(fmt.Sprintf("/d/%s", url.PathEscape(strings.TrimSpace(spec.DashboardUID)))),
+			client.buildURL(fmt.Sprintf("/d/%s", url.PathEscape(strings.TrimSpace(spec.Dashboard)))),
 			panelID,
 			timeMS,
 			timeEndMS,
@@ -284,6 +284,13 @@ func decodeCreateAnnotationSpec(config any) (CreateAnnotationSpec, error) {
 	}
 	if err := decoder.Decode(config); err != nil {
 		return CreateAnnotationSpec{}, fmt.Errorf("error decoding configuration: %v", err)
+	}
+	if strings.TrimSpace(spec.Dashboard) == "" {
+		if m, ok := config.(map[string]any); ok {
+			if v, ok := m["dashboardUID"]; ok && v != nil {
+				spec.Dashboard = strings.TrimSpace(fmt.Sprint(v))
+			}
+		}
 	}
 	return spec, nil
 }

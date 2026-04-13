@@ -187,7 +187,10 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 			return nil, fmt.Errorf("error creating client: %w", err)
 		}
 
-		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboardUID"])
+		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboard"])
+		if dashboardUID == "" {
+			dashboardUID = strings.TrimSpace(ctx.Parameters["dashboardUID"])
+		}
 		if dashboardUID == "" {
 			return []core.IntegrationResource{}, nil
 		}

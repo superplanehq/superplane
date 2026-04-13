@@ -16,7 +16,7 @@ import (
 type DeleteAnnotation struct{}
 
 type DeleteAnnotationSpec struct {
-	AnnotationID string `json:"annotationId" mapstructure:"annotationId"`
+	Annotation string `json:"annotation" mapstructure:"annotation"`
 }
 
 type DeleteAnnotationOutput struct {
@@ -70,7 +70,7 @@ func (d *DeleteAnnotation) OutputChannels(_ any) []core.OutputChannel {
 func (d *DeleteAnnotation) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "annotationId",
+			Name:        "annotation",
 			Label:       "Annotation",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
@@ -93,7 +93,7 @@ func (d *DeleteAnnotation) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return setAnnotationNodeMetadata(ctx, spec.AnnotationID)
+	return setAnnotationNodeMetadata(ctx, spec.Annotation)
 }
 
 func (d *DeleteAnnotation) Execute(ctx core.ExecutionContext) error {
@@ -105,7 +105,7 @@ func (d *DeleteAnnotation) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	id, err := parseAnnotationIDForExecute(spec.AnnotationID)
+	id, err := parseAnnotationIDForExecute(spec.Annotation)
 	if err != nil {
 		return err
 	}
@@ -155,17 +155,20 @@ func decodeDeleteAnnotationSpec(config any) (DeleteAnnotationSpec, error) {
 	if !ok {
 		return DeleteAnnotationSpec{}, fmt.Errorf("error decoding configuration: expected map")
 	}
-	raw, ok := m["annotationId"]
+	raw, ok := m["annotation"]
+	if !ok || raw == nil {
+		raw, ok = m["annotationId"]
+	}
 	if !ok || raw == nil {
 		return DeleteAnnotationSpec{}, nil
 	}
-	return DeleteAnnotationSpec{AnnotationID: normalizeAnnotationIDRaw(raw)}, nil
+	return DeleteAnnotationSpec{Annotation: normalizeAnnotationIDRaw(raw)}, nil
 }
 
 func validateDeleteAnnotationSpec(spec DeleteAnnotationSpec) error {
-	s := strings.TrimSpace(spec.AnnotationID)
+	s := strings.TrimSpace(spec.Annotation)
 	if s == "" {
-		return errors.New("annotationId is required")
+		return errors.New("annotation is required")
 	}
 	if isExpressionValue(s) {
 		return nil
@@ -201,10 +204,10 @@ func normalizeAnnotationIDRaw(raw any) string {
 func parseAnnotationIDForExecute(s string) (int64, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, errors.New("annotationId is required")
+		return 0, errors.New("annotation is required")
 	}
 	if isExpressionValue(s) {
-		return 0, errors.New("annotationId must resolve to a numeric id before execution")
+		return 0, errors.New("annotation must resolve to a numeric id before execution")
 	}
 	return parseAnnotationIDString(s)
 }
@@ -212,11 +215,11 @@ func parseAnnotationIDForExecute(s string) (int64, error) {
 func parseAnnotationIDString(s string) (int64, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, errors.New("annotationId is required")
+		return 0, errors.New("annotation is required")
 	}
 	id, err := strconv.ParseInt(s, 10, 64)
 	if err != nil || id <= 0 {
-		return 0, errors.New("annotationId must be a positive integer")
+		return 0, errors.New("annotation must be a positive integer")
 	}
 	return id, nil
 }
