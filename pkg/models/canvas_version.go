@@ -80,7 +80,7 @@ func ListPublishedCanvasVersionsInTransaction(
 ) ([]CanvasVersion, error) {
 	query := tx.
 		Where("workflow_id = ?", workflowID).
-		Where("published_at IS NOT NULL").
+		Where("state = ?", CanvasVersionStatePublished).
 		Order("published_at DESC, created_at DESC")
 
 	if before != nil {
@@ -104,7 +104,7 @@ func CountPublishedCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID
 	err := tx.
 		Model(&CanvasVersion{}).
 		Where("workflow_id = ?", workflowID).
-		Where("published_at IS NOT NULL").
+		Where("state = ?", CanvasVersionStatePublished).
 		Count(&count).
 		Error
 	if err != nil {
