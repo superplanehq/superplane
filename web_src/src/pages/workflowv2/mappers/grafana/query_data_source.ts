@@ -1,11 +1,10 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -16,6 +15,7 @@ import type { QueryDataSourceConfiguration } from "./types";
 import { truncate } from "../safeMappers";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestamp } from "../utils";
+import { baseEventSections } from "./base";
 
 export const queryDataSourceMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -41,8 +41,8 @@ export const queryDataSourceMapper: ComponentBaseMapper = {
       "Queried At": formatTimestamp(context.execution.createdAt),
     };
 
-    if (configuration?.dataSourceUid) {
-      details["Data Source"] = configuration.dataSourceUid;
+    if (configuration?.dataSource) {
+      details["Data Source"] = configuration.dataSource;
     }
 
     if (configuration?.query) {
@@ -86,8 +86,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as QueryDataSourceConfiguration;
 
-  if (configuration?.dataSourceUid) {
-    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSourceUid}` });
+  if (configuration?.dataSource) {
+    metadata.push({ icon: "database", label: `Data Source: ${configuration.dataSource}` });
   }
 
   if (configuration?.query) {
@@ -99,28 +99,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "funnel", label: `Format: ${configuration.format}` });
   }
 
-  if (configuration?.timezone) {
-    metadata.push({ icon: "schedule", label: `Timezone: ${configuration.timezone}` });
-  }
-
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const eventTitle = title || "Trigger event";
-
-  return [
-    {
-      receivedAt: execution.createdAt ? new Date(execution.createdAt) : undefined,
-      eventTitle: eventTitle,
-      eventSubtitle: execution.createdAt ? renderTimeAgo(new Date(execution.createdAt)) : "-",
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent?.id || "",
-    },
-  ];
 }
 
 function buildQueryResultSummary(responseData: Record<string, unknown>): Record<string, string> {

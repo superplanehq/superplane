@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -9,10 +10,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const resourceTypeDataSource = "data-source"
-const resourceTypeAlertRule = "alert-rule"
-const resourceTypeContactPoint = "contact-point"
-const resourceTypeRuleGroup = "rule-group"
+const (
+	resourceTypeDataSource   = "data-source"
+	resourceTypeAlertRule    = "alert-rule"
+	resourceTypeContactPoint = "contact-point"
+	resourceTypeRuleGroup    = "rule-group"
+	resourceTypeDashboard    = "dashboard"
+	resourceTypePanel        = "panel"
+	resourceTypeAnnotation   = "annotation"
+)
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("grafana", &Grafana{}, &GrafanaWebhookHandler{})
@@ -33,7 +39,7 @@ func (g *Grafana) Icon() string {
 }
 
 func (g *Grafana) Description() string {
-	return "Connect Grafana alerts, alert rules, and data queries to SuperPlane workflows"
+	return "Connect Grafana alerts, alert rules, annotations, and data queries to SuperPlane workflows"
 }
 
 func (g *Grafana) Instructions() string {
@@ -88,6 +94,9 @@ func (g *Grafana) Components() []core.Component {
 		&ListAlertRules{},
 		&QueryDataSource{},
 		&UpdateAlertRule{},
+		&CreateAnnotation{},
+		&ListAnnotations{},
+		&DeleteAnnotation{},
 	}
 }
 
@@ -116,8 +125,8 @@ func (g *Grafana) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
-	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule, resourceTypeContactPoint, resourceTypeRuleGroup:
-		// Known types require a Grafana API client.
+	case resourceTypeFolder, resourceTypeDataSource, resourceTypeAlertRule, resourceTypeContactPoint, resourceTypeRuleGroup,
+		resourceTypeDashboard, resourceTypePanel, resourceTypeAnnotation:
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -151,7 +160,6 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 		if err != nil {
 			return nil, err
 		}
-		// Contact point name is the value used in notification_settings.receiver, so use name as ID.
 		return grafanaResourcesFromList(resourceTypeContactPoint, contactPoints, func(cp ContactPoint) string { return cp.Name }, func(cp ContactPoint) string { return cp.Name }), nil
 	case resourceTypeRuleGroup:
 		groups, err := client.ListRuleGroups()
@@ -159,21 +167,89 @@ func (g *Grafana) ListResources(resourceType string, ctx core.ListResourcesConte
 			return nil, err
 		}
 		resources := make([]core.IntegrationResource, 0, len(groups))
-		for _, g := range groups {
+		for _, group := range groups {
 			resources = append(resources, core.IntegrationResource{
 				Type: resourceTypeRuleGroup,
-				Name: g,
-				ID:   g,
+				Name: group,
+				ID:   group,
 			})
 		}
 		return resources, nil
-	}
+	case resourceTypeDashboard:
+		dashboards, err := client.SearchDashboards()
+		if err != nil {
+			return nil, err
+		}
+		return grafanaResourcesFromList(resourceTypeDashboard, dashboards, func(d DashboardSearchHit) string { return d.UID }, func(d DashboardSearchHit) string { return d.Title }), nil
+	case resourceTypePanel:
+		dashboardUID := strings.TrimSpace(ctx.Parameters["dashboard"])
+		if dashboardUID == "" {
+			dashboardUID = strings.TrimSpace(ctx.Parameters["dashboardUID"])
+		}
+		if dashboardUID == "" {
+			return []core.IntegrationResource{}, nil
+		}
 
-	return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
+		panels, err := client.ListDashboardPanels(dashboardUID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(panels))
+		for _, panel := range panels {
+			if panel.ID <= 0 {
+				continue
+			}
+
+			name := strings.TrimSpace(panel.Title)
+			if name == "" {
+				name = fmt.Sprintf("Panel %d", panel.ID)
+			}
+
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypePanel,
+				Name: name,
+				ID:   strconv.FormatInt(panel.ID, 10),
+			})
+		}
+
+		return resources, nil
+	case resourceTypeAnnotation:
+		annotations, err := client.ListAnnotations(nil, "", nil, 0, 0, 5000)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(annotations))
+		for _, annotation := range annotations {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceTypeAnnotation,
+				Name: formatAnnotationResourceName(annotation),
+				ID:   strconv.FormatInt(annotation.ID, 10),
+			})
+		}
+
+		return resources, nil
+	default:
+		return nil, fmt.Errorf("internal error: unhandled grafana resource type %q", resourceType)
+	}
 }
 
-// grafanaResourcesFromList maps Grafana API list rows to workflow integration resources.
-// Empty UIDs are skipped; empty display names fall back to the UID.
+func formatAnnotationResourceName(a Annotation) string {
+	text := strings.TrimSpace(a.Text)
+	const maxRunes = 72
+	if text != "" {
+		r := []rune(text)
+		if len(r) > maxRunes {
+			text = string(r[:maxRunes]) + "…"
+		}
+	}
+	if text == "" {
+		return fmt.Sprintf("#%d", a.ID)
+	}
+	return fmt.Sprintf("#%d · %s", a.ID, text)
+}
+
 func grafanaResourcesFromList[T any](resourceType string, items []T, idOf func(T) string, nameOf func(T) string) []core.IntegrationResource {
 	resources := make([]core.IntegrationResource, 0, len(items))
 	for _, item := range items {

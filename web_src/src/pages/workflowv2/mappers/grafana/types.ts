@@ -27,11 +27,10 @@ export interface OnAlertFiringConfiguration {
 }
 
 export interface QueryDataSourceConfiguration {
-  dataSourceUid: string;
+  dataSource: string;
   query: string;
   timeFrom?: string;
   timeTo?: string;
-  timezone?: string;
   format?: string;
 }
 
@@ -115,4 +114,59 @@ export interface ListAlertRulesNodeMetadata {
 
 export interface ListAlertRulesOutput {
   alertRules?: GrafanaAlertRuleSummary[];
+}
+
+export interface Annotation {
+  id: number;
+  dashboardUID?: string;
+  panelId?: number;
+  time?: number;
+  timeEnd?: number;
+  text: string;
+  tags?: string[];
+  type?: string;
+}
+
+export interface CreateAnnotationConfiguration {
+  dashboard?: string;
+  panel?: string;
+  text: string;
+  tags?: string[];
+  time?: string;
+  timeEnd?: string;
+}
+
+export interface CreateAnnotationOutput {
+  id: number;
+  url?: string;
+}
+
+export interface ListAnnotationsConfiguration {
+  dashboard?: string;
+  panel?: string;
+  text?: string;
+  tags?: string[];
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface ListAnnotationsOutput {
+  annotations: Annotation[];
+  from?: string;
+  to?: string;
+}
+
+export interface DeleteAnnotationConfiguration {
+  annotation?: string;
+}
+
+export interface DeleteAnnotationOutput {
+  id: number;
+  deleted: boolean;
+}
+
+export interface AnnotationNodeMetadata {
+  dashboardTitle?: string;
+  annotationLabel?: string;
 }

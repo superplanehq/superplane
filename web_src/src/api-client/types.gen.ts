@@ -1006,6 +1006,7 @@ export type OrganizationsOrganizationLimits = {
   retentionWindowDays?: number;
   maxEventsPerMonth?: string;
   maxIntegrations?: number;
+  maxAgentTokensPerMonth?: string;
 };
 
 export type OrganizationsOrganizationMetadata = {
@@ -1023,6 +1024,10 @@ export type OrganizationsOrganizationUsage = {
   eventBucketCapacity?: number;
   eventBucketLastUpdatedAt?: string;
   nextEventBucketDecreaseAt?: string;
+  agentTokenBucketLevel?: number;
+  agentTokenBucketCapacity?: number;
+  agentTokenBucketLastUpdatedAt?: string;
+  nextAgentTokenBucketDecreaseAt?: string;
 };
 
 export type OrganizationsRemoveInvitationResponse = {

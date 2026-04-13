@@ -5,6 +5,7 @@ from pydantic_evals import Case, Dataset
 import evals.evaluators as evals
 
 dataset = Dataset(
+    evaluators=(evals.ToolCalled("get_canvas"),),
     cases=[
         Case(
             name="manual_run_then_two_noops",

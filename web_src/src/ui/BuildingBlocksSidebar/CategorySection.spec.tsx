@@ -11,7 +11,6 @@ function createCategory(name: string): BuildingBlockCategory {
         name: "smtp.send",
         label: "Send Email",
         type: "component",
-        componentSubtype: "action",
         integrationName: "smtp",
       },
     ],
