@@ -97,7 +97,7 @@ function buildAiConversationItems({
       if (showToolsInlineForLiveTurn) {
         for (let k = groupStart; k < j; k++) {
           const toolMessage = messages[k];
-          items.push(<AiMessage key={toolMessage.id} message={toolMessage} />);
+          items.push(<AiMessage key={toolMessage.id} message={toolMessage} animate />);
         }
       } else {
         const toolGroup = messages.slice(groupStart, j);
