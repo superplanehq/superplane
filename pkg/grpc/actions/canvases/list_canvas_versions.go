@@ -73,11 +73,7 @@ func ListCanvasVersionsPaginated(
 			return draftErr
 		}
 
-		version, versionErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, draft.VersionID)
-		if versionErr != nil {
-			return versionErr
-		}
-		draftVersion = version
+		draftVersion = draft
 		return nil
 	})
 	if err != nil {
